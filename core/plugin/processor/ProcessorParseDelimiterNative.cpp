@@ -289,33 +289,33 @@ bool ProcessorParseDelimiterNative::ProcessEvent(const StringView& logPath,
                      "columns count, parsed",
                      parsedColCount)("required", mKeys.size())("log", buffer)("project", GetContext().GetProjectName())(
                         "logstore", GetContext().GetLogstoreName())("file", logPath));
-                GetContext().GetAlarm().SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                  std::string("keys count unmatch columns count :")
-                                                      + ToString(parsedColCount) + ", required:"
-                                                      + ToString(mKeys.size()) + ", logs:" + buffer.to_string(),
-                                                  GetContext().GetRegion(),
-                                                  GetContext().GetProjectName(),
-                                                  GetContext().GetConfigName(),
-                                                  GetContext().GetLogstoreName());
+                GetContext().GetAlarm().SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                         std::string("keys count unmatch columns count :")
+                                                             + ToString(parsedColCount) + ", required:"
+                                                             + ToString(mKeys.size()) + ", logs:" + buffer.to_string(),
+                                                         GetContext().GetRegion(),
+                                                         GetContext().GetProjectName(),
+                                                         GetContext().GetConfigName(),
+                                                         GetContext().GetLogstoreName());
                 parseSuccess = false;
             }
         } else {
-            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                   std::string("parse delimiter log fail")
-                                                       + ", logs:" + buffer.to_string(),
-                                                   GetContext().GetRegion(),
-                                                   GetContext().GetProjectName(),
-                                                   GetContext().GetConfigName(),
-                                                   GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                          std::string("parse delimiter log fail")
+                                                              + ", logs:" + buffer.to_string(),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
             parseSuccess = false;
         }
     } else {
-        AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                               "no column keys defined",
-                                               GetContext().GetRegion(),
-                                               GetContext().GetProjectName(),
-                                               GetContext().GetConfigName(),
-                                               GetContext().GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                      "no column keys defined",
+                                                      GetContext().GetRegion(),
+                                                      GetContext().GetProjectName(),
+                                                      GetContext().GetConfigName(),
+                                                      GetContext().GetLogstoreName());
         LOG_WARNING(sLogger,
                     ("parse delimiter log fail", "no column keys defined")("project", GetContext().GetProjectName())(
                         "logstore", GetContext().GetLogstoreName())("file", logPath));

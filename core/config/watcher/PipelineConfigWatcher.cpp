@@ -290,13 +290,13 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
             CollectionConfig config(configName, std::move(configDetail), filepath);
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
-                AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                       "new config found but invalid: skip current object, config: "
-                                                           + configName,
-                                                       config.mRegion,
-                                                       config.mProject,
-                                                       configName,
-                                                       config.mLogstore);
+                AlarmManager::GetInstance()->SendAlarmError(
+                    CATEGORY_CONFIG_ALARM,
+                    "new config found but invalid: skip current object, config: " + configName,
+                    config.mRegion,
+                    config.mProject,
+                    configName,
+                    config.mLogstore);
                 return false;
             }
             PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
@@ -308,7 +308,7 @@ bool PipelineConfigWatcher::CheckAddedConfig(const string& configName,
             TaskConfig config(configName, std::move(configDetail), filepath);
             if (!config.Parse()) {
                 LOG_ERROR(sLogger, ("new config found but invalid", "skip current object")("config", configName));
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmError(
                     CATEGORY_CONFIG_ALARM, "new config found but invalid: skip current object, config: " + configName);
                 return false;
             }
@@ -336,7 +336,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                     LOG_ERROR(sLogger,
                               ("existing invalid config modified and remains invalid",
                                "skip current object")("config", configName));
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmError(
                         CATEGORY_CONFIG_ALARM,
                         "existing invalid config modified and remains invalid: skip current object, config: "
                             + configName,
@@ -356,7 +356,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                     LOG_ERROR(sLogger,
                               ("existing valid config modified and becomes invalid",
                                "keep current pipeline running")("config", configName));
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmError(
                         CATEGORY_CONFIG_ALARM,
                         "existing valid config modified and becomes invalid: skip current object, config: "
                             + configName,
@@ -383,7 +383,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                     LOG_ERROR(sLogger,
                               ("existing invalid config modified and remains invalid",
                                "skip current object")("config", configName));
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmError(
                         CATEGORY_CONFIG_ALARM,
                         "existing invalid config modified and remains invalid: skip current object, config: "
                             + configName);
@@ -399,7 +399,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                     LOG_ERROR(sLogger,
                               ("existing valid config modified and becomes invalid",
                                "keep current task running")("config", configName));
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmError(
                         CATEGORY_CONFIG_ALARM,
                         "existing valid config modified and becomes invalid: skip current object, config: "
                             + configName);

@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <stdio.h>
 
 #include <atomic>
@@ -100,8 +101,15 @@ enum AlarmType {
     ALL_LOGTAIL_ALARM_NUM = 69
 };
 
+enum AlarmLevel {
+    ALARM_LEVEL_WARNING = 1, // 单点报错，不影响整体流程
+    ALARM_LEVEL_ERROR = 2, // 对主要流程有影响，如果不优化处理可能导致风险
+    ALARM_LEVEL_CRITICAL = 3, // 采集配置/重要模块不可用;对Agent稳定性造成影响;导致资损（数据丢失等）
+};
+
 struct AlarmMessage {
     std::string mMessageType;
+    std::string mLevel;
     std::string mProjectName;
     std::string mCategory;
     std::string mConfig;
@@ -109,12 +117,14 @@ struct AlarmMessage {
     int32_t mCount;
 
     AlarmMessage(const std::string& type,
+                 const std::string& level,
                  const std::string& projectName,
                  const std::string& category,
                  const std::string& config,
                  const std::string& message,
                  const int32_t count)
         : mMessageType(type),
+          mLevel(level),
           mProjectName(projectName),
           mCategory(category),
           mConfig(config),
@@ -130,12 +140,30 @@ public:
         return &instance;
     }
 
-    void SendAlarm(const AlarmType alarmType,
-                   const std::string& message,
-                   const std::string& region = "",
-                   const std::string& projectName = "",
-                   const std::string& config = "",
-                   const std::string& category = "");
+    void SendAlarmWarning(const AlarmType& alarmType,
+                          const std::string& message,
+                          const std::string& region = "",
+                          const std::string& projectName = "",
+                          const std::string& config = "",
+                          const std::string& category = "") {
+        SendAlarm(alarmType, ALARM_LEVEL_WARNING, message, region, projectName, config, category);
+    }
+    void SendAlarmError(const AlarmType& alarmType,
+                        const std::string& message,
+                        const std::string& region = "",
+                        const std::string& projectName = "",
+                        const std::string& config = "",
+                        const std::string& category = "") {
+        SendAlarm(alarmType, ALARM_LEVEL_ERROR, message, region, projectName, config, category);
+    }
+    void SendAlarmCritical(const AlarmType& alarmType,
+                           const std::string& message,
+                           const std::string& region = "",
+                           const std::string& projectName = "",
+                           const std::string& config = "",
+                           const std::string& category = "") {
+        SendAlarm(alarmType, ALARM_LEVEL_CRITICAL, message, region, projectName, config, category);
+    }
     // only be called when prepare to exit
     void ForceToSend();
     bool IsLowLevelAlarmValid();
@@ -147,6 +175,14 @@ private:
 
     AlarmManager();
     ~AlarmManager() = default;
+
+    void SendAlarm(const AlarmType& alarmType,
+                   const AlarmLevel& level,
+                   const std::string& message,
+                   const std::string& region,
+                   const std::string& projectName,
+                   const std::string& config,
+                   const std::string& category);
 
     // without lock
     AlarmVector* MakesureLogtailAlarmMapVecUnlocked(const std::string& region);

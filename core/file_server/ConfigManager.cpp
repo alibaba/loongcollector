@@ -150,12 +150,13 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
 
         LOG_ERROR(sLogger, ("Open dir fail", path.c_str())("errno", ErrnoToString(err)));
         return false;
@@ -324,12 +325,13 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
         LOG_WARNING(sLogger, ("Open dir fail", path.c_str())("errno", err));
         return;
     }
@@ -340,14 +342,14 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
             LOG_WARNING(sLogger,
                         ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
                                                                                           config.first->GetBasePath()));
-            AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("too many sub directoried for path:" + path
-                                                          + " dirCount: " + ToString(dirCount) + " basePath"
-                                                          + config.first->GetBasePath()),
-                                                   config.second->GetRegion(),
-                                                   config.second->GetProjectName(),
-                                                   config.second->GetConfigName(),
-                                                   config.second->GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmError(STAT_LIMIT_ALARM,
+                                                        string("too many sub directoried for path:" + path
+                                                               + " dirCount: " + ToString(dirCount) + " basePath"
+                                                               + config.first->GetBasePath()),
+                                                        config.second->GetRegion(),
+                                                        config.second->GetProjectName(),
+                                                        config.second->GetConfigName(),
+                                                        config.second->GetLogstoreName());
             break;
         }
         if (!ent.IsDir())
@@ -490,12 +492,13 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         int err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
 
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
@@ -542,12 +545,13 @@ bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryC
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
     }
@@ -656,7 +660,7 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -801,7 +805,7 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -841,7 +845,7 @@ void ConfigManager::SendAllMatchAlarm(const string& path,
               ("file", path + '/' + name)("include in too many configs", allConfig.size())(
                   "max multi config size", maxMultiConfigSize)("allconfigs", allConfigNames));
     for (auto iter = allConfig.begin(); iter != allConfig.end(); ++iter)
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmError(
             TOO_MANY_CONFIG_ALARM,
             path + '/' + name + " include in too many configs:" + ToString(allConfig.size())
                 + ", max multi config size : " + ToString(maxMultiConfigSize) + ", allmatch: " + allConfigNames,

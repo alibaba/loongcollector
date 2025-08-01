@@ -103,7 +103,7 @@ func (r *InputSystem) Init(context pipeline.Context) (int, error) {
 	// mount the host proc path
 	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "READ_PROC_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), "READ_PROC_ALARM", "err", err)
 		return 0, err
 	}
 	r.fs = &fs
@@ -118,11 +118,11 @@ func (r *InputSystem) CollectTCPStats(collector pipeline.Collector, stat *net.Pr
 
 	tcp, errTCP := r.fs.NetTCP()
 	if errTCP != nil {
-		logger.Error(r.context.GetRuntimeContext(), "READ_PTOCTCP_ALARM", "err", errTCP)
+		logger.Warning(r.context.GetRuntimeContext(), "READ_PTOCTCP_ALARM", "err", errTCP)
 	}
 	tcp6, errTCP6 := r.fs.NetTCP6()
 	if errTCP6 != nil {
-		logger.Error(r.context.GetRuntimeContext(), "READ_PTOCTCP6_ALARM", "err", errTCP6)
+		logger.Warning(r.context.GetRuntimeContext(), "READ_PTOCTCP6_ALARM", "err", errTCP6)
 	}
 	if errTCP != nil && errTCP6 != nil {
 		return
@@ -147,7 +147,7 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	// mount the host proc path
 	file, err := os.Open(containercenter.GetMountedFilePath("/proc/sys/fs/file-nr"))
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "OPEN_FILENR_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), "OPEN_FILENR_ALARM", "err", err)
 		return
 	}
 	defer func(file *os.File) {
@@ -155,12 +155,12 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 	}(file)
 	content, err := io.ReadAll(file)
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "READ_FILENR_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), "READ_FILENR_ALARM", "err", err)
 		return
 	}
 	parts := bytes.Split(bytes.TrimSpace(content), []byte("\u0009"))
 	if len(parts) < 3 {
-		logger.Error(r.context.GetRuntimeContext(), "FILENR_PATTERN_ALARM", "want", 3, "got", len(parts))
+		logger.Warning(r.context.GetRuntimeContext(), "FILENR_PATTERN_ALARM", "want", 3, "got", len(parts))
 		return
 	}
 	allocated, _ := strconv.ParseFloat(string(parts[0]), 64)
@@ -175,7 +175,7 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 	// mount the host proc path
 	file, err := os.Open(containercenter.GetMountedFilePath("/proc/1/mounts"))
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "OPEN_1MOUNTS_ALARM", "err", err)
+		logger.Warning(r.context.GetRuntimeContext(), "OPEN_1MOUNTS_ALARM", "err", err)
 		return
 	}
 	defer func(file *os.File) {
@@ -186,7 +186,7 @@ func (r *InputSystem) CollectDiskUsage(collector pipeline.Collector) {
 		text := scanner.Text()
 		parts := strings.Fields(text)
 		if len(parts) < 4 {
-			logger.Error(r.context.GetRuntimeContext(), "READ_1MOUNTS_ALARM", "got", text)
+			logger.Warning(r.context.GetRuntimeContext(), "READ_1MOUNTS_ALARM", "got", text)
 			return
 		}
 		if r.excludeDiskFsTypeRegex != nil && r.excludeDiskFsTypeRegex.MatchString(parts[2]) {

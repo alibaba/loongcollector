@@ -50,21 +50,21 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 	// check SourceKey
 	if p.SourceKey == "" {
 		err = errors.New("parameter SourceKey should not be empty")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 		return err
 	}
 
 	// check Method
 	if p.Method != "const" && p.Method != "md5" {
 		err = errors.New("parameter Method should be \"const\" or \"md5\"")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 		return err
 	}
 
 	// check Method
 	if p.Method == "const" && p.ReplaceString == "" {
 		err = errors.New("parameter ReplaceString should not be empty when Method is \"const\"")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 		return err
 	}
 
@@ -75,31 +75,31 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 		// check RegexBegin
 		if p.RegexBegin == "" {
 			err = errors.New("need parameter RegexBegin")
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
 		}
 		p.regexBegin, err = regexp2.Compile(p.RegexBegin, regexp2.RE2)
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
 		}
 
 		// check RegexContent
 		if p.RegexContent == "" {
 			err = errors.New("need parameter RegexContent")
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
 		}
 		p.regexContent, err = regexp2.Compile(p.RegexContent, regexp2.RE2)
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
 		}
 
 		return nil
 	default:
 		err = errors.New("parameter Match should be \"full\" or \"regex\"")
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 		return err
 	}
 }

@@ -36,7 +36,7 @@ func NewProducers(context context.Context, maxProducers int) *Producers {
 		producer := value
 		err := close(producer)
 		if err != nil {
-			logger.Error(context, "close pulsar producer error", err)
+			logger.Warning(context, "close pulsar producer error", err)
 			return
 		}
 	})

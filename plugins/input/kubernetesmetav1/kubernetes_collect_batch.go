@@ -29,7 +29,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 	jobLister := lister.(batch.JobLister)
 	jobs, err := jobLister.List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	if in.Job {
@@ -64,7 +64,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 func (in *InputKubernetesMeta) collectCronJobs(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	cronJobs, err := lister.(batchbeta.CronJobLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	if in.CronJob {

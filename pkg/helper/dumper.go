@@ -120,7 +120,7 @@ func (d *Dumper) doDumpFile() {
 			if time.Now().Hour() != lastHour {
 				file, cerr := cutFile()
 				if cerr != nil {
-					logger.Error(context.Background(), "DUMP_FILE_ALARM", "cut new file error", err)
+					logger.Warning(context.Background(), "DUMP_FILE_ALARM", "cut new file error", err)
 				} else {
 					offset, _ = file.Seek(0, io.SeekEnd)
 					f = file

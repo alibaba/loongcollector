@@ -51,7 +51,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if k.Brokers == nil || len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
 	config := sarama.NewConfig()
@@ -80,13 +80,13 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	case "random":
 		partitioner = sarama.NewRandomPartitioner
 	default:
-		logger.Error(k.context.GetRuntimeContext(), "INVALID_KAFKA_PARTITIONER", "invalid PartitionerType, use RandomPartitioner instead, type", k.PartitionerType)
+		logger.Warning(k.context.GetRuntimeContext(), "INVALID_KAFKA_PARTITIONER", "invalid PartitionerType, use RandomPartitioner instead, type", k.PartitionerType)
 	}
 	config.Producer.Partitioner = partitioner
 	config.Producer.Timeout = 5 * time.Second
 	producer, err := sarama.NewAsyncProducer(k.Brokers, config)
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
 	SIGTERM := make(chan bool)
@@ -97,7 +97,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 			select {
 			case err := <-errors:
 				if err != nil {
-					logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
+					logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
 				}
 			case <-success:
 				// Do Nothing
