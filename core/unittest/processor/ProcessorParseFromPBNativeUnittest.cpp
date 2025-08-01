@@ -43,11 +43,11 @@ public:
 private:
     void prepareValidProcessor(ProcessorParseFromPBNative&);
 
-    void generateValidSpanData(PipelineEventGroup&);
+    void generateValidSpanData(PipelineEventGroup&, std::map<std::string, std::string> tags = {});
     void generateInvalidSpanData(PipelineEventGroup&);
     void generateNonRawEventData(PipelineEventGroup&);
 
-    void assertValidSpanData(const EventsContainer&, int32_t offset);
+    void assertValidSpanData(const EventsContainer&);
 
     void generateHttpServerValidSpanData(logtail::models::PipelineEventGroup&);
     void generateNoSQLValidSpanData(logtail::models::PipelineEventGroup&);
@@ -91,21 +91,25 @@ void ProcessorParseFromPBNativeUnittest::TestInit() {
     }
 }
 
+// 1 pipelineEventGroup with 1 raw event
 void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
     ProcessorParseFromPBNative processor;
     this->prepareValidProcessor(processor);
 
     // Prepare event group with raw span data
+    std::vector<PipelineEventGroup> eventGroupList;
     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
     this->generateValidSpanData(eventGroup);
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)1, eventGroup.GetEvents().size());
-    processor.Process(eventGroup);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList[0].GetEvents().size());
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
-    this->assertValidSpanData(eventGroup.GetEvents(), 0);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    this->assertValidSpanData(eventGroupList[0].GetEvents());
 
     APSARA_TEST_EQUAL(uint64_t(1), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
@@ -113,23 +117,31 @@ void ProcessorParseFromPBNativeUnittest::TestProcessValidSpanData() {
     APSARA_TEST_EQUAL(uint64_t(2), processor.mOutSuccessfulEventsTotal->GetValue());
 }
 
+// 1 pipelineEventGroup with 2 raw events
 void ProcessorParseFromPBNativeUnittest::TestProcessMultiValidSpanData() {
     ProcessorParseFromPBNative processor;
     this->prepareValidProcessor(processor);
 
     // Prepare event group with raw span data
+    std::vector<PipelineEventGroup> eventGroupList;
     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
-    this->generateValidSpanData(eventGroup);
-    this->generateValidSpanData(eventGroup);
+    this->generateValidSpanData(eventGroup, {{"key1", "value1"}});
+    this->generateValidSpanData(eventGroup, {{"key2", "value2"}});
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
-    processor.Process(eventGroup);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)4, eventGroup.GetEvents().size());
-    this->assertValidSpanData(eventGroup.GetEvents(), 0);
-    this->assertValidSpanData(eventGroup.GetEvents(), 2);
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[1].GetEvents().size());
+    this->assertValidSpanData(eventGroupList[0].GetEvents());
+    APSARA_TEST_EQUAL("value1", eventGroupList[0].GetTag("key1"));
+    this->assertValidSpanData(eventGroupList[1].GetEvents());
+    APSARA_TEST_EQUAL("value2", eventGroupList[1].GetTag("key2"));
 
     APSARA_TEST_EQUAL(uint64_t(2), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
@@ -142,14 +154,15 @@ void ProcessorParseFromPBNativeUnittest::TestProcessEmptyEventGroup() {
     this->prepareValidProcessor(processor);
 
     // Prepare event group with no raw event
-    PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
-    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    std::vector<PipelineEventGroup> eventGroupList;
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    APSARA_TEST_EQUAL((size_t)0, eventGroup.GetEvents().size());
 
     // Process the event
-    processor.Process(invalidEventGroup);
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)0, eventGroupList.size());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -161,14 +174,16 @@ void ProcessorParseFromPBNativeUnittest::TestProcessNonRawEventGroup() {
     this->prepareValidProcessor(processor);
 
     // Prepare event group with non raw event
-    PipelineEventGroup nonRawEventGroup(std::make_shared<SourceBuffer>());
-    this->generateNonRawEventData(nonRawEventGroup);
+    std::vector<PipelineEventGroup> eventGroupList;
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    this->generateNonRawEventData(eventGroup);
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    processor.Process(nonRawEventGroup);
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)0, nonRawEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)0, eventGroupList.size());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutFailedEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(1), processor.mDiscardedEventsTotal->GetValue());
@@ -180,15 +195,18 @@ void ProcessorParseFromPBNativeUnittest::TestProcessInvalidProtobufData() {
     this->prepareValidProcessor(processor);
 
     // Prepare event group with invalid protobuf data
-    PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
-    this->generateInvalidSpanData(invalidEventGroup);
+    std::vector<PipelineEventGroup> eventGroupList;
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    this->generateInvalidSpanData(eventGroup);
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)1, invalidEventGroup.GetEvents().size());
-    processor.Process(invalidEventGroup);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList[0].GetEvents().size());
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)0, eventGroupList.size());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(1), processor.mOutFailedEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -200,16 +218,19 @@ void ProcessorParseFromPBNativeUnittest::TestProcessMultiInvalidProtobufData() {
     this->prepareValidProcessor(processor);
 
     // Prepare event group with multi invalid protobuf data
-    PipelineEventGroup invalidEventGroup(std::make_shared<SourceBuffer>());
-    this->generateInvalidSpanData(invalidEventGroup);
-    this->generateInvalidSpanData(invalidEventGroup);
+    std::vector<PipelineEventGroup> eventGroupList;
+    PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
+    this->generateInvalidSpanData(eventGroup);
+    this->generateInvalidSpanData(eventGroup);
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)2, invalidEventGroup.GetEvents().size());
-    processor.Process(invalidEventGroup);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)0, invalidEventGroup.GetEvents().size());
+    APSARA_TEST_EQUAL((size_t)0, eventGroupList.size());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(2), processor.mOutFailedEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(0), processor.mDiscardedEventsTotal->GetValue());
@@ -221,17 +242,21 @@ void ProcessorParseFromPBNativeUnittest::TestProcessPartialInvalidProtobufData()
     this->prepareValidProcessor(processor);
 
     // Prepare event group with partial invalid protobuf data
+    std::vector<PipelineEventGroup> eventGroupList;
     PipelineEventGroup eventGroup(std::make_shared<SourceBuffer>());
     this->generateValidSpanData(eventGroup);
     this->generateInvalidSpanData(eventGroup);
+    eventGroupList.emplace_back(std::move(eventGroup));
 
     // Process the event
-    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
-    processor.Process(eventGroup);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    processor.Process(eventGroupList);
 
     // Validate output
-    APSARA_TEST_EQUAL((size_t)2, eventGroup.GetEvents().size());
-    this->assertValidSpanData(eventGroup.GetEvents(), 0);
+    APSARA_TEST_EQUAL((size_t)1, eventGroupList.size());
+    APSARA_TEST_EQUAL((size_t)2, eventGroupList[0].GetEvents().size());
+    this->assertValidSpanData(eventGroupList[0].GetEvents());
 
     APSARA_TEST_EQUAL(uint64_t(1), processor.mOutSuccessfulEventGroupsTotal->GetValue());
     APSARA_TEST_EQUAL(uint64_t(1), processor.mOutFailedEventGroupsTotal->GetValue());
@@ -247,10 +272,15 @@ void ProcessorParseFromPBNativeUnittest::prepareValidProcessor(ProcessorParseFro
     APSARA_TEST_TRUE(processor.Init(config));
 }
 
-void ProcessorParseFromPBNativeUnittest::generateValidSpanData(logtail::PipelineEventGroup& eventGroup) {
+void ProcessorParseFromPBNativeUnittest::generateValidSpanData(logtail::PipelineEventGroup& eventGroup,
+                                                               std::map<std::string, std::string> tags) {
     logtail::models::PipelineEventGroup pbEventGroup;
     this->generateHttpServerValidSpanData(pbEventGroup);
     this->generateNoSQLValidSpanData(pbEventGroup);
+
+    for (const auto& [key, value] : tags) {
+        (*pbEventGroup.mutable_tags())[key] = value;
+    }
 
     eventGroup.AddRawEvent()->SetContent(pbEventGroup.SerializeAsString());
 }
@@ -336,9 +366,9 @@ void ProcessorParseFromPBNativeUnittest::generateNoSQLValidSpanData(logtail::mod
     *spanEvents->add_events() = pbSpan;
 }
 
-void ProcessorParseFromPBNativeUnittest::assertValidSpanData(const EventsContainer& events, int32_t offset) {
-    assertHttpServerValidSpanData(events[0 + offset]);
-    assertNoSQLValidSpanData(events[1 + offset]);
+void ProcessorParseFromPBNativeUnittest::assertValidSpanData(const EventsContainer& events) {
+    assertHttpServerValidSpanData(events[0]);
+    assertNoSQLValidSpanData(events[1]);
 }
 
 

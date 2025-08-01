@@ -31,8 +31,9 @@ public:
     static const std::vector<std::string> sSupportedProtocols;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override;
+    bool Init(const Json::Value&) override;
     void Process(PipelineEventGroup&) override;
+    void Process(std::vector<PipelineEventGroup>&) override;
 
 protected:
     bool IsSupportedEvent(const PipelineEventPtr&) const override;

@@ -69,35 +69,58 @@ bool ProcessorParseFromPBNative::Init(const Json::Value& config) {
     return true;
 }
 
+void ProcessorParseFromPBNative::Process(std::vector<PipelineEventGroup>& eventGroupList) {
+    std::vector<PipelineEventGroup> originalEventGroupList = std::move(eventGroupList);
+    eventGroupList.clear();
+
+    for (auto& rawEventGroup : originalEventGroupList) {
+        if (rawEventGroup.GetEvents().empty()) {
+            continue;
+        }
+
+        for (const auto& e : rawEventGroup.GetEvents()) {
+            if (!IsSupportedEvent(e)) {
+                LOG_WARNING(sLogger,
+                            ("unsupported event type", "pipelineEventGroup is not a RawEvent, will be discarded"));
+                ADD_COUNTER(mDiscardedEventsTotal, 1);
+                continue;
+            }
+            const auto& sourceEvent = e.Cast<RawEvent>();
+
+            std::string errMsg;
+            models::PipelineEventGroup pbGroup;
+            auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+
+            // parse event group from raw event
+            const auto& content = sourceEvent.GetContent();
+            if (!pbGroup.ParseFromArray(content.data(), content.size())
+                || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+                LOG_WARNING(sLogger,
+                            ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
+                ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+                continue;
+            }
+
+            // inherit metadata from original event group
+            // SetAllMetadata is not a deep copy, so we need to iterate and set the metadata to the new event group
+            for (const auto& [key, value] : rawEventGroup.GetAllMetadata()) {
+                eventGroup.SetMetadata(key, value);
+            }
+            ADD_COUNTER(mOutSuccessfulEventsTotal, eventGroup.GetEvents().size());
+
+            // append event group to eventGroupList
+            eventGroupList.emplace_back(std::move(eventGroup));
+            ADD_COUNTER(mOutSuccessfulEventGroupsTotal, 1);
+        }
+    }
+}
+
 void ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup) {
-    if (eventGroup.GetEvents().empty()) {
-        LOG_WARNING(sLogger, ("unsupported event group", "pipelineEventGroup is empty"));
-        return;
-    }
-
-    auto originalRawEvents = std::move(eventGroup.MutableEvents());
-    eventGroup.MutableEvents().clear();
-
-    for (const auto& e : originalRawEvents) {
-        if (!IsSupportedEvent(e)) {
-            LOG_WARNING(sLogger, ("unsupported event type", "pipelineEventGroup is not a RawEvent, will be discarded"));
-            ADD_COUNTER(mDiscardedEventsTotal, 1);
-            continue;
-        }
-        const auto& sourceEvent = e.Cast<RawEvent>();
-
-        std::string errMsg;
-        models::PipelineEventGroup pbGroup;
-        const auto& content = sourceEvent.GetContent();
-        if (!pbGroup.ParseFromArray(content.data(), content.size())
-            || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
-            LOG_WARNING(sLogger, ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
-            ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
-            continue;
-        }
-        ADD_COUNTER(mOutSuccessfulEventGroupsTotal, 1);
-    }
-    ADD_COUNTER(mOutSuccessfulEventsTotal, eventGroup.GetEvents().size());
+    LOG_ERROR(sLogger,
+              ("ProcessorParseFromPBNative error",
+               "unexpected enter in ProcessorParseFromPBNative::Process(PipelineEventGroup& eventGroup)")(
+                  "project", mContext->GetProjectName())("logstore", mContext->GetLogstoreName())(
+                  "region", mContext->GetRegion())("configName", mContext->GetConfigName()));
 }
 
 bool ProcessorParseFromPBNative::IsSupportedEvent(const PipelineEventPtr& event) const {
