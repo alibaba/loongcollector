@@ -189,7 +189,6 @@ EBPFServer::EBPFServer()
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
-    initUnifiedEpollMonitoring();
 }
 
 EBPFServer::~EBPFServer() {
@@ -202,6 +201,9 @@ void EBPFServer::Init() {
         return;
     }
     if (!mEnvMgr.AbleToLoadDyLib()) {
+        return;
+    }
+    if(!initUnifiedEpollMonitoring()) {
         return;
     }
     mInited = true;
@@ -633,16 +635,17 @@ void EBPFServer::sendEvents() {
     }
 }
 
-void EBPFServer::initUnifiedEpollMonitoring() {
+bool EBPFServer::initUnifiedEpollMonitoring() {
     mUnifiedEpollFd = epoll_create1(EPOLL_CLOEXEC);
     if (mUnifiedEpollFd < 0) {
         LOG_ERROR(sLogger, ("Failed to create unified epoll fd", strerror(errno)));
-        return;
+        return false;
     }
 
     mEpollEvents.resize(1024);
 
     LOG_INFO(sLogger, ("Unified epoll monitoring initialized", mUnifiedEpollFd));
+    return true;
 }
 
 void EBPFServer::registerPluginPerfBuffers(PluginType type) {

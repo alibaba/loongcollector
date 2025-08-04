@@ -129,7 +129,7 @@ private:
     void handleEpollEvents();
 
     // Unified epoll monitoring methods
-    void initUnifiedEpollMonitoring();
+    bool initUnifiedEpollMonitoring();
     void registerPluginPerfBuffers(PluginType type);
     void unregisterPluginPerfBuffers(PluginType type);
     void cleanupUnifiedEpollMonitoring();

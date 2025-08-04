@@ -604,6 +604,7 @@ void eBPFServerUnittest::TestEbpfParameters() {
 
 void eBPFServerUnittest::TestUnifiedEpoll() {
     auto* server = ebpf::EBPFServer::GetInstance();
+    server->Init();
     APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
 
     std::string configStr = R"(
@@ -719,11 +720,11 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
 }
 
 void eBPFServerUnittest::TestRetryCache() {
-    ebpf::EBPFServer::GetInstance()->Init();
-    auto& eventCache = ebpf::EBPFServer::GetInstance()->EventCache();
+    auto& server = *ebpf::EBPFServer::GetInstance();
+    server.Init();
+    auto& eventCache = server.EventCache();
     APSARA_TEST_EQUAL(0UL, eventCache.Size());
 
-    auto& server = *ebpf::EBPFServer::GetInstance();
     auto initialRetryTime = server.mLastEventCacheRetryTime;
     server.handleEventCache();
     APSARA_TEST_GE(server.mLastEventCacheRetryTime, initialRetryTime);
