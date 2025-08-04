@@ -14,12 +14,11 @@
 
 
 #include <mutex>
-#include "_thirdparty/coolbpf/src/net.h"
+#include <regex>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>
 #pragma GCC diagnostic pop
-#include <regex>
 
 #include "ebpf/include/export.h"
 
@@ -201,11 +200,6 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 
             // TODO
             if (config->mEnableCidFilter) {
-                // if (config->mCidOffset <= 0) {
-                //     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                //              "offset invalid!! skip cid filter... offset %d\n",
-                //              config->mCidOffset);
-                // }
                 struct self_runtime_info info;
                 int prefixLen = 0;
                 // get self info ...
