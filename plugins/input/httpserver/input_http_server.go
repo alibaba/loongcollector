@@ -278,7 +278,7 @@ func (s *ServiceHTTP) start() error {
 		logger.Info(s.context.GetRuntimeContext(), "http server start", s.Address, "listener", listener.Addr().String())
 		err := server.Serve(listener)
 		if err != nil {
-			logger.Error(s.context.GetRuntimeContext(), "INIT_SERVER_ARMAR", "err", err.Error())
+			logger.Warning(s.context.GetRuntimeContext(), "INIT_SERVER_ARMAR", "err", err.Error())
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.ShutdownTimeoutSec)*time.Second)
 		defer cancel()

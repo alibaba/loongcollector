@@ -66,7 +66,7 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 	case MethodRegex:
 		p.re, err = regexp2.Compile(p.Match, regexp2.RE2)
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Match)
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Match)
 			return err
 		}
 	case MethodUnquote:
@@ -111,7 +111,7 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 				newContVal = cont.Value
 			}
 			if err != nil {
-				logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "process log error", err)
+				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "process log error", err)
 				newContVal = cont.Value
 			}
 			if len(p.DestKey) > 0 {

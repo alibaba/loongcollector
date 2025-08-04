@@ -120,7 +120,7 @@ func (s *SkywalkingHTTPServerInput) registerErrorLogsHandler(handler errorLogsHa
 		for dec.More() {
 			var result map[string]interface{}
 			if e := dec.Decode(&result); e != nil {
-				logger.Error(s.context.GetRuntimeContext(), "Failed to decode error log", e)
+				logger.Warning(s.context.GetRuntimeContext(), "Failed to decode error log", e)
 				continue
 			} else {
 				d, _ := json.Marshal(result)
@@ -202,7 +202,7 @@ func (s *SkywalkingHTTPServerInput) registerTraceSegmentsHandler(handler traceSe
 		for dec.More() {
 			var result map[string]interface{}
 			if e := dec.Decode(&result); e != nil {
-				logger.Error(s.context.GetRuntimeContext(), "Failed to decode error log", e)
+				logger.Warning(s.context.GetRuntimeContext(), "Failed to decode error log", e)
 				continue
 			} else {
 				d, _ := json.Marshal(result)
@@ -242,7 +242,7 @@ func (s *SkywalkingHTTPServerInput) registerHandler(parser parameterParser, hand
 
 func (s *SkywalkingHTTPServerInput) writeResponse(writer http.ResponseWriter, data []byte) {
 	if _, e := writer.Write(data); e != nil {
-		logger.Error(s.context.GetRuntimeContext(), "Failed to write response", e)
+		logger.Warning(s.context.GetRuntimeContext(), "Failed to write response", e)
 	}
 }
 

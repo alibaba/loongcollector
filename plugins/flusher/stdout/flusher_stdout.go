@@ -79,7 +79,7 @@ func (p *FlusherStdout) Init(context pipeline.Context) error {
 		var err error
 		p.outLogger, err = seelog.LoggerFromConfigAsString(fmt.Sprintf(flushMsg, pattern))
 		if err != nil {
-			logger.Error(p.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init stdout flusher fail, error", err)
+			logger.Warning(p.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init stdout flusher fail, error", err)
 			p.outLogger = seelog.Disabled
 		}
 	}

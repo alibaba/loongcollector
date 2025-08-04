@@ -31,6 +31,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input/udpserver"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
@@ -47,7 +48,7 @@ func GetJmxFetchManager(agentDirPath string) *Manager {
 	once.Do(func() {
 		manager = createManager(agentDirPath)
 		// don't init the collector with struct because the collector depends on the bindMeta.
-		util.RegisterAlarm("jmxfetch", manager.managerMeta.GetAlarm())
+		selfmonitor.RegisterAlarm("jmxfetch", manager.managerMeta.GetAlarm())
 		if manager.autoInstall() || manager.manualInstall() {
 			manager.initSuccess = manager.initConfDir()
 		}
@@ -142,7 +143,7 @@ func (m *Manager) Register(key string, configs map[string]*InstanceInner, newGcM
 	var todoAddCfgs, todoDeleteCfgs bool
 	cfg, ok := m.allLoadedCfgs[key]
 	if !ok {
-		logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "cannot find instance key", key)
+		logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "cannot find instance key", key)
 		return
 	}
 	for key := range cfg.instances {
@@ -173,17 +174,17 @@ func (m *Manager) startServer() {
 	}
 	if !m.server.IsRunning() {
 		if err := m.server.Start(); err != nil {
-			logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "start jmx server err", err)
+			logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "start jmx server err", err)
 		} else {
 			p, err := m.checkJavaPath(m.javaPath)
 			if err != nil {
-				logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "java path", m.javaPath, "err", err)
+				logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "java path", m.javaPath, "err", err)
 				return
 			}
 			logger.Infof(m.managerMeta.GetContext(), "find jdk path: %s", p)
 			err = m.installScripts(p)
 			if err != nil {
-				logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "jmxfetch script install fail", err)
+				logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "jmxfetch script install fail", err)
 				return
 			}
 			logger.Info(m.managerMeta.GetContext(), "install jmx scripts success")
@@ -294,14 +295,14 @@ func (m *Manager) updateFiles(key string, userCfg *Cfg) {
 	cfg["instances"] = instances
 	bytes, err := yaml.Marshal(cfg)
 	if err != nil {
-		logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "cannot convert to yaml bytes", err)
+		logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "cannot convert to yaml bytes", err)
 		return
 	}
 	cfgPath := path.Join(m.jmxfetchConfPath, key+".yaml")
 	logger.Debug(m.managerMeta.GetContext(), "write files", string(bytes), "path", cfgPath)
 	err = os.WriteFile(cfgPath, bytes, 0600)
 	if err != nil {
-		logger.Error(m.managerMeta.GetContext(), JMXAlarmType, "write config file err", err, "path", cfgPath)
+		logger.Warning(m.managerMeta.GetContext(), JMXAlarmType, "write config file err", err, "path", cfgPath)
 	}
 }
 

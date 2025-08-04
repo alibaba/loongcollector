@@ -14,11 +14,11 @@
 
 #pragma once
 
-#include "FileEvent.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
 #include "ebpf/plugin/ProcessCache.h"
 #include "ebpf/plugin/RetryableEvent.h"
+#include "ebpf/type/FileEvent.h"
 
 namespace logtail::ebpf {
 

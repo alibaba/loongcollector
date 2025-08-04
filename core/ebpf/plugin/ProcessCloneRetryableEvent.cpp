@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "ProcessEvent.h"
 #include "common/ProcParser.h"
+#include "ebpf/type/ProcessEvent.h"
 #include "logger/Logger.h"
 #include "metadata/ContainerMetadata.h"
 #include "metadata/K8sMetadata.h"

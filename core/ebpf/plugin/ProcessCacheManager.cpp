@@ -190,7 +190,7 @@ void ProcessCacheManager::waitForConsumeFinished() {
         int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
         if (!alarmOnce && duration > 10) { // 10s
             LOG_ERROR(sLogger, ("ProcessCacheManager stop", "too slow")("cost", duration));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CONFIG_UPDATE_ALARM, std::string("ProcessCacheManager stop too slow; cost:" + ToString(duration)));
             alarmOnce = true;
         }

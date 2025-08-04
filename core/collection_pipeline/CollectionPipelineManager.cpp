@@ -71,7 +71,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for existing config",
                          "keep current pipeline running")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
                 config.mRegion,
@@ -120,7 +120,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for new config", "skip current object")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
                 config.mRegion,

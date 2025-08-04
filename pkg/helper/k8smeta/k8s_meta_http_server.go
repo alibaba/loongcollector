@@ -54,7 +54,7 @@ func (m *metadataHandler) K8sServerRun(stopCh <-chan struct{}) error {
 	go func() {
 		defer panicRecover()
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error(context.Background(), "HTTP_SERVER_ERROR", "HTTP server error", err)
+			logger.Critical(context.Background(), "HTTP_SERVER_ERROR", "HTTP server error", err)
 		}
 	}()
 	<-stopCh

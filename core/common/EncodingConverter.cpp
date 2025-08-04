@@ -79,7 +79,7 @@ size_t EncodingConverter::ConvertGbk2Utf8(
         if (ret == (size_t)(-1)) {
             LOG_ERROR(sLogger, ("convert GBK to UTF8 fail, errno", strerror(errno)));
             iconv(mGbk2Utf8Cd, NULL, NULL, NULL, NULL); // Clear status.
-            AlarmManager::GetInstance()->SendAlarm(ENCODING_CONVERT_ALARM, "convert GBK to UTF8 fail");
+            AlarmManager::GetInstance()->SendAlarmWarning(ENCODING_CONVERT_ALARM, "convert GBK to UTF8 fail");
             // use memcpy
             memcpy(originDes + destIndex, originSrc + beginIndex, endIndex - beginIndex + 1);
             destIndex += endIndex - beginIndex + 1;

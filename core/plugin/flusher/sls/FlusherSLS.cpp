@@ -297,6 +297,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // Workspace
+    if (!GetOptionalStringParam(config, "Workspace", mWorkspace, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
@@ -685,7 +697,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data);
             break;
         default:
             break;
@@ -768,14 +780,14 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
                 ADD_COUNTER(mProjectQuotaErrorCnt, 1);
             }
-            AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
-                                                   "error_code: " + slsResponse.mErrorCode
-                                                       + ", error_message: " + slsResponse.mErrorMsg
-                                                       + ", request_id:" + slsResponse.mRequestId,
-                                                   mRegion,
-                                                   mProject,
-                                                   mContext ? mContext->GetConfigName() : "",
-                                                   data->mLogstore);
+            AlarmManager::GetInstance()->SendAlarmError(SEND_QUOTA_EXCEED_ALARM,
+                                                        "error_code: " + slsResponse.mErrorCode
+                                                            + ", error_message: " + slsResponse.mErrorMsg
+                                                            + ", request_id:" + slsResponse.mRequestId,
+                                                        mRegion,
+                                                        mProject,
+                                                        mContext ? mContext->GetConfigName() : "",
+                                                        data->mLogstore);
             operation = OperationOnFail::RETRY_LATER;
         } else if (sendResult == SEND_UNAUTHORIZED) {
             failDetail << "write unauthorized";
@@ -795,7 +807,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 if (!cpt) {
                     failDetail << ", unexpected result when exactly once checkpoint is not found";
                     suggestion << "report bug";
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmCritical(
                         EXACTLY_ONCE_ALARM,
                         "drop exactly once log group because of invalid sequence ID, request id:"
                             + slsResponse.mRequestId,
@@ -814,7 +826,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << ", drop exactly once log group and commit checkpoint"
                            << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmCritical(
                     EXACTLY_ONCE_ALARM,
                     "drop exactly once log group because of invalid sequence ID, cpt:" + cpt->key
                         + ", data:" + cpt->data.DebugString() + "request id:" + slsResponse.mRequestId,
@@ -880,7 +892,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmCritical(
                         SEND_DATA_FAIL_ALARM,
                         "failed to send request: " + failDetail.str() + "\toperation: " + GetOperationString(operation)
                             + "\trequestId: " + slsResponse.mRequestId
@@ -919,13 +931,14 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress data",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                           "failed to compress data: " + errorMsg + "\taction: discard data\tplugin: "
-                                               + sName + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                  "failed to compress data: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             return false;
         }
     } else {
@@ -979,14 +992,14 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
         LOG_WARNING(mContext->GetLogger(),
                     ("failed to serialize event group",
                      errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                       "failed to serialize event group: " + errorMsg
-                                           + "\taction: discard data\tplugin: " + sName
-                                           + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mContext->GetLogstoreName());
+        mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                              "failed to serialize event group: " + errorMsg
+                                                  + "\taction: discard data\tplugin: " + sName
+                                                  + "\tconfig: " + mContext->GetConfigName(),
+                                              mContext->GetRegion(),
+                                              mContext->GetProjectName(),
+                                              mContext->GetConfigName(),
+                                              mContext->GetLogstoreName());
         return false;
     }
     if (mCompressor) {
@@ -994,14 +1007,14 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                           "failed to compress event group: " + errorMsg
-                                               + "\taction: discard data\tplugin: " + sName
-                                               + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                  "failed to compress event group: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             return false;
         }
     } else {
@@ -1041,14 +1054,14 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to serialize event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                           "failed to serialize event group: " + errorMsg
-                                               + "\taction: discard data\tplugin: " + sName
-                                               + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                                  "failed to serialize event group: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             allSucceeded = false;
             continue;
         }
@@ -1057,14 +1070,14 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                 LOG_WARNING(mContext->GetLogger(),
                             ("failed to compress event group",
                              errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-                mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                               "failed to compress event group: " + errorMsg
-                                                   + "\taction: discard data\tplugin: " + sName
-                                                   + "\tconfig: " + mContext->GetConfigName(),
-                                               mContext->GetRegion(),
-                                               mContext->GetProjectName(),
-                                               mContext->GetConfigName(),
-                                               mContext->GetLogstoreName());
+                mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                      "failed to compress event group: " + errorMsg
+                                                          + "\taction: discard data\tplugin: " + sName
+                                                          + "\tconfig: " + mContext->GetConfigName(),
+                                                      mContext->GetRegion(),
+                                                      mContext->GetProjectName(),
+                                                      mContext->GetConfigName(),
+                                                      mContext->GetLogstoreName());
                 allSucceeded = false;
                 continue;
             }
@@ -1133,7 +1146,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 DISCARD_DATA_ALARM,
                 "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
             return false;
@@ -1148,7 +1161,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     LOG_WARNING(
         sLogger,
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    AlarmManager::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarmCritical(
         DISCARD_DATA_ALARM,
         "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
     return false;
@@ -1287,30 +1300,28 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
                                                                     const string& accessKeySecret,
                                                                     SLSClientManager::AuthType type,
-                                                                    SLSSenderQueueItem* item,
-                                                                    const std::string& subPath) const {
-    string query;
+                                                                    SLSSenderQueueItem* item) const {
     map<string, string> header;
+    header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
+    header.insert({APM_HEADER_PROJECT, mProject});
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  type,
                                  item->mCurrentHost,
                                  item->mRealIpFlag,
                                  mProject,
-                                 item->mLogstore,
                                  CompressTypeToString(mCompressor->GetCompressType()),
                                  item->mType,
                                  item->mData,
                                  item->mRawSize,
                                  mSubpath,
-                                 query,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
-                                        subPath,
+                                        mSubpath,
                                         "",
                                         header,
                                         item->mData,

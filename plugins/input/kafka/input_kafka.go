@@ -163,7 +163,7 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 			if err := k.consumerGroupClient.Consume(cancelCtx, k.Topics, k); err != nil {
 				// Keep retrying Consume when error occurs.
 				// This loop will only exit when the context is canceled (i.e., when loongcollector process is stopping)
-				logger.Error(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Error from kafka consumer", err)
+				logger.Warning(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "Error from kafka consumer", err)
 
 				// Add a retry delay to avoid busy loop.
 				select {
@@ -276,7 +276,7 @@ func (k *InputKafka) Stop() error {
 	err := k.consumerGroupClient.Close()
 	if err != nil {
 		e := fmt.Errorf("[inputs.kafka_consumer] Error closing consumer: %v", err)
-		logger.Errorf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "%v", e)
+		logger.Warningf(k.context.GetRuntimeContext(), "INPUT_KAFKA_ALARM", "%v", e)
 		return e
 	}
 	return nil

@@ -23,7 +23,6 @@
 #include <memory>
 #include <thread>
 
-#include "ContainerInfo.h"
 #include "app_config/AppConfig.h"
 #include "common/MachineInfoUtil.h"
 #include "common/NetworkUtil.h"
@@ -33,6 +32,7 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#include "metadata/ContainerInfo.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
