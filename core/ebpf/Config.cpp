@@ -249,6 +249,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                mContext->GetRegion());
         }
         if (!GetMandatoryStringParam(selector, "WorkloadKind", item.mWorkloadKind, errorMsg)) {
+            item.mWorkloadKind = ToLowerCaseString(item.mWorkloadKind);
             PARAM_ERROR_RETURN(mContext->GetLogger(),
                                mContext->GetAlarm(),
                                errorMsg,
