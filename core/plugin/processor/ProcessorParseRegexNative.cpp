@@ -60,6 +60,7 @@ bool ProcessorParseRegexNative::Init(const Json::Value& config) {
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
+    mReg.reserve(AppConfig::GetInstance()->GetProcessThreadCount());
     for (int i = 0; i < AppConfig::GetInstance()->GetProcessThreadCount(); ++i) {
         mReg.emplace_back(mRegex);
     }
@@ -145,7 +146,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
     if (mIsWholeLineMode) {
         parseSuccess = WholeLineModeParser(sourceEvent, mKeys.empty() ? DEFAULT_CONTENT_KEY : mKeys[0]);
     } else {
-        parseSuccess = RegexLogLineParser(sourceEvent, mReg[ProcessorRunner::GetThreadNo()], mKeys, logPath);
+        parseSuccess = RegexLogLineParser(sourceEvent, GetReg(), mKeys, logPath);
     }
 
     if (!parseSuccess || !mSourceKeyOverwritten) {
@@ -248,6 +249,10 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         AddLog(keys[i], StringView(what[i + 1].begin(), what[i + 1].length()), sourceEvent);
     }
     return true;
+}
+
+const boost::regex& ProcessorParseRegexNative::GetReg() const {
+    return mReg[ProcessorRunner::GetThreadNo()];
 }
 
 } // namespace logtail
