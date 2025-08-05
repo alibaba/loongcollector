@@ -211,6 +211,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
 
                   auto serviceId = sourceBuffer->CopyString(appConfig->mServiceId);
                   data->mTags.SetNoCopy<kArmsServiceId>(StringView(serviceId.data, serviceId.size));
+
+                  auto language = sourceBuffer->CopyString(appConfig->mLanguage);
+                  data->mTags.SetNoCopy<kLanguage>(StringView(language.data, language.size));
               }
 
               auto workloadKind = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadKind>());
@@ -675,6 +678,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.MetricKey(), appInfo->mAppName);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.MetricKey(), appInfo->mWorkspace);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
+                COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod name
                 init = true;
@@ -835,6 +839,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.MetricKey(), appInfo->mAppName);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.MetricKey(), appInfo->mWorkspace);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
+                COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod ip
 
@@ -1019,6 +1024,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.SpanKey(), appInfo->mAppName);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.SpanKey(), appInfo->mWorkspace);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.SpanKey(), appInfo->mServiceId);
+                    COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
 
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kHostIp.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
                     COPY_AND_SET_TAG(

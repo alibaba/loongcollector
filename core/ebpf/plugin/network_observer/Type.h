@@ -47,6 +47,7 @@ public:
           mAppId(opt->mApmConfig.mAppId),
           mWorkspace(opt->mApmConfig.mWorkspace),
           mServiceId(opt->mApmConfig.mServiceId),
+          mLanguage(opt->mApmConfig.mLanguage),
           mEnableL7(opt->mL7Config.mEnable),
           mEnableLog(opt->mL7Config.mEnableLog),
           mEnableSpan(opt->mL7Config.mEnableSpan),
@@ -69,6 +70,7 @@ public:
         AttrHashCombine(mAppHash, hasher(mAppId));
         AttrHashCombine(mAppHash, hasher(mWorkspace));
         AttrHashCombine(mAppHash, hasher(mServiceId));
+        AttrHashCombine(mAppHash, hasher(mLanguage));
 
         if (metricMgr) {
             // init metrics
@@ -158,6 +160,7 @@ public:
     std::string mAppId;
     std::string mWorkspace;
     std::string mServiceId;
+    std::string mLanguage;
 
     bool mEnableL7;
     bool mEnableLog;

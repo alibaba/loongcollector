@@ -265,6 +265,14 @@ inline constexpr DataElement kArmsServiceId = {
     "arms serviceid",
 };
 
+inline constexpr DataElement kLanguage = {
+    "language",
+    "language", // metric
+    "language", // span
+    "language", // log
+    "program language",
+};
+
 inline constexpr DataElement kPeerAppName = {
     "peer_app",
     "arms_peer_app_name", // metric
