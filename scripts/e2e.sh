@@ -28,9 +28,17 @@ if [ "$TEST_SCOPE" = "core" ]; then
 elif [ "$TEST_SCOPE" = "performance" ]; then
   if [ -n "$AGENT" ]; then
     export AGENT="$AGENT"
-    go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+    if [ "$TYPE" = "benchmark" ]; then
+      go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE/local
+    else
+      go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+    fi
   else
-    go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+    if [ "$TYPE" = "benchmark" ]; then
+      go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE/local
+    else
+      go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/$TYPE
+    fi
   fi
 else
   go test -v -timeout 30m -run ^TestE2EOnDockerCompose$ github.com/alibaba/ilogtail/test/$TYPE
