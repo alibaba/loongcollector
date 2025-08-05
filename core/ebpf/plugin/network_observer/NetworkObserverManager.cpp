@@ -1763,13 +1763,20 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
 }
 
 void NetworkObserverManager::ReportAgentInfo() {
+    std::unordered_map<std::string, std::set<size_t>> configToWorkloadsReplica;
+    std::unordered_map<size_t, WorkloadConfig> workloadConfigsReplica;
+    {
+        ReadLock lk(mAppConfigLock);
+        configToWorkloadsReplica = mConfigToWorkloads;
+        workloadConfigsReplica = mWorkloadConfigs;
+    }
     int cnt = 0;
     const time_t now = time(nullptr);
-    for (const auto& configToWorkload : mConfigToWorkloads) {
+    for (const auto& configToWorkload : configToWorkloadsReplica) {
         const auto& workloadKeys = configToWorkload.second;
         auto sourceBuffer = std::make_shared<SourceBuffer>();
-        const auto& itGlobal = mWorkloadConfigs.find(kGlobalWorkloadKey);
-        if (itGlobal != mWorkloadConfigs.end()) {
+        const auto& itGlobal = workloadConfigsReplica.find(kGlobalWorkloadKey);
+        if (itGlobal != workloadConfigsReplica.end()) {
             cnt += reportAgentInfo(now, sourceBuffer, kGlobalWorkloadKey, itGlobal->second);
         }
 
@@ -1778,8 +1785,8 @@ void NetworkObserverManager::ReportAgentInfo() {
                 continue;
             }
 
-            const auto& it = mWorkloadConfigs.find(workloadKey);
-            if (it != mWorkloadConfigs.end()) {
+            const auto& it = workloadConfigsReplica.find(workloadKey);
+            if (it != workloadConfigsReplica.end()) {
                 cnt += reportAgentInfo(now, sourceBuffer, workloadKey, it->second);
             } else {
                 LOG_INFO(sLogger, ("[AgentInfo] failed to find workloadKey", workloadKey));
