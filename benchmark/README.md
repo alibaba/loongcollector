@@ -4,6 +4,7 @@
 - **Hardware**: Alibaba Cloud ECS g7 (32 vCPU, 64GB RAM) - enterprise-grade specification
 - **OS**: Ubuntu 20.02 with ext4 filesystem  
 - **Reproducibility**: Full benchmark suite available on GitHub with automated scripts
+- **Disk**: ESSD PL3 1500GiB (76800 IOPS)
 
 ## Test Data
 
@@ -36,7 +37,7 @@ Same as **Single Line**
 
 ## Resource Efficiency
 
-![Resource Efficiency Comparison](./figures/resources.png)
+![Resource Efficiency Comparison](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/benchmark/resources.png)
 
 | Scenario | LoongCollector | FluentBit | Vector | Filebeat |
 |----------|----------------|-----------|--------|----------|
