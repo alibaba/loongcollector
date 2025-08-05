@@ -1659,6 +1659,7 @@ const static std::string kAgentInfoAppIdKey = "pid";
 const static std::string kAgentInfoIpKey = "ip";
 const static std::string kAgentInfoHostnameKey = "hostname";
 const static std::string kAgentInfoAppnameKey = "appName";
+const static std::string kAgentInfoLanguageKey = "language";
 const static std::string kAgentInfoAgentVersionKey = "agentVersion";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
 
@@ -1743,7 +1744,9 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
             event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
             event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+            event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
             event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+            event->SetContent(kPodName.LogKey(), podMeta->mPodName);
             event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
             event->SetTimestamp(now, 0);
         }
