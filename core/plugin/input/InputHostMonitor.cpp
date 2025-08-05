@@ -72,7 +72,7 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetRegion());
     }
     if (enableCPU) {
-        // mCollectors.push_back(CPUCollector::sName);
+        mCollectors.push_back(CPUCollector::sName);
     }
 
     // system load
@@ -106,7 +106,7 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
     }
 
     if (enableMem) {
-        // mCollectors.push_back(MemCollector::sName);
+        mCollectors.push_back(MemCollector::sName);
     }
 
     bool enableProcess = true;

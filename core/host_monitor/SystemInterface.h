@@ -113,17 +113,6 @@ struct ProcessTime {
     std::chrono::milliseconds stime() const { return sys - cstime; }
 };
 
-struct ProcessCpuInformationCache {
-    ProcessCpuInformation processCpu;
-    std::chrono::steady_clock::time_point expireTime;
-};
-
-struct CpuInformationCache {
-    pid_t pid;
-    std::chrono::steady_clock::time_point recordTimestamp;
-    uint16_t cpuTime;
-};
-
 struct ProcessInfo {
     pid_t pid;
     std::string name;

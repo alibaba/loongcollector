@@ -40,58 +40,9 @@ DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N c
 DEFINE_FLAG_INT32(process_total_count, "number of each calculate epoch to report", 3);
 #define PATH_MAX 4096
 
-int64_t ToMillis(std::chrono::system_clock::time_point& t) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(t.time_since_epoch()).count();
-}
 
 // topN进行的缓存为55s
 const std::chrono::seconds ProcessSortInterval{55};
-
-// TIndex为索引的Vector
-template <typename TIndex>
-class TVector {
-    const std::vector<std::string>& data;
-    const TIndex offset;
-
-public:
-    const std::string empty{};
-
-    TVector(const std::vector<std::string>& d, TIndex of = (TIndex)0) : data(d), offset(of) {}
-
-    const std::string& operator[](TIndex key) const {
-        int index = (int)key - (int)offset;
-        return 0 <= index && index < static_cast<int>(data.size()) ? data[index] : empty;
-    }
-};
-
-extern const int ClkTck = sysconf(_SC_CLK_TCK); // 一般为100
-
-static uint64_t Tick2Millisecond(uint64_t tick) {
-    constexpr const uint64_t MILLISECOND = 1000;
-    return tick * MILLISECOND / ClkTck;
-}
-
-static uint64_t Tick2Millisecond(const std::string& tick) {
-    return Tick2Millisecond(static_cast<uint64_t>(std::stoll(tick)));
-}
-
-// T: uint64_t、std::chrono::milliseconds
-template <typename T>
-T Tick2(const std::string& tick) {
-    return T{Tick2Millisecond(tick)};
-}
-
-template <typename T, typename TIndex>
-class MillisVector {
-    const TVector<TIndex>& v;
-
-public:
-    static constexpr const T zero{0};
-
-    explicit MillisVector(const TVector<TIndex>& r) : v(r) {}
-
-    T operator[](TIndex key) const { return Tick2<T>(v[key]); }
-};
 
 namespace logtail {
 
@@ -162,7 +113,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     std::vector<ProcessAllStat> allPidStats;
     for (auto pid : pids) {
         ProcessAllStat stat;
-        if (GetProcessAllStat(pid, stat) != EXECUTE_SUCCESS) {
+        if (!GetProcessAllStat(pid, stat)) {
             continue;
         }
         allPidStats.push_back(stat);
@@ -340,65 +291,55 @@ void ProcessCollector::RemovePid(std::vector<pid_t>& pids, pid_t pid, pid_t ppid
     }
 }
 
-void ProcessCollector::GetSelfPid(pid_t& pid, pid_t& ppid) {
-    pid = getpid();
-    ppid = getppid();
-}
-
 // 获取某个pid的信息
-int ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat) {
+bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat) {
     // 获取这个pid的cpu信息
     processStat.pid = pid;
 
-    int ret = GetProcessCpuInformation(pid, processStat.processCpu, false);
-    if (ret != 0) {
-        return ret;
+    if (!GetProcessCpuInformation(pid, processStat.processCpu, false)) {
+        return false;
     }
 
-    ret = GetProcessState(pid, processStat.processState);
-    if (ret != 0) {
-        return ret;
+    if (!GetProcessState(pid, processStat.processState)) {
+        return false;
     }
 
-    ret = GetProcessMemory(pid, processStat.processMemory);
-    if (ret != 0) {
-        return ret;
+    if (!GetProcessMemory(pid, processStat.processMemory)) {
+        return false;
     }
 
     ProcessFd procFd;
-    ret = GetProcessFdNumber(pid, procFd);
-    if (ret != EXECUTE_SUCCESS) {
-        return ret;
+    if (!GetProcessFdNumber(pid, procFd)) {
+        return false;
     }
     processStat.fdNum = procFd.total;
     processStat.fdNumExact = procFd.exact;
 
-    ret = GetProcessInfo(pid, processStat.processInfo);
-    if (ret != EXECUTE_SUCCESS) {
-        return ret;
+    if (!GetProcessInfo(pid, processStat.processInfo)) {
+        return false;
     }
 
     processStat.memPercent = mTotalMemory == 0 ? 0 : 100.0 * processStat.processMemory.resident / mTotalMemory;
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
-int ProcessCollector::GetProcessCredName(pid_t pid, ProcessCredName& processCredName) {
+bool ProcessCollector::GetProcessCredName(pid_t pid, ProcessCredName& processCredName) {
     if (!SystemInterface::GetInstance()->GetProcessCredNameObj(pid, processCredName)) {
-        return EXECUTE_FAIL;
+        return false;
     }
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
-int ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args) {
+bool ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args) {
     std::string cmdline;
 
     ProcessCmdlineString processCMDline;
     if (!SystemInterface::GetInstance()->GetProcessCmdlineString(pid, processCMDline)) {
-        return EXECUTE_FAIL;
+        return false;
     }
     if (processCMDline.cmdline.empty()) {
         // /proc/pid/cmdline have no content
-        return EXECUTE_FAIL;
+        return false;
     }
     cmdline = processCMDline.cmdline.front();
     std::vector<std::string> cmdlineMetric;
@@ -406,7 +347,7 @@ int ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args) 
     for (auto const& metric : cmdlineMetric) {
         args.push_back(metric);
     }
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 std::string ProcessCollector::GetExecutablePath(pid_t pid) {
@@ -419,16 +360,16 @@ std::string ProcessCollector::GetExecutablePath(pid_t pid) {
 
 // argus 的进程path是通过readlink /proc/pid/exe 获取的
 // args 是通过 /proc/pid/cmdline 获取的
-int ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
+bool ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
     std::string user = "unknown";
     ProcessCredName processCredName;
 
-    if (GetProcessCredName(pid, processCredName) == EXECUTE_SUCCESS) {
+    if (GetProcessCredName(pid, processCredName)) {
         user = processCredName.user;
     }
 
     std::vector<std::string> args;
-    if (GetProcessArgs(pid, args) == EXECUTE_SUCCESS) {
+    if (GetProcessArgs(pid, args)) {
         processInfo.args = args.front();
         for (size_t i = 1; i < args.size(); i++) {
             processInfo.args += " " + args[i];
@@ -445,44 +386,42 @@ int ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
     processInfo.name = processCredName.name;
     processInfo.user = user;
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 // 获取进程文件数信息
-int ProcessCollector::GetProcessFdNumber(pid_t pid, ProcessFd& processFd) {
+bool ProcessCollector::GetProcessFdNumber(pid_t pid, ProcessFd& processFd) {
     if (!SystemInterface::GetInstance()->GetProcessOpenFiles(pid, processFd)) {
-        return EXECUTE_FAIL;
+        return false;
     }
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 // 获取pid的内存信息
-int ProcessCollector::GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory) {
+bool ProcessCollector::GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory) {
     ProcessStat processStat;
 
-    int status = ReadProcessStat(pid, processStat);
-    if (status != 0) {
-        return status;
+    if (!ReadProcessStat(pid, processStat)) {
+        return false;
     }
     processMemory.minorFaults = processStat.minorFaults;
     processMemory.majorFaults = processStat.majorFaults;
     processMemory.pageFaults = processStat.minorFaults + processStat.majorFaults;
 
     if (!SystemInterface::GetInstance()->GetPorcessStatm(pid, processMemory)) {
-        return EXECUTE_FAIL;
+        return false;
     }
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 // 获取pid的状态信息
-int ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
+bool ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
     ProcessInformation processInfo;
 
-    int status = ReadProcessStat(pid, processInfo.stat);
-    if (status != 0) {
-        return status;
+    if (!ReadProcessStat(pid, processInfo.stat)) {
+        return false;
     }
 
     processState.state = processInfo.stat.state;
@@ -493,11 +432,11 @@ int ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
     processState.processor = processInfo.stat.processor;
     processState.numThreads = processInfo.stat.numThreads;
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 // 获取每个Pid的CPU信息
-int ProcessCollector::GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap) {
+bool ProcessCollector::GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap) {
     int readCount = 0;
     for (pid_t pid : pids) {
         if (++readCount > mProcessSilentCount) { // 每读一段时间就要停下，防止进程过多占用太多时间
@@ -510,7 +449,7 @@ int ProcessCollector::GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t,
             pidMap[pid] = procCpu.total;
         }
     }
-    return 0;
+    return true;
 }
 
 
@@ -523,19 +462,8 @@ bool ProcessCollector::GetProcessCpuInCache(pid_t pid, bool includeCTime) {
     }
 }
 
-double ProcessCollector::GetSysHz() {
-    static double hz = 0.0;
-    if (hz == 0.0) {
-        hz = static_cast<double>(sysconf(_SC_CLK_TCK));
-    }
-    if (hz == -1) {
-        // set default hz
-        hz = 1000.0;
-    }
-    return hz;
-}
 
-int ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime) {
+bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime) {
     const auto now = std::chrono::steady_clock::now();
     bool findCache = false;
     ProcessCpuInformation* prev = nullptr;
@@ -546,10 +474,9 @@ int ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation&
 
     information.lastTime = now;
     ProcessTime processTime{};
-    int res = GetProcessTime(pid, processTime, includeCTime);
 
-    if (res != EXECUTE_SUCCESS) {
-        return EXECUTE_FAIL;
+    if (!GetProcessTime(pid, processTime, includeCTime)) {
+        return false;
     }
 
     if (findCache) {
@@ -565,7 +492,7 @@ int ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation&
         information.user = processTime.user.count();
         information.total = processTime.total.count();
         cpuTimeCache[pid] = information;
-        return 0;
+        return true;
     }
 
     int64_t timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(now - prev->lastTime).count();
@@ -579,18 +506,17 @@ int ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation&
     information.total = processTime.total.count();
 
     // calculate cpuPercent = (thisTotal - prevTotal)/HZ;
-    auto totalCPUDiff = static_cast<double>(information.total - prev->total) / GetSysHz();
-    information.percent = 100 * totalCPUDiff / (static_cast<double>(timeDiff) / GetSysHz()); // 100%
+    auto totalCPUDiff = static_cast<double>(information.total - prev->total) / SYSTEM_HERTZ;
+    information.percent = 100 * totalCPUDiff / (static_cast<double>(timeDiff) / SYSTEM_HERTZ); // 100%
     cpuTimeCache[pid] = information;
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
-int ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime) {
+bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime) {
     ProcessInformation processInfo;
 
-    int stat = ReadProcessStat(pid, processInfo.stat);
-    if (stat != EXECUTE_SUCCESS) {
-        return stat;
+    if (!ReadProcessStat(pid, processInfo.stat)) {
+        return false;
     }
 
     output.startTime = processInfo.stat.startTicks;
@@ -602,18 +528,18 @@ int ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output, bool includ
 
     output.total = std::chrono::milliseconds(output.user + output.sys);
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 // 数据样例: /proc/1/stat, 解析/proc/pid/stat
 // 1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600 171 18446744073709551615 4194304 4238788
 // 140727020025920 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 6336016 6337300 21442560 140727020027760 140727020027777
 // 140727020027777 140727020027887 0
-int ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
+bool ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
     processStat.pid = pid;
     ProcessInformation processInfo{};
     if (!SystemInterface::GetInstance()->GetProcessInformation(pid, processInfo)) {
-        return EXECUTE_FAIL;
+        return false;
     }
 
     processStat.name = processInfo.stat.name;
@@ -638,7 +564,7 @@ int ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
     processStat.rss = processInfo.stat.rss;
     processStat.processor = processInfo.stat.processor;
 
-    return EXECUTE_SUCCESS;
+    return true;
 }
 
 } // namespace logtail

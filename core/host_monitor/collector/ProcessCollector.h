@@ -45,38 +45,30 @@ public:
 public:
     void RemovePid(std::vector<pid_t>& pids, pid_t pid, pid_t ppid);
 
-    void GetSelfPid(pid_t& pid, pid_t& ppid);
+    bool GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime);
 
-    int GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime);
+    bool ReadProcessStat(pid_t pid, ProcessStat& processStat);
 
-    int ReadProcessStat(pid_t pid, ProcessStat& processStat);
+    bool GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
 
-    int GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
+    bool GetProcessAllStat(pid_t pid, ProcessAllStat& processStat);
 
-    int GetTopNProcessStat(std::vector<pid_t>& sortPids, int topN, std::vector<ProcessAllStat>& processAllStats);
+    bool GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory);
 
-    int GetProcessAllStat(pid_t pid, ProcessAllStat& processStat);
+    bool GetProcessFdNumber(pid_t pid, ProcessFd& processFd);
 
-    int GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessInfo(pid_t pid, ProcessInfo& processInfo);
 
-    int GetProcessFdNumber(pid_t pid, ProcessFd& processFd);
+    bool GetProcessCredName(pid_t pid, ProcessCredName& processCredName);
 
-    int GetProcessInfo(pid_t pid, ProcessInfo& processInfo);
+    bool GetProcessArgs(pid_t pid, std::vector<std::string>& args);
 
-    int GetProcessCredName(pid_t pid, ProcessCredName& processCredName);
-
-    int GetProcessArgs(pid_t pid, std::vector<std::string>& args);
-
-    int GetProcessState(pid_t pid, ProcessStat& processState);
-
-    int CountNumsDir(const std::filesystem::path& root, ProcessFd& processFd);
-
-    double GetSysHz();
+    bool GetProcessState(pid_t pid, ProcessStat& processState);
 
     std::string GetExecutablePath(pid_t pid);
 
 protected:
-    int GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime);
+    bool GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime);
 
     bool GetProcessCpuInCache(pid_t pid, bool includeCTime);
 
@@ -93,16 +85,16 @@ private:
     std::chrono::steady_clock::time_point mLastCollectSteadyTime;
     decltype(ProcessCpuInformation{}.total) mLastAgentTotalMillis = 0;
     std::shared_ptr<std::map<pid_t, uint64_t>> mLastPidCpuMap;
-    std::map<pid_t, ProcessCpuInformation> cpuTimeCache;
-    std::map<pid_t, MetricCalculate<ProcessPushMertic>> mProcessPushMertic; // 记录每个pid对应的多值体系
+    std::unordered_map<pid_t, ProcessCpuInformation> cpuTimeCache;
+    std::unordered_map<pid_t, MetricCalculate<ProcessPushMertic>> mProcessPushMertic; // 记录每个pid对应的多值体系
     MetricCalculate<VMProcessNumStat> mVMProcessNumStat;
-    std::map<pid_t, double> mAvgProcessCpuPercent;
-    std::map<pid_t, double> mAvgProcessMemPercent;
-    std::map<pid_t, double> mAvgProcessFd;
-    std::map<pid_t, double> mAvgProcessNumThreads;
-    std::map<pid_t, double> mMinProcessNumThreads;
-    std::map<pid_t, double> mMaxProcessNumThreads;
-    std::map<pid_t, std::string> pidNameMap;
+    std::unordered_map<pid_t, double> mAvgProcessCpuPercent;
+    std::unordered_map<pid_t, double> mAvgProcessMemPercent;
+    std::unordered_map<pid_t, double> mAvgProcessFd;
+    std::unordered_map<pid_t, double> mAvgProcessNumThreads;
+    std::unordered_map<pid_t, double> mMinProcessNumThreads;
+    std::unordered_map<pid_t, double> mMaxProcessNumThreads;
+    std::unordered_map<pid_t, std::string> pidNameMap;
 };
 
 } // namespace logtail

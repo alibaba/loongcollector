@@ -121,7 +121,7 @@ void ProcessCollectorUnittest::TestGetHostPidStat() const {
     auto collector = ProcessCollector();
     pid_t pid = 12345;
     ProcessAllStat stat;
-    APSARA_TEST_EQUAL_FATAL(EXECUTE_SUCCESS, collector.GetProcessAllStat(pid, stat));
+    APSARA_TEST_TRUE(collector.GetProcessAllStat(pid, stat));
 }
 
 void ProcessCollectorUnittest::TestCollect() const {
