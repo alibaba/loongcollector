@@ -653,6 +653,9 @@ bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformatio
     // netInterfaceInfo.configs
     for (size_t i = 2; i < netDevLines.size(); ++i) {
         auto pos = netDevLines[i].find_first_of(':');
+        if (pos == std::string::npos) {
+            continue;
+        }
         std::string devCounterStr = netDevLines[i].substr(pos + 1);
         std::string devName = netDevLines[i].substr(0, pos);
 

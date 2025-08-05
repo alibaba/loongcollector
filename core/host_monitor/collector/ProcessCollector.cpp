@@ -36,15 +36,15 @@
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 
+
+namespace logtail {
+
 DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N cpu percent", 5);
 DEFINE_FLAG_INT32(process_total_count, "number of each calculate epoch to report", 3);
 #define PATH_MAX 4096
 
-
 // topN进行的缓存为55s
 const std::chrono::seconds ProcessSortInterval{55};
-
-namespace logtail {
 
 const std::string ProcessCollector::sName = "process";
 const std::string kMetricLabelProcess = "valueTag";
@@ -272,24 +272,6 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     return true;
 }
 
-//////////////////////////////////////////////
-// pid - self
-// pid - parent id
-void ProcessCollector::RemovePid(std::vector<pid_t>& pids, pid_t pid, pid_t ppid) {
-    size_t count = pids.size();
-    for (size_t i = 0; i < count;) {
-        pid_t curPid = pids[i];
-        if (curPid == pid || curPid == ppid) {
-            count--;
-            pids[i] = pids[count];
-        } else {
-            ++i;
-        }
-    }
-    if (count != pids.size()) {
-        pids.resize(count);
-    }
-}
 
 // 获取某个pid的信息
 bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat) {

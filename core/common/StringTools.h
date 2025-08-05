@@ -34,10 +34,10 @@
 
 #include "common/StringView.h"
 
-// C++11定义的空白符
-const std::string SPACE_CHARS = " \f\n\r\t\v";
-
 namespace logtail {
+
+// C++11定义的空白符
+extern const std::string kSpaceChars;
 
 inline bool StartWith(const std::string& input, StringView pattern) {
     return input.find(pattern.data(), 0, pattern.size()) == 0;
@@ -382,15 +382,15 @@ inline std::string TrimRight(const std::string& str, const std::string& trimChar
 }
 
 inline std::string TrimSpace(const std::string& str) {
-    return Trim(str, SPACE_CHARS, true, true);
+    return Trim(str, kSpaceChars, true, true);
 }
 
 inline std::string TrimLeftSpace(const std::string& str) {
-    return TrimLeft(str, SPACE_CHARS);
+    return TrimLeft(str, kSpaceChars);
 }
 
 inline std::string TrimRightSpace(const std::string& str) {
-    return TrimRight(str, SPACE_CHARS);
+    return TrimRight(str, kSpaceChars);
 }
 
 

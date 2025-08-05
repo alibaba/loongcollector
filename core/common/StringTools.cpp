@@ -30,6 +30,8 @@ using namespace std;
 
 namespace logtail {
 
+const std::string kSpaceChars = " \f\n\r\t\v";
+
 std::string ToLowerCaseString(const std::string& orig) {
     auto copy = orig;
     std::transform(copy.begin(), copy.end(), copy.begin(), ::tolower);

@@ -43,8 +43,6 @@ public:
     const std::string& Name() const override { return sName; }
 
 public:
-    void RemovePid(std::vector<pid_t>& pids, pid_t pid, pid_t ppid);
-
     bool GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime);
 
     bool ReadProcessStat(pid_t pid, ProcessStat& processStat);
