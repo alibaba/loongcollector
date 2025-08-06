@@ -48,7 +48,9 @@ public:
     void TestHandleContainerStoppedEventWhenNotReadToEnd();
     void TestHandleModifyEventWhenContainerStopped();
     void TestRecoverReaderFromCheckpoint();
+#ifndef _MSC_VER // Unnecessary on platforms without symbolic.
     void TestRecoverReaderFromCheckpointSoftLink();
+#endif
     void TestRecoverReaderFromCheckpointContainer();
     void TestHandleModifyEventWhenContainerRestartCase1();
     void TestHandleModifyEventWhenContainerRestartCase2();
@@ -231,7 +233,9 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToE
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
+#ifndef _MSC_VER // Unnecessary on platforms without symbolic.
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointSoftLink);
+#endif
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointContainer);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase2);
@@ -470,6 +474,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
 }
 
+#ifndef _MSC_VER // Unnecessary on platforms without symbolic.
 void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointSoftLink() begin", time(NULL)));
     std::string basicLogName = "rotate.log";
@@ -626,6 +631,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     unlink(softLinkPath2.c_str());
     unlink(softLinkPath3.c_str());
 }
+#endif
 
 void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointContainer() begin", time(NULL)));
