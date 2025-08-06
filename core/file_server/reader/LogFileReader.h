@@ -484,6 +484,7 @@ protected:
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
     std::string mRealLogPath; // real log path
+    std::string mChineseEncodingPath; // On Windows, Chinese config base path's __path__ will be converted to GBK
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
     // int32_t mTailLimit; // KB

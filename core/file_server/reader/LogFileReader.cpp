@@ -206,7 +206,11 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
       mConfigName(readerConfig.second->GetConfigName()),
       mRegion(readerConfig.second->GetRegion()) {
     mHostLogPath = PathJoin(hostLogPathDir, hostLogPathFile);
-
+#if defined(_MSC_VER)
+    if (BOOL_FLAG(enable_chinese_tag_path)) {
+        mChineseEncodingPath = EncodingConverter::GetInstance()->FromACPToUTF8(mHostLogPath);
+    }
+#endif
 
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = GetParser<RawTextParser>(0);
@@ -2439,16 +2443,12 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
 }
 
 const std::string& LogFileReader::GetConvertedPath() const {
-    const std::string& path = mDockerPath.empty() ? mHostLogPath : mDockerPath;
 #if defined(_MSC_VER)
     if (BOOL_FLAG(enable_chinese_tag_path)) {
-        static std::string newPath = EncodingConverter::GetInstance()->FromACPToUTF8(path);
-        return newPath;
+        return mChineseEncodingPath;
     }
-    return path;
-#else
-    return path;
 #endif
+    return mDockerPath.empty() ? mHostLogPath : mDockerPath;
 }
 
 bool LogFileReader::UpdateContainerInfo() {
