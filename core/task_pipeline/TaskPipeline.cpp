@@ -16,6 +16,7 @@
 
 #include "task_pipeline/TaskPipeline.h"
 
+#include "config/OnetimeConfigInfoManager.h"
 #include "task_pipeline/TaskRegistry.h"
 
 using namespace std;
@@ -23,13 +24,35 @@ using namespace std;
 namespace logtail {
 
 bool TaskPipeline::Init(TaskConfig&& config) {
-    mConfigName = config.mName;
+    mName = config.mName;
+    mIsOnetime = config.mExpireTime.has_value();
     mCreateTime = config.mCreateTime;
     mConfig = std::move(config.mDetail);
 
     const auto& detail = (*mConfig)["task"];
     mPlugin = TaskRegistry::GetInstance()->CreateTask(detail["Type"].asString());
-    return mPlugin->Init(detail);
+    if (!mPlugin->Init(detail)) {
+        return false;
+    }
+    if (mIsOnetime) {
+        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
+            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
+    }
+    return true;
+}
+
+void TaskPipeline::Start() {
+    mPlugin->Start();
+}
+
+void TaskPipeline::Stop(bool isRemoving) {
+    mPlugin->Stop(isRemoving);
+
+    // only valid for onetime config
+    // for update, the old expire has been replaced by the new one on init, should not remove here
+    if (mIsOnetime && isRemoving) {
+        OnetimeConfigInfoManager::GetInstance()->RemoveConfig(mName);
+    }
 }
 
 } // namespace logtail
