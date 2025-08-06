@@ -12,18 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <sys/eventfd.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <chrono>
+#include <shared_mutex>
+#include <thread>
+#include <vector>
+
 #include "app_config/AppConfig.h"
-#include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "ebpf/Config.h"
-#include "ebpf/EBPFAdapter.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
-// #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
@@ -42,13 +50,13 @@ public:
     void TestNetworkObserver();
     void TestProcessSecurity();
     void TestNetworkSecurity();
-    // void TestFileSecurity();
+    void TestFileSecurity();
 
     // for start and stop all ...
     void TestAllStartAndStop();
 
     // for update scenario ...
-    // void TestUpdateFileSecurity();
+    void TestUpdateFileSecurity();
     void TestUpdateNetworkSecurity();
 
     void TestLoadEbpfParametersV1();
@@ -61,6 +69,10 @@ public:
     void TestEbpfParameters();
 
     void TestEnvManager();
+
+    void TestUnifiedEpoll();
+
+    void TestRetryCache();
 
     template <typename T>
     void setJSON(Json::Value& v, const std::string& key, const T& value) {
@@ -103,7 +115,6 @@ protected:
     void TearDown() override {
         mConfig.reset();
         EBPFServer::GetInstance()->Stop();
-        Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
     }
 
@@ -203,52 +214,53 @@ void eBPFServerUnittest::TestNetworkSecurity() {
     EXPECT_TRUE(res);
 }
 
-// void eBPFServerUnittest::TestFileSecurity() {
-//     std::string configStr = R"(
-//         {
-//             "Type": "input_file_security",
-//             "ProbeConfig":
-//             {
-//                 "FilePathFilter": [
-//                     "/etc/passwd",
-//                     "/etc/shadow",
-//                     "/bin"
-//                 ]
-//             }
-//         }
-//     )";
+void eBPFServerUnittest::TestFileSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
+        }
+    )";
 
-//     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
 
-//     std::string errorMsg;
-//     Json::Value configJson, optionalGoPipeline;
+    std::string errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
 
-//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
 
-//     input->SetContext(ctx);
-//     input->CreateMetricsRecordRef("test", "1");
-//     auto initStatus = input->Init(configJson, optionalGoPipeline);
-//     input->CommitMetricsRecordRef();
-//     APSARA_TEST_TRUE(initStatus);
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    auto initStatus = input->Init(configJson, optionalGoPipeline);
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
 
-//     ctx.SetConfigName("test-1");
-//     auto res = input->Start();
-//     EXPECT_TRUE(res);
+    ctx.SetConfigName("test-1");
+    auto res = input->Start();
+    EXPECT_TRUE(res);
 
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
-//     // stop
-//     res = input->Stop(true);
-//     EXPECT_TRUE(res);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
+    // stop
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
-//     // re-run...
-//     input->Start();
-//     EXPECT_TRUE(res);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     res = input->Stop(true);
-//     EXPECT_TRUE(res);
-// }
+    // re-run...
+    input->Start();
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+}
 
 void eBPFServerUnittest::TestProcessSecurity() {
     std::string configStr = R"(
@@ -288,66 +300,114 @@ void eBPFServerUnittest::TestProcessSecurity() {
     EXPECT_TRUE(res);
 }
 
-// void eBPFServerUnittest::TestUpdateFileSecurity() {
-//     std::string configStr = R"(
-//         {
-//             "Type": "input_file_security",
-//             "ProbeConfig":
-//             {
-//                 "FilePathFilter": [
-//                     "/etc/passwd",
-//                     "/etc/shadow",
-//                     "/bin"
-//                 ]
-//             }
-//         }
-//     )";
+void eBPFServerUnittest::TestUpdateFileSecurity() {
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/etc/passwd",
+                    "/etc/shadow",
+                    "/bin"
+                ]
+            }
+        }
+    )";
 
-//     ctx.SetConfigName("test-pipeline-1");
-//     std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
-//     input->SetContext(ctx);
-//     input->CreateMetricsRecordRef("test", "1");
-//     input->CommitMetricsRecordRef();
+    ctx.SetConfigName("test-pipeline-1");
+    std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    input->CommitMetricsRecordRef();
 
-//     std::string errorMsg;
-//     Json::Value configJson, optionalGoPipeline;
-//     ;
-//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-//     auto res = input->Init(configJson, optionalGoPipeline);
-//     res = input->Start();
-//     EXPECT_TRUE(res);
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
-//     // suspend
-//     res = input->Stop(false);
-//     EXPECT_TRUE(res);
+    std::string errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
 
-//     // resume ...
-//     input = std::make_shared<InputFileSecurity>();
-//     configStr = R"(
-//         {
-//             "Type": "input_file_security",
-//             "ProbeConfig":
-//             {
-//                 "FilePathFilter": [
-//                     "/lib"
-//                 ]
-//             }
-//         }
-//     )";
-//     input->SetContext(ctx);
-//     input->CreateMetricsRecordRef("test", "2");
-//     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-//     res = input->Init(configJson, optionalGoPipeline);
-//     input->CommitMetricsRecordRef();
-//     EXPECT_TRUE(res);
-//     res = input->Start();
-//     EXPECT_TRUE(res);
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    auto res = input->Init(configJson, optionalGoPipeline);
+    LOG_INFO(sLogger, ("test start 1", "FILE_SECURITY"));
+    res = input->Start();
+    EXPECT_TRUE(res);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    // suspend
+    LOG_INFO(sLogger, ("test suspend", "FILE_SECURITY"));
+    res = input->Stop(false);
+    EXPECT_TRUE(res);
 
-//     std::this_thread::sleep_for(std::chrono::seconds(1));
+    // resume ...
+    input = std::make_shared<InputFileSecurity>();
+    configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/lib"
+                ]
+            }
+        }
+    )";
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "2");
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    res = input->Init(configJson, optionalGoPipeline);
+    input->CommitMetricsRecordRef();
+    EXPECT_TRUE(res);
+    LOG_INFO(sLogger, ("test update", "FILE_SECURITY"));
+    res = input->Start();
+    EXPECT_TRUE(res);
 
-//     res = input->Stop(true);
-//     EXPECT_TRUE(res);
-// }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    LOG_INFO(sLogger, ("test real stop", "FILE_SECURITY"));
+
+    res = input->Stop(true);
+    EXPECT_TRUE(res);
+
+    {
+        LOG_INFO(sLogger, ("test restart", "FILE_SECURITY"));
+        std::string configStr = R"(
+            {
+                "Type": "input_file_security",
+                "ProbeConfig":
+                {
+                    "FilePathFilter": [
+                        "/etc/passwd",
+                        "/etc/shadow",
+                        "/bin"
+                    ]
+                }
+            }
+        )";
+
+        std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+
+        std::string errorMsg;
+        Json::Value configJson;
+        Json::Value optionalGoPipeline;
+
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef("test", "1");
+        auto initStatus = input->Init(configJson, optionalGoPipeline);
+        input->CommitMetricsRecordRef();
+        APSARA_TEST_TRUE(initStatus);
+
+        ctx.SetConfigName("test-1");
+        auto res = input->Start();
+        EXPECT_TRUE(res);
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        // stop
+        res = input->Stop(true);
+        EXPECT_TRUE(res);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
 
 void eBPFServerUnittest::TestUpdateNetworkSecurity() {
     std::string configStr = R"(
@@ -588,6 +648,145 @@ void eBPFServerUnittest::TestEbpfParameters() {
     APSARA_TEST_EQUAL(mConfig->GetAdminConfig().mDebugMode, false);
 }
 
+void eBPFServerUnittest::TestUnifiedEpoll() {
+    auto* server = ebpf::EBPFServer::GetInstance();
+    APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
+
+    std::string configStr = R"(
+        {
+            "Type": "input_file_security",
+            "ProbeConfig":
+            {
+                "FilePathFilter": [
+                    "/tmp/test"
+                ]
+            }
+        }
+    )";
+    ctx.SetConfigName("test-unified-epoll-file");
+    std::shared_ptr<InputFileSecurity> inputFile(new InputFileSecurity());
+    inputFile->SetContext(ctx);
+    inputFile->CreateMetricsRecordRef("test_file", "1");
+
+    std::string errorMsg;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    auto initStatus = inputFile->Init(configJson, optionalGoPipeline);
+    inputFile->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
+
+    // Test plugin init and epoll registration
+    auto res = inputFile->Start();
+    APSARA_TEST_TRUE(res);
+
+    // Create test eventfds to simulate perf buffer file descriptors
+    std::vector<int> testFds;
+    for (int i = 0; i < 3; ++i) {
+        int efd = eventfd(0, EFD_NONBLOCK);
+        APSARA_TEST_GE(efd, 0);
+        testFds.push_back(efd);
+    }
+
+    // Manually register the test fds to epoll (simulating plugin registration)
+    auto pluginType = ebpf::PluginType::FILE_SECURITY;
+    for (int testFd : testFds) {
+        struct epoll_event event {};
+        event.events = EPOLLIN;
+        event.data.u32 = static_cast<uint32_t>(pluginType);
+
+        int ret = epoll_ctl(server->mUnifiedEpollFd, EPOLL_CTL_ADD, testFd, &event);
+        APSARA_TEST_EQUAL(ret, 0);
+    }
+
+    // Test multi-threaded access to epoll structures
+    std::vector<std::thread> threads;
+    std::atomic<bool> keepRunning{true};
+
+    // Thread 1: Simulate epoll event handling
+    threads.emplace_back([&]() {
+        while (keepRunning) {
+            server->handleEpollEvents();
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    });
+
+    // Thread 2: Write to eventfds to trigger epoll events
+    threads.emplace_back([&]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        for (int i = 0; i < 5 && keepRunning; ++i) {
+            for (int testFd : testFds) {
+                uint64_t value = 1;
+                ssize_t written = write(testFd, &value, sizeof(value));
+                (void)written;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        }
+    });
+
+    // test epoll registration when epoll handle
+    configStr = R"(
+        {
+            "Type": "input_process_security"
+        }
+    )";
+    ctx.SetConfigName("test-unified-epoll-process");
+    std::shared_ptr<InputProcessSecurity> inputProcess(new InputProcessSecurity());
+    inputProcess->SetContext(ctx);
+    inputProcess->CreateMetricsRecordRef("test_process", "2");
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    initStatus = inputProcess->Init(configJson, optionalGoPipeline);
+    inputProcess->CommitMetricsRecordRef();
+    APSARA_TEST_TRUE(initStatus);
+
+    res = inputProcess->Start();
+    APSARA_TEST_TRUE(res);
+
+    // Let threads run for a short time
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // Clean up
+    keepRunning = false;
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    for (int testFd : testFds) {
+        epoll_ctl(server->mUnifiedEpollFd, EPOLL_CTL_DEL, testFd, nullptr);
+        close(testFd);
+    }
+
+    // Test plugin stop and epoll unregistration
+    res = inputFile->Stop(true);
+    APSARA_TEST_TRUE(res);
+    res = inputProcess->Stop(true);
+    APSARA_TEST_TRUE(res);
+}
+
+void eBPFServerUnittest::TestRetryCache() {
+    ebpf::EBPFServer::GetInstance()->Init();
+    auto& eventCache = ebpf::EBPFServer::GetInstance()->EventCache();
+    APSARA_TEST_EQUAL(0UL, eventCache.Size());
+
+    auto& server = *ebpf::EBPFServer::GetInstance();
+    auto initialRetryTime = server.mLastEventCacheRetryTime;
+    server.handleEventCache();
+    APSARA_TEST_GE(server.mLastEventCacheRetryTime, initialRetryTime);
+
+    // Test multiple rapid calls
+    auto retryTimeBefore = server.mLastEventCacheRetryTime;
+    server.handleEventCache();
+    server.handleEventCache();
+    APSARA_TEST_EQUAL(retryTimeBefore, server.mLastEventCacheRetryTime);
+
+    // Test timing stability
+    server.mLastEventCacheRetryTime = TimeKeeper::GetInstance()->NowSec() - 10;
+    auto oldRetryTime = server.mLastEventCacheRetryTime;
+    server.handleEventCache();
+    APSARA_TEST_GT(server.mLastEventCacheRetryTime, oldRetryTime);
+}
+
 void eBPFServerUnittest::TestEnvManager() {
     EBPFServer::GetInstance()->mEnvMgr.InitEnvInfo();
 
@@ -621,17 +820,21 @@ void eBPFServerUnittest::TestEnvManager() {
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 
+// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
+
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+
+UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV2);
-UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager)
+UNIT_TEST_CASE(eBPFServerUnittest, TestUnifiedEpoll);
+UNIT_TEST_CASE(eBPFServerUnittest, TestRetryCache);
+UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager);
 
 } // namespace ebpf
 } // namespace logtail

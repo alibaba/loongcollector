@@ -59,6 +59,9 @@ if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
 endif()
 
+add_definitions(-DXXH_DISPATCH_AVX2=0)
+add_definitions(-DXXH_DISPATCH_AVX512=0)
+
 # Default C/CXX flags.
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
@@ -130,7 +133,7 @@ set(SUB_DIRECTORIES_LIST
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
         task_pipeline
         runner runner/sink/http
-        protobuf/sls protobuf/models
+        protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
         parser
         )
@@ -140,12 +143,9 @@ if (LINUX)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        host_monitor host_monitor/collector
+        host_monitor host_monitor/collector forward forward/loongsuite
         )
 elseif(MSVC)
-    if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
-    endif()
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
@@ -233,6 +233,12 @@ add_subdirectory(common)
 # Build eBPF dependencies
 set(EBPF_DIRVER_TARGET "eBPFDriver")
 add_subdirectory(ebpf/driver)
+if(MSVC)
+    if (ENABLE_ENTERPRISE)
+        add_subdirectory(windows/daemon)
+        add_subdirectory(windows/installer)
+    endif()
+endif()
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)

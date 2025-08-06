@@ -59,6 +59,8 @@
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "common/LinuxDaemonUtil.h"
 #include "shennong/ShennongManager.h"
+#elif defined(_MSC_VER)
+#include "common/WindowsDaemonUtil.h"
 #endif
 #else
 #include "provider/Provider.h"
@@ -117,14 +119,16 @@ void Application::Init() {
     LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+#if defined(__linux__)
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
-        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_ALARM, "Logtail Restart");
+        AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM, "Logtail Restart");
     }
+#endif
     // get last crash info
     string backTraceStr = GetCrashBackTrace();
     if (!backTraceStr.empty()) {
         LOG_ERROR(sLogger, ("last logtail crash stack", backTraceStr));
-        AlarmManager::GetInstance()->SendAlarm(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_STACK_ALARM, backTraceStr);
     }
     if (BOOL_FLAG(ilogtail_disable_core)) {
         ResetCrashBackTrace();
@@ -391,7 +395,7 @@ void Application::CheckCriticalCondition(int32_t curTime) {
     // force to exit if config update thread is block more than 1 hour
     if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > 3600) {
         LOG_ERROR(sLogger, ("last config get time is too old", lastGetConfigTime)("prepare force exit", ""));
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmCritical(
             LOGTAIL_CRASH_ALARM, "last config get time is too old: " + ToString(lastGetConfigTime) + " force exit");
         AlarmManager::GetInstance()->ForceToSend();
         sleep(10);

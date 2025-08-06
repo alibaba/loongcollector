@@ -163,12 +163,12 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
                         "processor", sName)("config", mContext->GetConfigName()));
         errorMsg = "failed to parse log line, error: " + errorMsg + "\tcontainer runtime: " + containerType.to_string()
             + "\tprocessor: " + sName + "\tconfig: " + mContext->GetConfigName();
-        AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                               errorMsg,
-                                               GetContext().GetRegion(),
-                                               GetContext().GetProjectName(),
-                                               GetContext().GetConfigName(),
-                                               GetContext().GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                      errorMsg,
+                                                      GetContext().GetRegion(),
+                                                      GetContext().GetProjectName(),
+                                                      GetContext().GetConfigName(),
+                                                      GetContext().GetLogstoreName());
     }
     return shouldKeepEvent;
 }

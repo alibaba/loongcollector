@@ -108,10 +108,10 @@ void PollingModify::MakeSpaceForNewFile() {
         return;
     }
 
-    AlarmManager::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
-                                           string("modify cache is up limit, delete old cache, modify file count:")
-                                               + ToString(mModifyCacheMap.size())
-                                               + "  delete count : " + ToString(removeCount));
+    AlarmManager::GetInstance()->SendAlarmError(MODIFY_FILE_EXCEED_ALARM,
+                                                string("modify cache is up limit, delete old cache, modify file count:")
+                                                    + ToString(mModifyCacheMap.size())
+                                                    + "  delete count : " + ToString(removeCount));
     LOG_ERROR(sLogger, ("modify cache is up limit, delete old cache, modify file count", mModifyCacheMap.size()));
 
     vector<ModifySortItem> sortedItemVec;
@@ -156,9 +156,9 @@ void PollingModify::LoadFileNameInQueues() {
 
         if (mModifyCacheMap.size() >= (size_t)INT32_FLAG(modify_cache_max)) {
             LOG_ERROR(sLogger, ("total modify polling stat count is exceeded, drop event", newFileNameQueue.size()));
-            AlarmManager::GetInstance()->SendAlarm(MODIFY_FILE_EXCEED_ALARM,
-                                                   string("total modify polling stat count is exceeded, drop event:")
-                                                       + ToString(newFileNameQueue.size()));
+            AlarmManager::GetInstance()->SendAlarmError(
+                MODIFY_FILE_EXCEED_ALARM,
+                string("total modify polling stat count is exceeded, drop event:") + ToString(newFileNameQueue.size()));
             hasSpace = false;
         }
     }

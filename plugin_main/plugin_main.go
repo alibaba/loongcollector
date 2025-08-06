@@ -119,7 +119,7 @@ func changePluginConfigIO(pluginCfg string) string {
 			cfg, _ := json.Marshal(newCfg)
 			pluginCfg = string(cfg)
 		} else {
-			logger.Error(context.Background(), "PLUGIN_UNMARSHAL_ALARM", "err", err)
+			logger.Warning(context.Background(), "PLUGIN_UNMARSHAL_ALARM", "err", err)
 		}
 		return pluginCfg
 	}
@@ -153,7 +153,7 @@ func main() {
 		instance := k8smeta.GetMetaManagerInstance()
 		err := instance.Init("")
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_INIT_FAIL", "init k8s meta manager fail", err)
+			logger.Critical(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "init k8s meta manager fail", err)
 			return
 		}
 		stopCh := make(chan struct{})

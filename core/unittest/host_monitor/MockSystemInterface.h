@@ -86,6 +86,32 @@ private:
         ++mMockCalledCount;
         return true;
     }
+    bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        tcpStatInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        netInterfaceInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetHostMemInformationStatOnce(MemoryInformation& meminfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        meminfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
 
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;

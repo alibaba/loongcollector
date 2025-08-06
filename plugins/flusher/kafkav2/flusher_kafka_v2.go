@@ -209,7 +209,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	k.context = context
 	if k.Brokers == nil || len(k.Brokers) == 0 {
 		var err = errors.New("brokers ip is nil")
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
 
@@ -224,7 +224,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 
 	convert, err := k.getConverter()
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher converter fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher converter fail, error", err)
 		return err
 	}
 	k.converter = convert
@@ -232,7 +232,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	// Obtain topic keys from dynamic topic expression
 	topicKeys, err := fmtstr.CompileKeys(k.Topic)
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
 	k.topicKeys = topicKeys
@@ -242,19 +242,19 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 	// Init headers
 	k.recordHeaders = k.makeHeaders()
 
+	k.selectFields = k.topicKeys
+
 	saramaConfig, err := newSaramaConfig(k)
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
 
 	producer, err := sarama.NewAsyncProducer(k.Brokers, saramaConfig)
 	if err != nil {
-		logger.Error(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
+		logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init kafka flusher fail, error", err)
 		return err
 	}
-	// Merge topicKeys and HashKeys,Only one convert after merge
-	k.selectFields = util.UniqueStrings(k.topicKeys, k.HashKeys)
 
 	SIGTERM := make(chan bool)
 	go func(p sarama.AsyncProducer, SIGTERM chan bool) {
@@ -264,7 +264,7 @@ func (k *FlusherKafka) Init(context pipeline.Context) error {
 			select {
 			case err := <-errors:
 				if err != nil {
-					logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
+					logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka write data fail, error", err)
 				}
 			case <-success:
 				// Do Nothing
@@ -286,9 +286,9 @@ func (k *FlusherKafka) Description() string {
 func (k *FlusherKafka) Flush(projectName string, logstoreName string, configName string, logGroupList []*protocol.LogGroup) error {
 	for _, logGroup := range logGroupList {
 		logger.Debug(k.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
-		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.topicKeys)
+		logs, values, err := k.converter.ToByteStreamWithSelectedFields(logGroup, k.selectFields)
 		if err != nil {
-			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			k.flush(log, values[index])
@@ -301,9 +301,9 @@ func (k *FlusherKafka) Export(groupEventsArray []*models.PipelineGroupEvents, ct
 	for _, groupEvents := range groupEventsArray {
 		logger.Debug(k.context.GetRuntimeContext(), "[GroupEvents] events count", len(groupEvents.Events),
 			"tags", groupEvents.Group.GetTags().Iterator())
-		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.topicKeys)
+		logs, values, err := k.converter.ToByteStreamWithSelectedFieldsV2(groupEvents, k.selectFields)
 		if err != nil {
-			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka convert log fail, error", err)
 		}
 		for index, log := range logs.([][]byte) {
 			k.flush(log, values[index])
@@ -317,7 +317,7 @@ func (k *FlusherKafka) flush(log []byte, valueMap map[string]string) {
 	if len(k.topicKeys) > 0 {
 		formattedTopic, err := fmtstr.FormatTopic(valueMap, k.Topic)
 		if err != nil {
-			logger.Error(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
+			logger.Warning(k.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush kafka format topic fail, error", err)
 		} else {
 			topic = *formattedTopic
 		}
@@ -445,7 +445,7 @@ func newSaramaConfig(config *FlusherKafka) (*sarama.Config, error) {
 	k.Producer.Partitioner = partitioner
 
 	if err := k.Validate(); err != nil {
-		logger.Error(config.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "Invalid kafka configuration, error", err)
+		logger.Warning(config.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "Invalid kafka configuration, error", err)
 		return nil, err
 	}
 	return k, nil
@@ -507,6 +507,8 @@ func makePartitioner(k *FlusherKafka) (partitioner sarama.PartitionerConstructor
 		for _, key := range k.HashKeys {
 			k.hashKeyMap[key] = struct{}{}
 		}
+		// Merge topicKeys and HashKeys,Only one convert after merge
+		k.selectFields = util.UniqueStrings(k.topicKeys, k.HashKeys)
 	case PartitionerTypeRandom:
 		partitioner = sarama.NewRandomPartitioner
 	default:

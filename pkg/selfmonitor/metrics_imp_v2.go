@@ -15,7 +15,6 @@
 package selfmonitor
 
 import (
-	"context"
 	"errors"
 	"strconv"
 	"sync"
@@ -23,7 +22,6 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper/math"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -451,15 +449,15 @@ type errorNumericMetric struct {
 }
 
 func (e *errorNumericMetric) Add(f int64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "add", e.err)
+	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "add", e.err)
 }
 
 func (e *errorNumericMetric) Set(f float64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
 }
 
 func (e *errorNumericMetric) Observe(f float64) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "observe", e.err)
+	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "observe", e.err)
 }
 
 func (e *errorNumericMetric) Serialize(log *protocol.Log) {}
@@ -487,7 +485,7 @@ type errorStrMetric struct {
 }
 
 func (e errorStrMetric) Set(s string) {
-	logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
 }
 
 func (e errorStrMetric) Collect() MetricValue[string] {

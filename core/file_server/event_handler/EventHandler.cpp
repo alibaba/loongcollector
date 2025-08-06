@@ -82,9 +82,9 @@ void NormalEventHandler::Handle(const Event& event) {
                 mCreateHandlerPtr->Handle(event);
             } else if (!buf.IsRegFile()) {
                 LOG_INFO(sLogger, ("path is not file or directory, ignore it", fullPath)("stat mode", buf.GetMode()));
-                AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
-                                                       string("found unexpected type mode: ") + ToString(buf.GetMode())
-                                                           + ", file path: " + fullPath);
+                AlarmManager::GetInstance()->SendAlarmWarning(
+                    UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                    string("found unexpected type mode: ") + ToString(buf.GetMode()) + ", file path: " + fullPath);
                 return;
             } else if (event.IsCreate())
                 fileCreateModify = true;
@@ -234,9 +234,9 @@ void CreateModifyHandler::Handle(const Event& event) {
             isDir = true;
         else if (!buf.IsRegFile()) {
             LOG_INFO(sLogger, ("path is not file or directory, ignore it", path)("stat mode", buf.GetMode()));
-            AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
-                                                   std::string("found unexpected type mode: ") + ToString(buf.GetMode())
-                                                       + ", file path: " + path);
+            AlarmManager::GetInstance()->SendAlarmWarning(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                                                          std::string("found unexpected type mode: ")
+                                                              + ToString(buf.GetMode()) + ", file path: " + path);
             return;
         }
     }
@@ -336,7 +336,7 @@ void ModifyHandler::MakeSpaceForNewReader() {
                  "total log reader count exceeds upper limit")("reader count after clean", mDevInodeReaderMap.size()));
     // randomly choose one project to send alarm
     LogFileReaderPtr oneReader = mDevInodeReaderMap.begin()->second;
-    AlarmManager::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarmError(
         FILE_READER_EXCEED_ALARM,
         string("total log reader count exceeds upper limit, delete some of the old readers, reader count after clean:")
             + ToString(mDevInodeReaderMap.size()),
@@ -389,7 +389,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
                     "logstore", readerConfig.second->GetLogstoreName())("config", readerConfig.second->GetConfigName())(
                     "log reader queue name", PathJoin(path, name))("max queue length",
                                                                    readerConfig.first->mRotatorQueueSize));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 DROP_LOG_ALARM,
                 string("log reader queue length excceeds upper limit, stop creating new reader, config: ")
                     + readerConfig.second->GetConfigName() + ", log reader queue name: " + PathJoin(path, name)
@@ -559,10 +559,24 @@ void ModifyHandler::Handle(const Event& event) {
             }
         }
         for (auto& pair : mRotatorReaderMap) {
-            if (pair.second->GetContainerID() != event.GetContainerID()) {
+            auto& reader = pair.second;
+            if (reader->GetContainerID() != event.GetContainerID()) {
                 continue;
             }
-            pair.second->SetContainerStopped();
+            reader->SetContainerStopped();
+            if (reader->IsReadToEnd() || reader->ShouldForceReleaseDeletedFileFd()) {
+                if (reader->IsFileOpened()) {
+                    LOG_INFO(sLogger,
+                             ("close the file",
+                              "the container has been stopped, and current file has been read or is forced to close")(
+                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                 "file size", reader->GetFileSize())("container id", event.GetContainerID()));
+                    // release fd as quick as possible
+                    reader->CloseFilePtr();
+                }
+            }
         }
     } else if (event.IsModify()) {
         // devInode cannot be found, this means a rotate file(like a.log.1) has event, and reader for rotate file is
@@ -723,7 +737,7 @@ void ModifyHandler::Handle(const Event& event) {
                              ToString(reader->GetDevInode().inode),
                              reader->GetLastFilePos())("DevInode map size", mDevInodeReaderMap.size()));
                 recreateReaderFlag = true;
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmWarning(
                     INNER_PROFILE_ALARM,
                     string("file dev inode changed, create new reader. new path:") + reader->GetHostLogPath()
                         + " ,project:" + reader->GetProject() + " ,logstore:" + reader->GetLogstore(),
@@ -780,7 +794,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 ("logprocess queue is full, put modify event to event queue again",
                                  reader->GetHostLogPath())(reader->GetProject(), reader->GetLogstore()));
 
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmWarning(
                         PROCESS_QUEUE_BUSY_ALARM,
                         string("logprocess queue is full, put modify event to event queue again, file:")
                             + reader->GetHostLogPath(),

@@ -32,11 +32,15 @@ const (
 )
 
 const (
-	k8sDomain  = "k8s"
-	ackCluster = "ack"
-	oneCluster = "one"
-	asiCluster = "asi"
+	k8sDomain      = "k8s"
+	infraDomain    = "infra"
+	acsDomain      = "acs"
+	infraServer    = "infra.server"
+	acsEcsInstance = "acs.ecs.instance"
 
-	clusterTypeName   = "cluster"
-	containerTypeName = "container"
+	clusterKindName   = "cluster"
+	containerKindName = "container"
+	crossDomainSameAs = "same_as"
+
+	aliyunInstanceIDLabel = "ecs-instance-id"
 )

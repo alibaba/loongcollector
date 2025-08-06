@@ -83,7 +83,7 @@ func (p *ProcessorJSON) processLog(log *protocol.Log) {
 			}
 			err := jsonparser.ObjectEach([]byte(objectVal), param.ExpandJSONCallBack)
 			if err != nil {
-				logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
+				logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
 			}
 			if !p.shouldKeepSource(err) {
 				log.Contents = append(log.Contents[:idx], log.Contents[idx+1:]...)
@@ -278,7 +278,7 @@ func (p *ProcessorJSON) processEvent(event models.PipelineEvent) {
 	}
 	err := jsonparser.ObjectEach(bytesVal, param.ExpandJSONCallBack)
 	if err != nil {
-		logger.Errorf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
+		logger.Warningf(p.context.GetRuntimeContext(), "PROCESSOR_JSON_PARSER_ALARM", "parser json error %v", err)
 	}
 	if !p.shouldKeepSource(err) && !param.isSourceKeyOverwritten {
 		contents.Delete(p.SourceKey)

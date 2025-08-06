@@ -14,8 +14,6 @@
 
 #pragma once
 
-#include "ProcessEvent.h"
-#include "RetryableEventCache.h"
 #include "common/ProcParser.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/bpf_process_event_type.h"
@@ -23,6 +21,8 @@
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/ProcessDataMap.h"
 #include "ebpf/plugin/RetryableEvent.h"
+#include "ebpf/plugin/RetryableEventCache.h"
+#include "ebpf/type/ProcessEvent.h"
 
 namespace logtail::ebpf {
 

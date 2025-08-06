@@ -132,6 +132,7 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                       containerPath->mRealBaseDir.size());
                 reader->SetContainerID(containerPath->mID);
                 reader->SetContainerMetadatas(containerPath->mMetadatas);
+                reader->SetContainerCustomMetadatas(containerPath->mCustomMetadatas);
                 reader->SetContainerExtraTags(containerPath->mTags);
             }
         }
@@ -205,7 +206,11 @@ LogFileReader::LogFileReader(const std::string& hostLogPathDir,
       mConfigName(readerConfig.second->GetConfigName()),
       mRegion(readerConfig.second->GetRegion()) {
     mHostLogPath = PathJoin(hostLogPathDir, hostLogPathFile);
-
+#if defined(_MSC_VER)
+    if (BOOL_FLAG(enable_chinese_tag_path)) {
+        mChineseEncodingPath = EncodingConverter::GetInstance()->FromACPToUTF8(mHostLogPath);
+    }
+#endif
 
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = GetParser<RawTextParser>(0);
@@ -326,13 +331,6 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             }
             // new property to recover reader exactly from checkpoint
             mIdxInReaderArrayFromLastCpt = checkPointPtr->mIdxInReaderArray;
-            LOG_INFO(sLogger,
-                     ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
-                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
-                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
-                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
-                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
-                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID));
             // if file is open or
             // last update time is new and the file's container is not stopped we
             // we should use first modify
@@ -343,6 +341,14 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             } else {
                 mSkipFirstModify = true;
             }
+            LOG_INFO(sLogger,
+                     ("recover log reader status from checkpoint, project", GetProject())("logstore", GetLogstore())(
+                         "config", GetConfigName())("log reader queue name", mHostLogPath)(
+                         "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
+                         "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
+                         "real file path", mRealLogPath)("last file position", mLastFilePos)(
+                         "index in reader array", mIdxInReaderArrayFromLastCpt)("container id", mContainerID)(
+                         "container stop", mContainerStopped)("skipFirstModify", mSkipFirstModify));
             // delete checkpoint at last
             checkPointManagerPtr->DeleteCheckPoint(mDevInode, GetConfigName());
             // because the reader is initialized by checkpoint, so set first watch to false
@@ -653,13 +659,13 @@ bool LogFileReader::CheckForFirstOpen(FileReadPolicy policy) {
             return true;
         }
         LOG_ERROR(sLogger, ("open log file fail", mHostLogPath)("errno", ErrnoToString(error)));
-        AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                               string("Failed to open log file: ") + mHostLogPath
-                                                   + "; errono:" + ErrnoToString(error),
-                                               GetRegion(),
-                                               GetProject(),
-                                               GetConfigName(),
-                                               GetLogstore());
+        AlarmManager::GetInstance()->SendAlarmWarning(OPEN_LOGFILE_FAIL_ALARM,
+                                                      string("Failed to open log file: ") + mHostLogPath
+                                                          + "; errono:" + ErrnoToString(error),
+                                                      GetRegion(),
+                                                      GetProject(),
+                                                      GetConfigName(),
+                                                      GetLogstore());
         return false;
     }
 
@@ -830,25 +836,25 @@ std::string LogFileReader::GetTopicName(const std::string& topicConfig, const st
                             ("extract topic by regex", "fail")("project", GetProject())("logstore", GetLogstore())(
                                 "path", finalPath)("regx", topicConfig));
 
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   string("extract topic by regex fail, exception:") + exception
-                                                       + ", path:" + finalPath + ", regex:" + topicConfig,
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                                          string("extract topic by regex fail, exception:") + exception
+                                                              + ", path:" + finalPath + ", regex:" + topicConfig,
+                                                          GetRegion(),
+                                                          GetProject(),
+                                                          GetConfigName(),
+                                                          GetLogstore());
         }
     } catch (...) {
         LOG_ERROR(sLogger,
                   ("extract topic by regex", "fail")("exception", exception)("project", GetProject())(
                       "logstore", GetLogstore())("path", finalPath)("regx", topicConfig));
-        AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                               string("extract topic by regex fail, exception:") + exception
-                                                   + ", path:" + finalPath + ", regex:" + topicConfig,
-                                               GetRegion(),
-                                               GetProject(),
-                                               GetConfigName(),
-                                               GetLogstore());
+        AlarmManager::GetInstance()->SendAlarmWarning(CATEGORY_CONFIG_ALARM,
+                                                      string("extract topic by regex fail, exception:") + exception
+                                                          + ", path:" + finalPath + ", regex:" + topicConfig,
+                                                      GetRegion(),
+                                                      GetProject(),
+                                                      GetConfigName(),
+                                                      GetLogstore());
     }
 
     return res;
@@ -997,13 +1003,13 @@ void LogFileReader::OnOpenFileError() {
                           "log path", mRealLogPath)("file device", ToString(mDevInode.dev))(
                           "file inode", ToString(mDevInode.inode))("file signature", mLastFileSignatureHash)(
                           "file signature size", mLastFileSignatureSize)("last file position", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(LOGFILE_PERMINSSION_ALARM,
-                                                   string("Failed to open log file because of permission: ")
-                                                       + mHostLogPath,
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmWarning(LOGFILE_PERMINSSION_ALARM,
+                                                          string("Failed to open log file because of permission: ")
+                                                              + mHostLogPath,
+                                                          GetRegion(),
+                                                          GetProject(),
+                                                          GetConfigName(),
+                                                          GetLogstore());
             break;
         case EMFILE:
             LOG_ERROR(sLogger,
@@ -1012,13 +1018,13 @@ void LogFileReader::OnOpenFileError() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                                   string("Failed to open log file because of : Too many open files")
-                                                       + mHostLogPath,
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmWarning(
+                OPEN_LOGFILE_FAIL_ALARM,
+                string("Failed to open log file because of : Too many open files") + mHostLogPath,
+                GetRegion(),
+                GetProject(),
+                GetConfigName(),
+                GetLogstore());
             break;
         default:
             LOG_ERROR(sLogger,
@@ -1027,13 +1033,13 @@ void LogFileReader::OnOpenFileError() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                                   string("Failed to open log file: ") + mHostLogPath
-                                                       + "; errono:" + ErrnoToString(GetErrno()),
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmWarning(OPEN_LOGFILE_FAIL_ALARM,
+                                                          string("Failed to open log file: ") + mHostLogPath
+                                                              + "; errono:" + ErrnoToString(GetErrno()),
+                                                          GetRegion(),
+                                                          GetProject(),
+                                                          GetConfigName(),
+                                                          GetLogstore());
     }
 }
 
@@ -1060,13 +1066,13 @@ bool LogFileReader::UpdateFilePtr() {
                           "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                           "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                           "last file position", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(OPEN_FILE_LIMIT_ALARM,
-                                                   string("Failed to open log file: ") + mHostLogPath
-                                                       + " limit:" + ToString(INT32_FLAG(max_reader_open_files)),
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmError(OPEN_FILE_LIMIT_ALARM,
+                                                        string("Failed to open log file: ") + mHostLogPath
+                                                            + " limit:" + ToString(INT32_FLAG(max_reader_open_files)),
+                                                        GetRegion(),
+                                                        GetProject(),
+                                                        GetConfigName(),
+                                                        GetLogstore());
             // set errno to "too many open file"
             errno = EMFILE;
             return false;
@@ -1205,14 +1211,14 @@ void LogFileReader::CloseFilePtr() {
                     "file device", ToString(mDevInode.dev))("file inode", ToString(mDevInode.inode))(
                     "file signature", mLastFileSignatureHash)("file signature size", mLastFileSignatureSize)(
                     "file size", mLastFileSize)("last file position", mLastFilePos)("reader id", long(this)));
-            AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                                   string("close file error because of ") + strerror(errno)
-                                                       + ", file path: " + mHostLogPath + ", inode: "
-                                                       + ToString(mDevInode.inode) + ", inode: " + ToString(fd),
-                                                   GetRegion(),
-                                                   GetProject(),
-                                                   GetConfigName(),
-                                                   GetLogstore());
+            AlarmManager::GetInstance()->SendAlarmWarning(OPEN_LOGFILE_FAIL_ALARM,
+                                                          string("close file error because of ") + strerror(errno)
+                                                              + ", file path: " + mHostLogPath + ", inode: "
+                                                              + ToString(mDevInode.inode) + ", inode: " + ToString(fd),
+                                                          GetRegion(),
+                                                          GetProject(),
+                                                          GetConfigName(),
+                                                          GetLogstore());
         } else {
             LOG_INFO(
                 sLogger,
@@ -1266,13 +1272,14 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
             sLogger,
             ("tell error", mHostLogPath)("inode", mDevInode.inode)("error", strerror(lastErrNo))("reopen", reopenFlag)(
                 "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
-        AlarmManager::GetInstance()->SendAlarm(OPEN_LOGFILE_FAIL_ALARM,
-                                               string("tell error because of ") + strerror(lastErrNo) + " file path: "
-                                                   + mHostLogPath + ", inode : " + ToString(mDevInode.inode),
-                                               GetRegion(),
-                                               GetProject(),
-                                               GetConfigName(),
-                                               GetLogstore());
+        AlarmManager::GetInstance()->SendAlarmWarning(OPEN_LOGFILE_FAIL_ALARM,
+                                                      string("tell error because of ") + strerror(lastErrNo)
+                                                          + " file path: " + mHostLogPath
+                                                          + ", inode : " + ToString(mDevInode.inode),
+                                                      GetRegion(),
+                                                      GetProject(),
+                                                      GetConfigName(),
+                                                      GetLogstore());
         if (endSize < 0) {
             return false;
         }
@@ -1321,14 +1328,14 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
                   mHostLogPath)(ToString(endSize), ToString(mLastFilePos))("project", GetProject())(
                      "logstore", GetLogstore())("config", GetConfigName()));
 
-        AlarmManager::GetInstance()->SendAlarm(LOG_TRUNCATE_ALARM,
-                                               mHostLogPath
-                                                   + " signature is same but size decrease, read from now fileSize "
-                                                   + ToString(endSize) + " last read pos " + ToString(mLastFilePos),
-                                               GetRegion(),
-                                               GetProject(),
-                                               GetConfigName(),
-                                               GetLogstore());
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            LOG_TRUNCATE_ALARM,
+            mHostLogPath + " signature is same but size decrease, read from now fileSize " + ToString(endSize)
+                + " last read pos " + ToString(mLastFilePos),
+            GetRegion(),
+            GetProject(),
+            GetConfigName(),
+            GetLogstore());
 
         mLastFilePos = endSize;
         // when we use truncate_pos_skip_bytes, if truncate stop and log start to append, logtail will drop less data or
@@ -1420,7 +1427,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             LOG_WARNING(sLogger,
                         ("read log delay", mHostLogPath)("fall behind bytes",
                                                          delta)("file size", fileSize)("read pos", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 READ_LOG_DELAY_ALARM,
                 std::string("fall behind ") + ToString(delta) + " bytes, file size:" + ToString(fileSize)
                     + ", now position:" + ToString(mLastFilePos) + ", path:" + mHostLogPath
@@ -1440,7 +1447,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
                     ("read log delay and force set file pos to file size", mHostLogPath)("fall behind bytes", delta)(
                         "skip bytes config", mReaderConfig.first->mReadDelaySkipThresholdBytes)("file size", fileSize)(
                         "read pos", mLastFilePos));
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmError(
             READ_LOG_DELAY_ALARM,
             string("force set file pos to file size, fall behind ") + ToString(delta)
                 + " bytes, file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos)
@@ -1461,7 +1468,7 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             LOG_WARNING(sLogger,
                         ("read stopped container file", mHostLogPath)("stopped time", mContainerStoppedTime)(
                             "file size", fileSize)("read pos", mLastFilePos));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmWarning(
                 READ_STOPPED_CONTAINER_ALARM,
                 string("path: ") + mHostLogPath + ", stopped time:" + ToString(mContainerStoppedTime)
                     + ", file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos),
@@ -1598,7 +1605,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
                 oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
                     << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
                     << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmWarning(
                     SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
             } else {
                 // line is not finished yet nor more data, put all data in cache
@@ -1806,7 +1813,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos)
             << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
             << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmWarning(
             SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
     }
     LOG_DEBUG(sLogger,
@@ -2397,6 +2404,10 @@ void LogFileReader::SetEventGroupMetaAndTag(PipelineEventGroup& group) {
                 group.SetTagNoCopy(key, StringView(b.data, b.size));
             }
         }
+        const auto& containerCustomMetadatas = GetContainerCustomMetadatas();
+        for (const auto& metadata : containerCustomMetadatas) {
+            group.SetTag(metadata.first, metadata.second);
+        }
     }
 
     const auto& topic = GetTopicName();
@@ -2432,16 +2443,12 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
 }
 
 const std::string& LogFileReader::GetConvertedPath() const {
-    const std::string& path = mDockerPath.empty() ? mHostLogPath : mDockerPath;
 #if defined(_MSC_VER)
     if (BOOL_FLAG(enable_chinese_tag_path)) {
-        static std::string newPath = EncodingConverter::GetInstance()->FromACPToUTF8(path);
-        return newPath;
+        return mChineseEncodingPath;
     }
-    return path;
-#else
-    return path;
 #endif
+    return mDockerPath.empty() ? mHostLogPath : mDockerPath;
 }
 
 bool LogFileReader::UpdateContainerInfo() {
