@@ -724,7 +724,6 @@ bool LinuxSystemInterface::GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdline
 bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) {
     auto processStatm = PROCESS_DIR / std::to_string(pid) / PROCESS_STATM;
     std::vector<std::string> processStatmString;
-    char* endptr;
 
     std::ifstream file(static_cast<std::string>(processStatm));
 
@@ -749,14 +748,13 @@ bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformati
         return false;
     }
 
-    long pagesize = sysconf(_SC_PAGESIZE); // 获取系统页大小
     int index = 0;
-    processMemory.size = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
-    processMemory.size = processMemory.size * pagesize;
-    processMemory.resident = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
-    processMemory.resident = processMemory.resident * pagesize;
-    processMemory.share = static_cast<uint64_t>(std::strtoull(processMemoryMetric[index++].c_str(), &endptr, 10));
-    processMemory.share = processMemory.share * pagesize;
+    StringTo(processMemoryMetric[index++], processMemory.size);
+    processMemory.size = processMemory.size * PAGE_SIZE;
+    StringTo(processMemoryMetric[index++], processMemory.resident);
+    processMemory.resident = processMemory.resident * PAGE_SIZE;
+    StringTo(processMemoryMetric[index++], processMemory.share);
+    processMemory.share = processMemory.share * PAGE_SIZE;
 
     return true;
 }
@@ -801,12 +799,10 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     passwd* pw = nullptr;
     passwd pwbuffer;
     char buffer[2048];
-    if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0) {
+    if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0 || pw == nullptr || pw->pw_name == nullptr) {
         return false;
     }
-    if (pw == nullptr) {
-        return false;
-    }
+
     processCredName.user = pw->pw_name;
 
     group* grp = nullptr;
