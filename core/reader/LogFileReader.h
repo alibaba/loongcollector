@@ -80,7 +80,8 @@ typedef std::deque<LogFileReaderPtr> LogFileReaderPtrArray;
 class LogFileReader {
 public:
     static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
-    static const int32_t CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY = -2;
+    static const int32_t CHECKPOINT_IDX_OF_ROTATOR_MAP = -2;
+    static const int32_t CHECKPOINT_IDX_UNDEFINED = -3;
     enum FileCompareResult {
         FileCompareResult_DevInodeChange,
         FileCompareResult_SigChange,
@@ -393,7 +394,7 @@ protected:
     int64_t mLastFileSize = 0;
     time_t mLastMTime = 0;
     std::string mCache;
-    // >= 0: index of reader array, -1: new reader, -2: not in reader array
+    // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
     std::string mTopicName;
