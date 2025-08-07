@@ -119,6 +119,8 @@ const string& METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL = METRIC_DISCARDED_EVENTS_TOT
 const string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL = "out_failed_events_total";
 const string METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL = "out_key_not_found_events_total";
 const string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL = "out_successful_events_total";
+const string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL = "out_failed_event_groups_total";
+const string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL = "out_successful_event_groups_total";
 
 /**********************************************************
  *   processor_parse_apsara_native
@@ -144,7 +146,6 @@ const string METRIC_PLUGIN_UNMATCHED_EVENTS_TOTAL = "unmatched_events_total";
  **********************************************************/
 const string METRIC_PLUGIN_PARSE_STDERR_TOTAL = "parse_stderr_total";
 const string METRIC_PLUGIN_PARSE_STDOUT_TOTAL = "parse_stdout_total";
-
 
 /**********************************************************
  *   all flusher （所有发送插件通用指标）
