@@ -120,6 +120,7 @@ int FileSecurityManager::SendEvents() {
     if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
     WriteLock lk(this->mLock);
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
@@ -132,7 +133,7 @@ int FileSecurityManager::SendEvents() {
         return 0;
     }
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
@@ -221,7 +222,6 @@ int FileSecurityManager::SendEvents() {
             }
         }
     }
-    mLastSendTimeMs = nowMs;
     return 0;
 }
 

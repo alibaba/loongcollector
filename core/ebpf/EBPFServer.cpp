@@ -287,7 +287,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         // create ...
         if (isNeedProcessCache) {
             if (mProcessCacheManager->Init()) {
-                registerPluginPerfBuffers(PluginType::PROCESS_SECURITY);
                 LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
             } else {
                 LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
@@ -361,7 +360,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
     if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
-        registerPluginPerfBuffers(type);
+        RegisterPluginPerfBuffers(type);
     }
 
     return true;
@@ -403,7 +402,6 @@ bool EBPFServer::checkIfNeedStopProcessCacheManager() const {
 void EBPFServer::stopProcessCacheManager() {
     LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
     mProcessCacheManager->Stop();
-    unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
 }
 
 bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
@@ -427,7 +425,7 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         }
 
         // do real destroy ...
-        unregisterPluginPerfBuffers(type);
+        UnregisterPluginPerfBuffers(type);
         ret = pluginManager->Destroy();
         if (ret != 0) {
             LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
@@ -670,7 +668,7 @@ bool EBPFServer::initUnifiedEpollMonitoring() {
     return true;
 }
 
-void EBPFServer::registerPluginPerfBuffers(PluginType type) {
+void EBPFServer::RegisterPluginPerfBuffers(PluginType type) {
     if (mUnifiedEpollFd < 0) {
         return;
     }
@@ -695,7 +693,7 @@ void EBPFServer::registerPluginPerfBuffers(PluginType type) {
     }
 }
 
-void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
+void EBPFServer::UnregisterPluginPerfBuffers(PluginType type) {
     if (mUnifiedEpollFd < 0) {
         return;
     }

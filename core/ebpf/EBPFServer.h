@@ -108,6 +108,9 @@ public:
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
 
+    void RegisterPluginPerfBuffers(PluginType type);
+    void UnregisterPluginPerfBuffers(PluginType type);
+
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,
@@ -137,8 +140,6 @@ private:
 
     // Unified epoll monitoring methods
     bool initUnifiedEpollMonitoring();
-    void registerPluginPerfBuffers(PluginType type);
-    void unregisterPluginPerfBuffers(PluginType type);
     void cleanupUnifiedEpollMonitoring();
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;

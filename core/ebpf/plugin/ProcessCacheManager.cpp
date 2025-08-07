@@ -28,6 +28,7 @@
 #include <memory>
 #include <utility>
 
+#include "EBPFServer.h"
 #include "Flags.h"
 #include "ProcessCache.h"
 #include "TimeKeeper.h"
@@ -162,6 +163,7 @@ bool ProcessCacheManager::Init() {
         return false;
     }
     LOG_INFO(sLogger, ("start process probes, status", status));
+    ebpf::EBPFServer::GetInstance()->RegisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
     mInited = true;
     auto ret = syncAllProc(); // write process cache contention with pollPerfBuffers
     if (ret) {
@@ -174,6 +176,7 @@ void ProcessCacheManager::Stop() {
     if (!mInited) {
         return;
     }
+    ebpf::EBPFServer::GetInstance()->UnregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
     mInited = false;
     waitForConsumeFinished();
     auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);

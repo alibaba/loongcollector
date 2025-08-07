@@ -170,6 +170,7 @@ int ProcessSecurityManager::SendEvents() {
     if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
 
@@ -181,7 +182,7 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
