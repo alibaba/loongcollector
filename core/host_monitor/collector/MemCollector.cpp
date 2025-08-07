@@ -65,7 +65,6 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
 
     mCount = 0;
     mCalculateMeminfo.Reset();
-
     const time_t now = time(nullptr);
 
     MetricEvent* metricEvent = group->AddMetricEvent(true);
