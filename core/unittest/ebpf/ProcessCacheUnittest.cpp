@@ -24,25 +24,26 @@ using namespace logtail::ebpf;
 
 class ProcessCacheValueUnittest : public ::testing::Test {
 protected:
-    void TestCloneContents();
-    void TestCloneContentsExcessive();
+    void TestShallowCopyContents();
+    void TestShallowCopyContentsExcessive();
     void TestSetContent();
 };
 
-void ProcessCacheValueUnittest::TestCloneContents() {
+void ProcessCacheValueUnittest::TestShallowCopyContents() {
     ProcessCacheValue v1;
     v1.mPPid = 1;
     v1.mPKtime = 2;
     v1.mRefCount = 3;
     v1.SetContent<ebpf::kArguments>(StringView("arg1 arg2 arg3"));
-    std::unique_ptr<ProcessCacheValue> v2(v1.CloneContents());
+    std::unique_ptr<ProcessCacheValue> v2(v1.ShallowCopyContents());
     APSARA_TEST_EQUAL_FATAL(0U, v2->mPPid);
     APSARA_TEST_EQUAL_FATAL(0UL, v2->mPKtime);
     APSARA_TEST_EQUAL_FATAL(0, v2->mRefCount);
+    APSARA_TEST_EQUAL_FATAL(nullptr, v2->mParent);
     APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), v2->Get<ebpf::kArguments>());
 }
 
-void ProcessCacheValueUnittest::TestCloneContentsExcessive() {
+void ProcessCacheValueUnittest::TestShallowCopyContentsExcessive() {
     ProcessCacheValue v1;
     v1.mPPid = 1;
     v1.mPKtime = 2;
@@ -52,14 +53,15 @@ void ProcessCacheValueUnittest::TestCloneContentsExcessive() {
     for (size_t i = 0; i < clones.size(); ++i) {
         auto& v2 = clones[i];
         if (i == 0) {
-            v2.reset(v1.CloneContents());
+            v2.reset(v1.ShallowCopyContents());
         } else {
             auto& parent = clones[i - 1];
-            v2.reset(parent->CloneContents());
+            v2.reset(parent->ShallowCopyContents());
         }
         APSARA_TEST_EQUAL_FATAL(0U, v2->mPPid);
         APSARA_TEST_EQUAL_FATAL(0UL, v2->mPKtime);
         APSARA_TEST_EQUAL_FATAL(0, v2->mRefCount);
+        APSARA_TEST_EQUAL_FATAL(nullptr, v2->mParent);
         APSARA_TEST_EQUAL_FATAL(StringView("arg1 arg2 arg3"), v2->Get<ebpf::kArguments>());
     }
     APSARA_TEST_NOT_EQUAL_FATAL(v1.GetSourceBuffer().get(), clones.back()->GetSourceBuffer().get());
@@ -73,8 +75,8 @@ void ProcessCacheValueUnittest::TestSetContent() {
     APSARA_TEST_EQUAL_FATAL(StringView("1000000000"), v.Get<ebpf::kKtime>());
 }
 
-UNIT_TEST_CASE(ProcessCacheValueUnittest, TestCloneContents);
-UNIT_TEST_CASE(ProcessCacheValueUnittest, TestCloneContentsExcessive);
+UNIT_TEST_CASE(ProcessCacheValueUnittest, TestShallowCopyContents);
+UNIT_TEST_CASE(ProcessCacheValueUnittest, TestShallowCopyContentsExcessive);
 UNIT_TEST_CASE(ProcessCacheValueUnittest, TestSetContent);
 
 class ProcessCacheUnittest : public ::testing::Test {

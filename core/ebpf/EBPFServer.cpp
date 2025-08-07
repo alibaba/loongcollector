@@ -207,7 +207,7 @@ void EBPFServer::Init() {
     if (!mEnvMgr.AbleToLoadDyLib()) {
         return;
     }
-    if(!initUnifiedEpollMonitoring()) {
+    if (!initUnifiedEpollMonitoring()) {
         return;
     }
     mInited = true;
