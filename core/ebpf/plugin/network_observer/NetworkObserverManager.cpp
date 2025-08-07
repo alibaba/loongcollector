@@ -1764,9 +1764,9 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
             event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
             event->SetContent(kPodName.LogKey(), podMeta->mPodName);
-            event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
+            event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mStartTime * 1000));
 
-            event->SetContent("timestamp", ToString(podMeta->mTimestamp));
+            event->SetContent("timestamp", ToString(now * 1000));
             rapidjson::Document doc;
             doc.SetObject();
 
