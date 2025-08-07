@@ -180,7 +180,7 @@ private:
     int GetFileSystemInfos(std::vector<FileSystemInfo>& fileSystemInfos);
     int GetFileSystemStat(const std::string& dirName, FileSystemUsage& fileSystemUsage);
     std::string GetDiskName(const std::string& dev);
-    int GetDiskStat(dev_t rDev, const std::string& dirName, DiskUsage& disk, DiskUsage& deviceUsage);
+    int GetDiskStat(dev_t rDev, DiskUsage& disk, DiskUsage& deviceUsage);
     int CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage);
     int GetDiskUsage(DiskUsage& diskUsage, std::string dirName);
     int GetIOstat(std::string& dirName, DiskUsage& disk, std::shared_ptr<IODev>& ioDev, DiskUsage& deviceUsage);
@@ -196,7 +196,7 @@ private:
     const std::string mModuleName;
     int mCountPerReport = 0;
     int mCount = 0;
-    size_t maxDirSize = 1024;
+    static const size_t kMaxDirSize = 1024;
     std::chrono::steady_clock::time_point mLastTime; // 上次获取磁盘信息的时间
     std::unordered_map<uint64_t, std::shared_ptr<IODev>> fileSystemCache;
     std::map<std::string, MetricCalculate<DeviceMetric>> mDeviceCalMap;

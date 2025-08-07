@@ -39,7 +39,7 @@ namespace logtail {
 const std::string DiskCollector::sName = "disk";
 
 template <typename T>
-T Diff(const T& a, const T& b) {
+T DiffOrZero(const T& a, const T& b) {
     return a > b ? a - b : T{0};
 }
 
@@ -62,7 +62,7 @@ int DiskCollector::Init(int totalCount) {
 
 // 最少一条
 template <typename T>
-std::string join_n(const T& v, const std::string& splitter, size_t n) {
+std::string JoinBytesLimit(const T& v, const std::string& splitter, size_t n) {
     static_assert(std::is_base_of<std::vector<std::string>, T>::value
                       || std::is_base_of<std::set<std::string>, T>::value
                       || std::is_base_of<std::list<std::string>, T>::value,
@@ -78,7 +78,6 @@ std::string join_n(const T& v, const std::string& splitter, size_t n) {
             result.append(*it);
         }
     }
-    // 去掉最后一个分隔符
     return result;
 }
 
@@ -151,7 +150,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
     for (auto& mDeviceCal : mDeviceCalMap) {
         std::string devName = mDeviceCal.first;
         std::string diskName = GetDiskName(devName);
-        std::string diskSerialId = "";
+        std::string diskSerialId;
         SerialIdInformation diskSerialIdInfo;
 
         if (SystemInterface::GetInstance()->GetDiskSerialIdInformation(diskName, diskSerialIdInfo)) {
@@ -160,7 +159,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
 
         MetricEvent* metricEvent = group->AddMetricEvent(true);
         DiskCollectStat diskCollectStat = mCurrentDiskCollectStatMap[devName];
-        std::string dir_name = join_n(diskCollectStat.deviceMountInfo.mountPaths, ",", maxDirSize);
+        std::string dirName = JoinBytesLimit(diskCollectStat.deviceMountInfo.mountPaths, ",", kMaxDirSize);
         if (!metricEvent) {
             return false;
         }
@@ -169,7 +168,7 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), devName);
         metricEvent->SetTag(std::string("id_serial"), diskSerialId);
-        metricEvent->SetTag(std::string("diskname"), dir_name);
+        metricEvent->SetTag(std::string("diskname"), dirName);
         metricEvent->SetTag(std::string("m"), std::string("system.disk"));
 
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
@@ -228,12 +227,12 @@ bool DiskCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectC
 }
 
 template <typename T>
-constexpr bool is_numeric() {
+constexpr bool IsNumeric() {
     return std::is_arithmetic<T>::value;
 }
 template <typename T1, typename T2, typename... TOthers>
-constexpr bool is_numeric() {
-    return is_numeric<T1>() && is_numeric<T2, TOthers...>();
+constexpr bool IsNumeric() {
+    return IsNumeric<T1>() && IsNumeric<T2, TOthers...>();
 }
 template <typename T>
 double GetRatio(const T& prev, const T& curr, double interval) {
@@ -260,7 +259,7 @@ T Delta(const T& a, const T& b) {
 // T1, T2不是相同数字类型，或不是无符号整数，不支持溢出情况下的循环计算
 template <typename T1,
           typename T2,
-          typename std::enable_if<is_numeric<T1, T2>() && (!std::is_same<T1, T2>::value || !is_uint<T1>()), int>::type
+          typename std::enable_if<IsNumeric<T1, T2>() && (!std::is_same<T1, T2>::value || !is_uint<T1>()), int>::type
           = 0>
 auto Delta(const T1& a, const T2& b) -> decltype(a - b) {
     return a > b ? a - b : 0;
@@ -298,10 +297,9 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
 
     for (auto& it : deviceMountMap) {
         std::string dirName = it.second.mountPaths[0];
-        // string devName = it.second.devName;
         FileSystemUsage fileSystemStat;
         // 只有在获取文件系统信息成功之后才进行磁盘信息的获取
-        if (GetFileSystemStat(dirName, fileSystemStat) != 0) { // || GetDiskStat(devName, fileSystemStat) != 0) {
+        if (GetFileSystemStat(dirName, fileSystemStat) != 0) {
             continue;
         }
 
@@ -355,7 +353,7 @@ int DiskCollector::GetFileSystemStat(const std::string& dirName, FileSystemUsage
     fileSystemUsage.total = ((buffer.f_blocks * bsize) >> 1);
     fileSystemUsage.free = ((buffer.f_bfree * bsize) >> 1);
     fileSystemUsage.avail = ((buffer.f_bavail * bsize) >> 1); // 非超级用户最大可使用的磁盘量
-    fileSystemUsage.used = Diff(fileSystemUsage.total, fileSystemUsage.free);
+    fileSystemUsage.used = DiffOrZero(fileSystemUsage.total, fileSystemUsage.free);
     fileSystemUsage.files = buffer.f_files;
     fileSystemUsage.freeFiles = buffer.f_ffree;
 
@@ -376,7 +374,7 @@ int DiskCollector::GetFileSystemStat(const std::string& dirName, FileSystemUsage
     return 0;
 }
 
-int DiskCollector::GetDiskStat(dev_t rDev, const std::string& dirName, DiskUsage& disk, DiskUsage& deviceUsage) {
+int DiskCollector::GetDiskStat(dev_t rDev, DiskUsage& disk, DiskUsage& deviceUsage) {
     std::vector<std::string> diskLines = {};
     std::string errorMessage;
 
@@ -416,7 +414,7 @@ int DiskCollector::CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage) {
 
     diskUsage.serviceTime = -1;
     if (diskUsage.time != std::numeric_limits<uint64_t>::max()) {
-        uint64_t ios = Diff(diskUsage.reads, ioDev.diskUsage.reads) + Diff(diskUsage.writes, ioDev.diskUsage.writes);
+        uint64_t ios = DiffOrZero(diskUsage.reads, ioDev.diskUsage.reads) + DiffOrZero(diskUsage.writes, ioDev.diskUsage.writes);
         double tmp = ((double)ios) * HZ / interval;
         double util = ((double)(diskUsage.time - ioDev.diskUsage.time)) / interval * HZ;
 
@@ -487,7 +485,7 @@ int DiskCollector::GetIOstat(std::string& dirName,
     // print(ioDev->name, ioStat);
 
     // 2. 统计dev的磁盘使用情况
-    return GetDiskStat(ioStat.st_rdev, dirName, disk, deviceUsage);
+    return GetDiskStat(ioStat.st_rdev, disk, deviceUsage);
 }
 
 bool IsDev(const std::string& dirName) {
