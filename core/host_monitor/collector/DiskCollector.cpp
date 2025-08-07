@@ -235,8 +235,8 @@ constexpr bool IsNumeric() {
     return IsNumeric<T1>() && IsNumeric<T2, TOthers...>();
 }
 template <typename T>
-double GetRatio(const T& prev, const T& curr, double interval) {
-    auto delta = static_cast<double>(prev > curr ? prev - curr : 0);
+double GetRatio(const T& curr, const T& prev, double interval) {
+    auto delta = static_cast<double>(curr > prev ? curr - prev : 0);
     return interval == 0 ? 0.0 : (delta / interval);
 }
 
