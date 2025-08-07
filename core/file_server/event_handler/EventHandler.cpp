@@ -418,7 +418,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
             readerPtr->ResetLastFilePos();
         }
     } else {
-        // rotate log or soft link, push front
+        // rotate log, push front
         backFlag = false;
         LOG_DEBUG(sLogger, ("rotator log, push front", readerPtr->GetRealLogPath()));
     }
@@ -455,7 +455,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
     }
 
     int32_t idx = readerPtr->GetIdxInReaderArrayFromLastCpt();
-    if (idx == LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY) { // reader not in reader array
+    if (idx == LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP) { // reader not in reader array
         mRotatorReaderMap[devInode] = readerPtr;
     } else if (idx >= 0) { // reader in reader array
         readerArray.push_back(readerPtr);
@@ -466,7 +466,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
         mDevInodeReaderMap[devInode] = readerPtr;
     }
     // should only happen when upgrade from old version, may cause wrong reader array order
-    else { // rotate log, soft link
+    else { // rotate log
         if (idx != LogFileReader::CHECKPOINT_IDX_OF_NOT_FOUND) {
             LOG_ERROR(
                 sLogger,
@@ -1019,7 +1019,7 @@ void ModifyHandler::HandleTimeOut() {
 bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
     if (!isRotatorReader) {
         for (DevInodeLogFileReaderMap::iterator it = mDevInodeReaderMap.begin(); it != mDevInodeReaderMap.end(); ++it) {
-            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY;
+            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP;
             for (size_t i = 0; i < it->second->GetReaderArray()->size(); ++i) {
                 if (it->second->GetReaderArray()->at(i) == it->second) {
                     idxInReaderArray = i;
@@ -1030,7 +1030,7 @@ bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
         }
     } else {
         for (DevInodeLogFileReaderMap::iterator it = mRotatorReaderMap.begin(); it != mRotatorReaderMap.end(); ++it) {
-            it->second->DumpMetaToMem(checkConfigFlag, LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY);
+            it->second->DumpMetaToMem(checkConfigFlag, LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP);
         }
     }
     return true;

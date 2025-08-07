@@ -162,7 +162,7 @@ public:
 
     static size_t BUFFER_SIZE;
     static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
-    static const int32_t CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY = -2;
+    static const int32_t CHECKPOINT_IDX_OF_ROTATOR_MAP = -2;
     static const int32_t CHECKPOINT_IDX_OF_NOT_FOUND = -3;
     std::vector<BaseLineParse*> mLineParsers = {};
     template <typename T>

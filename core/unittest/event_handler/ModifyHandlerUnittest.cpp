@@ -48,9 +48,7 @@ public:
     void TestHandleContainerStoppedEventWhenNotReadToEnd();
     void TestHandleModifyEventWhenContainerStopped();
     void TestRecoverReaderFromCheckpoint();
-#ifndef _MSC_VER // Unnecessary on platforms without symbolic.
-    void TestRecoverReaderFromCheckpointSoftLink();
-#endif
+    void TestRecoverReaderFromCheckpointRotateLog();
     void TestRecoverReaderFromCheckpointContainer();
     void TestHandleModifyEventWhenContainerRestartCase1();
     void TestHandleModifyEventWhenContainerRestartCase2();
@@ -234,7 +232,7 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotRead
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpoint);
 #ifndef _MSC_VER // Unnecessary on platforms without symbolic.
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointSoftLink);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointRotateLog);
 #endif
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestRecoverReaderFromCheckpointContainer);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase1);
@@ -474,9 +472,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
 }
 
-#ifndef _MSC_VER // Unnecessary on platforms without symbolic.
-void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
-    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointSoftLink() begin", time(NULL)));
+void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointRotateLog() {
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointRotateLog() begin", time(NULL)));
     std::string basicLogName = "rotate.log";
     std::string logPath = gRootDir + PATH_SEPARATOR + basicLogName;
     std::string signature = "a sample log";
@@ -485,35 +482,30 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     // build a modify handler
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
     writeLog(logPath, "a sample log\n");
-    std::string softLinkPath = "/tmp/" + basicLogName;
-    unlink(softLinkPath.c_str());
-    symlink(logPath.c_str(), softLinkPath.c_str());
 
-    auto devInode = GetFileDevInode(softLinkPath);
-    auto reader = std::make_shared<LogFileReader>("/tmp",
+    auto devInode = GetFileDevInode(logPath);
+    auto reader = std::make_shared<LogFileReader>(gRootDir,
                                                   basicLogName,
                                                   devInode,
                                                   std::make_pair(&readerOpts, &ctx),
                                                   std::make_pair(&multilineOpts, &ctx),
                                                   std::make_pair(&tagOpts, &ctx));
-    reader->mRealLogPath = softLinkPath;
+    reader->mRealLogPath = logPath;
     reader->mLastFileSignatureSize = sigSize;
     reader->mLastFileSignatureHash = sigHash;
     reader->mLastFilePos = signature.size();
 
     std::string logPath1 = logPath + ".1";
     writeLog(logPath1, "a sample log\n");
-    std::string softLinkPath1 = "/tmp/" + basicLogName + ".1";
-    unlink(softLinkPath1.c_str());
-    symlink(logPath1.c_str(), softLinkPath1.c_str());
-    auto devInode1 = GetFileDevInode(softLinkPath1);
-    auto reader1 = std::make_shared<LogFileReader>("/tmp",
+    auto devInode1 = GetFileDevInode(logPath1);
+    auto reader1 = std::make_shared<LogFileReader>(gRootDir,
                                                    basicLogName,
                                                    devInode1,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
-    reader1->mRealLogPath = softLinkPath1;
+    reader1->mHostLogPath = logPath;
+    reader1->mRealLogPath = logPath1;
     reader1->mLastFileSignatureSize = sigSize;
     reader1->mLastFileSignatureHash = sigHash;
     reader1->mLastFilePos = signature.size();
@@ -527,17 +519,15 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
 
     std::string logPath2 = logPath + ".2";
     writeLog(logPath2, "a sample log\n");
-    std::string softLinkPath2 = "/tmp/" + basicLogName + ".2";
-    unlink(softLinkPath2.c_str());
-    symlink(logPath2.c_str(), softLinkPath2.c_str());
-    auto devInode2 = GetFileDevInode(softLinkPath2);
-    auto reader2 = std::make_shared<LogFileReader>("/tmp",
+    auto devInode2 = GetFileDevInode(logPath2);
+    auto reader2 = std::make_shared<LogFileReader>(gRootDir,
                                                    basicLogName,
                                                    devInode2,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
-    reader2->mRealLogPath = softLinkPath2;
+    reader2->mHostLogPath = logPath;
+    reader2->mRealLogPath = logPath2;
     reader2->mLastFileSignatureSize = sigSize;
     reader2->mLastFileSignatureHash = sigHash;
     reader2->mLastFilePos = signature.size();
@@ -550,17 +540,15 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     // upgrade from old version
     std::string logPath3 = logPath + ".3";
     writeLog(logPath3, "a sample log\n");
-    std::string softLinkPath3 = "/tmp/" + basicLogName + ".3";
-    unlink(softLinkPath3.c_str());
-    symlink(logPath3.c_str(), softLinkPath3.c_str());
-    auto devInode3 = GetFileDevInode(softLinkPath3);
-    auto reader3 = std::make_shared<LogFileReader>("/tmp",
+    auto devInode3 = GetFileDevInode(logPath3);
+    auto reader3 = std::make_shared<LogFileReader>(gRootDir,
                                                    basicLogName,
                                                    devInode3,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
-    reader3->mRealLogPath = softLinkPath3;
+    reader3->mHostLogPath = logPath;
+    reader3->mRealLogPath = logPath3;
     reader3->mLastFileSignatureSize = sigSize;
     reader3->mLastFileSignatureHash = sigHash;
     reader3->mLastFilePos = signature.size();
@@ -569,7 +557,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     // clear reader map
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
     // new reader
-    handlerPtr->CreateLogFileReaderPtr("/tmp",
+    handlerPtr->CreateLogFileReaderPtr(gRootDir,
                                        basicLogName,
                                        devInode,
                                        std::make_pair(&readerOpts, &ctx),
@@ -579,7 +567,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
                                        0,
                                        false);
     // recover reader from checkpoint, random order
-    handlerPtr->CreateLogFileReaderPtr("/tmp",
+    handlerPtr->CreateLogFileReaderPtr(gRootDir,
                                        basicLogName,
                                        devInode3,
                                        std::make_pair(&readerOpts, &ctx),
@@ -588,7 +576,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
                                        std::make_pair(&tagOpts, &ctx),
                                        0,
                                        false);
-    handlerPtr->CreateLogFileReaderPtr("/tmp",
+    handlerPtr->CreateLogFileReaderPtr(gRootDir,
                                        basicLogName,
                                        devInode2,
                                        std::make_pair(&readerOpts, &ctx),
@@ -597,7 +585,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
                                        std::make_pair(&tagOpts, &ctx),
                                        0,
                                        false);
-    handlerPtr->CreateLogFileReaderPtr("/tmp",
+    handlerPtr->CreateLogFileReaderPtr(gRootDir,
                                        basicLogName,
                                        devInode1,
                                        std::make_pair(&readerOpts, &ctx),
@@ -624,14 +612,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointSoftLink() {
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->mDevInode.inode, devInode2.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->mLastFilePos, signature.size());
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
-    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointSoftLink() end", time(NULL)));
-
-    unlink(softLinkPath.c_str());
-    unlink(softLinkPath1.c_str());
-    unlink(softLinkPath2.c_str());
-    unlink(softLinkPath3.c_str());
+    LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointRotateLog() end", time(NULL)));
 }
-#endif
 
 void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     LOG_INFO(sLogger, ("TestRecoverReaderFromCheckpointContainer() begin", time(NULL)));
