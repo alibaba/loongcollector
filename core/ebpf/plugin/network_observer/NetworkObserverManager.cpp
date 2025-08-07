@@ -16,6 +16,10 @@
 
 #include <cstdint>
 
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
@@ -1025,6 +1029,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.SpanKey(), appInfo->mWorkspace);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.SpanKey(), appInfo->mServiceId);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
+                    // containerid ...
 
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kHostIp.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
                     COPY_AND_SET_TAG(
@@ -1064,6 +1069,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
                 spanEvent->SetName(record->GetSpanName());
                 auto* httpRecord = static_cast<HttpRecord*>(record);
+                spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetPath());
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
@@ -1662,6 +1668,15 @@ const static std::string kAgentInfoAppnameKey = "appName";
 const static std::string kAgentInfoLanguageKey = "language";
 const static std::string kAgentInfoAgentVersionKey = "agentVersion";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
+const static std::string kAgentInfoServiceIdKey = "acs_arms_service_id";
+const static std::string kAgentInfoWorkspaceKey = "acs_cms_workspace";
+const static std::string kAgentInfoPropertiesKey = "properties";
+
+const static std::string kAgentInfoPropertiesValueClusterId = "k8s.cluster.uid";
+const static std::string kAgentInfoPropertiesValueClusterName = "k8s.cluster.name";
+const static std::string kAgentInfoPropertiesValueNamespace = "k8s.namespace.name";
+const static std::string kAgentInfoPropertiesValuePodName = "k8s.pod.name";
+
 
 void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
                                                  PipelineEventGroup&& eventGroup,
@@ -1741,6 +1756,8 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
 
             auto* event = eventGroup.AddLogEvent();
             event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+            event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
+            event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
             event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
             event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
             event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
@@ -1748,6 +1765,61 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
             event->SetContent(kPodName.LogKey(), podMeta->mPodName);
             event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
+
+            event->SetContent("timestamp", ToString(podMeta->mTimestamp));
+            rapidjson::Document doc;
+            doc.SetObject();
+
+            // 创建 JSON 构造器
+            rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
+            // 添加 k8s 相关字段
+            doc.AddMember("k8s.cluster.uid", rapidjson::Value().SetString(mClusterId.c_str(), allocator), allocator);
+            // doc.AddMember("k8s.cluster.name", rapidjson::Value().SetString("test-cluster", allocator), allocator);
+            doc.AddMember(
+                "k8s.namespace.name", rapidjson::Value().SetString(podMeta->mNamespace.c_str(), allocator), allocator);
+            doc.AddMember("k8s.workload.kind",
+                          rapidjson::Value().SetString(podMeta->mWorkloadKind.c_str(), allocator),
+                          allocator);
+            doc.AddMember("k8s.workload.name",
+                          rapidjson::Value().SetString(podMeta->mWorkloadName.c_str(), allocator),
+                          allocator);
+            // doc.AddMember("k8s.node.name", rapidjson::Value().SetString("host-1", allocator), allocator);
+
+            // 添加 pod 字段
+            doc.AddMember(
+                "k8s.pod.name", rapidjson::Value().SetString(podMeta->mPodName.c_str(), allocator), allocator);
+            // doc.AddMember("k8s.pod.uid", rapidjson::Value().SetString("xxxxxxxx-xxxxxxx", allocator), allocator);
+
+
+            // 添加 ECS 元数据字段
+            const auto* entity = InstanceIdentity::Instance()->GetEntity();
+            if (entity != nullptr) {
+                doc.AddMember("acs.ecs.instance.id",
+                              rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
+                              allocator);
+                // doc.AddMember("acs.ecs.zone.id", rapidjson::Value().SetString("cn-hangzhou-idpt-inner-2-a",
+                // allocator), allocator);
+
+                // 创建 ecs.metadata 对象
+                rapidjson::Value ecsMetadata(rapidjson::kObjectType);
+                // ecsMetadata.AddMember("hostName", rapidjson::Value().SetString("iZr3x01l4fjkhkn5cus3qrZ", allocator),
+                // allocator);
+                ecsMetadata.AddMember("instanceId",
+                                      rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
+                                      allocator);
+                ecsMetadata.AddMember(
+                    "regionId", rapidjson::Value().SetString(entity->GetEcsRegionID().data(), allocator), allocator);
+                doc.AddMember("acs.ecs.metadata", ecsMetadata, allocator);
+            }
+
+
+            // 生成格式化 JSON 字符串
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            doc.Accept(writer);
+
+            event->SetContent(kAgentInfoPropertiesKey, std::string(buffer.GetString(), buffer.GetLength()));
             event->SetTimestamp(now, 0);
         }
     }
