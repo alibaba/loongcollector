@@ -52,7 +52,7 @@ public:
     std::string mConfigName;
     std::string mFileName;
     std::string mRealFileName;
-    int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NOT_FOUND;
+    int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
 
     CheckPoint() {}
 

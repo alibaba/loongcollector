@@ -386,7 +386,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpoint() {
     reader5->mLastFileSignatureSize = sigSize;
     reader5->mLastFileSignatureHash = sigHash;
     reader5->mLastFilePos = signature.size();
-    reader5->DumpMetaToMem(false, LogFileReader::CHECKPOINT_IDX_OF_NOT_FOUND);
+    reader5->DumpMetaToMem(false, LogFileReader::CHECKPOINT_IDX_UNDEFINED);
 
     // clear reader map
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));
@@ -552,7 +552,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointRotateLog() {
     reader3->mLastFileSignatureSize = sigSize;
     reader3->mLastFileSignatureHash = sigHash;
     reader3->mLastFilePos = signature.size();
-    reader3->DumpMetaToMem(false, LogFileReader::CHECKPOINT_IDX_OF_NOT_FOUND);
+    reader3->DumpMetaToMem(false, LogFileReader::CHECKPOINT_IDX_UNDEFINED);
 
     // clear reader map
     handlerPtr.reset(new ModifyHandler(mConfigName, mConfig));

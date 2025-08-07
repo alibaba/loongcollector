@@ -467,7 +467,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
     }
     // should only happen when upgrade from old version, may cause wrong reader array order
     else { // rotate log
-        if (idx != LogFileReader::CHECKPOINT_IDX_OF_NOT_FOUND) {
+        if (idx != LogFileReader::CHECKPOINT_IDX_UNDEFINED) {
             LOG_ERROR(
                 sLogger,
                 ("unexpected checkpoint reader array index, may cause wrong reader array order",

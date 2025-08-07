@@ -163,7 +163,7 @@ public:
     static size_t BUFFER_SIZE;
     static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
     static const int32_t CHECKPOINT_IDX_OF_ROTATOR_MAP = -2;
-    static const int32_t CHECKPOINT_IDX_OF_NOT_FOUND = -3;
+    static const int32_t CHECKPOINT_IDX_UNDEFINED = -3;
     std::vector<BaseLineParse*> mLineParsers = {};
     template <typename T>
     T* GetParser(size_t size) {
