@@ -33,6 +33,7 @@
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
+#include "common/EnvUtil.h"
 
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 DEFINE_FLAG_STRING(default_access_key_id, "", "");
@@ -100,7 +101,7 @@ void SLSClientManager::GenerateUserAgent() {
 
 string SLSClientManager::GetRunningEnvironment() {
     string env;
-    if (getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
+    if (GetEnv("LOONG_STATIC_CONTAINER_INFO", "ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
         env = "ECI";
     } else if (getenv("ACK_NODE_LOCAL_DNS_ADMISSION_CONTROLLER_SERVICE_HOST")) {
         // logtail-ds installed by ACK will possess the above env
@@ -117,7 +118,7 @@ string SLSClientManager::GetRunningEnvironment() {
         } else {
             env = "K8S-Sidecar";
         }
-    } else if (AppConfig::GetInstance()->IsPurageContainerMode() || getenv("ALIYUN_LOGTAIL_CONFIG")) {
+    } else if (AppConfig::GetInstance()->IsPurageContainerMode() || GetEnv("LOONG_CONFIG", "ALIYUN_LOGTAIL_CONFIG")) {
         env = "Docker";
     } else if (InstanceIdentity::Instance()->GetEntity()->IsECSValid()) {
         env = "ECS";

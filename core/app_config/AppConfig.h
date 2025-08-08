@@ -76,7 +76,7 @@ std::string GetAgentName();
 std::string GetMonitorInfoFileName();
 std::string GetSymLinkName();
 std::string GetAgentPrefix();
-std::string GetFileTagsDir();
+std::string GenerateFileTagsDir();
 
 template <class T>
 class DoubleBuffer {
@@ -110,6 +110,7 @@ private:
     std::map<std::string, std::function<bool()>*> mCallbacks;
 
     DoubleBuffer<std::vector<sls_logs::LogTag>> mFileTags;
+    std::string mFileTagsDir;
     DoubleBuffer<std::map<std::string, std::string>> mAgentAttrs;
 
     Json::Value mFileTagsJson;
@@ -311,8 +312,8 @@ private:
     // Read values will replace corresponding configs in loongcollector_config.json.
     void LoadEnvResourceLimit();
 
-    // logtail is in purage container mode when STRING_FLAG(ilogtail_user_defined_id_env_name) exist and /logtail_host
-    // exist
+    // logtail is in purage container mode when STRING_FLAG(ilogtail_user_defined_id_env_name) or
+    // "ALIYUN_LOGTAIL_USER_DEFINED_ID" exist and /logtail_host exist
     void CheckPurageContainerMode();
     bool CheckAndResetProxyEnv();
     bool CheckAndResetProxyAddress(const char* envKey, std::string& address);
@@ -389,6 +390,8 @@ public:
     std::vector<sls_logs::LogTag>& GetFileTags() { return mFileTags.getReadBuffer(); }
     // 更新从文件中来的tags
     void UpdateFileTags();
+
+    std::string GetFileTagsDir() { return mFileTagsDir; }
 
     // Agent属性相关，获取从文件中来的attrs
     std::map<std::string, std::string>& GetAgentAttrs() { return mAgentAttrs.getReadBuffer(); }

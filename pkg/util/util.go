@@ -44,6 +44,8 @@ const alphanum string = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 const (
 	ShardHashTagKey = "__shardhash__"
 	PackIDTagKey    = "__pack_id__"
+	AliCloudPrefix  = "ALICLOUD_"
+	LoongPrefix     = "LOONG_"
 )
 
 var (
@@ -257,7 +259,13 @@ func SplitPath(path string) (dir string, filename string) {
 }
 
 func InitFromEnvBool(key string, value *bool, defaultValue bool) error {
-	if envValue := os.Getenv(key); len(envValue) > 0 {
+	var envValue string
+	if strings.Contains(key, AliCloudPrefix) {
+		envValue = GetEnvTags(strings.Replace(key, AliCloudPrefix, LoongPrefix, 1), key)
+	} else {
+		envValue = os.Getenv(key)
+	}
+	if len(envValue) > 0 {
 		lowErVal := strings.ToLower(envValue)
 		if strings.HasPrefix(lowErVal, "y") || strings.HasPrefix(lowErVal, "t") || strings.HasPrefix(lowErVal, "on") || strings.HasPrefix(lowErVal, "ok") {
 			*value = true
@@ -271,7 +279,13 @@ func InitFromEnvBool(key string, value *bool, defaultValue bool) error {
 }
 
 func InitFromEnvInt(key string, value *int, defaultValue int) error {
-	if envValue := os.Getenv(key); len(envValue) > 0 {
+	var envValue string
+	if strings.Contains(key, AliCloudPrefix) {
+		envValue = GetEnvTags(strings.Replace(key, AliCloudPrefix, LoongPrefix, 1), key)
+	} else {
+		envValue = os.Getenv(key)
+	}
+	if len(envValue) > 0 {
 		if val, err := strconv.Atoi(envValue); err == nil {
 			*value = val
 			return nil
@@ -284,12 +298,26 @@ func InitFromEnvInt(key string, value *int, defaultValue int) error {
 }
 
 func InitFromEnvString(key string, value *string, defaultValue string) error {
-	if envValue := os.Getenv(key); len(envValue) > 0 {
+	var envValue string
+	if strings.Contains(key, AliCloudPrefix) {
+		envValue = GetEnvTags(strings.Replace(key, AliCloudPrefix, LoongPrefix, 1), key)
+	} else {
+		envValue = os.Getenv(key)
+	}
+	if len(envValue) > 0 {
 		*value = envValue
 		return nil
 	}
 	*value = defaultValue
 	return nil
+}
+
+func GetEnvTags(firstKey, secondKey string) string {
+	tag := os.Getenv(firstKey)
+	if len(tag) == 0 {
+		return os.Getenv(secondKey)
+	}
+	return tag
 }
 
 // GuessRegionByEndpoint guess region

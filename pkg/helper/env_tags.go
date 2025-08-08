@@ -18,9 +18,12 @@ import (
 	"os"
 	"strings"
 	"sync"
+
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const defaultEnvTagKeys = "ALIYUN_LOG_ENV_TAGS"
+const defaultLoongEnvTagKeys = "LOONG_LOG_ENV_TAGS"
 
 // EnvTags to be add to every logroup
 var EnvTags []string
@@ -30,7 +33,7 @@ var envTagsLock sync.RWMutex
 func LoadEnvTags() {
 	envTagsLock.Lock() // Lock for writing
 	defer envTagsLock.Unlock()
-	envTagKeys := os.Getenv(defaultEnvTagKeys)
+	envTagKeys := util.GetEnvTags(defaultLoongEnvTagKeys, defaultEnvTagKeys)
 	if len(envTagKeys) == 0 || len(EnvTags) > 0 {
 		return
 	}
