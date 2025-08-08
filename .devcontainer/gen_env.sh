@@ -18,7 +18,15 @@ set -ue
 set -o pipefail
 
 if [[ $(echo 'x\ty') = 'x\ty' ]]; then
-  echo -e "HOST_OS=Linux\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=$(id -gn $USER)\nGROUP_GID=$(id -g $USER)" > .devcontainer/.env;
+  echo -e "HOST_OS=Linux\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=$(id -gn $USER)\nGROUP_GID=$(id -g $USER)" > .env;
 else
-  echo "HOST_OS=Darwin\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=root\nGROUP_GID=0" > .devcontainer/.env;  
+  echo "HOST_OS=Darwin\nUSERNAME=$USER\nUSER_UID=$(id -u $USER)\nGROUPNAME=root\nGROUP_GID=0" > .env;  
+fi
+
+PUB_KEY_PATH="$HOME/.ssh/id_rsa.pub"
+if [ -f "$PUB_KEY_PATH" ]; then
+  cp "$PUB_KEY_PATH" authorized_keys
+else
+  echo "主机未找到公钥 $PUB_KEY_PATH，请先生成。"
+  exit 1
 fi
