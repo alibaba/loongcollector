@@ -104,6 +104,7 @@ bool ProcessSyncRetryableEvent::incrementParentRef() {
         if (value == nullptr) {
             return false;
         }
+        mProcessCacheValue->mParent = value;
         mProcessCache.IncRef(key, value);
         LOG_DEBUG(sLogger,
                   ("push clone event. IncRef pid", mProcessCacheValue->mPPid)("ktime", mProcessCacheValue->mPKtime));

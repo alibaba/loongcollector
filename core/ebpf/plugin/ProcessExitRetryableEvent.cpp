@@ -111,7 +111,7 @@ bool ProcessExitRetryableEvent::flushEvent() {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why
         LOG_WARNING(sLogger,
-                    ("event", "Failed to enqueue process clone event")("pid", mRawEvent->current.pid)(
+                    ("event", "Failed to enqueue process exit event")("pid", mRawEvent->current.pid)(
                         "ktime", mRawEvent->current.ktime));
         // TODO: Alarm discard event if it is called by OnDrop
         return false;
@@ -122,7 +122,7 @@ bool ProcessExitRetryableEvent::flushEvent() {
 bool ProcessExitRetryableEvent::decrementRef() {
     if (mProcessCacheValue->mPPid > 0 || mProcessCacheValue->mPKtime > 0) {
         data_event_id key{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
-        auto value = mProcessCache.Lookup(key);
+        auto& value = mProcessCacheValue->mParent;
         if (!value) {
             return false;
         }

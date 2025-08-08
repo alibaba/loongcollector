@@ -74,9 +74,10 @@ ProcessCacheValue* ProcessCloneRetryableEvent::cloneProcessCacheValue(const msg_
         return nullptr;
     }
     auto execId = GenerateExecId(mHostname, event.tgid, event.ktime);
-    auto* cacheValue = parent->CloneContents();
+    auto* cacheValue = parent->ShallowCopyContents();
     cacheValue->mPPid = event.parent.pid;
     cacheValue->mPKtime = event.parent.ktime;
+    cacheValue->mParent = parent;
     cacheValue->SetContent<kExecId>(execId);
     cacheValue->SetContent<kProcessId>(event.tgid);
     cacheValue->SetContent<kKtime>(event.ktime);
@@ -142,6 +143,7 @@ bool ProcessCloneRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
+    return true;
     if (!mCommonEventQueue.try_enqueue(mProcessEvent)) {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why

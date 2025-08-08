@@ -135,6 +135,7 @@ int NetworkSecurityManager::SendEvents() {
     if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
 
@@ -146,7 +147,7 @@ int NetworkSecurityManager::SendEvents() {
     }
     // do we need to aggregate all the events into a eventgroup??
     // use source buffer to hold the memory
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
