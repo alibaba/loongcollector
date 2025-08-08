@@ -157,6 +157,42 @@ private:
         return true;
     }
 
+    bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        fileSystemListInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        systemUptimeInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        serialIdInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        diskStateInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
 
