@@ -253,7 +253,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     if (lastReadEventTime > 0
         && (now.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
         LOG_ERROR(sLogger, ("last read event time is too old", lastReadEventTime)("prepare force exit", ""));
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmCritical(
             LOGTAIL_CRASH_ALARM, "last read event time is too old: " + ToString(lastReadEventTime) + " force exit");
         AlarmManager::GetInstance()->ForceToSend();
         sleep(10);

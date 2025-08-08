@@ -84,7 +84,7 @@ type Rdb struct {
 }
 
 func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
-	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
+	initAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver)))
 	m.Context = context
 	if len(m.StateMent) == 0 && len(m.StateMentPath) != 0 {
 		data, err := os.ReadFile(m.StateMentPath)
@@ -113,10 +113,10 @@ func (m *Rdb) Init(context pipeline.Context, rdbFunc RdbFunc) (int, error) {
 }
 
 func (m *Rdb) initRdbsql(connStr string, rdbFunc RdbFunc) error {
-	initAlarmName := fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver))
+	initAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_INIT_ALARM", strings.ToUpper(m.Driver)))
 	err := rdbFunc()
 	if err != nil {
-		logger.Error(m.Context.GetRuntimeContext(), initAlarmName, "rdb func ", err)
+		logger.Warning(m.Context.GetRuntimeContext(), initAlarmName, "rdb func ", err)
 		return err
 	}
 	for tryTime := 0; tryTime < m.ConnectionRetryTime; tryTime++ {
@@ -149,9 +149,9 @@ func (m *Rdb) CheckPointToString() string {
 
 // Start starts the ServiceInput's service, whatever that may be
 func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFunc, columnResolverFuncMap map[string]ColumnResolverFunc) error {
-	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
-	timeoutAlarmName := fmt.Sprintf("%s_TIMEOUT_ALARM", strings.ToUpper(m.Driver))
-	queryAlarmName := fmt.Sprintf("%s_QUERY_ALARM", strings.ToUpper(m.Driver))
+	checkpointAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver)))
+	timeoutAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_TIMEOUT_ALARM", strings.ToUpper(m.Driver)))
+	queryAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_QUERY_ALARM", strings.ToUpper(m.Driver)))
 	m.waitGroup.Add(1)
 	defer m.waitGroup.Done()
 	// initialize additional query intervals
@@ -169,7 +169,7 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 
 			switch {
 			case err != nil:
-				logger.Error(m.Context.GetRuntimeContext(), checkpointAlarmName, "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
+				logger.Warning(m.Context.GetRuntimeContext(), checkpointAlarmName, "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
 			case cp.CheckPointColumn == m.CheckPointColumn && m.CheckPointColumnType == cp.CheckPointColumnType:
 				m.checkpointValue = cp.Value
 			default:
@@ -196,7 +196,7 @@ func (m *Rdb) Start(collector pipeline.Collector, connStr string, rdbFunc RdbFun
 			startTime := time.Now()
 			err = m.Collect(collector, columnResolverFuncMap)
 			if err != nil {
-				logger.Error(m.Context.GetRuntimeContext(), queryAlarmName, "collect err", err)
+				logger.Warning(m.Context.GetRuntimeContext(), queryAlarmName, "collect err", err)
 			}
 			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()
@@ -279,7 +279,7 @@ func (m *Rdb) Collect(collector pipeline.Collector, columnResolverFuncMap map[st
 }
 
 func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
-	checkpointAlarmName := fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver))
+	checkpointAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_CHECKPOINT_ALARM", strings.ToUpper(m.Driver)))
 	cp := CheckPoint{
 		CheckPointColumn:     m.CheckPointColumn,
 		CheckPointColumnType: m.CheckPointColumnType,
@@ -302,7 +302,7 @@ func (m *Rdb) SaveCheckPoint(collector pipeline.Collector) {
 }
 
 func (m *Rdb) ParseRows(rows *sql.Rows, columnResolverFuncMap map[string]ColumnResolverFunc, collector pipeline.Collector) int {
-	parseAlarmName := fmt.Sprintf("%s_PARSE_ALARM", strings.ToUpper(m.Driver))
+	parseAlarmName := selfmonitor.AlarmType(fmt.Sprintf("%s_PARSE_ALARM", strings.ToUpper(m.Driver)))
 	defer rows.Close()
 	rowCount := 0
 	if m.columnsKeyBuffer == nil {

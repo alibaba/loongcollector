@@ -24,6 +24,7 @@
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
+#include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
@@ -31,7 +32,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
-// #include "plugin/file_security/FileSecurityManager.h"
+#include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
@@ -171,9 +172,13 @@ EBPFServer::EBPFServer()
     auto processCacheMissTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL);
     auto processCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE);
     auto processDataMapSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE);
-    auto retryableEventCacheSize = mMetricsRecordRef.CreateIntGauge(
+    mRetryableEventCacheSize = mMetricsRecordRef.CreateIntGauge(
         METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE); // TODO: shoud be shared across network connection retry
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+
+    mRecvKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL);
+    mLossKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL);
+    mConnectionCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE);
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
@@ -184,14 +189,16 @@ EBPFServer::EBPFServer()
                                                                  processCacheMissTotal,
                                                                  processCacheSize,
                                                                  processDataMapSize,
-                                                                 retryableEventCacheSize);
+                                                                 mRetryableEventCache);
     // ebpf config
     auto configJson = AppConfig::GetInstance()->GetConfig();
     mAdminConfig.LoadEbpfConfig(configJson);
+    initUnifiedEpollMonitoring();
 }
 
 EBPFServer::~EBPFServer() {
     Stop();
+    cleanupUnifiedEpollMonitoring();
 }
 
 void EBPFServer::Init() {
@@ -204,8 +211,6 @@ void EBPFServer::Init() {
     mInited = true;
     mRunning = true;
 
-    LOG_DEBUG(sLogger, ("begin to init timer", ""));
-    Timer::GetInstance()->Init();
     AsynCurlRunner::GetInstance()->Init();
     LOG_DEBUG(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
@@ -223,14 +228,15 @@ void EBPFServer::Stop() {
     mRunning = false;
     LOG_INFO(sLogger, ("begin to stop all plugins", ""));
     for (int i = 0; i < int(PluginType::MAX); i++) {
-        auto pipelineName = mPlugins[i].mPipelineName;
-        if (pipelineName.size()) {
-            bool ret = DisablePlugin(pipelineName, static_cast<PluginType>(i));
+        auto pipelines = mPlugins[i].mPipelines;
+        for (const auto& entry : pipelines) {
+            bool ret = DisablePlugin(entry.first, static_cast<PluginType>(i));
             LOG_INFO(sLogger,
-                     ("force stop plugin",
-                      magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", pipelineName)("ret", ret));
+                     ("force stop plugin", magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline",
+                                                                                              entry.first)("ret", ret));
         }
     }
+    mRetryableEventCache.Clear();
 
     bool alarmOnce = false;
     while (mPoller.valid()) {
@@ -241,7 +247,7 @@ void EBPFServer::Stop() {
         }
         if (!alarmOnce) {
             LOG_ERROR(sLogger, ("poller thread stop", "too slow"));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM, std::string("EBPFServer stop too slow"));
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM, std::string("EBPFServer stop too slow"));
             alarmOnce = true;
         }
     }
@@ -255,8 +261,8 @@ void EBPFServer::Stop() {
         }
         if (!alarmOnce) {
             LOG_ERROR(sLogger, ("handler thread ", " too slow"));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
-                                                   std::string("ProcessCacheManager stop too slow"));
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM,
+                                                        std::string("ProcessCacheManager stop too slow"));
             alarmOnce = true;
         }
     }
@@ -270,93 +276,98 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                                      const PluginMetricManagerPtr& metricManager) {
-    std::string prevPipelineName = checkLoadedPipelineName(type);
-    if (prevPipelineName == pipelineName) { // update
-        auto& pluginMgr = getPluginState(type).mManager;
-        if (pluginMgr) {
-            int res = pluginMgr->Update(options);
-            if (res) {
-                LOG_WARNING(sLogger, ("update plugin failed, type", magic_enum::enum_name(type))("res", res));
-                return false;
-            }
-            res = pluginMgr->Resume(options);
-            if (res) {
-                LOG_WARNING(sLogger, ("resume plugin failed, type", magic_enum::enum_name(type))("res", res));
-                return false;
-            }
-            pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
-            return true;
-        }
-        LOG_ERROR(sLogger, ("no plugin registered, should not happen", magic_enum::enum_name(type)));
-        return false;
-    }
-
+    bool isNeedProcessCache = false;
     if (type != PluginType::NETWORK_OBSERVE) {
-        if (mProcessCacheManager->Init()) {
-            LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
-        } else {
-            LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
-            return false;
-        }
+        isNeedProcessCache = true;
     }
-
-    // step1: convert options to export type
-    auto eBPFConfig = std::make_unique<PluginConfig>();
-    eBPFConfig->mPluginType = type;
-    // call update function
-    // step2: call init function
     auto& pluginMgr = getPluginState(type).mManager;
-    switch (type) {
-        case PluginType::PROCESS_SECURITY: {
-            if (!pluginMgr) {
-                pluginMgr = ProcessSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+    if (!pluginMgr) {
+        // create ...
+        if (isNeedProcessCache) {
+            if (mProcessCacheManager->Init()) {
+                registerPluginPerfBuffers(PluginType::PROCESS_SECURITY);
+                LOG_INFO(sLogger, ("ProcessCacheManager initialization", "succeeded"));
+            } else {
+                LOG_ERROR(sLogger, ("ProcessCacheManager initialization", "failed"));
+                return false;
             }
-            break;
         }
 
-        case PluginType::NETWORK_OBSERVE: {
-            if (!pluginMgr) {
-                pluginMgr = NetworkObserverManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+        // step1: convert options to export type
+        auto eBPFConfig = std::make_unique<PluginConfig>();
+        eBPFConfig->mPluginType = type;
+        // step2: create plugin manager
+        auto& pluginMgr = getPluginState(type).mManager;
+        switch (type) {
+            case PluginType::PROCESS_SECURITY: {
+                if (!pluginMgr) {
+                    pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                }
+                break;
             }
-            break;
+
+            case PluginType::NETWORK_OBSERVE: {
+                if (!pluginMgr) {
+                    auto mgr = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
+
+            case PluginType::NETWORK_SECURITY: {
+                if (!pluginMgr) {
+                    auto mgr = NetworkSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
+
+            case PluginType::FILE_SECURITY: {
+                if (!pluginMgr) {
+                    auto mgr = FileSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, mRetryableEventCache);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
+            default:
+                LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
+                return false;
         }
 
-        case PluginType::NETWORK_SECURITY: {
-            if (!pluginMgr) {
-                pluginMgr = NetworkSecurityManager::Create(
-                    mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, metricManager);
+        if (pluginMgr->Init() != 0) {
+            pluginMgr.reset();
+            if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
+                stopProcessCacheManager();
             }
-            break;
-        }
-
-        // case PluginType::FILE_SECURITY: {
-        //     if (!pluginMgr) {
-        //         pluginMgr
-        //             = FileSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mDataEventQueue,
-        //             metricManager);
-        //     }
-        //     break;
-        // }
-        default:
-            LOG_ERROR(sLogger, ("unknown plugin type", int(type)));
+            LOG_WARNING(sLogger, ("Failed to init plugin, type", magic_enum::enum_name(type)));
             return false;
+        }
     }
 
-    if (pluginMgr->Init(options) != 0) {
+    if (pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) != 0) {
         pluginMgr.reset();
+        LOG_WARNING(sLogger, ("Failed to AddOrUpdateConfig, type", magic_enum::enum_name(type)));
+        if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
+            stopProcessCacheManager();
+        }
         return false;
     }
 
-    updatePluginState(type, pipelineName, ctx->GetProjectName(), pluginMgr);
-    pluginMgr->UpdateContext(ctx, ctx->GetProcessQueueKey(), pluginIndex);
+    updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
+    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+        registerPluginPerfBuffers(type);
+    }
+
     return true;
 }
 
 bool EBPFServer::HasRegisteredPlugins() const {
     for (const auto& p : mPlugins) {
-        if (!p.mPipelineName.empty()) {
+        if (!p.mPipelines.empty()) {
             return true;
         }
     }
@@ -387,36 +398,45 @@ bool EBPFServer::checkIfNeedStopProcessCacheManager() const {
     return true;
 }
 
+void EBPFServer::stopProcessCacheManager() {
+    LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
+    mProcessCacheManager->Stop();
+    unregisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
+}
+
 bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type) {
     if (!IsSupportedEnv(type)) {
         return true;
     }
     auto& pluginState = getPluginState(type);
     std::unique_lock<std::shared_mutex> lock(pluginState.mMtx);
-    std::string prevPipeline = checkLoadedPipelineName(type);
-    if (prevPipeline != pipelineName) {
-        LOG_WARNING(
-            sLogger,
-            ("the specified config is not running, prev pipeline", prevPipeline)("curr pipeline", pipelineName));
-        return true;
-    }
-
     LOG_INFO(sLogger, ("begin to stop plugin for ", magic_enum::enum_name(type))("pipeline", pipelineName));
     auto& pluginManager = pluginState.mManager;
     if (pluginManager) {
-        pluginManager->UpdateContext(nullptr, -1, -1);
-        int ret = pluginManager->Destroy();
+        // pluginManager->UpdateContext(nullptr, -1, -1);
+        int ret = pluginManager->RemoveConfig(pipelineName);
+        if (ret) {
+            LOG_ERROR(sLogger, ("failed to remove config for", magic_enum::enum_name(type))("pipeline", pipelineName));
+            return false;
+        }
+        updatePluginState(type, pipelineName, "", PluginStateOperation::kRemovePipeline, pluginManager);
+        if (pluginManager->RegisteredConfigCount() > 0) {
+            return true;
+        }
+
+        // do real destroy ...
+        unregisterPluginPerfBuffers(type);
+        ret = pluginManager->Destroy();
         if (ret != 0) {
             LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         }
-        updatePluginState(type, "", "", nullptr);
+        updatePluginState(type, "", "", PluginStateOperation::kRemoveAll, nullptr);
         LOG_DEBUG(sLogger, ("stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
         if (type == PluginType::NETWORK_SECURITY || type == PluginType::PROCESS_SECURITY
             || type == PluginType::FILE_SECURITY) {
             // check if we need stop ProcessCacheManager
             if (checkIfNeedStopProcessCacheManager()) {
-                LOG_INFO(sLogger, ("No security plugin registered", "begin to stop ProcessCacheManager ... "));
-                mProcessCacheManager->Stop();
+                stopProcessCacheManager();
             }
         }
     } else {
@@ -425,10 +445,6 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
                      magic_enum::enum_name(type))("pipeline", pipelineName));
     }
     return true;
-}
-
-std::string EBPFServer::checkLoadedPipelineName(PluginType type) {
-    return mPlugins[int(type)].mPipelineName;
 }
 
 std::string EBPFServer::GetAllProjects() {
@@ -440,8 +456,8 @@ std::string EBPFServer::GetAllProjects() {
             continue;
         }
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-        if (mPlugins[i].mProject != "") {
-            res += mPlugins[i].mProject;
+        for (const auto& entry : mPlugins[i].mPipelines) {
+            res += entry.first;
             res += " ";
         }
     }
@@ -460,14 +476,57 @@ bool EBPFServer::SuspendPlugin(const std::string&, PluginType type) {
         return true;
     }
 
-    mgr->UpdateContext(nullptr, -1, -1);
-
     int ret = mgr->Suspend();
     if (ret) {
         LOG_ERROR(sLogger, ("failed to suspend plugin", magic_enum::enum_name(type)));
         return false;
     }
     return true;
+}
+
+void EBPFServer::handleEventCache() {
+    auto now = TimeKeeper::GetInstance()->NowSec();
+    if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
+        EventCache().HandleEvents();
+        mLastEventCacheRetryTime = now;
+        SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
+        LOG_DEBUG(sLogger, ("retry cache size", EventCache().Size()));
+    }
+}
+
+void EBPFServer::handleEpollEvents() {
+    if (mUnifiedEpollFd < 0) {
+        return;
+    }
+
+    int numEvents = epoll_wait(mUnifiedEpollFd, mEpollEvents.data(), mEpollEvents.size(), kDefaultMaxWaitTimeMS);
+    if (numEvents <= 0) {
+        if (numEvents < 0 && errno != EINTR) {
+            LOG_ERROR(sLogger, ("Unified epoll wait error", strerror(errno)));
+        }
+        return;
+    }
+
+    LOG_DEBUG(sLogger, ("Unified epoll detected events", numEvents));
+
+    for (int i = 0; i < numEvents; ++i) {
+        auto type = static_cast<PluginType>(mEpollEvents[i].data.u32);
+
+        if (type == PluginType::PROCESS_SECURITY) {
+            mProcessCacheManager->ConsumePerfBufferData();
+            continue;
+        }
+
+        auto& pluginState = getPluginState(type);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
+        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+        if (pluginState.mManager) {
+            const int cnt = pluginState.mManager->ConsumePerfBufferData();
+            LOG_DEBUG(sLogger, ("Event-driven consume for", magic_enum::enum_name(type))("cnt", cnt));
+        }
+    }
 }
 
 void EBPFServer::pollPerfBuffers() {
@@ -481,21 +540,20 @@ void EBPFServer::pollPerfBuffers() {
         } else {
             mFrequencyMgr.Reset(now);
         }
-        mProcessCacheManager->PollPerfBuffers();
-        for (int i = 0; i < int(PluginType::MAX); i++) {
-            auto type = PluginType(i);
-            auto& pluginState = getPluginState(type);
-            if (!pluginState.mValid.load(std::memory_order_acquire)) {
-                continue;
-            }
-            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-            auto& plugin = pluginState.mManager;
-            if (plugin) {
-                int cnt = plugin->PollPerfBuffer();
-                LOG_DEBUG(sLogger,
-                          ("poll buffer for ", magic_enum::enum_name(type))("cnt", cnt)("running status",
-                                                                                        plugin->IsRunning()));
-            }
+
+        handleEventCache();
+        handleEpollEvents();
+        mProcessCacheManager->ClearProcessExpiredCache();
+
+        // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
+        auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
+        if (!pluginState.mValid.load(std::memory_order_acquire)) {
+            continue;
+        }
+        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+        if (pluginState.mManager) {
+            auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
+            mgr->PollPerfBuffer(0); // 0 means non-blocking r(ef: https://libbpf.readthedocs.io/en/latest/api.html)
         }
     }
 }
@@ -516,12 +574,27 @@ PluginState& EBPFServer::getPluginState(PluginType type) {
 void EBPFServer::updatePluginState(PluginType type,
                                    const std::string& name,
                                    const std::string& project,
+                                   PluginStateOperation op,
                                    std::shared_ptr<AbstractManager> mgr) {
     if (type >= PluginType::MAX) {
         return;
     }
-    mPlugins[static_cast<int>(type)].mPipelineName = name;
-    mPlugins[static_cast<int>(type)].mProject = project;
+    switch (op) {
+        case PluginStateOperation::kAddPipeline: {
+            mPlugins[static_cast<int>(type)].mPipelines.insert({name, project});
+            break;
+        }
+        case PluginStateOperation::kRemovePipeline: {
+            mPlugins[static_cast<int>(type)].mPipelines.erase(name);
+            break;
+        }
+        case PluginStateOperation::kRemoveAll: {
+            mPlugins[static_cast<int>(type)].mPipelines.clear();
+            break;
+        }
+        default:
+            break;
+    }
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
 }
@@ -590,5 +663,68 @@ void EBPFServer::sendEvents() {
             plugin->SendEvents();
         }
     }
+}
+
+void EBPFServer::initUnifiedEpollMonitoring() {
+    mUnifiedEpollFd = epoll_create1(EPOLL_CLOEXEC);
+    if (mUnifiedEpollFd < 0) {
+        LOG_ERROR(sLogger, ("Failed to create unified epoll fd", strerror(errno)));
+        return;
+    }
+
+    mEpollEvents.resize(1024);
+
+    LOG_INFO(sLogger, ("Unified epoll monitoring initialized", mUnifiedEpollFd));
+}
+
+void EBPFServer::registerPluginPerfBuffers(PluginType type) {
+    if (mUnifiedEpollFd < 0) {
+        return;
+    }
+
+    auto epollFds = mEBPFAdapter->GetPerfBufferEpollFds(type);
+
+    for (int epollFd : epollFds) {
+        if (epollFd >= 0) {
+            struct epoll_event event {};
+            event.events = EPOLLIN;
+            event.data.u32 = static_cast<uint32_t>(type);
+
+            if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event) == 0) {
+                LOG_DEBUG(sLogger,
+                          ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            } else {
+                LOG_ERROR(sLogger,
+                          ("Failed to register perf buffer epoll fd",
+                           epollFd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
+            }
+        }
+    }
+}
+
+void EBPFServer::unregisterPluginPerfBuffers(PluginType type) {
+    if (mUnifiedEpollFd < 0) {
+        return;
+    }
+
+    auto epollFds = mEBPFAdapter->GetPerfBufferEpollFds(type);
+
+    for (int epollFd : epollFds) {
+        if (epollFd >= 0) {
+            epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, epollFd, nullptr);
+            LOG_DEBUG(sLogger,
+                      ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+        }
+    }
+}
+
+void EBPFServer::cleanupUnifiedEpollMonitoring() {
+    if (mUnifiedEpollFd >= 0) {
+        close(mUnifiedEpollFd);
+        mUnifiedEpollFd = -1;
+    }
+
+    mEpollEvents.clear();
+    LOG_INFO(sLogger, ("Unified epoll monitoring cleaned up", ""));
 }
 } // namespace logtail::ebpf

@@ -8,26 +8,6 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 )
 
-func TestGenEntityTypeKeyAcs(t *testing.T) {
-	m := metaCollector{
-		serviceK8sMeta: &ServiceK8sMeta{},
-	}
-	*flags.ClusterType = ackCluster
-	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "ack.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "ack.cluster", m.genEntityTypeKey("cluster"))
-
-	*flags.ClusterType = oneCluster
-	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "one.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "one.cluster", m.genEntityTypeKey("cluster"))
-
-	*flags.ClusterType = asiCluster
-	m.serviceK8sMeta.initDomain()
-	assert.Equal(t, "asi.pod", m.genEntityTypeKey("pod"))
-	assert.Equal(t, "asi.cluster", m.genEntityTypeKey("cluster"))
-}
-
 func TestGenEntityTypeKeyInfra(t *testing.T) {
 	m := metaCollector{
 		serviceK8sMeta: &ServiceK8sMeta{},

@@ -27,12 +27,12 @@
 
 #include "json/value.h"
 
-#include "ContainerInfo.h"
 #include "common/Flags.h"
 #include "common/LRUCache.h"
 #include "common/NetworkUtil.h"
 #include "common/StringView.h"
 #include "common/http/HttpRequest.h"
+#include "metadata/ContainerInfo.h"
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/MetricTypes.h"
 
@@ -160,6 +160,8 @@ public:
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
     friend class NetworkObserverManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
 #endif
 };
 

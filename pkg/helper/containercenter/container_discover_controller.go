@@ -164,7 +164,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 
 	// discover which runtime is valid
 	if wrapper, err := NewCRIRuntimeWrapper(containerCenterInstance); err != nil {
-		logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
 		criRuntimeWrapper = nil
 	} else {
 		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
@@ -250,13 +250,13 @@ func (c *ContainerDiscoverManager) Init() bool {
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
+			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
 		}
 	}
 	if c.enableCRIDiscover {
 		if err = c.fetchCRI(); err != nil {
 			c.enableCRIDiscover = false
-			logger.Errorf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
+			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
 		}
 	}
 	if c.enableStaticDiscover {

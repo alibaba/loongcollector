@@ -122,7 +122,7 @@ func (m *Mysql) Description() string {
 func (m *Mysql) initMysql() error {
 	tlsConfig, err := util.GetTLSConfig(m.SSLCert, m.SSLKey, m.SSLCA, false)
 	if err != nil {
-		logger.Error(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "MySQL Error registering TLS config", err)
+		logger.Warning(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "MySQL Error registering TLS config", err)
 	}
 
 	if tlsConfig != nil {
@@ -196,7 +196,7 @@ func (m *Mysql) dsnConfig() (string, error) {
 		if err != nil {
 			conf.Loc = loc
 		} else {
-			logger.Error(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "Set Mysql location error, loc", m.Location, "error", err)
+			logger.Warning(m.context.GetRuntimeContext(), "MYSQL_INIT_ALARM", "Set Mysql location error, loc", m.Location, "error", err)
 		}
 	}
 
@@ -248,7 +248,7 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 
 			switch {
 			case err != nil:
-				logger.Error(m.context.GetRuntimeContext(), "MYSQL_CHECKPOING_ALARM", "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
+				logger.Warning(m.context.GetRuntimeContext(), "MYSQL_CHECKPOING_ALARM", "init checkpoint error, key", m.CheckPointColumn, "value", string(val), "error", err)
 			case cp.CheckPointColumn == m.CheckPointColumn && m.CheckPointColumnType == cp.CheckPointColumnType:
 				m.checkpointValue = cp.Value
 			default:
@@ -274,7 +274,7 @@ func (m *Mysql) Start(collector pipeline.Collector) error {
 			startTime := time.Now()
 			err = m.Collect(collector)
 			if err != nil {
-				logger.Error(m.context.GetRuntimeContext(), "MYSQL_QUERY_ALARM", "sql query error", err)
+				logger.Warning(m.context.GetRuntimeContext(), "MYSQL_QUERY_ALARM", "sql query error", err)
 			}
 			m.collectLatency.Observe(float64(time.Since(startTime)))
 			endTime := time.Now()

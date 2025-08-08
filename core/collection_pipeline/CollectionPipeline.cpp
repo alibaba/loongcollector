@@ -403,7 +403,7 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
                     ("input index out of range", "skip inner processing")(
                         "reason", "may be caused by input delete but there are still data belong to it")(
                         "input index", inputIndex)("config", mName));
-        GetContext().GetAlarm().SendAlarm(
+        GetContext().GetAlarm().SendAlarmWarning(
             LOGTAIL_CONFIG_ALARM,
             "input delete but there are still data belong to it, may cause processing wrong",
             GetContext().GetRegion(),
@@ -573,12 +573,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "Go pipeline is invalid, content: " + content + ", config: " + mName,
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmCritical(CATEGORY_CONFIG_ALARM,
+                                                           "Go pipeline is invalid, content: " + content
+                                                               + ", config: " + mName,
+                                                           mContext.GetRegion(),
+                                                           mContext.GetProjectName(),
+                                                           mContext.GetConfigName(),
+                                                           mContext.GetLogstoreName());
             return false;
         }
     }
@@ -593,12 +594,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "Go pipeline is invalid, content: " + content + ", config: " + mName,
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmCritical(CATEGORY_CONFIG_ALARM,
+                                                           "Go pipeline is invalid, content: " + content
+                                                               + ", config: " + mName,
+                                                           mContext.GetRegion(),
+                                                           mContext.GetProjectName(),
+                                                           mContext.GetConfigName(),
+                                                           mContext.GetLogstoreName());
             if (!mGoPipelineWithoutInput.isNull()) {
                 LogtailPlugin::GetInstance()->UnloadPipeline(GetConfigNameOfGoPipelineWithoutInput());
             }
@@ -625,13 +627,13 @@ void CollectionPipeline::WaitAllItemsInProcessFinished() {
         uint64_t duration = GetCurrentTimeInMilliSeconds() - startTime;
         if (!alarmOnce && duration > 10000) { // 10s
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
-                                                   string("pipeline stop too slow, config: ") + mName
-                                                       + "; cost:" + to_string(duration),
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM,
+                                                        string("pipeline stop too slow, config: ") + mName
+                                                            + "; cost:" + to_string(duration),
+                                                        mContext.GetRegion(),
+                                                        mContext.GetProjectName(),
+                                                        mContext.GetConfigName(),
+                                                        mContext.GetLogstoreName());
             alarmOnce = true;
         }
     }

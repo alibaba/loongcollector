@@ -22,6 +22,8 @@
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/MemCollector.h"
+#include "host_monitor/collector/NetCollector.h"
+#include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 
 namespace logtail {
@@ -120,9 +122,44 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
+
     if (enableDisk) {
         mCollectors.push_back(DiskCollector::sName);
     }
+
+    bool enableProcess = true;
+    if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableProcess) {
+        mCollectors.push_back(ProcessCollector::sName);
+    }
+
+    // net
+    bool enableNet = true;
+    if (!GetOptionalBoolParam(config, "EnableNet", enableNet, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableNet) {
+        mCollectors.push_back(NetCollector::sName);
+    }
+
 
     return true;
 }

@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ConnectionManager.h"
+#include "ebpf/plugin/network_observer/ConnectionManager.h"
 
+#include "TimeKeeper.h"
 #include "logger/Logger.h"
 
 extern "C" {
@@ -63,7 +64,11 @@ void ConnectionManager::AcceptNetCtrlEvent(struct conn_ctrl_event_t* event) {
         return;
     }
 
-    conn->UpdateConnState(event);
+    bool isClose = false;
+    conn->UpdateConnState(event, isClose);
+    if (isClose) {
+        mClosedConnections[0].push_back(connId);
+    }
     conn->RecordActive();
 }
 
@@ -101,11 +106,34 @@ void ConnectionManager::AcceptNetStatsEvent(struct conn_stats_event_t* event) {
     conn->RecordActive();
 }
 
+void ConnectionManager::cleanClosedConnections() {
+    for (const auto& connId : mClosedConnections[kConnectionEpoch - 1]) {
+        const auto& it = mConnections.find(connId);
+        if (it == mConnections.end()) {
+            // connection is already removed
+            continue;
+        }
+        deleteConnection(connId);
+        LOG_DEBUG(sLogger,
+                  ("delete connections caused by close, pid", connId.tgid)("fd", connId.fd)("start", connId.start));
+    }
+
+    for (size_t i = kConnectionEpoch - 1; i >= 1; i--) {
+        std::swap(mClosedConnections[i], mClosedConnections[i - 1]);
+    }
+
+    mClosedConnections[0].clear();
+}
+
 void ConnectionManager::Iterations() {
+    cleanClosedConnections();
+    auto nowMs = TimeKeeper::GetInstance()->NowMs();
+    if (nowMs - mLastGcTimeMs < mGcIntervalMs) {
+        return;
+    }
+    mLastGcTimeMs = nowMs;
+
     std::chrono::time_point<std::chrono::steady_clock> now = std::chrono::steady_clock::now();
-    auto nowTs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-    // report every seconds ...
-    bool needGenRecord = (nowTs - mLastReportTs > 5);
     LOG_DEBUG(sLogger,
               ("[Iterations] conn tracker map size", mConnections.size())("total count", mConnectionTotal.load()));
     int n = 0;
@@ -123,28 +151,12 @@ void ConnectionManager::Iterations() {
         connection->TryAttachPeerMeta();
         connection->TryAttachSelfMeta();
 
-        bool forceGenRecord = false;
         if (connection && connection->ReadyToDestroy(now)) {
-            forceGenRecord = true;
             // push conn stats ...
             deleteQueue.push_back(it.first);
             connection->MarkConnDeleted();
             n++;
             continue;
-        }
-
-        if (mEnableConnStats && connection->IsMetaAttachReadyForNetRecord() && (needGenRecord || forceGenRecord)) {
-            std::shared_ptr<AbstractRecord> record = std::make_shared<ConnStatsRecord>(connection);
-            LOG_DEBUG(sLogger,
-                      ("needGenRecord", needGenRecord)("mEnableConnStats", mEnableConnStats)("forceGenRecord",
-                                                                                             forceGenRecord));
-            bool res = connection->GenerateConnStatsRecord(record);
-            if (res && mConnStatsHandler) {
-                mConnStatsHandler(record);
-            }
-            if (needGenRecord) {
-                mLastReportTs = nowTs; // update report ts
-            }
         }
 
         // when we query for conn tracker, we record active

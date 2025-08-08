@@ -30,6 +30,8 @@ using namespace std;
 
 namespace logtail {
 
+const std::string kSpaceChars = " \f\n\r\t\v";
+
 std::string ToLowerCaseString(const std::string& orig) {
     auto copy = orig;
     std::transform(copy.begin(), copy.end(), copy.begin(), ::tolower);
@@ -365,5 +367,29 @@ bool IsInt(const char* sz) {
     }
     return ok;
 }
+
+template <typename UnaryPredicate>
+std::string trimCopy(const std::string& str, UnaryPredicate pred, bool left, bool right) {
+    size_t end = str.size();
+    size_t st = 0;
+    const char* val = str.data();
+
+    if (left) {
+        while (st < end && pred(val[st])) {
+            st++;
+        }
+    }
+    if (right) {
+        while (st < end && pred(val[end - 1])) {
+            end--;
+        }
+    }
+    return (0 < st || end < str.size()) ? str.substr(st, end - st) : str;
+}
+
+std::string Trim(const std::string& str, const std::string& trimCharacters, bool trimLeft, bool trimRight) {
+    return trimCopy(str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
+}
+
 
 } // namespace logtail

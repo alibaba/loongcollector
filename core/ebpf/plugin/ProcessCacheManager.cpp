@@ -47,8 +47,6 @@ DEFINE_FLAG_INT32(max_ebpf_process_cache_size, "Size of the process cache", 1310
 DEFINE_FLAG_INT32(ebpf_process_cache_gc_interval_sec,
                   "Time in seconds between checking the process cache for expired entries",
                   30);
-DEFINE_FLAG_INT32(ebpf_event_retry_limit, "Number of attempts to retry processing ebpf event", 15);
-DEFINE_FLAG_INT32(ebpf_event_retry_interval_sec, "Time in seconds between ebpf event retries", 2);
 
 namespace logtail::ebpf {
 
@@ -112,6 +110,7 @@ void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) 
 }
 
 void HandleKernelProcessEventLost(void* ctx, int cpu, unsigned long long cnt) {
+    LOG_WARNING(sLogger, ("kernel event loss, lost_count", cnt)("type", "process security"));
     auto* processCacheMgr = static_cast<ProcessCacheManager*>(ctx);
     if (!processCacheMgr) {
         LOG_ERROR(sLogger, ("ProcessCacheManager is null!", "")("lost events", cnt)("cpu", cpu));
@@ -131,20 +130,20 @@ ProcessCacheManager::ProcessCacheManager(std::shared_ptr<EBPFAdapter>& eBPFAdapt
                                          CounterPtr processCacheMissTotal,
                                          IntGaugePtr processCacheSize,
                                          IntGaugePtr processDataMapSize,
-                                         IntGaugePtr retryableEventCacheSize)
+                                         RetryableEventCache& retryableEventCache)
     : mEBPFAdapter(eBPFAdapter),
       mHostPathPrefix(hostPathPrefix),
       mProcParser(hostPathPrefix),
       mProcessCache(INT32_FLAG(max_ebpf_process_cache_size), mProcParser),
       mProcessDataMap(INT32_FLAG(max_ebpf_max_process_data_map_size)),
+      mRetryableEventCache(retryableEventCache),
       mHostName(hostName),
       mCommonEventQueue(queue),
       mPollProcessEventsTotal(std::move(pollEventsTotal)),
       mLossProcessEventsTotal(std::move(lossEventsTotal)),
       mProcessCacheMissTotal(std::move(processCacheMissTotal)),
       mProcessCacheSize(std::move(processCacheSize)),
-      mProcessDataMapSize(std::move(processDataMapSize)),
-      mRetryableEventCacheSize(std::move(retryableEventCacheSize)) {
+      mProcessDataMapSize(std::move(processDataMapSize)) {
 }
 
 bool ProcessCacheManager::Init() {
@@ -175,24 +174,23 @@ void ProcessCacheManager::Stop() {
     if (!mInited) {
         return;
     }
+    mInited = false;
+    waitForConsumeFinished();
     auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);
     LOG_INFO(sLogger, ("stop process probes, status", res));
-    mInited = false;
-    waitForPollingFinished();
     mProcessCache.Clear();
     mProcessDataMap.Clear();
-    mRetryableEventCache.Clear();
 }
 
-void ProcessCacheManager::waitForPollingFinished() {
+void ProcessCacheManager::waitForConsumeFinished() {
     int64_t startTime = TimeKeeper::GetInstance()->NowSec();
     bool alarmOnce = false;
-    while (mIsPolling) {
+    while (mIsConsuming) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100)); // 100ms
         int64_t duration = TimeKeeper::GetInstance()->NowSec() - startTime;
         if (!alarmOnce && duration > 10) { // 10s
             LOG_ERROR(sLogger, ("ProcessCacheManager stop", "too slow")("cost", duration));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CONFIG_UPDATE_ALARM, std::string("ProcessCacheManager stop too slow; cost:" + ToString(duration)));
             alarmOnce = true;
         }
@@ -433,22 +431,21 @@ int ProcessCacheManager::writeProcToBPFMap(const std::shared_ptr<Proc>& proc) {
     return res;
 }
 
-void ProcessCacheManager::PollPerfBuffers() {
-    int zero = 0;
-    mIsPolling = true;
-    // mIsPolling must be set before mInited check to ensure
-    // when stopping, mIsPolling == false can ensure no more events will be processed
+int ProcessCacheManager::ConsumePerfBufferData() {
+    int ret = 0;
+    mIsConsuming = true;
+    if (mInited) {
+        mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
+        LOG_DEBUG(sLogger, ("process cache consume buffer", "")("cnt", ret));
+    }
+    mIsConsuming = false;
+
+    return ret;
+}
+
+void ProcessCacheManager::ClearProcessExpiredCache() {
     if (mInited) {
         auto now = TimeKeeper::GetInstance()->NowSec();
-        if (now > mLastEventCacheRetryTime + INT32_FLAG(ebpf_event_retry_interval_sec)) {
-            EventCache().HandleEvents();
-            mLastEventCacheRetryTime = now;
-            SET_GAUGE(mRetryableEventCacheSize, EventCache().Size());
-        }
-        // poll after retry to avoid instant retry
-        auto ret = mEBPFAdapter->PollPerfBuffers(
-            PluginType::PROCESS_SECURITY, kDefaultMaxBatchConsumeSize, &zero, kDefaultMaxWaitTimeMS);
-        LOG_DEBUG(sLogger, ("poll event num", ret));
         if (now > mLastProcessCacheClearTime + INT32_FLAG(ebpf_process_cache_gc_interval_sec)) {
             mProcessCache.ClearExpiredCache();
             mLastProcessCacheClearTime = now;
@@ -463,7 +460,6 @@ void ProcessCacheManager::PollPerfBuffers() {
             }
         }
     }
-    mIsPolling = false;
 }
 
 } // namespace logtail::ebpf

@@ -92,6 +92,10 @@ func (m *MetaManager) Init(configPath string) (err error) {
 		// 创建 Kubernetes 客户端配置
 		config = controllerConfig.GetConfigOrDie()
 	}
+	// set protobuf support for config
+	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+
 	// 创建 Kubernetes 客户端
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -163,7 +167,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 		m.linkRegisterMap[configName] = append(m.linkRegisterMap[configName], resourceType)
 		m.registerLock.Unlock()
 	} else {
-		logger.Error(context.Background(), "ENTITY_PIPELINE_REGISTER_ERROR", "resourceType not support", resourceType)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", resourceType)
 	}
 }
 

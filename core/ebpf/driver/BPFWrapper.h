@@ -175,15 +175,10 @@ public:
 
         int* key = static_cast<int*>(outterKey);
 
-        // get inner map fd from outter map fd and outter key
-        // close fd for inner map
-        int innerFd = -1;
+        // Remove the entry from mApInMapFds to avoid double close
+        // Note: The fd was already closed in UpdateInnerMapElem
         if (mApInMapFds[mapFd].count(*key)) {
-            innerFd = mApInMapFds[mapFd][*key];
-        }
-
-        if (innerFd > 0) {
-            close(innerFd);
+            mApInMapFds[mapFd].erase(*key);
         }
 
         return 0;
@@ -217,6 +212,18 @@ public:
     template <typename MapInMapType>
     int UpdateInnerMapElem(
         const std::string& outterMapName, void* outterKey, void* innerKey, void* innerValue, uint64_t flag) {
+        // Use default max_entries from traits
+        return UpdateInnerMapElem<MapInMapType>(
+            outterMapName, outterKey, innerKey, innerValue, flag, BPFMapTraits<MapInMapType>::inner_max_entries);
+    }
+
+    template <typename MapInMapType>
+    int UpdateInnerMapElem(const std::string& outterMapName,
+                           void* outterKey,
+                           void* innerKey,
+                           void* innerValue,
+                           uint64_t flag,
+                           uint32_t max_entries) {
         int mapFd = SearchMapFd(outterMapName);
         if (mapFd < 0) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
@@ -245,7 +252,7 @@ public:
                                     NULL,
                                     BPFMapTraits<MapInMapType>::inner_key_size,
                                     BPFMapTraits<MapInMapType>::inner_val_size,
-                                    BPFMapTraits<MapInMapType>::inner_max_entries,
+                                    max_entries,
                                     popt);
             if (fd < 0) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
@@ -338,11 +345,15 @@ public:
         return 0;
     }
 
-    void DeletePerfBuffer(void* pb) { perf_buffer__free((struct perf_buffer*)pb); }
+    void DeletePerfBuffer(void* pb) { perf_buffer__free(static_cast<struct perf_buffer*>(pb)); }
 
     int PollPerfBuffer(void* pb, int /*maxEvents*/, int timeoutMs) {
-        return perf_buffer__poll((struct perf_buffer*)pb, timeoutMs);
+        return perf_buffer__poll(static_cast<struct perf_buffer*>(pb), timeoutMs);
     }
+
+    int ConsumePerfBuffer(void* pb) { return perf_buffer__consume(static_cast<struct perf_buffer*>(pb)); }
+
+    int GetPerfBufferEpollFd(void* pb) { return perf_buffer__epoll_fd(static_cast<struct perf_buffer*>(pb)); }
 
     void* CreatePerfBuffer(
         const std::string& name, int pageCnt, void* ctx, perf_buffer_sample_fn dataCb, perf_buffer_lost_fn lossCb) {

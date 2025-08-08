@@ -30,7 +30,7 @@ func (in *InputKubernetesMeta) collectDeployment(lister interface{}, selector la
 	deploymentLister := lister.(apps.DeploymentLister)
 	deployments, err := deploymentLister.List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	if in.Deployment {
@@ -68,7 +68,7 @@ func (in *InputKubernetesMeta) collectDaemonSet(lister interface{}, selector lab
 	daemonSetLister := lister.(apps.DaemonSetLister)
 	daemonSets, err := daemonSetLister.List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	if in.DaemonSet {
@@ -98,7 +98,7 @@ func (in *InputKubernetesMeta) collectDaemonSet(lister interface{}, selector lab
 func (in *InputKubernetesMeta) collectStatefulSet(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	statefulSets, err := lister.(apps.StatefulSetLister).List(selector)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
 		return
 	}
 	if in.StatefulSet {

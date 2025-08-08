@@ -71,7 +71,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for existing config",
                          "keep current pipeline running")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
                 config.mRegion,
@@ -86,7 +86,27 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                  ("pipeline building for existing config succeeded",
                   "stop the old pipeline and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+
+        // Check if input type has changed to determine stop behavior
+        bool shouldCompletelyStop = false;
+        const Json::Value& oldConfig = iter->second->GetConfig();
+        const Json::Value& oldInputs = oldConfig["inputs"];
+
+        std::set<std::string> newInputTypes;
+        std::set<std::string> oldInputTypes;
+        for (const auto& input : config.mInputs) {
+            newInputTypes.insert((*input)["Type"].asString());
+        }
+        for (const auto& oldInput : oldInputs) {
+            oldInputTypes.insert(oldInput["Type"].asString());
+        }
+
+        if (newInputTypes != oldInputTypes) {
+            LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", config.mName));
+            shouldCompletelyStop = true;
+        }
+
+        iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = p;
@@ -100,7 +120,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for new config", "skip current object")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
                 config.mRegion,

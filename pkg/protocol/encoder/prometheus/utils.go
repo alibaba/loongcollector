@@ -34,7 +34,7 @@ func marshalBatchTimeseriesData(wr *pb.WriteRequest) []byte {
 
 	data, err := wr.Marshal()
 	if err != nil {
-		// logger.Error(context.Background(), alarmType, "pb marshal err", err)
+		// logger.Warning(context.Background(), alarmType, "pb marshal err", err)
 		return nil
 	}
 

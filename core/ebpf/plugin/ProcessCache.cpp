@@ -14,6 +14,7 @@
 
 #include "ebpf/plugin/ProcessCache.h"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <chrono>
 #include <iterator>
 #include <mutex>
@@ -25,37 +26,50 @@
 namespace logtail {
 
 ProcessCache::ProcessCache(size_t maxCacheSize, ProcParser& procParser) : mProcParser(procParser) {
-    mCache.reserve(maxCacheSize);
+    mCache = std::make_unique<ExecveEventMap>(maxCacheSize, ebpf::DataEventIdHash{}, ebpf::DataEventIdEqual{});
 }
 
+ProcessCache::~ProcessCache() = default;
+
 bool ProcessCache::Contains(const data_event_id& key) const {
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    return mCache.find(key) != mCache.end();
+    if (!mCache) {
+        return false;
+    }
+    size_t found = mCache->cvisit(key, [](const auto& /* element */) {});
+    return found == 1;
 }
 
 std::shared_ptr<ProcessCacheValue> ProcessCache::Lookup(const data_event_id& key) {
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    auto it = mCache.find(key);
-    if (it != mCache.end()) {
-        return it->second;
+    if (!mCache) {
+        return nullptr;
     }
-    return nullptr;
+
+    std::shared_ptr<ProcessCacheValue> result = nullptr;
+    size_t found = mCache->cvisit(key, [&result](const auto& element) { result = element.second; });
+
+    return (found == 1) ? result : nullptr;
 }
 
 size_t ProcessCache::Size() const {
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    return mCache.size();
+    if (!mCache) {
+        return 0;
+    }
+    return mCache->size();
 }
 
 void ProcessCache::removeCache(const data_event_id& key) {
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    mCache.erase(key);
+    if (!mCache) {
+        return;
+    }
+    mCache->erase(key);
 }
 
 void ProcessCache::AddCache(const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
+    if (!mCache) {
+        return;
+    }
     value->IncRef();
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    mCache.emplace(key, value);
+    mCache->insert(std::make_pair(key, value));
 }
 
 void ProcessCache::IncRef([[maybe_unused]] const data_event_id& key, std::shared_ptr<ProcessCacheValue>& value) {
@@ -79,8 +93,10 @@ void ProcessCache::enqueueExpiredEntry(const data_event_id& key, std::shared_ptr
 }
 
 void ProcessCache::Clear() {
-    std::lock_guard<std::mutex> lock(mCacheMutex);
-    mCache.clear();
+    if (!mCache) {
+        return;
+    }
+    mCache->clear();
 }
 
 void ProcessCache::ClearExpiredCache() {
@@ -122,32 +138,39 @@ void ProcessCache::ClearExpiredCache() {
 }
 
 void ProcessCache::ForceShrink() {
-    if (mLastForceShrinkTimeSec < TimeKeeper::GetInstance()->NowSec() - 120) {
+    if (mLastForceShrinkTimeSec != 0 && mLastForceShrinkTimeSec > TimeKeeper::GetInstance()->NowSec() - 120) {
         return;
     }
+    if (!mCache) {
+        return;
+    }
+
     auto validProcs = mProcParser.GetAllPids();
     auto minKtime = TimeKeeper::GetInstance()->KtimeNs()
         - std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::minutes(2)).count();
+
     std::vector<data_event_id> cacheToRemove;
-    cacheToRemove.reserve(mCache.size() - validProcs.size());
-    {
-        std::lock_guard<std::mutex> lock(mCacheMutex);
-        for (const auto& [k, v] : mCache) {
-            if (validProcs.count(k.pid) == 0U && minKtime > time_t(k.time)) {
-                cacheToRemove.emplace_back(k);
-            }
+    mCache->visit_all([&](const auto& element) {
+        const auto& [k, v] = element;
+        if (validProcs.count(k.pid) == 0U && minKtime > time_t(k.time)) {
+            cacheToRemove.emplace_back(k);
         }
-        for (const auto& key : cacheToRemove) {
-            mCache.erase(key);
-            LOG_ERROR(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
-        }
+    });
+
+    for (const auto& key : cacheToRemove) {
+        mCache->erase(key);
+        LOG_ERROR(sLogger, ("[FORCE SHRINK] pid", key.pid)("ktime", key.time));
     }
+
     mLastForceShrinkTimeSec = TimeKeeper::GetInstance()->NowSec();
 }
 
 void ProcessCache::PrintDebugInfo() {
-    for (const auto& [key, value] : mCache) {
-        LOG_ERROR(sLogger, ("[DUMP CACHE] pid", key.pid)("ktime", key.time));
+    if (mCache) {
+        mCache->cvisit_all([](const auto& element) {
+            const auto& [key, value] = element;
+            LOG_ERROR(sLogger, ("[DUMP CACHE] pid", key.pid)("ktime", key.time));
+        });
     }
     for (const auto& entry : mCacheExpireQueue) {
         LOG_ERROR(sLogger, ("[DUMP EXPIRE Q] pid", entry.key.pid)("ktime", entry.key.time));
