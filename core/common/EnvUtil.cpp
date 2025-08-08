@@ -35,9 +35,9 @@ void UnsetEnv(const char* key) {
 }
 
 char* GetEnv(const char* firstKey, const char* secondKey) {
-    char* value = std::getenv(firstKey);
+    char* value = getenv(firstKey);
     if (value == nullptr) {
-        value = std::getenv(secondKey);
+        value = getenv(secondKey);
     }
     return value;
 }
