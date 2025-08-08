@@ -159,12 +159,12 @@ func (m *Manager) Start(p *GoProfile) error {
 		if err := m.discoveryManager.ApplyConfig(map[string]discovery.Configs{
 			c.JobName: c.ServiceDiscoveryConfigs,
 		}); err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "apply discovery config error", err.Error())
+			logger.Warning(context.Background(), "GOPROFILE_ALARM", "apply discovery config error", err.Error())
 		}
 		err := m.discoveryManager.Run()
 		logger.Debug(context.Background(), "finish discovery manager")
 		if err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "discovery err", err.Error())
+			logger.Warning(context.Background(), "GOPROFILE_ALARM", "discovery err", err.Error())
 		}
 	}()
 	go func() {
@@ -172,7 +172,7 @@ func (m *Manager) Start(p *GoProfile) error {
 		err := m.scrapeManager.Run(m.discoveryManager.SyncCh())
 		logger.Debug(context.Background(), "finish scrape manager")
 		if err != nil {
-			logger.Error(context.Background(), "GOPROFILE_ALARM", "scrape err", err.Error())
+			logger.Warning(context.Background(), "GOPROFILE_ALARM", "scrape err", err.Error())
 		}
 	}()
 	return nil

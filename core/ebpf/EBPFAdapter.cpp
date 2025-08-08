@@ -26,12 +26,11 @@
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 #define LOAD_EBPF_FUNC_ADDR(funcName) \
     ({ \
-        void* funcPtr = tmp_lib->LoadMethod(#funcName, loadErr); \
+        void* funcPtr = tmpLib->LoadMethod(#funcName, loadErr); \
         if (funcPtr == NULL) { \
             LOG_ERROR(sLogger, \
                       ("[source_manager] load ebpf method", "failed")("method", #funcName)("error", loadErr)); \
@@ -58,7 +57,7 @@ namespace ebpf {
 
 #define LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(funcName) \
     ({ \
-        void* funcPtr = tmp_lib->LoadMethod(#funcName, loadErr); \
+        void* funcPtr = tmpLib->LoadMethod(#funcName, loadErr); \
         long offset = 0; \
         if (funcPtr == NULL) { \
             LOG_ERROR(sLogger, \
@@ -157,10 +156,10 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
         return true;
     }
 
-    std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
+    std::shared_ptr<DynamicLibLoader> tmpLib = std::make_shared<DynamicLibLoader>();
     LOG_INFO(sLogger, ("[EBPFAdapter] begin load ebpf dylib, path", mBinaryPath));
     std::string loadErr;
-    if (!tmp_lib->LoadDynLib(libName, loadErr, mBinaryPath)) {
+    if (!tmpLib->LoadDynLib(libName, loadErr, mBinaryPath)) {
         LOG_ERROR(sLogger, ("failed to load ebpf dynamic library, path", mBinaryPath)("error", loadErr));
         return false;
     }
@@ -173,11 +172,13 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     mFuncs[static_cast<int>(ebpf_func::EBPF_SUSPEND_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(suspend_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_RESUME_PLUGIN)] = LOAD_EBPF_FUNC_ADDR(resume_plugin);
     mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)] = LOAD_EBPF_FUNC_ADDR(poll_plugin_pbs);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_CONSUME_PLUGIN_PB_DATA)] = LOAD_EBPF_FUNC_ADDR(consume_plugin_pb_data);
     mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CONFIG)]
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_config);
     mFuncs[static_cast<int>(ebpf_func::EBPF_SET_NETWORKOBSERVER_CID_FILTER)]
         = LOAD_EBPF_FUNC_ADDR(set_networkobserver_cid_filter);
     mFuncs[static_cast<int>(ebpf_func::EBPF_MAP_UPDATE_ELEM)] = LOAD_EBPF_FUNC_ADDR(update_bpf_map_elem);
+    mFuncs[static_cast<int>(ebpf_func::EBPF_GET_PLUGIN_PB_EPOLL_FDS)] = LOAD_EBPF_FUNC_ADDR(get_plugin_pb_epoll_fds);
 
     // check function load success
     if (std::any_of(mFuncs.begin(), mFuncs.end(), [](auto* x) { return x == nullptr; })) {
@@ -201,7 +202,7 @@ bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
     }
 
     // update meta
-    mLib = std::move(tmp_lib);
+    mLib = std::move(tmpLib);
     return true;
 }
 
@@ -211,10 +212,10 @@ bool EBPFAdapter::loadCoolBPF() {
         return true;
     }
 
-    std::shared_ptr<DynamicLibLoader> tmp_lib = std::make_shared<DynamicLibLoader>();
+    std::shared_ptr<DynamicLibLoader> tmpLib = std::make_shared<DynamicLibLoader>();
     LOG_INFO(sLogger, ("[EBPFAdapter] begin load libcoolbpf, path", mBinaryPath));
     std::string loadErr;
-    if (!tmp_lib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
+    if (!tmpLib->LoadDynLib("coolbpf", loadErr, mBinaryPath, ".1.0.0")) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf, path", mBinaryPath)("error", loadErr));
         return false;
     }
@@ -233,7 +234,7 @@ bool EBPFAdapter::loadCoolBPF() {
         return false;
     }
 
-    mCoolbpfLib = std::move(tmp_lib);
+    mCoolbpfLib = std::move(tmpLib);
 
     return true;
 }
@@ -278,7 +279,7 @@ bool EBPFAdapter::SetNetworkObserverConfig(int32_t key, int32_t value) {
 #endif
 }
 
-bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool update) {
+bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool update, uint64_t cidKey) {
     if (!dynamicLibSuccess()) {
         return false;
     }
@@ -291,7 +292,7 @@ bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool updat
     return true;
 #else
     auto func = (set_networkobserver_cid_filter_func)f;
-    func(cid.c_str(), cid.size(), update);
+    func(cid.c_str(), cid.size(), cidKey, update);
     return true;
 #endif
 }
@@ -344,6 +345,7 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
+    mRunning[int(pluginType)] = true;
     return true;
 #else
     auto startF = (start_plugin_func)f;
@@ -430,6 +432,7 @@ bool EBPFAdapter::StopPlugin(PluginType pluginType) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
+    mRunning[int(pluginType)] = false;
     return true;
 #else
     auto stopF = (stop_plugin_func)f;
@@ -463,5 +466,50 @@ bool EBPFAdapter::BPFMapUpdateElem(
 #endif
 }
 
-} // namespace ebpf
-} // namespace logtail
+std::vector<int> EBPFAdapter::GetPerfBufferEpollFds(PluginType pluginType) {
+    if (!dynamicLibSuccess()) {
+        return {};
+    }
+    void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_GET_PLUGIN_PB_EPOLL_FDS)];
+    if (!f) {
+        LOG_ERROR(sLogger,
+                  ("failed to load dynamic lib, get perf buffer epoll fds func ptr is null",
+                   magic_enum::enum_name(pluginType)));
+        return {};
+    }
+#ifdef APSARA_UNIT_TEST_MAIN
+    return {0, 1, 2};
+#else
+    auto getEpollFdsFunc = (get_plugin_pb_epoll_fds_func)f;
+    static const int kMaxFds = 8;
+    int fds[kMaxFds];
+    int count = getEpollFdsFunc(pluginType, static_cast<int*>(fds), kMaxFds);
+
+    std::vector<int> result;
+    if (count > 0) {
+        result.assign(static_cast<int*>(fds), static_cast<int*>(fds) + count);
+    }
+    return result;
+#endif
+}
+
+int32_t EBPFAdapter::ConsumePerfBufferData(PluginType pluginType) {
+    if (!dynamicLibSuccess()) {
+        return -1;
+    }
+    void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_CONSUME_PLUGIN_PB_DATA)];
+    if (!f) {
+        LOG_ERROR(sLogger,
+                  ("failed to load dynamic lib, consume perf buffer data func ptr is null",
+                   magic_enum::enum_name(pluginType)));
+        return -1;
+    }
+#ifdef APSARA_UNIT_TEST_MAIN
+    return 0;
+#else
+    auto consumeFunc = (consume_plugin_pb_data_func)f;
+    return consumeFunc(pluginType);
+#endif
+}
+
+} // namespace logtail::ebpf

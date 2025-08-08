@@ -64,7 +64,7 @@ func (p *Processor) flush() {
 	case "WARN":
 		logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "log", p.content.String())
 	case "ERROR":
-		logger.Error(manager.managerMeta.GetContext(), JMXAlarmType, "log", p.content.String())
+		logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "log", p.content.String())
 	case "INFO":
 		logger.Info(manager.managerMeta.GetContext(), "log", p.content.String())
 	case "DEBUG":

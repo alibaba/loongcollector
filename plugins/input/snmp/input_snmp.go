@@ -471,7 +471,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 			err := func() error {
 				err := thisGsAgent.Connect()
 				if err != nil {
-					logger.Errorf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", "%v", err)
+					logger.Warningf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", "%v", err)
 					return err
 				}
 
@@ -565,7 +565,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 				return nil
 			}()
 			if err != nil {
-				logger.Errorf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", fmt.Sprintf("%v", err))
+				logger.Warningf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", fmt.Sprintf("%v", err))
 			}
 		}()
 	}

@@ -24,6 +24,8 @@ inline constexpr DataElement kNetMetricsElements[] = {
     kAppId, // pid
     kIp, // server ip
     kAppName, // service
+    kWorkspace, // workspace
+    kArmsServiceId, // serviceId
 
     kNamespace,
     kPodName,

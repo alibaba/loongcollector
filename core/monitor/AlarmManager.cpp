@@ -168,6 +168,7 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
                                                                                        : now.tv_sec);
             logEvent->SetContent("alarm_type", messagePtr->mMessageType);
+            logEvent->SetContent("alarm_level", messagePtr->mLevel);
             logEvent->SetContent("alarm_message", messagePtr->mMessage);
             logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
             logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
@@ -214,7 +215,8 @@ AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(cons
     return iter->second.first.get();
 }
 
-void AlarmManager::SendAlarm(const AlarmType alarmType,
+void AlarmManager::SendAlarm(const AlarmType& alarmType,
+                             const AlarmLevel& level,
                              const std::string& message,
                              const std::string& region,
                              const std::string& projectName,
@@ -231,10 +233,12 @@ void AlarmManager::SendAlarm(const AlarmType alarmType,
     // LOG_DEBUG(sLogger, ("Add Alarm", region)("projectName", projectName)("alarm index",
     // mMessageType[alarmType])("msg", message));
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
-    string key = projectName + "_" + category + "_" + config;
+    string levelStr = ToString(level);
+    string key = projectName + "_" + category + "_" + config + "_" + levelStr;
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr = new AlarmMessage(mMessageType[alarmType], projectName, category, config, message, 1);
+        auto* messagePtr
+            = new AlarmMessage(mMessageType[alarmType], levelStr, projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();

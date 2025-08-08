@@ -147,7 +147,7 @@ func (b *InputMysqlBinlog) Init(context pipeline.Context) (int, error) {
 	data, exist := b.context.GetCheckPoint("mysql_bin_log")
 	if data != nil && exist {
 		if err := json.Unmarshal(data, &b.checkpoint); err != nil {
-			logger.Error(b.context.GetRuntimeContext(), "INIT_CHECKPOINT_ALARM", "load checkpoint error", err)
+			logger.Warning(b.context.GetRuntimeContext(), "INIT_CHECKPOINT_ALARM", "load checkpoint error", err)
 			b.checkpoint.BinlogFileName = ""
 			b.checkpoint.IndexFileDir = ""
 			b.checkpoint.Offset = 0
