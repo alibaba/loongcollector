@@ -63,6 +63,7 @@ inline constexpr DataElement kAppMetricsElements[] = {
     kAppName, // service
     kWorkspace, // workspace
     kArmsServiceId, // serviceId
+    kLanguage, // language
 
     kNamespace,
     kWorkloadKind,

@@ -346,7 +346,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump span tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 10UL);
+    APSARA_TEST_EQUAL(tags.size(), 11UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
@@ -362,7 +362,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 9UL);
+    APSARA_TEST_EQUAL(tags.size(), 10UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");

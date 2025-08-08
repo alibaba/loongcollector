@@ -193,6 +193,18 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                              mContext->GetRegion());
     }
 
+    // Language (Optional)
+    if (!GetOptionalStringParam(appConfig, "Language", thisObserverNetworkOption.mApmConfig.mLanguage, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
     // ServiceId (Optional)
     if (!GetOptionalStringParam(appConfig, "ServiceId", thisObserverNetworkOption.mApmConfig.mServiceId, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
@@ -249,6 +261,7 @@ bool InitObserverNetworkOptionInner(const Json::Value& probeConfig,
                                mContext->GetRegion());
         }
         if (!GetMandatoryStringParam(selector, "WorkloadKind", item.mWorkloadKind, errorMsg)) {
+            item.mWorkloadKind = ToLowerCaseString(item.mWorkloadKind);
             PARAM_ERROR_RETURN(mContext->GetLogger(),
                                mContext->GetAlarm(),
                                errorMsg,
