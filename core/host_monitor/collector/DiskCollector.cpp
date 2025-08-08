@@ -414,7 +414,8 @@ int DiskCollector::CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage) {
 
     diskUsage.serviceTime = -1;
     if (diskUsage.time != std::numeric_limits<uint64_t>::max()) {
-        uint64_t ios = DiffOrZero(diskUsage.reads, ioDev.diskUsage.reads) + DiffOrZero(diskUsage.writes, ioDev.diskUsage.writes);
+        uint64_t ios
+            = DiffOrZero(diskUsage.reads, ioDev.diskUsage.reads) + DiffOrZero(diskUsage.writes, ioDev.diskUsage.writes);
         double tmp = ((double)ios) * HZ / interval;
         double util = ((double)(diskUsage.time - ioDev.diskUsage.time)) / interval * HZ;
 

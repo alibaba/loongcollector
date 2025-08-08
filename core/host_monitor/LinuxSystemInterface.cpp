@@ -22,8 +22,8 @@
 using namespace std;
 using namespace std::chrono;
 
-#include <mntent.h>
 #include <grp.h>
+#include <mntent.h>
 #include <pwd.h>
 
 #include <boost/algorithm/string.hpp>
@@ -732,7 +732,7 @@ bool LinuxSystemInterface::GetFileSystemListInformationOnce(FileSystemListInform
     if (!(fp = setmntent(mountedDir.c_str(), "r"))) {
         return false;
     }
-    defer(endmntent(fp));
+    deferred(endmntent(fp));
 
     mntent ent{};
     std::vector<char> buffer((size_t)4096);

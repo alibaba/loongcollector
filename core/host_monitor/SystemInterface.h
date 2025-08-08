@@ -61,7 +61,7 @@ public:
 
 #define defer3(ln, statement) ScopeGuard __##ln##_defer_([&]() { statement; })
 #define defer2(ln, statement) defer3(ln, statement)
-#define defer(statement) defer2(__LINE__, statement)
+#define deferred(statement) defer2(__LINE__, statement)
 
 // man proc: https://man7.org/linux/man-pages/man5/proc.5.html
 // search key: /proc/stat
