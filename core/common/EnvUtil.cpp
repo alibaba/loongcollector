@@ -34,4 +34,12 @@ void UnsetEnv(const char* key) {
 #endif
 }
 
+char* GetEnv(const char* firstKey, const char* secondKey) {
+    char* value = std::getenv(firstKey);
+    if (value == nullptr) {
+        value = std::getenv(secondKey);
+    }
+    return value;
+}
+
 } // namespace logtail
