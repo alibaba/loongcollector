@@ -61,12 +61,9 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<CPUCollector>();
     RegisterCollector<SystemCollector>();
     RegisterCollector<MemCollector>();
-<<<<<<< HEAD
     RegisterCollector<DiskCollector>();
-=======
     RegisterCollector<ProcessCollector>();
     RegisterCollector<NetCollector>();
->>>>>>> abing_demo/main
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0

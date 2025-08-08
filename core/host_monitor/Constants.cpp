@@ -40,7 +40,6 @@ const std::filesystem::path PROCESS_CWD = "cwd";
 const std::filesystem::path PROCESS_EXE = "exe";
 const std::filesystem::path PROCESS_ROOT = "root";
 const std::filesystem::path PROCESS_STATUS = "status";
-const std::filesystem::path PROCESS_UPTIME = "uptime";
 const int EXECUTE_SUCCESS = 0;
 const int EXECUTE_FAIL = -1;
 const std::filesystem::path PROCESS_NET_IF_INET6 = "net/if_inet6";
