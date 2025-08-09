@@ -71,7 +71,7 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     const CollectionPipelineContext* ctx,
     uint32_t index,
     const PluginMetricManagerPtr& metricMgr,
-    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    [[maybe_unused]] const PluginOptions& opt) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return -1;

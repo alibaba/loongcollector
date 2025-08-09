@@ -77,14 +77,14 @@ public:
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+                          const PluginOptions&) override;
 
     int RemoveConfig(const std::string&) override;
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
     std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    GeneratePluginConfig(const PluginOptions& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;

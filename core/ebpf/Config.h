@@ -48,6 +48,8 @@ public:
     SecurityProbeType mProbeType;
 };
 
+using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*>;
+
 ///////////////////// Process Level Config /////////////////////
 
 struct AdminConfig {

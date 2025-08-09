@@ -260,7 +260,7 @@ int NetworkSecurityManager::Init() {
 int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+                                              const PluginOptions& options) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return -1;

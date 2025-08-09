@@ -1268,7 +1268,7 @@ std::shared_ptr<AppDetail> NetworkObserverManager::getAppConfigFromReplica(const
 int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+                                              const PluginOptions& opt) {
     if (!ctx) {
         LOG_ERROR(sLogger, ("ctx is null", ""));
         return 1;
