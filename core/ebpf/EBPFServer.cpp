@@ -36,6 +36,7 @@
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
+#include "plugin/cpu_profiling/CpuProfilingManager.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -59,7 +60,8 @@ bool EnvManager::IsSupportedEnv(PluginType type) {
             break;
         case PluginType::FILE_SECURITY:
         case PluginType::NETWORK_SECURITY:
-        case PluginType::PROCESS_SECURITY: {
+        case PluginType::PROCESS_SECURITY:
+        case PluginType::CPU_PROFILING: {
             status = mArchSupport && mBTFSupport;
             break;
         }
@@ -346,6 +348,17 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 }
                 break;
             }
+
+            case PluginType::CPU_PROFILING: {
+                if (!pluginMgr) {
+                    auto mgr = CpuProfilingManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
+                    // mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
+
             default:
                 LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
                 return false;
@@ -550,14 +563,18 @@ void EBPFServer::pollPerfBuffers() {
         mProcessCacheManager->ClearProcessExpiredCache();
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
-        auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
-        if (!pluginState.mValid.load(std::memory_order_acquire)) {
-            continue;
-        }
-        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-        if (pluginState.mManager) {
-            auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
-            mgr->PollPerfBuffer(0); // 0 means non-blocking r(ef: https://libbpf.readthedocs.io/en/latest/api.html)
+        std::vector<PluginState*> pluginStatePtrs = {
+            &getPluginState(PluginType::NETWORK_OBSERVE),
+            &getPluginState(PluginType::CPU_PROFILING)};
+        for (auto& pluginStatePtr : pluginStatePtrs) {
+            auto& pluginState = *pluginStatePtr;
+            if (!pluginState.mValid.load(std::memory_order_acquire)) {
+                continue;
+            }
+            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+            if (pluginState.mManager) {
+                pluginState.mManager->PollPerfBuffer(0); // 0 means non-blocking
+            }
         }
     }
 }

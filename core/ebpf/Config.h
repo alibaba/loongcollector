@@ -48,7 +48,18 @@ public:
     SecurityProbeType mProbeType;
 };
 
-using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*>;
+/////////////////////  /////////////////////
+
+class CpuProfilingOption {
+public:
+    bool Init(const Json::Value& config,
+              const CollectionPipelineContext* mContext,
+              const std::string& sName);
+    
+    std::vector<std::string> mCmdlines;
+};
+
+using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*, CpuProfilingOption*>;
 
 ///////////////////// Process Level Config /////////////////////
 

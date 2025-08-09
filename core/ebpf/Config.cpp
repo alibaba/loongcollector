@@ -555,6 +555,14 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
     return true;
 }
 
+bool CpuProfilingOption::Init(const Json::Value& config,
+                              const CollectionPipelineContext* mContext,
+                              const std::string& sName) {
+    std::string errorMsg;
+    GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg);
+    return true;
+}
+
 //////
 void eBPFAdminConfig::LoadEbpfConfig(const Json::Value& confJson) {
     // receive_event_chan_cap (Optional)
