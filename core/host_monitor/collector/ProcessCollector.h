@@ -70,6 +70,8 @@ protected:
 
     bool GetProcessCpuInCache(pid_t pid, bool includeCTime);
 
+    void ClearProcessCpuTimeCache();
+
 private:
     int mCountPerReport = 0;
     int mCount = 0;

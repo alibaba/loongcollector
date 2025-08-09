@@ -43,8 +43,8 @@ DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N c
 DEFINE_FLAG_INT32(process_total_count, "number of each calculate epoch to report", 3);
 #define PATH_MAX 4096
 
-// topN进行的缓存为55s
-const std::chrono::seconds ProcessSortInterval{55};
+// topN进行的缓存为120s
+const std::chrono::seconds ProcessSortInterval{120};
 
 const std::string ProcessCollector::sName = "process";
 const std::string kMetricLabelProcess = "valueTag";
@@ -269,6 +269,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     mAvgProcessNumThreads.clear();
     pidNameMap.clear();
     pushMerticList.clear();
+    ClearProcessCpuTimeCache();
     return true;
 }
 
@@ -547,6 +548,24 @@ bool ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
     processStat.processor = processInfo.stat.processor;
 
     return true;
+}
+
+void ProcessCollector::ClearProcessCpuTimeCache() {
+    // 清除超时的cache
+    const auto now = std::chrono::steady_clock::now();
+    auto it = cpuTimeCache.begin();
+
+    while (it != cpuTimeCache.end()) {
+        // 检查当前元素是否超过120秒未访问
+        if (now - it->second.lastTime > ProcessSortInterval) {
+            // 超过120秒，删除该元素
+            it = cpuTimeCache.erase(it);
+        } else {
+            // 未超过120秒，继续检查下一个元素
+            ++it;
+        }
+    }
+    return;
 }
 
 } // namespace logtail
