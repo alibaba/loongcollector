@@ -56,6 +56,7 @@ add_unittest(process_security_manager_unittest ProcessSecurityManagerUnittest.cp
 add_unittest(network_security_manager_unittest NetworkSecurityManagerUnittest.cpp)
 add_unittest(retryable_event_unittest RetryableEventUnittest.cpp)
 add_unittest(http_retryable_event_unittest HttpRetryableEventUnittest.cpp)
+add_unittest(process_scanner_unittest ProcessScannerUnittest.cpp)
 
 add_driver_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
 add_driver_unittest(ebpf_driver_log_unittest EBPFDriverLogUnittest.cpp)
