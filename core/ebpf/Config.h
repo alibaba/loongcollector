@@ -72,6 +72,8 @@ public:
     bool mAgentsightMessageDeltaOnly = true;
 };
 
+using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*>;
+
 ///////////////////// Process Level Config /////////////////////
 
 struct AdminConfig {

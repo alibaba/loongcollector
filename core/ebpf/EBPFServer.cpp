@@ -331,7 +331,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
-                                     const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                                     const PluginOptions& options,
                                      const PluginMetricManagerPtr& metricManager) {
     bool isNeedProcessCache = true;
     if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE) {
@@ -451,7 +451,7 @@ bool EBPFServer::EnablePlugin(const std::string& pipelineName,
                               uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
-                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                              const PluginOptions& options,
                               const PluginMetricManagerPtr& mgr) {
     if (!IsSupportedEnv(type)) {
         return false;

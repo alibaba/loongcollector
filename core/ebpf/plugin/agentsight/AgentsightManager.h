@@ -65,7 +65,7 @@ public:
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+                          const PluginOptions&) override;
 
     int RemoveConfig(const std::string&) override;
 
@@ -74,7 +74,7 @@ public:
     int OnEpollReadable() override;
 
     std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    GeneratePluginConfig(const PluginOptions& options) override;
 
     void SetMetrics(CounterPtr lossKernelEventsTotal, CounterPtr pushLogFailedTotal) {
         mLossKernelEventsTotal = std::move(lossKernelEventsTotal);
@@ -90,8 +90,8 @@ public:
 #endif
 
 protected:
-    int update(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
-    int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int update(const PluginOptions& options) override;
+    int resume(const PluginOptions& options) override;
 
 private:
     static void OnLlmCallback(const AgentsightLLMData* data, void* user_data);

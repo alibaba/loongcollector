@@ -46,7 +46,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerEventHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     // 测试TCP连接事件
@@ -124,7 +124,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
@@ -166,7 +166,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
 
 void NetworkSecurityManagerUnittest::TestGeneratePluginConfigNullOptions() {
     auto manager = createAndInitManagerInstance();
-    std::variant<SecurityOptions*, ObserverNetworkOption*> v{static_cast<SecurityOptions*>(nullptr)};
+    PluginOptions v{static_cast<SecurityOptions*>(nullptr)};
     auto pc = static_cast<NetworkSecurityManager*>(manager.get())->GeneratePluginConfig(v);
     APSARA_TEST_TRUE(pc != nullptr);
     manager->Destroy();
@@ -179,7 +179,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerAggregation() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     // 创建多个相关的网络事件
