@@ -250,7 +250,7 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
 int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                          uint32_t index,
                                          const PluginMetricManagerPtr& metricMgr,
-                                         const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+                                         const PluginOptions& opt) {
     const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
     if (!secPtr || !*secPtr) {
         LOG_ERROR(sLogger, ("AgentsightManager AddOrUpdateConfig", "invalid options variant"));
@@ -353,11 +353,11 @@ int AgentsightManager::Suspend() {
     return 0;
 }
 
-int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+int AgentsightManager::update(const PluginOptions&) {
     return 0;
 }
 
-int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+int AgentsightManager::resume(const PluginOptions& opt) {
     const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
     if (!secPtr || !*secPtr) {
         return 1;
@@ -377,7 +377,7 @@ int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetwo
 }
 
 std::unique_ptr<PluginConfig>
-AgentsightManager::GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+AgentsightManager::GeneratePluginConfig(const PluginOptions&) {
     auto c = std::make_unique<PluginConfig>();
     c->mPluginType = PluginType::AGENTSIGHT_OBSERVE;
     c->mConfig = ProcessConfig{};

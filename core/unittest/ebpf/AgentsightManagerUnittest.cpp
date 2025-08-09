@@ -203,7 +203,7 @@ public:
 
     std::shared_ptr<AbstractManager> createManagerInstance() override { return makeManager(); }
 
-    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override { return asVariant(); }
+    PluginOptions createTestOptions() override { return asVariant(); }
 
     static SecurityOptions& agentsightOptions() {
         static SecurityOptions o;
@@ -213,7 +213,7 @@ public:
         return o;
     }
 
-    std::variant<SecurityOptions*, ObserverNetworkOption*> asVariant() { return &agentsightOptions(); }
+    PluginOptions asVariant() { return &agentsightOptions(); }
 
     std::shared_ptr<AgentsightManager> makeManager() {
         auto m = AgentsightManager::Create(mProcessCacheManager,
@@ -258,12 +258,12 @@ void AgentsightManagerUnittest::TestAddOrUpdateValidation() {
 
     ObserverNetworkOption o{};
     APSARA_TEST_NOT_EQUAL(
-        0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&o)));
+        0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
 
     APSARA_TEST_NOT_EQUAL(
         0,
         mgr->AddOrUpdateConfig(
-            nullptr, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&agentsightOptions())));
+            nullptr, 0, nullptr, PluginOptions(&agentsightOptions())));
 
     {
         static SecurityOptions wrong;
@@ -271,7 +271,7 @@ void AgentsightManagerUnittest::TestAddOrUpdateValidation() {
         wrong.mProbeType = SecurityProbeType::FILE;
         APSARA_TEST_NOT_EQUAL(
             0,
-            mgr->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&wrong)));
+            mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&wrong)));
     }
 
     mgr->Destroy();
@@ -411,7 +411,7 @@ void AgentsightManagerUnittest::TestResumeInvalidOptions() {
                                            mEventPool.get());
     std::shared_ptr<TestableAgentsightManager> mgr(p);
     APSARA_TEST_EQUAL(0, mgr->Init());
-    std::variant<SecurityOptions*, ObserverNetworkOption*> nullSec{static_cast<SecurityOptions*>(nullptr)};
+    PluginOptions nullSec{static_cast<SecurityOptions*>(nullptr)};
     APSARA_TEST_NOT_EQUAL(0, mgr->resume(nullSec));
     mgr->Destroy();
 }
