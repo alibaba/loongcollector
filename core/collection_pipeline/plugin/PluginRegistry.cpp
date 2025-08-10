@@ -62,6 +62,7 @@
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
+#include "plugin/input/InputCpuProfiling.h"
 #include "plugin/input/InputPrometheus.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
@@ -78,6 +79,7 @@ DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_cpu_profiling, "", false);
 
 using namespace std;
 
@@ -173,6 +175,9 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_cpu_profiling)) {
+        RegisterContinuousInputCreator(new StaticInputCreator<InputCpuProfiling>(), true);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
