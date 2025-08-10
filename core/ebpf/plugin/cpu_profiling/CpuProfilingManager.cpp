@@ -86,7 +86,7 @@ int CpuProfilingManager::AddOrUpdateConfig(
 
     CpuProfilingOption *opts = std::get<CpuProfilingOption *>(options);
 
-    ProcessScanner::GetInstance()->RegisterScan({
+    return ProcessScanner::GetInstance()->RegisterScan({
         .mName = mConfigName,
         .mRegexs = opts->mCmdlines,
         .mCallback =
@@ -96,8 +96,6 @@ int CpuProfilingManager::AddOrUpdateConfig(
                     buildCpuProfilingConfig(std::move(pids), nullptr, nullptr));
             },
     });
-
-    return 0;
 }
 
 int CpuProfilingManager::RemoveConfig(const std::string &configName) {
