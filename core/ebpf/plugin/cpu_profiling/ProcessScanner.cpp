@@ -62,7 +62,7 @@ void ProcessScanner::Resume() {
     }
 }
 
-void ProcessScanner::RegisterScan(const ProcessScanOption &option) {
+int ProcessScanner::RegisterScan(const ProcessScanOption &option) {
     std::lock_guard<std::mutex> guard(mLock);
     auto it = mScanStates.emplace(option.mName, ScanState{}).first;
     auto &state = it->second;
@@ -73,11 +73,13 @@ void ProcessScanner::RegisterScan(const ProcessScanOption &option) {
         } catch (const boost::regex_error &e) {
             LOG_ERROR(sLogger,
                       ("Failed to compile regex", regexStr)("error", e.what()));
-            continue;
+            mScanStates.erase(it);
+            return -1;
         }
     }
     state.mCallback = option.mCallback;
-};
+    return 0;
+}
 
 void ProcessScanner::RemoveScan(const std::string &name) {
     std::lock_guard<std::mutex> guard(mLock);
@@ -136,7 +138,7 @@ void ProcessScanner::findMatchedProcesses(
 }
 
 static bool isSame(const std::vector<uint32_t> &a,
-                          const std::vector<uint32_t> &b) {
+                   const std::vector<uint32_t> &b) {
     if (a.size() != b.size()) {
         return false;
     }

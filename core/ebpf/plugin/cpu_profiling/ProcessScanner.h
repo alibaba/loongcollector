@@ -53,7 +53,7 @@ public:
     void Pause();
     void Resume();
 
-    void RegisterScan(const ProcessScanOption &option);
+    int RegisterScan(const ProcessScanOption &option);
     void RemoveScan(const std::string &name);
 
 private:
