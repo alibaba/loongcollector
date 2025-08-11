@@ -266,6 +266,7 @@ private:
     friend class NetworkObserverManagerUnittest;
     friend class HttpRetryableEventUnittest;
     friend class NetworkObserverConfigUpdateUnittest;
+    std::vector<PipelineEventGroup> mAgentInfoEventGroups;
     std::vector<PipelineEventGroup> mMetricEventGroups;
     std::vector<PipelineEventGroup> mLogEventGroups;
     std::vector<PipelineEventGroup> mSpanEventGroups;

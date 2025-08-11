@@ -45,6 +45,7 @@ public:
     void TestPeriodicalTask();
     void TestSaeScenario();
     void BenchmarkConsumeTask();
+    void TestReportAgentInfo();
 
 protected:
     void SetUp() override {
@@ -764,6 +765,62 @@ void NetworkObserverManagerUnittest::TestSaeScenario() {
 void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {
 }
 
+void NetworkObserverManagerUnittest::TestReportAgentInfo() {
+    // 测试无配置时调用 ReportAgentInfo
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 0UL);
+
+    // 测试有全局配置时调用 ReportAgentInfo
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test-config");
+    ctx.SetProcessQueueKey(1);
+    ObserverNetworkOption options;
+    options.mApmConfig = {.mWorkspace = "test-workspace",
+                          .mAppName = "test-app",
+                          .mAppId = "test-app-id",
+                          .mServiceId = "test-service-id"};
+    options.mL4Config.mEnable = true;
+    options.mL7Config
+        = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
+    options.mSelectors = {};
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &options);
+
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 1UL);
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[0].GetEvents().size(), 1UL);
+
+    // 测试有 workload 配置和 container 时调用 ReportAgentInfo
+    options.mSelectors = {{"test-workload", "deployment", "test-namespace"}};
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &options);
+
+    // 添加 container 信息
+    auto podInfo = std::make_shared<K8sPodInfo>();
+    podInfo->mContainerIds = {"test-container-id"};
+    podInfo->mPodIp = "192.168.1.100";
+    podInfo->mPodName = "test-pod";
+    podInfo->mNamespace = "test-namespace";
+    podInfo->mWorkloadKind = "deployment";
+    podInfo->mWorkloadName = "test-workload";
+    podInfo->mStartTime = time(nullptr);
+    K8sMetadata::GetInstance().mContainerCache.insert("test-container-id", podInfo);
+    mManager->HandleHostMetadataUpdate({"test-container-id"});
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 2UL);
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[1].GetEvents().size(), 1UL);
+
+
+    // 验证 workload 配置已正确设置
+    size_t workloadKey = GenerateWorkloadKey("test-namespace", "deployment", "test-workload");
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs.count(workloadKey) > 0);
+    const auto& workloadConfig = mManager->mWorkloadConfigs[workloadKey];
+    APSARA_TEST_EQUAL(workloadConfig.containerIds.count("test-container-id"), 1u);
+    APSARA_TEST_TRUE(workloadConfig.config != nullptr);
+    APSARA_TEST_EQUAL(workloadConfig.config->mAppId, "test-app-id");
+    APSARA_TEST_EQUAL(workloadConfig.config->mAppName, "test-app");
+    APSARA_TEST_EQUAL(workloadConfig.config->mWorkspace, "test-workspace");
+    APSARA_TEST_EQUAL(workloadConfig.config->mServiceId, "test-service-id");
+}
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
@@ -773,6 +830,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
 
 } // namespace ebpf
 } // namespace logtail

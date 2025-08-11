@@ -1723,7 +1723,8 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
                                              const WorkloadConfig& workloadConfig) {
     const auto& appConfig = workloadConfig.config;
     if (appConfig == nullptr) {
-        LOG_INFO(sLogger, ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
+        LOG_DEBUG(sLogger,
+                  ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
         return false;
     }
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -1755,10 +1756,10 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             // generate for k8s ---- POD Level
             auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
             if (podMeta == nullptr) {
-                LOG_INFO(sLogger, ("[AgentInfo] failed to fetch containerId", containerId));
+                LOG_DEBUG(sLogger, ("[AgentInfo] failed to fetch containerId", containerId));
                 continue;
             }
-            LOG_INFO(sLogger, ("[AgentInfo] generate for cid", containerId)("podName", podMeta->mPodName));
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate for cid", containerId)("podName", podMeta->mPodName));
 
             auto* event = eventGroup.AddLogEvent();
             event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
@@ -1796,7 +1797,6 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValuePodName.data()),
                           rapidjson::Value().SetString(podMeta->mPodName.c_str(), allocator),
                           allocator);
-            // doc.AddMember("k8s.pod.uid", rapidjson::Value().SetString("xxxxxxxx-xxxxxxx", allocator), allocator);
 
 
             // add ECS meta
@@ -1823,7 +1823,10 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             event->SetTimestamp(now, 0);
         }
     }
-
+#ifdef APSARA_UNIT_TEST_MAIN
+    mAgentInfoEventGroups.emplace_back(std::move(eventGroup));
+    return true;
+#endif
     pushEventsWithRetry(EventDataType::AGENT_INFO,
                         std::move(eventGroup),
                         appConfig->mConfigName,
@@ -1850,18 +1853,20 @@ void NetworkObserverManager::ReportAgentInfo() {
         const auto& itGlobal = workloadConfigsReplica.find(kGlobalWorkloadKey);
         if (itGlobal != workloadConfigsReplica.end()) {
             cnt += reportAgentInfo(now, sourceBuffer, kGlobalWorkloadKey, itGlobal->second);
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate agentinfo for globalKey, res", cnt));
         }
 
         for (const auto& workloadKey : workloadKeys) {
             if (workloadKey == kGlobalWorkloadKey) {
                 continue;
             }
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate agentinfo for workloadKey", workloadKey));
 
             const auto& it = workloadConfigsReplica.find(workloadKey);
             if (it != workloadConfigsReplica.end()) {
                 cnt += reportAgentInfo(now, sourceBuffer, workloadKey, it->second);
             } else {
-                LOG_INFO(sLogger, ("[AgentInfo] failed to find workloadKey", workloadKey));
+                LOG_DEBUG(sLogger, ("[AgentInfo] failed to find workloadKey", workloadKey));
             }
         }
     }
