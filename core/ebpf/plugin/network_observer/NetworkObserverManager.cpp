@@ -1145,6 +1145,7 @@ int NetworkObserverManager::Init() {
     mConnectionManager->UpdateMaxConnectionThreshold(INT32_FLAG(ebpf_networkobserver_max_connections));
 
     mCidOffset = GuessContainerIdOffset();
+    mConvergerManager = std::make_shared<AppConvergerManager>();
 
     const char* value = getenv("_cluster_id_");
     if (value != nullptr) {
@@ -1276,6 +1277,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     newConfig->mQueueKey = ctx->GetProcessQueueKey();
     newConfig->mPluginIndex = index;
     newConfig->mConfigName = ctx->GetConfigName();
+    mConvergerManager->RegisterApp(newConfig);
 
     WriteLock lk(mAppConfigLock);
     std::vector<std::string> expiredCids;
@@ -1380,6 +1382,7 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
     // clear related workloads
     for (auto key : configIt->second) {
         if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
+            mConvergerManager->DeregisterApp(wIt->second.config); // deregister app
             for (const auto& cid : wIt->second.containerIds) {
                 expiredCids.push_back(cid);
                 // clean up container configs ...

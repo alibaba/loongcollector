@@ -26,6 +26,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/AggregateTree.h"
+#include "ebpf/util/Converger.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 
@@ -239,7 +240,7 @@ private:
     // replica of mContainerConfigs, only used in poller thread ...
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
 
-    std::shared_ptr<Sampler> mSampler;
+    std::shared_ptr<AppConvergerManager> mConvergerManager;
 
     std::string mClusterId; // inited in Init()
     std::string mHostName; // host
