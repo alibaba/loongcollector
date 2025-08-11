@@ -133,7 +133,9 @@ public:
         if (mServiceId != other.mServiceId) {
             return false;
         }
-
+        if (mLanguage != other.mLanguage) {
+            return false;
+        }
         if (mEnableL7 != other.mEnableL7) {
             return false;
         }
