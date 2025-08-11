@@ -313,7 +313,6 @@ void ExactlyOnceQueueManagerUnittest::OnPipelineUpdate() {
     sManager->PushProcessQueue(1, std::move(item5));
 
     auto item6 = GenerateProcessItem();
-    // auto p6 = item6.get();  // Commented out to fix unused variable warning
     sManager->PushProcessQueue(2, std::move(item6));
 
     sManager->DisablePopProcessQueue("test_config", true);

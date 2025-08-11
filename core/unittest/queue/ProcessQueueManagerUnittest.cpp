@@ -430,7 +430,6 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
         sProcessQueueManager->PushQueue(1, std::move(item5));
 
         auto item6 = GenerateItem();
-        // auto p6 = item6.get(); // Fix unused variable warning
         sProcessQueueManager->PushQueue(2, std::move(item6));
 
         sProcessQueueManager->DisablePop("test_config_2", true);

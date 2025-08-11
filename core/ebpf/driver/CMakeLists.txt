@@ -23,8 +23,10 @@ if (LINUX)
     # Save the original C flags
     set(ORIGINAL_CMAKE_C_FLAGS ${CMAKE_C_FLAGS})
     
-    # Remove -Werror for coolbpf compilation
-    string(REPLACE "-Werror" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+    # Remove -Werror for coolbpf compilation (only if ENABLE_WERROR is ON)
+    if (ENABLE_WERROR)
+        string(REPLACE "-Werror" "" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
+    endif()
     
     # Now add the coolbpf subdirectory
     add_subdirectory(${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf)
@@ -49,5 +51,5 @@ if (LINUX)
     target_link_options(${EBPF_DIRVER_TARGET} PRIVATE "-Wl,-rpath=.:${DEFAULT_DEPS_ROOT}/lib")
     target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf)
     add_dependencies(${EBPF_DIRVER_TARGET} install_coolbpf)
-    target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC -Werror)
+    target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC)
 endif ()
