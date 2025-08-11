@@ -27,9 +27,11 @@ inline constexpr char kContentLength[] = "Content-Length";
 inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
-std::vector<std::shared_ptr<L7Record>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
-                                                                 const std::shared_ptr<Connection>& conn,
-                                                                 const std::shared_ptr<AppDetail>& appDetail) {
+std::vector<std::shared_ptr<L7Record>>
+HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
+                          const std::shared_ptr<Connection>& conn,
+                          const std::shared_ptr<AppDetail>& appDetail,
+                          const std::shared_ptr<AppConvergerManager>& converger) {
     auto record = std::make_shared<HttpRecord>(conn, appDetail);
     record->SetEndTsNs(dataEvent->end_ts);
     record->SetStartTsNs(dataEvent->start_ts);
@@ -55,6 +57,9 @@ std::vector<std::shared_ptr<L7Record>> HTTPProtocolParser::Parse(struct conn_dat
         if (state != ParseState::kSuccess) {
             LOG_DEBUG(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
             return {};
+        }
+        if (converger) {
+            converger->DoConverge(appDetail, ConvType::kUrl, record->mPath);
         }
     }
 

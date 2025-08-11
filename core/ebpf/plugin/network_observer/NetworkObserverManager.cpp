@@ -1069,7 +1069,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
                 spanEvent->SetName(record->GetSpanName());
                 auto* httpRecord = static_cast<HttpRecord*>(record);
-                spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetPath());
+                spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetConvSpanName());
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
@@ -1598,7 +1598,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
     }
 
     std::vector<std::shared_ptr<L7Record>> records
-        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail);
+        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail, mConvergerManager);
 
     if (records.empty()) {
         return;
