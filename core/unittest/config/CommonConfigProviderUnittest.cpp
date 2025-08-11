@@ -58,7 +58,8 @@ public:
         Json::Value root;
         std::string errorMsg;
 
-        bool parsingSuccessful = reader->parse(jsonString.c_str(), jsonString.c_str() + jsonString.size(), &root, &errorMsg);
+        bool parsingSuccessful
+            = reader->parse(jsonString.c_str(), jsonString.c_str() + jsonString.size(), &root, &errorMsg);
         if (!parsingSuccessful) {
             std::cout << "Failed to parse configuration\n" << errorMsg;
             return false;

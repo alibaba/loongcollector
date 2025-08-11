@@ -172,9 +172,20 @@ macro(link_re2 target_name)
             message(FATAL_ERROR "Could not find re2 library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "re2d"
-                optimized "re2")
+        find_library(RE2_DEBUG_LIB re2d.lib PATHS "${re2_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(RE2_RELEASE_LIB re2.lib PATHS "${re2_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(RE2_RELEASE_LIB)
+            if(RE2_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${RE2_DEBUG_LIB}"
+                        optimized "${RE2_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${RE2_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find re2 library (Debug: ${RE2_DEBUG_LIB}, Release: ${RE2_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -191,11 +202,22 @@ macro(link_tcmalloc target_name)
                 message(FATAL_ERROR "Could not find tcmalloc library")
             endif()
             # target_link_libraries(${target_name} "${tcmalloc_${LIBRARY_DIR_SUFFIX}}/libtcmalloc_and_profiler.a")
-        elseif (MSVC)
-            add_definitions(-DPERFTOOLS_DLL_DECL=)
-            target_link_libraries(${target_name}
-                    debug "libtcmalloc_minimald"
-                    optimized "libtcmalloc_minimal")
+            elseif (MSVC)
+        add_definitions(-DPERFTOOLS_DLL_DECL=)
+        find_library(TCMALLOC_DEBUG_LIB libtcmalloc_minimald.lib PATHS "${tcmalloc_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(TCMALLOC_RELEASE_LIB libtcmalloc_minimal.lib PATHS "${tcmalloc_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(TCMALLOC_RELEASE_LIB)
+            if(TCMALLOC_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${TCMALLOC_DEBUG_LIB}"
+                        optimized "${TCMALLOC_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${TCMALLOC_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find tcmalloc library (Debug: ${TCMALLOC_DEBUG_LIB}, Release: ${TCMALLOC_RELEASE_LIB})")
+        endif()
         endif ()
     endif ()
 endmacro()
@@ -212,9 +234,20 @@ macro(link_cityhash target_name)
             message(FATAL_ERROR "Could not find cityhash library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "cityhashd"
-                optimized "cityhash")
+        find_library(CITYHASH_DEBUG_LIB cityhashd.lib PATHS "${cityhash_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(CITYHASH_RELEASE_LIB cityhash.lib PATHS "${cityhash_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(CITYHASH_RELEASE_LIB)
+            if(CITYHASH_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${CITYHASH_DEBUG_LIB}"
+                        optimized "${CITYHASH_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${CITYHASH_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find cityhash library (Debug: ${CITYHASH_DEBUG_LIB}, Release: ${CITYHASH_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -230,9 +263,20 @@ macro(link_gflags target_name)
             message(FATAL_ERROR "Could not find gflags library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "gflags_staticd"
-                optimized "gflags_static")
+        find_library(GFLAGS_DEBUG_LIB gflags_staticd.lib PATHS "${gflags_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GFLAGS_RELEASE_LIB gflags_static.lib PATHS "${gflags_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(GFLAGS_RELEASE_LIB)
+            if(GFLAGS_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${GFLAGS_DEBUG_LIB}"
+                        optimized "${GFLAGS_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${GFLAGS_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find gflags library (Debug: ${GFLAGS_DEBUG_LIB}, Release: ${GFLAGS_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -248,9 +292,20 @@ macro(link_jsoncpp target_name)
             message(FATAL_ERROR "Could not find jsoncpp library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "jsoncppd"
-                optimized "jsoncpp")
+        find_library(JSONCPP_DEBUG_LIB jsoncppd.lib PATHS "${jsoncpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(JSONCPP_RELEASE_LIB jsoncpp.lib PATHS "${jsoncpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(JSONCPP_RELEASE_LIB)
+            if(JSONCPP_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${JSONCPP_DEBUG_LIB}"
+                        optimized "${JSONCPP_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${JSONCPP_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find jsoncpp library (Debug: ${JSONCPP_DEBUG_LIB}, Release: ${JSONCPP_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -266,9 +321,20 @@ macro(link_yamlcpp target_name)
             message(FATAL_ERROR "Could not find yaml-cpp library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "yaml-cppd"
-                optimized "yaml-cpp")
+        find_library(YAMLCPP_DEBUG_LIB yaml-cppd.lib PATHS "${yamlcpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(YAMLCPP_RELEASE_LIB yaml-cpp.lib PATHS "${yamlcpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(YAMLCPP_RELEASE_LIB)
+            if(YAMLCPP_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${YAMLCPP_DEBUG_LIB}"
+                        optimized "${YAMLCPP_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${YAMLCPP_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find yaml-cpp library (Debug: ${YAMLCPP_DEBUG_LIB}, Release: ${YAMLCPP_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -320,9 +386,20 @@ macro(link_lz4 target_name)
             message(FATAL_ERROR "Could not find lz4 library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "liblz4_staticd"
-                optimized "liblz4_static")
+        find_library(LZ4_DEBUG_LIB liblz4_staticd.lib PATHS "${lz4_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LZ4_RELEASE_LIB liblz4_static.lib PATHS "${lz4_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LZ4_RELEASE_LIB)
+            if(LZ4_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${LZ4_DEBUG_LIB}"
+                        optimized "${LZ4_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${LZ4_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find lz4 library (Debug: ${LZ4_DEBUG_LIB}, Release: ${LZ4_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -340,9 +417,20 @@ macro(link_zlib target_name)
             message(FATAL_ERROR "Could not find zlib library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "zlibstaticd"
-                optimized "zlibstatic")
+        find_library(ZLIB_DEBUG_LIB zlibstaticd.lib PATHS "${zlib_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(ZLIB_RELEASE_LIB zlibstatic.lib PATHS "${zlib_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZLIB_RELEASE_LIB)
+            if(ZLIB_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${ZLIB_DEBUG_LIB}"
+                        optimized "${ZLIB_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${ZLIB_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find zlib library (Debug: ${ZLIB_DEBUG_LIB}, Release: ${ZLIB_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -359,9 +447,20 @@ macro(link_zstd target_name)
             message(FATAL_ERROR "Could not find zstd library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "zstdstaticd"
-                optimized "zstdstatic")
+        find_library(ZSTD_DEBUG_LIB zstdstaticd.lib PATHS "${zstd_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(ZSTD_RELEASE_LIB zstdstatic.lib PATHS "${zstd_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZSTD_RELEASE_LIB)
+            if(ZSTD_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${ZSTD_DEBUG_LIB}"
+                        optimized "${ZSTD_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${ZSTD_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find zstd library (Debug: ${ZSTD_DEBUG_LIB}, Release: ${ZSTD_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -377,18 +476,40 @@ macro(link_curl target_name)
             message(FATAL_ERROR "Could not find curl library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "libcurl-d"
-                optimized "libcurl")
-        add_definitions(-DCURL_STATICLIB)
-        target_link_libraries(${target_name}
-                debug "libeay32"
-                optimized "libeay32")
-        target_link_libraries(${target_name}
-                debug "ssleay32"
-                optimized "ssleay32")
-        target_link_libraries(${target_name} "Ws2_32.lib")
-        target_link_libraries(${target_name} "Wldap32.lib")
+        find_library(CURL_DEBUG_LIB libcurl-d.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(CURL_RELEASE_LIB libcurl.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LIBEAY32_LIB libeay32.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(SSLEAY32_LIB ssleay32.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(CURL_RELEASE_LIB)
+            if(CURL_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${CURL_DEBUG_LIB}"
+                        optimized "${CURL_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${CURL_RELEASE_LIB}")
+            endif()
+            
+            add_definitions(-DCURL_STATICLIB)
+            
+            if(LIBEAY32_LIB)
+                target_link_libraries(${target_name} "${LIBEAY32_LIB}")
+            else()
+                target_link_libraries(${target_name} "libeay32")
+            endif()
+            
+            if(SSLEAY32_LIB)
+                target_link_libraries(${target_name} "${SSLEAY32_LIB}")
+            else()
+                target_link_libraries(${target_name} "ssleay32")
+            endif()
+            
+            target_link_libraries(${target_name} "Ws2_32.lib")
+            target_link_libraries(${target_name} "Wldap32.lib")
+        else()
+            message(FATAL_ERROR "Could not find curl library (Debug: ${CURL_DEBUG_LIB}, Release: ${CURL_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -406,15 +527,43 @@ macro(link_unwind target_name)
             message(FATAL_ERROR "Could not find unwind library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "breakpad_commond.lib"
-                optimized "breakpad_common.lib")
-        target_link_libraries(${target_name}
-                debug "breakpad_crash_generation_clientd.lib"
-                optimized "breakpad_crash_generation_client.lib")
-        target_link_libraries(${target_name}
-                debug "breakpad_exception_handlerd.lib"
-                optimized "breakpad_exception_handler.lib")
+        find_library(BREAKPAD_COMMON_DEBUG_LIB breakpad_commond.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_COMMON_RELEASE_LIB breakpad_common.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_CLIENT_DEBUG_LIB breakpad_crash_generation_clientd.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_CLIENT_RELEASE_LIB breakpad_crash_generation_client.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_HANDLER_DEBUG_LIB breakpad_exception_handlerd.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_HANDLER_RELEASE_LIB breakpad_exception_handler.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(BREAKPAD_COMMON_RELEASE_LIB AND BREAKPAD_CLIENT_RELEASE_LIB AND BREAKPAD_HANDLER_RELEASE_LIB)
+            # Link common library
+            if(BREAKPAD_COMMON_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_COMMON_DEBUG_LIB}"
+                        optimized "${BREAKPAD_COMMON_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_COMMON_RELEASE_LIB}")
+            endif()
+            
+            # Link client library
+            if(BREAKPAD_CLIENT_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_CLIENT_DEBUG_LIB}"
+                        optimized "${BREAKPAD_CLIENT_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_CLIENT_RELEASE_LIB}")
+            endif()
+            
+            # Link handler library
+            if(BREAKPAD_HANDLER_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_HANDLER_DEBUG_LIB}"
+                        optimized "${BREAKPAD_HANDLER_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_HANDLER_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find one or more breakpad libraries (missing release versions)")
+        endif()
     endif ()
 endmacro()
 
@@ -464,9 +613,20 @@ macro(link_leveldb target_name)
             message(FATAL_ERROR "Could not find leveldb library")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "leveldbd.lib"
-                optimized "leveldb.lib")
+        find_library(LEVELDB_DEBUG_LIB leveldbd.lib PATHS "${leveldb_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LEVELDB_RELEASE_LIB leveldb.lib PATHS "${leveldb_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LEVELDB_RELEASE_LIB)
+            if(LEVELDB_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${LEVELDB_DEBUG_LIB}"
+                        optimized "${LEVELDB_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${LEVELDB_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find leveldb library (Debug: ${LEVELDB_DEBUG_LIB}, Release: ${LEVELDB_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -524,9 +684,20 @@ macro(link_grpc target_name)
         endif()
         target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "libprotobufd"
-                optimized "libprotobuf")
+        find_library(PROTOBUF_DEBUG_LIB libprotobufd.lib PATHS "${protobuf_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(PROTOBUF_RELEASE_LIB libprotobuf.lib PATHS "${protobuf_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(PROTOBUF_RELEASE_LIB)
+            if(PROTOBUF_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${PROTOBUF_DEBUG_LIB}"
+                        optimized "${PROTOBUF_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${PROTOBUF_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find protobuf library (Debug: ${PROTOBUF_DEBUG_LIB}, Release: ${PROTOBUF_RELEASE_LIB})")
+        endif()
     endif()
 endmacro()
 
