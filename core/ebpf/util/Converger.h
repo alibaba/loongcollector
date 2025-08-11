@@ -17,9 +17,9 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "ebpf/type/NetworkObserverEvent.h"
 
@@ -31,10 +31,9 @@ enum class ConvType {
 
 class Converger {
 public:
-    explicit Converger(size_t threshold = 1024) : mThreshold(threshold) {
-        mIds.reserve(threshold);
-    }
+    explicit Converger(size_t threshold = 1024) : mThreshold(threshold) { mIds.reserve(threshold); }
     void DoConverge(ConvType type, std::string& val);
+
 private:
     size_t mThreshold;
     std::unordered_set<std::string> mIds;
@@ -59,4 +58,4 @@ private:
 #endif
 };
 
-} // namespace logtail::ebpf 
+} // namespace logtail::ebpf

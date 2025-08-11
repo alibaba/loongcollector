@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "ebpf/util/Converger.h"
+
 #include "common/Flags.h"
 
 DEFINE_FLAG_INT32(ebpf_apm_default_url_threshold, "apm default url threshold", 1024);
@@ -41,7 +42,8 @@ void AppConvergerManager::RegisterApp(const std::shared_ptr<AppDetail>& app) {
     }
     auto& converger = mAppConvergers[app->mConfigName];
     if (!converger) {
-        // TODO (@qianlu.kk) apm server didn't implement any limit yet, so we cannot expose this param in COLLECTION CONFIG
+        // TODO (@qianlu.kk) apm server didn't implement any limit yet, so we cannot expose this param in COLLECTION
+        // CONFIG
         converger = std::make_shared<Converger>(INT32_FLAG(ebpf_apm_default_url_threshold));
     }
 }
@@ -71,4 +73,4 @@ void AppConvergerManager::DoConverge(const std::shared_ptr<AppDetail>& app, Conv
     converger->DoConverge(type, val);
 }
 
-} // namespace logtail::ebpf 
+} // namespace logtail::ebpf
