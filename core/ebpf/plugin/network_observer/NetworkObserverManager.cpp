@@ -183,7 +183,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               base->mSum += other->GetLatencySeconds();
           },
           [this](L7Record* in, std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<AppMetricData> {
-              auto spanName = sourceBuffer->CopyString(in->GetSpanName());
+              auto spanName = sourceBuffer->CopyString(in->GetConvSpanName());
               auto connection = in->GetConnection();
               if (!connection) {
                   LOG_WARNING(sLogger, ("connection is null", ""));
@@ -421,7 +421,7 @@ NetworkObserverManager::generateAggKeyForAppMetric(L7Record* record,
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[1], hasher(attr));
     }
-    std::string_view rpc(record->GetSpanName());
+    std::string_view rpc(record->GetConvSpanName());
     AttrHashCombine(result[1], hasher(rpc));
 
     return result;

@@ -16,7 +16,7 @@
 #include <memory>
 #include <thread>
 
-#include "common/TimeUtil.h"
+#include "common/StringTools.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/EBPFAdapter.h"
@@ -283,6 +283,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     options.mApmConfig.mAppName = "test-app-name";
     options.mApmConfig.mWorkspace = "test-workspace";
     options.mApmConfig.mServiceId = "test-service-id";
+    options.mApmConfig.mLanguage = "php";
 
     options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
 
@@ -352,12 +353,14 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["arms.app.type"], "apm");
+    APSARA_TEST_EQUAL(tags["language"], "php");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
     LOG_INFO(sLogger, ("====== consume metric ======", ""));
     APSARA_TEST_TRUE(mManager->ConsumeMetricAggregateTree());
     APSARA_TEST_EQUAL(mManager->mMetricEventGroups.size(), 1UL);
-    APSARA_TEST_EQUAL(mManager->mMetricEventGroups[0].GetEvents().size(), 301UL);
+    APSARA_TEST_EQUAL(mManager->mMetricEventGroups[0].GetEvents().size(),
+                      301UL); // 100 record => 300 RED metric and 1 tag metric
     tags = mManager->mMetricEventGroups[0].GetTags();
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
@@ -369,7 +372,21 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["source"], "apm");
     APSARA_TEST_EQUAL(tags["technology"], "ebpf");
+    APSARA_TEST_EQUAL(tags["language"], "php");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
+    StringView prefix = "/index.html/";
+    for (const auto& evt : mManager->mMetricEventGroups[0].GetEvents()) {
+        APSARA_TEST_TRUE(evt.Is<MetricEvent>());
+        auto* metricEvent = evt.Get<MetricEvent>();
+        auto view = metricEvent->GetTag(kRpc.MetricKey());
+        std::string rpc(view.data(), view.size());
+        LOG_INFO(sLogger, ("rpc", rpc)("name", metricEvent->GetName()));
+        if (metricEvent->GetName() == "arms_tag_entity") {
+            continue;
+        }
+        APSARA_TEST_TRUE(StartWith(rpc, prefix)); // used for route
+    }
+
     LOG_INFO(sLogger, ("====== consume log ======", ""));
     APSARA_TEST_TRUE(mManager->ConsumeLogAggregateTree());
     APSARA_TEST_EQUAL(mManager->mLogEventGroups.size(), 1UL);

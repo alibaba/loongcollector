@@ -109,7 +109,7 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& resu
             result->SetRealPath(kRootPath);
         } else if (pos != std::string::npos) {
             result->SetPath(trimPath.substr(0, pos));
-            result->SetPath(trimPath.substr(0, pos));
+            result->SetRealPath(trimPath.substr(0, pos));
         } else {
             result->SetPath(trimPath);
             result->SetRealPath(trimPath);
