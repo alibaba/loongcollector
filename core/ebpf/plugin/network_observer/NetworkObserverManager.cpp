@@ -238,8 +238,8 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               auto mDestId = sourceBuffer->CopyString(ctAttrs.Get<kDestId>());
               data->mTags.SetNoCopy<kDestId>(StringView(mDestId.data, mDestId.size));
 
-              auto endpoint = sourceBuffer->CopyString(ctAttrs.Get<kEndpoint>());
-              data->mTags.SetNoCopy<kEndpoint>(StringView(endpoint.data, endpoint.size));
+              //   auto endpoint = sourceBuffer->CopyString(ctAttrs.Get<kEndpoint>());
+              //   data->mTags.SetNoCopy<kEndpoint>(StringView(endpoint.data, endpoint.size));
 
               auto ns = sourceBuffer->CopyString(ctAttrs.Get<kNamespace>());
               data->mTags.SetNoCopy<kNamespace>(StringView(ns.data, ns.size));
@@ -401,23 +401,29 @@ NetworkObserverManager::generateAggKeyForAppMetric(L7Record* record,
         return {};
     }
 
+    constexpr uint32_t destIdIdx = kConnTrackerTable.ColIndex(kDestId.Name());
+
     static constexpr std::array<uint32_t, 4> kIdxes0 = {kHostNameIndex, kHostIpIndex};
     static constexpr std::array<uint32_t, 9> kIdxes1 = {kWorkloadKindIndex,
                                                         kWorkloadNameIndex,
                                                         kConnTrackerTable.ColIndex(kProtocol.Name()),
                                                         kConnTrackerTable.ColIndex(kDestId.Name()),
-                                                        kConnTrackerTable.ColIndex(kEndpoint.Name()),
+                                                        // kConnTrackerTable.ColIndex(kEndpoint.Name()),
                                                         kConnTrackerTable.ColIndex(kCallType.Name()),
                                                         kConnTrackerTable.ColIndex(kRpcType.Name()),
                                                         kConnTrackerTable.ColIndex(kCallKind.Name())};
 
     const auto& ctAttrs = connection->GetConnTrackerAttrs();
+    bool isServer = connection->IsServer();
     for (const auto x : kIdxes0) {
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
     }
     AttrHashCombine(result[0], appInfo->mAppHash);
     for (const auto x : kIdxes1) {
+        if (isServer && x == destIdIdx) {
+            continue;
+        }
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[1], hasher(attr));
     }
@@ -943,7 +949,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 metricsEvent->SetTagNoCopy(kRpcType.MetricKey(), group->mTags.Get<kRpcType>());
                 metricsEvent->SetTagNoCopy(kCallType.MetricKey(), group->mTags.Get<kCallType>());
                 metricsEvent->SetTagNoCopy(kCallKind.MetricKey(), group->mTags.Get<kCallKind>());
-                metricsEvent->SetTagNoCopy(kEndpoint.MetricKey(), group->mTags.Get<kEndpoint>());
+                metricsEvent->SetTagNoCopy(kEndpoint.MetricKey(), group->mTags.Get<kRpc>());
                 metricsEvent->SetTagNoCopy(kDestId.MetricKey(), group->mTags.Get<kDestId>());
             }
         });
@@ -1070,6 +1076,9 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 spanEvent->SetName(record->GetSpanName());
                 auto* httpRecord = static_cast<HttpRecord*>(record);
                 spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetConvSpanName());
+                if (!ct->IsServer()) {
+                    spanEvent->SetTag(kEndpoint.SpanKey(), httpRecord->GetConvSpanName());
+                }
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
