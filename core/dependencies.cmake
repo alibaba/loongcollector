@@ -42,25 +42,26 @@ set(LIBRARY_DIR_SUFFIX "LIBRARY_DIR")
 set(LINK_OPTION_SUFFIX "LINK_OPTION")
 # Dependencies list.
 set(DEP_NAME_LIST
-        spdlog                  # header-only
-        rapidjson               # header-only
-        gtest
-        gmock
-        re2
-        cityhash
-        gflags
-        jsoncpp
-        yamlcpp
         boost
+        cityhash
+        crypto
+        curl
+        gflags
+        gmock
+        gtest
+        jsoncpp
+        leveldb
         lz4
+        protobuf
+        rapidjson               # header-only
+        re2
+        spdlog                  # header-only
+        ssl                     # openssl
+        unwind                  # google breakpad on Windows
+        uuid
+        yamlcpp
         zlib
         zstd
-        curl
-        unwind                  # google breakpad on Windows
-        ssl                     # openssl
-        crypto
-        leveldb
-        uuid
         )
 
 if (NOT NO_TCMALLOC)
