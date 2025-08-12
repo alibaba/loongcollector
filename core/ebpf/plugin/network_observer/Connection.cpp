@@ -191,11 +191,8 @@ void Connection::updatePeerPodMetaForExternal() {
     mTags.SetNoCopy<kPeerWorkloadKind>(kExternalStr);
     mTags.SetNoCopy<kPeerNamespace>(kExternalStr);
     mTags.SetNoCopy<kPeerServiceName>(kExternalStr);
-    // if (mRole == IsClient) {
     auto dip = mTags.Get<kRemoteIp>();
     mTags.SetNoCopy<kDestId>(dip);
-    // mTags.SetNoCopy<kEndpoint>(daddr);
-    // }
 }
 
 void Connection::updatePeerPodMetaForLocalhost() {
@@ -203,10 +200,7 @@ void Connection::updatePeerPodMetaForLocalhost() {
     mTags.SetNoCopy<kPeerPodIp>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadKind>(kLocalhostStr);
-    // if (mRole == IsClient) {
     mTags.SetNoCopy<kDestId>(kLocalhostStr);
-    // mTags.SetNoCopy<kEndpoint>(kLocalhostStr);
-    // }
 }
 
 void Connection::updateSelfPodMetaForEnv() {
@@ -241,20 +235,13 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : kUnknownStr);
     mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : kUnknownStr);
 
-    // set destId and endpoint ...
-    if (mRole == IsClient) {
-        // if (pod->mAppName.size()) {
-        //     mTags.Set<kDestId>(pod->mAppName);
-        // } else
-        if (pod->mWorkloadName.size()) {
-            mTags.Set<kDestId>(pod->mWorkloadName);
-        } else if (pod->mServiceName.size()) {
-            mTags.Set<kDestId>(pod->mServiceName);
-        } else {
-            auto dip = mTags.Get<kRemoteIp>();
-            mTags.SetNoCopy<kDestId>(dip);
-        }
-        // mTags.Set<kEndpoint>(mTags.Get<kRemoteIp>());
+    if (pod->mWorkloadName.size()) {
+        mTags.Set<kDestId>(pod->mWorkloadName);
+    } else if (pod->mServiceName.size()) {
+        mTags.Set<kDestId>(pod->mServiceName);
+    } else {
+        auto dip = mTags.Get<kRemoteIp>();
+        mTags.SetNoCopy<kDestId>(dip);
     }
 }
 
