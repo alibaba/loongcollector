@@ -83,7 +83,8 @@ foreach (DEP_NAME ${DEP_NAME_LIST})
     endif ()
 
     if (${DEP_NAME}_${LIBRARY_DIR_SUFFIX})
-        link_directories("${${DEP_NAME}_${LIBRARY_DIR_SUFFIX}}")
+        # Prefer CMAKE_LIBRARY_PATH for find_library over link_directories
+        list(PREPEND CMAKE_LIBRARY_PATH "${${DEP_NAME}_${LIBRARY_DIR_SUFFIX}}")
     else ()
         set(${DEP_NAME}_${LIBRARY_DIR_SUFFIX} "${DEPS_LIBRARY_ROOT}")
     endif ()
