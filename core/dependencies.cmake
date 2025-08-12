@@ -102,11 +102,26 @@ macro(link_gtest target_name)
             message(FATAL_ERROR "Could not find gtest or gmock libraries")
         endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "gtestd"
-                optimized "gtest"
-                debug "gmockd"
-                optimized "gmock")
+        find_library(GTEST_DEBUG_LIB gtestd.lib PATHS "${gtest_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GTEST_RELEASE_LIB gtest.lib PATHS "${gtest_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GMOCK_DEBUG_LIB gmockd.lib PATHS "${gmock_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GMOCK_RELEASE_LIB gmock.lib PATHS "${gmock_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(GTEST_RELEASE_LIB AND GMOCK_RELEASE_LIB)
+            if(GTEST_DEBUG_LIB AND GMOCK_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${GTEST_DEBUG_LIB}" "${GMOCK_DEBUG_LIB}"
+                        optimized "${GTEST_RELEASE_LIB}" "${GMOCK_RELEASE_LIB}")
+            else()
+                # Use release libraries for both debug and release builds when debug libs are missing
+                target_link_libraries(${target_name} "${GTEST_RELEASE_LIB}" "${GMOCK_RELEASE_LIB}")
+            endif()
+        elseif(GTEST_DEBUG_LIB AND GMOCK_DEBUG_LIB)
+            # Fallback to debug libs when only debug is available
+            target_link_libraries(${target_name} "${GTEST_DEBUG_LIB}" "${GMOCK_DEBUG_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find gtest/gmock libraries (GTEST: d=${GTEST_DEBUG_LIB}; r=${GTEST_RELEASE_LIB}, GMOCK: d=${GMOCK_DEBUG_LIB}; r=${GMOCK_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
