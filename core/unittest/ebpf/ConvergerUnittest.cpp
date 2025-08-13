@@ -144,7 +144,7 @@ void ConvergerUnittest::Benchmark10w() {
     }
 
     auto start = std::chrono::high_resolution_clock::now();
-    for (int i = 0; i < urls.size(); ++i) {
+    for (size_t i = 0; i < urls.size(); ++i) {
         std::string val = urls[i];
         converger.DoConverge(ConvType::kUrl, val);
     }
