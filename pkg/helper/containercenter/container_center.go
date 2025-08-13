@@ -407,6 +407,8 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 		if _, ok := envMap[envKey]; !ok {
 			envMap[envKey] = value
 		} else if logEnvPrefix == flags.LoongcollectorContainerLogEnvPrefix {
+			// If environment variables with the prefix 'loong_logs_' and 'aliyun_logs_' both exist,
+			// then override the variable with the prefix 'loong_logs_'.
 			envMap[envKey] = value
 		}
 	}
