@@ -34,3 +34,31 @@ func MemHigh(ctx context.Context, time int) (context.Context, error) {
 	}
 	return ctx, nil
 }
+
+func Oom(ctx context.Context) (context.Context, error) {
+	switch setup.Env.GetType() {
+	case "host":
+		command := "sh /root/e2eshel/runpy.sh /root/e2eshel/oom_kill.py"
+		_, err := setup.Env.ExecOnLoongCollector(command)
+		if err != nil {
+			return ctx, err
+		}
+	default:
+		return ctx, fmt.Errorf("not supported")
+	}
+	return ctx, nil
+}
+
+func MemFrag(ctx context.Context, time int) (context.Context, error) {
+	switch setup.Env.GetType() {
+	case "host":
+		command := "/root/e2eshel/mem_frag " + strconv.FormatInt(int64(time), 10)
+		_, err := setup.Env.ExecOnLoongCollector(command)
+		if err != nil {
+			return ctx, err
+		}
+	default:
+		return ctx, fmt.Errorf("not supported")
+	}
+	return ctx, nil
+}

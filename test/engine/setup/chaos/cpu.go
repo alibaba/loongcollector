@@ -34,3 +34,31 @@ func CPUFullLoad(ctx context.Context, time int) (context.Context, error) {
 	}
 	return ctx, nil
 }
+
+func CPU100NProc(ctx context.Context, time int) (context.Context, error) {
+	switch setup.Env.GetType() {
+	case "host":
+		command := "sh /root/e2eshel/100nProc.sh " + strconv.FormatInt(int64(time), 10)
+		_, err := setup.Env.ExecOnLoongCollector(command)
+		if err != nil {
+			return ctx, err
+		}
+	default:
+		return ctx, fmt.Errorf("not supported")
+	}
+	return ctx, nil
+}
+
+func CPUNProc(ctx context.Context, time int) (context.Context, error) {
+	switch setup.Env.GetType() {
+	case "host":
+		command := "sh /root/e2eshel/runpy.sh /root/e2eshel/nproc.py " + strconv.FormatInt(int64(time), 10)
+		_, err := setup.Env.ExecOnLoongCollector(command)
+		if err != nil {
+			return ctx, err
+		}
+	default:
+		return ctx, fmt.Errorf("not supported")
+	}
+	return ctx, nil
+}
