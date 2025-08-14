@@ -18,6 +18,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dlclark/regexp2"
 
@@ -26,13 +27,20 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+const (
+	defaultRegexTimeoutMs = 100
+)
+
 type ProcessorDesensitize struct {
-	SourceKey     string
-	Method        string
-	Match         string
-	ReplaceString string
-	RegexBegin    string
-	RegexContent  string
+	SourceKey     string // Target field to desensitize; required
+	Method        string // Method of desensitization: "const" (use ReplaceString) or "md5" (hash target); default is "const"
+	Match         string // Match mode: "full" (entire value) or "regex" (use RegexBegin/RegexContent); default is "full"
+	ReplaceString string // Replacement text when Method is "const"; required if Method=="const"
+	RegexBegin    string // When Match=="regex": begin boundary regex; RE2 syntax
+	RegexContent  string // When Match=="regex": content regex to replace; must not be zero-width; RE2 syntax
+
+	// Safety controls
+	RegexTimeoutMs int // Per-regex match timeout in milliseconds; default is 100
 
 	context      pipeline.Context
 	regexBegin   *regexp2.Regexp
@@ -68,6 +76,11 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 		return err
 	}
 
+	// defaults
+	if p.RegexTimeoutMs <= 0 {
+		p.RegexTimeoutMs = defaultRegexTimeoutMs
+	}
+
 	switch p.Match {
 	case "full":
 		return nil
@@ -83,6 +96,7 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
 		}
+		p.regexBegin.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
 
 		// check RegexContent
 		if p.RegexContent == "" {
@@ -94,6 +108,12 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 		if err != nil {
 			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
 			return err
+		}
+		p.regexContent.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
+
+		// warn about zero-width RegexContent which may cause performance issues
+		if ok, _ := p.regexContent.MatchString(""); ok {
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "RegexContent is zero-width (matching empty string), may cause performance issues", "pattern", p.RegexContent)
 		}
 
 		return nil
@@ -135,11 +155,17 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 		}
 	}
 
+	deadline := time.Now().Add(time.Duration(p.RegexTimeoutMs) * time.Millisecond)
+
 	var pos = 0
 	runeVal := runes(val)
 	runeReplace := runes(p.ReplaceString)
 	beginMatch, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	for beginMatch != nil {
+		if time.Now().After(deadline) {
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_DESENSITIZE_ALARM", "desensitize total timeout exceeded")
+			break
+		}
 		pos = beginMatch.Index + beginMatch.Length
 		content, _ := p.regexContent.FindRunesMatchStartingAt(runeVal, pos)
 		if content != nil {

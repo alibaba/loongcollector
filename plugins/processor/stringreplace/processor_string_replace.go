@@ -18,6 +18,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dlclark/regexp2"
 
@@ -27,25 +28,30 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-type ProcessorStringReplace struct {
-	SourceKey     string
-	Method        string
-	Match         string
-	ReplaceString string
-	DestKey       string
-
-	re            *regexp2.Regexp
-	context       pipeline.Context
-	logPairMetric selfmonitor.CounterMetric
-}
-
 const (
 	PluginName = "processor_string_replace"
 
 	MethodRegex   = "regex"
 	MethodConst   = "const"
 	MethodUnquote = "unquote"
+	// Defaults
+	defaultRegexTimeoutMs = 100
 )
+
+type ProcessorStringReplace struct {
+	SourceKey     string // Target field; required
+	Method        string // One of: "regex", "const", "unquote"; required
+	Match         string // When Method=="const": substring to replace; when Method=="regex": regex pattern (RE2 syntax)
+	ReplaceString string // Replacement string used by "regex" and "const" methods
+	DestKey       string // Optional destination field; if empty, replaces in place
+
+	// Safety controls for regex processing
+	RegexTimeoutMs int // Per-regex match timeout in milliseconds; default is 100
+
+	re            *regexp2.Regexp
+	context       pipeline.Context
+	logPairMetric selfmonitor.CounterMetric
+}
 
 var errNoMethod = errors.New("no method error")
 var errNoMatch = errors.New("no match error")
@@ -58,6 +64,10 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 		return errNoSourceKey
 	}
 	var err error
+	// default safety settings
+	if p.RegexTimeoutMs <= 0 {
+		p.RegexTimeoutMs = defaultRegexTimeoutMs
+	}
 	switch p.Method {
 	case MethodConst:
 		if len(p.Match) == 0 {
@@ -68,6 +78,11 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 		if err != nil {
 			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Match)
 			return err
+		}
+		p.re.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
+		// warn about zero-width regex which may cause performance issues
+		if ok, _ := p.re.MatchString(""); ok {
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "regex pattern is zero-width (matching empty string), may cause performance issues", "regex", p.Match)
 		}
 	case MethodUnquote:
 	default:
@@ -96,11 +111,8 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 			case MethodConst:
 				newContVal = strings.ReplaceAll(cont.Value, p.Match, p.ReplaceString)
 			case MethodRegex:
-				if ok, _ := p.re.MatchString(cont.Value); ok {
-					newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, -1, -1)
-				} else {
-					newContVal = cont.Value
-				}
+				// directly replace with unlimited count (guarded by regex MatchTimeout); startAt=0
+				newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, 0, -1)
 			case MethodUnquote:
 				if strings.HasPrefix(cont.Value, "\"") && strings.HasSuffix(cont.Value, "\"") {
 					newContVal, err = strconv.Unquote(cont.Value)
@@ -111,7 +123,7 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 				newContVal = cont.Value
 			}
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "process log error", err)
+				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_STRING_REPLACE_ALARM", "process log error", err)
 				newContVal = cont.Value
 			}
 			if len(p.DestKey) > 0 {

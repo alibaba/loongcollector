@@ -17,7 +17,9 @@ package desensitize
 import (
 	"errors"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 
@@ -32,7 +34,7 @@ func newProcessor() *ProcessorDesensitize {
 		Match:         "regex",
 		ReplaceString: "***",
 		RegexBegin:    "'password':'",
-		RegexContent:  "[^']*",
+		RegexContent:  "[^']+", // Changed from [^']* to [^']+ to require at least one character
 	}
 	return processor
 }
@@ -289,7 +291,7 @@ func BenchmarkDesensitizeTest(b *testing.B) {
 			processor := newProcessor()
 
 			processor.RegexBegin = "'password':'"
-			processor.RegexContent = "[^']*"
+			processor.RegexContent = "[^']+"
 
 			processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			b.ReportAllocs()
@@ -300,4 +302,73 @@ func BenchmarkDesensitizeTest(b *testing.B) {
 			b.StopTimer()
 		})
 	}
+}
+
+func TestRegexContentZeroWidthWarning(t *testing.T) {
+	Convey("Init should warn about zero-width RegexContent", t, func() {
+		p := &ProcessorDesensitize{
+			SourceKey:     "content",
+			Method:        "const",
+			Match:         "regex",
+			ReplaceString: "*",
+			RegexBegin:    "A",
+			RegexContent:  ".*", // zero-width pattern that matches empty string
+		}
+		err := p.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil) // Should not error, just warn
+
+		// Should still work despite zero-width pattern
+		record := "ATest"
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+		logs := []*protocol.Log{log}
+		out := p.ProcessLogs(logs)
+		So(len(out), ShouldEqual, 1)
+	})
+}
+
+func TestTotalTimeoutBudget(t *testing.T) {
+	Convey("desensitize should honor TotalTimeoutMs budget", t, func() {
+		p := &ProcessorDesensitize{
+			SourceKey:      "content",
+			Method:         "const",
+			Match:          "regex",
+			ReplaceString:  "X",
+			RegexBegin:     "A",
+			RegexContent:   "(a+)+b", // catastrophic backtracking pattern
+			RegexTimeoutMs: 50,
+		}
+		err := p.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		// Input that triggers catastrophic backtracking
+		record := "A" + strings.Repeat("a", 10000) + "c" // 'A' followed by many 'a's but no 'b'
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+
+		start := time.Now()
+		logs := []*protocol.Log{log}
+		out := p.ProcessLogs(logs)
+		elapsed := time.Since(start)
+
+		// Should complete quickly due to timeout protection
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 200)
+		So(len(out), ShouldEqual, 1)
+		// Should preserve original content when timeout occurs
+		So(out[0].Contents[0].Value, ShouldEqual, record)
+	})
+}
+
+func TestTimeoutDefaults(t *testing.T) {
+	Convey("Timeout fields should have proper defaults", t, func() {
+		p := &ProcessorDesensitize{
+			SourceKey:     "content",
+			Method:        "const",
+			Match:         "full",
+			ReplaceString: "*",
+		}
+		err := p.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+		So(p.RegexTimeoutMs, ShouldEqual, 100)
+	})
 }
