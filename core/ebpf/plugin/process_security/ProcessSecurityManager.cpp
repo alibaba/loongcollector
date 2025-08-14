@@ -28,6 +28,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -167,7 +168,10 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
     mLastSendTimeMs = nowMs;
@@ -182,7 +186,7 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
 
-    auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {

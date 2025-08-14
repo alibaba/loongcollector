@@ -143,7 +143,6 @@ bool ProcessCloneRetryableEvent::flushEvent() {
     if (!mFlushProcessEvent) {
         return true;
     }
-    return true;
     if (!mCommonEventQueue.try_enqueue(mProcessEvent)) {
         // don't use move as it will set mProcessEvent to nullptr even
         // if enqueue failed, this is unexpected but don't know why

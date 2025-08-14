@@ -507,7 +507,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
     for (auto& node : nodes) {
         // convert to a item and push to process queue
-        auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
         eventGroup.SetTagNoCopy(kDataType.LogKey(), kLogValue);
         bool init = false;
@@ -982,7 +982,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
     for (auto& node : nodes) {
         // convert to a item and push to process queue
-        auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer); // per node represent an APP ...
         bool init = false;
         bool needPush = false;
@@ -1694,7 +1694,7 @@ void NetworkObserverManager::ReportAgentInfo() {
     const time_t now = time(nullptr);
     for (const auto& configToWorkload : mConfigToWorkloads) {
         const auto& workloadKeys = configToWorkload.second;
-        auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
         for (const auto& workloadKey : workloadKeys) {
             const auto& it = mWorkloadConfigs.find(kGlobalWorkloadKey);
             if (it == mWorkloadConfigs.end()) {

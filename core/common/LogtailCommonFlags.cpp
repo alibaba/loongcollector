@@ -66,3 +66,4 @@ DEFINE_FLAG_STRING(third_party_dir, "loongcollector third party dir", "thirdpart
 // ebpf event retry flags
 DEFINE_FLAG_INT32(ebpf_event_retry_interval_sec, "Time in seconds between ebpf event retries", 2);
 DEFINE_FLAG_INT32(ebpf_event_retry_limit, "Number of attempts to retry processing ebpf event", 15);
+DEFINE_FLAG_INT32(ebpf_max_aggregate_events, "Maximum events in aggregate tree before sending", 2000);

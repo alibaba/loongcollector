@@ -18,6 +18,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
@@ -117,14 +118,15 @@ int FileSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
     mLastSendTimeMs = nowMs;
 
-    WriteLock lk(this->mLock);
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
-    lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
@@ -132,8 +134,7 @@ int FileSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("empty nodes...", ""));
         return 0;
     }
-
-    auto sourceBuffer = std::make_shared<SourceBuffer>(1024);
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
     for (auto& node : nodes) {
@@ -214,7 +215,6 @@ int FileSecurityManager::SendEvents() {
                             "[FileSecurityEvent] push queue failed!", ""));
             // TODO: Alarm discard data
         }
-
     }
     return 0;
 }
