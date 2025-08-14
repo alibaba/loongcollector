@@ -18,6 +18,17 @@ ARG USERNAME=admin
 ARG USER_PASSWORD
 USER root
 
+RUN wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/glibc-2.18.tar.gz && \
+    tar -zxvf glibc-2.18.tar.gz && \
+    cd glibc-2.18 && \
+    mkdir build && \
+    cd build && \
+    ../configure --prefix=/usr && \
+    make -j$(nproc) && \
+    make install && \
+    cd ../ && \
+    rm -fr glibc-2.18*
+    
 RUN yum -y install openssh-server && \
     ssh-keygen -A
     

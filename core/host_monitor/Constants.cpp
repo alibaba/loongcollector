@@ -21,9 +21,15 @@
 namespace logtail {
 
 std::filesystem::path PROCESS_DIR = "/proc";
+std::filesystem::path ETC_DIR = "/etc";
+std::filesystem::path SYSTEM_BLOCK_DIR = "/sys/class/block";
 const std::filesystem::path PROCESS_STAT = "stat";
 const std::filesystem::path PROCESS_LOADAVG = "loadavg";
 const std::filesystem::path PROCESS_MEMINFO = "meminfo";
+const std::filesystem::path ETC_MTAB = "mtab";
+const std::filesystem::path PROCESS_UPTIME = "uptime";
+const std::filesystem::path SERIAL = "serial";
+const std::filesystem::path PROCESS_DISKSTATS = "diskstats";
 const std::filesystem::path PROCESS_NET_SOCKSTAT = "net/sockstat";
 const std::filesystem::path PROCESS_NET_SOCKSTAT6 = "net/sockstat6";
 const std::filesystem::path PROCESS_NET_DEV = "net/dev";
@@ -34,7 +40,6 @@ const std::filesystem::path PROCESS_CWD = "cwd";
 const std::filesystem::path PROCESS_EXE = "exe";
 const std::filesystem::path PROCESS_ROOT = "root";
 const std::filesystem::path PROCESS_STATUS = "status";
-const std::filesystem::path PROCESS_UPTIME = "uptime";
 const int EXECUTE_SUCCESS = 0;
 const int EXECUTE_FAIL = -1;
 const std::filesystem::path PROCESS_NET_IF_INET6 = "net/if_inet6";
