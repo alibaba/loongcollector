@@ -162,7 +162,8 @@ public:
 
     static size_t BUFFER_SIZE;
     static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
-    static const int32_t CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY = -2;
+    static const int32_t CHECKPOINT_IDX_OF_ROTATOR_MAP = -2;
+    static const int32_t CHECKPOINT_IDX_UNDEFINED = -3;
     std::vector<BaseLineParse*> mLineParsers = {};
     template <typename T>
     T* GetParser(size_t size) {
@@ -488,6 +489,7 @@ protected:
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
     std::string mRealLogPath; // real log path
+    std::string mChineseEncodingPath; // On Windows, Chinese config base path's __path__ will be converted to GBK
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
     // int32_t mTailLimit; // KB
@@ -497,7 +499,7 @@ protected:
     int64_t mLastFileSize = 0;
     time_t mLastMTime = 0;
     std::string mCache;
-    // >= 0: index of reader array, -1: new reader, -2: not in reader array
+    // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
     std::string mTopicName;

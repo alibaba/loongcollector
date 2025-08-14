@@ -128,6 +128,109 @@ bool SystemInterface::GetHostMemInformationStat(MemoryInformation& meminfo) {
         errorType);
 }
 
+bool SystemInterface::GetFileSystemListInformation(FileSystemListInformation& fileSystemListInfo) {
+    const std::string errorType = "filesystem list";
+    return MemoizedCall(
+        mFileSystemListInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetFileSystemListInformationOnce(static_cast<FileSystemListInformation&>(info));
+        },
+        fileSystemListInfo,
+        errorType);
+}
+
+bool SystemInterface::GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo) {
+    const std::string errorType = "system uptime";
+    return MemoizedCall(
+        mSystemUptimeInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetSystemUptimeInformationOnce(static_cast<SystemUptimeInformation&>(info));
+        },
+        systemUptimeInfo,
+        errorType);
+}
+
+bool SystemInterface::GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo) {
+    const std::string errorType = "SerialId";
+    return MemoizedCall(
+        mSerialIdInformationCache,
+        [this](BaseInformation& info, std::string diskName) {
+            return this->GetDiskSerialIdInformationOnce(diskName, static_cast<SerialIdInformation&>(info));
+        },
+        serialIdInfo,
+        errorType,
+        diskName);
+}
+
+bool SystemInterface::GetDiskStateInformation(DiskStateInformation& diskStateInfo) {
+    const std::string errorType = "disk state";
+    return MemoizedCall(
+        mDiskStateInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetDiskStateInformationOnce(static_cast<DiskStateInformation&>(info));
+        },
+        diskStateInfo,
+        errorType);
+}
+bool SystemInterface::GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& processCmdlineString) {
+    const std::string errorType = "processCmdline";
+    return MemoizedCall(
+        mProcessCmdlineCache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetProcessCmdlineStringOnce(pid, static_cast<ProcessCmdlineString&>(info));
+        },
+        processCmdlineString,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetPorcessStatm(pid_t pid, ProcessMemoryInformation& processMemory) {
+    const std::string errorType = "processStatm";
+    return MemoizedCall(
+        mProcessStatmCache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetProcessStatmOnce(pid, static_cast<ProcessMemoryInformation&>(info));
+        },
+        processMemory,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetProcessCredNameObj(pid_t pid, ProcessCredName& credName) {
+    const std::string errorType = "processStatus";
+    return MemoizedCall(
+        mProcessStatusCache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetProcessCredNameOnce(pid, static_cast<ProcessCredName&>(info));
+        },
+        credName,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetExecutablePathCache(pid_t pid, ProcessExecutePath& executePath) {
+    const std::string errorType = "executablePath";
+    return MemoizedCall(
+        mExecutePathCache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetExecutablePathOnce(pid, static_cast<ProcessExecutePath&>(info));
+        },
+        executePath,
+        errorType,
+        pid);
+}
+
+bool SystemInterface::GetProcessOpenFiles(pid_t pid, ProcessFd& processFd) {
+    const std::string errorType = "processOpenFiles";
+    return MemoizedCall(
+        mProcessFdCache,
+        [this](BaseInformation& info, pid_t pid) {
+            return this->GetProcessOpenFilesOnce(pid, static_cast<ProcessFd&>(info));
+        },
+        processFd,
+        errorType,
+        pid);
+}
 bool SystemInterface::GetTCPStatInformation(TCPStatInformation& tcpStatInfo) {
     const std::string errorType = "TCP stat";
     return MemoizedCall(

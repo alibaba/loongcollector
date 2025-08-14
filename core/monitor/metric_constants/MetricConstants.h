@@ -167,6 +167,8 @@ extern const std::string& METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL;
+extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL;
+extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL;
 
 /**********************************************************
  *   all flusher （所有发送插件通用指标）

@@ -45,6 +45,7 @@
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
@@ -175,6 +176,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseFromPBNative>());
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());

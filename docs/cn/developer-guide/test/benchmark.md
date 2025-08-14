@@ -47,10 +47,10 @@ Feature: performance file to blackhole vector
 
 ```shell
 # 运行所有benchmark测试
-go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/benchmark
+go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$ github.com/alibaba/ilogtail/test/benchmark/local
 
 # 以正则表达式匹配Scenario运行测试，以下为运行Scenario以Vector为结尾的test_case
-go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$/^.*Vector$ github.com/alibaba/ilogtail/test/benchmark
+go test -v -timeout 30m -run ^TestE2EOnDockerComposePerformance$/^.*Vector$ github.com/alibaba/ilogtail/test/benchmark/local
 ```
 
 ### 测试结果
