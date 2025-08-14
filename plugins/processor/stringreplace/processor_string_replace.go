@@ -46,7 +46,7 @@ type ProcessorStringReplace struct {
 	DestKey       string // Optional destination field; if empty, replaces in place
 
 	// Safety controls for regex processing
-	RegexTimeoutMs int // Per-regex match timeout in milliseconds; default is 100
+	RegexTimeoutMs int // Match timeout in milliseconds for a single log; default is 100
 
 	re            *regexp2.Regexp
 	context       pipeline.Context

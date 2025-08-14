@@ -40,7 +40,7 @@ type ProcessorDesensitize struct {
 	RegexContent  string // When Match=="regex": content regex to replace; must not be zero-width; RE2 syntax
 
 	// Safety controls
-	RegexTimeoutMs int // Per-regex match timeout in milliseconds; default is 100
+	RegexTimeoutMs int // Match timeout in milliseconds for a single log; default is 100
 
 	context      pipeline.Context
 	regexBegin   *regexp2.Regexp

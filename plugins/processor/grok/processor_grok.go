@@ -43,7 +43,7 @@ type ProcessorGrok struct {
 	CustomPatterns      map[string]string // Custom GROK patterns, key is pattern's name and value is grok expression
 	SourceKey           string            // Target field, default is "content"
 	Match               []string          // Grok expressions to match logs
-	TimeoutMilliSeconds int64             // Maximum attempt time in milliseconds to parse grok expressions for a single regex, set to 0 to disable timeout, default is 100
+	TimeoutMilliSeconds int64             // Maximum attempt time in milliseconds to parse grok expressions for a single log, set to 0 to disable timeout, default is 100
 	IgnoreParseFailure  bool              // Whether to keep the original field after parsing failure，default is true. Configured to false to discard the log when parsing fails.
 	KeepSource          bool              // Whether to keep the original field after parsing success, default is true
 	NoKeyError          bool              // Whether to report an error if there is no matching original field, default is false
