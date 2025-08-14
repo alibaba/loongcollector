@@ -36,7 +36,6 @@
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 
-
 namespace logtail {
 
 DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N cpu percent", 5);
@@ -93,7 +92,6 @@ int ProcessCollector::Init(int processTotalCount, int processReportTopN) {
     return 0;
 }
 
-
 bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
@@ -147,7 +145,8 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     // 为vmState添加多值计算
     mVMProcessNumStat.AddValue(processNumStat);
     // 给每个pid推送对象设定其多值体系
-    // mProcessPushMertic是一个字典，key 为pid，对应的value为多值vector，里面存储了每一个pid的多值体系
+    // mProcessPushMertic是一个字典，key
+    // 为pid，对应的value为多值vector，里面存储了每一个pid的多值体系
     for (auto& metric : pushMerticList) {
         uint64_t thisPid = metric.pid;
         // auto met = mProcessPushMertic.find(thisPid);
@@ -272,7 +271,6 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     ClearProcessCpuTimeCache();
     return true;
 }
-
 
 // 获取某个pid的信息
 bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat) {
@@ -418,24 +416,6 @@ bool ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
     return true;
 }
 
-// 获取每个Pid的CPU信息
-bool ProcessCollector::GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap) {
-    int readCount = 0;
-    for (pid_t pid : pids) {
-        if (++readCount > mProcessSilentCount) { // 每读一段时间就要停下，防止进程过多占用太多时间
-            readCount = 0;
-            std::this_thread::sleep_for(milliseconds{100});
-        }
-        // 获取每个Pid的CPU信息
-        ProcessCpuInformation procCpu;
-        if (0 == GetProcessCpuInformation(pid, procCpu, false)) {
-            pidMap[pid] = procCpu.total;
-        }
-    }
-    return true;
-}
-
-
 // 给pid做cache
 bool ProcessCollector::GetProcessCpuInCache(pid_t pid, bool includeCTime) {
     if (cpuTimeCache.find(pid) != cpuTimeCache.end()) {
@@ -444,7 +424,6 @@ bool ProcessCollector::GetProcessCpuInCache(pid_t pid, bool includeCTime) {
         return false;
     }
 }
-
 
 bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime) {
     const auto now = std::chrono::steady_clock::now();
@@ -515,8 +494,9 @@ bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output, bool inclu
 }
 
 // 数据样例: /proc/1/stat, 解析/proc/pid/stat
-// 1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600 171 18446744073709551615 4194304 4238788
-// 140727020025920 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 6336016 6337300 21442560 140727020027760 140727020027777
+// 1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600
+// 171 18446744073709551615 4194304 4238788 140727020025920 0 0 0 0 0 0 0 0 0 17
+// 3 0 0 0 0 0 6336016 6337300 21442560 140727020027760 140727020027777
 // 140727020027777 140727020027887 0
 bool ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
     processStat.pid = pid;

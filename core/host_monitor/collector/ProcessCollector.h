@@ -47,8 +47,6 @@ public:
 
     bool ReadProcessStat(pid_t pid, ProcessStat& processStat);
 
-    bool GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
-
     bool GetProcessAllStat(pid_t pid, ProcessAllStat& processStat);
 
     bool GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory);
