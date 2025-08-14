@@ -111,8 +111,8 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 			case MethodConst:
 				newContVal = strings.ReplaceAll(cont.Value, p.Match, p.ReplaceString)
 			case MethodRegex:
-				// directly replace with unlimited count (guarded by regex MatchTimeout); startAt=0
-				newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, 0, -1)
+				// directly replace with unlimited count (guarded by regex MatchTimeout)
+				newContVal, err = p.re.Replace(cont.Value, p.ReplaceString, -1, -1)
 			case MethodUnquote:
 				if strings.HasPrefix(cont.Value, "\"") && strings.HasSuffix(cont.Value, "\"") {
 					newContVal, err = strconv.Unquote(cont.Value)
