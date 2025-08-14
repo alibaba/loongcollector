@@ -82,7 +82,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["ELB_URI"], ShouldEqual, ans["SLB_URI"])
+			So(processor.processedPatterns["ELB_URI"], ShouldEqual, expectedGrokPatterns["SLB_URI"])
 			for k, v := range processor.processedPatterns {
 				_, err = regexp2.Compile(v, regexp2.RE2)
 				if err != nil {
@@ -98,7 +98,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["HTTP"], ShouldEqual, ans["%{HTTP}"])
+			So(processor.processedPatterns["HTTP"], ShouldEqual, expectedGrokPatterns["%{HTTP}"])
 			_, err = regexp2.Compile(processor.processedPatterns["Http"], regexp2.RE2)
 			So(err, ShouldBeNil)
 		})
@@ -109,7 +109,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["DATA"], ShouldEqual, ans["%{HTTP}"])
+			So(processor.processedPatterns["DATA"], ShouldEqual, expectedGrokPatterns["%{HTTP}"])
 			_, err := regexp2.Compile(processor.processedPatterns["Http"], regexp2.RE2)
 			So(err, ShouldBeNil)
 		})
