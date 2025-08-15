@@ -229,6 +229,8 @@ bool EBPFAdapter::loadCoolBPF() {
         = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_disable_process);
     mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR)]
         = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(ebpf_update_conn_addr);
+    mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_GET_RUNTIME_INFO)]
+        = LOAD_EBPF_FUNC_AND_UPROBE_OFFSET(get_self_runtime_info);
     if (!std::all_of(mOffsets.begin(), mOffsets.end(), [](auto x) { return x > 0; })) {
         LOG_ERROR(sLogger, ("failed to load libcoolbpf funcs addr, path", mBinaryPath));
         return false;
@@ -336,6 +338,8 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
                 = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE)];
             nconf->mUppsOffset
                 = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_DISABLE_PROCESS)];
+            nconf->mUpgsOffset
+                = mOffsets[static_cast<int>(network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_GET_RUNTIME_INFO)];
         }
     }
 

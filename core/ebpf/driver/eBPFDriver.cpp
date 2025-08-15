@@ -14,6 +14,7 @@
 
 
 #include <mutex>
+#include <regex>
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>
@@ -199,12 +200,30 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 
             // TODO
             if (config->mEnableCidFilter) {
-                if (config->mCidOffset <= 0) {
+                struct self_runtime_info info;
+                int prefixLen = 0;
+                // get self info ...
+                int res = ebpf_init_self_runtime_info(config->mSo.data(), config->mUpgsOffset, &info);
+                if (res || info.docker_id_length <= 0) {
                     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "offset invalid!! skip cid filter... offset %d\n",
-                             config->mCidOffset);
+                             "dockerid len invalid!! skip cid filter... docker id len %d, res %d\n",
+                             info.docker_id_length, res);
+                } else {
+                    static std::regex cidRegex = std::regex("[a-f0-9]{64}");
+                    std::cmatch match;
+                    if (std::regex_search(info.docker_id, match, cidRegex)) {
+                        prefixLen = match.position();
+                        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                                "docker id from kernel %s, docker id len %d, pid %d, position %d\n",
+                                info.docker_id, info.docker_id_length, info.pid, prefixLen);
+                    }
                 }
-                SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, config->mCidOffset);
+                
+                if (prefixLen > 0) {
+                    SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, prefixLen);
+                }
+                
+                // SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, config->mCidOffset);
             }
             //
             err = ebpf_start();
