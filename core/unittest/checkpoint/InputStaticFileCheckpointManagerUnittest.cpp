@@ -53,7 +53,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
         {
-            ofstream fout(files[i]);
+            ofstream fout(files[i], std::ios_base::binary);
             fout << contents[i];
         }
         auto& item = fingerprints.emplace_back();
@@ -65,9 +65,9 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     }
 
     // prepare checkpoint files
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config_2@0.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config_2@0.json", std::ios_base::binary); }
     {
-        ofstream fout(sManager->mCheckpointRootPath / "test_config_3@0.json");
+        ofstream fout(sManager->mCheckpointRootPath / "test_config_3@0.json", std::ios_base::binary);
         string cptStr = R"({
         "config_name" : "test_config_3",
         "current_file_index" : 0,
@@ -204,7 +204,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
         {
-            ofstream fout(files[i]);
+            ofstream fout(files[i], std::ios_base::binary);
             fout << contents[i];
         }
         auto& item = fingerprints.emplace_back();
@@ -338,12 +338,12 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
 void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     // valid checkpoint root path
     filesystem::create_directories(sManager->mCheckpointRootPath / "dir");
-    { ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml"); }
-    { ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json"); }
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json"); }
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json"); }
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json"); }
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config@1.json"); }
+    { ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml", std::ios_base::binary); }
+    { ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json", std::ios_base::binary); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json", std::ios_base::binary); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json", std::ios_base::binary); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json", std::ios_base::binary); }
+    { ofstream fout(sManager->mCheckpointRootPath / "test_config@1.json", std::ios_base::binary); }
     sManager->GetAllCheckpointFileNames();
     APSARA_TEST_EQUAL(2U, sManager->mCheckpointFileNamesOnInit.size());
     APSARA_TEST_NOT_EQUAL(sManager->mCheckpointFileNamesOnInit.end(),
@@ -362,7 +362,7 @@ void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     EXPECT_NO_THROW(sManager->GetAllCheckpointFileNames());
 
     // invalid checkpoint root path
-    { ofstream fout(sManager->mCheckpointRootPath); }
+    { ofstream fout(sManager->mCheckpointRootPath, std::ios_base::binary); }
     EXPECT_NO_THROW(sManager->GetAllCheckpointFileNames());
 }
 
@@ -373,19 +373,19 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
                                    "./test_logs/test_file_3.log",
                                    "./test_logs/test_file_4.log"};
     {
-        ofstream fout(files[0]);
+        ofstream fout(files[0], std::ios_base::binary);
         fout << string(2000, 'a') << endl;
     }
     {
-        ofstream fout(files[1]);
+        ofstream fout(files[1], std::ios_base::binary);
         fout << string(100, 'b') << endl;
     }
     {
-        ofstream fout(files[2]);
+        ofstream fout(files[2], std::ios_base::binary);
         fout << string(500, 'c') << endl;
     }
     {
-        ofstream fout(files[3]);
+        ofstream fout(files[3], std::ios_base::binary);
         fout << string(1500, 'd') << endl;
     }
     // job_1 running: file 1 finished, file 2 abort, file 3 reading, file 4 waiting
@@ -453,17 +453,17 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     filesystem::remove_all(cptPath);
     // empty file
-    { ofstream fout(cptPath); }
+    { ofstream fout(cptPath, std::ios_base::binary); }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     // invalid json
     {
-        ofstream fout(cptPath);
+        ofstream fout(cptPath, std::ios_base::binary);
         fout << "{]";
     }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     // not json object
     {
-        ofstream fout(cptPath);
+        ofstream fout(cptPath, std::ios_base::binary);
         fout << "[]";
     }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -521,7 +521,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             auto copy = validCptJson;
             copy.removeMember(key);
             {
-                ofstream fout(cptPath);
+                ofstream fout(cptPath, std::ios_base::binary);
                 fout << copy.toStyledString();
             }
             APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -529,28 +529,28 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
         {
             auto copy = validCptJson;
             copy["status"] = "unknown";
-            ofstream fout(cptPath);
+            ofstream fout(cptPath, std::ios_base::binary);
             fout << copy.toStyledString();
         }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
         {
             auto copy = validCptJson;
             copy["files"] = Json::objectValue;
-            ofstream fout(cptPath);
+            ofstream fout(cptPath, std::ios_base::binary);
             fout << copy.toStyledString();
         }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
         {
             auto copy = validCptJson;
             copy["files"] = Json::arrayValue;
-            ofstream fout(cptPath);
+            ofstream fout(cptPath, std::ios_base::binary);
             fout << copy.toStyledString();
         }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
         {
             auto copy = validCptJson;
             copy["files"][0] = Json::arrayValue;
-            ofstream fout(cptPath);
+            ofstream fout(cptPath, std::ios_base::binary);
             fout << copy.toStyledString();
         }
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -563,7 +563,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
                 auto copy = validCptJson;
                 copy["files"][0].removeMember(key);
                 {
-                    ofstream fout(cptPath);
+                    ofstream fout(cptPath, std::ios_base::binary);
                     fout << copy.toStyledString();
                 }
                 APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -573,7 +573,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             auto copy = validCptJson;
             copy["files"][0]["status"] = "unknown";
             {
-                ofstream fout(cptPath);
+                ofstream fout(cptPath, std::ios_base::binary);
                 fout << copy.toStyledString();
             }
         }
@@ -586,7 +586,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             auto copy = validCptJson;
             copy["files"][0].removeMember(key);
             {
-                ofstream fout(cptPath);
+                ofstream fout(cptPath, std::ios_base::binary);
                 fout << copy.toStyledString();
             }
             APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -596,7 +596,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
         // invalid abort file key
         auto copy = validCptJson;
         copy["files"][1].removeMember("abort_time");
-        ofstream fout(cptPath);
+        ofstream fout(cptPath, std::ios_base::binary);
         fout << copy.toStyledString();
     }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -607,7 +607,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             auto copy = validCptJson;
             copy["files"][2].removeMember(key);
             {
-                ofstream fout(cptPath);
+                ofstream fout(cptPath, std::ios_base::binary);
                 fout << copy.toStyledString();
             }
             APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -620,7 +620,7 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             auto copy = validCptJson;
             copy["files"][3].removeMember(key);
             {
-                ofstream fout(cptPath);
+                ofstream fout(cptPath, std::ios_base::binary);
                 fout << copy.toStyledString();
             }
             APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));

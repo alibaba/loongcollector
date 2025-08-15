@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #include "common/FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/JsonUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
@@ -55,7 +54,7 @@ protected:
 private:
     static OnetimeConfigInfoManager* sConfigManager;
 
-    filesystem::path mConfigDir = "./continuous_pipeline_config";
+    filesystem::path mConfigDir = "continuous_pipeline_config";
 };
 
 OnetimeConfigInfoManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigInfoManager::GetInstance();
@@ -149,7 +148,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         vector<string> filenames
             = {"new_config.json", "changed_config.json", "old_config.json", "obsolete_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            ofstream fout(mConfigDir / filenames[i]);
+            ofstream fout(mConfigDir / filenames[i], ios::binary);
             fout << configDetails[i];
         }
 
@@ -163,7 +162,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
 
         // prepare checkpoint file
         {
-            ofstream fout(sConfigManager->mCheckpointFilePath);
+            ofstream fout(sConfigManager->mCheckpointFilePath, ios::binary);
             fout << R"({
             "changed_config": {
                 "config_hash": 8279028812201817660,
@@ -256,11 +255,11 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         })"};
         vector<string> filenames = {"new_config.json", "old_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            ofstream fout(mConfigDir / filenames[i]);
+            ofstream fout(mConfigDir / filenames[i], ios::binary);
             fout << configDetails[i];
         }
         {
-            ofstream fout(mConfigDir / "unused_config.json");
+            ofstream fout(mConfigDir / "unused_config.json", ios::binary);
             fout << unusedConfigDetail;
         }
         filesystem::remove(mConfigDir / "changed_config.json");

@@ -98,7 +98,9 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
     // prepare checkpoint file
     {
-        ofstream fout(sConfigManager->mCheckpointFilePath);
+        ofstream fout(sConfigManager->mCheckpointFilePath, ios::binary);
+        // hard code the checkpoint file content for different platforms
+#ifdef __linux__
         fout << R"({
             "old_config": {
                 "config_hash": 3197596144834030155,
@@ -113,13 +115,29 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
                 "expire_time": 1000000000
             }
         })";
+#else ifdef _MSC_VER
+        fout << R"({
+            "old_config": {
+                "config_hash": 11286657321592460016,
+                "expire_time": 2500000000
+            },
+            "obsolete_config_1": {
+                "config_hash": 6918115327984169868,
+                "expire_time": 1000000000
+            },
+            "obsolete_config_2": {
+                "config_hash": 6918115327984169868,
+                "expire_time": 1000000000
+            }
+        })";
+#endif
     }
     sConfigManager->LoadCheckpointFile();
 
     filesystem::create_directories("config");
     {
         // new config
-        { ofstream fout("config/new_config.json"); }
+        { ofstream fout("config/new_config.json", ios::binary); }
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 3600U;
 
@@ -132,7 +150,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
     }
     {
         // old config
-        { ofstream fout("config/old_config.json"); }
+        { ofstream fout("config/old_config.json", ios::binary); }
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 600U;
 
@@ -145,7 +163,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
     }
     {
         // obsolete config, config file existed
-        { ofstream fout("config/obselete_config_1.json"); }
+        { ofstream fout("config/obsolete_config_1.json", ios::binary); }
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 1800U;
 
