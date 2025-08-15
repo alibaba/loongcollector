@@ -14,6 +14,7 @@
 
 #include "config/OnetimeConfigInfoManager.h"
 #include "config/PipelineConfig.h"
+#include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -100,7 +101,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
     {
         ofstream fout(sConfigManager->mCheckpointFilePath, ios::binary);
         // hard code the checkpoint file content for different platforms
-#ifdef __linux__
+#if defined(__linux__)
         fout << R"({
             "old_config": {
                 "config_hash": 3197596144834030155,
@@ -115,7 +116,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
                 "expire_time": 1000000000
             }
         })";
-#else ifdef _MSC_VER
+#elif defined(_MSC_VER)
         fout << R"({
             "old_config": {
                 "config_hash": 11286657321592460016,
@@ -181,7 +182,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         ConfigMock config("obsolete_config_2", std::move(configJson), filepath);
         APSARA_TEST_FALSE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
     }
-    filesystem::remove_all("config");
+    
+    // 使用错误处理来安全地删除目录
+    error_code ec;
+    filesystem::remove_all("config", ec);
+    if (ec) {
+        // 如果删除失败，记录警告但不抛出异常
+        LOG_WARNING(sLogger, ("failed to remove config directory", ec.message()));
+    }
 }
 
 UNIT_TEST_CASE(PipelineConfigUnittest, TestOnetimeConfig)
