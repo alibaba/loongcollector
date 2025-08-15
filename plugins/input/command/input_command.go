@@ -49,6 +49,7 @@ type InputCommand struct {
 	storageDir       string
 	scriptPath       string
 	cmdUser          *user.User
+	currentUser      *user.User
 	scriptContentMd5 string
 }
 
@@ -60,9 +61,19 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 		return 0, err
 	}
 
+	// Get current user
+	currentUser, err := user.Current()
+	if err != nil {
+		err = fmt.Errorf("cannot get current user, error: %s", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
+		return 0, err
+	}
+	in.currentUser = currentUser
+
 	// Parse Base64 content
 	if in.ContentEncoding == ContentTypeBase64 {
-		decodeContent, err := base64.StdEncoding.DecodeString(in.ScriptContent)
+		var decodeContent []byte
+		decodeContent, err = base64.StdEncoding.DecodeString(in.ScriptContent)
 		if err != nil {
 			return 0, fmt.Errorf("base64.StdEncoding error:%s", err)
 		}
@@ -71,7 +82,7 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 
 	// mkdir
 	in.storageDir = path.Join(config.LoongcollectorGlobalConfig.LoongCollectorConfDir, "/scripts")
-	err := mkdir(in.storageDir)
+	err = mkdir(in.storageDir)
 	if err != nil {
 		err = fmt.Errorf("init storageInstance error : %s", err)
 		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
@@ -161,7 +172,7 @@ func isValidBinPath(cmdPath string) error {
 func (in *InputCommand) Collect(collector pipeline.Collector) error {
 	// stderrStr is used to store the standard error output generated during command execution.
 	// It captures any error messages or diagnostic information produced by the command.
-	stdoutStr, stderrStr, isKilled, err := RunCommandWithTimeOut(in.TimeoutMilliSeconds, in.cmdUser, in.CmdPath, in.Environments, in.scriptPath)
+	stdoutStr, stderrStr, isKilled, err := RunCommandWithTimeOut(in.TimeoutMilliSeconds, in.cmdUser, in.currentUser, in.CmdPath, in.Environments, in.scriptPath)
 
 	if err != nil {
 		if in.IgnoreError {

@@ -43,7 +43,7 @@ ifndef DOCKER_BUILD_USE_BUILDKIT
 	DOCKER_BUILD_USE_BUILDKIT = true
 
 	# docker BuildKit supported start from 19.03
-	docker_version := $(shell docker version --format '{{.Server.Version}}')
+	docker_version := $(shell docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0.0")
 	least_version := "19.03"
 	ifeq ($(shell printf "$(least_version)\n$(docker_version)" | sort -V | tail -n 1),$(least_version))
 		DOCKER_BUILD_USE_BUILDKIT = false
@@ -190,12 +190,25 @@ unittest_e2e_engine: clean gocdocker
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins
+	cp pkg/logtail/libGoPluginAdapter.so ./plugins/input/docker/logmeta
 	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
 	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig|(input\/prometheus)|(input\/syslog)"| grep -Ev "plugin_main|pluginmanager") -coverprofile .testCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
 	rm -rf plugins/input/jmxfetch/test/
+
+.PHONY: unittest_plugin_clean
+unittest_plugin_clean:
+	find . -name "go_plugin.LOG" -type f -delete
+	rm -rf./plugins/input/command/conf
+	rm ./plugins/input/command/VGVzdFNjcmlwdFN0b3JhZ2U=.sh
+	rm -rf .testCoverage.txt
+	rm -rf plugins/input/docker/logmeta/libGoPluginAdapter.so
+	rm -rf plugin_main/libGoPluginAdapter.so
+	rm -rf plugin_main/GoPluginAdapter.dll
+	rm -rf plugins/input/jmxfetch/test/
+	@echo "Plugin unittest files cleaned"
 
 .PHONY: unittest_core
 unittest_core:
