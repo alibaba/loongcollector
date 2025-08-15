@@ -116,8 +116,9 @@ LoongCollector has been battle-tested in some of the world's most demanding prod
 
 ```bash
 # Clone the repository
-git clone --recurse-submodules https://github.com/alibaba/loongcollector.git
+git clone https://github.com/alibaba/loongcollector.git
 cd loongcollector
+git submodule update --init
 
 # Build LoongCollector
 make all
