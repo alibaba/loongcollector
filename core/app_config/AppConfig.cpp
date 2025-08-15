@@ -118,6 +118,7 @@ DECLARE_FLAG_INT32(modify_check_interval);
 DECLARE_FLAG_INT32(ignore_file_modify_timeout);
 DEFINE_FLAG_STRING(host_path_blacklist, "host path matches substring in blacklist will be ignored", "");
 DEFINE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS, "default env file key to load tags", "");
+DEFINE_FLAG_STRING(LOONG_FILE_TAGS, "default env file key to load tags", "");
 DEFINE_FLAG_INT32(max_holded_data_size,
                   "for every id and metric name, the max data size can be holded in memory (default 512KB)",
                   512 * 1024);
@@ -428,7 +429,7 @@ std::string GetAgentConfDir(const ParseConfResult& res, const Json::Value& confJ
 std::string GetAgentConfigFile() {
     if (BOOL_FLAG(logtail_mode)) {
         // load ilogtail_config.json
-        char* configEnv = getenv(STRING_FLAG(ilogtail_config_env_name).c_str());
+        char* configEnv = GetEnv("LOONG_CONFIG", STRING_FLAG(ilogtail_config_env_name).c_str());
         if (configEnv == NULL || strlen(configEnv) == 0) {
             return STRING_FLAG(ilogtail_config);
         } else {
@@ -538,11 +539,16 @@ string GetExactlyOnceCheckpoint() {
     }
 }
 
-string GetFileTagsDir() {
+string GenerateFileTagsDir() {
+    if (STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty() && STRING_FLAG(LOONG_FILE_TAGS).empty()) {
+        return "";
+    }
+    std::string fileTags
+        = STRING_FLAG(LOONG_FILE_TAGS).empty() ? STRING_FLAG(ALIYUN_LOG_FILE_TAGS) : STRING_FLAG(LOONG_FILE_TAGS);
     if (BOOL_FLAG(logtail_mode)) {
-        return STRING_FLAG(ALIYUN_LOG_FILE_TAGS);
+        return fileTags;
     } else {
-        return AbsolutePath(STRING_FLAG(ALIYUN_LOG_FILE_TAGS), AppConfig::GetInstance()->GetLoongcollectorConfDir());
+        return AbsolutePath(fileTags, AppConfig::GetInstance()->GetLoongcollectorConfDir());
     }
 }
 
@@ -715,6 +721,8 @@ void AppConfig::LoadAppConfig(const std::string& ilogtailConfigFile) {
     // LoadAddrConfig(mLocalInstanceConfig);
     LoadOtherConf(mLocalInstanceConfig);
 
+    mFileTagsDir = GenerateFileTagsDir();
+
     CheckAndResetProxyEnv();
 }
 
@@ -770,7 +778,7 @@ void AppConfig::loadAppConfigLogtailMode(const std::string& ilogtailConfigFile) 
  * Tag键从环境变量中获取，对应的值也从环境变量中读取。
  */
 void AppConfig::LoadEnvTags() {
-    char* envTagKeys = getenv(STRING_FLAG(default_env_tag_keys).c_str());
+    char* envTagKeys = GetEnv("LOONG_ENV_TAGS", STRING_FLAG(default_env_tag_keys).c_str());
     if (envTagKeys == NULL) {
         return;
     }
@@ -855,7 +863,7 @@ void AppConfig::LoadEnvResourceLimit() {
  */
 void AppConfig::CheckPurageContainerMode() {
 #ifdef __ENTERPRISE__
-    if (getenv(STRING_FLAG(ilogtail_user_defined_id_env_name).c_str()) == NULL) {
+    if (GetEnv("LOONG_USER_DEFINED_ID", STRING_FLAG(ilogtail_user_defined_id_env_name).c_str()) == NULL) {
         LOG_INFO(sLogger, ("purage container mode", false));
         return;
     }
@@ -1705,18 +1713,18 @@ bool AppConfig::IsHostPathMatchBlacklist(const string& dirPath) const {
 }
 
 void AppConfig::UpdateFileTags() {
-    if (STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
+    if (mFileTagsDir.empty()) {
         return;
     }
     // read local config
     Json::Value localFileTagsJson;
     string file_tags_dir = GetFileTagsDir();
-    ParseConfResult userLogRes = ParseConfig(file_tags_dir, localFileTagsJson);
+    ParseConfResult userLogRes = ParseConfig(mFileTagsDir, localFileTagsJson);
     if (userLogRes != CONFIG_OK) {
         if (userLogRes == CONFIG_NOT_EXIST)
-            LOG_ERROR(sLogger, ("load file tags fail, file not exist", file_tags_dir));
+            LOG_ERROR(sLogger, ("load file tags fail, file not exist", mFileTagsDir));
         else if (userLogRes == CONFIG_INVALID_FORMAT) {
-            LOG_ERROR(sLogger, ("load file tags fail, file content is not valid json", file_tags_dir));
+            LOG_ERROR(sLogger, ("load file tags fail, file content is not valid json", mFileTagsDir));
         }
     } else {
         if (localFileTagsJson != mFileTagsJson) {
