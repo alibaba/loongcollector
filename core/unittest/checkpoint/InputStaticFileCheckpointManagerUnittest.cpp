@@ -341,7 +341,10 @@ void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     { ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml", std::ios_base::binary); }
     { ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json", std::ios_base::binary); }
     { ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json", std::ios_base::binary); }
-    { ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json", std::ios_base::binary); }
+    {
+        ofstream fout(sManager->mCheckpointRootPath / "test_config@18446744073709551614000.json",
+                      std::ios_base::binary);
+    }
     { ofstream fout(sManager->mCheckpointRootPath / "test_config@0.json", std::ios_base::binary); }
     { ofstream fout(sManager->mCheckpointRootPath / "test_config@1.json", std::ios_base::binary); }
     sManager->GetAllCheckpointFileNames();

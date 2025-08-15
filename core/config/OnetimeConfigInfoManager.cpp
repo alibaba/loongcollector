@@ -114,7 +114,9 @@ bool OnetimeConfigInfoManager::LoadCheckpointFile() {
     error_code ec;
     filesystem::file_status s = filesystem::status(mCheckpointFilePath, ec);
     if (ec) {
-        LOG_INFO(sLogger, ("failed to get checkpoint file status, filepath", mCheckpointFilePath.string())("error code", ec.value())("error msg", ec.message()));
+        LOG_INFO(sLogger,
+                 ("failed to get checkpoint file status, filepath",
+                  mCheckpointFilePath.string())("error code", ec.value())("error msg", ec.message()));
         return false;
     }
     if (!filesystem::exists(s)) {
