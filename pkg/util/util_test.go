@@ -107,8 +107,8 @@ func TestInitFromEnvString(t *testing.T) {
 
 	{
 		cleanupTestEnv()
-		os.Setenv("LOONG_TEST_ENV_KEY1", testValue1)
-		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
+		os.Setenv(testKey1, testValue1)
+		os.Setenv(testKey3, testValue3)
 
 		var result string
 		err := InitFromEnvString(testKey3, &result, defaultValue)
@@ -118,7 +118,7 @@ func TestInitFromEnvString(t *testing.T) {
 
 	{
 		cleanupTestEnv()
-		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
+		os.Setenv(testKey3, testValue3)
 
 		var result string
 		err := InitFromEnvString(testKey3, &result, defaultValue)
