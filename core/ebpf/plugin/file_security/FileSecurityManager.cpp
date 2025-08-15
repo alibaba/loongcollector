@@ -98,8 +98,9 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         EventPool* pool,
                                          RetryableEventCache& retryableEventCache)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
 
       mRetryableEventCache(retryableEventCache),
       mAggregateTree(
@@ -147,7 +148,7 @@ int FileSecurityManager::SendEvents() {
         }
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
             if (!hit) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
@@ -156,7 +157,7 @@ int FileSecurityManager::SendEvents() {
             auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& commonEvent : group->mInnerEvents) {
                 FileEvent* innerEvent = static_cast<FileEvent*>(commonEvent.get());
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 // attach process tags
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);

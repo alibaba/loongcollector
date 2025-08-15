@@ -147,7 +147,8 @@ EBPFServer::EBPFServer()
     : mEBPFAdapter(std::make_shared<EBPFAdapter>()),
       mHostIp(GetHostIp()),
       mHostName(GetHostName()),
-      mCommonEventQueue(8192) {
+      mCommonEventQueue(8192),
+      mEventPool(true) {
     mEnvMgr.InitEnvInfo();
 
     // read host path prefix
@@ -271,6 +272,10 @@ void EBPFServer::Stop() {
     mInited = false;
 }
 
+void EBPFServer::EventGC() {
+    mEventPool.CheckGC();
+}
+
 // maybe update or create
 bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
@@ -302,14 +307,16 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         switch (type) {
             case PluginType::PROCESS_SECURITY: {
                 if (!pluginMgr) {
-                    pluginMgr = ProcessSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    pluginMgr = ProcessSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
                 }
                 break;
             }
 
             case PluginType::NETWORK_OBSERVE: {
                 if (!pluginMgr) {
-                    auto mgr = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    auto mgr = NetworkObserverManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
                     mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize);
                     pluginMgr = mgr;
                 }
@@ -318,7 +325,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
             case PluginType::NETWORK_SECURITY: {
                 if (!pluginMgr) {
-                    auto mgr = NetworkSecurityManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue);
+                    auto mgr = NetworkSecurityManager::Create(
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
                     mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
                     pluginMgr = mgr;
                 }
@@ -328,7 +336,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
             case PluginType::FILE_SECURITY: {
                 if (!pluginMgr) {
                     auto mgr = FileSecurityManager::Create(
-                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, mRetryableEventCache);
+                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mRetryableEventCache);
                     mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
                     pluginMgr = mgr;
                 }

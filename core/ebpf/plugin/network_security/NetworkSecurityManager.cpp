@@ -107,8 +107,9 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 
 NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(base, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(base, eBPFAdapter, queue, pool),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -164,7 +165,7 @@ int NetworkSecurityManager::SendEvents() {
             return 0;
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
             if (!hit) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
@@ -180,7 +181,7 @@ int NetworkSecurityManager::SendEvents() {
             auto netnsSb = sourceBuffer->CopyString(std::to_string(group->mNetns));
 
             for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }

@@ -40,8 +40,9 @@
 namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -193,7 +194,7 @@ int ProcessSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         // convert to a item and push to process queue
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             // represent a process ...
             auto processCacheMgr = GetProcessCacheManager();
             if (processCacheMgr == nullptr) {
@@ -206,7 +207,7 @@ int ProcessSecurityManager::SendEvents() {
                 return;
             }
             for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }

@@ -25,6 +25,7 @@
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/CommonDataEvent.h"
+#include "models/EventPool.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
@@ -36,7 +37,8 @@ public:
     AbstractManager() = delete;
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                              const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue
+                             moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                             EventPool* pool
                              /*const PluginMetricManagerPtr& metricManager*/);
     virtual ~AbstractManager();
 
@@ -121,6 +123,8 @@ protected:
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& mCommonEventQueue;
+
+    EventPool* mEventPool = nullptr;
 };
 
 } // namespace logtail::ebpf

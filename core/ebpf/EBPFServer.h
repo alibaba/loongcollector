@@ -86,6 +86,8 @@ public:
 
     void Stop() override;
 
+    void EventGC() override;
+
     bool EnablePlugin(const std::string& pipelineName,
                       uint32_t pluginIndex,
                       PluginType type,
@@ -179,6 +181,8 @@ private:
     RetryableEventCache mRetryableEventCache;
     IntGaugePtr mRetryableEventCacheSize;
     int64_t mLastEventCacheRetryTime = 0;
+
+    EventPool mEventPool;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
