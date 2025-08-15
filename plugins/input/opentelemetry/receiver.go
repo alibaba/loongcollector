@@ -30,109 +30,135 @@ import (
 )
 
 // The following functions implement Opten telemetry GRPCServer Interface.
-type tracesReceiverFunc consumer.ConsumeTracesFunc
-type metricsReceiverFunc consumer.ConsumeMetricsFunc
-type logsReceiverFunc consumer.ConsumeLogsFunc
+var _ ptraceotlp.GRPCServer = (*tracesGRPCServer)(nil)
+var _ pmetricotlp.GRPCServer = (*metricsGRPCServer)(nil)
+var _ plogotlp.GRPCServer = (*logsGRPCServer)(nil)
 
-func newTracesReceiverV1(c pipeline.Collector) tracesReceiverFunc {
-	return func(ctx context.Context, td ptrace.Traces) error {
-		logs, err := opentelemetry.ConvertOtlpTraceV1(td)
-		if err != nil {
-			return err
-		}
-		for _, log := range logs {
-			c.AddRawLog(log)
-		}
-		return nil
+// The following functions implement Opten telemetry GRPCServer Interface.
+type tracesGRPCServer struct {
+	consumer.ConsumeTracesFunc
+	ptraceotlp.UnimplementedGRPCServer
+}
+type metricsGRPCServer struct {
+	consumer.ConsumeMetricsFunc
+	pmetricotlp.UnimplementedGRPCServer
+}
+type logsGRPCServer struct {
+	consumer.ConsumeLogsFunc
+	plogotlp.UnimplementedGRPCServer
+}
+
+func newTracesReceiverV1(c pipeline.Collector) ptraceotlp.GRPCServer {
+	return &tracesGRPCServer{
+		ConsumeTracesFunc: func(ctx context.Context, td ptrace.Traces) error {
+			logs, err := opentelemetry.ConvertOtlpTraceV1(td)
+			if err != nil {
+				return err
+			}
+			for _, log := range logs {
+				c.AddRawLog(log)
+			}
+			return nil
+		},
 	}
 }
 
-func newTracesReceiver(pctx pipeline.PipelineContext) tracesReceiverFunc {
-	return func(ctx context.Context, td ptrace.Traces) error {
-		groupEvents, err := opentelemetry.ConvertOtlpTracesToGroupEvents(td)
-		if err != nil {
-			return err
-		}
-		pctx.Collector().CollectList(groupEvents...)
-		return nil
+func newTracesReceiver(pctx pipeline.PipelineContext) ptraceotlp.GRPCServer {
+	return &tracesGRPCServer{
+		ConsumeTracesFunc: func(ctx context.Context, td ptrace.Traces) error {
+			groupEvents, err := opentelemetry.ConvertOtlpTracesToGroupEvents(td)
+			if err != nil {
+				return err
+			}
+			pctx.Collector().CollectList(groupEvents...)
+			return nil
+		},
 	}
 }
 
-func newMetricsReceiverV1(c pipeline.Collector) metricsReceiverFunc {
-	return func(ctx context.Context, md pmetric.Metrics) error {
-		logs, err := opentelemetry.ConvertOtlpMetricV1(md)
-		if err != nil {
-			return err
-		}
-		for _, log := range logs {
-			c.AddRawLog(log)
-		}
-		return nil
+func newMetricsReceiverV1(c pipeline.Collector) pmetricotlp.GRPCServer {
+	return &metricsGRPCServer{
+		ConsumeMetricsFunc: func(ctx context.Context, md pmetric.Metrics) error {
+			logs, err := opentelemetry.ConvertOtlpMetricV1(md)
+			if err != nil {
+				return err
+			}
+			for _, log := range logs {
+				c.AddRawLog(log)
+			}
+			return nil
+		},
 	}
 }
 
-func newMetricsReceiver(pctx pipeline.PipelineContext) metricsReceiverFunc {
-	return func(ctx context.Context, md pmetric.Metrics) error {
-		groupEvents, err := opentelemetry.ConvertOtlpMetricsToGroupEvents(md)
-		if err != nil {
-			return err
-		}
-		pctx.Collector().CollectList(groupEvents...)
-		return nil
+func newMetricsReceiver(pctx pipeline.PipelineContext) pmetricotlp.GRPCServer {
+	return &metricsGRPCServer{
+		ConsumeMetricsFunc: func(ctx context.Context, md pmetric.Metrics) error {
+			groupEvents, err := opentelemetry.ConvertOtlpMetricsToGroupEvents(md)
+			if err != nil {
+				return err
+			}
+			pctx.Collector().CollectList(groupEvents...)
+			return nil
+		},
 	}
 }
 
-func newLogsReceiverV1(c pipeline.Collector) logsReceiverFunc {
-	return func(ctx context.Context, ld plog.Logs) error {
-		logs, err := opentelemetry.ConvertOtlpLogV1(ld)
-		if err != nil {
-			return err
-		}
-		for _, log := range logs {
-			c.AddRawLog(log)
-		}
-		return nil
+func newLogsReceiverV1(c pipeline.Collector) plogotlp.GRPCServer {
+	return &logsGRPCServer{
+		ConsumeLogsFunc: func(ctx context.Context, ld plog.Logs) error {
+			logs, err := opentelemetry.ConvertOtlpLogV1(ld)
+			if err != nil {
+				return err
+			}
+			for _, log := range logs {
+				c.AddRawLog(log)
+			}
+			return nil
+		},
 	}
 }
 
-func newLogsReceiver(pctx pipeline.PipelineContext) logsReceiverFunc {
-	return func(ctx context.Context, ld plog.Logs) error {
-		groupEvents, err := opentelemetry.ConvertOtlpLogsToGroupEvents(ld)
-		if err != nil {
-			return err
-		}
-		pctx.Collector().CollectList(groupEvents...)
-		return nil
+func newLogsReceiver(pctx pipeline.PipelineContext) plogotlp.GRPCServer {
+	return &logsGRPCServer{
+		ConsumeLogsFunc: func(ctx context.Context, ld plog.Logs) error {
+			groupEvents, err := opentelemetry.ConvertOtlpLogsToGroupEvents(ld)
+			if err != nil {
+				return err
+			}
+			pctx.Collector().CollectList(groupEvents...)
+			return nil
+		},
 	}
 }
 
-func (f tracesReceiverFunc) Export(ctx context.Context, req ptraceotlp.ExportRequest) (ptraceotlp.ExportResponse, error) {
+func (f tracesGRPCServer) Export(ctx context.Context, req ptraceotlp.ExportRequest) (ptraceotlp.ExportResponse, error) {
 	td := req.Traces()
 	numSpans := td.SpanCount()
 	if numSpans == 0 {
 		return ptraceotlp.NewExportResponse(), nil
 	}
 
-	err := f(ctx, td)
+	err := f.ConsumeTracesFunc(ctx, td)
 	return ptraceotlp.NewExportResponse(), err
 }
 
-func (f metricsReceiverFunc) Export(ctx context.Context, req pmetricotlp.ExportRequest) (pmetricotlp.ExportResponse, error) {
+func (f metricsGRPCServer) Export(ctx context.Context, req pmetricotlp.ExportRequest) (pmetricotlp.ExportResponse, error) {
 	md := req.Metrics()
 	numMetrics := md.MetricCount()
 	if numMetrics == 0 {
 		return pmetricotlp.NewExportResponse(), nil
 	}
-	err := f(ctx, md)
+	err := f.ConsumeMetricsFunc(ctx, md)
 	return pmetricotlp.NewExportResponse(), err
 }
 
-func (f logsReceiverFunc) Export(ctx context.Context, req plogotlp.ExportRequest) (plogotlp.ExportResponse, error) {
+func (f logsGRPCServer) Export(ctx context.Context, req plogotlp.ExportRequest) (plogotlp.ExportResponse, error) {
 	ld := req.Logs()
 	numLogs := ld.LogRecordCount()
 	if numLogs == 0 {
 		return plogotlp.NewExportResponse(), nil
 	}
-	err := f(ctx, ld)
+	err := f.ConsumeLogsFunc(ctx, ld)
 	return plogotlp.NewExportResponse(), err
 }
