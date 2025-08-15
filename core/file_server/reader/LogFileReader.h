@@ -24,7 +24,6 @@
 #include <utility>
 #include <vector>
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
@@ -38,6 +37,7 @@
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 #include "file_server/event/Event.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "logger/Logger.h"
@@ -379,6 +379,10 @@ public:
     //                       std::vector<StringView>& discardIndex);
 
     bool IsFromCheckPoint() { return mLastFileSignatureHash != 0 && mLastFileSignatureSize > (size_t)0; }
+
+    std::pair<uint64_t, uint32_t> GetSignature() const {
+        return std::make_pair(mLastFileSignatureHash, mLastFileSignatureSize);
+    }
 
     // void SetDelayAlarmBytes(int64_t value) { mReadDelayAlarmBytes = value; }
 

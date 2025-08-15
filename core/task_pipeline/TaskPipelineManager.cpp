@@ -49,7 +49,9 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
                  ("task building for existing config succeeded",
                   "stop the old task and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+        // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one should
+        // be considered as deleted
+        iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
         mPipelineNameEntityMap[config.mName] = std::move(p);
         mPipelineNameEntityMap[config.mName]->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,

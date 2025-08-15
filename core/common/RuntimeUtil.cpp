@@ -38,8 +38,6 @@ DECLARE_FLAG_BOOL(logtail_mode);
 
 namespace logtail {
 
-// TODO: In ConfigManager.cpp, some places use / to concat path, which might fail on Windows,
-// replace them with PATH_SEPARATOR.
 std::string GetProcessExecutionDir(void) {
 #if defined(__ANDROID__)
     // In Android, runtime configuration files cannot be stored in the same directory as the executable
@@ -48,14 +46,14 @@ std::string GetProcessExecutionDir(void) {
     char exePath[PATH_MAX + 1] = "";
     readlink("/proc/self/exe", exePath, sizeof(exePath));
     std::string fullPath(exePath);
-    size_t index = fullPath.rfind(PATH_SEPARATOR);
+    size_t index = fullPath.rfind('/');
     if (index == std::string::npos) {
         return "";
     }
     return fullPath.substr(0, index + 1);
 #elif defined(_MSC_VER)
     auto fullPath = GetBinaryName();
-    auto index = fullPath.rfind(PATH_SEPARATOR);
+    auto index = fullPath.rfind('\\');
     return (std::string::npos == index) ? "" : fullPath.substr(0, index + 1);
 #endif
 }
