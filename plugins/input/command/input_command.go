@@ -72,7 +72,8 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 
 	// Parse Base64 content
 	if in.ContentEncoding == ContentTypeBase64 {
-		decodeContent, err := base64.StdEncoding.DecodeString(in.ScriptContent)
+		var decodeContent []byte
+		decodeContent, err = base64.StdEncoding.DecodeString(in.ScriptContent)
 		if err != nil {
 			return 0, fmt.Errorf("base64.StdEncoding error:%s", err)
 		}
