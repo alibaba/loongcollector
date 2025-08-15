@@ -120,12 +120,14 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 			// no match error
 			if parseResult == matchFail && p.NoMatchError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "all match fail", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "all match fail",
+					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
 			// tome out error
 			if parseResult == matchTimeOut && p.TimeoutError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "match time out", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "match time out",
+					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
 			// keep source
@@ -137,7 +139,8 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 	// no key err
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "anchor cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "anchor cannot find key",
+			"source_key", p.SourceKey)
 	}
 }
 

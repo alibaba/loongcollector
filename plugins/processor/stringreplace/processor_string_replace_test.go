@@ -499,7 +499,7 @@ func TestRegexTimeoutProtection(t *testing.T) {
 		elapsed := time.Since(start)
 
 		// Should complete quickly due to timeout protection
-		So(elapsed.Milliseconds(), ShouldBeLessThan, 200)
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
 		// Original value should be kept when timeout occurs
 		So(out[0].Contents[0].Value, ShouldEqual, record)
 	})

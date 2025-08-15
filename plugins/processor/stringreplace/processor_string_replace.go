@@ -123,7 +123,8 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 				newContVal = cont.Value
 			}
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_STRING_REPLACE_ALARM", "process log error", err)
+				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_STRING_REPLACE_ALARM", "error", err,
+					"method", p.Method, "source_key", cont.Key, "content", cont.Value)
 				newContVal = cont.Value
 			}
 			if len(p.DestKey) > 0 {

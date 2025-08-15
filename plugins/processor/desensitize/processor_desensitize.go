@@ -163,7 +163,8 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 	beginMatch, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	for beginMatch != nil {
 		if time.Now().After(deadline) {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_DESENSITIZE_ALARM", "desensitize total timeout exceeded")
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_DESENSITIZE_ALARM", "error", "desensitize total timeout exceeded",
+				"source_key", p.SourceKey, "content", val)
 			break
 		}
 		pos = beginMatch.Index + beginMatch.Length

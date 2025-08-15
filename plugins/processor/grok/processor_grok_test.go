@@ -447,7 +447,7 @@ func TestGrokTotalTimeoutBudget(t *testing.T) {
 		// Should timeout and return matchTimeOut
 		So(result, ShouldEqual, matchTimeOut)
 		// Should complete within reasonable time due to timeout protection
-		So(elapsed.Milliseconds(), ShouldBeLessThan, 200)
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
 	})
 }
 

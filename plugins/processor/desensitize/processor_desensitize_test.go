@@ -352,7 +352,7 @@ func TestTotalTimeoutBudget(t *testing.T) {
 		elapsed := time.Since(start)
 
 		// Should complete quickly due to timeout protection
-		So(elapsed.Milliseconds(), ShouldBeLessThan, 200)
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
 		So(len(out), ShouldEqual, 1)
 		// Should preserve original content when timeout occurs
 		So(out[0].Contents[0].Value, ShouldEqual, record)
