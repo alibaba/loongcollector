@@ -228,9 +228,8 @@ func GetMetaManagerMetrics() []map[string]string {
 		},
 	}
 
-	return []map[string]string{
-		manager.metricRecord.ExportMetricRecords(),
-	}
+	return manager.metricRecord.ExportMetricRecords()
+
 }
 
 func (m *MetaManager) runServer() {
