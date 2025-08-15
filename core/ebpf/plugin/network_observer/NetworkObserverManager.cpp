@@ -16,6 +16,10 @@
 
 #include <cstdint>
 
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
@@ -179,7 +183,7 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               base->mSum += other->GetLatencySeconds();
           },
           [this](L7Record* in, std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<AppMetricData> {
-              auto spanName = sourceBuffer->CopyString(in->GetSpanName());
+              auto spanName = sourceBuffer->CopyString(in->GetConvSpanName());
               auto connection = in->GetConnection();
               if (!connection) {
                   LOG_WARNING(sLogger, ("connection is null", ""));
@@ -211,6 +215,9 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
 
                   auto serviceId = sourceBuffer->CopyString(appConfig->mServiceId);
                   data->mTags.SetNoCopy<kArmsServiceId>(StringView(serviceId.data, serviceId.size));
+
+                  auto language = sourceBuffer->CopyString(appConfig->mLanguage);
+                  data->mTags.SetNoCopy<kLanguage>(StringView(language.data, language.size));
               }
 
               auto workloadKind = sourceBuffer->CopyString(ctAttrs.Get<kWorkloadKind>());
@@ -231,8 +238,8 @@ NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCach
               auto mDestId = sourceBuffer->CopyString(ctAttrs.Get<kDestId>());
               data->mTags.SetNoCopy<kDestId>(StringView(mDestId.data, mDestId.size));
 
-              auto endpoint = sourceBuffer->CopyString(ctAttrs.Get<kEndpoint>());
-              data->mTags.SetNoCopy<kEndpoint>(StringView(endpoint.data, endpoint.size));
+              //   auto endpoint = sourceBuffer->CopyString(ctAttrs.Get<kEndpoint>());
+              //   data->mTags.SetNoCopy<kEndpoint>(StringView(endpoint.data, endpoint.size));
 
               auto ns = sourceBuffer->CopyString(ctAttrs.Get<kNamespace>());
               data->mTags.SetNoCopy<kNamespace>(StringView(ns.data, ns.size));
@@ -394,27 +401,33 @@ NetworkObserverManager::generateAggKeyForAppMetric(L7Record* record,
         return {};
     }
 
+    constexpr uint32_t destIdIdx = kConnTrackerTable.ColIndex(kDestId.Name());
+
     static constexpr std::array<uint32_t, 4> kIdxes0 = {kHostNameIndex, kHostIpIndex};
     static constexpr std::array<uint32_t, 9> kIdxes1 = {kWorkloadKindIndex,
                                                         kWorkloadNameIndex,
                                                         kConnTrackerTable.ColIndex(kProtocol.Name()),
                                                         kConnTrackerTable.ColIndex(kDestId.Name()),
-                                                        kConnTrackerTable.ColIndex(kEndpoint.Name()),
+                                                        // kConnTrackerTable.ColIndex(kEndpoint.Name()),
                                                         kConnTrackerTable.ColIndex(kCallType.Name()),
                                                         kConnTrackerTable.ColIndex(kRpcType.Name()),
                                                         kConnTrackerTable.ColIndex(kCallKind.Name())};
 
     const auto& ctAttrs = connection->GetConnTrackerAttrs();
+    bool isServer = connection->IsServer();
     for (const auto x : kIdxes0) {
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[0], hasher(attr));
     }
     AttrHashCombine(result[0], appInfo->mAppHash);
     for (const auto x : kIdxes1) {
+        if (isServer && x == destIdIdx) {
+            continue;
+        }
         std::string_view attr(ctAttrs[x].data(), ctAttrs[x].size());
         AttrHashCombine(result[1], hasher(attr));
     }
-    std::string_view rpc(record->GetSpanName());
+    std::string_view rpc(record->GetConvSpanName());
     AttrHashCombine(result[1], hasher(rpc));
 
     return result;
@@ -675,6 +688,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.MetricKey(), appInfo->mAppName);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.MetricKey(), appInfo->mWorkspace);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
+                COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod name
                 init = true;
@@ -835,6 +849,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.MetricKey(), appInfo->mAppName);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.MetricKey(), appInfo->mWorkspace);
                 COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.MetricKey(), appInfo->mServiceId);
+                COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
                 eventGroup.SetTagNoCopy(kIp.MetricKey(), group->mTags.Get<kIp>()); // pod ip
                 eventGroup.SetTagNoCopy(kHostName.MetricKey(), group->mTags.Get<kHostName>()); // pod ip
 
@@ -934,7 +949,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 metricsEvent->SetTagNoCopy(kRpcType.MetricKey(), group->mTags.Get<kRpcType>());
                 metricsEvent->SetTagNoCopy(kCallType.MetricKey(), group->mTags.Get<kCallType>());
                 metricsEvent->SetTagNoCopy(kCallKind.MetricKey(), group->mTags.Get<kCallKind>());
-                metricsEvent->SetTagNoCopy(kEndpoint.MetricKey(), group->mTags.Get<kEndpoint>());
+                metricsEvent->SetTagNoCopy(kEndpoint.MetricKey(), group->mTags.Get<kRpc>());
                 metricsEvent->SetTagNoCopy(kDestId.MetricKey(), group->mTags.Get<kDestId>());
             }
         });
@@ -1019,6 +1034,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kAppName.SpanKey(), appInfo->mAppName);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kWorkspace.SpanKey(), appInfo->mWorkspace);
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kArmsServiceId.SpanKey(), appInfo->mServiceId);
+                    COPY_AND_SET_TAG(eventGroup, sourceBuffer, kLanguage.MetricKey(), appInfo->mLanguage);
+                    // containerid ...
 
                     COPY_AND_SET_TAG(eventGroup, sourceBuffer, kHostIp.SpanKey(), ctAttrs.Get<kIp>()); // pod ip
                     COPY_AND_SET_TAG(
@@ -1058,6 +1075,10 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
                 spanEvent->SetName(record->GetSpanName());
                 auto* httpRecord = static_cast<HttpRecord*>(record);
+                spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetConvSpanName());
+                if (!ct->IsServer()) {
+                    spanEvent->SetTag(kEndpoint.SpanKey(), httpRecord->GetConvSpanName());
+                }
                 spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
                 spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
                 spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
@@ -1133,6 +1154,7 @@ int NetworkObserverManager::Init() {
     mConnectionManager->UpdateMaxConnectionThreshold(INT32_FLAG(ebpf_networkobserver_max_connections));
 
     mCidOffset = GuessContainerIdOffset();
+    mConvergerManager = std::make_shared<AppConvergerManager>();
 
     const char* value = getenv("_cluster_id_");
     if (value != nullptr) {
@@ -1264,6 +1286,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     newConfig->mQueueKey = ctx->GetProcessQueueKey();
     newConfig->mPluginIndex = index;
     newConfig->mConfigName = ctx->GetConfigName();
+    mConvergerManager->RegisterApp(newConfig);
 
     WriteLock lk(mAppConfigLock);
     std::vector<std::string> expiredCids;
@@ -1368,6 +1391,7 @@ int NetworkObserverManager::RemoveConfig(const std::string& configName) {
     // clear related workloads
     for (auto key : configIt->second) {
         if (auto wIt = mWorkloadConfigs.find(key); wIt != mWorkloadConfigs.end()) {
+            mConvergerManager->DeregisterApp(wIt->second.config); // deregister app
             for (const auto& cid : wIt->second.containerIds) {
                 expiredCids.push_back(cid);
                 // clean up container configs ...
@@ -1583,7 +1607,7 @@ void NetworkObserverManager::AcceptDataEvent(struct conn_data_event_t* event) {
     }
 
     std::vector<std::shared_ptr<L7Record>> records
-        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail);
+        = ProtocolParserManager::GetInstance().Parse(protocol, conn, event, appDetail, mConvergerManager);
 
     if (records.empty()) {
         return;
@@ -1653,8 +1677,24 @@ const static std::string kAgentInfoAppIdKey = "pid";
 const static std::string kAgentInfoIpKey = "ip";
 const static std::string kAgentInfoHostnameKey = "hostname";
 const static std::string kAgentInfoAppnameKey = "appName";
+const static std::string kAgentInfoLanguageKey = "language";
 const static std::string kAgentInfoAgentVersionKey = "agentVersion";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
+const static std::string kAgentInfoTimestampKey = "timestamp";
+const static std::string kAgentInfoServiceIdKey = "acs_arms_service_id";
+const static std::string kAgentInfoWorkspaceKey = "acs_cms_workspace";
+const static std::string kAgentInfoPropertiesKey = "properties";
+
+const static std::string kAgentInfoPropertiesValueClusterId = "k8s.cluster.uid";
+const static std::string kAgentInfoPropertiesValueClusterName = "k8s.cluster.name";
+const static std::string kAgentInfoPropertiesValueNamespace = "k8s.namespace.name";
+const static std::string kAgentInfoPropertiesValueWorkloadKind = "k8s.workload.kind";
+const static std::string kAgentInfoPropertiesValueWorkloadName = "k8s.workload.name";
+const static std::string kAgentInfoPropertiesValuePodName = "k8s.pod.name";
+const static std::string kAgentInfoPropertiesValueEcsId = "acs.ecs.instance.id";
+const static std::string kAgentInfoPropertiesValueInstanceId = "instanceId";
+const static std::string kAgentInfoPropertiesValueRegionId = "regionId";
+const static std::string kAgentInfoPropertiesValueEcsMeta = "acs.ecs.metadata";
 
 void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
                                                  PipelineEventGroup&& eventGroup,
@@ -1689,78 +1729,157 @@ void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
     }
 }
 
+bool NetworkObserverManager::reportAgentInfo(const time_t& now,
+                                             std::shared_ptr<SourceBuffer>& sourceBuffer,
+                                             size_t workloadKey,
+                                             const WorkloadConfig& workloadConfig) {
+    const auto& appConfig = workloadConfig.config;
+    if (appConfig == nullptr) {
+        LOG_DEBUG(sLogger,
+                  ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
+        return false;
+    }
+    PipelineEventGroup eventGroup(sourceBuffer);
+    eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
+    if (workloadKey == kGlobalWorkloadKey) {
+        // instance level ...
+        auto* event = eventGroup.AddLogEvent();
+        event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+        event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+        event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+        if (Connection::gSelfPodIp.empty()) {
+            event->SetContent(kAgentInfoIpKey, GetHostIp());
+        } else {
+            event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
+        }
+
+        if (Connection::gSelfPodName.empty()) {
+            event->SetContent(kAgentInfoHostnameKey, GetHostName());
+        } else {
+            event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
+        }
+        event->SetTimestamp(now, 0);
+    } else {
+        if (!K8sMetadata::GetInstance().Enable()) {
+            return false;
+        }
+
+        for (const auto& containerId : workloadConfig.containerIds) {
+            // generate for k8s ---- POD Level
+            auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
+            if (podMeta == nullptr) {
+                LOG_DEBUG(sLogger, ("[AgentInfo] failed to fetch containerId", containerId));
+                continue;
+            }
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate for cid", containerId)("podName", podMeta->mPodName));
+
+            auto* event = eventGroup.AddLogEvent();
+            event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+            event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
+            event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
+            event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
+            event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
+            event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+            event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
+            event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+            event->SetContent(kPodName.LogKey(), podMeta->mPodName);
+            event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mStartTime * 1000));
+
+            event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
+            rapidjson::Document doc;
+            doc.SetObject();
+
+            rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
+
+            // add k8s meta
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueClusterId.data()),
+                          rapidjson::Value().SetString(mClusterId.c_str(), allocator),
+                          allocator);
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueNamespace.data()),
+                          rapidjson::Value().SetString(podMeta->mNamespace.c_str(), allocator),
+                          allocator);
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueWorkloadKind.data()),
+                          rapidjson::Value().SetString(podMeta->mWorkloadKind.c_str(), allocator),
+                          allocator);
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueWorkloadName.data()),
+                          rapidjson::Value().SetString(podMeta->mWorkloadName.c_str(), allocator),
+                          allocator);
+
+            // add pod meta
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValuePodName.data()),
+                          rapidjson::Value().SetString(podMeta->mPodName.c_str(), allocator),
+                          allocator);
+
+
+            // add ECS meta
+            const auto* entity = InstanceIdentity::Instance()->GetEntity();
+            if (entity != nullptr) {
+                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueEcsId.data()),
+                              rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
+                              allocator);
+                rapidjson::Value ecsMetadata(rapidjson::kObjectType);
+                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueInstanceId.data()),
+                                      rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
+                                      allocator);
+                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueRegionId.data()),
+                                      rapidjson::Value().SetString(entity->GetEcsRegionID().data(), allocator),
+                                      allocator);
+                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueEcsMeta.data()), ecsMetadata, allocator);
+            }
+
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            doc.Accept(writer);
+
+            event->SetContent(kAgentInfoPropertiesKey, std::string(buffer.GetString(), buffer.GetLength()));
+            event->SetTimestamp(now, 0);
+        }
+    }
+#ifdef APSARA_UNIT_TEST_MAIN
+    mAgentInfoEventGroups.emplace_back(std::move(eventGroup));
+    return true;
+#endif
+    pushEventsWithRetry(EventDataType::AGENT_INFO,
+                        std::move(eventGroup),
+                        appConfig->mConfigName,
+                        appConfig->mQueueKey,
+                        appConfig->mPluginIndex,
+                        appConfig->mPushLogsTotal,
+                        appConfig->mPushLogGroupTotal);
+    return true;
+}
+
 void NetworkObserverManager::ReportAgentInfo() {
+    std::unordered_map<std::string, std::set<size_t>> configToWorkloadsReplica;
+    std::unordered_map<size_t, WorkloadConfig> workloadConfigsReplica;
+    {
+        ReadLock lk(mAppConfigLock);
+        configToWorkloadsReplica = mConfigToWorkloads;
+        workloadConfigsReplica = mWorkloadConfigs;
+    }
     int cnt = 0;
     const time_t now = time(nullptr);
-    for (const auto& configToWorkload : mConfigToWorkloads) {
+    for (const auto& configToWorkload : configToWorkloadsReplica) {
         const auto& workloadKeys = configToWorkload.second;
         auto sourceBuffer = std::make_shared<SourceBuffer>();
+        const auto& itGlobal = workloadConfigsReplica.find(kGlobalWorkloadKey);
+        if (itGlobal != workloadConfigsReplica.end()) {
+            cnt += reportAgentInfo(now, sourceBuffer, kGlobalWorkloadKey, itGlobal->second);
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate agentinfo for globalKey, res", cnt));
+        }
+
         for (const auto& workloadKey : workloadKeys) {
-            const auto& it = mWorkloadConfigs.find(kGlobalWorkloadKey);
-            if (it == mWorkloadConfigs.end()) {
-                LOG_DEBUG(sLogger, ("[AgentInfo] failed to find workloadKey from mWorkloadConfigs", workloadKey));
-                continue;
-            }
-            auto& workloadConfig = it->second;
-            auto& appConfig = workloadConfig.config;
-            if (appConfig == nullptr) {
-                LOG_DEBUG(sLogger,
-                          ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
-                continue;
-            }
-            PipelineEventGroup eventGroup(sourceBuffer);
-            eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
             if (workloadKey == kGlobalWorkloadKey) {
-                // instance level ...
-                auto* event = eventGroup.AddLogEvent();
-                event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
-                event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
-                event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-                if (Connection::gSelfPodIp.empty()) {
-                    event->SetContent(kAgentInfoIpKey, GetHostIp());
-                } else {
-                    event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
-                }
-
-                if (Connection::gSelfPodName.empty()) {
-                    event->SetContent(kAgentInfoHostnameKey, GetHostName());
-                } else {
-                    event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
-                }
-                event->SetTimestamp(now, 0);
-                cnt++;
-            } else {
-                if (!K8sMetadata::GetInstance().Enable()) {
-                    continue;
-                }
-
-                for (const auto& containerId : workloadConfig.containerIds) {
-                    // generate for k8s ---- POD Level
-                    auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
-                    if (podMeta == nullptr) {
-                        LOG_DEBUG(sLogger, ("[AgentInfo] failed to fetch containerId", containerId));
-                        continue;
-                    }
-
-                    auto* event = eventGroup.AddLogEvent();
-                    event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
-                    event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
-                    event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
-                    event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
-                    event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-                    event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mTimestamp));
-                    event->SetTimestamp(now, 0);
-                    cnt++;
-                }
+                continue;
             }
+            LOG_DEBUG(sLogger, ("[AgentInfo] generate agentinfo for workloadKey", workloadKey));
 
-            pushEventsWithRetry(EventDataType::AGENT_INFO,
-                                std::move(eventGroup),
-                                appConfig->mConfigName,
-                                appConfig->mQueueKey,
-                                appConfig->mPluginIndex,
-                                appConfig->mPushLogsTotal,
-                                appConfig->mPushLogGroupTotal);
+            const auto& it = workloadConfigsReplica.find(workloadKey);
+            if (it != workloadConfigsReplica.end()) {
+                cnt += reportAgentInfo(now, sourceBuffer, workloadKey, it->second);
+            } else {
+                LOG_DEBUG(sLogger, ("[AgentInfo] failed to find workloadKey", workloadKey));
+            }
         }
     }
 

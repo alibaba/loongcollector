@@ -59,6 +59,7 @@ public:
     [[nodiscard]] double GetLatencySeconds() const { return (mEndTs - mStartTs) / 1e9; }
 
     [[nodiscard]] virtual const std::string& GetSpanName() = 0;
+    [[nodiscard]] virtual const std::string& GetConvSpanName() = 0;
     [[nodiscard]] virtual bool IsError() const = 0;
     [[nodiscard]] virtual bool IsSlow() const = 0;
     [[nodiscard]] virtual int GetStatusCode() const = 0;
@@ -86,8 +87,10 @@ public:
     [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
     void SetStatusCode(int code) { mCode = code; }
     [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
-    [[nodiscard]] virtual const std::string& GetSpanName() { return mPath; }
-
+    // 2025-08-07 spanName use real path ...
+    // metric use path
+    [[nodiscard]] virtual const std::string& GetSpanName() { return mRealPath; }
+    [[nodiscard]] virtual const std::string& GetConvSpanName() { return mPath; }
     const std::string& GetReqBody() const { return mReqBody; }
     const std::string& GetRespBody() const { return mRespBody; }
     std::string GetRespMsg() const { return mRespMsg; }

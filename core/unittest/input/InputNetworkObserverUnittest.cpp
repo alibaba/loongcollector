@@ -96,11 +96,12 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
                     "AppName": "prod-app",
                     "AppId": "xxx@xxx",
                     "ServiceId": "aaa@xxx",
+                    "Language": "php"
                 },
                 "WorkloadSelectors": [
                     {
                         "WorkloadName": "default-workload-name",
-                        "WorkloadKind": "default-workload-kind",
+                        "WorkloadKind": "default-Workload-kInd",
                         "Namespace": "default-ns"
                     },
                 ]
@@ -127,6 +128,7 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
 
 
     APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 1);
@@ -160,6 +162,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
                     "AppName": "prod-app",
                     "AppId": "xxx@xxx",
                     "ServiceId": "aaa@xxx",
+                    "Language": "php"
                 },
                 "WorkloadSelectors": [
                     {
@@ -191,6 +194,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
 
     APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 1);
     APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mNamespace, "default-ns");
@@ -217,6 +221,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
                     "AppName": "prod-app",
                     "AppId": "xxx@xxx",
                     "ServiceId": "aaa@xxx",
+                    "Language": "php"
                 }  
             }
         }
@@ -240,6 +245,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
     APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
 
     APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 0);
 
@@ -262,6 +268,7 @@ void InputNetworkObserverUnittest::OnFailedInit() {
                 "AppName": "prod-app",
                 "AppId": "xxx@xxx",
                 "ServiceId": "aaa@xxx",
+                "Language": "php"
             },
             "WorkloadSelectors": [
                 {
@@ -303,6 +310,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
                     "AppName": "prod-app",
                     "AppId": "xxx@xxx",
                     "ServiceId": "aaa@xxx",
+                    "Language": "php"
                 },
                 "WorkloadSelectors": [
                     {
@@ -349,6 +357,7 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
                     "AppName": "prod-app",
                     "AppId": "xxx@xxx",
                     "ServiceId": "aaa@xxx",
+                    "Language": "php"
                 },
                 "WorkloadSelectors": [
                     {
@@ -381,7 +390,8 @@ void InputNetworkObserverUnittest::TestSaeConfig() {
                     "AppId": "76fe228e-2c2e-4363-9f08-dcc412502062",
                     "AppName": "zizhao-ebpf-test",
                     "ServiceId": "hc4fs1hkb3@71ec1c84e2ca4cc069064",
-                    "Workspace": "default-cms-1760720386195983-cn-beijing"
+                    "Workspace": "default-cms-1760720386195983-cn-beijing",
+                    "Language": "php"
                 },
                 "L4Config": {
                     "Enable": true

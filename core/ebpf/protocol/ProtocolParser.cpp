@@ -21,6 +21,7 @@
 
 #include "common/magic_enum.hpp"
 #include "ebpf/plugin/network_observer/Connection.h"
+#include "ebpf/util/Converger.h"
 #include "logger/Logger.h"
 
 extern "C" {
@@ -88,13 +89,15 @@ bool ProtocolParserManager::RemoveParser(support_proto_e type) {
 }
 
 
-std::vector<std::shared_ptr<L7Record>> ProtocolParserManager::Parse(support_proto_e type,
-                                                                    const std::shared_ptr<Connection>& conn,
-                                                                    struct conn_data_event_t* data,
-                                                                    const std::shared_ptr<AppDetail>& appDetail) {
+std::vector<std::shared_ptr<L7Record>>
+ProtocolParserManager::Parse(support_proto_e type,
+                             const std::shared_ptr<Connection>& conn,
+                             struct conn_data_event_t* data,
+                             const std::shared_ptr<AppDetail>& appDetail,
+                             const std::shared_ptr<AppConvergerManager>& converger) {
     ReadLock lock(mLock);
     if (mParsers.find(type) != mParsers.end()) {
-        return mParsers[type]->Parse(data, conn, appDetail);
+        return mParsers[type]->Parse(data, conn, appDetail, converger);
     }
 
     LOG_ERROR(sLogger, ("No parser found for given protocol type", std::string(magic_enum::enum_name(type))));
