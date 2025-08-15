@@ -54,7 +54,6 @@ require (
 	github.com/streadway/handy v0.0.0-20230327021402-6a47ec586270
 	github.com/stretchr/testify v1.8.4
 	github.com/syndtr/goleveldb v0.0.0-20170725064836-b89cc31ef797
-	github.com/xdg-go/scram v1.1.2
 	go.opentelemetry.io/collector/consumer v0.66.0
 	go.opentelemetry.io/collector/pdata v0.66.0
 	go.opentelemetry.io/proto/otlp v0.19.0
@@ -239,6 +238,7 @@ require (
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
 	github.com/vishvananda/netns v0.0.0-20210104183010-2eb08e3e575f // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
+	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
