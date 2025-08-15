@@ -96,7 +96,7 @@ void MemCollectorUnittest::TestGetHostSystemMeminfoStat() const {
     auto collector = MemCollector();
     MemoryInformation memInfoStat;
 
-    APSARA_TEST_TRUE(collector.GetHostMeminfoStat(memInfoStat));
+    APSARA_TEST_TRUE(SystemInterface::GetInstance()->GetHostMemInformationStat(time(nullptr), memInfoStat));
     APSARA_TEST_EQUAL_FATAL((int64_t)31534908 * 1024, (int64_t)memInfoStat.memStat.total);
     APSARA_TEST_EQUAL_FATAL((int64_t)13226912 * 1024, (int64_t)memInfoStat.memStat.free);
     APSARA_TEST_EQUAL_FATAL((int64_t)28771376 * 1024, (int64_t)memInfoStat.memStat.available);
@@ -113,11 +113,12 @@ void MemCollectorUnittest::TestGetHostSystemMeminfoStat() const {
 void MemCollectorUnittest::TestCollect() const {
     auto collector = MemCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(MemCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectContext collectContext("test", MemCollector::sName, 0, 0, std::chrono::seconds(1));
+    collectContext.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
     APSARA_TEST_EQUAL_FATAL(1UL, group.GetEvents().size());
 
     double total = 31534908.0;

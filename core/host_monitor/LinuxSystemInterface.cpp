@@ -404,7 +404,6 @@ bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInf
             break;
         }
     }
-    systemInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -446,7 +445,6 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
             cpuInfo.stats.push_back(cpuStat);
         }
     }
-    cpuInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -477,7 +475,6 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
             }
         }
     }
-    processListInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -489,7 +486,6 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
         return false;
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
-    processInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -862,6 +858,11 @@ bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& dis
                 LOG_ERROR(sLogger, ("failed to parse number in diskstats", diskLine));
                 return false;
             }
+            std::cout << "diskStat.major " << diskStat.major << " diskStat.minor " << diskStat.minor
+                      << " diskStat.reads " << diskStat.reads << " diskStat.readBytes " << diskStat.readBytes
+                      << " diskStat.rTime " << diskStat.rTime << " diskStat.writes " << diskStat.writes
+                      << " diskStat.writeBytes " << diskStat.writeBytes << " diskStat.wTime " << diskStat.wTime
+                      << " diskStat.qTime " << diskStat.qTime << " diskStat.time " << diskStat.time << std::endl;
             diskStateInfo.diskStats.push_back(diskStat);
         }
     }

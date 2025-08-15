@@ -121,17 +121,19 @@ void ProcessCollectorUnittest::TestGetHostPidStat() const {
     auto collector = ProcessCollector();
     pid_t pid = 12345;
     ProcessAllStat stat;
-    APSARA_TEST_TRUE(collector.GetProcessAllStat(pid, stat));
+    HostMonitorTimerEvent::CollectTime collectTime{std::chrono::steady_clock::now(), time(nullptr)};
+    APSARA_TEST_TRUE(collector.GetProcessAllStat(collectTime, pid, stat));
 }
 
 void ProcessCollectorUnittest::TestCollect() const {
     auto collector = ProcessCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectContext collectContext(
+        "test", ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
 
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
 
     vector<string> expectedVMProcessNames = {
         "vm_process_min",
