@@ -22,21 +22,21 @@ import (
 )
 
 const (
-	TEST_KEY1 = "LOONG_TEST_ENV_KEY1"
-	TEST_KEY2 = "ALIYUN_TEST_ENV_KEY1"
-	TEST_KEY3 = "ALICLOUD_TEST_ENV_KEY1"
+	testKey1 = "LOONG_TEST_ENV_KEY1"
+	testKey2 = "ALIYUN_TEST_ENV_KEY1"
+	testKey3 = "ALICLOUD_TEST_ENV_KEY1"
 
-	TEST_VALUE1 = "loong_test_value_1"
-	TEST_VALUE2 = "aliyun_test_value_1"
-	TEST_VALUE3 = "alicloud_test_value_1"
+	testValue1 = "loong_test_value_1"
+	testValue2 = "aliyun_test_value_1"
+	testValue3 = "alicloud_test_value_1"
 
 	DEFAULT_VALUE = "default_value"
 )
 
 func cleanupTestEnv() {
-	os.Unsetenv(TEST_KEY1)
-	os.Unsetenv(TEST_KEY2)
-	os.Unsetenv(TEST_KEY3)
+	os.Unsetenv(testKey1)
+	os.Unsetenv(testKey2)
+	os.Unsetenv(testKey3)
 }
 
 func Test(t *testing.T) {
@@ -54,84 +54,84 @@ func Test(t *testing.T) {
 func TestGetEnvTags(t *testing.T) {
 	{
 		cleanupTestEnv()
-		os.Setenv(TEST_KEY1, TEST_VALUE1)
+		os.Setenv(testKey1, testValue1)
 
-		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
-		assert.Equal(t, TEST_VALUE1, result)
+		result := GetEnvTags(testKey1, testKey2)
+		assert.Equal(t, testValue1, result)
 	}
 
 	{
 		cleanupTestEnv()
-		os.Setenv(TEST_KEY2, TEST_VALUE2)
+		os.Setenv(testKey2, testValue2)
 
-		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
-		assert.Equal(t, TEST_VALUE2, result)
+		result := GetEnvTags(testKey1, testKey2)
+		assert.Equal(t, testValue2, result)
 	}
 
 	{
 		cleanupTestEnv()
 
-		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
+		result := GetEnvTags(testKey1, testKey2)
 		assert.Equal(t, "", result)
 	}
 
 	{
 		cleanupTestEnv()
-		os.Setenv(TEST_KEY1, TEST_VALUE1)
-		os.Setenv(TEST_KEY2, TEST_VALUE2)
+		os.Setenv(testKey1, testValue1)
+		os.Setenv(testKey2, testValue2)
 
-		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
-		assert.Equal(t, TEST_VALUE1, result)
+		result := GetEnvTags(testKey1, testKey2)
+		assert.Equal(t, testValue1, result)
 	}
 }
 
 func TestInitFromEnvString(t *testing.T) {
 	{
 		cleanupTestEnv()
-		os.Setenv(TEST_KEY1, TEST_VALUE1)
+		os.Setenv(testKey1, testValue1)
 
 		var result string
-		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
 		assert.NoError(t, err)
-		assert.Equal(t, TEST_VALUE1, result)
+		assert.Equal(t, testValue1, result)
 	}
 
 	{
 		cleanupTestEnv()
 
 		var result string
-		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
 		assert.NoError(t, err)
 		assert.Equal(t, DEFAULT_VALUE, result)
 	}
 
 	{
 		cleanupTestEnv()
-		os.Setenv("LOONG_TEST_ENV_KEY1", TEST_VALUE1)
-		os.Setenv("ALICLOUD_TEST_ENV_KEY1", TEST_VALUE3)
+		os.Setenv("LOONG_TEST_ENV_KEY1", testValue1)
+		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
 
 		var result string
-		err := InitFromEnvString(TEST_KEY3, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey3, &result, DEFAULT_VALUE)
 		assert.NoError(t, err)
-		assert.Equal(t, TEST_VALUE1, result)
+		assert.Equal(t, testValue1, result)
 	}
 
 	{
 		cleanupTestEnv()
-		os.Setenv("ALICLOUD_TEST_ENV_KEY1", TEST_VALUE3)
+		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
 
 		var result string
-		err := InitFromEnvString(TEST_KEY3, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey3, &result, DEFAULT_VALUE)
 		assert.NoError(t, err)
-		assert.Equal(t, TEST_VALUE3, result)
+		assert.Equal(t, testValue3, result)
 	}
 
 	{
 		cleanupTestEnv()
-		os.Setenv(TEST_KEY1, "")
+		os.Setenv(testKey1, "")
 
 		var result string
-		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
 		assert.NoError(t, err)
 		assert.Equal(t, DEFAULT_VALUE, result)
 	}
