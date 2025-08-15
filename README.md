@@ -118,6 +118,7 @@ LoongCollector has been battle-tested in some of the world's most demanding prod
 # Clone the repository
 git clone https://github.com/alibaba/loongcollector.git
 cd loongcollector
+git submodule update --init
 
 # Build LoongCollector
 make all
