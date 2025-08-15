@@ -149,9 +149,11 @@ int FileSecurityManager::SendEvents() {
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
-            if (!hit) {
+            auto processCacheValue = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent);
+            if (!processCacheValue) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
+            } else {
+                eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
             }
 
             auto pathSb = sourceBuffer->CopyString(group->mPath);

@@ -353,6 +353,67 @@ bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogE
     return true;
 }
 
+std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent) {
+    auto procPtr = mProcessCache.Lookup({pid, ktime});
+    if (!procPtr) {
+        ADD_COUNTER(mProcessCacheMissTotal, 1);
+        LOG_WARNING(sLogger, ("cannot find proc in cache, pid", pid)("ktime", ktime)("size", mProcessCache.Size()));
+        return nullptr;
+    }
+
+    auto& proc = *procPtr;
+    
+    logEvent.SetContentNoCopy(kExecId.LogKey(), proc.Get<kExecId>());
+    logEvent.SetContentNoCopy(kProcessId.LogKey(), proc.Get<kProcessId>());
+    logEvent.SetContentNoCopy(kUid.LogKey(), proc.Get<kUid>());
+    logEvent.SetContentNoCopy(kUser.LogKey(), proc.Get<kUser>());
+    logEvent.SetContentNoCopy(kBinary.LogKey(), proc.Get<kBinary>());
+    logEvent.SetContentNoCopy(kArguments.LogKey(), proc.Get<kArguments>());
+    logEvent.SetContentNoCopy(kCWD.LogKey(), proc.Get<kCWD>());
+    logEvent.SetContentNoCopy(kKtime.LogKey(), proc.Get<kKtime>());
+    
+    logEvent.SetContentNoCopy(kCapPermitted.LogKey(), proc.Get<kCapPermitted>());
+    logEvent.SetContentNoCopy(kCapEffective.LogKey(), proc.Get<kCapEffective>());
+    logEvent.SetContentNoCopy(kCapInheritable.LogKey(), proc.Get<kCapInheritable>());
+
+    if (!proc.Get<kContainerId>().empty()) {
+        logEvent.SetContentNoCopy(kContainerId.LogKey(), proc.Get<kContainerId>());
+    }
+    
+    auto containerInfo = proc.LoadContainerInfo();
+    if (containerInfo) {
+        logEvent.SetContentNoCopy(kContainerName.LogKey(), containerInfo->mContainerName);
+        logEvent.SetContentNoCopy(kContainerImageName.LogKey(), containerInfo->mImageName);
+    }
+    
+    auto podInfo = proc.LoadK8sPodInfo();
+    if (podInfo) {
+        logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), podInfo->mWorkloadKind);
+        logEvent.SetContentNoCopy(kWorkloadName.LogKey(), podInfo->mWorkloadName);
+        logEvent.SetContentNoCopy(kNamespace.LogKey(), podInfo->mNamespace);
+        logEvent.SetContentNoCopy(kPodName.LogKey(), podInfo->mPodName);
+    }
+
+    auto& parentProcPtr = proc.mParent;
+    if (parentProcPtr) {
+        auto& parentProc = *parentProcPtr;
+        logEvent.SetContentNoCopy(kParentExecId.LogKey(), parentProc.Get<kExecId>());
+        logEvent.SetContentNoCopy(kParentProcessId.LogKey(), parentProc.Get<kProcessId>());
+        logEvent.SetContentNoCopy(kParentUid.LogKey(), parentProc.Get<kUid>());
+        logEvent.SetContentNoCopy(kParentUser.LogKey(), parentProc.Get<kUser>());
+        logEvent.SetContentNoCopy(kParentBinary.LogKey(), parentProc.Get<kBinary>());
+        logEvent.SetContentNoCopy(kParentArguments.LogKey(), parentProc.Get<kArguments>());
+        logEvent.SetContentNoCopy(kParentCWD.LogKey(), parentProc.Get<kCWD>());
+        logEvent.SetContentNoCopy(kParentKtime.LogKey(), parentProc.Get<kKtime>());
+
+        if (!parentProc.Get<kContainerId>().empty()) {
+            logEvent.SetContentNoCopy(kParentContainerId.LogKey(), parentProc.Get<kContainerId>());
+        }
+    }
+    
+    return procPtr;
+}
+
 int ProcessCacheManager::syncAllProc() {
     std::vector<std::shared_ptr<Proc>> procs = listRunningProcs();
     // update execve map
