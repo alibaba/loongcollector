@@ -15,10 +15,29 @@
 package util
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+const (
+	TEST_KEY1 = "LOONG_TEST_ENV_KEY1"
+	TEST_KEY2 = "ALIYUN_TEST_ENV_KEY1"
+	TEST_KEY3 = "ALICLOUD_TEST_ENV_KEY1"
+
+	TEST_VALUE1 = "loong_test_value_1"
+	TEST_VALUE2 = "aliyun_test_value_1"
+	TEST_VALUE3 = "alicloud_test_value_1"
+
+	DEFAULT_VALUE = "default_value"
+)
+
+func cleanupTestEnv() {
+	os.Unsetenv(TEST_KEY1)
+	os.Unsetenv(TEST_KEY2)
+	os.Unsetenv(TEST_KEY3)
+}
 
 func Test(t *testing.T) {
 	assert.Equal(t, "cn-hangzhou", GuessRegionByEndpoint("cn-hangzhou.log.aliyuncs.com", "xx"))
@@ -30,4 +49,90 @@ func Test(t *testing.T) {
 	assert.Equal(t, "xx", GuessRegionByEndpoint("hangzhou", "xx"))
 	assert.Equal(t, "xx", GuessRegionByEndpoint("", "xx"))
 	assert.Equal(t, "xx", GuessRegionByEndpoint("http://", "xx"))
+}
+
+func TestGetEnvTags(t *testing.T) {
+	{
+		cleanupTestEnv()
+		os.Setenv(TEST_KEY1, TEST_VALUE1)
+
+		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
+		assert.Equal(t, TEST_VALUE1, result)
+	}
+
+	{
+		cleanupTestEnv()
+		os.Setenv(TEST_KEY2, TEST_VALUE2)
+
+		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
+		assert.Equal(t, TEST_VALUE2, result)
+	}
+
+	{
+		cleanupTestEnv()
+
+		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
+		assert.Equal(t, "", result)
+	}
+
+	{
+		cleanupTestEnv()
+		os.Setenv(TEST_KEY1, TEST_VALUE1)
+		os.Setenv(TEST_KEY2, TEST_VALUE2)
+
+		result := GetEnvTags(TEST_KEY1, TEST_KEY2)
+		assert.Equal(t, TEST_VALUE1, result)
+	}
+}
+
+func TestInitFromEnvString(t *testing.T) {
+	{
+		cleanupTestEnv()
+		os.Setenv(TEST_KEY1, TEST_VALUE1)
+
+		var result string
+		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		assert.NoError(t, err)
+		assert.Equal(t, TEST_VALUE1, result)
+	}
+
+	{
+		cleanupTestEnv()
+
+		var result string
+		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		assert.NoError(t, err)
+		assert.Equal(t, DEFAULT_VALUE, result)
+	}
+
+	{
+		cleanupTestEnv()
+		os.Setenv("LOONG_TEST_ENV_KEY1", TEST_VALUE1)
+		os.Setenv("ALICLOUD_TEST_ENV_KEY1", TEST_VALUE3)
+
+		var result string
+		err := InitFromEnvString(TEST_KEY3, &result, DEFAULT_VALUE)
+		assert.NoError(t, err)
+		assert.Equal(t, TEST_VALUE1, result)
+	}
+
+	{
+		cleanupTestEnv()
+		os.Setenv("ALICLOUD_TEST_ENV_KEY1", TEST_VALUE3)
+
+		var result string
+		err := InitFromEnvString(TEST_KEY3, &result, DEFAULT_VALUE)
+		assert.NoError(t, err)
+		assert.Equal(t, TEST_VALUE3, result)
+	}
+
+	{
+		cleanupTestEnv()
+		os.Setenv(TEST_KEY1, "")
+
+		var result string
+		err := InitFromEnvString(TEST_KEY1, &result, DEFAULT_VALUE)
+		assert.NoError(t, err)
+		assert.Equal(t, DEFAULT_VALUE, result)
+	}
 }
