@@ -30,7 +30,7 @@ const (
 	testValue2 = "aliyun_test_value_1"
 	testValue3 = "alicloud_test_value_1"
 
-	DEFAULT_VALUE = "default_value"
+	defaultValue = "default_value"
 )
 
 func cleanupTestEnv() {
@@ -91,7 +91,7 @@ func TestInitFromEnvString(t *testing.T) {
 		os.Setenv(testKey1, testValue1)
 
 		var result string
-		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, defaultValue)
 		assert.NoError(t, err)
 		assert.Equal(t, testValue1, result)
 	}
@@ -100,9 +100,9 @@ func TestInitFromEnvString(t *testing.T) {
 		cleanupTestEnv()
 
 		var result string
-		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, defaultValue)
 		assert.NoError(t, err)
-		assert.Equal(t, DEFAULT_VALUE, result)
+		assert.Equal(t, defaultValue, result)
 	}
 
 	{
@@ -111,7 +111,7 @@ func TestInitFromEnvString(t *testing.T) {
 		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
 
 		var result string
-		err := InitFromEnvString(testKey3, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey3, &result, defaultValue)
 		assert.NoError(t, err)
 		assert.Equal(t, testValue1, result)
 	}
@@ -121,7 +121,7 @@ func TestInitFromEnvString(t *testing.T) {
 		os.Setenv("ALICLOUD_TEST_ENV_KEY1", testValue3)
 
 		var result string
-		err := InitFromEnvString(testKey3, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey3, &result, defaultValue)
 		assert.NoError(t, err)
 		assert.Equal(t, testValue3, result)
 	}
@@ -131,8 +131,8 @@ func TestInitFromEnvString(t *testing.T) {
 		os.Setenv(testKey1, "")
 
 		var result string
-		err := InitFromEnvString(testKey1, &result, DEFAULT_VALUE)
+		err := InitFromEnvString(testKey1, &result, defaultValue)
 		assert.NoError(t, err)
-		assert.Equal(t, DEFAULT_VALUE, result)
+		assert.Equal(t, defaultValue, result)
 	}
 }
