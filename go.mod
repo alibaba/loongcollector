@@ -14,7 +14,7 @@ require (
 	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f
 	github.com/danwakefield/fnmatch v0.0.0-20160403171240-cbb64ac3d964
 	github.com/denisenkom/go-mssqldb v0.12.2
-	github.com/dlclark/regexp2 v1.7.0
+	github.com/dlclark/regexp2 v1.11.5
 	github.com/docker/docker v20.10.23+incompatible
 	github.com/eclipse/paho.mqtt.golang v1.3.5
 	github.com/elastic/beats/v7 v7.7.1
