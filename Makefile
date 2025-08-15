@@ -190,6 +190,7 @@ unittest_e2e_engine: clean gocdocker
 
 .PHONY: unittest_plugin
 unittest_plugin: clean import_plugins
+	cp pkg/logtail/libGoPluginAdapter.so ./plugins/input/docker/logmeta
 	cp pkg/logtail/libGoPluginAdapter.so ./plugin_main
 	cp pkg/logtail/GoPluginAdapter.dll ./plugin_main
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
