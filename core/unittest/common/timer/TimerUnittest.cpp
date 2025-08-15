@@ -34,6 +34,7 @@ class TimerUnittest : public ::testing::Test {
 public:
     void TestPushEvent();
     void TestPeriodicEvent();
+    void TestGetTimeStamp();
 
 private:
     std::vector<int> mVec;
@@ -56,8 +57,13 @@ void TimerUnittest::TestPushEvent() {
     timer.mQueue.pop();
 }
 
-UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
+void TimerUnittest::TestGetTimeStamp() {
+    time_t tm = 1755065971;
+    APSARA_TEST_EQUAL(GetTimeStamp(tm, "%Y-%m-%dT%H:%M:%SZ", false), "2025-08-13T06:19:31Z");
+}
 
+UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
+UNIT_TEST_CASE(TimerUnittest, TestGetTimeStamp)
 
 } // namespace logtail
 
