@@ -38,7 +38,7 @@ protected:
     void TearDown() override {}
 
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(nullptr, mEBPFAdapter, mEventQueue);
+        return NetworkObserverManager::Create(nullptr, mEBPFAdapter, mEventQueue, &mEventPool);
     }
 
     int HandleEvents() {
@@ -58,6 +58,7 @@ protected:
     std::shared_ptr<NetworkObserverManager> mManager;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
+    EventPool mEventPool = EventPool(true);
 };
 
 conn_data_event_t* CreateHttpDataEvent() {

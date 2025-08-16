@@ -74,7 +74,7 @@ protected:
                                                                      processDataMapSize,
                                                                      mRetryableEventCache);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
-        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+        mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
         EBPFServer::GetInstance()->updatePluginState(
             PluginType::NETWORK_OBSERVE, "pipeline", "project", PluginStateOperation::kAddPipeline, mManager);
     }
@@ -89,7 +89,7 @@ protected:
 
 private:
     std::shared_ptr<NetworkObserverManager> CreateManager() {
-        return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+        return NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
     }
 
     int HandleEvents() {
@@ -110,6 +110,7 @@ private:
     MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
+    EventPool mEventPool = EventPool(true);
     std::shared_ptr<NetworkObserverManager> mManager;
     RetryableEventCache mRetryableEventCache;
 };

@@ -18,6 +18,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/NetworkUtil.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
@@ -106,8 +107,9 @@ void NetworkSecurityManager::RecordNetworkEvent(tcp_data_t* event) {
 
 NetworkSecurityManager::NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(base, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(base, eBPFAdapter, queue, pool),
       mAggregateTree(
           4096,
           [](std::unique_ptr<NetworkEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -132,9 +134,14 @@ int NetworkSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
     SIZETAggTree<NetworkEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
 
@@ -158,12 +165,13 @@ int NetworkSecurityManager::SendEvents() {
             return 0;
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
-            if (!hit) {
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
+            auto processCacheValue = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent);
+            if (!processCacheValue) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
+            eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));
@@ -174,7 +182,7 @@ int NetworkSecurityManager::SendEvents() {
             auto netnsSb = sourceBuffer->CopyString(std::to_string(group->mNetns));
 
             for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }

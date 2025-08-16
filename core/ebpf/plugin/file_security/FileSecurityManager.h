@@ -39,6 +39,7 @@ public:
     FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        EventPool* pool,
                         RetryableEventCache& retryableEventCache);
 
 
@@ -46,8 +47,10 @@ public:
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool,
            RetryableEventCache& retryableEventCache) {
-        return std::make_shared<FileSecurityManager>(processCacheManager, eBPFAdapter, queue, retryableEventCache);
+        return std::make_shared<FileSecurityManager>(
+            processCacheManager, eBPFAdapter, queue, pool, retryableEventCache);
     }
 
     ~FileSecurityManager() {}

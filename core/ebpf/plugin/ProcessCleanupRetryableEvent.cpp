@@ -37,7 +37,7 @@ bool ProcessCleanupRetryableEvent::HandleMessage() {
 bool ProcessCleanupRetryableEvent::decrementRef() {
     if (mProcessCacheValue->mPPid > 0 || mProcessCacheValue->mPKtime > 0) {
         data_event_id parentKey{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
-        auto parent = mProcessCache.Lookup(parentKey);
+        auto& parent = mProcessCacheValue->mParent;
         if (!parent) {
             return false;
         }

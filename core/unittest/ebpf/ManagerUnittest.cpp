@@ -29,6 +29,7 @@
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/NetworkEvent.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "models/EventPool.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
@@ -91,11 +92,13 @@ protected:
     MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
+    EventPool mEventPool = EventPool(true);
     RetryableEventCache mRetryableEventCache;
 };
 
 void ManagerUnittest::TestProcessSecurityManagerBasic() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
 
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
@@ -117,7 +120,8 @@ void ManagerUnittest::TestProcessSecurityManagerBasic() {
 }
 
 void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
@@ -137,8 +141,8 @@ void ManagerUnittest::TestProcessSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestFileSecurityManagerBasic() {
-    auto manager
-        = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, mRetryableEventCache);
+    auto manager = std::make_shared<FileSecurityManager>(
+        mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool, mRetryableEventCache);
 
     SecurityOptions options;
     APSARA_TEST_EQUAL(manager->Init(), 0);
@@ -160,8 +164,8 @@ void ManagerUnittest::TestFileSecurityManagerBasic() {
 }
 
 void ManagerUnittest::TestFileSecurityManagerEventHandling() {
-    auto manager
-        = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, mRetryableEventCache);
+    auto manager = std::make_shared<FileSecurityManager>(
+        mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool, mRetryableEventCache);
     SecurityOptions options;
     manager->Init();
     CollectionPipelineContext ctx;
@@ -194,9 +198,10 @@ void ManagerUnittest::TestFileSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestManagerConcurrency() {
-    auto processManager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
-    auto fileManager
-        = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, mRetryableEventCache);
+    auto processManager
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
+    auto fileManager = std::make_shared<FileSecurityManager>(
+        mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool, mRetryableEventCache);
 
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
@@ -236,7 +241,8 @@ void ManagerUnittest::TestManagerConcurrency() {
 }
 
 void ManagerUnittest::TestManagerErrorHandling() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
 
     auto event = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 0);
     APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
@@ -256,7 +262,8 @@ void ManagerUnittest::TestManagerErrorHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerBasic() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
 
     // 测试初始化
     CollectionPipelineContext ctx;
@@ -281,7 +288,8 @@ void ManagerUnittest::TestNetworkSecurityManagerBasic() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
@@ -342,7 +350,8 @@ void ManagerUnittest::TestNetworkSecurityManagerEventHandling() {
 }
 
 void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
-    auto manager = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<NetworkSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
@@ -395,7 +404,8 @@ void ManagerUnittest::TestNetworkSecurityManagerAggregation() {
 }
 
 void ManagerUnittest::TestProcessSecurityManagerAggregation() {
-    auto manager = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+    auto manager
+        = std::make_shared<ProcessSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
@@ -439,8 +449,8 @@ void ManagerUnittest::TestProcessSecurityManagerAggregation() {
 }
 
 void ManagerUnittest::TestFileSecurityManagerAggregation() {
-    auto manager
-        = std::make_shared<FileSecurityManager>(mProcessCacheManager, mEBPFAdapter, mEventQueue, mRetryableEventCache);
+    auto manager = std::make_shared<FileSecurityManager>(
+        mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool, mRetryableEventCache);
     SecurityOptions options;
     manager->Init();
     CollectionPipelineContext ctx;

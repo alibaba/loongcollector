@@ -60,8 +60,9 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool) {
+        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     NetworkObserverManager() = delete;
@@ -69,7 +70,8 @@ public:
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           EventPool* pool);
 
     int Init() override;
 

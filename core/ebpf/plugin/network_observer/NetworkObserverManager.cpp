@@ -155,8 +155,9 @@ GetAppDetail(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& curre
 
 NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, L7Record* other) {
@@ -550,7 +551,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
                     init = true;
                 }
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
                     if (kConnTrackerTable.ColLogKey(i) == "" || ctAttrVal[i] == "") {
                         continue;
@@ -1712,7 +1713,7 @@ void NetworkObserverManager::ReportAgentInfo() {
             eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
             if (workloadKey == kGlobalWorkloadKey) {
                 // instance level ...
-                auto* event = eventGroup.AddLogEvent();
+                auto* event = eventGroup.AddLogEvent(true, mEventPool);
                 event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
                 event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
                 event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
@@ -1742,7 +1743,7 @@ void NetworkObserverManager::ReportAgentInfo() {
                         continue;
                     }
 
-                    auto* event = eventGroup.AddLogEvent();
+                    auto* event = eventGroup.AddLogEvent(true, mEventPool);
                     event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
                     event->SetContent(kAgentInfoIpKey, podMeta->mPodIp);
                     event->SetContent(kAgentInfoHostnameKey, podMeta->mPodName);
