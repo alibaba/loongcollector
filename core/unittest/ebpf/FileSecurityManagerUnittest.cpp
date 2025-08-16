@@ -90,11 +90,11 @@ private:
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
     ProcessCacheManagerWrapper mWrapper;
     std::unique_ptr<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>> mEventQueue;
+    EventPool mEventPool = EventPool(true);
     std::shared_ptr<FileSecurityManager> mManager;
     MetricsRecordRef mMetricRef;
     PluginMetricManagerPtr mPluginMetricPtr;
     RetryableEventCache mRetryableEventCache;
-    EventPool mEventPool = EventPool(true);
 };
 
 void FileSecurityManagerUnittest::TestConstructor() {

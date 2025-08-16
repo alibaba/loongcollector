@@ -110,9 +110,9 @@ private:
     MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
+    EventPool mEventPool = EventPool(true);
     std::shared_ptr<NetworkObserverManager> mManager;
     RetryableEventCache mRetryableEventCache;
-    EventPool mEventPool = EventPool(true);
 };
 
 void NetworkObserverManagerUnittest::TestInitialization() {

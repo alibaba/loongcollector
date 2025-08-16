@@ -92,8 +92,8 @@ protected:
     MetricsRecordRef mRef;
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mEventQueue;
-    RetryableEventCache mRetryableEventCache;
     EventPool mEventPool = EventPool(true);
+    RetryableEventCache mRetryableEventCache;
 };
 
 void ManagerUnittest::TestProcessSecurityManagerBasic() {
