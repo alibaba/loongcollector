@@ -241,119 +241,8 @@ void ProcessCacheManager::RecordDataEvent(msg_data* eventPtr) {
     mProcessDataMap.DataAdd(eventPtr);
 }
 
-bool ProcessCacheManager::FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent) {
-    static const std::string kUnkownStr = "unknown";
-
-    auto procPtr = mProcessCache.Lookup({pid, ktime});
-    if (!procPtr) {
-        ADD_COUNTER(mProcessCacheMissTotal, 1);
-        LOG_WARNING(sLogger, ("cannot find proc in cache, pid", pid)("ktime", ktime)("size", mProcessCache.Size()));
-        return false;
-    }
-
-    // event_type, added by xxx_security_manager
-    // call_name, added by xxx_security_manager
-    // event_time, added by xxx_security_manager
-
-    // finalize proc tags
-    auto& proc = *procPtr;
-    auto& sb = logEvent.GetSourceBuffer();
-    auto execIdSb = sb->CopyString(proc.Get<kExecId>());
-    logEvent.SetContentNoCopy(kExecId.LogKey(), StringView(execIdSb.data, execIdSb.size));
-
-    auto pidSb = sb->CopyString(proc.Get<kProcessId>());
-    logEvent.SetContentNoCopy(kProcessId.LogKey(), StringView(pidSb.data, pidSb.size));
-
-    auto uidSb = sb->CopyString(proc.Get<kUid>());
-    logEvent.SetContentNoCopy(kUid.LogKey(), StringView(uidSb.data, uidSb.size));
-
-    auto userSb = sb->CopyString(proc.Get<kUser>());
-    logEvent.SetContentNoCopy(kUser.LogKey(), StringView(userSb.data, userSb.size));
-
-    auto binarySb = sb->CopyString(proc.Get<kBinary>());
-    logEvent.SetContentNoCopy(kBinary.LogKey(), StringView(binarySb.data, binarySb.size));
-
-    auto argsSb = sb->CopyString(proc.Get<kArguments>());
-    logEvent.SetContentNoCopy(kArguments.LogKey(), StringView(argsSb.data, argsSb.size));
-
-    auto cwdSb = sb->CopyString(proc.Get<kCWD>());
-    logEvent.SetContentNoCopy(kCWD.LogKey(), StringView(cwdSb.data, cwdSb.size));
-
-    auto ktimeSb = sb->CopyString(proc.Get<kKtime>());
-    logEvent.SetContentNoCopy(kKtime.LogKey(), StringView(ktimeSb.data, ktimeSb.size));
-
-    auto permitted = sb->CopyString(proc.Get<kCapPermitted>());
-    logEvent.SetContentNoCopy(kCapPermitted.LogKey(), StringView(permitted.data, permitted.size));
-
-    auto effective = sb->CopyString(proc.Get<kCapEffective>());
-    logEvent.SetContentNoCopy(kCapEffective.LogKey(), StringView(effective.data, effective.size));
-
-    auto inheritable = sb->CopyString(proc.Get<kCapInheritable>());
-    logEvent.SetContentNoCopy(kCapInheritable.LogKey(), StringView(inheritable.data, inheritable.size));
-
-    if (!proc.Get<kContainerId>().empty()) {
-        auto containerId = sb->CopyString(proc.Get<kContainerId>());
-        logEvent.SetContentNoCopy(kContainerId.LogKey(), StringView(containerId.data, containerId.size));
-    }
-    auto containerInfo = proc.LoadContainerInfo();
-    if (containerInfo) {
-        auto containerName = sb->CopyString(containerInfo->mContainerName);
-        logEvent.SetContentNoCopy(kContainerName.LogKey(), StringView(containerName.data, containerName.size));
-        auto imageName = sb->CopyString(containerInfo->mImageName);
-        logEvent.SetContentNoCopy(kContainerImageName.LogKey(), StringView(imageName.data, imageName.size));
-    }
-    auto podInfo = proc.LoadK8sPodInfo();
-    if (podInfo) {
-        auto workloadKind = sb->CopyString(podInfo->mWorkloadKind);
-        logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), StringView(workloadKind.data, workloadKind.size));
-        auto workloadName = sb->CopyString(podInfo->mWorkloadName);
-        logEvent.SetContentNoCopy(kWorkloadName.LogKey(), StringView(workloadName.data, workloadName.size));
-        auto namespaceStr = sb->CopyString(podInfo->mNamespace);
-        logEvent.SetContentNoCopy(kNamespace.LogKey(), StringView(namespaceStr.data, namespaceStr.size));
-        auto podName = sb->CopyString(podInfo->mPodName);
-        logEvent.SetContentNoCopy(kPodName.LogKey(), StringView(podName.data, podName.size));
-    }
-
-    auto& parentProcPtr = proc.mParent;
-    // for parent
-    if (!parentProcPtr) {
-        return true;
-    }
-    // finalize parent tags
-    auto& parentProc = *parentProcPtr;
-    auto parentExecIdSb = sb->CopyString(parentProc.Get<kExecId>());
-    logEvent.SetContentNoCopy(kParentExecId.LogKey(), StringView(parentExecIdSb.data, parentExecIdSb.size));
-
-    auto parentPidSb = sb->CopyString(parentProc.Get<kProcessId>());
-    logEvent.SetContentNoCopy(kParentProcessId.LogKey(), StringView(parentPidSb.data, parentPidSb.size));
-
-    auto parentUidSb = sb->CopyString(parentProc.Get<kUid>());
-    logEvent.SetContentNoCopy(kParentUid.LogKey(), StringView(parentUidSb.data, parentUidSb.size));
-
-    auto parentUserSb = sb->CopyString(parentProc.Get<kUser>());
-    logEvent.SetContentNoCopy(kParentUser.LogKey(), StringView(parentUserSb.data, parentUserSb.size));
-
-    auto parentBinarySb = sb->CopyString(parentProc.Get<kBinary>());
-    logEvent.SetContentNoCopy(kParentBinary.LogKey(), StringView(parentBinarySb.data, parentBinarySb.size));
-
-    auto parentArgsSb = sb->CopyString(parentProc.Get<kArguments>());
-    logEvent.SetContentNoCopy(kParentArguments.LogKey(), StringView(parentArgsSb.data, parentArgsSb.size));
-
-    auto parentCwdSb = sb->CopyString(parentProc.Get<kCWD>());
-    logEvent.SetContentNoCopy(kParentCWD.LogKey(), StringView(parentCwdSb.data, parentCwdSb.size));
-
-    auto parentKtimeSb = sb->CopyString(parentProc.Get<kKtime>());
-    logEvent.SetContentNoCopy(kParentKtime.LogKey(), StringView(parentKtimeSb.data, parentKtimeSb.size));
-
-    if (!parentProc.Get<kContainerId>().empty()) {
-        auto parentContainerId = sb->CopyString(parentProc.Get<kContainerId>());
-        logEvent.SetContentNoCopy(kParentContainerId.LogKey(),
-                                  StringView(parentContainerId.data, parentContainerId.size));
-    }
-    return true;
-}
-
-std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent) {
+std::shared_ptr<ProcessCacheValue>
+ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent) {
     auto procPtr = mProcessCache.Lookup({pid, ktime});
     if (!procPtr) {
         ADD_COUNTER(mProcessCacheMissTotal, 1);
@@ -362,7 +251,7 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32
     }
 
     auto& proc = *procPtr;
-    
+
     logEvent.SetContentNoCopy(kExecId.LogKey(), proc.Get<kExecId>());
     logEvent.SetContentNoCopy(kProcessId.LogKey(), proc.Get<kProcessId>());
     logEvent.SetContentNoCopy(kUid.LogKey(), proc.Get<kUid>());
@@ -371,7 +260,7 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32
     logEvent.SetContentNoCopy(kArguments.LogKey(), proc.Get<kArguments>());
     logEvent.SetContentNoCopy(kCWD.LogKey(), proc.Get<kCWD>());
     logEvent.SetContentNoCopy(kKtime.LogKey(), proc.Get<kKtime>());
-    
+
     logEvent.SetContentNoCopy(kCapPermitted.LogKey(), proc.Get<kCapPermitted>());
     logEvent.SetContentNoCopy(kCapEffective.LogKey(), proc.Get<kCapEffective>());
     logEvent.SetContentNoCopy(kCapInheritable.LogKey(), proc.Get<kCapInheritable>());
@@ -379,13 +268,13 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32
     if (!proc.Get<kContainerId>().empty()) {
         logEvent.SetContentNoCopy(kContainerId.LogKey(), proc.Get<kContainerId>());
     }
-    
+
     auto containerInfo = proc.LoadContainerInfo();
     if (containerInfo) {
         logEvent.SetContentNoCopy(kContainerName.LogKey(), containerInfo->mContainerName);
         logEvent.SetContentNoCopy(kContainerImageName.LogKey(), containerInfo->mImageName);
     }
-    
+
     auto podInfo = proc.LoadK8sPodInfo();
     if (podInfo) {
         logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), podInfo->mWorkloadKind);
@@ -410,7 +299,7 @@ std::shared_ptr<ProcessCacheValue> ProcessCacheManager::AttachProcessData(uint32
             logEvent.SetContentNoCopy(kParentContainerId.LogKey(), parentProc.Get<kContainerId>());
         }
     }
-    
+
     return procPtr;
 }
 

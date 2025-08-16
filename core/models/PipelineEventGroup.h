@@ -99,8 +99,8 @@ public:
 
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
     void AddSourceBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer);
-    std::unordered_set<std::shared_ptr<SourceBuffer>> GetAllSourceBuffers() { return mAdditionalSourceBuffers;}
-    
+    std::unordered_set<std::shared_ptr<SourceBuffer>> GetAllSourceBuffers() { return mAdditionalSourceBuffers; }
+
     void SetMetadata(EventGroupMetaKey key, StringView val);
     void SetMetadata(EventGroupMetaKey key, const std::string& val);
     void SetMetadataNoCopy(EventGroupMetaKey key, const StringBuffer& val);
@@ -145,7 +145,7 @@ private:
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
 
-    std::unordered_set<std::shared_ptr<SourceBuffer>>  mAdditionalSourceBuffers;
+    std::unordered_set<std::shared_ptr<SourceBuffer>> mAdditionalSourceBuffers;
 };
 
 } // namespace logtail
