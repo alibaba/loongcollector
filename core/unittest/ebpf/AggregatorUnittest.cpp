@@ -128,7 +128,7 @@ void AggregatorUnittest::TestAggregator() {
         },
         [this](const std::shared_ptr<FileEvent>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
             LOG_INFO(sLogger, ("generate node", ""));
-            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime);
         });
 
     std::vector<std::shared_ptr<FileEvent>> events;
