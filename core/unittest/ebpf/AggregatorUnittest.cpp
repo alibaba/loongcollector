@@ -170,7 +170,7 @@ void AggregatorUnittest::TestAggregator() {
             APSARA_TEST_EQUAL(group->mPid, pid);
             APSARA_TEST_EQUAL(group->mKtime, ktime);
             globalNodeCnt++;
-            LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime)("path", group->mPath));
+            LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime));
             for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
                 auto* fe = static_cast<NetworkEvent*>(innerEvent.get());

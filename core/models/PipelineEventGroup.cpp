@@ -122,6 +122,11 @@ PipelineEventGroup PipelineEventGroup::Copy() const {
     }
     return res;
 }
+PipelineEventGroup PipelineEventGroup::CopySourceBuffer() const {
+    PipelineEventGroup res(mSourceBuffer);
+    res.mAdditionalSourceBuffers = mAdditionalSourceBuffers;
+    return res;
+}
 
 unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent(bool fromPool, EventPool* pool) {
     LogEvent* e = nullptr;

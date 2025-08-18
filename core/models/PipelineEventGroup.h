@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/memory/SourceBuffer.h"
@@ -82,6 +83,7 @@ public:
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
     PipelineEventGroup Copy() const;
+    PipelineEventGroup CopySourceBuffer() const;
 
     std::unique_ptr<LogEvent> CreateLogEvent(bool fromPool = false, EventPool* pool = nullptr);
     std::unique_ptr<MetricEvent> CreateMetricEvent(bool fromPool = false, EventPool* pool = nullptr);

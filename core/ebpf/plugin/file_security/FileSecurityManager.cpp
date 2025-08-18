@@ -158,7 +158,7 @@ int FileSecurityManager::SendEvents() {
             }
 
             for (const auto& commonEvent : group->mInnerEvents) {
-                auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());            
+                auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());
                 auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 // attach process tags
                 for (const auto& it : *sharedEvent) {
