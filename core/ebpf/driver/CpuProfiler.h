@@ -40,11 +40,13 @@ int32_t livetrace_profiler_ctrl(struct Profiler *profiler, int op,
                                 const char *pids);
 
 using livetrace_profiler_read_cb_t = void (*)(uint32_t pid, const char *comm,
-                                              const char *stack, uint32_t cnt,
-                                              void *ctx);
+                                              const char *stack, uint32_t cnt);
 
 void livetrace_profiler_read(struct Profiler *profiler,
-                             livetrace_profiler_read_cb_t cb, void *ctx);
+                             livetrace_profiler_read_cb_t cb);
+
+using livetrace_profiler_read_cb_ctx_t = void (*)(uint32_t pid, const char *comm,
+                                              const char *stack, uint32_t cnt, void *ctx);
 }
 
 namespace logtail {
@@ -59,6 +61,8 @@ public:
     void Start() {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][Start] create profiler");
             mProfiler = livetrace_profiler_create();
             assert(mProfiler != nullptr);
         }
@@ -67,6 +71,8 @@ public:
     void Stop() {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler != nullptr) {
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][Stop] destroy profiler");
             livetrace_profiler_destroy(mProfiler);
             mProfiler = nullptr;
         }
@@ -90,12 +96,16 @@ public:
 
         if (!toAdd.empty()) {
             std::string pidsToAdd = pidsToString(toAdd);
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][UpdatePids] add pids: %s", pidsToAdd.c_str());
             livetrace_profiler_ctrl(mProfiler, LivetraceCtrlOp::LIVETRACE_ADD,
                                     pidsToAdd.c_str());
         }
 
         if (!toRemove.empty()) {
             std::string pidsToRemove = pidsToString(toRemove);
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][UpdatePids] remove pids: %s", pidsToRemove.c_str());
             livetrace_profiler_ctrl(mProfiler,
                                     LivetraceCtrlOp::LIVETRACE_REMOVE,
                                     pidsToRemove.c_str());
@@ -104,8 +114,10 @@ public:
         mPids = std::move(newPidsSet);
     }
 
-    void RegisterPollHandler(livetrace_profiler_read_cb_t handler, void *ctx) {
+    void RegisterPollHandler(livetrace_profiler_read_cb_ctx_t handler, void *ctx) {
         std::lock_guard<std::mutex> lock(mMutex);
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][RegisterPollHandler] register handler: %p ctx: %p", handler, ctx);
         mHandler = handler;
         mCtx = ctx;
     }
@@ -117,10 +129,16 @@ public:
             return;
         }
 
-        livetrace_profiler_read(mProfiler, mHandler, mCtx);
+        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CPUProfiler][Poll] poll");
+        livetrace_profiler_read(mProfiler, handler_without_ctx);
     }
 
 private:
+    static void handler_without_ctx(uint32_t pid, const char *comm, const char *stack, uint32_t cnt) {
+        mHandler(pid, comm, stack, cnt, mCtx);
+    }
+
     static std::string pidsToString(const std::unordered_set<uint32_t> &pids) {
         std::string result;
         for (const auto &pid : pids) {
@@ -151,8 +169,9 @@ private:
     std::mutex mMutex;
     std::unordered_set<uint32_t> mPids;
     Profiler *mProfiler = nullptr;
-    livetrace_profiler_read_cb_t mHandler = nullptr;
-    void *mCtx = nullptr;
+    // TODO: make this non-static
+    inline static livetrace_profiler_read_cb_ctx_t mHandler = nullptr;
+    inline static void *mCtx = nullptr;
 };
 
 } // namespace ebpf
