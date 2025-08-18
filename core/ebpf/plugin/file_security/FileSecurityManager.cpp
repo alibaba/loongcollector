@@ -110,7 +110,7 @@ FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManag
           },
           [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>&) {
               auto* in = static_cast<FileEvent*>(ce.get());
-              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime);
           }) {
 }
 
@@ -157,9 +157,8 @@ int FileSecurityManager::SendEvents() {
                 eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
             }
 
-            auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& commonEvent : group->mInnerEvents) {
-                FileEvent* innerEvent = static_cast<FileEvent*>(commonEvent.get());
+                auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());            
                 auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 // attach process tags
                 for (const auto& it : *sharedEvent) {
@@ -167,6 +166,7 @@ int FileSecurityManager::SendEvents() {
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
+                auto pathSb = sourceBuffer->CopyString(innerEvent->mPath);
                 logEvent->SetContentNoCopy(kFilePath.LogKey(), StringView(pathSb.data, pathSb.size));
                 // set callnames
                 switch (innerEvent->mEventType) {

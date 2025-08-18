@@ -39,7 +39,11 @@ bool ProcessCleanupRetryableEvent::decrementRef() {
         data_event_id parentKey{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
         auto& parent = mProcessCacheValue->mParent;
         if (!parent) {
-            return false;
+            parent = mProcessCache.Lookup(parentKey);
+            if (!parent) {
+                return false;
+            }
+            mProcessCacheValue->mParent = parent;
         }
         // dec parent's ref count
         mProcessCache.DecRef(parentKey, parent);
