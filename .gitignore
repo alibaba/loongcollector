@@ -107,4 +107,6 @@ license_coverage.txt
 /tags/
 
 ### Cursor
-.cursor/*
+/.cursor/
+/.claude/
+/.gemini/

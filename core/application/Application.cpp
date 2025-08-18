@@ -26,6 +26,7 @@
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/CrashBackTraceUtil.h"
+#include "common/EnvUtil.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
@@ -260,7 +261,7 @@ void Application::Start() { // GCOVR_EXCL_START
     }
     // Actually, docker env config will not work if not in purage container mode, so there is no need to load plugin
     // base if not in purage container mode. However, we still load it here for backward compatability.
-    const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
+    const char* dockerEnvConfig = GetEnv("LOONG_DOCKER_ENV_CONFIG", "ALICLOUD_LOG_DOCKER_ENV_CONFIG");
     if (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
         && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T')) {
         LogtailPlugin::GetInstance()->LoadPluginBase();

@@ -51,7 +51,7 @@ func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	if _, err = p.Init(ctx); err != nil {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
@@ -80,13 +80,13 @@ func TestCommandTestCollecetUserBase64(t *testing.T) {
 	}
 	p.ScriptContent = base64.StdEncoding.EncodeToString([]byte(scriptContent))
 	p.ContentEncoding = "Base64"
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	if _, err := p.Init(ctx); err != nil {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
 	}
 	if err := p.Collect(c); err != nil {
-		t.Errorf("Collect() error = %v", err)
+		t.Errorf("Collect() error = %v, user = %s, scriptContent = %s", err, p.User, p.ScriptContent)
 		return
 	}
 }
@@ -106,7 +106,7 @@ func TestCommandTestCollect(t *testing.T) {
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -134,7 +134,7 @@ func TestCommandTestExceptionCollect(t *testing.T) {
 	p.ScriptContent = `echo "1"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -163,7 +163,7 @@ func TestCommandTestTimeoutCollect(t *testing.T) {
 	p.ScriptContent = `sleep 10`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -216,7 +216,7 @@ func TestCommandTestInit(t *testing.T) {
 	if err != nil {
 		fmt.Println("expect error with wrong user root", err)
 	}
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 
 	// test contentType
 	p.ContentEncoding = "mixin"
@@ -299,7 +299,7 @@ func TestErrorCmdPath(t *testing.T) {
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = "runner"
+	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
 	p.CmdPath = "rm -rf *"
 	if _, err = p.Init(ctx); err != nil {
 		if err.Error() == "CmdPath rm -rf * does not exist, err:stat rm -rf *: no such file or directory" {

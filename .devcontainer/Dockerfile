@@ -25,7 +25,9 @@ RUN yum -y install openssh-server && \
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys
 
-RUN source /tmp/.env && rm /tmp/.env; \
+RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
+    cp /opt/logtail/deps/lib/libcrypto.so.1.0.0 /usr/lib64; \
+    source /tmp/.env && rm /tmp/.env; \
     if getent passwd $USERNAME; then userdel -f $USERNAME; fi; \
     if [ $HOST_OS = "Linux" ]; then \
     if getent group $GROUPNAME; then groupdel -f $GROUPNAME; fi; \
@@ -46,7 +48,7 @@ RUN source /tmp/.env && rm /tmp/.env; \
     chmod 600 /home/$USERNAME/.ssh/authorized_keys; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     rm /tmp/authorized_keys; \
-    echo "export PATH=/usr/local/go/bin:$PATH" >> /home/$USERNAME/.bashrc; \
+    echo "export PATH=/usr/local/go/bin:/opt/logtail/deps/bin:$PATH" >> /home/$USERNAME/.bashrc; \
     su - $USERNAME -c "\
     go env -w GO111MODULE=on && \
     go env -w GOPROXY=https://goproxy.cn,direct"

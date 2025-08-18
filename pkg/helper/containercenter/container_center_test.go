@@ -660,3 +660,70 @@ func TestInitClientMutiTime(t *testing.T) {
 		assert.Nil(t, containerCenterInstance.client)
 	}
 }
+
+func TestFindAllEnvConfig(t *testing.T) {
+	did := &DockerInfoDetail{
+		ContainerInfo: types.ContainerJSON{
+			Config: &container.Config{
+				Env: []string{
+					"loong_logs_key1=value1",
+					"aliyun_logs_key1=value2",
+					"loong_logs_key1_project=loong_project",
+					"aliyun_logs_key1_logstore=aliyun_logstore",
+					"xxxx_KEY=xxxx",
+					"loong_logs_key1_tags=appName=ut1",
+				},
+			},
+			ContainerJSONBase: &types.ContainerJSONBase{
+				Name: "ut-container",
+			},
+		},
+		ContainerNameTag: map[string]string{},
+	}
+
+	tests := []struct {
+		envConfigPrefix    string
+		selfConfigFlag     bool
+		expectedConfigName string
+		expectedResult     map[string]*EnvConfigInfo
+	}{
+		{
+			envConfigPrefix:    "aliyun_logs_",
+			selfConfigFlag:     false,
+			expectedConfigName: "key1",
+			expectedResult: map[string]*EnvConfigInfo{
+				"key1":          {ConfigItemMap: map[string]string{"": "value1"}},
+				"key1_project":  {ConfigItemMap: map[string]string{"project": "loong_project"}},
+				"key1_logstore": {ConfigItemMap: map[string]string{"logstore": "aliyun_logstore"}},
+			},
+		},
+		{
+			envConfigPrefix: "aliyun_logs_",
+			selfConfigFlag:  false,
+			expectedResult:  map[string]*EnvConfigInfo{},
+		},
+	}
+
+	for _, test := range tests {
+		did.EnvConfigInfoMap = make(map[string]*EnvConfigInfo)
+		if len(test.expectedResult) == 0 {
+			did.ContainerInfo.Config.Env = append(did.ContainerInfo.Config.Env, "ALICLOUD_LOG_DOCKER_ENV_CONFIG_SELF=true")
+		}
+		did.FindAllEnvConfig(envConfigPrefix, test.selfConfigFlag)
+		if len(test.expectedResult) == 0 {
+			assert.Equal(t, len(did.EnvConfigInfoMap), 0)
+		} else {
+			config, exists := did.EnvConfigInfoMap[test.expectedConfigName]
+			assert.True(t, exists, "Expected config for key %s not found", test.expectedConfigName)
+			for key, expectedConfig := range test.expectedResult {
+				for subKey, expectedValue := range expectedConfig.ConfigItemMap {
+					value, ok := config.ConfigItemMap[subKey]
+					assert.True(t, ok && value == expectedValue, "Expected config for key %s not found", key)
+				}
+			}
+		}
+
+		assert.Equal(t, len(did.ContainerNameTag), 1)
+		assert.Equal(t, did.ContainerNameTag["appName"], "ut1")
+	}
+}
