@@ -207,6 +207,7 @@ int ProcessSecurityManager::SendEvents() {
                 return;
             }
             eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
+            eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
 
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);

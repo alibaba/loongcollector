@@ -269,18 +269,25 @@ ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& l
         logEvent.SetContentNoCopy(kContainerId.LogKey(), proc.Get<kContainerId>());
     }
 
+    auto& sb = logEvent.GetSourceBuffer();
     auto containerInfo = proc.LoadContainerInfo();
     if (containerInfo) {
-        logEvent.SetContentNoCopy(kContainerName.LogKey(), containerInfo->mContainerName);
-        logEvent.SetContentNoCopy(kContainerImageName.LogKey(), containerInfo->mImageName);
+        auto containerName = sb->CopyString(containerInfo->mContainerName);
+        logEvent.SetContentNoCopy(kContainerName.LogKey(), StringView(containerName.data, containerName.size));
+        auto imageName = sb->CopyString(containerInfo->mImageName);
+        logEvent.SetContentNoCopy(kContainerImageName.LogKey(), StringView(imageName.data, imageName.size));
     }
 
     auto podInfo = proc.LoadK8sPodInfo();
     if (podInfo) {
-        logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), podInfo->mWorkloadKind);
-        logEvent.SetContentNoCopy(kWorkloadName.LogKey(), podInfo->mWorkloadName);
-        logEvent.SetContentNoCopy(kNamespace.LogKey(), podInfo->mNamespace);
-        logEvent.SetContentNoCopy(kPodName.LogKey(), podInfo->mPodName);
+        auto workloadKind = sb->CopyString(podInfo->mWorkloadKind);
+        logEvent.SetContentNoCopy(kWorkloadKind.LogKey(), StringView(workloadKind.data, workloadKind.size));
+        auto workloadName = sb->CopyString(podInfo->mWorkloadName);
+        logEvent.SetContentNoCopy(kWorkloadName.LogKey(), StringView(workloadName.data, workloadName.size));
+        auto namespaceStr = sb->CopyString(podInfo->mNamespace);
+        logEvent.SetContentNoCopy(kNamespace.LogKey(), StringView(namespaceStr.data, namespaceStr.size));
+        auto podName = sb->CopyString(podInfo->mPodName);
+        logEvent.SetContentNoCopy(kPodName.LogKey(), StringView(podName.data, podName.size));
     }
 
     auto& parentProcPtr = proc.mParent;

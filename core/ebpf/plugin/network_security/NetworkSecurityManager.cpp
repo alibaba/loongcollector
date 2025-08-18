@@ -172,6 +172,7 @@ int NetworkSecurityManager::SendEvents() {
                 return;
             }
             eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
+            eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));
