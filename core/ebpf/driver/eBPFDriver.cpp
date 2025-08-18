@@ -14,7 +14,8 @@
 
 
 #include <mutex>
-#include <regex>
+
+#include "boost/regex.hpp"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include <coolbpf/security.skel.h>
@@ -158,10 +159,10 @@ void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
 }
 
 void ExtractContainerIdPrefix(const char* dockerId, int& prefixLen) {
-    static std::regex cidRegex = std::regex("[a-f0-9]{64}");
-    std::cmatch match;
-    if (std::regex_search(dockerId, match, cidRegex)) {
-        prefixLen = match.position();
+    static boost::regex cidRegex("[a-f0-9]{64}");
+    boost::cmatch match;
+    if (boost::regex_search(dockerId, match, cidRegex)) {
+        prefixLen = static_cast<int>(match.position());
     }
 }
 
