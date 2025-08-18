@@ -336,7 +336,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const PluginOptions& options,
                                      const PluginMetricManagerPtr& metricManager) {
     bool isNeedProcessCache = true;
-    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE) {
+    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE
+        || type == PluginType::CPU_PROFILING) {
         isNeedProcessCache = false;
     }
     auto& pluginMgr = getPluginState(type).mManager;
@@ -441,7 +442,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
     if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
-        && type != PluginType::AGENTSIGHT_OBSERVE) {
+        && type != PluginType::AGENTSIGHT_OBSERVE && type != PluginType::CPU_PROFILING) {
         RegisterPluginPerfBuffers(type);
     }
 
@@ -784,7 +785,7 @@ void EBPFServer::RegisterPluginPerfBuffers(PluginType type) {
 
     for (int epollFd : epollFds) {
         if (epollFd >= 0) {
-            struct epoll_event event {};
+            struct epoll_event event{};
             event.events = EPOLLIN;
             event.data.u32 = static_cast<uint32_t>(type);
 
@@ -815,7 +816,7 @@ void EBPFServer::RegisterExternalEpollFd(PluginType type, int fd) {
     if (type != PluginType::AGENTSIGHT_OBSERVE) {
         return;
     }
-    struct epoll_event event {};
+    struct epoll_event event{};
     event.events = EPOLLIN;
     event.data.u32 = static_cast<uint32_t>(type);
     if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, fd, &event) != 0) {
