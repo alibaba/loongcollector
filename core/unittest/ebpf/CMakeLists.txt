@@ -60,6 +60,7 @@ add_unittest(agentsight_manager_unittest AgentsightManagerUnittest.cpp)
 add_unittest(retryable_event_unittest RetryableEventUnittest.cpp)
 add_unittest(http_retryable_event_unittest HttpRetryableEventUnittest.cpp)
 add_unittest(process_scanner_unittest ProcessScannerUnittest.cpp)
+add_unittest(process_discovery_manager_unittest ProcessDiscoveryManagerUnittest.cpp)
 
 add_driver_unittest(id_allocator_unittest IdAllocatorUnittest.cpp)
 add_driver_unittest(ebpf_driver_log_unittest EBPFDriverLogUnittest.cpp)
