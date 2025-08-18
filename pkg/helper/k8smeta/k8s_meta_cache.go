@@ -7,6 +7,7 @@ import (
 
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
+	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	storage "k8s.io/api/storage/v1"
@@ -44,6 +45,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.schema = runtime.NewScheme()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
+	_ = batchv1beta1.AddToScheme(m.schema)
 	_ = app.AddToScheme(m.schema)
 	_ = networking.AddToScheme(m.schema)
 	_ = storage.AddToScheme(m.schema)
@@ -164,7 +166,7 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	case DAEMONSET:
 		informer = factory.Apps().V1().DaemonSets().Informer()
 	case CRONJOB:
-		informer = factory.Batch().V1().CronJobs().Informer()
+		informer = m.getCronJobInformer(factory)
 	case JOB:
 		informer = factory.Batch().V1().Jobs().Informer()
 	case NODE:
@@ -214,6 +216,8 @@ func (m *k8sMetaCache) preProcess(obj interface{}) interface{} {
 	switch m.resourceType {
 	case POD:
 		return m.preProcessPod(obj)
+	case CRONJOB:
+		return m.preProcessCronJob(obj)
 	default:
 		return m.preProcessCommon(obj)
 	}
@@ -261,6 +265,35 @@ func (m *k8sMetaCache) preProcessPod(obj interface{}) interface{} {
 	return pod
 }
 
+func (m *k8sMetaCache) preProcessCronJob(obj interface{}) interface{} {
+	// 尝试处理v1 CronJob
+	if cronJob, ok := obj.(*batch.CronJob); ok {
+		return m.preProcessCommon(cronJob)
+	}
+
+	// 尝试处理v1beta1 CronJob，转换为v1格式
+	if cronJob, ok := obj.(*batchv1beta1.CronJob); ok {
+		// 转换为v1格式，保持与现有代码的兼容性
+		v1CronJob := &batch.CronJob{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              cronJob.Name,
+				Namespace:         cronJob.Namespace,
+				Labels:            cronJob.Labels,
+				Annotations:       cronJob.Annotations,
+				CreationTimestamp: cronJob.CreationTimestamp,
+			},
+			Spec: batch.CronJobSpec{
+				Schedule: cronJob.Spec.Schedule,
+				Suspend:  cronJob.Spec.Suspend,
+			},
+		}
+		return m.preProcessCommon(v1CronJob)
+	}
+
+	// 如果都不是，返回原始对象
+	return m.preProcessCommon(obj)
+}
+
 func generateCommonKey(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
@@ -269,6 +302,65 @@ func generateCommonKey(obj interface{}) ([]string, error) {
 	return []string{generateNameWithNamespaceKey(meta.GetNamespace(), meta.GetName())}, nil
 }
 
+// // getCronJobInformer returns the appropriate CronJob informer based on API availability
+// func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
+// 	// 首先尝试v1 API
+// 	v1Informer := factory.Batch().V1().CronJobs().Informer()
+
+// 	// 测试v1 API是否可用 - 通过尝试list资源来检测
+// 	_, err := factory.Batch().V1().CronJobs().Lister().List(nil)
+// 	if err == nil {
+// 		logger.Info(context.Background(), "Using CronJob v1 API")
+// 		return v1Informer
+// 	}
+
+// 	// 如果v1 API不可用，fallback到v1beta1
+// 	logger.Info(context.Background(), "CronJob v1 API not available, falling back to v1beta1", "error", err)
+// 	beta1Informer := factory.Batch().V1beta1().CronJobs().Informer()
+
+// 	// 测试v1beta1 API是否可用
+// 	_, err = factory.Batch().V1beta1().CronJobs().Lister().List(nil)
+// 	if err != nil {
+// 		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "Both CronJob v1 and v1beta1 APIs are unavailable", "error", err)
+// 		return nil
+// 	}
+
+// 	logger.Info(context.Background(), "Successfully using CronJob v1beta1 API")
+// 	return beta1Informer
+// }
+
+func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
+	// using v1 first
+	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1")
+	if err == nil && containsResource(resourceList.APIResources, "cronjobs") {
+		logger.Info(context.Background(), "Using CronJob v1 API")
+		return factory.Batch().V1().CronJobs().Informer()
+	}
+	// fallback v1beta1
+	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
+	if err != nil {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode,
+			"Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
+		return nil
+	}
+	if !containsResource(resourceList.APIResources, "cronjobs") {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode,
+			"CronJob API not found in both v1 and v1beta1")
+		return nil
+	}
+	logger.Info(context.Background(), "Using CronJob v1beta1 API")
+	return factory.Batch().V1beta1().CronJobs().Informer()
+}
+
+// helper: 判断资源列表里是否包含指定名称
+func containsResource(resources []metav1.APIResource, name string) bool {
+	for _, r := range resources {
+		if r.Name == name {
+			return true
+		}
+	}
+	return false
+}
 func generateNodeKey(obj interface{}) ([]string, error) {
 	node, err := meta.Accessor(obj)
 	if err != nil {

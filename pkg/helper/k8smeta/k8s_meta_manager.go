@@ -95,6 +95,7 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	// set protobuf support for config
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
+	config.UserAgent = "entityCollectorLoongcollector"
 
 	// 创建 Kubernetes 客户端
 	clientset, err := kubernetes.NewForConfig(config)
@@ -115,7 +116,8 @@ func (m *MetaManager) Init(configPath string) (err error) {
 
 	go func() {
 		startTime := time.Now()
-		for _, cache := range m.cacheMap {
+		for resourceType, cache := range m.cacheMap {
+			logger.Info(context.Background(), resourceType, "init success")
 			cache.init(clientset)
 		}
 		m.ready.Store(true)
