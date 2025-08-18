@@ -18,7 +18,6 @@
 
 #include <memory>
 #include <string>
-#include <unordered_set>
 
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/memory/SourceBuffer.h"
@@ -83,7 +82,6 @@ public:
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
     PipelineEventGroup Copy() const;
-    PipelineEventGroup CopySourceBuffer() const;
 
     std::unique_ptr<LogEvent> CreateLogEvent(bool fromPool = false, EventPool* pool = nullptr);
     std::unique_ptr<MetricEvent> CreateMetricEvent(bool fromPool = false, EventPool* pool = nullptr);
@@ -100,8 +98,6 @@ public:
     void ReserveEvents(size_t size) { mEvents.reserve(size); }
 
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
-    void AddSourceBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer);
-    std::unordered_set<std::shared_ptr<SourceBuffer>> GetAllSourceBuffers() { return mAdditionalSourceBuffers; }
 
     void SetMetadata(EventGroupMetaKey key, StringView val);
     void SetMetadata(EventGroupMetaKey key, const std::string& val);
@@ -146,8 +142,6 @@ private:
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
-
-    std::unordered_set<std::shared_ptr<SourceBuffer>> mAdditionalSourceBuffers;
 };
 
 } // namespace logtail

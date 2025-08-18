@@ -166,13 +166,11 @@ int NetworkSecurityManager::SendEvents() {
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
-            auto processCacheValue = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent);
-            if (!processCacheValue) {
+            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            if (!hit) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;
             }
-            eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
-            eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
 
             auto protocolSb = sourceBuffer->CopyString(GetProtocolString(group->mProtocol));
             auto familySb = sourceBuffer->CopyString(GetFamilyString(group->mFamily));

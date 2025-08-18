@@ -67,8 +67,7 @@ PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
     : mMetadata(std::move(rhs.mMetadata)),
       mTags(std::move(rhs.mTags)),
       mEvents(std::move(rhs.mEvents)),
-      mSourceBuffer(std::move(rhs.mSourceBuffer)),
-      mAdditionalSourceBuffers(std::move(rhs.mAdditionalSourceBuffers)) {
+      mSourceBuffer(std::move(rhs.mSourceBuffer)) {
     for (auto& item : mEvents) {
         item->ResetPipelineEventGroup(this);
     }
@@ -102,7 +101,6 @@ PipelineEventGroup& PipelineEventGroup::operator=(PipelineEventGroup&& rhs) noex
         mTags = std::move(rhs.mTags);
         mEvents = std::move(rhs.mEvents);
         mSourceBuffer = std::move(rhs.mSourceBuffer);
-        mAdditionalSourceBuffers = std::move(rhs.mAdditionalSourceBuffers);
         for (auto& item : mEvents) {
             item->ResetPipelineEventGroup(this);
         }
@@ -115,16 +113,10 @@ PipelineEventGroup PipelineEventGroup::Copy() const {
     res.mMetadata = mMetadata;
     res.mTags = mTags;
     res.mExactlyOnceCheckpoint = mExactlyOnceCheckpoint;
-    res.mAdditionalSourceBuffers = mAdditionalSourceBuffers;
     for (auto& event : mEvents) {
         res.mEvents.emplace_back(event.Copy());
         res.mEvents.back()->ResetPipelineEventGroup(&res);
     }
-    return res;
-}
-PipelineEventGroup PipelineEventGroup::CopySourceBuffer() const {
-    PipelineEventGroup res(mSourceBuffer);
-    res.mAdditionalSourceBuffers = mAdditionalSourceBuffers;
     return res;
 }
 
@@ -242,14 +234,6 @@ RawEvent* PipelineEventGroup::AddRawEvent(bool fromPool, EventPool* pool) {
     }
     mEvents.emplace_back(e, fromPool, pool);
     return e;
-}
-
-void PipelineEventGroup::AddSourceBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer) {
-    if (sourceBuffer == nullptr || sourceBuffer == mSourceBuffer) {
-        return;
-    }
-
-    mAdditionalSourceBuffers.insert(sourceBuffer);
 }
 
 void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, StringView val) {

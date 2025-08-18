@@ -154,9 +154,6 @@ public:
                                g.GetSourceBuffer(),
                                g.GetExactlyOnceCheckpoint(),
                                g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
-                    for (const auto& additionalSourceBuffer : g.GetAllSourceBuffers()) {
-                        item.AddSourceBuffer(additionalSourceBuffer);
-                    }
                 }
                 item.Add(std::move(e));
                 if (mEventFlushStrategy.SizeReachingUpperLimit(item.GetStatus())) {
@@ -198,9 +195,6 @@ public:
                                g.GetSourceBuffer(),
                                g.GetExactlyOnceCheckpoint(),
                                g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
-                    for (const auto& additionalSourceBuffer : g.GetAllSourceBuffers()) {
-                        item.AddSourceBuffer(additionalSourceBuffer);
-                    }
                     TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
                                                                      mFlusher->GetFlusherIndex(),
                                                                      key,
@@ -210,9 +204,6 @@ public:
                     ADD_GAUGE(mBufferedDataSizeByte, item.DataSize());
                 } else if (i == 0) {
                     item.AddSourceBuffer(g.GetSourceBuffer());
-                    for (const auto& additionalSourceBuffer : g.GetAllSourceBuffers()) {
-                        item.AddSourceBuffer(additionalSourceBuffer);
-                    }
                 }
                 ADD_GAUGE(mBufferedEventsTotal, 1);
                 ADD_GAUGE(mBufferedDataSizeByte, e->DataSize());

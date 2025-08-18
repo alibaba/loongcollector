@@ -66,7 +66,7 @@ public:
     void RecordDataEvent(msg_data* eventPtr);
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
-    std::shared_ptr<ProcessCacheValue> AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
+    bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
     ProcessCache& GetProcessCache() { return mProcessCache; }
