@@ -3,10 +3,8 @@ package k8smeta
 import (
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
-	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -68,120 +66,6 @@ const (
 	K8S_CRONJOB_TYPE     = "CronJob"
 	K8S_JOB_TYPE         = "Job"
 )
-
-// CronJobVersion represents the version of CronJob API being used
-type CronJobVersion string
-
-const (
-	CronJobV1      CronJobVersion = "v1"
-	CronJobV1Beta1 CronJobVersion = "v1beta1"
-)
-
-// CronJobWrapper wraps both v1 and v1beta1 CronJob types for unified processing
-type CronJobWrapper struct {
-	Version CronJobVersion
-	V1      *batch.CronJob
-	V1Beta1 *batchv1beta1.CronJob
-}
-
-// GetName returns the name of the CronJob regardless of version
-func (cw *CronJobWrapper) GetName() string {
-	if cw.V1 != nil {
-		return cw.V1.Name
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Name
-	}
-	return ""
-}
-
-// GetNamespace returns the namespace of the CronJob regardless of version
-func (cw *CronJobWrapper) GetNamespace() string {
-	if cw.V1 != nil {
-		return cw.V1.Namespace
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Namespace
-	}
-	return ""
-}
-
-// GetKind returns the kind of the CronJob regardless of version
-func (cw *CronJobWrapper) GetKind() string {
-	if cw.V1 != nil {
-		return cw.V1.Kind
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Kind
-	}
-	return "CronJob"
-}
-
-// GetAPIVersion returns the API version of the CronJob
-func (cw *CronJobWrapper) GetAPIVersion() string {
-	if cw.V1 != nil {
-		return cw.V1.APIVersion
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.APIVersion
-	}
-	return ""
-}
-
-// GetLabels returns the labels of the CronJob regardless of version
-func (cw *CronJobWrapper) GetLabels() map[string]string {
-	if cw.V1 != nil {
-		return cw.V1.Labels
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Labels
-	}
-	return nil
-}
-
-// GetAnnotations returns the annotations of the CronJob regardless of version
-func (cw *CronJobWrapper) GetAnnotations() map[string]string {
-	if cw.V1 != nil {
-		return cw.V1.Annotations
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Annotations
-	}
-	return nil
-}
-
-// GetCreationTimestamp returns the creation timestamp of the CronJob regardless of version
-func (cw *CronJobWrapper) GetCreationTimestamp() metav1.Time {
-	if cw.V1 != nil {
-		return cw.V1.CreationTimestamp
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.CreationTimestamp
-	}
-	return metav1.Time{}
-}
-
-// GetSchedule returns the schedule of the CronJob regardless of version
-func (cw *CronJobWrapper) GetSchedule() string {
-	if cw.V1 != nil {
-		return cw.V1.Spec.Schedule
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Spec.Schedule
-	}
-	return ""
-}
-
-// GetSuspend returns the suspend status of the CronJob regardless of version
-func (cw *CronJobWrapper) GetSuspend() *bool {
-	if cw.V1 != nil {
-		return cw.V1.Spec.Suspend
-	}
-	if cw.V1Beta1 != nil {
-		return cw.V1Beta1.Spec.Suspend
-	}
-	return nil
-}
 
 var AllResources = []string{
 	POD,
