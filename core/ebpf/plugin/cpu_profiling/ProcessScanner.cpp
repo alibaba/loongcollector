@@ -111,7 +111,7 @@ void ProcessScanner::listAllProcesses(std::vector<ProcessEntry> &proc_out) {
         // /proc/<pid>/cmdline use '\0' as separator, replace it with space
         std::replace(cmdline.begin(), cmdline.end(), '\0', ' ');
 
-        proc_out.emplace_back(std::move(cmdline), pid);
+        proc_out.emplace_back(cmdline, pid);
     }
 }
 

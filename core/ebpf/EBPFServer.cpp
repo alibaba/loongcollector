@@ -287,7 +287,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const PluginOptions& options,
                                      const PluginMetricManagerPtr& metricManager) {
     bool isNeedProcessCache = false;
-    if (type != PluginType::NETWORK_OBSERVE) {
+    if (type != PluginType::NETWORK_OBSERVE && type != PluginType::CPU_PROFILING) {
         isNeedProcessCache = true;
     }
     auto& pluginMgr = getPluginState(type).mManager;
@@ -384,7 +384,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
-    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE && type != PluginType::CPU_PROFILING) {
         RegisterPluginPerfBuffers(type);
     }
 

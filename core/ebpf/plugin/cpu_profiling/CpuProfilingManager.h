@@ -73,7 +73,7 @@ public:
                                  const char *stack, uint32_t cnt);
 
 private:
-    std::atomic<bool> mInited;
+    std::atomic<bool> mInited = false;
 
     std::string mConfigName;
     const CollectionPipelineContext *mPipelineCtx{nullptr};
