@@ -182,7 +182,6 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         ConfigMock config("obsolete_config_2", std::move(configJson), filepath);
         APSARA_TEST_FALSE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
     }
-
     // 使用错误处理来安全地删除目录
     error_code ec;
     filesystem::remove_all("config", ec);
