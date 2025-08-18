@@ -90,12 +90,14 @@ func (m *k8sMetaCache) UnRegisterSendFunc(key string) {
 }
 
 func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
+	defer panicRecover()
 	factory, informer := m.getFactoryInformer()
 	if informer == nil {
 		return
 	}
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			defer panicRecover()
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeAdd,
@@ -109,6 +111,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			metaManager.addEventCount.Add(1)
 		},
 		UpdateFunc: func(oldObj interface{}, obj interface{}) {
+			defer panicRecover()
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,
@@ -122,6 +125,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			metaManager.updateEventCount.Add(1)
 		},
 		DeleteFunc: func(obj interface{}) {
+			defer panicRecover()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeDelete,
 				Object: &ObjectWrapper{
