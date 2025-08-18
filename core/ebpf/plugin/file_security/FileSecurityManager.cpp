@@ -154,6 +154,7 @@ int FileSecurityManager::SendEvents() {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             } else {
                 eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
+                eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
             }
 
             auto pathSb = sourceBuffer->CopyString(group->mPath);

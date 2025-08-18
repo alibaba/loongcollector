@@ -111,6 +111,7 @@ public:
     }
 
     std::shared_ptr<SourceBuffer> GetSourceBuffer() { return mContents.GetSourceBuffer(); }
+    std::shared_ptr<SourceBuffer> GetParentBuffer() { return mParent->GetSourceBuffer(); }
 
     int RefCount() { return mRefCount; }
 
