@@ -195,11 +195,14 @@ int ProcessSecurityManager::SendEvents() {
                 LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
-            if (!hit) {
+            auto processCacheValue = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent);
+            if (!processCacheValue) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
             }
+            eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
+            eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
+
             for (const auto& innerEvent : group->mInnerEvents) {
                 auto* logEvent = eventGroup.AddLogEvent();
                 for (const auto& it : *sharedEvent) {

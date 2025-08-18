@@ -146,12 +146,14 @@ int FileSecurityManager::SendEvents() {
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
             auto sharedEvent = sharedEventGroup.CreateLogEvent();
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
-            if (!hit) {
+            auto processCacheValue = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent);
+            if (!processCacheValue) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
+            } else {
+                eventGroup.AddSourceBuffer(processCacheValue->GetSourceBuffer());
+                eventGroup.AddSourceBuffer(processCacheValue->GetParentBuffer());
             }
 
-            auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& commonEvent : group->mInnerEvents) {
                 FileEvent* innerEvent = static_cast<FileEvent*>(commonEvent.get());
                 auto* logEvent = eventGroup.AddLogEvent();
