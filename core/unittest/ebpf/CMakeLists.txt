@@ -5,6 +5,7 @@ include(GoogleTest)
 
 set(EBPF_DRIVER_DIR "${CMAKE_BINARY_DIR}/ebpf/driver")
 set(COOLBPF_DIR "${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src")
+message(STATUS "EBPF_DRIVER_DIR: ${EBPF_DRIVER_DIR}")
 
 function(add_driver_unittest target_name source_file)
     add_executable(${target_name} ${source_file})

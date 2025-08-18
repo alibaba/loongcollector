@@ -117,6 +117,7 @@ struct NetworkObserveConfig {
     long mUpcaOffset;
     long mUppsOffset;
     long mUpcrOffset;
+    long mUpgsOffset;
 
     void* mCustomCtx;
     eBPFLogHandler mLogHandler;
