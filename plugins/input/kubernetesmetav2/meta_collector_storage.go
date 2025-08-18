@@ -18,8 +18,12 @@ func (m *metaCollector) processStorageClassEntity(data *k8smeta.ObjectWrapper, m
 
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		if obj.ReclaimPolicy != nil {
 			log.Contents.Add("reclaim_policy", string(*obj.ReclaimPolicy))
 		} else {

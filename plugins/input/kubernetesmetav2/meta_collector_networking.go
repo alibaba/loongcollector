@@ -19,8 +19,12 @@ func (m *metaCollector) processIngressEntity(data *k8smeta.ObjectWrapper, method
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
