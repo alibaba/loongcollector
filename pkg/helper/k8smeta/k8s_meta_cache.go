@@ -350,7 +350,7 @@ func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactor
 		logger.Info(context.Background(), "Using CronJob v1 API")
 		return factory.Batch().V1().CronJobs().Informer()
 	}
-	//2. 如不支持v1，那么 fallback到 v1beta1
+	// 2. 如不支持v1，那么 fallback到 v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
 	if err != nil {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
