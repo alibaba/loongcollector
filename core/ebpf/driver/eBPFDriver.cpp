@@ -157,6 +157,14 @@ void DeletePerfBuffers(logtail::ebpf::PluginType pluginType) {
     }
 }
 
+void ExtractContainerIdPrefix(const char* dockerId, int& prefixLen) {
+    static std::regex cidRegex = std::regex("[a-f0-9]{64}");
+    std::cmatch match;
+    if (std::regex_search(dockerId, match, cidRegex)) {
+        prefixLen = match.position();
+    }
+}
+
 int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 1. load skeleton
     // 2. start consumer
@@ -187,8 +195,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                                 config->mUppsOffset,
                                 config->mUpcrOffset);
             if (err) {
-                EBPF_LOG(
-                    logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "network observe: ebpf_init fail ret:%d\n", err);
+                EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                         "[eBPFNetworkObserver] network observe: ebpf_init fail ret:%d\n",
+                         err);
                 return err;
             }
             // config
@@ -205,31 +214,31 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 // get self info ...
                 int res = ebpf_init_self_runtime_info(config->mSo.data(), config->mUpgsOffset, &info);
                 if (res || info.docker_id_length <= 0) {
-                    EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                             "dockerid len invalid!! skip cid filter... docker id len %d, res %d\n",
-                             info.docker_id_length, res);
+                    EBPF_LOG(
+                        logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                        "[eBPFNetworkObserver] dockerid len invalid, skip set cid filter, docker id len %d, res %d\n",
+                        info.docker_id_length,
+                        res);
                 } else {
-                    static std::regex cidRegex = std::regex("[a-f0-9]{64}");
-                    std::cmatch match;
-                    if (std::regex_search(info.docker_id, match, cidRegex)) {
-                        prefixLen = match.position();
-                        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
-                                "docker id from kernel %s, docker id len %d, pid %d, position %d\n",
-                                info.docker_id, info.docker_id_length, info.pid, prefixLen);
-                    }
+                    ExtractContainerIdPrefix(info.docker_id, prefixLen);
+                    EBPF_LOG(
+                        logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO,
+                        "[eBPFNetworkObserver] docker id from kernel %s, docker id len %d, pid %d, guess prefix %d\n",
+                        info.docker_id,
+                        info.docker_id_length,
+                        info.pid,
+                        prefixLen);
                 }
-                
+
                 if (prefixLen > 0) {
                     SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, prefixLen);
                 }
-                
-                // SetCoolBpfConfig((int32_t)CONTAINER_ID_FILTER, config->mCidOffset);
             }
-            //
             err = ebpf_start();
             if (err) {
-                EBPF_LOG(
-                    logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "network observe: ebpf_start fail ret:%d\n", err);
+                EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                         "[eBPFNetworkObserver] network observe: ebpf_start fail ret:%d\n",
+                         err);
                 return err;
             }
             break;
