@@ -340,6 +340,10 @@ func generateCommonKey(obj interface{}) ([]string, error) {
 
 // CronJobInformer 在 client-go 1.26+下不仅提供batch/v1（1.21以上）支持还提供batch/v1beta1（1.21以下）支持，因此可以兼容1.21以下版本的k8s
 func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
+	if m.clientset == nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "clientset is nil")
+		return nil
+	}
 	// 1. 探测 v1 是否支持当前k8s集群
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1")
 	if err == nil && containsResource(resourceList.APIResources, "cronjobs") {
@@ -364,6 +368,10 @@ func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactor
 
 // IngressInformer 在 client-go 1.26+下不仅提供networking.k8s.io/v1（1.19以上）支持还提供extensions/v1beta1（1.19以下）支持，因此可以兼容1.19以下版本的k8s
 func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
+	if m.clientset == nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "clientset is nil")
+		return nil
+	}
 	// 1. 探测 networking.k8s.io/v1 是否支持当前k8s集群
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("networking.k8s.io/v1")
 	if err == nil && containsResource(resourceList.APIResources, "ingresses") {
