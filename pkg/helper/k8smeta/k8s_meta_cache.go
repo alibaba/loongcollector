@@ -9,6 +9,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	v1 "k8s.io/api/core/v1"
+	extensionsV1beta1 "k8s.io/api/extensions/v1beta1"
 	networking "k8s.io/api/networking/v1"
 	storage "k8s.io/api/storage/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -47,6 +48,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
 	_ = app.AddToScheme(m.schema)
+	_ = extensionsV1beta1.AddToScheme(m.schema)
 	_ = networking.AddToScheme(m.schema)
 	_ = storage.AddToScheme(m.schema)
 	return m
@@ -182,7 +184,7 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	case STORAGECLASS:
 		informer = factory.Storage().V1().StorageClasses().Informer()
 	case INGRESS:
-		informer = factory.Networking().V1().Ingresses().Informer()
+		informer = m.getIngressInformer(factory)
 	default:
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", m.resourceType)
 		return factory, nil
@@ -218,6 +220,8 @@ func (m *k8sMetaCache) preProcess(obj interface{}) interface{} {
 		return m.preProcessPod(obj)
 	case CRONJOB:
 		return m.preProcessCronJob(obj)
+	case INGRESS:
+		return m.preProcessIngress(obj)
 	default:
 		return m.preProcessCommon(obj)
 	}
@@ -294,6 +298,34 @@ func (m *k8sMetaCache) preProcessCronJob(obj interface{}) interface{} {
 	return m.preProcessCommon(obj)
 }
 
+func (m *k8sMetaCache) preProcessIngress(obj interface{}) interface{} {
+	// 尝试处理v1 Ingress
+	if ingress, ok := obj.(*networking.Ingress); ok {
+		return m.preProcessCommon(ingress)
+	}
+
+	// 尝试处理v1beta1 Ingress，转换为v1格式
+	if ingress, ok := obj.(*extensionsV1beta1.Ingress); ok {
+		// 转换为v1格式，保持与现有代码的兼容性
+		v1Ingress := &networking.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              ingress.Name,
+				Namespace:         ingress.Namespace,
+				Labels:            ingress.Labels,
+				Annotations:       ingress.Annotations,
+				CreationTimestamp: ingress.CreationTimestamp,
+			},
+			Spec: networking.IngressSpec{
+				IngressClassName: ingress.Spec.IngressClassName,
+			},
+		}
+		return m.preProcessCommon(v1Ingress)
+	}
+
+	// 如果都不是，返回原始对象
+	return m.preProcessCommon(obj)
+}
+
 func generateCommonKey(obj interface{}) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
@@ -302,54 +334,53 @@ func generateCommonKey(obj interface{}) ([]string, error) {
 	return []string{generateNameWithNamespaceKey(meta.GetNamespace(), meta.GetName())}, nil
 }
 
-// // getCronJobInformer returns the appropriate CronJob informer based on API availability
-// func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
-// 	// 首先尝试v1 API
-// 	v1Informer := factory.Batch().V1().CronJobs().Informer()
-
-// 	// 测试v1 API是否可用 - 通过尝试list资源来检测
-// 	_, err := factory.Batch().V1().CronJobs().Lister().List(nil)
-// 	if err == nil {
-// 		logger.Info(context.Background(), "Using CronJob v1 API")
-// 		return v1Informer
-// 	}
-
-// 	// 如果v1 API不可用，fallback到v1beta1
-// 	logger.Info(context.Background(), "CronJob v1 API not available, falling back to v1beta1", "error", err)
-// 	beta1Informer := factory.Batch().V1beta1().CronJobs().Informer()
-
-// 	// 测试v1beta1 API是否可用
-// 	_, err = factory.Batch().V1beta1().CronJobs().Lister().List(nil)
-// 	if err != nil {
-// 		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "Both CronJob v1 and v1beta1 APIs are unavailable", "error", err)
-// 		return nil
-// 	}
-
-// 	logger.Info(context.Background(), "Successfully using CronJob v1beta1 API")
-// 	return beta1Informer
-// }
-
+// CronJobInformer 在 client-go 1.26+下不仅提供batch/v1（1.21以上）支持还提供batch/v1beta1（1.21以下）支持，因此可以兼容1.21以下版本的k8s
 func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
-	// using v1 first
+	// 1. 探测 v1 是否支持当前k8s集群
 	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1")
 	if err == nil && containsResource(resourceList.APIResources, "cronjobs") {
 		logger.Info(context.Background(), "Using CronJob v1 API")
 		return factory.Batch().V1().CronJobs().Informer()
 	}
-	// fallback v1beta1
+	//2. 如不支持v1，那么 fallback到 v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
 	if err != nil {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode,
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
 			"Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
 		return nil
 	}
 	if !containsResource(resourceList.APIResources, "cronjobs") {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode,
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
 			"CronJob API not found in both v1 and v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using CronJob v1beta1 API")
 	return factory.Batch().V1beta1().CronJobs().Informer()
+}
+
+// IngressInformer 在 client-go 1.26+下不仅提供networking.k8s.io/v1（1.19以上）支持还提供extensions/v1beta1（1.19以下）支持，因此可以兼容1.19以下版本的k8s
+func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactory) cache.SharedIndexInformer {
+	// 1. 探测 networking.k8s.io/v1 是否支持当前k8s集群
+	resourceList, err := m.clientset.Discovery().ServerResourcesForGroupVersion("networking.k8s.io/v1")
+	if err == nil && containsResource(resourceList.APIResources, "ingresses") {
+		logger.Info(context.Background(), "Using Ingress networking.k8s.io/v1 API")
+		return factory.Networking().V1().Ingresses().Informer()
+	}
+
+	// 2. 如不支持networking.k8s.io/v1，那么 fallback到 extensions/v1beta1
+	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
+	if err != nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
+		return nil
+	}
+	if !containsResource(resourceList.APIResources, "ingresses") {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
+		return nil
+	}
+	logger.Info(context.Background(), "Using Ingress extensions/v1beta1 API")
+	return factory.Extensions().V1beta1().Ingresses().Informer()
 }
 
 // helper: 判断资源列表里是否包含指定名称
