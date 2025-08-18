@@ -857,13 +857,13 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
                 tagMetric->SetName(kMetricNameTag);
                 tagMetric->SetValue(UntypedSingleValue{1.0});
                 tagMetric->SetTimestamp(seconds, 0);
-                tagMetric->SetTagNoCopy(kTagAgentVersionKey, kTagV1Value);
+                tagMetric->SetTag(kTagAgentVersionKey, ILOGTAIL_VERSION);
                 tagMetric->SetTag(kTagAppKey, appInfo->mAppName); // app ===> appname
                 tagMetric->SetTag(kTagResourceIdKey, appInfo->mAppId); // resourceid -==> pid
                 tagMetric->SetTag(kTagCmsWorkspaceKey, appInfo->mWorkspace); // workspace ===>
                 tagMetric->SetTag(kTagArmsServiceIdKey, appInfo->mServiceId); // serviceId ===>
                 tagMetric->SetTagNoCopy(kTagResourceTypeKey, kTagApplicationValue); // resourcetype ===> APPLICATION
-                tagMetric->SetTagNoCopy(kTagVersionKey, kTagV1Value); // version ===> v1
+                tagMetric->SetTag(kTagVersionKey, ILOGTAIL_VERSION); // version
                 tagMetric->SetTagNoCopy(kTagClusterIdKey,
                                         mClusterId); // clusterId ===> TODO read from env _cluster_id_
                 tagMetric->SetTagNoCopy(kTagHostKey, group->mTags.Get<kIp>()); // host ===>
@@ -1679,12 +1679,16 @@ const static std::string kAgentInfoHostnameKey = "hostname";
 const static std::string kAgentInfoAppnameKey = "appName";
 const static std::string kAgentInfoLanguageKey = "language";
 const static std::string kAgentInfoAgentVersionKey = "agentVersion";
+const static std::string kAgentInfoAgentEvnKey = "agentEnv";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
 const static std::string kAgentInfoTimestampKey = "timestamp";
 const static std::string kAgentInfoServiceIdKey = "acs_arms_service_id";
 const static std::string kAgentInfoWorkspaceKey = "acs_cms_workspace";
 const static std::string kAgentInfoPropertiesKey = "properties";
 
+const static std::string kAgentInfoAgentEvnACKVal = "ACSK8S";
+const static std::string kAgentInfoAgentEvnECSAutoVal = "ECS_AUTO";
+const static std::string kAgentInfoAgentEvnDefaultVal = "DEFAULT";
 const static std::string kAgentInfoPropertiesValueClusterId = "k8s.cluster.uid";
 const static std::string kAgentInfoPropertiesValueClusterName = "k8s.cluster.name";
 const static std::string kAgentInfoPropertiesValueNamespace = "k8s.namespace.name";
@@ -1747,6 +1751,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+        event->SetContent(kAgentInfoAgentEvnKey, kAgentInfoAgentEvnACKVal);
         if (Connection::gSelfPodIp.empty()) {
             event->SetContent(kAgentInfoIpKey, GetHostIp());
         } else {
