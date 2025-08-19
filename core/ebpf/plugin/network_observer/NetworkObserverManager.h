@@ -225,10 +225,7 @@ private:
         std::set<std::string> containerIds;
     };
 
-    bool reportAgentInfo(const time_t& now,
-                         std::shared_ptr<SourceBuffer>& sourceBuffer,
-                         size_t workloadKey,
-                         const WorkloadConfig& workloadConfig);
+    bool reportAgentInfo(const time_t& now, size_t workloadKey, const WorkloadConfig& workloadConfig);
 
     mutable ReadWriteLock mAppConfigLock;
     std::atomic_int mConfigVersion = 0;

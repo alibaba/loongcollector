@@ -1727,7 +1727,6 @@ void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
 }
 
 bool NetworkObserverManager::reportAgentInfo(const time_t& now,
-                                             std::shared_ptr<SourceBuffer>& sourceBuffer,
                                              size_t workloadKey,
                                              const WorkloadConfig& workloadConfig) {
     const auto& appConfig = workloadConfig.config;
@@ -1736,6 +1735,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
                   ("[AgentInfo] failed to find app config for workloadKey from mWorkloadConfigs", workloadKey));
         return false;
     }
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
     if (workloadKey == kGlobalWorkloadKey) {
@@ -1859,10 +1859,9 @@ void NetworkObserverManager::ReportAgentInfo() {
     const time_t now = time(nullptr);
     for (const auto& configToWorkload : configToWorkloadsReplica) {
         const auto& workloadKeys = configToWorkload.second;
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
         const auto& itGlobal = workloadConfigsReplica.find(kGlobalWorkloadKey);
         if (itGlobal != workloadConfigsReplica.end()) {
-            cnt += reportAgentInfo(now, sourceBuffer, kGlobalWorkloadKey, itGlobal->second);
+            cnt += reportAgentInfo(now, kGlobalWorkloadKey, itGlobal->second);
             LOG_DEBUG(sLogger, ("[AgentInfo] generate agentinfo for globalKey, res", cnt));
         }
 
@@ -1874,7 +1873,7 @@ void NetworkObserverManager::ReportAgentInfo() {
 
             const auto& it = workloadConfigsReplica.find(workloadKey);
             if (it != workloadConfigsReplica.end()) {
-                cnt += reportAgentInfo(now, sourceBuffer, workloadKey, it->second);
+                cnt += reportAgentInfo(now, workloadKey, it->second);
             } else {
                 LOG_DEBUG(sLogger, ("[AgentInfo] failed to find workloadKey", workloadKey));
             }
