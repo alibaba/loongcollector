@@ -586,12 +586,12 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 #else
         if (init && needPush) {
             pushEvents(EventDataType::LOG,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushLogsTotal,
-                                pushLogGroupTotal);
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushLogsTotal,
+                       pushLogGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push log ", ""));
         }
@@ -761,12 +761,12 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
         pushEvents(EventDataType::NET_METRIC,
-                            std::move(eventGroup),
-                            configName,
-                            queueKey,
-                            pluginIdx,
-                            pushMetricsTotal,
-                            pushMetricGroupTotal);
+                   std::move(eventGroup),
+                   configName,
+                   queueKey,
+                   pluginIdx,
+                   pushMetricsTotal,
+                   pushMetricGroupTotal);
 #endif
     }
     return true;
@@ -948,12 +948,12 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
 #else
         if (init) {
             pushEvents(EventDataType::APP_METRIC,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushMetricsTotal,
-                                pushMetricGroupTotal);
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushMetricsTotal,
+                       pushMetricGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("appid is empty, no need to push", ""));
         }
@@ -1089,12 +1089,12 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 #else
         if (init && needPush) {
             pushEvents(EventDataType::APP_SPAN,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushSpansTotal,
-                                pushSpanGroupTotal);
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushSpansTotal,
+                       pushSpanGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
         }
@@ -1658,12 +1658,12 @@ const static std::string kAgentInfoAgentVersionKey = "agentVersion";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
 
 void NetworkObserverManager::pushEvents(EventDataType dataType,
-                                                 PipelineEventGroup&& eventGroup,
-                                                 const StringView& configName,
-                                                 QueueKey queueKey,
-                                                 uint32_t pluginIdx,
-                                                 CounterPtr& eventCounter,
-                                                 CounterPtr& eventGroupCounter) {
+                                        PipelineEventGroup&& eventGroup,
+                                        const StringView& configName,
+                                        QueueKey queueKey,
+                                        uint32_t pluginIdx,
+                                        CounterPtr& eventCounter,
+                                        CounterPtr& eventGroupCounter) {
     size_t eventsSize = eventGroup.GetEvents().size();
     if (eventsSize > 0) {
         // push
@@ -1673,17 +1673,15 @@ void NetworkObserverManager::pushEvents(EventDataType dataType,
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
 
         if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-            LOG_WARNING(
-                sLogger,
-                ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
-                    "[NetworkObserver] push to queue failed!", ""));
+            LOG_WARNING(sLogger,
+                        ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
+                            "[NetworkObserver] push to queue failed!", ""));
             ADD_COUNTER(mPushLogFailedTotal, eventsSize);
         } else {
             LOG_DEBUG(sLogger,
-                        ("NetworkObserver push events successful, eventSize:",
-                        eventsSize)("dataType", magic_enum::enum_name(dataType)));
+                      ("NetworkObserver push events successful, eventSize:",
+                       eventsSize)("dataType", magic_enum::enum_name(dataType)));
         }
-
     }
 }
 
@@ -1753,12 +1751,12 @@ void NetworkObserverManager::ReportAgentInfo() {
             }
 
             pushEvents(EventDataType::AGENT_INFO,
-                                std::move(eventGroup),
-                                appConfig->mConfigName,
-                                appConfig->mQueueKey,
-                                appConfig->mPluginIndex,
-                                appConfig->mPushLogsTotal,
-                                appConfig->mPushLogGroupTotal);
+                       std::move(eventGroup),
+                       appConfig->mConfigName,
+                       appConfig->mQueueKey,
+                       appConfig->mPluginIndex,
+                       appConfig->mPushLogsTotal,
+                       appConfig->mPushLogGroupTotal);
         }
     }
 

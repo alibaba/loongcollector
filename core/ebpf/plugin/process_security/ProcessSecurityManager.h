@@ -84,9 +84,7 @@ public:
         return 0;
     }
 
-    void SetMetrics(CounterPtr lossLogsTotal) {
-        mPushLogFailedTotal = std::move(lossLogsTotal);
-    }
+    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
 
 private:
     int64_t mSendIntervalMs = 400;

@@ -121,7 +121,10 @@ public:
         return 0;
     }
 
-    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, IntGaugePtr connCacheSize, CounterPtr lossLogsTotal) {
+    void SetMetrics(CounterPtr pollEventsTotal,
+                    CounterPtr lossEventsTotal,
+                    IntGaugePtr connCacheSize,
+                    CounterPtr lossLogsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mLossKernelEventsTotal = std::move(lossEventsTotal);
         mConnectionNum = std::move(connCacheSize);
@@ -174,12 +177,12 @@ private:
     };
 
     void pushEvents(EventDataType dataType,
-                             PipelineEventGroup&& eventGroup,
-                             const StringView& configName,
-                             QueueKey queueKey,
-                             uint32_t pluginIdx,
-                             CounterPtr& eventCounter,
-                             CounterPtr& eventGroupCounter);
+                    PipelineEventGroup&& eventGroup,
+                    const StringView& configName,
+                    QueueKey queueKey,
+                    uint32_t pluginIdx,
+                    CounterPtr& eventCounter,
+                    CounterPtr& eventGroupCounter);
 
     std::unique_ptr<ConnectionManager> mConnectionManager; // hold connection cache ...
 
