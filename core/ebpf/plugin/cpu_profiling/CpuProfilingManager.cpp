@@ -99,8 +99,9 @@ int CpuProfilingManager::AddOrUpdateConfig(
             config.mConfigKey = key;
             config.mFullDiscovery = false;
             config.mRegexs.clear();
-            if (opts->mCmdlines.empty()) {
+            if (opts->mEnableSystemProfiling) {
                 config.mFullDiscovery = true;
+                return;
             }
             for (auto& cmdStr : opts->mCmdlines) {
                 try {

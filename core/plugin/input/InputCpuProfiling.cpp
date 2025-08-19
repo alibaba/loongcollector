@@ -14,7 +14,7 @@
 // limitations under the License.
 
 #include "plugin/input/InputCpuProfiling.h"
-
+#include "collection_pipeline/CollectionPipeline.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
@@ -26,7 +26,15 @@ const std::string InputCpuProfiling::sName = "input_cpu_profiling";
 bool InputCpuProfiling::Init(const Json::Value &config,
                              Json::Value &optionalGoPipeline) {
     // TODO: add metrics
-    return mCpuProfilingOption.Init(config, mContext, sName);
+    auto ok = mCpuProfilingOption.Init(config, mContext, sName);
+    if (!ok) {
+        return false;
+    }
+    if (mCpuProfilingOption.mEnableContainerDiscovery) {
+        mCpuProfilingOption.mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
+            optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
+    }
+    return true;
 }
 
 bool InputCpuProfiling::Start() {

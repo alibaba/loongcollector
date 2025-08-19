@@ -17,6 +17,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -559,7 +560,63 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                               const CollectionPipelineContext* mContext,
                               const std::string& sName) {
     std::string errorMsg;
-    GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg);
+
+    // CommandLines
+    bool hasCmdline;
+    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+        hasCmdline = true;
+    } else {
+        hasCmdline = !mCmdlines.empty();
+    }
+
+    // EnableContainerDiscovery
+    bool hasContainer;
+    if (!GetOptionalBoolParam(config, "EnableContainerDiscovery", mEnableContainerDiscovery, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              false,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+        hasContainer = true;
+    } else {
+        hasContainer = mEnableContainerDiscovery;
+    }
+
+    if (!hasCmdline && !hasContainer) {
+        mEnableSystemProfiling = true;
+        return true;
+    }
+
+    if (mEnableContainerDiscovery && !AppConfig::GetInstance()->IsPurageContainerMode()) {
+        mEnableContainerDiscovery = false;
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "iLogtail is not in container, but container discovery is required",
+                              false,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+    if (mEnableContainerDiscovery) {
+        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+            return false;
+        }
+    }
+
     return true;
 }
 
