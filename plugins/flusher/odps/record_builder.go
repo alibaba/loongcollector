@@ -63,27 +63,10 @@ func (rb *RecordBuilderImpl) Init() {
 	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 }
 
-func findLogTag(logTags []*protocol.LogTag, key string) (string, bool) {
-	if logTags == nil {
-		return "", false
-	}
-
-	for _, tag := range logTags {
-		if tag.Key == key {
-			return tag.Value, true
-		}
-	}
-
-	return "", false
-}
-
 func (rb *RecordBuilderImpl) genExtraInfo(logGroup *protocol.LogGroup, log *protocol.Log) ExtraInfo {
 	info := ExtraInfo{}
 
 	if rb.extraLevel >= 1 {
-		if path, ok := findLogTag(logGroup.LogTags, LogtailPath); ok {
-			info.CollectPath = path
-		}
 		info.HostIP = rb.hostIP
 	}
 

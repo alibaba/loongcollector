@@ -125,44 +125,7 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 		return nil, err
 	}
 
-	rb.addExtraInfo(logGroup, log, record)
 	return record, nil
-}
-
-func findLogTag(logTags []*protocol.LogTag, key string) (string, bool) {
-	if logTags == nil {
-		return "", false
-	}
-
-	for _, tag := range logTags {
-		if tag.Key == key {
-			return tag.Value, true
-		}
-	}
-
-	return "", false
-}
-
-func (rb *RecordBuilderImpl) addExtraInfo(logGroup *protocol.LogGroup, log *protocol.Log, record datahub.IRecord) {
-	rb.addLevelExtraInfo(logGroup, log, record, rb.extraLevel)
-}
-
-func (rb *RecordBuilderImpl) addLevelExtraInfo(logGroup *protocol.LogGroup, log *protocol.Log, record datahub.IRecord, level int) {
-	if level == 1 {
-		record.SetAttribute(HostIPKey, rb.hostIP)
-		if val, ok := findLogTag(logGroup.LogTags, LogtailPath); ok {
-			record.SetAttribute(CollectPathKey, val)
-		}
-
-		if len(logGroup.Topic) > 0 {
-			record.SetAttribute(LogtailTopic, logGroup.Topic)
-		}
-	} else if level == 2 {
-		rb.addLevelExtraInfo(logGroup, log, record, level-1)
-		record.SetAttribute(HostnameKey, rb.hostname)
-		record.SetAttribute(CollectTimeKey, strconv.FormatUint(uint64(log.Time), 10))
-		record.SetAttribute(FlushTimeKey, strconv.FormatInt(time.Now().UnixMilli(), 10))
-	}
 }
 
 func (rb *RecordBuilderImpl) log2TupleRecord(log *protocol.Log) (datahub.IRecord, error) {
