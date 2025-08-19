@@ -320,7 +320,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr = NetworkObserverManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
-                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize, mPushLogFailedTotal);
+                    mgr->SetMetrics(
+                        mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }
                 break;
