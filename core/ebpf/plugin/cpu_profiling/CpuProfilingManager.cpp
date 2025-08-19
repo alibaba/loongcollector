@@ -77,8 +77,6 @@ int CpuProfilingManager::Destroy() {
 int CpuProfilingManager::AddOrUpdateConfig(
     const CollectionPipelineContext *context, uint32_t index,
     const PluginMetricManagerPtr &metricManager, const PluginOptions &options) {
-    // TODO: add metrics later
-
     auto configName = context->GetConfigName();
     auto it = mConfigNameToKey.find(configName);
     if (it == mConfigNameToKey.end()) {
@@ -176,6 +174,8 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
                                                   const char *comm,
                                                   const char *stack,
                                                   uint32_t cnt) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
+
     std::unordered_set<ConfigKey> targets;
     {
         std::lock_guard guard(mMutex);
