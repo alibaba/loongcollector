@@ -723,11 +723,6 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             break;
         }
-        case logtail::ebpf::PluginType::CPU_PROFILING: {
-            gCpuProfiler->UpdatePids({});
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler suspended\n");
-            break;
-        }
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[suspend plugin] unknown plugin type, please check. \n");

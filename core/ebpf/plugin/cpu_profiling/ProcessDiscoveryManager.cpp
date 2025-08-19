@@ -88,7 +88,7 @@ void ProcessDiscoveryManager::run() {
         {
             std::lock_guard<std::mutex> guard(mLock);
 
-            for (auto &[configName, state] : mStates) {
+            for (auto &[_, state] : mStates) {
                 auto& config = state.mConfig;
                 std::set<uint32_t> matchedPids;
                 for (const auto& proc : procs) {
@@ -100,7 +100,7 @@ void ProcessDiscoveryManager::run() {
                 if (prevPids == matchedPids) {
                     continue;
                 }
-                result.emplace_back(configName, matchedPids); // copy
+                result.emplace_back(config.mConfigKey, matchedPids); // copy
                 state.mPrevPids = std::move(matchedPids); // move
             }
         }
