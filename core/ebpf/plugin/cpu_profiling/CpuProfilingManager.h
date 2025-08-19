@@ -75,6 +75,10 @@ public:
 
     void HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result);
 
+    void SetMetrics(CounterPtr pollEventsTotal) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+    }
+
 private:
     std::atomic<bool> mInited = false;
 
@@ -90,6 +94,9 @@ private:
 
     std::mutex mMutex;
     std::unordered_map<uint32_t, std::unordered_set<ConfigKey>> mRouter;
+
+    // runner metrics
+    CounterPtr mRecvKernelEventsTotal;
 };
 
 } // namespace logtail::ebpf
