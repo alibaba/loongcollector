@@ -27,6 +27,7 @@ namespace ebpf {
 
 
 struct ProcessDiscoveryConfig {
+    size_t mConfigKey;
     std::vector<boost::regex> mRegexs;
     bool mFullDiscovery = false;
 
@@ -45,7 +46,7 @@ struct ProcessDiscoveryConfig {
 
 class ProcessDiscoveryManager {
 public:
-    using DiscoverEntry = std::pair<std::string, std::set<uint32_t>>;
+    using DiscoverEntry = std::pair<size_t, std::set<uint32_t>>;
     using DiscoverResult = std::vector<DiscoverEntry>;
     using NotifyFn = std::function<void(DiscoverResult)>;
     using UpdateFn = std::function<void(ProcessDiscoveryConfig&)>;

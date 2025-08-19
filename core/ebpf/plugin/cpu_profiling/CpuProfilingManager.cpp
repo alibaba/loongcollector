@@ -17,7 +17,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/queue/blockingconcurrentqueue.h"
-#include "ebpf/plugin/cpu_profiling/ProcessScanner.h"
+#include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 
 namespace logtail {
 namespace ebpf {
@@ -55,8 +55,10 @@ int CpuProfilingManager::Init() {
     mEBPFAdapter->StartPlugin(
         PluginType::CPU_PROFILING,
         buildCpuProfilingConfig({}, handleCpuProfilingEvent, this));
-    ProcessScanner::GetInstance()->Start();
-    LOG_INFO(sLogger, ("CpuProfilingManager initialized", ""));
+    ProcessDiscoveryManager::GetInstance()->Start([this](auto v) {
+        HandleProcessDiscoveryEvent(std::move(v));
+    });
+    LOG_INFO(sLogger, ("CpuProfilingManager", "init"));
     return 0;
 }
 
@@ -65,9 +67,9 @@ int CpuProfilingManager::Destroy() {
         return 0;
     }
     mInited = false;
-    ProcessScanner::GetInstance()->Stop();
+    ProcessDiscoveryManager::GetInstance()->Stop();
     mEBPFAdapter->StopPlugin(PluginType::CPU_PROFILING);
-    LOG_INFO(sLogger, ("CpuProfilingManager destroyed", ""));
+    LOG_INFO(sLogger, ("CpuProfilingManager", "destroy"));
     return 0;
 }
 
@@ -76,53 +78,61 @@ int CpuProfilingManager::AddOrUpdateConfig(
     const PluginMetricManagerPtr &metricManager, const PluginOptions &options) {
     // TODO: add metrics later
 
-    // TODO: support multiple configs
-    if (mConfigName.empty()) {
-        mConfigName = context->GetConfigName();
-        mPluginIndex = index;
-        mPipelineCtx = context;
-        mQueueKey = context->GetProcessQueueKey();
-        mRegisteredConfigCount = 1;
+    auto configName = context->GetConfigName();
+    auto it = mConfigNameToKey.find(configName);
+    if (it == mConfigNameToKey.end()) {
+        auto key = mNextKey++;
+        it = mConfigNameToKey.emplace(configName, key).first;
     }
+    auto key = it->second;
 
-    assert(mConfigName == context->GetConfigName());
+    auto info = ConfigInfo{
+        .mPipelineCtx = context,
+        .mQueueKey = context->GetProcessQueueKey(),
+        .mPluginIndex = index,
+    };
+    mConfigInfoMap.insert_or_assign(key, info);
 
     CpuProfilingOption *opts = std::get<CpuProfilingOption *>(options);
 
-    return ProcessScanner::GetInstance()->RegisterScan({
-        .mName = mConfigName,
-        .mRegexs = opts->mCmdlines,
-        .mCallback =
-            [this](std::vector<uint32_t> pids) {
-                std::string pidsStr;
-                for (auto pid : pids) {
-                    pidsStr += std::to_string(pid) + ",";
-                }
-                LOG_DEBUG(sLogger, ("CpuProfilingManager update config",
-                                    "")("pids", pidsStr));
-                mEBPFAdapter->UpdatePlugin(
-                    PluginType::CPU_PROFILING,
-                    buildCpuProfilingConfig(std::move(pids), nullptr, nullptr));
-            },
-    });
+    ProcessDiscoveryManager::GetInstance()->AddOrUpdateDiscovery(
+        configName, [&](ProcessDiscoveryConfig& config) {
+            config.mConfigKey = key;
+            config.mFullDiscovery = false;
+            config.mRegexs.clear();
+            if (opts->mCmdlines.empty()) {
+                config.mFullDiscovery = true;
+            }
+            // TODO: handle regex exception
+            for (auto& cmdStr : opts->mCmdlines) {
+                config.mRegexs.emplace_back(cmdStr);
+            }
+        });
+
+    LOG_DEBUG(sLogger, ("CpuProfilingManager", "add or update config")("config", configName));
+    
+    return 0;
 }
 
 int CpuProfilingManager::RemoveConfig(const std::string &configName) {
-    // TODO: support multiple configs
-    assert(mConfigName == configName);
-    ProcessScanner::GetInstance()->RemoveScan(mConfigName);
-    mConfigName.clear();
-    mPipelineCtx = nullptr;
-    mQueueKey = 0;
-    mPluginIndex = 0;
-    mRegisteredConfigCount = 0;
+    auto it = mConfigNameToKey.find(configName);
+    assert(it != mConfigNameToKey.end());
+    auto key = it->second;
+    mConfigNameToKey.erase(it);
+
+    ProcessDiscoveryManager::GetInstance()->RemoveDiscovery(configName);
+
+    auto hit = mConfigInfoMap.erase(key);
+    assert(hit);
+
+    LOG_DEBUG(sLogger, ("CpuProfilingManager", "remove config")("config", configName));
+
     return 0;
 }
 
 int CpuProfilingManager::Suspend() {
-    ProcessScanner::GetInstance()->RemoveScan(mConfigName);
-    mEBPFAdapter->SuspendPlugin(PluginType::CPU_PROFILING);
-    LOG_INFO(sLogger, ("CpuProfilingManager suspended", ""));
+    // Do nothing
+    LOG_INFO(sLogger, ("CpuProfilingManager", "suspend"));
     return 0;
 }
 
@@ -159,9 +169,6 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
                                                   const char *comm,
                                                   const char *stack,
                                                   uint32_t cnt) {
-    LOG_DEBUG(sLogger, ("CpuProfilingEvent", "")("pid", pid)("comm", comm)(
-                           "stack", stack)("cnt", cnt));
-
     std::vector<StackCnt> stacks;
     parseStackCnt(stack, stacks);
 
@@ -175,19 +182,35 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
         event->SetContent("cnt", std::to_string(cnt));
     }
 
+    std::unordered_set<ConfigKey> targets;
     {
-        if (!mPipelineCtx) {
-            return;
+        std::lock_guard guard(mMutex);
+        auto it = mRouter.find(pid);
+        if (it != mRouter.end()) {
+            targets = it->second;
         }
+    }
+
+    LOG_DEBUG(sLogger, ("CpuProfilingEvent", "")("pid", pid)("comm", comm)(
+                           "stack", stack)("cnt", cnt)("send to queues num", targets.size()));
+
+    for (auto& key : targets) {
+        auto it = mConfigInfoMap.find(key);
+        if (it == mConfigInfoMap.end()) {
+            continue;
+        }
+        ConfigInfo& info = it->second;
 
         std::unique_ptr<ProcessQueueItem> item =
-            std::make_unique<ProcessQueueItem>(std::move(eventGroup),
-                                               mPluginIndex);
+            std::make_unique<ProcessQueueItem>(
+                eventGroup.Copy(),
+                info.mPluginIndex);
+
         int maxRetry = 5;
         for (int retry = 0; retry < maxRetry; ++retry) {
             if (QueueStatus::OK ==
                 ProcessQueueManager::GetInstance()->PushQueue(
-                    mQueueKey, std::move(item))) {
+                    info.mQueueKey, std::move(item))) {
                 break;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -202,6 +225,29 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
         }
     }
 };
+
+void CpuProfilingManager::HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result) {
+    std::unordered_set<uint32_t> totalPids;
+    {
+        std::lock_guard guard(mMutex);
+        mRouter.clear();
+        for (auto& [configKey, pids] : result) {
+            for (auto& pid : pids) {
+                totalPids.insert(pid);
+                auto it = mRouter.emplace(pid, std::unordered_set<ConfigKey>{}).first;
+                auto& configSet = it->second;
+                configSet.insert(configKey);
+            }
+        }
+    }
+
+    // TODO: remove this conversion (set -> vector)
+    mEBPFAdapter->UpdatePlugin(
+        PluginType::CPU_PROFILING,
+        buildCpuProfilingConfig(
+            std::vector<uint32_t>(totalPids.begin(), totalPids.end()),
+            nullptr, nullptr));
+}
 
 } // namespace ebpf
 } // namespace logtail
