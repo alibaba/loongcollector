@@ -21,6 +21,7 @@
 #include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "container_manager/ContainerDiscoveryOptions.h"
 #include "ebpf/include/export.h"
 
 namespace logtail::ebpf {
@@ -56,7 +57,10 @@ public:
               const CollectionPipelineContext* mContext,
               const std::string& sName);
     
+    bool mEnableSystemProfiling = false;
     std::vector<std::string> mCmdlines;
+    bool mEnableContainerDiscovery = false;
+    ContainerDiscoveryOptions mContainerDiscovery;
 };
 
 using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*, CpuProfilingOption*>;
