@@ -81,14 +81,12 @@ public:
         mCtx = nullptr;
     }
 
-    void UpdatePids(const std::vector<uint32_t> &newPids) {
+    void UpdatePids(std::unordered_set<uint32_t> newPids) {
         std::lock_guard<std::mutex> lock(mMutex);
         assert(mProfiler != nullptr);
 
-        std::unordered_set<uint32_t> newPidsSet(newPids.begin(), newPids.end());
-
         std::unordered_set<uint32_t> toAdd, toRemove;
-        compareSets(newPidsSet, toAdd, toRemove);
+        compareSets(newPids, toAdd, toRemove);
 
         if (toAdd.empty() && toRemove.empty()) {
             return; // No changes
@@ -111,7 +109,7 @@ public:
                                     pidsToRemove.c_str());
         }
 
-        mPids = std::move(newPidsSet);
+        mPids = std::move(newPids);
     }
 
     void RegisterPollHandler(livetrace_profiler_read_cb_ctx_t handler, void *ctx) {

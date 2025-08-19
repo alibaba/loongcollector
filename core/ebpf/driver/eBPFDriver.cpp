@@ -407,10 +407,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
             assert(config != nullptr);
 
-            gCpuProfiler->UpdatePids(config->mPids);
+            gCpuProfiler->UpdatePids(std::move(config->mPids));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "cpu profiling: profiler pids updated, size:%zu\n",
-                     config->mPids.size());
+                     "cpu profiling: profiler pids updated\n");
 
             if (config->mHandler != nullptr) {
                 gCpuProfiler->RegisterPollHandler(config->mHandler, config->mCtx);
@@ -573,10 +572,9 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
             auto *config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
             assert(config != nullptr);
             
-            gCpuProfiler->UpdatePids(config->mPids);
+            gCpuProfiler->UpdatePids(std::move(config->mPids));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "cpu profiling: profiler pids updated, size:%zu\n",
-                     config->mPids.size());
+                     "cpu profiling: profiler pids updated\n");
 
             if (config->mHandler != nullptr) {
                 gCpuProfiler->RegisterPollHandler(config->mHandler, config->mCtx);
