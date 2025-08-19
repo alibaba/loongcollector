@@ -176,7 +176,7 @@ void PluginRegistry::LoadStaticPlugins() {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
     if (BOOL_FLAG(enable_ebpf_cpu_profiling)) {
-        RegisterContinuousInputCreator(new StaticInputCreator<InputCpuProfiling>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputCpuProfiling>(), false);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);

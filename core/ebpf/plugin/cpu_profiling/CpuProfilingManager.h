@@ -15,6 +15,7 @@
 #pragma once
 
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 
 namespace logtail::ebpf {
 
@@ -45,7 +46,7 @@ public:
 
     int SendEvents() override { return 0; }
 
-    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
+    int RegisteredConfigCount() override { return mConfigNameToKey.size(); }
 
     int AddOrUpdateConfig(const CollectionPipelineContext *context,
                           uint32_t configId,
@@ -72,14 +73,23 @@ public:
     void HandleCpuProfilingEvent(uint32_t pid, const char *comm,
                                  const char *stack, uint32_t cnt);
 
+    void HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result);
+
 private:
     std::atomic<bool> mInited = false;
 
-    std::string mConfigName;
-    const CollectionPipelineContext *mPipelineCtx{nullptr};
-    logtail::QueueKey mQueueKey = 0;
-    uint32_t mPluginIndex{0};
-    int mRegisteredConfigCount = 0;
+    using ConfigKey = size_t;
+    struct ConfigInfo {
+        const CollectionPipelineContext *mPipelineCtx{nullptr};
+        logtail::QueueKey mQueueKey = 0;
+        uint32_t mPluginIndex{0};
+    };
+    ConfigKey mNextKey = 0;
+    std::unordered_map<std::string, ConfigKey> mConfigNameToKey;
+    std::unordered_map<ConfigKey, ConfigInfo> mConfigInfoMap;
+
+    std::mutex mMutex;
+    std::unordered_map<uint32_t, std::unordered_set<ConfigKey>> mRouter;
 };
 
 } // namespace logtail::ebpf
