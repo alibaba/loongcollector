@@ -24,7 +24,7 @@ namespace logtail {
 namespace ebpf {
 
 std::unique_ptr<PluginConfig>
-buildCpuProfilingConfig(std::vector<uint32_t> pids, CpuProfilingHandler handler,
+buildCpuProfilingConfig(std::unordered_set<uint32_t> pids, CpuProfilingHandler handler,
                         void *ctx) {
     CpuProfilingConfig config = {
         .mPids = std::move(pids), .mHandler = handler, .mCtx = ctx};
@@ -257,12 +257,9 @@ void CpuProfilingManager::HandleProcessDiscoveryEvent(ProcessDiscoveryManager::D
         }
     }
 
-    // TODO: remove this conversion (set -> vector)
     mEBPFAdapter->UpdatePlugin(
         PluginType::CPU_PROFILING,
-        buildCpuProfilingConfig(
-            std::vector<uint32_t>(totalPids.begin(), totalPids.end()),
-            nullptr, nullptr));
+        buildCpuProfilingConfig(std::move(totalPids), nullptr, nullptr));
 }
 
 } // namespace ebpf
