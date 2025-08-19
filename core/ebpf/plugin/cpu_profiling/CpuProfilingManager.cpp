@@ -104,9 +104,15 @@ int CpuProfilingManager::AddOrUpdateConfig(
             if (opts->mCmdlines.empty()) {
                 config.mFullDiscovery = true;
             }
-            // TODO: handle regex exception
             for (auto& cmdStr : opts->mCmdlines) {
-                config.mRegexs.emplace_back(cmdStr);
+                try {
+                    config.mRegexs.emplace_back(cmdStr);
+                } catch (boost::regex_error& e) {
+                    LOG_ERROR(sLogger,
+                        ("CpuProfilingManager", "failed to compile regex")
+                        ("pattern", cmdStr)("error", e.what()));
+                    continue;
+                }
             }
         });
 
