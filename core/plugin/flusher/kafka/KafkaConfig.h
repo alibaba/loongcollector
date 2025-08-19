@@ -29,11 +29,24 @@ namespace logtail {
 struct KafkaConfig {
     std::vector<std::string> Brokers;
     std::string Topic;
-    std::string ClientID;
-    uint32_t TimeoutMs = 3000;
-    uint32_t Retries = 3;
-    uint32_t BatchNumMessages = 1000;
-    uint32_t LingerMs = 0;
+
+    struct Producer {
+        uint32_t QueueBufferingMaxKbytes = 1048576;
+        uint32_t QueueBufferingMaxMessages = 100000;
+        uint32_t LingerMs = 5;
+        uint32_t BatchNumMessages = 10000;
+        uint32_t BatchSize = 1000000;
+        uint32_t MaxMessageBytes = 1000000;
+    } Producer;
+
+    struct Delivery {
+        std::string Acks = "1";
+        uint32_t RequestTimeoutMs = 30000;
+        uint32_t MessageTimeoutMs = 300000;
+        uint32_t MaxRetries = 2147483647;
+        uint32_t RetryBackoffMs = 1000;
+    } Delivery;
+
     std::map<std::string, std::string> CustomConfig;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
@@ -45,11 +58,19 @@ struct KafkaConfig {
             return false;
         }
 
-        GetOptionalStringParam(config, "ClientID", ClientID, errorMsg);
-        GetOptionalUIntParam(config, "TimeoutMs", TimeoutMs, errorMsg);
-        GetOptionalUIntParam(config, "Retries", Retries, errorMsg);
-        GetOptionalUIntParam(config, "BatchNumMessages", BatchNumMessages, errorMsg);
-        GetOptionalUIntParam(config, "LingerMs", LingerMs, errorMsg);
+        GetOptionalUIntParam(config, "Producer.QueueBufferingMaxKbytes", Producer.QueueBufferingMaxKbytes, errorMsg);
+        GetOptionalUIntParam(
+            config, "Producer.QueueBufferingMaxMessages", Producer.QueueBufferingMaxMessages, errorMsg);
+        GetOptionalUIntParam(config, "Producer.LingerMs", Producer.LingerMs, errorMsg);
+        GetOptionalUIntParam(config, "Producer.BatchNumMessages", Producer.BatchNumMessages, errorMsg);
+        GetOptionalUIntParam(config, "Producer.BatchSize", Producer.BatchSize, errorMsg);
+        GetOptionalUIntParam(config, "Producer.MaxMessageBytes", Producer.MaxMessageBytes, errorMsg);
+
+        GetOptionalStringParam(config, "Delivery.Acks", Delivery.Acks, errorMsg);
+        GetOptionalUIntParam(config, "Delivery.RequestTimeoutMs", Delivery.RequestTimeoutMs, errorMsg);
+        GetOptionalUIntParam(config, "Delivery.MessageTimeoutMs", Delivery.MessageTimeoutMs, errorMsg);
+        GetOptionalUIntParam(config, "Delivery.MaxRetries", Delivery.MaxRetries, errorMsg);
+        GetOptionalUIntParam(config, "Delivery.RetryBackoffMs", Delivery.RetryBackoffMs, errorMsg);
 
         if (config.isMember("Kafka") && config["Kafka"].isObject()) {
             const Json::Value& kafkaConfig = config["Kafka"];
