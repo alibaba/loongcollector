@@ -18,6 +18,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
+#include "ebpf/type/table/ProfileTable.h"
 
 namespace logtail {
 namespace ebpf {
@@ -169,19 +170,6 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
                                                   const char *comm,
                                                   const char *stack,
                                                   uint32_t cnt) {
-    std::vector<StackCnt> stacks;
-    parseStackCnt(stack, stacks);
-
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
-    for (auto &[stack, cnt] : stacks) {
-        auto* event = eventGroup.AddLogEvent();
-        event->SetContent("pid", std::to_string(pid));
-        event->SetContent("comm", std::string(comm));
-        event->SetContent("stack", std::string(stack));
-        event->SetContent("cnt", std::to_string(cnt));
-    }
-
     std::unordered_set<ConfigKey> targets;
     {
         std::lock_guard guard(mMutex);
@@ -193,6 +181,28 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
 
     LOG_DEBUG(sLogger, ("CpuProfilingEvent", "")("pid", pid)("comm", comm)(
                            "stack", stack)("cnt", cnt)("send to queues num", targets.size()));
+
+    if (targets.empty()) {
+        return;
+    }
+
+    std::vector<StackCnt> stacks;
+    parseStackCnt(stack, stacks);
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    
+    auto pidSb = sourceBuffer->CopyString(std::to_string(pid));
+    auto commSb = sourceBuffer->CopyString(std::string(comm));
+    for (auto &[stack, cnt] : stacks) {
+        auto* event = eventGroup.AddLogEvent();
+        auto stackSb = sourceBuffer->CopyString(stack);
+        auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
+        event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
+        event->SetContentNoCopy(kComm.LogKey(), StringView(commSb.data, commSb.size));
+        event->SetContentNoCopy(kStack.LogKey(), StringView(stackSb.data, stackSb.size));
+        event->SetContentNoCopy(kCnt.LogKey(), StringView(cntSb.data, cntSb.size));
+    }
 
     for (auto& key : targets) {
         auto it = mConfigInfoMap.find(key);
