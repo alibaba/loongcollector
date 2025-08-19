@@ -82,6 +82,7 @@ const string METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE = "retryable_event_ca
 const string METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL = "poll_kernel_event_total";
 const string METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL = "lost_kernel_event_total";
 const string METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE = "connection_cache_size";
+const string METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL = "lost_log_event_total";
 
 /**********************************************************
  *   k8s metadata

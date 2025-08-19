@@ -585,7 +585,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
 #else
         if (init && needPush) {
-            pushEventsWithRetry(EventDataType::LOG,
+            pushEvents(EventDataType::LOG,
                                 std::move(eventGroup),
                                 configName,
                                 queueKey,
@@ -760,7 +760,7 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         ADD_COUNTER(pushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        pushEventsWithRetry(EventDataType::NET_METRIC,
+        pushEvents(EventDataType::NET_METRIC,
                             std::move(eventGroup),
                             configName,
                             queueKey,
@@ -947,7 +947,7 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         }
 #else
         if (init) {
-            pushEventsWithRetry(EventDataType::APP_METRIC,
+            pushEvents(EventDataType::APP_METRIC,
                                 std::move(eventGroup),
                                 configName,
                                 queueKey,
@@ -1088,7 +1088,7 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
 #else
         if (init && needPush) {
-            pushEventsWithRetry(EventDataType::APP_SPAN,
+            pushEvents(EventDataType::APP_SPAN,
                                 std::move(eventGroup),
                                 configName,
                                 queueKey,
@@ -1657,14 +1657,13 @@ const static std::string kAgentInfoAppnameKey = "appName";
 const static std::string kAgentInfoAgentVersionKey = "agentVersion";
 const static std::string kAgentInfoStartTsKey = "startTimestamp";
 
-void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
+void NetworkObserverManager::pushEvents(EventDataType dataType,
                                                  PipelineEventGroup&& eventGroup,
                                                  const StringView& configName,
                                                  QueueKey queueKey,
                                                  uint32_t pluginIdx,
                                                  CounterPtr& eventCounter,
-                                                 CounterPtr& eventGroupCounter,
-                                                 size_t retryTimes) {
+                                                 CounterPtr& eventGroupCounter) {
     size_t eventsSize = eventGroup.GetEvents().size();
     if (eventsSize > 0) {
         // push
@@ -1672,21 +1671,19 @@ void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
         ADD_COUNTER(eventGroupCounter, 1);
         LOG_DEBUG(sLogger, ("agentinfo group size", eventsSize));
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-        for (size_t times = 0; times < retryTimes; times++) {
-            auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-            if (QueueStatus::OK != result) {
-                LOG_WARNING(
-                    sLogger,
-                    ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
-                        "[NetworkObserver] push to queue failed!", magic_enum::enum_name(result)));
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            } else {
-                LOG_DEBUG(sLogger,
-                          ("NetworkObserver push events successful, eventSize:",
-                           eventsSize)("dataType", magic_enum::enum_name(dataType)));
-                break;
-            }
+
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+            LOG_WARNING(
+                sLogger,
+                ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
+                    "[NetworkObserver] push to queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventsSize);
+        } else {
+            LOG_DEBUG(sLogger,
+                        ("NetworkObserver push events successful, eventSize:",
+                        eventsSize)("dataType", magic_enum::enum_name(dataType)));
         }
+
     }
 }
 
@@ -1755,7 +1752,7 @@ void NetworkObserverManager::ReportAgentInfo() {
                 }
             }
 
-            pushEventsWithRetry(EventDataType::AGENT_INFO,
+            pushEvents(EventDataType::AGENT_INFO,
                                 std::move(eventGroup),
                                 appConfig->mConfigName,
                                 appConfig->mQueueKey,

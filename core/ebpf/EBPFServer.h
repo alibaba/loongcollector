@@ -174,6 +174,7 @@ private:
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionCacheSize;
+    CounterPtr mPushLogFailedTotal;
 
     int mUnifiedEpollFd = -1;
     std::vector<struct epoll_event> mEpollEvents;

@@ -24,6 +24,8 @@
 
 namespace logtail {
 
+inline constexpr int kDefaultNodeSourceBufferSize = 1024;
+
 class StringBuffer {
     friend class SourceBuffer;
 

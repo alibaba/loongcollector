@@ -38,18 +38,13 @@ bool ProcessCleanupRetryableEvent::decrementRef() {
     if (mProcessCacheValue->mPPid > 0 || mProcessCacheValue->mPKtime > 0) {
         data_event_id parentKey{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
         auto& parent = mProcessCacheValue->mParent;
-        if (!parent) {
-            parent = mProcessCache.Lookup(parentKey);
-            if (!parent) {
-                return false;
-            }
-            mProcessCacheValue->mParent = parent;
+        if (parent) {
+            // dec parent's ref count
+            mProcessCache.DecRef(parentKey, parent);
+            LOG_DEBUG(sLogger,
+                        ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef parent")(
+                            "ppid", mProcessCacheValue->mPPid)("pktime", mProcessCacheValue->mPKtime));
         }
-        // dec parent's ref count
-        mProcessCache.DecRef(parentKey, parent);
-        LOG_DEBUG(sLogger,
-                  ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef parent")(
-                      "ppid", mProcessCacheValue->mPPid)("pktime", mProcessCacheValue->mPKtime));
     }
     // dec self ref count
     mProcessCache.DecRef(mKey, mProcessCacheValue);

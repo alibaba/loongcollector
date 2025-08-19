@@ -103,7 +103,7 @@ public:
                 if (!p->mSourceBuffer) {
                     if (NeedSourceBuffer) {
                         // level1 nodes will setup new sourcebuffer ...
-                        newNode->mSourceBuffer = std::make_shared<SourceBuffer>(1024);
+                        newNode->mSourceBuffer = std::make_shared<SourceBuffer>(kDefaultNodeSourceBufferSize);
                     }
                 } else {
                     // level2 or lower nodes will hold the ref of level1 node's

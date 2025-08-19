@@ -38,8 +38,7 @@ public:
     explicit AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                              const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                              moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                             EventPool* pool
-                             /*const PluginMetricManagerPtr& metricManager*/);
+                             EventPool* pool);
     virtual ~AbstractManager();
 
     virtual int Init() = 0;

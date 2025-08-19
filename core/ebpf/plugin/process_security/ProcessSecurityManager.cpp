@@ -257,7 +257,8 @@ int ProcessSecurityManager::SendEvents() {
             return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        size_t eventCount = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
@@ -265,7 +266,7 @@ int ProcessSecurityManager::SendEvents() {
             LOG_WARNING(sLogger,
                         ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
                             "[ProcessSecurityEvent] push queue failed!", ""));
-            // TODO: Alarm discard data
+            ADD_COUNTER(mPushLogFailedTotal, eventCount);
         }
     }
 

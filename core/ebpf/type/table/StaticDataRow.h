@@ -39,7 +39,7 @@ constexpr size_t kMaxInt64Width = 20;
 template <const DataTableSchema* schema>
 class StaticDataRow {
 public:
-    StaticDataRow() : mSourceBuffer(std::make_shared<SourceBuffer>(1024)) {}
+    StaticDataRow() : mSourceBuffer(std::make_shared<SourceBuffer>(kDefaultNodeSourceBufferSize)) {}
     explicit StaticDataRow(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
 
     [[nodiscard]] constexpr size_t Size() const { return schema->Size(); }

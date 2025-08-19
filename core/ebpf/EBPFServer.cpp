@@ -180,6 +180,7 @@ EBPFServer::EBPFServer()
     mRecvKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL);
     mLossKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL);
     mConnectionCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE);
+    mPushLogFailedTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL);
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
@@ -307,8 +308,10 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
         switch (type) {
             case PluginType::PROCESS_SECURITY: {
                 if (!pluginMgr) {
-                    pluginMgr = ProcessSecurityManager::Create(
+                    auto mgr = ProcessSecurityManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
+                    mgr->SetMetrics(mPushLogFailedTotal);
+                    pluginMgr = mgr;
                 }
                 break;
             }
@@ -317,7 +320,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr = NetworkObserverManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
-                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mConnectionCacheSize, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }
                 break;
@@ -327,7 +330,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr = NetworkSecurityManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
-                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }
                 break;
@@ -337,7 +340,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr = FileSecurityManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mRetryableEventCache);
-                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mLossKernelEventsTotal, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }
                 break;

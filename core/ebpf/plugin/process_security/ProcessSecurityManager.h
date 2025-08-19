@@ -84,6 +84,10 @@ public:
         return 0;
     }
 
+    void SetMetrics(CounterPtr lossLogsTotal) {
+        mPushLogFailedTotal = std::move(lossLogsTotal);
+    }
+
 private:
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
@@ -97,6 +101,7 @@ private:
     uint32_t mPluginIndex{0};
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 };
 
 } // namespace logtail::ebpf

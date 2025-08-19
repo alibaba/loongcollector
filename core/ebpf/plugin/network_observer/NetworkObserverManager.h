@@ -121,10 +121,11 @@ public:
         return 0;
     }
 
-    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, IntGaugePtr connCacheSize) {
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, IntGaugePtr connCacheSize, CounterPtr lossLogsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mLossKernelEventsTotal = std::move(lossEventsTotal);
         mConnectionNum = std::move(connCacheSize);
+        mPushLogFailedTotal = std::move(lossLogsTotal);
     }
 
     // periodically tasks ...
@@ -172,14 +173,13 @@ private:
         LOG,
     };
 
-    void pushEventsWithRetry(EventDataType dataType,
+    void pushEvents(EventDataType dataType,
                              PipelineEventGroup&& eventGroup,
                              const StringView& configName,
                              QueueKey queueKey,
                              uint32_t pluginIdx,
                              CounterPtr& eventCounter,
-                             CounterPtr& eventGroupCounter,
-                             size_t retryTimes = 5);
+                             CounterPtr& eventGroupCounter);
 
     std::unique_ptr<ConnectionManager> mConnectionManager; // hold connection cache ...
 
@@ -258,6 +258,7 @@ private:
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionNum;
+    CounterPtr mPushLogFailedTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;

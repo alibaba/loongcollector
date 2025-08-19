@@ -68,9 +68,10 @@ public:
 
     int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
-    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, CounterPtr lossLogsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mLossKernelEventsTotal = std::move(lossEventsTotal);
+        mPushLogFailedTotal = std::move(lossLogsTotal);
     }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
@@ -116,6 +117,7 @@ private:
 
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;
