@@ -238,16 +238,19 @@ void ProcessCacheManager::RecordDataEvent(msg_data* eventPtr) {
     mProcessDataMap.DataAdd(eventPtr);
 }
 
-std::shared_ptr<ProcessCacheValue>
-ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent) {
+bool ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent, PipelineEventGroup& eventGroup) {
     auto procPtr = mProcessCache.Lookup({pid, ktime});
     if (!procPtr) {
         ADD_COUNTER(mProcessCacheMissTotal, 1);
         LOG_WARNING(sLogger, ("cannot find proc in cache, pid", pid)("ktime", ktime)("size", mProcessCache.Size()));
-        return nullptr;
+        return false;
     }
 
     auto& proc = *procPtr;
+    eventGroup.AddSourceBuffer(proc.GetSourceBuffer());
+    if (proc.mParent) {
+        eventGroup.AddSourceBuffer(proc.mParent->GetSourceBuffer());
+    }
 
     logEvent.SetContentNoCopy(kExecId.LogKey(), proc.Get<kExecId>());
     logEvent.SetContentNoCopy(kProcessId.LogKey(), proc.Get<kProcessId>());
@@ -304,7 +307,7 @@ ProcessCacheManager::AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& l
         }
     }
 
-    return procPtr;
+    return true;
 }
 
 int ProcessCacheManager::syncAllProc() {
