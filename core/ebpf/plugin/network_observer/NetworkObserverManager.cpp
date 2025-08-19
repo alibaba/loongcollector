@@ -1682,16 +1682,16 @@ const static std::string kAgentInfoPropertiesKey = "properties";
 const static std::string kAgentInfoAgentEnvACKVal = "ACSK8S";
 const static std::string kAgentInfoAgentEnvECSAutoVal = "ECS_AUTO";
 const static std::string kAgentInfoAgentEnvDefaultVal = "DEFAULT";
-const static std::string kAgentInfoPropertiesValueClusterId = "k8s.cluster.uid";
-const static std::string kAgentInfoPropertiesValueClusterName = "k8s.cluster.name";
-const static std::string kAgentInfoPropertiesValueNamespace = "k8s.namespace.name";
-const static std::string kAgentInfoPropertiesValueWorkloadKind = "k8s.workload.kind";
-const static std::string kAgentInfoPropertiesValueWorkloadName = "k8s.workload.name";
-const static std::string kAgentInfoPropertiesValuePodName = "k8s.pod.name";
-const static std::string kAgentInfoPropertiesValueEcsId = "acs.ecs.instance.id";
-const static std::string kAgentInfoPropertiesValueInstanceId = "instanceId";
-const static std::string kAgentInfoPropertiesValueRegionId = "regionId";
-const static std::string kAgentInfoPropertiesValueEcsMeta = "acs.ecs.metadata";
+const static std::string kAgentInfoPropertiesKeyClusterId = "k8s.cluster.uid";
+const static std::string kAgentInfoPropertiesKeyClusterName = "k8s.cluster.name";
+const static std::string kAgentInfoPropertiesKeyNamespace = "k8s.namespace.name";
+const static std::string kAgentInfoPropertiesKeyWorkloadKind = "k8s.workload.kind";
+const static std::string kAgentInfoPropertiesKeyWorkloadName = "k8s.workload.name";
+const static std::string kAgentInfoPropertiesKeyPodName = "k8s.pod.name";
+const static std::string kAgentInfoPropertiesKeyEcsId = "acs.ecs.instance.id";
+const static std::string kAgentInfoPropertiesKeyInstanceId = "instanceId";
+const static std::string kAgentInfoPropertiesKeyRegionId = "regionId";
+const static std::string kAgentInfoPropertiesKeyEcsMeta = "acs.ecs.metadata";
 
 void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
                                                  PipelineEventGroup&& eventGroup,
@@ -1790,21 +1790,21 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
 
             // add k8s meta
-            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueClusterId.data()),
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyClusterId.data()),
                           rapidjson::Value().SetString(mClusterId.c_str(), allocator),
                           allocator);
-            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueNamespace.data()),
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyNamespace.data()),
                           rapidjson::Value().SetString(podMeta->mNamespace.c_str(), allocator),
                           allocator);
-            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueWorkloadKind.data()),
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyWorkloadKind.data()),
                           rapidjson::Value().SetString(podMeta->mWorkloadKind.c_str(), allocator),
                           allocator);
-            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueWorkloadName.data()),
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyWorkloadName.data()),
                           rapidjson::Value().SetString(podMeta->mWorkloadName.c_str(), allocator),
                           allocator);
 
             // add pod meta
-            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValuePodName.data()),
+            doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyPodName.data()),
                           rapidjson::Value().SetString(podMeta->mPodName.c_str(), allocator),
                           allocator);
 
@@ -1812,17 +1812,17 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             // add ECS meta
             const auto* entity = InstanceIdentity::Instance()->GetEntity();
             if (entity != nullptr) {
-                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueEcsId.data()),
+                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyEcsId.data()),
                               rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
                               allocator);
                 rapidjson::Value ecsMetadata(rapidjson::kObjectType);
-                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueInstanceId.data()),
+                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyInstanceId.data()),
                                       rapidjson::Value().SetString(entity->GetEcsInstanceID().data(), allocator),
                                       allocator);
-                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueRegionId.data()),
+                ecsMetadata.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyRegionId.data()),
                                       rapidjson::Value().SetString(entity->GetEcsRegionID().data(), allocator),
                                       allocator);
-                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesValueEcsMeta.data()), ecsMetadata, allocator);
+                doc.AddMember(rapidjson::StringRef(kAgentInfoPropertiesKeyEcsMeta.data()), ecsMetadata, allocator);
             }
 
             rapidjson::StringBuffer buffer;
