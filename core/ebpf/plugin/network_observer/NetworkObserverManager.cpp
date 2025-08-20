@@ -1762,6 +1762,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             return false;
         }
 
+        rapidjson::Document doc;
         for (const auto& containerId : workloadConfig.containerIds) {
             // generate for k8s ---- POD Level
             auto podMeta = K8sMetadata::GetInstance().GetInfoByContainerIdFromCache(containerId);
@@ -1784,7 +1785,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             event->SetContent(kAgentInfoStartTsKey, ToString(podMeta->mStartTime * 1000));
 
             event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
-            rapidjson::Document doc;
+
             doc.SetObject();
 
             rapidjson::Document::AllocatorType& allocator = doc.GetAllocator();
