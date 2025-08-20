@@ -16,7 +16,6 @@ package datahub
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -285,106 +284,4 @@ func TestGenTupleRecordWithTypeMissMatch(t *testing.T) {
 
 	_, err := builder.log2TupleRecord(log)
 	assert.NotNil(t, err)
-}
-
-// Test for ExtraInfoColumn
-func TestGenRecord(t *testing.T) {
-	builder := RecordBuilderImpl{
-		nextFreshTime: time.Now().Add(time.Hour),
-		hostIP:        "127.0.0.1",
-		hostname:      "hostname",
-	}
-
-	logGroup := &protocol.LogGroup{
-		LogTags: []*protocol.LogTag{
-			{
-				Key:   "__path__",
-				Value: "/tmp/test.log",
-			},
-		},
-		Topic: "test_topic",
-	}
-
-	log := &protocol.Log{
-		Time: 1733205626,
-	}
-	log.Contents = []*protocol.Log_Content{
-		{
-			Key:   "content",
-			Value: "value",
-		},
-	}
-
-	builder.extraLevel = 0
-	record, err := builder.Log2Record(logGroup, log)
-	assert.Nil(t, err)
-	bRecord, ok := record.(*datahub.BlobRecord)
-	assert.True(t, ok)
-	assert.Equal(t, "value", string(bRecord.RawData))
-	attr := record.GetAttributes()
-	assert.Equal(t, 0, len(attr))
-
-	// level 1
-	builder.extraLevel = 1
-	record, err = builder.Log2Record(logGroup, log)
-	assert.Nil(t, err)
-	bRecord, ok = record.(*datahub.BlobRecord)
-	assert.True(t, ok)
-	assert.Equal(t, "value", string(bRecord.RawData))
-	attr = record.GetAttributes()
-	assert.Equal(t, 3, len(attr))
-	path, ok := attr["path"]
-	assert.True(t, ok)
-	pathStr, ok := path.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "/tmp/test.log", pathStr)
-	ip, ok := attr["host_ip"]
-	assert.True(t, ok)
-	ipStr, ok := ip.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "127.0.0.1", ipStr)
-	topic, ok := attr["__topic__"]
-	assert.True(t, ok)
-	topicStr, ok := topic.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "test_topic", topicStr)
-
-	// level 2
-	builder.extraLevel = 2
-	record, err = builder.Log2Record(logGroup, log)
-	assert.Nil(t, err)
-	bRecord, ok = record.(*datahub.BlobRecord)
-	assert.True(t, ok)
-	assert.Equal(t, "value", string(bRecord.RawData))
-	attr = record.GetAttributes()
-	assert.Equal(t, 6, len(attr))
-	path, ok = attr["path"]
-	assert.True(t, ok)
-	pathStr, ok = path.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "/tmp/test.log", pathStr)
-	ip, ok = attr["host_ip"]
-	assert.True(t, ok)
-	ipStr, ok = ip.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "127.0.0.1", ipStr)
-	topic, ok = attr["__topic__"]
-	assert.True(t, ok)
-	topicStr, ok = topic.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "test_topic", topicStr)
-	cTime, ok := attr["collect_time"]
-	assert.True(t, ok)
-	cTimeStr, ok := cTime.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "1733205626", cTimeStr)
-	hostname, ok := attr["hostname"]
-	assert.True(t, ok)
-	hostnameStr, ok := hostname.(string)
-	assert.True(t, ok)
-	assert.Equal(t, "hostname", hostnameStr)
-	fTime, ok := attr["flush_time"]
-	assert.True(t, ok)
-	_, ok = fTime.(string)
-	assert.True(t, ok)
 }

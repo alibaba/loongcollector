@@ -258,12 +258,12 @@ func TestGenRecordWithExtraInfo(t *testing.T) {
 	record, err := builder.Log2Record(logGroup, log, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
-	assert.Equal(t, "[value, {\"host_ip\":\"127.0.0.1\",\"path\":\"/tmp/test.log\"}]", record.String())
+	assert.Equal(t, "[value, {\"host_ip\":\"127.0.0.1\"}]", record.String())
 
 	builder.extraLevel = 2
 	record, err = builder.Log2Record(logGroup, log, &schema)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, record.Len())
-	re := regexp.MustCompile(`\[value, \{"host_ip":"127\.0\.0\.1","path":"/tmp/test\.log","hostname":"hostname","collect_time":"1733205626","flush_time":"\d+"\}\]`)
+	re := regexp.MustCompile(`\[value, \{"host_ip":"127\.0\.0\.1","hostname":"hostname","collect_time":"1733205626","flush_time":"\d+"\}\]`)
 	assert.Truef(t, re.MatchString(record.String()), "regexp match failed, result:%s", record.String())
 }

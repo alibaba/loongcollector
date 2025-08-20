@@ -63,7 +63,7 @@ func (rb *RecordBuilderImpl) Init() {
 	rb.hostname = config.LoongcollectorGlobalConfig.Hostname
 }
 
-func (rb *RecordBuilderImpl) genExtraInfo(logGroup *protocol.LogGroup, log *protocol.Log) ExtraInfo {
+func (rb *RecordBuilderImpl) genExtraInfo(log *protocol.Log) ExtraInfo {
 	info := ExtraInfo{}
 
 	if rb.extraLevel >= 1 {
@@ -83,7 +83,7 @@ func (rb *RecordBuilderImpl) Log2Record(logGroup *protocol.LogGroup, log *protoc
 
 	for idx, column := range schema.Columns {
 		if column.Name == ExtraInfoColumn && column.Type.ID() == datatype.JSON {
-			val, err := data.NewJson(rb.genExtraInfo(logGroup, log))
+			val, err := data.NewJson(rb.genExtraInfo(log))
 			if err != nil {
 				return nil, err
 			}
