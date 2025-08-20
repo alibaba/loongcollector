@@ -11,6 +11,14 @@ function arch() {
   fi
 }
 
+# Default values for build arguments
+VERSION=${VERSION:-edge}
+ENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE:-OFF}
+ENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT:-OFF}
+WITHOUTGDB=${WITHOUTGDB:-ON}
+WITHSPL=${WITHSPL:-ON}
+MAKE_JOBS=${MAKE_JOBS:-$(nproc)}
+
 ARCH=$(arch)
 HOST_OS=`uname -s`
 ROOT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
@@ -74,6 +82,6 @@ done
 
 echo "echo 'StrictHostkeyChecking no' >> /etc/ssh/ssh_config" >> generated_files/gen_build.sh
 chmod 755 generated_files/gen_build.sh
-echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=edge -DBUILD_LOGTAIL_UT=OFF -DENABLE_COMPATIBLE_MODE=OFF -DENABLE_STATIC_LINK_CRT=OFF -DWITHOUTGDB=OFF .. && make -sj\$nproc && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared output edge plugins.yml,external_plugins.yml go.mod" >> generated_files/gen_build.sh
+echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=OFF -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS} && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared output ${VERSION} plugins.yml,external_plugins.yml go.mod" >> generated_files/gen_build.sh
 
 ./generated_files/gen_build.sh
