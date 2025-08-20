@@ -128,7 +128,7 @@ int CpuProfilingManager::RemoveConfig(const std::string &configName) {
 
     ProcessDiscoveryManager::GetInstance()->RemoveDiscovery(configName);
 
-    auto hit = mConfigInfoMap.erase(key);
+    [[maybe_unused]] auto hit = mConfigInfoMap.erase(key);
     assert(hit);
 
     LOG_DEBUG(sLogger, ("CpuProfilingManager", "remove config")("config", configName));
