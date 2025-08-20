@@ -31,9 +31,10 @@ namespace ebpf {
 struct ProcessDiscoveryConfig {
     size_t mConfigKey;
     std::vector<boost::regex> mRegexs;
+    std::unordered_set<std::string> mContainerIds;
     bool mFullDiscovery = false;
 
-    bool IsMatch(const std::string& cmdline) {
+    bool IsMatch(const std::string& cmdline, const std::string& containerId) {
         if (mFullDiscovery) {
             return true;
         }
@@ -41,6 +42,9 @@ struct ProcessDiscoveryConfig {
             if (boost::regex_match(cmdline, regex)) {
                 return true;
             }
+        }
+        if (!containerId.empty() && mContainerIds.find(containerId) != mContainerIds.end()) {
+            return true;
         }
         return false;
     }
