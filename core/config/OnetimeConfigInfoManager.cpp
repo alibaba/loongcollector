@@ -33,16 +33,27 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoi
                                                                                    uint64_t hash,
                                                                                    uint32_t* expireTime) {
     lock_guard<mutex> lock(mMux);
+    
+    LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "start")("config", configName)("hash", hash)("checkpoint_size", mConfigExpireTimeCheckpoint.size()));
+    
     auto it = mConfigExpireTimeCheckpoint.find(configName);
     if (it == mConfigExpireTimeCheckpoint.end()) {
+        LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "config not found in checkpoint, status=NEW")("config", configName));
         return OnetimeConfigStatus::NEW;
     }
+    
+    LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "config found in checkpoint")("config", configName)("checkpoint_hash", it->second.first)("checkpoint_expire_time", it->second.second)("current_time", time(nullptr)));
+    
     OnetimeConfigStatus status = OnetimeConfigStatus::OLD;
     if (it->second.first != hash) {
         status = OnetimeConfigStatus::NEW;
+        LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "hash mismatch, status=NEW")("config", configName)("checkpoint_hash", it->second.first)("current_hash", hash));
     } else {
         if (time(nullptr) >= it->second.second) {
             status = OnetimeConfigStatus::OBSOLETE;
+            LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "config expired, status=OBSOLETE")("config", configName)("expire_time", it->second.second)("current_time", time(nullptr)));
+        } else {
+            LOG_INFO(sLogger, ("OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint", "config valid, status=OLD")("config", configName)("expire_time", it->second.second)("current_time", time(nullptr)));
         }
         if (expireTime) {
             *expireTime = it->second.second;
@@ -55,12 +66,17 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoi
 bool OnetimeConfigInfoManager::UpdateConfig(
     const string& configName, ConfigType type, const filesystem::path& filepath, uint64_t hash, uint32_t expireTime) {
     lock_guard<mutex> lock(mMux);
+    
+    LOG_INFO(sLogger, ("OnetimeConfigInfoManager::UpdateConfig", "start")("config", configName)("hash", hash)("expire_time", expireTime)("current_time", time(nullptr)));
+    
     auto it = mConfigInfoMap.find(configName);
     if (it != mConfigInfoMap.end()) {
         // on update
+        LOG_INFO(sLogger, ("OnetimeConfigInfoManager::UpdateConfig", "updating existing config")("config", configName)("old_hash", it->second.mHash)("new_hash", hash)("old_expire_time", it->second.mExpireTime)("new_expire_time", expireTime));
         it->second = ConfigInfo(type, filepath, hash, expireTime);
     } else {
         // on added
+        LOG_INFO(sLogger, ("OnetimeConfigInfoManager::UpdateConfig", "adding new config")("config", configName)("hash", hash)("expire_time", expireTime));
         mConfigInfoMap.try_emplace(configName, type, filepath, hash, expireTime);
     }
     LOG_INFO(sLogger, ("onetime pipeline expire time", expireTime)("config", configName));

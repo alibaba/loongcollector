@@ -62,11 +62,18 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
 bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
     uint32_t timeout = 0;
     if (!IsOneTime(mName, global, &timeout)) {
+        LOG_INFO(sLogger, ("PipelineConfig::GetExpireTimeIfOneTime", "not onetime config")("config", mName));
         return true;
     }
+    
+    LOG_INFO(sLogger, ("PipelineConfig::GetExpireTimeIfOneTime", "onetime config detected")("config", mName)("timeout", timeout)("config_hash", mConfigHash));
+    
     uint32_t expireTime = 0;
     auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
         mName, mConfigHash, &expireTime);
+    
+    LOG_INFO(sLogger, ("PipelineConfig::GetExpireTimeIfOneTime", "status check result")("config", mName)("status", static_cast<int>(status))("expireTime", expireTime)("current_time", time(nullptr)));
+    
     switch (status) {
         case OnetimeConfigStatus::OLD:
             mExpireTime = expireTime;
@@ -75,6 +82,7 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
             return true;
         case OnetimeConfigStatus::NEW:
             mExpireTime = time(nullptr) + timeout;
+            LOG_INFO(sLogger, ("PipelineConfig::GetExpireTimeIfOneTime", "new config, calculated expire time")("config", mName)("expire_time", mExpireTime.value())("current_time", time(nullptr))("timeout", timeout));
             return true;
         case OnetimeConfigStatus::OBSOLETE: {
             error_code ec;

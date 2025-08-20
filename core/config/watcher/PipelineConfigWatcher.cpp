@@ -219,7 +219,12 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
             auto iter = mFileInfoMap.find(filepath);
             uintmax_t size = filesystem::file_size(path, ec);
             filesystem::file_time_type mTime = filesystem::last_write_time(path, ec);
+            
+            // 添加调试日志
+            LOG_INFO(sLogger, ("PipelineConfigWatcher::InsertPipelines", "file info")("config", configName)("filepath", filepath)("size", size)("mTime", mTime.time_since_epoch().count()));
+            
             if (iter == mFileInfoMap.end()) {
+                LOG_INFO(sLogger, ("PipelineConfigWatcher::InsertPipelines", "new file detected")("config", configName)("filepath", filepath));
                 mFileInfoMap[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
                 if (!LoadConfigDetailFromFile(path, *detail)) {
@@ -233,6 +238,9 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                     continue;
                 }
             } else if (iter->second.first != size || iter->second.second != mTime) {
+                // 添加调试日志
+                LOG_INFO(sLogger, ("PipelineConfigWatcher::InsertPipelines", "file modified")("config", configName)("filepath", filepath)("old_size", iter->second.first)("new_size", size)("old_mTime", iter->second.second.time_since_epoch().count())("new_mTime", mTime.time_since_epoch().count()));
+                
                 // for config currently running, we leave it untouched if new config is invalid
                 mFileInfoMap[filepath] = make_pair(size, mTime);
                 unique_ptr<Json::Value> detail = make_unique<Json::Value>();
@@ -331,6 +339,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
         case ConfigType::Collection: {
             shared_ptr<CollectionPipeline> p = mCollectionPipelineManager->FindConfigByName(configName);
             if (!p) {
+                LOG_INFO(sLogger, ("PipelineConfigWatcher::CheckModifiedConfig", "config not found in pipeline manager")("config", configName));
                 CollectionConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
@@ -351,6 +360,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                           "prepare to build pipeline")("config", configName));
                 PushPipelineConfig(std::move(config), ConfigDiffEnum::Added, pDiff, singletonCache);
             } else if (*configDetail != p->GetConfig()) {
+                LOG_INFO(sLogger, ("PipelineConfigWatcher::CheckModifiedConfig", "config content changed")("config", configName));
                 CollectionConfig config(configName, std::move(configDetail), filepath);
                 if (!config.Parse()) {
                     LOG_ERROR(sLogger,
@@ -371,6 +381,7 @@ bool PipelineConfigWatcher::CheckModifiedConfig(const string& configName,
                           "prepare to rebuild pipeline")("config", configName));
                 PushPipelineConfig(std::move(config), ConfigDiffEnum::Modified, pDiff, singletonCache);
             } else {
+                LOG_INFO(sLogger, ("PipelineConfigWatcher::CheckModifiedConfig", "config content unchanged")("config", configName));
                 LOG_DEBUG(sLogger, ("existing valid config file modified, but no change found", "skip current object"));
             }
             break;
