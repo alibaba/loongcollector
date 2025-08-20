@@ -104,6 +104,7 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
     // update role
     if (mRole == IsUnknown && role != IsUnknown) {
         mRole = role;
+        mTags.Set<kTraceRole>(std::string(magic_enum::enum_name(mRole)));
     }
 
     if (mProtocol == support_proto_e::ProtoUnknown && protocol != support_proto_e::ProtoUnknown) {
@@ -159,7 +160,6 @@ void Connection::updateL4Meta(struct conn_stats_event_t* event) {
     mTags.Set<kRemotePort>(std::to_string(dport));
     mTags.Set<kNetNs>(std::to_string(netns));
     mTags.Set<kFamily>(family);
-    mTags.Set<kTraceRole>(std::string(magic_enum::enum_name(mRole)));
     mTags.Set<kIp>(sip);
     mTags.Set<kRemoteIp>(dip);
 }
@@ -191,11 +191,8 @@ void Connection::updatePeerPodMetaForExternal() {
     mTags.SetNoCopy<kPeerWorkloadKind>(kExternalStr);
     mTags.SetNoCopy<kPeerNamespace>(kExternalStr);
     mTags.SetNoCopy<kPeerServiceName>(kExternalStr);
-    if (mRole == IsClient) {
-        auto daddr = mTags.Get<kRemoteAddr>();
-        mTags.SetNoCopy<kDestId>(daddr);
-        mTags.SetNoCopy<kEndpoint>(daddr);
-    }
+    auto dip = mTags.Get<kRemoteIp>();
+    mTags.SetNoCopy<kDestId>(dip);
 }
 
 void Connection::updatePeerPodMetaForLocalhost() {
@@ -203,10 +200,7 @@ void Connection::updatePeerPodMetaForLocalhost() {
     mTags.SetNoCopy<kPeerPodIp>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadName>(kLocalhostStr);
     mTags.SetNoCopy<kPeerWorkloadKind>(kLocalhostStr);
-    if (mRole == IsClient) {
-        mTags.SetNoCopy<kDestId>(kLocalhostStr);
-        mTags.SetNoCopy<kEndpoint>(kLocalhostStr);
-    }
+    mTags.SetNoCopy<kDestId>(kLocalhostStr);
 }
 
 void Connection::updateSelfPodMetaForEnv() {
@@ -241,19 +235,13 @@ void Connection::updatePeerPodMeta(const std::shared_ptr<K8sPodInfo>& pod) {
     mTags.Set<kPeerNamespace>(pod->mNamespace.size() ? pod->mNamespace : kUnknownStr);
     mTags.Set<kPeerServiceName>(pod->mServiceName.size() ? pod->mServiceName : kUnknownStr);
 
-    // set destId and endpoint ...
-    if (mRole == IsClient) {
-        if (pod->mAppName.size()) {
-            mTags.Set<kDestId>(pod->mAppName);
-        } else if (pod->mWorkloadName.size()) {
-            mTags.Set<kDestId>(pod->mWorkloadName);
-        } else if (pod->mServiceName.size()) {
-            mTags.Set<kDestId>(pod->mServiceName);
-        } else {
-            // TODO(qianlu.kk): set to rpc value...
-            mTags.Set<kDestId>(kUnknownStr);
-        }
-        mTags.Set<kEndpoint>(mTags.Get<kRemoteAddr>());
+    if (pod->mWorkloadName.size()) {
+        mTags.Set<kDestId>(pod->mWorkloadName);
+    } else if (pod->mServiceName.size()) {
+        mTags.Set<kDestId>(pod->mServiceName);
+    } else {
+        auto dip = mTags.Get<kRemoteIp>();
+        mTags.SetNoCopy<kDestId>(dip);
     }
 }
 
@@ -337,6 +325,10 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
         // start an async task
         K8sMetadata::GetInstance().AsyncQueryMetadata(PodInfoType::IpInfo, dip);
     }
+}
+
+bool Connection::IsServer() {
+    return mRole == support_role_e::IsServer;
 }
 
 std::string Connection::gSelfPodName = [] {

@@ -80,10 +80,10 @@ std::shared_ptr<ProcessCacheValue> ProcessSyncRetryableEvent::procToProcessCache
         cacheValue->SetContent<kBinary>(proc.exe);
         cacheValue->SetContent<kUid>(proc.effectiveUid);
         auto userName = mProcParser.GetUserNameByUid(proc.effectiveUid);
+        cacheValue->SetContent<kUser>(userName);
         auto permitted = GetCapabilities(proc.permitted, *cacheValue->GetSourceBuffer());
         auto effective = GetCapabilities(proc.effective, *cacheValue->GetSourceBuffer());
         auto inheritable = GetCapabilities(proc.inheritable, *cacheValue->GetSourceBuffer());
-        cacheValue->SetContentNoCopy<kUser>(userName);
         cacheValue->SetContentNoCopy<kCapPermitted>(permitted);
         cacheValue->SetContentNoCopy<kCapEffective>(effective);
         cacheValue->SetContentNoCopy<kCapInheritable>(inheritable);

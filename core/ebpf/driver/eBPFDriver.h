@@ -51,4 +51,9 @@ void set_networkobserver_cid_filter(const char* container_id, size_t length, uin
 // oprations
 int update_bpf_map_elem(logtail::ebpf::PluginType type, const char* map_name, void* key, void* value, uint64_t flag);
 int get_plugin_pb_epoll_fds(logtail::ebpf::PluginType type, int* fds, int maxCount);
+
+
+#ifdef APSARA_UNIT_TEST_MAIN
+void ExtractContainerIdPrefix(const char* docker_id, int& prefix_len);
+#endif
 }
