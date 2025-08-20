@@ -92,12 +92,11 @@ void ProcessDiscoveryManager::run() {
                 auto& config = state.mConfig;
                 std::set<uint32_t> matchedPids;
                 for (const auto& proc : procs) {
-                    if (config.IsMatch(proc.mCmdline)) {
+                    if (config.IsMatch(proc.mCmdline, proc.mContainerId)) {
                         matchedPids.insert(proc.mPid);
                     }
                 }
-                auto& prevPids = state.mPrevPids;
-                if (prevPids == matchedPids) {
+                if (state.mPrevPids == matchedPids) {
                     continue;
                 }
                 result.emplace_back(config.mConfigKey, matchedPids); // copy
