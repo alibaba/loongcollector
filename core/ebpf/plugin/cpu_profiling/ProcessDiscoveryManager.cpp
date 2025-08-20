@@ -81,7 +81,7 @@ bool ProcessDiscoveryManager::CheckDiscoveryExist(const std::string &configName)
 void ProcessDiscoveryManager::run() {
     while (mRunning) {
         std::vector<ProcessEntry> procs;
-        ListAllProcesses(procs);
+        ListAllProcesses(mProcParser, procs);
 
         std::vector<DiscoverEntry> result;
 

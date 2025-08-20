@@ -20,11 +20,13 @@
 #include <string>
 #include <vector>
 
+#include "app_config/AppConfig.h"
+#include "common/LogtailCommonFlags.h"
+#include "common/ProcParser.h"
 #include "boost/regex.hpp"
 
 namespace logtail {
 namespace ebpf {
-
 
 struct ProcessDiscoveryConfig {
     size_t mConfigKey;
@@ -51,7 +53,7 @@ public:
     using NotifyFn = std::function<void(DiscoverResult)>;
     using UpdateFn = std::function<void(ProcessDiscoveryConfig&)>;
 
-    ProcessDiscoveryManager() = default;
+    ProcessDiscoveryManager() : mProcParser(getProcParserPrefix()) {}
 
     ProcessDiscoveryManager(const ProcessDiscoveryManager &) = delete;
     ProcessDiscoveryManager &operator=(const ProcessDiscoveryManager &) = delete;
@@ -77,6 +79,13 @@ public:
     bool CheckDiscoveryExist(const std::string &configName);
 
 private:
+    static std::string getProcParserPrefix() {
+        if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+            return STRING_FLAG(default_container_host_path);
+        }
+        return "/";
+    }
+
     void run();
 
     struct InnerState {
@@ -89,6 +98,8 @@ private:
     std::mutex mLock;
     std::unordered_map<std::string, InnerState> mStates;
     NotifyFn mCallback;
+    
+    ProcParser mProcParser;
 };
 
 } // namespace ebpf
