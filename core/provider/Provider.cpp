@@ -38,4 +38,8 @@ ProfileSender* GetProfileSender() {
     return ProfileSender::GetInstance();
 }
 
+
+void RegisterExternalPlugins() {
+}
+
 } // namespace logtail

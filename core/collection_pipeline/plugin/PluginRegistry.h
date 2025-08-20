@@ -56,6 +56,10 @@ public:
     bool IsValidNativeFlusherPlugin(const std::string& name) const;
     bool IsGlobalSingletonInputPlugin(const std::string& name) const;
 
+    void RegisterInputCreator(PluginCreator* creator, bool isSingleton = false);
+    void RegisterProcessorCreator(PluginCreator* creator);
+    void RegisterFlusherCreator(PluginCreator* creator, bool isSingleton = false);
+
 private:
     enum PluginCat { INPUT_PLUGIN, PROCESSOR_PLUGIN, FLUSHER_PLUGIN };
 
@@ -79,9 +83,6 @@ private:
 
     void LoadStaticPlugins();
     void LoadDynamicPlugins(const std::set<std::string>& plugins);
-    void RegisterInputCreator(PluginCreator* creator, bool isSingleton = false);
-    void RegisterProcessorCreator(PluginCreator* creator);
-    void RegisterFlusherCreator(PluginCreator* creator, bool isSingleton = false);
     PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginType);
     void RegisterCreator(PluginCat cat, PluginCreator* creator, bool isSingleton);
     std::unique_ptr<PluginInstance>
