@@ -281,7 +281,6 @@ void PipelineConfigWatcher::InsertPipelines(CollectionConfigDiff& pDiff,
                 }
             } else {
                 // check unchanged config just for singleton input
-                LOG_INFO(sLogger, ("PipelineConfigWatcher::InsertPipelines", "check unchanged config")("config", configName)("filepath", filepath));
                 CheckUnchangedConfig(configName, path, pDiff, singletonCache);
             }
         }
