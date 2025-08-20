@@ -30,33 +30,50 @@ on:
       - 1.*
       - 2.*
 jobs:
-  E2E:
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
-    strategy:
-      matrix:
-        runner: [ubuntu-latest]
-      fail-fast: true
+  # 生成E2E测试用例列表
+  GenerateE2ETestCasesList:
+    runs-on: ubuntu-latest
+    outputs:
+      cases: ${{ steps.discover.outputs.cases }}
     steps:
-      # Clean up space to prevent action from running out of disk space.
-      - name: clean
-        if: matrix.runner == 'ubuntu-latest'
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo -E apt-get -qq autoremove --purge
-          sudo -E apt-get -qq clean
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Check disk space
+      - name: Discover Test Cases
+        id: discover
         run: |
-          df -hT $PWD
+          # 使用JSON格式输出用例列表
+          cases=($(find test/e2e/test_cases -mindepth 1 -maxdepth 1 -type d -printf "%f\n"))
+          # 检查是否找到用例
+          if [ ${#cases[@]} -eq 0 ]; then
+            echo "Error: No test cases found"
+            exit 1
+          fi
+          # 转换为JSON数组格式
+          json="["
+          for i in "${!cases[@]}"; do
+            json+="\"${cases[$i]}\""
+            if [ $i -lt $((${#cases[@]}-1)) ]; then
+              json+=","
+            fi
+          done
+          json+="]"
+          # 输出JSON到文件和控制台
+          echo "$json" > cases.json
+          cat cases.json
+          echo "cases=$json" >> $GITHUB_OUTPUT
 
-      - name: Set up Go
+  # 生成e2e镜像
+  GenerateE2ETestImage:
+    runs-on: arc-runner-set-ilogtail
+    timeout-minutes: 60
+    permissions:
+      packages: write
+    steps:
+      - name: Set up Go 1.19
         uses: actions/setup-go@v4
         with:
-          go-version: 1.19.10
+          go-version: 1.19
 
       - name: Check out code
         uses: actions/checkout@v4
@@ -71,22 +88,65 @@ jobs:
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
 
+      - name: Build Image
+        env:
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
+          ENABLE_STATIC_LINK_CRT: ON
+          WITHOUTGDB: ON
+          MAKE_JOBS: 16
+          WITHSPL: ON
+        run: |
+          make gocdocker
+          make e2edocker
+
+      - name: Export Image to Tar
+        run: docker save -o image.tar aliyun/loongcollector:0.0.1
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: loongcollector-image
+          path: image.tar
+
+  # E2E测试
+  E2E:
+    runs-on: ubuntu-latest
+    needs: 
+      - GenerateE2ETestCasesList
+      - GenerateE2ETestImage
+    strategy:
+      matrix:
+        test_case: ${{ fromJson(needs.GenerateE2ETestCasesList.outputs.cases) }}
+    timeout-minutes: 60
+    steps:
+      - name: Set up Go 1.19
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
       - name: Update Docker-compose to v2
         run: |
           sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
           sudo chmod +x /usr/local/bin/docker-compose
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-image
 
-      - name: System environment
-        run: |
-          uname -r
-          docker --version
-          go version
+      - name: Import Image from Tar
+        run: docker load -i ./image.tar
 
-      - name: E2E Behavior Test
+      - name: E2E Behavior Test Case ${{ matrix.test_case }}
         env:
-          BUILD_LOGTAIL_UT: OFF
-          WITHOUTGDB: ON
-        run: make e2e
+          TEST_CASE: ${{ matrix.test_case }}
+        run: |
+          ./scripts/e2e.sh e2e
 
   actions-timeline:
     needs: [E2E]

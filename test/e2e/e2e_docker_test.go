@@ -44,22 +44,6 @@ func TestE2EOnDockerCompose(t *testing.T) {
 	}
 }
 
-func TestE2EOnDockerComposeCore(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "E2EOnDockerCompose",
-		ScenarioInitializer: engine.ScenarioInitializer,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"test_cases"},
-			Tags:     "@e2e-core && @docker-compose && ~@ebpf",
-			TestingT: t,
-		},
-	}
-	if suite.Run() != 0 {
-		t.Fail()
-	}
-}
-
 func TestE2EOnDockerComposePerformance(t *testing.T) {
 	suite := godog.TestSuite{
 		Name:                "E2EOnDockerCompose",
