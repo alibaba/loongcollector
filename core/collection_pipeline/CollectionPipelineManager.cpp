@@ -67,11 +67,6 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                                                                                      ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
-        LOG_INFO(sLogger, ("CollectionPipelineManager::UpdatePipelines", "processing modified config")("config", config.mName)("is_onetime", config.mExpireTime.has_value()));
-        if (config.mExpireTime.has_value()) {
-            LOG_INFO(sLogger, ("CollectionPipelineManager::UpdatePipelines", "onetime config details")("config", config.mName)("expire_time", config.mExpireTime.value())("current_time", time(nullptr)));
-        }
-        
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
             LOG_WARNING(sLogger,
