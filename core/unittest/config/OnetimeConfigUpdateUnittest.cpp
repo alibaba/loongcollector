@@ -18,6 +18,8 @@
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
+#include <thread>
+#include <chrono>
 
 using namespace std;
 
@@ -297,13 +299,44 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         })"};
         vector<string> filenames = {"new_config.json", "old_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            ofstream fout(mConfigDir / filenames[i], ios::binary);
+            // 先读取原始文件信息（如果存在）
+            filesystem::path filePath = mConfigDir / filenames[i];
+            if (filesystem::exists(filePath)) {
+                error_code ec;
+                auto originalSize = filesystem::file_size(filePath, ec);
+                auto originalTime = filesystem::last_write_time(filePath, ec);
+                cout << "Original file info for " << filenames[i] << ":" << endl;
+                cout << "  Size: " << originalSize << endl;
+                cout << "  Time: " << originalTime.time_since_epoch().count() << endl;
+            }
+            
+            // 更新文件内容
+            ofstream fout(filePath, ios::binary);
             fout << configDetails[i];
-            cout << "Created file: " << (mConfigDir / filenames[i]).string() << " with content hash: " << Hash(Json::Value(configDetails[i])) << endl;
+            fout.close(); // 确保文件写入完成
+            
+            // 强制更新文件修改时间
+            filesystem::file_time_type newTime = filesystem::file_time_type::clock::now();
+            filesystem::last_write_time(filePath, newTime);
+            
+            // 验证文件更新
+            error_code ec;
+            auto newSize = filesystem::file_size(filePath, ec);
+            auto actualTime = filesystem::last_write_time(filePath, ec);
+            
+            cout << "Updated file: " << filePath.string() << endl;
+            cout << "  Content hash: " << Hash(Json::Value(configDetails[i])) << endl;
+            cout << "  New size: " << newSize << endl;
+            cout << "  New time: " << actualTime.time_since_epoch().count() << endl;
+            cout << "  Time difference: " << (actualTime.time_since_epoch().count() - newTime.time_since_epoch().count()) << endl;
+            
+            // 添加一个小延迟确保文件系统更新
+            this_thread::sleep_for(chrono::milliseconds(10));
         }
         {
             ofstream fout(mConfigDir / "unused_config.json", ios::binary);
             fout << unusedConfigDetail;
+            fout.close();
             cout << "Created file: " << (mConfigDir / "unused_config.json").string() << endl;
         }
         filesystem::remove(mConfigDir / "changed_config.json");
