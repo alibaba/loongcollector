@@ -46,9 +46,8 @@ function check_docker_buildkit_support {
   echo "$support"
 }
 
-# Currently, there are 4 supported docker categories, which are goc, build, development and production.
+# Currently, there are 4 supported docker categories, which are build, development and production.
 #
-# goc: build goc server with Dockerfile_doc
 # build: build core or plugin binary with Dockerfile_build
 # development: build ilogtail development images.
 # production: build ilogtail production images.
@@ -90,7 +89,7 @@ else
   REMOVE_SSH_MOUNT='sed s/--mount=type=ssh//'
 fi
 
-if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
+if [[ $CATEGORY = "build" ]]; then
     cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "development" ]]; then
     cat $ROOTDIR/docker/Dockerfile_build | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;

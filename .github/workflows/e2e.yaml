@@ -97,7 +97,6 @@ jobs:
           MAKE_JOBS: 16
           WITHSPL: ON
         run: |
-          make gocdocker
           make e2edocker
 
       - name: Export Image to Tar
@@ -118,6 +117,7 @@ jobs:
     strategy:
       matrix:
         test_case: ${{ fromJson(needs.GenerateE2ETestCasesList.outputs.cases) }}
+      fail-fast: false
     timeout-minutes: 60
     steps:
       - name: Set up Go 1.19
