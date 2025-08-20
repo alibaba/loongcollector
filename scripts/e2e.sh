@@ -19,24 +19,6 @@ TYPE=$1
 TEST_SCOPE=$2
 AGENT=$3
 
-# 处理TEST_CASE环境变量
-if [ -n "$TEST_CASE" ]; then
-  echo "Running specific test case: $TEST_CASE"
-  # 验证测试用例是否存在
-  if [ ! -d "$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../test/e2e/test_cases/$TEST_CASE)" ]; then
-    echo "Error: Test case directory '$TEST_CASE' not found"
-    exit 1
-  fi
-  if [ ! -f "$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../test/e2e/test_cases/$TEST_CASE/case.feature)" ]; then
-    echo "Error: Test case '$TEST_CASE' is missing case.feature file"
-    exit 1
-  fi
-  # 设置环境变量供测试使用
-  export TEST_CASE="$TEST_CASE"
-else
-  echo "Running all test cases"
-fi
-
 ROOT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 TESTDIR=$ROOT_DIR/test
 

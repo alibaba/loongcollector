@@ -49,8 +49,8 @@ services:
     privileged: true
     pid: host
     volumes:
-      - %s:/loongcollector/conf/default_flusher.json
-      - %s:/loongcollector/conf/continuous_pipeline_config/local
+      - %s:/usr/local/loongcollector/conf/default_flusher.json
+      - %s:/usr/local/loongcollector/conf/continuous_pipeline_config/local
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
       - /sys/:/sys/
@@ -65,7 +65,7 @@ services:
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
     healthcheck:
-      test: "cat /loongcollector/log/loongcollector.LOG"
+      test: "cat /usr/local/loongcollector/log/loongcollector.LOG"
       interval: 15s
       timeout: 5s
 `
