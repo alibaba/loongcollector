@@ -16,41 +16,40 @@
 
 #include <string>
 #include <fstream>
-#include "boost/filesystem.hpp"
+
+#include "common/ProcParser.h"
+
+namespace logtail {
+namespace ebpf {
 
 struct ProcessEntry {
-    std::string mCmdline;
     uint32_t mPid;
+    std::string mCmdline;
+    std::string mContainerId;
 
-    ProcessEntry(std::string cmdline, uint32_t pid)
-        : mCmdline(std::move(cmdline)), mPid(pid) {}
+    ProcessEntry(uint32_t pid, std::string cmdline, std::string containerId)
+        : mPid(pid), mCmdline(std::move(cmdline)), mContainerId(containerId) {}
 };
 
-inline void ListAllProcesses(std::vector<ProcessEntry> &proc_out) {
+inline void ListAllProcesses(ProcParser &procParser, std::vector<ProcessEntry> &proc_out) {
     assert(proc_out.empty());
-    boost::filesystem::path procPath("/proc");
-    for (const auto &entry : boost::filesystem::directory_iterator(procPath)) {
-        std::string pidStr = entry.path().filename().string();
-        assert(!pidStr.empty());
-        if (!std::all_of(pidStr.begin(), pidStr.end(), ::isdigit)) {
-            continue;
-        }
-        uint32_t pid = std::stoi(pidStr);
-        boost::filesystem::path cmdlinePath = entry.path() / "cmdline";
-        std::ifstream cmdlineFile(cmdlinePath.string());
-        if (!cmdlineFile.is_open()) {
-            continue;
-        }
 
-        std::string cmdline;
-        std::getline(cmdlineFile, cmdline);
+    auto pids = procParser.GetAllPids();
+    for (auto& pid : pids) {
+        auto cmdline = procParser.GetPIDCmdline(pid);
         if (cmdline.empty()) {
-            continue;
+            continue; // process exit or no perm
         }
-
         // /proc/<pid>/cmdline use '\0' as separator, replace it with space
         std::replace(cmdline.begin(), cmdline.end(), '\0', ' ');
 
-        proc_out.emplace_back(cmdline, pid);
+        std::string containerId;
+        // ok if containerId is empty
+        procParser.GetPIDDockerId(pid, containerId);
+
+        proc_out.emplace_back(pid, std::move(cmdline), std::move(containerId));
     }
 }
+
+} // namespace ebpf
+} // namespace logtail
