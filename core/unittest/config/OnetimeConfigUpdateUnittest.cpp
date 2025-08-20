@@ -255,12 +255,20 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         })"};
         vector<string> filenames = {"new_config.json", "old_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            ofstream fout(mConfigDir / filenames[i], ios::binary);
+            filesystem::path filePath = mConfigDir / filenames[i];
+            ofstream fout(filePath, ios::binary);
             fout << configDetails[i];
+            fout.close();
+            // 强制更新文件修改时间
+            filesystem::file_time_type newTime = filesystem::file_time_type::clock::now();
+            filesystem::last_write_time(filePath, newTime);
+            // 添加一个小延迟确保文件系统更新
+            this_thread::sleep_for(chrono::milliseconds(10));
         }
         {
             ofstream fout(mConfigDir / "unused_config.json", ios::binary);
             fout << unusedConfigDetail;
+            fout.close();
         }
         filesystem::remove(mConfigDir / "changed_config.json");
 
