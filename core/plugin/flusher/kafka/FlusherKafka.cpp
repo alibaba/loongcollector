@@ -120,7 +120,7 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     string errorMsg;
     if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
         LOG_ERROR(mContext->GetLogger(), ("failed to serialize events", errorMsg)("action", "discard data"));
-        mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
+        mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
                                        "failed to serialize events: " + errorMsg + "\taction: discard data",
                                        mContext->GetRegion(),
                                        mContext->GetProjectName(),
@@ -172,7 +172,7 @@ void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::Error
                 break;
         }
 
-        mContext->GetAlarm().SendAlarm(SEND_DATA_FAIL_ALARM,
+        mContext->GetAlarm().SendAlarmCritical(SEND_DATA_FAIL_ALARM,
                                        "Kafka delivery error: " + errorInfo.message,
                                        mContext->GetRegion(),
                                        mContext->GetProjectName(),
