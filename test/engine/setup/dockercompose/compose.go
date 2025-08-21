@@ -140,7 +140,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	cmd := []string{
 		"sh",
 		"-c",
-		"env |grep HOST_OS|grep Linux && (apt-get update && apt-get install -y iproute2) && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
+		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
 	}
 	if err = c.exec(c.logtailID, cmd); err != nil {
 		logger.Error(context.Background(), "EXEC_ALARM", "err", err)

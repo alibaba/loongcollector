@@ -44,12 +44,18 @@ FROM ubuntu:25.10 AS loongcollector
 ENV container=docker
 
 # Build arguments for final image
-ARG HOST_OS=Linux
+ARG HOST_OS
 ARG VERSION=edge
 ARG TARGETPLATFORM
 
 WORKDIR /usr/local
 COPY --from=builder --chown=$(whoami) /src/dist/loongcollector-edge loongcollector
+
+# Install iproute2 if HOST_OS is Linux for e2e
+RUN if [ "$HOST_OS" = "Linux" ]; then \
+        apt-get update && apt-get install -y iproute2 && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 WORKDIR /usr/local/loongcollector
 ENV HTTP_PROBE_PORT=7953 \

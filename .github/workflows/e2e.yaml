@@ -95,6 +95,7 @@ jobs:
             --build-arg WITHOUTGDB=ON \
             --build-arg WITHSPL=ON \
             --build-arg MAKE_JOBS=16 \
+            --build-arg HOST_OS=Linux \
             .
 
       - name: Export Image to Tar
