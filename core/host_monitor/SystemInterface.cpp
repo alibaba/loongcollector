@@ -253,6 +253,17 @@ bool SystemInterface::GetNetInterfaceInformation(NetInterfaceInformation& netInt
         errorType);
 }
 
+bool SystemInterface::GetCgroupStatInformation(CgroupStatInformation& cgroupStatInfo) {
+    const std::string errorType = "Cgroup stat";
+    return MemoizedCall(
+        mCgroupStatInformationCache,
+        [this](BaseInformation& info) {
+            return this->GetCgroupStatInformationOnce(static_cast<CgroupStatInformation&>(info));
+        },
+        cgroupStatInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {

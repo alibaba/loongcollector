@@ -598,6 +598,66 @@ struct DiskStateInformation : public BaseInformation {
     std::vector<DiskState> diskStats;
 };
 
+// /proc/cgroups
+// #subsys_name    hierarchy       num_cgroups     enabled
+// cpuset  10      5       1
+// cpu     3       89      1
+// cpuacct 3       89      1
+// blkio   7       84      1
+// memory  12      522     1
+// devices 9       84      1
+// freezer 11      5       1
+// net_cls 13      5       1
+// perf_event      4       5       1
+// net_prio        13      5       1
+// hugetlb 8       5       1
+// pids    5       91      1
+// ioasids 2       1       1
+// rdma    6       5       1
+struct CgroupStat {
+    unsigned int cpuset = 0;
+    unsigned int cpu = 0;
+    unsigned int cpuacct = 0;
+    unsigned int blkio = 0;
+    unsigned int memory = 0;
+    unsigned int devices = 0;
+    unsigned int freezer = 0;
+    unsigned int net_cls = 0;
+    unsigned int perf_event = 0;
+    unsigned int net_prio = 0;
+    unsigned int hugetlb = 0;
+    unsigned int pids = 0;
+    unsigned int ioasids = 0;
+    unsigned int rdma = 0;
+
+    static inline const FieldName<CgroupStat, unsigned int> cgroupStatFields[] = {
+        FIELD_ENTRY(CgroupStat, cpuset),
+        FIELD_ENTRY(CgroupStat, cpu),
+        FIELD_ENTRY(CgroupStat, cpuacct),
+        FIELD_ENTRY(CgroupStat, blkio),
+        FIELD_ENTRY(CgroupStat, memory),
+        FIELD_ENTRY(CgroupStat, devices),
+        FIELD_ENTRY(CgroupStat, freezer),
+        FIELD_ENTRY(CgroupStat, net_cls),
+        FIELD_ENTRY(CgroupStat, perf_event),
+        FIELD_ENTRY(CgroupStat, net_prio),
+        FIELD_ENTRY(CgroupStat, hugetlb),
+        FIELD_ENTRY(CgroupStat, pids),
+        FIELD_ENTRY(CgroupStat, ioasids),
+        FIELD_ENTRY(CgroupStat, rdma),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<CgroupStat, unsigned int>&)>& callback) {
+        for (const auto& field : cgroupStatFields) {
+            callback(field);
+        }
+    }
+};
+
+struct CgroupStatInformation : public BaseInformation {
+    CgroupStat stat;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -661,9 +721,11 @@ public:
     bool GetProcessCredNameObj(pid_t pid, ProcessCredName& credName);
     bool GetExecutablePathCache(pid_t pid, ProcessExecutePath& executePath);
     bool GetProcessOpenFiles(pid_t pid, ProcessFd& processFd);
-
     bool GetTCPStatInformation(TCPStatInformation& tcpStatInfo);
     bool GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo);
+
+    bool GetCgroupStatInformation(CgroupStatInformation& cgroupStatInfo);
+
     explicit SystemInterface(std::chrono::milliseconds ttl
                              = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
         : mSystemInformationCache(),
@@ -683,7 +745,8 @@ public:
           mProcessFdCache(ttl),
           mExecutePathCache(ttl),
           mTCPStatInformationCache(ttl),
-          mNetInterfaceInformationCache(ttl) {}
+          mNetInterfaceInformationCache(ttl),
+          mCgroupStatInformationCache(ttl) {}
     virtual ~SystemInterface() = default;
 
 private:
@@ -712,6 +775,7 @@ private:
     virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
+    virtual bool GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -731,7 +795,7 @@ private:
     SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
-
+    SystemInformationCache<CgroupStatInformation> mCgroupStatInformationCache;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;
 #endif

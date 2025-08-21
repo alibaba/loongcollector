@@ -20,6 +20,7 @@
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/CgroupCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
@@ -160,6 +161,21 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
         mCollectors.push_back(NetCollector::sName);
     }
 
+    // cgroup
+    bool enableCgroup = true;
+    if (!GetOptionalBoolParam(config, "EnableCgroup", enableCgroup, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableCgroup) {
+        mCollectors.push_back(CgroupCollector::sName);
+    }
 
     return true;
 }

@@ -57,6 +57,9 @@ private:
     bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) override;
     bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) override;
     bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) override;
+
+    bool GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) override;
+
     bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
     bool GetHostLoadavg(std::vector<std::string>& lines, std::string& errorMessage);
     bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp);

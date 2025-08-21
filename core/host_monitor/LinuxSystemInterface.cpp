@@ -1090,4 +1090,76 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
 
     return true;
 }
+
+bool LinuxSystemInterface::GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) {
+    std::filesystem::path cgroupPath = PROCESS_DIR / PROCESS_CGROUP;
+    std::vector<std::string> cgroupLines = {};
+
+    if (!CheckExistance(cgroupPath)) {
+        LOG_ERROR(sLogger, ("file does not exist", (cgroupPath).string()));
+        return false;
+    }
+
+    std::string errorMessage;
+    int ret = GetFileLines(cgroupPath, cgroupLines, true, &errorMessage);
+    if (ret != 0 || cgroupLines.empty()) {
+        LOG_ERROR(sLogger, ("failed to read cgroup file", "fail")("error", errorMessage));
+        return false;
+    }
+
+    // 解析每一行，跳过注释行
+    for (const auto& line : cgroupLines) {
+        // 跳过空行和注释行
+        if (line.empty() || line[0] == '#') {
+            continue;
+        }
+        std::vector<std::string> fields;
+        boost::algorithm::split(fields, line, boost::algorithm::is_any_of(" \t"), boost::algorithm::token_compress_on);
+        // 每行应该有4个字段：subsys_name, hierarchy, num_cgroups, enabled
+        if (fields.size() >= 3) {
+            std::string subsysName = fields[0];
+            unsigned int numCgroups = 0;
+
+            // 尝试解析num_cgroups字段
+            if (StringTo(fields[2], numCgroups)) {
+                // 根据subsys_name设置对应的字段
+                if (subsysName == "cpuset") {
+                    cgroupStatInfo.stat.cpuset = numCgroups;
+                } else if (subsysName == "cpu") {
+                    cgroupStatInfo.stat.cpu = numCgroups;
+                } else if (subsysName == "cpuacct") {
+                    cgroupStatInfo.stat.cpuacct = numCgroups;
+                } else if (subsysName == "blkio") {
+                    cgroupStatInfo.stat.blkio = numCgroups;
+                } else if (subsysName == "memory") {
+                    cgroupStatInfo.stat.memory = numCgroups;
+                } else if (subsysName == "devices") {
+                    cgroupStatInfo.stat.devices = numCgroups;
+                } else if (subsysName == "freezer") {
+                    cgroupStatInfo.stat.freezer = numCgroups;
+                } else if (subsysName == "net_cls") {
+                    cgroupStatInfo.stat.net_cls = numCgroups;
+                } else if (subsysName == "perf_event") {
+                    cgroupStatInfo.stat.perf_event = numCgroups;
+                } else if (subsysName == "net_prio") {
+                    cgroupStatInfo.stat.net_prio = numCgroups;
+                } else if (subsysName == "hugetlb") {
+                    cgroupStatInfo.stat.hugetlb = numCgroups;
+                } else if (subsysName == "pids") {
+                    cgroupStatInfo.stat.pids = numCgroups;
+                } else if (subsysName == "ioasids") {
+                    cgroupStatInfo.stat.ioasids = numCgroups;
+                } else if (subsysName == "rdma") {
+                    cgroupStatInfo.stat.rdma = numCgroups;
+                }
+            } else {
+                LOG_WARNING(sLogger, ("failed to parse num_cgroups", fields[2])("subsys", subsysName));
+            }
+        }
+    }
+
+    return true;
+}
+
+
 } // namespace logtail
