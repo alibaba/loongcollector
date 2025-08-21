@@ -44,6 +44,7 @@ FROM ubuntu:25.10 AS loongcollector
 ENV container=docker
 
 # Build arguments for final image
+ARG HOST_OS=Linux
 ARG VERSION=edge
 ARG TARGETPLATFORM
 
@@ -54,5 +55,6 @@ WORKDIR /usr/local/loongcollector
 ENV HTTP_PROBE_PORT=7953 \
     ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
     docker_file_cache_path=checkpoint/docker_path_config.json \
-    LOONGCOLLECTOR_VERSION=$VERSION
+    LOONGCOLLECTOR_VERSION=$VERSION \
+    HOST_OS=$HOST_OS
 CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

@@ -131,7 +131,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		),
 	})
 	if len(list) != 1 {
-		logger.Errorf(context.Background(), "LOGTAIL_COMPOSE_ALARM", "logtail container size is not equal 1, got %d count", len(list))
+		logger.Errorf(context.Background(), "LOONGCOLLECTOR_COMPOSE_ALARM", "loongcollector container size is not equal 1, got %d count", len(list))
 		return err
 	}
 	c.logtailID = list[0].ID
@@ -140,9 +140,10 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	cmd := []string{
 		"sh",
 		"-c",
-		"env |grep HOST_OS|grep Linux && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
+		"env |grep HOST_OS|grep Linux && (apt-get update && apt-get install -y iproute2) && ip -4 route list match 0/0|awk '{print $3\" host.docker.internal\"}' >> /etc/hosts",
 	}
 	if err = c.exec(c.logtailID, cmd); err != nil {
+		logger.Error(context.Background(), "EXEC_ALARM", "err", err)
 		return err
 	}
 	err = registerDockerNetMapping(strategyWrappers)
@@ -190,13 +191,13 @@ func (c *ComposeBooter) CopyCoreLogs() {
 	if c.logtailID != "" {
 		_ = os.Remove(config.LogDir)
 		_ = os.Mkdir(config.LogDir, 0750)
-		cmd := exec.Command("docker", "cp", c.logtailID+":/loongcollector/log/loongcollector.LOG", config.LogDir)
+		cmd := exec.Command("docker", "cp", c.logtailID+":/usr/local/loongcollector/log/loongcollector.LOG", config.LogDir)
 		output, err := cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
 			logger.Error(context.Background(), "COPY_LOG_ALARM", "type", "main", "err", err)
 		}
-		cmd = exec.Command("docker", "cp", c.logtailID+":/loongcollector/log/go_plugin.LOG", config.LogDir)
+		cmd = exec.Command("docker", "cp", c.logtailID+":/usr/local/loongcollector/log/go_plugin.LOG", config.LogDir)
 		output, err = cmd.CombinedOutput()
 		logger.Debugf(context.Background(), "\n%s", string(output))
 		if err != nil {
@@ -278,8 +279,6 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 // getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
-	f, _ := os.Create(config.CoverageFile)
-	_ = f.Close()
 	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir)
 	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
 		panic(err)
