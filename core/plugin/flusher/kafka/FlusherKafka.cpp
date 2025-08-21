@@ -121,11 +121,11 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
         LOG_ERROR(mContext->GetLogger(), ("failed to serialize events", errorMsg)("action", "discard data"));
         mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
-                                       "failed to serialize events: " + errorMsg + "\taction: discard data",
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mContext->GetLogstoreName());
+                                               "failed to serialize events: " + errorMsg + "\taction: discard data",
+                                               mContext->GetRegion(),
+                                               mContext->GetProjectName(),
+                                               mContext->GetConfigName(),
+                                               mContext->GetLogstoreName());
         mDiscardCnt->Add(1);
         return false;
     }
@@ -173,11 +173,11 @@ void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::Error
         }
 
         mContext->GetAlarm().SendAlarmCritical(SEND_DATA_FAIL_ALARM,
-                                       "Kafka delivery error: " + errorInfo.message,
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mKafkaConfig.Topic);
+                                               "Kafka delivery error: " + errorInfo.message,
+                                               mContext->GetRegion(),
+                                               mContext->GetProjectName(),
+                                               mContext->GetConfigName(),
+                                               mKafkaConfig.Topic);
     }
 }
 
