@@ -95,7 +95,7 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	// set protobuf support for config
 	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
 	config.ContentType = "application/vnd.kubernetes.protobuf"
-	config.UserAgent = "EntityCollector-LoongCollector"
+	config.UserAgent = LOONG_COLLECTOR_ENRTITY_COLLECTOR_USER_AGENT
 
 	// 创建 Kubernetes 客户端
 	clientset, err := kubernetes.NewForConfig(config)
