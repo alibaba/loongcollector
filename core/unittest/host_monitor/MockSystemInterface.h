@@ -223,6 +223,24 @@ private:
         return true;
     }
 
+    bool GetCgroupStatInformationOnce(CgroupStatInformation& cgroupStatInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        cgroupStatInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetDentryStatInformationOnce(DentryStatInformation& dentryStatInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        dentryStatInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
 

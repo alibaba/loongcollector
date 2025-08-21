@@ -49,20 +49,20 @@ DECLARE_FLAG_INT32(system_interface_cache_entry_expire_seconds);
 namespace logtail {
 
 struct BaseInformation {
-    time_t collectTime;
+  time_t collectTime;
 };
 
 struct SystemInformation : public BaseInformation {
-    int64_t bootTime;
+  int64_t bootTime;
 };
 
 class ScopeGuard {
-    std::function<void()> fn;
+  std::function<void()> fn;
 
 public:
-    explicit ScopeGuard(std::function<void()> f) : fn(std::move(f)) {}
+  explicit ScopeGuard(std::function<void()> f) : fn(std::move(f)) {}
 
-    ~ScopeGuard() { fn(); }
+  ~ScopeGuard() { fn(); }
 };
 
 #define defer3(ln, statement) ScopeGuard __##ln##_defer_([&]() { statement; })
@@ -72,759 +72,893 @@ public:
 // man proc: https://man7.org/linux/man-pages/man5/proc.5.html
 // search key: /proc/stat
 enum class EnumCpuKey : int {
-    user = 1,
-    nice,
-    system,
-    idle,
-    iowait, // since Linux 2.5.41
-    irq, // since Linux 2.6.0
-    softirq, // since Linux 2.6.0
-    steal, // since Linux 2.6.11
-    guest, // since Linux 2.6.24
-    guest_nice, // since Linux 2.6.33
+  user = 1,
+  nice,
+  system,
+  idle,
+  iowait,     // since Linux 2.5.41
+  irq,        // since Linux 2.6.0
+  softirq,    // since Linux 2.6.0
+  steal,      // since Linux 2.6.11
+  guest,      // since Linux 2.6.24
+  guest_nice, // since Linux 2.6.33
 };
 
 struct CPUStat {
-    int32_t index; // -1 means total cpu
-    double user;
-    double nice;
-    double system;
-    double idle;
-    double iowait;
-    double irq;
-    double softirq;
-    double steal;
-    double guest;
-    double guestNice;
+  int32_t index; // -1 means total cpu
+  double user;
+  double nice;
+  double system;
+  double idle;
+  double iowait;
+  double irq;
+  double softirq;
+  double steal;
+  double guest;
+  double guestNice;
 };
 
 struct tagPidTotal {
-    pid_t pid = 0;
-    uint64_t total = 0;
+  pid_t pid = 0;
+  uint64_t total = 0;
 
-    tagPidTotal() = default;
+  tagPidTotal() = default;
 
-    tagPidTotal(pid_t p, uint64_t t) : pid(p), total(t) {}
+  tagPidTotal(pid_t p, uint64_t t) : pid(p), total(t) {}
 };
 
 // 单进程CPU信息
 struct ProcessCpuInformation {
-    int64_t startTime = 0;
-    std::chrono::steady_clock::time_point lastTime;
-    uint64_t user = 0;
-    uint64_t sys = 0;
-    uint64_t total = 0;
-    double percent = 0.0;
+  int64_t startTime = 0;
+  std::chrono::steady_clock::time_point lastTime;
+  uint64_t user = 0;
+  uint64_t sys = 0;
+  uint64_t total = 0;
+  double percent = 0.0;
 };
 
 struct ProcessTime {
-    int64_t startTime;
-    std::chrono::milliseconds cutime{0};
-    std::chrono::milliseconds cstime{0};
+  int64_t startTime;
+  std::chrono::milliseconds cutime{0};
+  std::chrono::milliseconds cstime{0};
 
-    std::chrono::milliseconds user{0}; // utime + cutime
-    std::chrono::milliseconds sys{0}; // stime + cstime
+  std::chrono::milliseconds user{0}; // utime + cutime
+  std::chrono::milliseconds sys{0};  // stime + cstime
 
-    std::chrono::milliseconds total{0}; // user + sys
+  std::chrono::milliseconds total{0}; // user + sys
 
-    std::chrono::milliseconds utime() const { return user - cutime; }
+  std::chrono::milliseconds utime() const { return user - cutime; }
 
-    std::chrono::milliseconds stime() const { return sys - cstime; }
+  std::chrono::milliseconds stime() const { return sys - cstime; }
 
-    time_t collectTime;
+  time_t collectTime;
 };
 
 struct ProcessInfo {
-    pid_t pid;
-    std::string name;
-    std::string path;
-    std::string cwd;
-    std::string root;
-    std::string args;
-    std::string user;
+  pid_t pid;
+  std::string name;
+  std::string path;
+  std::string cwd;
+  std::string root;
+  std::string args;
+  std::string user;
 };
 
 struct ProcessMemoryInformation : public BaseInformation {
-    uint64_t size = 0;
-    uint64_t resident = 0;
-    uint64_t share = 0;
-    uint64_t minorFaults = 0;
-    uint64_t majorFaults = 0;
-    uint64_t pageFaults = 0;
+  uint64_t size = 0;
+  uint64_t resident = 0;
+  uint64_t share = 0;
+  uint64_t minorFaults = 0;
+  uint64_t majorFaults = 0;
+  uint64_t pageFaults = 0;
 };
 
 // 进程打开文件数
 struct ProcessFd : public BaseInformation {
-    uint64_t total = 0;
-    bool exact = true; // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
+  uint64_t total = 0;
+  bool exact =
+      true; // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
 };
 
 struct ProcessCredName : public BaseInformation {
-    std::string user;
-    std::string group;
-    std::string name;
-    uid_t uid; // real user ID
-    gid_t gid; // real group ID
-    uid_t euid; // effective user ID
-    gid_t egid; // effective group ID
+  std::string user;
+  std::string group;
+  std::string name;
+  uid_t uid;  // real user ID
+  gid_t gid;  // real group ID
+  uid_t euid; // effective user ID
+  gid_t egid; // effective group ID
 };
 
 struct ProcessCred {
-    uid_t uid; // real user ID
-    gid_t gid; // real group ID
-    uid_t euid; // effective user ID
-    gid_t egid; // effective group ID
+  uid_t uid;  // real user ID
+  gid_t gid;  // real group ID
+  uid_t euid; // effective user ID
+  gid_t egid; // effective group ID
 };
 
 struct ProcessAllStat {
-    pid_t pid;
-    ProcessStat processState;
-    ProcessCpuInformation processCpu;
-    ProcessMemoryInformation processMemory;
-    double memPercent = 0.0;
-    uint64_t fdNum = 0;
-    bool fdNumExact = true;
+  pid_t pid;
+  ProcessStat processState;
+  ProcessCpuInformation processCpu;
+  ProcessMemoryInformation processMemory;
+  double memPercent = 0.0;
+  uint64_t fdNum = 0;
+  bool fdNumExact = true;
 };
 
 struct ProcessPushMertic {
-    pid_t pid;
-    double cpuPercent = 0.0;
-    double memPercent = 0.0;
-    double fdNum = 0.0;
-    double numThreads = 0.0;
-    double allNumProcess = 0.0;
+  pid_t pid;
+  double cpuPercent = 0.0;
+  double memPercent = 0.0;
+  double fdNum = 0.0;
+  double numThreads = 0.0;
+  double allNumProcess = 0.0;
 
-    static inline const FieldName<ProcessPushMertic> processPushMerticFields[] = {
-        FIELD_ENTRY(ProcessPushMertic, cpuPercent),
-        FIELD_ENTRY(ProcessPushMertic, memPercent),
-        FIELD_ENTRY(ProcessPushMertic, fdNum),
-        FIELD_ENTRY(ProcessPushMertic, numThreads),
-        FIELD_ENTRY(ProcessPushMertic, allNumProcess),
-    };
+  static inline const FieldName<ProcessPushMertic> processPushMerticFields[] = {
+      FIELD_ENTRY(ProcessPushMertic, cpuPercent),
+      FIELD_ENTRY(ProcessPushMertic, memPercent),
+      FIELD_ENTRY(ProcessPushMertic, fdNum),
+      FIELD_ENTRY(ProcessPushMertic, numThreads),
+      FIELD_ENTRY(ProcessPushMertic, allNumProcess),
+  };
 
-    static void enumerate(const std::function<void(const FieldName<ProcessPushMertic, double>&)>& callback) {
-        for (const auto& field : processPushMerticFields) {
-            callback(field);
-        }
+  static void enumerate(
+      const std::function<void(const FieldName<ProcessPushMertic, double> &)>
+          &callback) {
+    for (const auto &field : processPushMerticFields) {
+      callback(field);
     }
+  }
 };
 
 struct VMProcessNumStat {
-    double vmProcessNum = 0;
+  double vmProcessNum = 0;
 
-    static inline const FieldName<VMProcessNumStat> vmProcessNumStatMerticFields[] = {
-        FIELD_ENTRY(VMProcessNumStat, vmProcessNum),
-    };
+  static inline const FieldName<VMProcessNumStat>
+      vmProcessNumStatMerticFields[] = {
+          FIELD_ENTRY(VMProcessNumStat, vmProcessNum),
+  };
 
-    static void enumerate(const std::function<void(const FieldName<VMProcessNumStat, double>&)>& callback) {
-        for (const auto& field : vmProcessNumStatMerticFields) {
-            callback(field);
-        }
+  static void enumerate(
+      const std::function<void(const FieldName<VMProcessNumStat, double> &)>
+          &callback) {
+    for (const auto &field : vmProcessNumStatMerticFields) {
+      callback(field);
     }
+  }
 };
 
 struct SystemTaskInfo {
-    uint64_t threadCount = 0;
-    uint64_t processCount = 0;
-    uint64_t zombieProcessCount = 0;
+  uint64_t threadCount = 0;
+  uint64_t processCount = 0;
+  uint64_t zombieProcessCount = 0;
 };
 
 struct CPUInformation : public BaseInformation {
-    std::vector<CPUStat> stats;
+  std::vector<CPUStat> stats;
 };
 
 struct ProcessListInformation : public BaseInformation {
-    std::vector<pid_t> pids;
+  std::vector<pid_t> pids;
 };
 
 struct ProcessInformation : public BaseInformation {
-    ProcessStat stat; // shared data structrue with eBPF process
+  ProcessStat stat; // shared data structrue with eBPF process
 };
 
 // /proc/loadavg
 struct SystemStat {
-    double load1 = 0.0;
-    double load5 = 0.0;
-    double load15 = 0.0;
-    double load1PerCore = 0.0;
-    double load5PerCore = 0.0;
-    double load15PerCore = 0.0;
+  double load1 = 0.0;
+  double load5 = 0.0;
+  double load15 = 0.0;
+  double load1PerCore = 0.0;
+  double load5PerCore = 0.0;
+  double load15PerCore = 0.0;
 
-    // Define the field descriptors
-    static inline const FieldName<SystemStat> systemMetricFields[] = {
-        FIELD_ENTRY(SystemStat, load1),
-        FIELD_ENTRY(SystemStat, load5),
-        FIELD_ENTRY(SystemStat, load15),
-        FIELD_ENTRY(SystemStat, load1PerCore),
-        FIELD_ENTRY(SystemStat, load5PerCore),
-        FIELD_ENTRY(SystemStat, load15PerCore),
-    };
+  // Define the field descriptors
+  static inline const FieldName<SystemStat> systemMetricFields[] = {
+      FIELD_ENTRY(SystemStat, load1),
+      FIELD_ENTRY(SystemStat, load5),
+      FIELD_ENTRY(SystemStat, load15),
+      FIELD_ENTRY(SystemStat, load1PerCore),
+      FIELD_ENTRY(SystemStat, load5PerCore),
+      FIELD_ENTRY(SystemStat, load15PerCore),
+  };
 
-    // Define the enumerate function for your metric type
-    static void enumerate(const std::function<void(const FieldName<SystemStat, double>&)>& callback) {
-        for (const auto& field : systemMetricFields) {
-            callback(field);
-        }
+  // Define the enumerate function for your metric type
+  static void
+  enumerate(const std::function<void(const FieldName<SystemStat, double> &)>
+                &callback) {
+    for (const auto &field : systemMetricFields) {
+      callback(field);
     }
+  }
 };
 
 enum EnumTcpState : int8_t {
-    TCP_ESTABLISHED = 1,
-    TCP_SYN_SENT,
-    TCP_SYN_RECV,
-    TCP_FIN_WAIT1,
-    TCP_FIN_WAIT2,
-    TCP_TIME_WAIT,
-    TCP_CLOSE,
-    TCP_CLOSE_WAIT,
-    TCP_LAST_ACK,
-    TCP_LISTEN,
-    TCP_CLOSING,
-    TCP_IDLE,
-    TCP_BOUND,
-    TCP_UNKNOWN,
-    TCP_TOTAL,
-    TCP_NON_ESTABLISHED,
+  TCP_ESTABLISHED = 1,
+  TCP_SYN_SENT,
+  TCP_SYN_RECV,
+  TCP_FIN_WAIT1,
+  TCP_FIN_WAIT2,
+  TCP_TIME_WAIT,
+  TCP_CLOSE,
+  TCP_CLOSE_WAIT,
+  TCP_LAST_ACK,
+  TCP_LISTEN,
+  TCP_CLOSING,
+  TCP_IDLE,
+  TCP_BOUND,
+  TCP_UNKNOWN,
+  TCP_TOTAL,
+  TCP_NON_ESTABLISHED,
 
-    TCP_STATE_END, // 仅用于状态计数
+  TCP_STATE_END, // 仅用于状态计数
 };
 
 struct NetState {
-    uint64_t tcpStates[TCP_STATE_END] = {0};
-    unsigned int tcpInboundTotal = 0;
-    unsigned int tcpOutboundTotal = 0;
-    unsigned int allInboundTotal = 0;
-    unsigned int allOutboundTotal = 0;
+  uint64_t tcpStates[TCP_STATE_END] = {0};
+  unsigned int tcpInboundTotal = 0;
+  unsigned int tcpOutboundTotal = 0;
+  unsigned int allInboundTotal = 0;
+  unsigned int allOutboundTotal = 0;
 
-    void calcTcpTotalAndNonEstablished();
-    std::string toString(const char* lf = "\n", const char* tab = "    ") const;
-    bool operator==(const NetState&) const;
+  void calcTcpTotalAndNonEstablished();
+  std::string toString(const char *lf = "\n", const char *tab = "    ") const;
+  bool operator==(const NetState &) const;
 
-    inline bool operator!=(const NetState& r) const { return !(*this == r); }
+  inline bool operator!=(const NetState &r) const { return !(*this == r); }
 };
 
 struct NetLinkRequest {
-    struct nlmsghdr nlh;
-    struct inet_diag_req r;
+  struct nlmsghdr nlh;
+  struct inet_diag_req r;
 };
 
 // /proc/net/snmp  tcp:
 enum class EnumNetSnmpTCPKey : int {
-    RtoAlgorithm = 1,
-    RtoMin,
-    RtoMax,
-    MaxConn,
-    ActiveOpens,
-    PassiveOpens,
-    AttemptFails,
-    EstabResets,
-    CurrEstab,
-    InSegs,
-    OutSegs,
-    RetransSegs,
-    InErrs,
-    OutRsts,
-    InCsumErrors,
+  RtoAlgorithm = 1,
+  RtoMin,
+  RtoMax,
+  MaxConn,
+  ActiveOpens,
+  PassiveOpens,
+  AttemptFails,
+  EstabResets,
+  CurrEstab,
+  InSegs,
+  OutSegs,
+  RetransSegs,
+  InErrs,
+  OutRsts,
+  InCsumErrors,
 };
 
 struct NetInterfaceMetric {
-    // received
-    uint64_t rxPackets = 0;
-    uint64_t rxBytes = 0;
-    uint64_t rxErrors = 0;
-    uint64_t rxDropped = 0;
-    uint64_t rxOverruns = 0;
-    uint64_t rxFrame = 0;
-    // transmitted
-    uint64_t txPackets = 0;
-    uint64_t txBytes = 0;
-    uint64_t txErrors = 0;
-    uint64_t txDropped = 0;
-    uint64_t txOverruns = 0;
-    uint64_t txCollisions = 0;
-    uint64_t txCarrier = 0;
+  // received
+  uint64_t rxPackets = 0;
+  uint64_t rxBytes = 0;
+  uint64_t rxErrors = 0;
+  uint64_t rxDropped = 0;
+  uint64_t rxOverruns = 0;
+  uint64_t rxFrame = 0;
+  // transmitted
+  uint64_t txPackets = 0;
+  uint64_t txBytes = 0;
+  uint64_t txErrors = 0;
+  uint64_t txDropped = 0;
+  uint64_t txOverruns = 0;
+  uint64_t txCollisions = 0;
+  uint64_t txCarrier = 0;
 
-    int64_t speed = 0;
-    std::string name;
+  int64_t speed = 0;
+  std::string name;
 };
 
 struct NetAddress {
-    enum { SI_AF_UNSPEC, SI_AF_INET, SI_AF_INET6, SI_AF_LINK } family;
-    union {
-        uint32_t in;
-        uint32_t in6[4];
-        unsigned char mac[8];
-    } addr;
+  enum { SI_AF_UNSPEC, SI_AF_INET, SI_AF_INET6, SI_AF_LINK } family;
+  union {
+    uint32_t in;
+    uint32_t in6[4];
+    unsigned char mac[8];
+  } addr;
 
-    NetAddress();
-    std::string str() const;
+  NetAddress();
+  std::string str() const;
 };
 
 struct InterfaceConfig {
-    std::string name;
-    std::string type;
-    std::string description;
-    NetAddress hardWareAddr;
+  std::string name;
+  std::string type;
+  std::string description;
+  NetAddress hardWareAddr;
 
-    NetAddress address;
-    NetAddress destination;
-    NetAddress broadcast;
-    NetAddress netmask;
+  NetAddress address;
+  NetAddress destination;
+  NetAddress broadcast;
+  NetAddress netmask;
 
-    NetAddress address6;
-    int prefix6Length = 0;
-    int scope6 = 0;
+  NetAddress address6;
+  int prefix6Length = 0;
+  int scope6 = 0;
 
-    uint64_t mtu = 0;
-    uint64_t metric = 0;
-    int txQueueLen = 0;
+  uint64_t mtu = 0;
+  uint64_t metric = 0;
+  int txQueueLen = 0;
 };
 
 // TCP各种状态下的连接数
 struct ResTCPStat {
-    uint64_t tcpEstablished = 0;
-    uint64_t tcpListen = 0;
-    uint64_t tcpTotal = 0;
-    uint64_t tcpNonEstablished = 0;
+  uint64_t tcpEstablished = 0;
+  uint64_t tcpListen = 0;
+  uint64_t tcpTotal = 0;
+  uint64_t tcpNonEstablished = 0;
 
-    static inline const FieldName<ResTCPStat, uint64_t> resTCPStatFields[] = {
-        FIELD_ENTRY(ResTCPStat, tcpEstablished),
-        FIELD_ENTRY(ResTCPStat, tcpListen),
-        FIELD_ENTRY(ResTCPStat, tcpTotal),
-        FIELD_ENTRY(ResTCPStat, tcpNonEstablished),
-    };
+  static inline const FieldName<ResTCPStat, uint64_t> resTCPStatFields[] = {
+      FIELD_ENTRY(ResTCPStat, tcpEstablished),
+      FIELD_ENTRY(ResTCPStat, tcpListen),
+      FIELD_ENTRY(ResTCPStat, tcpTotal),
+      FIELD_ENTRY(ResTCPStat, tcpNonEstablished),
+  };
 
-    static void enumerate(const std::function<void(const FieldName<ResTCPStat, uint64_t>&)>& callback) {
-        for (auto& field : resTCPStatFields) {
-            callback(field);
-        }
-    };
+  static void
+  enumerate(const std::function<void(const FieldName<ResTCPStat, uint64_t> &)>
+                &callback) {
+    for (auto &field : resTCPStatFields) {
+      callback(field);
+    }
+  };
 };
-
 
 // 每秒发包数，上行带宽，下行带宽.每秒发送错误包数量
 struct ResNetRatePerSec {
-    double rxPackRate = 0.0;
-    double txPackRate = 0.0;
-    double rxByteRate = 0.0;
-    double txByteRate = 0.0;
-    double txErrorRate = 0.0;
-    double rxErrorRate = 0.0;
-    double rxDropRate = 0.0;
-    double txDropRate = 0.0;
+  double rxPackRate = 0.0;
+  double txPackRate = 0.0;
+  double rxByteRate = 0.0;
+  double txByteRate = 0.0;
+  double txErrorRate = 0.0;
+  double rxErrorRate = 0.0;
+  double rxDropRate = 0.0;
+  double txDropRate = 0.0;
 
-
-    static inline const FieldName<ResNetRatePerSec> resRatePerSecFields[] = {
-        FIELD_ENTRY(ResNetRatePerSec, rxPackRate),
-        FIELD_ENTRY(ResNetRatePerSec, txPackRate),
-        FIELD_ENTRY(ResNetRatePerSec, rxByteRate),
-        FIELD_ENTRY(ResNetRatePerSec, txByteRate),
-        FIELD_ENTRY(ResNetRatePerSec, txErrorRate),
-        FIELD_ENTRY(ResNetRatePerSec, rxErrorRate),
-        FIELD_ENTRY(ResNetRatePerSec, rxDropRate),
-        FIELD_ENTRY(ResNetRatePerSec, txDropRate),
-    };
-    static void enumerate(const std::function<void(const FieldName<ResNetRatePerSec, double>&)>& callback) {
-        for (auto& field : resRatePerSecFields) {
-            callback(field);
-        }
-    };
+  static inline const FieldName<ResNetRatePerSec> resRatePerSecFields[] = {
+      FIELD_ENTRY(ResNetRatePerSec, rxPackRate),
+      FIELD_ENTRY(ResNetRatePerSec, txPackRate),
+      FIELD_ENTRY(ResNetRatePerSec, rxByteRate),
+      FIELD_ENTRY(ResNetRatePerSec, txByteRate),
+      FIELD_ENTRY(ResNetRatePerSec, txErrorRate),
+      FIELD_ENTRY(ResNetRatePerSec, rxErrorRate),
+      FIELD_ENTRY(ResNetRatePerSec, rxDropRate),
+      FIELD_ENTRY(ResNetRatePerSec, txDropRate),
+  };
+  static void enumerate(
+      const std::function<void(const FieldName<ResNetRatePerSec, double> &)>
+          &callback) {
+    for (auto &field : resRatePerSecFields) {
+      callback(field);
+    }
+  };
 };
 
 struct SystemLoadInformation : public BaseInformation {
-    SystemStat systemStat;
+  SystemStat systemStat;
 };
 
 struct CpuCoreNumInformation : public BaseInformation {
-    unsigned int cpuCoreNum;
+  unsigned int cpuCoreNum;
 };
 
 struct ProcessExecutePath : public BaseInformation {
-    std::string path;
+  std::string path;
 };
 
 struct TCPStatInformation : public BaseInformation {
-    ResTCPStat stat;
+  ResTCPStat stat;
 };
 
 struct NetInterfaceInformation : public BaseInformation {
-    std::vector<NetInterfaceMetric> metrics;
-    std::vector<InterfaceConfig> configs;
+  std::vector<NetInterfaceMetric> metrics;
+  std::vector<InterfaceConfig> configs;
 };
 
 struct TupleHash {
-    template <typename... T>
-    std::size_t operator()(const std::tuple<T...>& t) const {
-        size_t seed = 0;
-        std::apply(
-            [&](const T&... args) { ((seed ^= std::hash<T>{}(args) + 0x9e3779b9 + (seed << 6) + (seed >> 2)), ...); },
-            t);
-        return seed;
-    }
+  template <typename... T>
+  std::size_t operator()(const std::tuple<T...> &t) const {
+    size_t seed = 0;
+    std::apply(
+        [&](const T &...args) {
+          ((seed ^=
+            std::hash<T>{}(args) + 0x9e3779b9 + (seed << 6) + (seed >> 2)),
+           ...);
+        },
+        t);
+    return seed;
+  }
 };
 
 struct MemoryInformationString : public BaseInformation {
-    std::vector<std::string> meminfoString;
+  std::vector<std::string> meminfoString;
 };
 
 struct MTRRInformationString : public BaseInformation {
-    std::vector<std::string> mtrrString;
+  std::vector<std::string> mtrrString;
 };
 
 // /proc/pid/status
 struct ProcessStatusString : public BaseInformation {
-    std::vector<std::string> processStatusString;
+  std::vector<std::string> processStatusString;
 };
 
 // /proc/pid/cmdline
 struct ProcessCmdlineString : public BaseInformation {
-    std::vector<std::string> cmdline;
+  std::vector<std::string> cmdline;
 };
 
 // /proc/pid/statm
 struct ProcessStatmString : public BaseInformation {
-    std::vector<std::string> processStatmString;
+  std::vector<std::string> processStatmString;
 };
 
 struct MemoryStat {
-    double ram = 0;
-    double total = 0;
-    double used = 0;
-    double free = 0;
-    double available = 0;
-    double actualUsed = 0;
-    double actualFree = 0;
-    double buffers = 0;
-    double cached = 0;
-    double usedPercent = 0.0;
-    double freePercent = 0.0;
+  double ram = 0;
+  double total = 0;
+  double used = 0;
+  double free = 0;
+  double available = 0;
+  double actualUsed = 0;
+  double actualFree = 0;
+  double buffers = 0;
+  double cached = 0;
+  double usedPercent = 0.0;
+  double freePercent = 0.0;
 
-    static inline const FieldName<MemoryStat> memStatMetas[] = {
-        FIELD_ENTRY(MemoryStat, ram),
-        FIELD_ENTRY(MemoryStat, total),
-        FIELD_ENTRY(MemoryStat, used),
-        FIELD_ENTRY(MemoryStat, free),
-        FIELD_ENTRY(MemoryStat, available),
-        FIELD_ENTRY(MemoryStat, actualUsed),
-        FIELD_ENTRY(MemoryStat, actualFree),
-        FIELD_ENTRY(MemoryStat, buffers),
-        FIELD_ENTRY(MemoryStat, cached),
-        FIELD_ENTRY(MemoryStat, usedPercent),
-        FIELD_ENTRY(MemoryStat, freePercent),
-    };
+  static inline const FieldName<MemoryStat> memStatMetas[] = {
+      FIELD_ENTRY(MemoryStat, ram),
+      FIELD_ENTRY(MemoryStat, total),
+      FIELD_ENTRY(MemoryStat, used),
+      FIELD_ENTRY(MemoryStat, free),
+      FIELD_ENTRY(MemoryStat, available),
+      FIELD_ENTRY(MemoryStat, actualUsed),
+      FIELD_ENTRY(MemoryStat, actualFree),
+      FIELD_ENTRY(MemoryStat, buffers),
+      FIELD_ENTRY(MemoryStat, cached),
+      FIELD_ENTRY(MemoryStat, usedPercent),
+      FIELD_ENTRY(MemoryStat, freePercent),
+  };
 
-    static void enumerate(const std::function<void(const FieldName<MemoryStat>&)>& callback) {
-        for (const auto& field : memStatMetas) {
-            callback(field);
-        }
+  static void enumerate(
+      const std::function<void(const FieldName<MemoryStat> &)> &callback) {
+    for (const auto &field : memStatMetas) {
+      callback(field);
     }
+  }
 };
 
 struct MemoryInformation : public BaseInformation {
-    MemoryStat memStat;
+  MemoryStat memStat;
 };
 
 enum FileSystemType {
-    FILE_SYSTEM_TYPE_UNKNOWN = 0,
-    FILE_SYSTEM_TYPE_NONE,
-    FILE_SYSTEM_TYPE_LOCAL_DISK,
-    FILE_SYSTEM_TYPE_NETWORK,
-    FILE_SYSTEM_TYPE_RAM_DISK,
-    FILE_SYSTEM_TYPE_CDROM,
-    FILE_SYSTEM_TYPE_SWAP,
-    FILE_SYSTEM_TYPE_MAX
+  FILE_SYSTEM_TYPE_UNKNOWN = 0,
+  FILE_SYSTEM_TYPE_NONE,
+  FILE_SYSTEM_TYPE_LOCAL_DISK,
+  FILE_SYSTEM_TYPE_NETWORK,
+  FILE_SYSTEM_TYPE_RAM_DISK,
+  FILE_SYSTEM_TYPE_CDROM,
+  FILE_SYSTEM_TYPE_SWAP,
+  FILE_SYSTEM_TYPE_MAX
 };
 
 struct FileSystem {
-    std::string dirName;
-    std::string devName;
-    std::string typeName;
-    std::string sysTypeName;
-    std::string options;
-    FileSystemType type = FILE_SYSTEM_TYPE_UNKNOWN;
-    unsigned long flags = 0;
+  std::string dirName;
+  std::string devName;
+  std::string typeName;
+  std::string sysTypeName;
+  std::string options;
+  FileSystemType type = FILE_SYSTEM_TYPE_UNKNOWN;
+  unsigned long flags = 0;
 };
 
 struct FileSystemListInformation : public BaseInformation {
-    // mounted file systems
-    std::vector<FileSystem> fileSystemList;
+  // mounted file systems
+  std::vector<FileSystem> fileSystemList;
 };
 
 struct SystemUptimeInformation : public BaseInformation {
-    double uptime;
+  double uptime;
 };
 
 struct SerialIdInformation : public BaseInformation {
-    std::string serialId;
+  std::string serialId;
 };
 
 enum class EnumDiskState {
-    major,
-    minor,
-    devName,
+  major,
+  minor,
+  devName,
 
-    reads,
-    readsMerged,
-    readSectors,
-    rMillis,
+  reads,
+  readsMerged,
+  readSectors,
+  rMillis,
 
-    writes,
-    writesMerged,
-    writeSectors,
-    wMillis,
+  writes,
+  writesMerged,
+  writeSectors,
+  wMillis,
 
-    ioCount,
-    rwMillis, // 输入输出花费的毫秒数
-    qMillis, // 输入/输出操作花费的加权毫秒数
+  ioCount,
+  rwMillis, // 输入输出花费的毫秒数
+  qMillis,  // 输入/输出操作花费的加权毫秒数
 
-    count, // 这个用于收尾，不是实际的列号。
+  count, // 这个用于收尾，不是实际的列号。
 };
-static_assert((int)EnumDiskState::count == 14, "EnumDiskState::count unexpected");
+static_assert((int)EnumDiskState::count == 14,
+              "EnumDiskState::count unexpected");
 
 struct DiskState {
-    unsigned int major;
-    unsigned int minor;
+  unsigned int major;
+  unsigned int minor;
 
-    uint64_t reads;
-    uint64_t readBytes;
-    uint64_t rTime;
+  uint64_t reads;
+  uint64_t readBytes;
+  uint64_t rTime;
 
-    uint64_t writes;
-    uint64_t writeBytes;
-    uint64_t wTime;
+  uint64_t writes;
+  uint64_t writeBytes;
+  uint64_t wTime;
 
-    uint64_t time; // 输入输出花费的毫秒数
-    uint64_t qTime; // 输入/输出操作花费的加权毫秒数
+  uint64_t time;  // 输入输出花费的毫秒数
+  uint64_t qTime; // 输入/输出操作花费的加权毫秒数
 };
 
 struct FileSystemState {
-    double use_percent = 0;
-    uint64_t total = 0;
-    uint64_t free = 0;
-    uint64_t used = 0;
-    uint64_t avail = 0;
-    uint64_t files = 0;
-    uint64_t freeFiles = 0;
+  double use_percent = 0;
+  uint64_t total = 0;
+  uint64_t free = 0;
+  uint64_t used = 0;
+  uint64_t avail = 0;
+  uint64_t files = 0;
+  uint64_t freeFiles = 0;
 };
 
 struct FileSystemInformation : public BaseInformation {
-    FileSystemState fileSystemState;
+  FileSystemState fileSystemState;
 };
 
 struct DiskStateInformation : public BaseInformation {
-    std::vector<DiskState> diskStats;
+  std::vector<DiskState> diskStats;
 };
 
 struct GPUStat {
-    std::string gpuId;
-    int64_t decoderUtilization;
-    int64_t encoderUtilization;
-    int64_t gpuUtilization;
-    int64_t memoryTotal;
-    int64_t memoryFree;
-    int64_t memoryUsed;
-    int64_t memoryReserved;
-    int64_t gpuTemperature;
-    double powerUsage;
+  std::string gpuId;
+  int64_t decoderUtilization;
+  int64_t encoderUtilization;
+  int64_t gpuUtilization;
+  int64_t memoryTotal;
+  int64_t memoryFree;
+  int64_t memoryUsed;
+  int64_t memoryReserved;
+  int64_t gpuTemperature;
+  double powerUsage;
 };
 
 struct GPUInformation : public BaseInformation {
-    std::vector<GPUStat> stats;
+  std::vector<GPUStat> stats;
 };
 
 using Int64FieldMap = std::unordered_map<unsigned short, int64_t GPUStat::*>;
-using StringFieldMap = std::unordered_map<unsigned short, std::string GPUStat::*>;
+using StringFieldMap =
+    std::unordered_map<unsigned short, std::string GPUStat::*>;
 using DoubleFieldMap = std::unordered_map<unsigned short, double GPUStat::*>;
 // using TimestampFieldMap = ... ; // Placeholder for future expansion
 // using BinaryFieldMap = ... ; // Placeholder for future expansion
 
 struct FieldMap {
-    Int64FieldMap int64Fields;
-    StringFieldMap stringFields;
-    DoubleFieldMap doubleFields;
-    // TimestampFieldMap timestampFields;
-    // BinaryFieldMap binaryFields;
+  Int64FieldMap int64Fields;
+  StringFieldMap stringFields;
+  DoubleFieldMap doubleFields;
+  // TimestampFieldMap timestampFields;
+  // BinaryFieldMap binaryFields;
+};
+
+// /proc/cgroups
+// #subsys_name    hierarchy       num_cgroups     enabled
+// cpuset  10      5       1
+// cpu     3       89      1
+// cpuacct 3       89      1
+// blkio   7       84      1
+// memory  12      522     1
+// devices 9       84      1
+// freezer 11      5       1
+// net_cls 13      5       1
+// perf_event      4       5       1
+// net_prio        13      5       1
+// hugetlb 8       5       1
+// pids    5       91      1
+// ioasids 2       1       1
+// rdma    6       5       1
+struct CgroupStat {
+  unsigned int cpuset = 0;
+  unsigned int cpu = 0;
+  unsigned int cpuacct = 0;
+  unsigned int blkio = 0;
+  unsigned int memory = 0;
+  unsigned int devices = 0;
+  unsigned int freezer = 0;
+  unsigned int net_cls = 0;
+  unsigned int perf_event = 0;
+  unsigned int net_prio = 0;
+  unsigned int hugetlb = 0;
+  unsigned int pids = 0;
+  unsigned int ioasids = 0;
+  unsigned int rdma = 0;
+
+  static inline const FieldName<CgroupStat, unsigned int> cgroupStatFields[] = {
+      FIELD_ENTRY(CgroupStat, cpuset),     FIELD_ENTRY(CgroupStat, cpu),
+      FIELD_ENTRY(CgroupStat, cpuacct),    FIELD_ENTRY(CgroupStat, blkio),
+      FIELD_ENTRY(CgroupStat, memory),     FIELD_ENTRY(CgroupStat, devices),
+      FIELD_ENTRY(CgroupStat, freezer),    FIELD_ENTRY(CgroupStat, net_cls),
+      FIELD_ENTRY(CgroupStat, perf_event), FIELD_ENTRY(CgroupStat, net_prio),
+      FIELD_ENTRY(CgroupStat, hugetlb),    FIELD_ENTRY(CgroupStat, pids),
+      FIELD_ENTRY(CgroupStat, ioasids),    FIELD_ENTRY(CgroupStat, rdma),
+  };
+
+  static void enumerate(
+      const std::function<void(const FieldName<CgroupStat, unsigned int> &)>
+          &callback) {
+    for (const auto &field : cgroupStatFields) {
+      callback(field);
+    }
+  }
+};
+
+struct CgroupStatInformation : public BaseInformation {
+  CgroupStat stat;
+};
+
+struct DentryStat {
+  unsigned int nrDentry = 0;
+  unsigned int nrUnused = 0;
+  unsigned int ageLimit = 0;
+  unsigned int wantPages = 0;
+  unsigned int nrNegative = 0;
+
+  static inline const FieldName<DentryStat, unsigned int> dentryStatFields[] = {
+      FIELD_ENTRY(DentryStat, nrDentry),
+      FIELD_ENTRY(DentryStat, nrUnused),
+      FIELD_ENTRY(DentryStat, ageLimit),
+      FIELD_ENTRY(DentryStat, wantPages),
+      FIELD_ENTRY(DentryStat, nrNegative),
+  };
+
+  static void enumerate(
+      const std::function<void(const FieldName<DentryStat, unsigned int> &)>
+          &callback) {
+    for (const auto &field : dentryStatFields) {
+      callback(field);
+    }
+  }
+};
+
+struct DentryStatInformation : public BaseInformation {
+  DentryStat stat;
 };
 
 class SystemInterface {
 public:
-    template <typename InfoT, typename... Args>
-    class SystemInformationCache {
-    private:
-        struct CacheEntry {
-            std::deque<InfoT> data;
-            std::chrono::steady_clock::time_point lastAccessTime;
+  template <typename InfoT, typename... Args> class SystemInformationCache {
+  private:
+    struct CacheEntry {
+      std::deque<InfoT> data;
+      std::chrono::steady_clock::time_point lastAccessTime;
 
-            CacheEntry() : lastAccessTime(std::chrono::steady_clock::now()) {}
-        };
-
-    public:
-        SystemInformationCache(size_t cacheSize)
-            : mCacheDequeSize(cacheSize),
-              mLastCleanupTime(std::chrono::steady_clock::now()),
-              mMaxCleanupCount(INT32_FLAG(system_interface_cache_max_cleanup_batch_size)),
-              mCleanupInterval(std::chrono::seconds(INT32_FLAG(system_interface_cache_cleanup_interval_seconds))),
-              mExpireThreshold(std::chrono::seconds(INT32_FLAG(system_interface_cache_entry_expire_seconds))) {}
-        bool Get(time_t targetTime, InfoT& info, Args... args);
-        bool Set(InfoT& info, Args... args);
-        void PerformGarbageCollection();
-        size_t GetCacheSize() const;
-        bool ClearExpiredEntries(std::chrono::steady_clock::duration maxAge);
-        bool ShouldPerformCleanup() const;
-
-    private:
-        mutable std::mutex mMutex;
-        std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
-        size_t mCacheDequeSize;
-        size_t mCurrentSize = 0;
-        std::chrono::steady_clock::time_point mLastCleanupTime;
-        int32_t mMaxCleanupCount;
-        std::chrono::seconds mCleanupInterval;
-        std::chrono::seconds mExpireThreshold;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-        friend class SystemInterfaceUnittest;
-#endif
+      CacheEntry() : lastAccessTime(std::chrono::steady_clock::now()) {}
     };
 
-    template <typename InfoT>
-    class SystemInformationCache<InfoT> {
-    public:
-        SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
-        bool Get(time_t targetTime, InfoT& info);
-        bool Set(InfoT& info);
-        size_t GetCacheSize() const;
+  public:
+    SystemInformationCache(size_t cacheSize)
+        : mCacheDequeSize(cacheSize),
+          mLastCleanupTime(std::chrono::steady_clock::now()),
+          mMaxCleanupCount(
+              INT32_FLAG(system_interface_cache_max_cleanup_batch_size)),
+          mCleanupInterval(std::chrono::seconds(
+              INT32_FLAG(system_interface_cache_cleanup_interval_seconds))),
+          mExpireThreshold(std::chrono::seconds(
+              INT32_FLAG(system_interface_cache_entry_expire_seconds))) {}
+    bool Get(time_t targetTime, InfoT &info, Args... args);
+    bool Set(InfoT &info, Args... args);
+    void PerformGarbageCollection();
+    size_t GetCacheSize() const;
+    bool ClearExpiredEntries(std::chrono::steady_clock::duration maxAge);
+    bool ShouldPerformCleanup() const;
 
-    private:
-        mutable std::mutex mMutex;
-        std::deque<InfoT> mCache;
-        size_t mCacheDequeSize;
-        size_t mCurrentSize = 0;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-        friend class SystemInterfaceUnittest;
-#endif
-    };
-
-    SystemInterface(const SystemInterface&) = delete;
-    SystemInterface(SystemInterface&&) = delete;
-    SystemInterface& operator=(const SystemInterface&) = delete;
-    SystemInterface& operator=(SystemInterface&&) = delete;
-
-    static SystemInterface* GetInstance();
-
-    bool GetSystemInformation(SystemInformation& systemInfo);
-    bool GetCPUInformation(time_t now, CPUInformation& cpuInfo);
-    bool GetProcessListInformation(time_t now, ProcessListInformation& processListInfo);
-    bool GetProcessInformation(time_t now, pid_t pid, ProcessInformation& processInfo);
-    bool GetSystemLoadInformation(time_t now, SystemLoadInformation& systemLoadInfo);
-    bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
-    bool GetHostMemInformationStat(time_t now, MemoryInformation& meminfo);
-    bool GetFileSystemListInformation(time_t now, FileSystemListInformation& fileSystemListInfo);
-    bool GetSystemUptimeInformation(time_t now, SystemUptimeInformation& systemUptimeInfo);
-    bool GetDiskSerialIdInformation(time_t now, std::string diskName, SerialIdInformation& serialIdInfo);
-    bool GetDiskStateInformation(time_t now, DiskStateInformation& diskStateInfo);
-    bool GetFileSystemInformation(time_t now, std::string dirName, FileSystemInformation& fileSystemInfo);
-    bool GetProcessCmdlineString(time_t now, pid_t pid, ProcessCmdlineString& cmdline);
-    bool GetPorcessStatm(time_t now, pid_t pid, ProcessMemoryInformation& processMemory);
-    bool GetProcessCredNameObj(time_t now, pid_t pid, ProcessCredName& credName);
-    bool GetExecutablePathCache(time_t now, pid_t pid, ProcessExecutePath& executePath);
-    bool GetProcessOpenFiles(time_t now, pid_t pid, ProcessFd& processFd);
-
-    bool GetTCPStatInformation(time_t now, TCPStatInformation& tcpStatInfo);
-    bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
-    bool InitGPUCollector(const FieldMap& fieldMap);
-    bool GetGPUInformation(time_t now, GPUInformation& gpuInfo);
-    explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
-        : mSystemInformationCache(),
-          mCPUInformationCache(cacheSize),
-          mProcessListInformationCache(cacheSize),
-          mProcessInformationCache(cacheSize),
-          mSystemLoadInformationCache(cacheSize),
-          mCPUCoreNumInformationCache(),
-          mMemInformationCache(cacheSize),
-          mFileSystemListInformationCache(cacheSize),
-          mSystemUptimeInformationCache(cacheSize),
-          mSerialIdInformationCache(cacheSize),
-          mDiskStateInformationCache(cacheSize),
-          mFileSystemInformationCache(cacheSize),
-          mProcessCmdlineCache(cacheSize),
-          mProcessStatmCache(cacheSize),
-          mProcessStatusCache(cacheSize),
-          mProcessFdCache(cacheSize),
-          mExecutePathCache(cacheSize),
-          mTCPStatInformationCache(cacheSize),
-          mNetInterfaceInformationCache(cacheSize),
-          mGPUInformationCache(cacheSize) {
-        InitMetrics();
-    }
-    virtual ~SystemInterface() = default;
-
-    void InitMetrics();
-    void UpdateSystemOpMetrics(bool success);
-    void UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter);
-
-private:
-    template <typename F, typename InfoT, typename... Args>
-    bool MemoizedCall(SystemInformationCache<InfoT, Args...>& cache,
-                      time_t now,
-                      F&& func,
-                      InfoT& info,
-                      const std::string& errorType,
-                      Args... args);
-
-    virtual bool GetSystemInformationOnce(SystemInformation& systemInfo) = 0;
-    virtual bool GetCPUInformationOnce(CPUInformation& cpuInfo) = 0;
-    virtual bool GetProcessListInformationOnce(ProcessListInformation& processListInfo) = 0;
-    virtual bool GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) = 0;
-    virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
-    virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
-    virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
-    virtual bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) = 0;
-    virtual bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) = 0;
-    virtual bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) = 0;
-    virtual bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) = 0;
-    virtual bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) = 0;
-    virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
-    virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
-    virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
-    virtual bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) = 0;
-    virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
-    virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
-    virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
-    virtual bool InitGPUCollectorOnce(const FieldMap& fieldMap) = 0;
-    virtual bool GetGPUInformationOnce(GPUInformation& gpuInfo) = 0;
-
-    SystemInformation mSystemInformationCache;
-    SystemInformationCache<CPUInformation> mCPUInformationCache;
-    SystemInformationCache<ProcessListInformation> mProcessListInformationCache;
-    SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
-    SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
-    CpuCoreNumInformation mCPUCoreNumInformationCache;
-    SystemInformationCache<MemoryInformation> mMemInformationCache;
-    SystemInformationCache<FileSystemListInformation> mFileSystemListInformationCache;
-    SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
-    SystemInformationCache<SerialIdInformation, std::string> mSerialIdInformationCache;
-    SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
-    SystemInformationCache<FileSystemInformation, std::string> mFileSystemInformationCache;
-    SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
-    SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
-    SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;
-    SystemInformationCache<ProcessFd, pid_t> mProcessFdCache;
-    SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
-    SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
-    SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
-    SystemInformationCache<GPUInformation> mGPUInformationCache;
-
-    // Metrics
-    MetricsRecordRef mMetricsRecordRef;
-    CounterPtr mSystemOpTotal;
-    CounterPtr mSystemOpFailTotal;
-    CounterPtr mCacheHitTotal;
-    IntGaugePtr mCacheItemsSize;
+  private:
+    mutable std::mutex mMutex;
+    std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
+    size_t mCacheDequeSize;
+    size_t mCurrentSize = 0;
+    std::chrono::steady_clock::time_point mLastCleanupTime;
+    int32_t mMaxCleanupCount;
+    std::chrono::seconds mCleanupInterval;
+    std::chrono::seconds mExpireThreshold;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;
+#endif
+  };
+
+  template <typename InfoT> class SystemInformationCache<InfoT> {
+  public:
+    SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
+    bool Get(time_t targetTime, InfoT &info);
+    bool Set(InfoT &info);
+    size_t GetCacheSize() const;
+
+  private:
+    mutable std::mutex mMutex;
+    std::deque<InfoT> mCache;
+    size_t mCacheDequeSize;
+    size_t mCurrentSize = 0;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class SystemInterfaceUnittest;
+#endif
+  };
+
+  SystemInterface(const SystemInterface &) = delete;
+  SystemInterface(SystemInterface &&) = delete;
+  SystemInterface &operator=(const SystemInterface &) = delete;
+  SystemInterface &operator=(SystemInterface &&) = delete;
+
+  static SystemInterface *GetInstance();
+
+  bool GetSystemInformation(SystemInformation &systemInfo);
+  bool GetCPUInformation(time_t now, CPUInformation &cpuInfo);
+  bool GetProcessListInformation(time_t now,
+                                 ProcessListInformation &processListInfo);
+  bool GetProcessInformation(time_t now, pid_t pid,
+                             ProcessInformation &processInfo);
+  bool GetSystemLoadInformation(time_t now,
+                                SystemLoadInformation &systemLoadInfo);
+  bool GetCPUCoreNumInformation(CpuCoreNumInformation &cpuCoreNumInfo);
+  bool GetHostMemInformationStat(time_t now, MemoryInformation &meminfo);
+  bool
+  GetFileSystemListInformation(time_t now,
+                               FileSystemListInformation &fileSystemListInfo);
+  bool GetSystemUptimeInformation(time_t now,
+                                  SystemUptimeInformation &systemUptimeInfo);
+  bool GetDiskSerialIdInformation(time_t now, std::string diskName,
+                                  SerialIdInformation &serialIdInfo);
+  bool GetDiskStateInformation(time_t now, DiskStateInformation &diskStateInfo);
+  bool GetFileSystemInformation(time_t now, std::string dirName,
+                                FileSystemInformation &fileSystemInfo);
+  bool GetProcessCmdlineString(time_t now, pid_t pid,
+                               ProcessCmdlineString &cmdline);
+  bool GetPorcessStatm(time_t now, pid_t pid,
+                       ProcessMemoryInformation &processMemory);
+  bool GetProcessCredNameObj(time_t now, pid_t pid, ProcessCredName &credName);
+  bool GetExecutablePathCache(time_t now, pid_t pid,
+                              ProcessExecutePath &executePath);
+  bool GetProcessOpenFiles(time_t now, pid_t pid, ProcessFd &processFd);
+
+  bool GetTCPStatInformation(time_t now, TCPStatInformation &tcpStatInfo);
+  bool GetNetInterfaceInformation(time_t now,
+                                  NetInterfaceInformation &netInterfaceInfo);
+  bool InitGPUCollector(const FieldMap &fieldMap);
+  bool GetGPUInformation(time_t now, GPUInformation &gpuInfo);
+  bool GetCgroupStatInformation(CgroupStatInformation &cgroupStatInfo);
+  bool GetDentryStatInformation(DentryStatInformation &dentryStatInfo);
+  explicit SystemInterface(
+      size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
+      : mSystemInformationCache(), mCPUInformationCache(cacheSize),
+        mProcessListInformationCache(cacheSize),
+        mProcessInformationCache(cacheSize),
+        mSystemLoadInformationCache(cacheSize), mCPUCoreNumInformationCache(),
+        mMemInformationCache(cacheSize),
+        mFileSystemListInformationCache(cacheSize),
+        mSystemUptimeInformationCache(cacheSize),
+        mSerialIdInformationCache(cacheSize),
+        mDiskStateInformationCache(cacheSize),
+        mFileSystemInformationCache(cacheSize), mProcessCmdlineCache(cacheSize),
+        mProcessStatmCache(cacheSize), mProcessStatusCache(cacheSize),
+        mProcessFdCache(cacheSize), mExecutePathCache(cacheSize),
+        mTCPStatInformationCache(cacheSize),
+        mNetInterfaceInformationCache(cacheSize),
+        mGPUInformationCache(cacheSize),
+        mCgroupStatInformationCache(cacheSize),
+        mDentryStatInformationCache(cacheSize) {
+    InitMetrics();
+  }
+  virtual ~SystemInterface() = default;
+
+  void InitMetrics();
+  void UpdateSystemOpMetrics(bool success);
+  void UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter);
+
+private:
+  template <typename F, typename InfoT, typename... Args>
+  bool MemoizedCall(SystemInformationCache<InfoT, Args...> &cache, time_t now,
+                    F &&func, InfoT &info, const std::string &errorType,
+                    Args... args);
+
+  virtual bool GetSystemInformationOnce(SystemInformation &systemInfo) = 0;
+  virtual bool GetCPUInformationOnce(CPUInformation &cpuInfo) = 0;
+  virtual bool
+  GetProcessListInformationOnce(ProcessListInformation &processListInfo) = 0;
+  virtual bool GetProcessInformationOnce(pid_t pid,
+                                         ProcessInformation &processInfo) = 0;
+  virtual bool
+  GetSystemLoadInformationOnce(SystemLoadInformation &systemLoadInfo) = 0;
+  virtual bool
+  GetCPUCoreNumInformationOnce(CpuCoreNumInformation &cpuCoreNumInfo) = 0;
+  virtual bool GetHostMemInformationStatOnce(MemoryInformation &meminfoStr) = 0;
+  virtual bool GetFileSystemListInformationOnce(
+      FileSystemListInformation &fileSystemListInfo) = 0;
+  virtual bool
+  GetSystemUptimeInformationOnce(SystemUptimeInformation &systemUptimeInfo) = 0;
+  virtual bool
+  GetDiskSerialIdInformationOnce(std::string diskName,
+                                 SerialIdInformation &serialIdInfo) = 0;
+  virtual bool
+  GetDiskStateInformationOnce(DiskStateInformation &diskStateInfo) = 0;
+  virtual bool
+  GetFileSystemInformationOnce(std::string dirName,
+                               FileSystemInformation &fileSystemInfo) = 0;
+  virtual bool GetProcessCmdlineStringOnce(pid_t pid,
+                                           ProcessCmdlineString &cmdline) = 0;
+  virtual bool GetProcessStatmOnce(pid_t pid,
+                                   ProcessMemoryInformation &processMemory) = 0;
+  virtual bool GetProcessCredNameOnce(pid_t pid,
+                                      ProcessCredName &processCredName) = 0;
+  virtual bool GetExecutablePathOnce(pid_t pid,
+                                     ProcessExecutePath &executePath) = 0;
+  virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd &processFd) = 0;
+  virtual bool GetTCPStatInformationOnce(TCPStatInformation &tcpStatInfo) = 0;
+  virtual bool
+  GetNetInterfaceInformationOnce(NetInterfaceInformation &netInterfaceInfo) = 0;
+  virtual bool InitGPUCollectorOnce(const FieldMap &fieldMap) = 0;
+  virtual bool GetGPUInformationOnce(GPUInformation &gpuInfo) = 0;
+  virtual bool
+  GetCgroupStatInformationOnce(CgroupStatInformation &cgroupStatInfo) = 0;
+  virtual bool GetDentryStatInformationOnce(
+      DentryStatInformation &dentryStatInfo) = 0;
+
+  SystemInformation mSystemInformationCache;
+  SystemInformationCache<CPUInformation> mCPUInformationCache;
+  SystemInformationCache<ProcessListInformation> mProcessListInformationCache;
+  SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
+  SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
+  CpuCoreNumInformation mCPUCoreNumInformationCache;
+  SystemInformationCache<MemoryInformation> mMemInformationCache;
+  SystemInformationCache<FileSystemListInformation>
+      mFileSystemListInformationCache;
+  SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
+  SystemInformationCache<SerialIdInformation, std::string>
+      mSerialIdInformationCache;
+  SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
+  SystemInformationCache<FileSystemInformation, std::string>
+      mFileSystemInformationCache;
+  SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
+  SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
+  SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;
+  SystemInformationCache<ProcessFd, pid_t> mProcessFdCache;
+  SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
+  SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
+  SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
+  SystemInformationCache<GPUInformation> mGPUInformationCache;
+  SystemInformationCache<CgroupStatInformation> mCgroupStatInformationCache;
+  SystemInformationCache<DentryStatInformation> mDentryStatInformationCache;
+  // Metrics
+  MetricsRecordRef mMetricsRecordRef;
+  CounterPtr mSystemOpTotal;
+  CounterPtr mSystemOpFailTotal;
+  CounterPtr mCacheHitTotal;
+  IntGaugePtr mCacheItemsSize;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+  friend class SystemInterfaceUnittest;
 #endif
 };
 
