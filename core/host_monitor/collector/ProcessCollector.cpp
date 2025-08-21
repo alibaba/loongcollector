@@ -42,8 +42,8 @@ DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N c
 DEFINE_FLAG_INT32(process_total_count, "number of each calculate epoch to report", 3);
 #define PATH_MAX 4096
 
-// topN进行的缓存为120s
-const std::chrono::seconds ProcessSortInterval{120};
+// topN进行的缓存为55s
+const std::chrono::seconds ProcessSortInterval{55};
 
 const std::string ProcessCollector::sName = "process";
 const std::string kMetricLabelProcess = "valueTag";
