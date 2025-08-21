@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 
 namespace logtail {
 

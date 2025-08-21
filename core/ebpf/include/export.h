@@ -45,6 +45,7 @@ struct ApmConfig {
     std::string mWorkspace;
     std::string mAppName;
     std::string mAppId; // optional, if not configured by backend, we need calculate it ...
+    std::string mLanguage;
     std::string mServiceId;
 };
 
@@ -117,6 +118,7 @@ struct NetworkObserveConfig {
     long mUpcaOffset;
     long mUppsOffset;
     long mUpcrOffset;
+    long mUpgsOffset;
 
     void* mCustomCtx;
     eBPFLogHandler mLogHandler;

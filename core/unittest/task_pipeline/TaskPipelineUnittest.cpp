@@ -37,6 +37,7 @@ protected:
 
 private:
     const string configName = "test_config";
+    const filesystem::path filepath = "/path/to/test";
 };
 
 void TaskPipelineUnittest::OnSuccessfulInit() const {
@@ -56,7 +57,7 @@ void TaskPipelineUnittest::OnSuccessfulInit() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     auto configPtr = configJson.get();
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
     task.reset(new TaskPipeline());
     APSARA_TEST_TRUE(task->Init(std::move(*config)));
@@ -84,7 +85,7 @@ void TaskPipelineUnittest::OnFailedInit() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
     task.reset(new TaskPipeline());
     APSARA_TEST_FALSE(task->Init(std::move(*config)));
@@ -106,7 +107,7 @@ void TaskPipelineUnittest::OnUpdate() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
     task.reset(new TaskPipeline());
     APSARA_TEST_TRUE(task->Init(std::move(*config)));

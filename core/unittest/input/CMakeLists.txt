@@ -18,6 +18,8 @@ project(input_unittest)
 add_executable(input_file_unittest InputFileUnittest.cpp)
 target_link_libraries(input_file_unittest ${UT_BASE_TARGET})
 
+add_executable(input_static_file_unittest InputStaticFileUnittest.cpp)
+target_link_libraries(input_static_file_unittest ${UT_BASE_TARGET})
 
 if (LINUX)
     add_executable(input_prometheus_unittest InputPrometheusUnittest.cpp)

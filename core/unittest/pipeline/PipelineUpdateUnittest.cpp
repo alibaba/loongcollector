@@ -147,8 +147,8 @@ protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
         LoadPluginMock();
-        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock>());
-        PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputFileMock2>());
+        PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock>());
+        PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputFileMock2>());
         PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock2>());
         PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock>());
         PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMock2>());
@@ -404,6 +404,10 @@ private:
         {
             "Type": "flusher_stdout2"
         })";
+
+    bool isFileServerStart = false;
+
+    filesystem::path filepath = "/path/to/test";
 };
 
 void PipelineUpdateUnittest::TestFileServerStart() {
@@ -413,11 +417,11 @@ void PipelineUpdateUnittest::TestFileServerStart() {
     auto pipelineManager = PipelineManagerMock::GetInstance();
     CollectionConfigDiff diff;
     CollectionConfig nativePipelineConfigObj
-        = CollectionConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson));
+        = CollectionConfig("test-file-1", make_unique<Json::Value>(nativePipelineConfigJson), filepath);
     nativePipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(nativePipelineConfigObj));
     CollectionConfig goPipelineConfigObj
-        = CollectionConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson));
+        = CollectionConfig("test-file-2", make_unique<Json::Value>(goPipelineConfigJson), filepath);
     goPipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(goPipelineConfigObj));
 
@@ -434,7 +438,8 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -461,7 +466,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -489,7 +494,8 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase2() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -501,7 +507,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase2() const {
         = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, goFlusherConfig2);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -516,7 +522,8 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -535,7 +542,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase3() const {
         = GeneratePipelineConfigJson(goInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -567,7 +574,8 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -593,7 +601,7 @@ void PipelineUpdateUnittest::TestPipelineParamUpdateCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, goProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -623,7 +631,8 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -650,7 +659,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -678,7 +687,8 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase2() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -690,7 +700,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase2() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -705,7 +715,8 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -724,7 +735,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase3() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -756,7 +767,8 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -782,7 +794,7 @@ void PipelineUpdateUnittest::TestPipelineTypeUpdateCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -812,7 +824,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -839,7 +852,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase1() const {
         = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -864,7 +877,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -891,7 +905,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase2() const {
         = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -928,7 +942,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -955,7 +970,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase3() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -984,7 +999,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -996,7 +1012,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1021,7 +1037,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1033,7 +1050,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase5() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1063,7 +1080,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase6() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1075,7 +1093,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase6() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1098,7 +1116,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1117,7 +1136,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase7() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1143,7 +1162,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1162,7 +1182,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase8() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1181,7 +1201,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1200,7 +1221,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase9() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     pipelineManager->UpdatePipelines(diffUpdate);
@@ -1225,7 +1246,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1251,7 +1273,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase10() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1283,7 +1305,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1309,7 +1332,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase11() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, goFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1334,7 +1357,8 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1360,7 +1384,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() {
@@ -1398,7 +1422,8 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1427,7 +1452,7 @@ void PipelineUpdateUnittest::TestPipelineInputBlock() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result1 = async(launch::async, [&]() {
@@ -1463,7 +1488,8 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1483,7 +1509,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase1() const {
         = GeneratePipelineConfigJson(goInputConfig3, goProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
@@ -1519,7 +1545,8 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
     Json::Value pipelineConfigJson = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1539,7 +1566,7 @@ void PipelineUpdateUnittest::TestPipelineGoInputBlockCase2() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeFlusherConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate;
     CollectionConfig pipelineConfigObjUpdate
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
     pipelineConfigObjUpdate.Parse();
     diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
     auto result = async(launch::async, [&]() { pipelineManager->UpdatePipelines(diffUpdate); });
@@ -1562,23 +1589,27 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase1() const {
     // C++ -> C++ -> C++
     Json::Value pipelineConfigJson1
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj1 = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    CollectionConfig pipelineConfigObj1
+        = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1), filepath);
     pipelineConfigObj1.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj1));
     // Go -> Go -> Go
     Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    CollectionConfig pipelineConfigObj2 = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    CollectionConfig pipelineConfigObj2
+        = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2), filepath);
     pipelineConfigObj2.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj2));
     // Go -> Go -> C++
     Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj3 = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    CollectionConfig pipelineConfigObj3
+        = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3), filepath);
     pipelineConfigObj3.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj3));
     // C++ -> Go -> C++
     Json::Value pipelineConfigJson4
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj4 = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    CollectionConfig pipelineConfigObj4
+        = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4), filepath);
     pipelineConfigObj4.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj4));
 
@@ -1623,23 +1654,27 @@ void PipelineUpdateUnittest::TestPipelineIsolationCase2() const {
     // C++ -> C++ -> C++
     Json::Value pipelineConfigJson1
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj1 = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1));
+    CollectionConfig pipelineConfigObj1
+        = CollectionConfig("test1", make_unique<Json::Value>(pipelineConfigJson1), filepath);
     pipelineConfigObj1.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj1));
     // Go -> Go -> Go
     Json::Value pipelineConfigJson2 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, goFlusherConfig);
-    CollectionConfig pipelineConfigObj2 = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2));
+    CollectionConfig pipelineConfigObj2
+        = CollectionConfig("test2", make_unique<Json::Value>(pipelineConfigJson2), filepath);
     pipelineConfigObj2.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj2));
     // Go -> Go -> C++
     Json::Value pipelineConfigJson3 = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj3 = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3));
+    CollectionConfig pipelineConfigObj3
+        = CollectionConfig("test3", make_unique<Json::Value>(pipelineConfigJson3), filepath);
     pipelineConfigObj3.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj3));
     // C++ -> Go -> C++
     Json::Value pipelineConfigJson4
         = GeneratePipelineConfigJson(nativeInputConfig, goProcessorConfig, nativeFlusherConfig);
-    CollectionConfig pipelineConfigObj4 = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4));
+    CollectionConfig pipelineConfigObj4
+        = CollectionConfig("test4", make_unique<Json::Value>(pipelineConfigJson4), filepath);
     pipelineConfigObj4.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj4));
 
@@ -1689,7 +1724,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1713,7 +1749,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -1731,7 +1767,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase1() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1768,7 +1804,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1792,7 +1829,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -1807,7 +1844,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase2() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1844,7 +1881,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1865,7 +1903,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -1883,7 +1921,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase3() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1920,7 +1958,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -1941,7 +1980,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -1956,7 +1995,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase4() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -1993,7 +2032,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2001,7 +2041,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -2012,7 +2051,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2030,7 +2069,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase5() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2066,7 +2105,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2074,7 +2114,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
     AddDataToProcessQueue(configName, "test-data-2");
     AddDataToProcessQueue(configName, "test-data-3");
@@ -2085,7 +2124,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2100,7 +2139,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase6() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2136,7 +2175,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2144,7 +2184,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
@@ -2152,7 +2191,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2170,7 +2209,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase7() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2206,7 +2245,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2214,7 +2254,6 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
 
     // Add data without trigger
-    auto pipeline1 = CollectionPipelineManager::GetInstance()->GetAllPipelines().at(configName).get();
     AddDataToProcessQueue(configName, "test-data-1"); // will be popped to processor
 
     // load new pipeline
@@ -2222,7 +2261,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2237,7 +2276,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase8() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     auto result = async(launch::async, [&]() {
@@ -2273,7 +2312,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2292,7 +2332,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2310,7 +2350,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase9() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     pipelineManager->UpdatePipelines(diffUpdate3);
@@ -2340,7 +2380,8 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2359,7 +2400,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, nativeFlusherConfig2);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);
@@ -2372,7 +2413,7 @@ void PipelineUpdateUnittest::TestPipelineUpdateManyCase10() const {
         = GeneratePipelineConfigJson(nativeInputConfig3, nativeProcessorConfig3, nativeFlusherConfig3);
     CollectionConfigDiff diffUpdate3;
     CollectionConfig pipelineConfigObjUpdate3
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate3), filepath);
     pipelineConfigObjUpdate3.Parse();
     diffUpdate3.mModified.push_back(std::move(pipelineConfigObjUpdate3));
     pipelineManager->UpdatePipelines(diffUpdate3);
@@ -2397,7 +2438,8 @@ void PipelineUpdateUnittest::TestPipelineRelease() const {
         = GeneratePipelineConfigJson(nativeInputConfig, nativeProcessorConfig, nativeFlusherConfig);
     auto pipelineManager = CollectionPipelineManager::GetInstance();
     CollectionConfigDiff diff;
-    CollectionConfig pipelineConfigObj = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson));
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
     pipelineManager->UpdatePipelines(diff);
@@ -2413,7 +2455,7 @@ void PipelineUpdateUnittest::TestPipelineRelease() const {
         = GeneratePipelineConfigJson(nativeInputConfig2, nativeProcessorConfig2, slowFlusherConfig);
     CollectionConfigDiff diffUpdate2;
     CollectionConfig pipelineConfigObjUpdate2
-        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2));
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate2), filepath);
     pipelineConfigObjUpdate2.Parse();
     diffUpdate2.mModified.push_back(std::move(pipelineConfigObjUpdate2));
     pipelineManager->UpdatePipelines(diffUpdate2);

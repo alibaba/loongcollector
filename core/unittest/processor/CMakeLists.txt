@@ -48,6 +48,12 @@ target_link_libraries(processor_desensitize_native_unittest ${UT_BASE_TARGET})
 add_executable(processor_merge_multiline_log_native_unittest ProcessorMergeMultilineLogNativeUnittest.cpp)
 target_link_libraries(processor_merge_multiline_log_native_unittest ${UT_BASE_TARGET})
 
+add_executable(processor_parse_from_pb_native_unittest ProcessorParseFromPBNativeUnittest.cpp)
+target_link_libraries(processor_parse_from_pb_native_unittest ${UT_BASE_TARGET})
+
+add_executable(parse_from_pb_native_benchmark ParseFromPBBenchmark.cpp)
+target_link_libraries(parse_from_pb_native_benchmark ${UT_BASE_TARGET})
+
 add_executable(boost_regex_benchmark BoostRegexBenchmark.cpp)
 target_link_libraries(boost_regex_benchmark ${UT_BASE_TARGET})
 
@@ -77,6 +83,7 @@ gtest_discover_tests(processor_parse_delimiter_native_unittest)
 gtest_discover_tests(processor_filter_native_unittest)
 gtest_discover_tests(processor_desensitize_native_unittest)
 gtest_discover_tests(processor_merge_multiline_log_native_unittest)
+gtest_discover_tests(processor_parse_from_pb_native_unittest)
 if (LINUX)
     gtest_discover_tests(processor_prom_relabel_metric_native_unittest)
     gtest_discover_tests(processor_prom_parse_metric_native_unittest)

@@ -34,6 +34,8 @@ public:
     void TestStartPlugin();
     void TestPerfbufferManagement();
 
+    void TestCidRegex();
+
 protected:
     void SetUp() override {
         mLogPrinter = [](int16_t level, const char* format, va_list args) -> int {
@@ -187,10 +189,18 @@ void eBPFDriverUnittest::TestCallNameIdx() {
     APSARA_TEST_EQUAL(GetCallNameIdx("tcp_sendmsg"), secure_funcs::SECURE_FUNC_TRACEPOINT_FUNC_TCP_SENDMSG);
 }
 
+void eBPFDriverUnittest::TestCidRegex() {
+    constexpr const char* kCID = "libpod-54dfe28cbce5eb0ebfed30c31f73d8ed0bee706c5a2cd0aea639f4c48ea65091.scope";
+    int prefixLen = -1;
+    ExtractContainerIdPrefix(kCID, prefixLen);
+    EXPECT_EQ(prefixLen, 7);
+}
+
 UNIT_TEST_CASE(eBPFDriverUnittest, TestCallNameIdx);
 UNIT_TEST_CASE(eBPFDriverUnittest, TestNetworkFilter);
 UNIT_TEST_CASE(eBPFDriverUnittest, TestFileFilter);
 UNIT_TEST_CASE(eBPFDriverUnittest, TestPerfbufferManagement);
+UNIT_TEST_CASE(eBPFDriverUnittest, TestCidRegex);
 
 } // namespace ebpf
 } // namespace logtail

@@ -35,10 +35,11 @@ const (
 )
 
 const (
-	DefaultGlobalConfig     = `{"InputIntervalMs":5000,"AggregatIntervalMs":30,"FlushIntervalMs":30,"DefaultLogQueueSize":11,"DefaultLogGroupQueueSize":12}`
-	DefaultPluginConfig     = `{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"Content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}`
-	DefaultFlusherConfig    = `{"type":"flusher_sls","detail":{}}`
-	LoongcollectorEnvPrefix = "LOONG_"
+	DefaultGlobalConfig                 = `{"InputIntervalMs":5000,"AggregatIntervalMs":30,"FlushIntervalMs":30,"DefaultLogQueueSize":11,"DefaultLogGroupQueueSize":12}`
+	DefaultPluginConfig                 = `{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"Content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}`
+	DefaultFlusherConfig                = `{"type":"flusher_sls","detail":{}}`
+	LoongcollectorEnvPrefix             = "LOONG_"
+	LoongcollectorContainerLogEnvPrefix = "loong_logs_"
 )
 
 var (

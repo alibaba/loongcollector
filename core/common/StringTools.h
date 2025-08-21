@@ -19,6 +19,7 @@
 #include <charconv>
 
 #include <algorithm>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -35,6 +36,9 @@
 #include "common/StringView.h"
 
 namespace logtail {
+
+// C++11定义的空白符
+extern const std::string kSpaceChars;
 
 inline bool StartWith(const std::string& input, StringView pattern) {
     return input.find(pattern.data(), 0, pattern.size()) == 0;
@@ -91,6 +95,7 @@ inline std::string ToString(bool value) {
     return value ? "true" : "false";
 }
 std::string ToString(const std::vector<std::string>& vec);
+std::string ToString(const std::vector<std::filesystem::path>& vec);
 
 template <typename T>
 std::string ToHexString(const T& value) {
@@ -360,5 +365,35 @@ template <class T>
 bool StringTo(const StringView& str, T& val, int base = 10) {
     return StringTo(str.data(), str.data() + str.size(), val, base);
 }
+
+// 移除前后缀的空白符，
+// std::string Trim(const std::string &str, bool trimLeft = true, bool trimRight = true);
+// 移除前、后缀的trimCharacters中的字符
+std::string Trim(const std::string& str, const std::string& trimChars, bool trimLeft = true, bool trimRight = true);
+
+inline std::string Trim(const std::string& str, const char* trimChars, bool trimLeft = true, bool trimRight = true) {
+    return trimChars ? Trim(str, std::string{trimChars}, trimLeft, trimRight) : str;
+}
+
+inline std::string TrimLeft(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, true, false);
+}
+
+inline std::string TrimRight(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, false, true);
+}
+
+inline std::string TrimSpace(const std::string& str) {
+    return Trim(str, kSpaceChars, true, true);
+}
+
+inline std::string TrimLeftSpace(const std::string& str) {
+    return TrimLeft(str, kSpaceChars);
+}
+
+inline std::string TrimRightSpace(const std::string& str) {
+    return TrimRight(str, kSpaceChars);
+}
+
 
 } // namespace logtail

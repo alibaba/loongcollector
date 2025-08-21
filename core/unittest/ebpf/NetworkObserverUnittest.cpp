@@ -16,7 +16,7 @@
 #include <memory>
 #include <thread>
 
-#include "common/TimeUtil.h"
+#include "common/StringTools.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/EBPFAdapter.h"
@@ -45,6 +45,8 @@ public:
     void TestPeriodicalTask();
     void TestSaeScenario();
     void BenchmarkConsumeTask();
+    void TestReportAgentInfo();
+    void TestConverge();
 
 protected:
     void SetUp() override {
@@ -75,6 +77,7 @@ protected:
                                                                      mRetryableEventCache);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, &mEventPool);
+        mManager->Init();
         EBPFServer::GetInstance()->updatePluginState(
             PluginType::NETWORK_OBSERVE, "pipeline", "project", PluginStateOperation::kAddPipeline, mManager);
     }
@@ -284,6 +287,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     options.mApmConfig.mAppName = "test-app-name";
     options.mApmConfig.mWorkspace = "test-workspace";
     options.mApmConfig.mServiceId = "test-service-id";
+    options.mApmConfig.mLanguage = "php";
 
     options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
 
@@ -347,30 +351,46 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump span tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 10UL);
+    APSARA_TEST_EQUAL(tags.size(), 11UL);
     APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
     APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
     APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["arms.app.type"], "apm");
+    APSARA_TEST_EQUAL(tags["language"], "php");
     APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
 
     LOG_INFO(sLogger, ("====== consume metric ======", ""));
     APSARA_TEST_TRUE(mManager->ConsumeMetricAggregateTree());
     APSARA_TEST_EQUAL(mManager->mMetricEventGroups.size(), 1UL);
-    APSARA_TEST_EQUAL(mManager->mMetricEventGroups[0].GetEvents().size(), 301UL);
+    APSARA_TEST_EQUAL(mManager->mMetricEventGroups[0].GetEvents().size(),
+                      301UL); // 100 record => 300 RED metric and 1 tag metric
     tags = mManager->mMetricEventGroups[0].GetTags();
     for (const auto& tag : tags) {
         LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
     }
-    APSARA_TEST_EQUAL(tags.size(), 9UL);
+    APSARA_TEST_EQUAL(tags.size(), 10UL);
     APSARA_TEST_EQUAL(tags["service"], "test-app-name");
     APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
     APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
     APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
     APSARA_TEST_EQUAL(tags["source"], "apm");
     APSARA_TEST_EQUAL(tags["technology"], "ebpf");
+    APSARA_TEST_EQUAL(tags["language"], "php");
     APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
+    StringView prefix = "/index.html/";
+    for (const auto& evt : mManager->mMetricEventGroups[0].GetEvents()) {
+        APSARA_TEST_TRUE(evt.Is<MetricEvent>());
+        auto* metricEvent = evt.Get<MetricEvent>();
+        auto view = metricEvent->GetTag(kRpc.MetricKey());
+        std::string rpc(view.data(), view.size());
+        LOG_INFO(sLogger, ("rpc", rpc)("name", metricEvent->GetName()));
+        if (metricEvent->GetName() == "arms_tag_entity") {
+            continue;
+        }
+        APSARA_TEST_TRUE(StartWith(rpc, prefix)); // used for route
+    }
+
     LOG_INFO(sLogger, ("====== consume log ======", ""));
     APSARA_TEST_TRUE(mManager->ConsumeLogAggregateTree());
     APSARA_TEST_EQUAL(mManager->mLogEventGroups.size(), 1UL);
@@ -388,6 +408,7 @@ size_t GenerateContainerIdHash(const std::string& cid) {
 
 void NetworkObserverManagerUnittest::TestConfigUpdate() {
     auto mManager = CreateManager();
+    mManager->Init();
     CollectionPipelineContext context;
     context.SetConfigName("test-config-1");
     context.SetCreateTime(12345);
@@ -748,6 +769,201 @@ void NetworkObserverManagerUnittest::TestSaeScenario() {
 void NetworkObserverManagerUnittest::BenchmarkConsumeTask() {
 }
 
+void NetworkObserverManagerUnittest::TestReportAgentInfo() {
+    // 测试无配置时调用 ReportAgentInfo
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 0UL);
+
+    // 测试有全局配置时调用 ReportAgentInfo
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test-config");
+    ctx.SetProcessQueueKey(1);
+    ObserverNetworkOption options;
+    options.mApmConfig = {.mWorkspace = "test-workspace",
+                          .mAppName = "test-app",
+                          .mAppId = "test-app-id",
+                          .mServiceId = "test-service-id"};
+    options.mL4Config.mEnable = true;
+    options.mL7Config
+        = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
+    options.mSelectors = {};
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &options);
+
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 1UL);
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[0].GetEvents().size(), 1UL);
+
+    // 测试有 workload 配置和 container 时调用 ReportAgentInfo
+    options.mSelectors = {{"test-workload", "deployment", "test-namespace"}};
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, &options);
+
+    // 添加 container 信息
+    auto podInfo = std::make_shared<K8sPodInfo>();
+    podInfo->mContainerIds = {"test-container-id"};
+    podInfo->mPodIp = "192.168.1.100";
+    podInfo->mPodName = "test-pod";
+    podInfo->mNamespace = "test-namespace";
+    podInfo->mWorkloadKind = "deployment";
+    podInfo->mWorkloadName = "test-workload";
+    podInfo->mStartTime = time(nullptr);
+    K8sMetadata::GetInstance().mContainerCache.insert("test-container-id", podInfo);
+    mManager->HandleHostMetadataUpdate({"test-container-id"});
+    mManager->ReportAgentInfo();
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 2UL);
+    APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[1].GetEvents().size(), 1UL);
+
+
+    // 验证 workload 配置已正确设置
+    size_t workloadKey = GenerateWorkloadKey("test-namespace", "deployment", "test-workload");
+    APSARA_TEST_TRUE(mManager->mWorkloadConfigs.count(workloadKey) > 0);
+    const auto& workloadConfig = mManager->mWorkloadConfigs[workloadKey];
+    APSARA_TEST_EQUAL(workloadConfig.containerIds.count("test-container-id"), 1u);
+    APSARA_TEST_TRUE(workloadConfig.config != nullptr);
+    APSARA_TEST_EQUAL(workloadConfig.config->mAppId, "test-app-id");
+    APSARA_TEST_EQUAL(workloadConfig.config->mAppName, "test-app");
+    APSARA_TEST_EQUAL(workloadConfig.config->mWorkspace, "test-workspace");
+    APSARA_TEST_EQUAL(workloadConfig.config->mServiceId, "test-service-id");
+}
+
+void NetworkObserverManagerUnittest::TestConverge() {
+    // auto mManager = CreateManager();
+    ObserverNetworkOption options;
+    options.mL7Config.mEnable = true;
+    options.mL7Config.mEnableLog = true;
+    options.mL7Config.mEnableMetric = true;
+    options.mL7Config.mEnableSpan = true;
+    options.mL7Config.mSampleRate = 1.0;
+
+    options.mApmConfig.mAppId = "test-app-id";
+    options.mApmConfig.mAppName = "test-app-name";
+    options.mApmConfig.mWorkspace = "test-workspace";
+    options.mApmConfig.mServiceId = "test-service-id";
+    options.mApmConfig.mLanguage = "php";
+
+    options.mSelectors = {{"test-workloadname", "Deployment", "test-namespace"}};
+
+    mManager->Init();
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test-config-networkobserver");
+    ctx.SetProcessQueueKey(1);
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+
+    auto podInfo = std::make_shared<K8sPodInfo>();
+    podInfo->mContainerIds = {"1", "2"};
+    podInfo->mPodIp = "test-pod-ip";
+    podInfo->mPodName = "test-pod-name";
+    podInfo->mNamespace = "test-namespace";
+    podInfo->mWorkloadKind = "Deployment";
+    podInfo->mWorkloadName = "test-workloadname";
+
+    LOG_INFO(sLogger, ("step", "0-0"));
+    K8sMetadata::GetInstance().mContainerCache.insert(
+        "80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106", podInfo);
+
+    mManager->HandleHostMetadataUpdate({"80b2ea13472c0d75a71af598ae2c01909bb5880151951bf194a3b24a44613106"});
+
+    auto peerPodInfo = std::make_shared<K8sPodInfo>();
+    peerPodInfo->mContainerIds = {"3", "4"};
+    peerPodInfo->mPodIp = "peer-pod-ip";
+    peerPodInfo->mPodName = "peer-pod-name";
+    peerPodInfo->mNamespace = "peer-namespace";
+    K8sMetadata::GetInstance().mIpCache.insert("192.168.1.1", peerPodInfo);
+
+    auto statsEvent = CreateConnStatsEvent();
+    mManager->AcceptNetStatsEvent(&statsEvent);
+    auto cnn = mManager->mConnectionManager->getConnection({0, 2, 1});
+    APSARA_TEST_TRUE(cnn != nullptr);
+    APSARA_TEST_TRUE(cnn->IsL7MetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsPeerMetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsSelfMetaAttachReady());
+    APSARA_TEST_TRUE(cnn->IsL4MetaAttachReady());
+
+    APSARA_TEST_TRUE(cnn->IsMetaAttachReadyForAppRecord());
+
+    // copy current
+    mManager->mContainerConfigsReplica = mManager->mContainerConfigs;
+
+    // Generate 10 records
+    for (size_t aa = 0; aa < 20; aa++) {
+        for (size_t i = 0; i < 100; i++) {
+            auto* dataEvent = CreateHttpDataEvent(i + aa * 100);
+            mManager->AcceptDataEvent(dataEvent);
+            free(dataEvent);
+        }
+        APSARA_TEST_EQUAL(HandleEvents(), 100);
+    }
+
+    StringView prefix = "/index.html/";
+
+
+    LOG_INFO(sLogger, ("====== test span ======", ""));
+    APSARA_TEST_TRUE(mManager->ConsumeSpanAggregateTree());
+    APSARA_TEST_EQUAL(mManager->mSpanEventGroups.size(), 1UL);
+    APSARA_TEST_EQUAL(mManager->mSpanEventGroups[0].GetEvents().size(), 2000UL);
+    auto tags = mManager->mSpanEventGroups[0].GetTags();
+    for (const auto& tag : tags) {
+        LOG_INFO(sLogger, ("dump span tags", "")(std::string(tag.first), std::string(tag.second)));
+    }
+    APSARA_TEST_EQUAL(tags.size(), 11UL);
+    APSARA_TEST_EQUAL(tags["service.name"], "test-app-name");
+    APSARA_TEST_EQUAL(tags["arms.appId"], "test-app-id");
+    APSARA_TEST_EQUAL(tags["host.ip"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host.name"], "test-pod-name");
+    APSARA_TEST_EQUAL(tags["arms.app.type"], "apm");
+    APSARA_TEST_EQUAL(tags["language"], "php");
+    APSARA_TEST_EQUAL(tags["data_type"], "trace"); // used for route
+    int spanCnt = 0;
+    for (const auto& evt : mManager->mSpanEventGroups[0].GetEvents()) {
+        APSARA_TEST_TRUE(evt.Is<SpanEvent>());
+        auto* spanEvent = evt.Get<SpanEvent>();
+        auto rpcView = spanEvent->GetTag(kRpc.SpanKey());
+        std::string rpc(rpcView.data(), rpcView.size());
+        auto spanNameView = spanEvent->GetName();
+        std::string spanName(spanNameView.data(), spanNameView.size());
+        APSARA_TEST_TRUE(StartWith(spanName, prefix));
+        if (!StartWith(rpc, prefix)) {
+            spanCnt++;
+            APSARA_TEST_EQUAL(rpc, "{DEFAULT}");
+        }
+    }
+    APSARA_TEST_TRUE(spanCnt > 0);
+
+    LOG_INFO(sLogger, ("====== test metric ======", ""));
+    APSARA_TEST_TRUE(mManager->ConsumeMetricAggregateTree());
+    APSARA_TEST_EQUAL(mManager->mMetricEventGroups.size(), 1UL);
+    tags = mManager->mMetricEventGroups[0].GetTags();
+    for (const auto& tag : tags) {
+        LOG_INFO(sLogger, ("dump metric tags", "")(std::string(tag.first), std::string(tag.second)));
+    }
+    APSARA_TEST_EQUAL(tags.size(), 10UL);
+    APSARA_TEST_EQUAL(tags["service"], "test-app-name");
+    APSARA_TEST_EQUAL(tags["pid"], "test-app-id");
+    APSARA_TEST_EQUAL(tags["serverIp"], "127.0.0.1");
+    APSARA_TEST_EQUAL(tags["host"], "test-pod-name");
+    APSARA_TEST_EQUAL(tags["source"], "apm");
+    APSARA_TEST_EQUAL(tags["technology"], "ebpf");
+    APSARA_TEST_EQUAL(tags["language"], "php");
+    APSARA_TEST_EQUAL(tags["data_type"], "metric"); // used for route
+
+    int cnt = 0;
+    for (const auto& evt : mManager->mMetricEventGroups[0].GetEvents()) {
+        APSARA_TEST_TRUE(evt.Is<MetricEvent>());
+        auto* metricEvent = evt.Get<MetricEvent>();
+        auto view = metricEvent->GetTag(kRpc.MetricKey());
+        std::string rpc(view.data(), view.size());
+        LOG_INFO(sLogger, ("rpc", rpc)("name", metricEvent->GetName()));
+        if (metricEvent->GetName() == "arms_tag_entity") {
+            continue;
+        }
+        if (!StartWith(rpc, prefix)) {
+            APSARA_TEST_EQUAL(rpc, "{DEFAULT}");
+            cnt++;
+        }
+    }
+    APSARA_TEST_TRUE(cnt > 0);
+}
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
@@ -757,6 +973,8 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConfigUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestHandleHostMetadataUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConverge);
 
 } // namespace ebpf
 } // namespace logtail

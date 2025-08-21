@@ -235,8 +235,29 @@ bool OverwriteFile(const std::string& fileName, const std::string& content) {
     return true;
 }
 
+bool UpdateFileContent(const std::filesystem::path& filepath, const std::string& content, std::string& errMsg) {
+    filesystem::path tmpFilepath = filepath.string() + ".new";
+    {
+        ofstream fout(tmpFilepath, ios::binary);
+        if (!fout) {
+            errMsg = "failed to open file";
+            return false;
+        }
+        fout << content;
+    }
+
+    error_code ec;
+    filesystem::rename(tmpFilepath, filepath, ec);
+    if (ec) {
+        filesystem::remove(tmpFilepath, ec);
+        errMsg = "failed to rename tmp file to file";
+        return false;
+    }
+    return true;
+}
+
 bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg) {
-    ofstream f(fileName, ios::trunc);
+    ofstream f(fileName, ios::trunc | ios::binary);
     if (!f.is_open()) {
         errMsg = "failed to open file " + fileName;
         return false;

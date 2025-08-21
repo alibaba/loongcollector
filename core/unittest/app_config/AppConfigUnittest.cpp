@@ -22,6 +22,8 @@ DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
 DECLARE_FLAG_BOOL(logtail_mode);
 DECLARE_FLAG_STRING(host_path_blacklist);
 DECLARE_FLAG_DOUBLE(default_machine_cpu_usage_threshold);
+DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
+DECLARE_FLAG_STRING(LOONG_FILE_TAGS);
 DEFINE_FLAG_INT32(test_receive_event_chan_cap, "test receive kernel event queue size", 4096);
 DEFINE_FLAG_BOOL(test_admin_config_debug_mode, "test admin config debug mode", false);
 DEFINE_FLAG_STRING(test_admin_config_log_level, "test admin config log level", "warn");
@@ -39,6 +41,7 @@ public:
     void TestParseEnvToFlags();
     void TestLoadSingleValueEnvConfig();
     void TestLoadStringParameter();
+    void TestGenerateFileTagsDir();
 
 private:
     void writeLogtailConfigJSON(const Json::Value& v) {
@@ -223,10 +226,58 @@ void AppConfigUnittest::TestLoadStringParameter() {
     APSARA_TEST_EQUAL(res, "0.7");
 }
 
+void AppConfigUnittest::TestGenerateFileTagsDir() {
+    {
+        STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
+        STRING_FLAG(LOONG_FILE_TAGS) = "";
+
+        std::string result = GenerateFileTagsDir();
+        APSARA_TEST_EQUAL(result, "");
+    }
+
+    {
+        STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "/path/to/aliyun/tags";
+        STRING_FLAG(LOONG_FILE_TAGS) = "";
+        BOOL_FLAG(logtail_mode) = true;
+
+        std::string result = GenerateFileTagsDir();
+        APSARA_TEST_EQUAL(result, "/path/to/aliyun/tags");
+    }
+
+    {
+        STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
+        STRING_FLAG(LOONG_FILE_TAGS) = "/path/to/loong/tags";
+        BOOL_FLAG(logtail_mode) = true;
+
+        std::string result = GenerateFileTagsDir();
+        APSARA_TEST_EQUAL(result, "/path/to/loong/tags");
+    }
+
+    {
+        STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "/path/to/aliyun/tags";
+        STRING_FLAG(LOONG_FILE_TAGS) = "/path/to/loong/tags";
+        BOOL_FLAG(logtail_mode) = true;
+
+        std::string result = GenerateFileTagsDir();
+        APSARA_TEST_EQUAL(result, "/path/to/loong/tags");
+    }
+
+    {
+        STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
+        STRING_FLAG(LOONG_FILE_TAGS) = "relative/path/tags";
+        BOOL_FLAG(logtail_mode) = false;
+
+        std::string result = GenerateFileTagsDir();
+        APSARA_TEST_EQUAL(result,
+                          AbsolutePath("relative/path/tags", AppConfig::GetInstance()->GetLoongcollectorConfDir()));
+    }
+}
+
 UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
+UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail
 

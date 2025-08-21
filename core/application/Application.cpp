@@ -21,12 +21,12 @@
 #include <thread>
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/CrashBackTraceUtil.h"
+#include "common/EnvUtil.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/RuntimeUtil.h"
@@ -37,11 +37,13 @@
 #include "common/version.h"
 #include "config/ConfigDiff.h"
 #include "config/InstanceConfigManager.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
@@ -259,7 +261,7 @@ void Application::Start() { // GCOVR_EXCL_START
     }
     // Actually, docker env config will not work if not in purage container mode, so there is no need to load plugin
     // base if not in purage container mode. However, we still load it here for backward compatability.
-    const char* dockerEnvConfig = getenv("ALICLOUD_LOG_DOCKER_ENV_CONFIG");
+    const char* dockerEnvConfig = GetEnv("LOONG_DOCKER_ENV_CONFIG", "ALICLOUD_LOG_DOCKER_ENV_CONFIG");
     if (dockerEnvConfig != NULL && strlen(dockerEnvConfig) > 0
         && (dockerEnvConfig[0] == 't' || dockerEnvConfig[0] == 'T')) {
         LogtailPlugin::GetInstance()->LoadPluginBase();
@@ -272,12 +274,19 @@ void Application::Start() { // GCOVR_EXCL_START
         LogtailPlugin::GetInstance()->LoadPluginBase();
     }
 
-    time_t curTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0, lastCheckTagsTime = 0, lastQueueGCTime = 0;
+    OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
+
+    time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
             AppConfig::GetInstance()->UpdateFileTags();
             lastCheckTagsTime = curTime;
+        }
+        if (curTime - lastOnetimeConfigTimeoutCheckTime >= 10) {
+            OnetimeConfigInfoManager::GetInstance()->DeleteTimeoutConfigFiles();
+            lastOnetimeConfigTimeoutCheckTime = curTime;
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -287,6 +296,10 @@ void Application::Start() { // GCOVR_EXCL_START
             if (!configDiff.second.IsEmpty()) {
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
             }
+            if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
+                OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
+            }
+
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!instanceConfigDiff.IsEmpty()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
@@ -304,6 +317,11 @@ void Application::Start() { // GCOVR_EXCL_START
             // this should be called in the same thread as config update
             SenderQueueManager::GetInstance()->ClearUnusedQueues();
             lastQueueGCTime = curTime;
+        }
+        if (curTime - lastCheckUnusedCheckpointsTime >= 60) {
+            CollectionPipelineManager::GetInstance()->ClearInputUnusedCheckpoints();
+            OnetimeConfigInfoManager::GetInstance()->ClearUnusedCheckpoints();
+            lastCheckUnusedCheckpointsTime = curTime;
         }
         CollectionPipelineManager::GetInstance()->InputRunnerEventGC();
         if (curTime - lastUpdateMetricTime >= 40) {

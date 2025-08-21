@@ -17,8 +17,8 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "constants/Constants.h"
 #include "constants/SpanConstants.h"
-#include "models/MetricValue.h"
 #include "protobuf/sls/LogGroupSerializer.h"
 
 using namespace std;

@@ -73,7 +73,7 @@ func saveContent(dataDir string, content string, configName, scriptType string) 
 	return filePath, nil
 }
 
-func RunCommandWithTimeOut(timeout int, user *user.User, command string, environments []string, args ...string) (stdout, stderr string, isKilled bool, err error) {
+func RunCommandWithTimeOut(timeout int, user *user.User, currentUser *user.User, command string, environments []string, args ...string) (stdout, stderr string, isKilled bool, err error) {
 	cmd := exec.Command(command, args...)
 
 	// set Env
@@ -90,19 +90,23 @@ func RunCommandWithTimeOut(timeout int, user *user.User, command string, environ
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 
-	// set uid and gid
-	uid, err := strconv.ParseUint(user.Uid, 10, 32)
-	if err != nil {
-		return
-	}
-	gid, err := strconv.ParseUint(user.Gid, 10, 32)
-	if err != nil {
-		return
-	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
-	cmd.SysProcAttr.Credential = &syscall.Credential{
-		Uid: uint32(uid),
-		Gid: uint32(gid),
+	// set uid and gid only if we need to switch user
+	if currentUser == nil || user.Uid != currentUser.Uid || user.Gid != currentUser.Gid {
+		uid, parseErr := strconv.ParseUint(user.Uid, 10, 32)
+		if parseErr != nil {
+			err = parseErr
+			return
+		}
+		gid, parseErr := strconv.ParseUint(user.Gid, 10, 32)
+		if parseErr != nil {
+			err = parseErr
+			return
+		}
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Credential = &syscall.Credential{
+			Uid: uint32(uid),
+			Gid: uint32(gid),
+		}
 	}
 	defer func() {
 		stdout = strings.TrimSpace(stdoutBuf.String())

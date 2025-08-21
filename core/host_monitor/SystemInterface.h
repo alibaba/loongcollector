@@ -50,6 +50,19 @@ struct SystemInformation : public BaseInformation {
     int64_t bootTime;
 };
 
+class ScopeGuard {
+    std::function<void()> fn;
+
+public:
+    explicit ScopeGuard(std::function<void()> f) : fn(std::move(f)) {}
+
+    ~ScopeGuard() { fn(); }
+};
+
+#define defer3(ln, statement) ScopeGuard __##ln##_defer_([&]() { statement; })
+#define defer2(ln, statement) defer3(ln, statement)
+#define deferred(statement) defer2(__LINE__, statement)
+
 // man proc: https://man7.org/linux/man-pages/man5/proc.5.html
 // search key: /proc/stat
 enum class EnumCpuKey : int {
@@ -77,6 +90,140 @@ struct CPUStat {
     double steal;
     double guest;
     double guestNice;
+};
+
+struct tagPidTotal {
+    pid_t pid = 0;
+    uint64_t total = 0;
+
+    tagPidTotal() = default;
+
+    tagPidTotal(pid_t p, uint64_t t) : pid(p), total(t) {}
+};
+
+// 单进程CPU信息
+struct ProcessCpuInformation {
+    int64_t startTime = 0;
+    std::chrono::steady_clock::time_point lastTime;
+    uint64_t user = 0;
+    uint64_t sys = 0;
+    uint64_t total = 0;
+    double percent = 0.0;
+};
+
+struct ProcessTime {
+    int64_t startTime;
+    std::chrono::milliseconds cutime{0};
+    std::chrono::milliseconds cstime{0};
+
+    std::chrono::milliseconds user{0}; // utime + cutime
+    std::chrono::milliseconds sys{0}; // stime + cstime
+
+    std::chrono::milliseconds total{0}; // user + sys
+
+    std::chrono::milliseconds utime() const { return user - cutime; }
+
+    std::chrono::milliseconds stime() const { return sys - cstime; }
+};
+
+struct ProcessInfo {
+    pid_t pid;
+    std::string name;
+    std::string path;
+    std::string cwd;
+    std::string root;
+    std::string args;
+    std::string user;
+};
+
+struct ProcessMemoryInformation : public BaseInformation {
+    uint64_t size = 0;
+    uint64_t resident = 0;
+    uint64_t share = 0;
+    uint64_t minorFaults = 0;
+    uint64_t majorFaults = 0;
+    uint64_t pageFaults = 0;
+};
+
+// 进程打开文件数
+struct ProcessFd : public BaseInformation {
+    uint64_t total = 0;
+    bool exact = true; // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
+};
+
+struct ProcessCredName : public BaseInformation {
+    std::string user;
+    std::string group;
+    std::string name;
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
+};
+
+struct ProcessCred {
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
+};
+
+struct ProcessAllStat {
+    pid_t pid;
+    ProcessStat processState;
+    ProcessInfo processInfo;
+    ProcessCpuInformation processCpu;
+    ProcessMemoryInformation processMemory;
+    double memPercent = 0.0;
+    uint64_t fdNum = 0;
+    bool fdNumExact = true;
+};
+
+struct ProcessPushMertic {
+    pid_t pid;
+    std::string name;
+    std::string user;
+    std::string path;
+    std::string args;
+    double cpuPercent = 0.0;
+    double memPercent = 0.0;
+    double fdNum = 0.0;
+    double numThreads = 0.0;
+    double allNumProcess = 0.0;
+
+    static inline const FieldName<ProcessPushMertic> processPushMerticFields[] = {
+        FIELD_ENTRY(ProcessPushMertic, cpuPercent),
+        FIELD_ENTRY(ProcessPushMertic, memPercent),
+        FIELD_ENTRY(ProcessPushMertic, fdNum),
+        FIELD_ENTRY(ProcessPushMertic, numThreads),
+        FIELD_ENTRY(ProcessPushMertic, allNumProcess),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<ProcessPushMertic, double>&)>& callback) {
+        for (const auto& field : processPushMerticFields) {
+            callback(field);
+        }
+    }
+};
+
+struct VMProcessNumStat {
+    double vmProcessNum = 0;
+
+    static inline const FieldName<VMProcessNumStat> vmProcessNumStatMerticFields[] = {
+        FIELD_ENTRY(VMProcessNumStat, vmProcessNum),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<VMProcessNumStat, double>&)>& callback) {
+        for (const auto& field : vmProcessNumStatMerticFields) {
+            callback(field);
+        }
+    }
+};
+
+struct SystemTaskInfo {
+    uint64_t threadCount = 0;
+    uint64_t processCount = 0;
+    uint64_t zombieProcessCount = 0;
 };
 
 struct CPUInformation : public BaseInformation {
@@ -289,6 +436,10 @@ struct CpuCoreNumInformation : public BaseInformation {
     unsigned int cpuCoreNum;
 };
 
+struct ProcessExecutePath : public BaseInformation {
+    std::string path;
+};
+
 struct TCPStatInformation : public BaseInformation {
     ResTCPStat stat;
 };
@@ -307,6 +458,29 @@ struct TupleHash {
             t);
         return seed;
     }
+};
+
+struct MemoryInformationString : public BaseInformation {
+    std::vector<std::string> meminfoString;
+};
+
+struct MTRRInformationString : public BaseInformation {
+    std::vector<std::string> mtrrString;
+};
+
+// /proc/pid/status
+struct ProcessStatusString : public BaseInformation {
+    std::vector<std::string> processStatusString;
+};
+
+// /proc/pid/cmdline
+struct ProcessCmdlineString : public BaseInformation {
+    std::vector<std::string> cmdline;
+};
+
+// /proc/pid/statm
+struct ProcessStatmString : public BaseInformation {
+    std::vector<std::string> processStatmString;
 };
 
 struct MemoryStat {
@@ -345,6 +519,83 @@ struct MemoryStat {
 
 struct MemoryInformation : public BaseInformation {
     MemoryStat memStat;
+};
+
+enum FileSystemType {
+    FILE_SYSTEM_TYPE_UNKNOWN = 0,
+    FILE_SYSTEM_TYPE_NONE,
+    FILE_SYSTEM_TYPE_LOCAL_DISK,
+    FILE_SYSTEM_TYPE_NETWORK,
+    FILE_SYSTEM_TYPE_RAM_DISK,
+    FILE_SYSTEM_TYPE_CDROM,
+    FILE_SYSTEM_TYPE_SWAP,
+    FILE_SYSTEM_TYPE_MAX
+};
+
+struct FileSystem {
+    std::string dirName;
+    std::string devName;
+    std::string typeName;
+    std::string sysTypeName;
+    std::string options;
+    FileSystemType type = FILE_SYSTEM_TYPE_UNKNOWN;
+    unsigned long flags = 0;
+};
+
+struct FileSystemListInformation : public BaseInformation {
+    // mounted file systems
+    std::vector<FileSystem> fileSystemList;
+};
+
+struct SystemUptimeInformation : public BaseInformation {
+    double uptime;
+};
+
+struct SerialIdInformation : public BaseInformation {
+    std::string serialId;
+};
+
+enum class EnumDiskState {
+    major,
+    minor,
+    devName,
+
+    reads,
+    readsMerged,
+    readSectors,
+    rMillis,
+
+    writes,
+    writesMerged,
+    writeSectors,
+    wMillis,
+
+    ioCount,
+    rwMillis, // 输入输出花费的毫秒数
+    qMillis, // 输入/输出操作花费的加权毫秒数
+
+    count, // 这个用于收尾，不是实际的列号。
+};
+static_assert((int)EnumDiskState::count == 14, "EnumDiskState::count unexpected");
+
+struct DiskState {
+    unsigned int major;
+    unsigned int minor;
+
+    uint64_t reads;
+    uint64_t readBytes;
+    uint64_t rTime;
+
+    uint64_t writes;
+    uint64_t writeBytes;
+    uint64_t wTime;
+
+    uint64_t time; // 输入输出花费的毫秒数
+    uint64_t qTime; // 输入/输出操作花费的加权毫秒数
+};
+
+struct DiskStateInformation : public BaseInformation {
+    std::vector<DiskState> diskStats;
 };
 
 class SystemInterface {
@@ -401,6 +652,15 @@ public:
     bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
     bool GetHostMemInformationStat(MemoryInformation& meminfo);
+    bool GetFileSystemListInformation(FileSystemListInformation& fileSystemListInfo);
+    bool GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo);
+    bool GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo);
+    bool GetDiskStateInformation(DiskStateInformation& diskStateInfo);
+    bool GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& cmdline);
+    bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessCredNameObj(pid_t pid, ProcessCredName& credName);
+    bool GetExecutablePathCache(pid_t pid, ProcessExecutePath& executePath);
+    bool GetProcessOpenFiles(pid_t pid, ProcessFd& processFd);
 
     bool GetTCPStatInformation(TCPStatInformation& tcpStatInfo);
     bool GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo);
@@ -413,6 +673,15 @@ public:
           mSystemLoadInformationCache(ttl),
           mCPUCoreNumInformationCache(ttl),
           mMemInformationCache(ttl),
+          mFileSystemListInformationCache(ttl),
+          mSystemUptimeInformationCache(ttl),
+          mSerialIdInformationCache(ttl),
+          mDiskStateInformationCache(ttl),
+          mProcessCmdlineCache(ttl),
+          mProcessStatmCache(ttl),
+          mProcessStatusCache(ttl),
+          mProcessFdCache(ttl),
+          mExecutePathCache(ttl),
           mTCPStatInformationCache(ttl),
           mNetInterfaceInformationCache(ttl) {}
     virtual ~SystemInterface() = default;
@@ -432,6 +701,15 @@ private:
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
     virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
+    virtual bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) = 0;
+    virtual bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) = 0;
+    virtual bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) = 0;
+    virtual bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) = 0;
+    virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
+    virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
+    virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
+    virtual bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) = 0;
+    virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
 
@@ -442,6 +720,15 @@ private:
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
     SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
     SystemInformationCache<MemoryInformation> mMemInformationCache;
+    SystemInformationCache<FileSystemListInformation> mFileSystemListInformationCache;
+    SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
+    SystemInformationCache<SerialIdInformation, std::string> mSerialIdInformationCache;
+    SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
+    SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
+    SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
+    SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;
+    SystemInformationCache<ProcessFd, pid_t> mProcessFdCache;
+    SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
 

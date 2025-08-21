@@ -18,7 +18,9 @@
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
+#include "constants/Constants.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "runner/ProcessorRunner.h"
 
 namespace logtail {
 
@@ -59,7 +61,10 @@ bool ProcessorParseRegexNative::Init(const Json::Value& config) {
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    mReg = boost::regex(mRegex);
+    mReg.reserve(AppConfig::GetInstance()->GetProcessThreadCount());
+    for (int i = 0; i < AppConfig::GetInstance()->GetProcessThreadCount(); ++i) {
+        mReg.emplace_back(mRegex);
+    }
     mIsWholeLineMode = mRegex == "(.*)";
 
     // Keys
@@ -142,7 +147,7 @@ bool ProcessorParseRegexNative::ProcessEvent(const StringView& logPath,
     if (mIsWholeLineMode) {
         parseSuccess = WholeLineModeParser(sourceEvent, mKeys.empty() ? DEFAULT_CONTENT_KEY : mKeys[0]);
     } else {
-        parseSuccess = RegexLogLineParser(sourceEvent, mReg, mKeys, logPath);
+        parseSuccess = RegexLogLineParser(sourceEvent, GetReg(), mKeys, logPath);
     }
 
     if (!parseSuccess || !mSourceKeyOverwritten) {
@@ -245,6 +250,10 @@ bool ProcessorParseRegexNative::RegexLogLineParser(LogEvent& sourceEvent,
         AddLog(keys[i], StringView(what[i + 1].begin(), what[i + 1].length()), sourceEvent);
     }
     return true;
+}
+
+const boost::regex& ProcessorParseRegexNative::GetReg() const {
+    return mReg[ProcessorRunner::GetThreadNo()];
 }
 
 } // namespace logtail

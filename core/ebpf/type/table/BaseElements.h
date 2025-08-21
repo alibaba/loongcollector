@@ -265,6 +265,14 @@ inline constexpr DataElement kArmsServiceId = {
     "arms serviceid",
 };
 
+inline constexpr DataElement kLanguage = {
+    "language",
+    "language", // metric
+    "language", // span
+    "language", // log
+    "program language",
+};
+
 inline constexpr DataElement kPeerAppName = {
     "peer_app",
     "arms_peer_app_name", // metric
@@ -316,7 +324,7 @@ inline constexpr DataElement kRpcType = {
 inline constexpr DataElement kCallType = {
     "callType",
     "callType", // metric
-    "callType", // span
+    "call.type", // span
     "arms.call.type", // log
     "arms call type",
 };
@@ -324,7 +332,7 @@ inline constexpr DataElement kCallType = {
 inline constexpr DataElement kCallKind = {
     "callKind",
     "callKind", // metric
-    "callKind", // span
+    "call.kind", // span
     "arms.call.kind", // log
     "arms call kind",
 };

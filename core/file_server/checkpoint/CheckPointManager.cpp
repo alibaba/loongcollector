@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "CheckPointManager.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 
 #include <fcntl.h>
 
@@ -213,7 +213,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             int32_t containerStopped = 0;
             string containerID;
             int32_t lastForceRead = 0;
-            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
+            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
             if (meta.isMember("real_file_name")) {
                 realFilePath = meta["real_file_name"].asString();
             }

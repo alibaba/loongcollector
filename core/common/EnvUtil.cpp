@@ -34,4 +34,12 @@ void UnsetEnv(const char* key) {
 #endif
 }
 
+char* GetEnv(const char* firstKey, const char* secondKey) {
+    char* value = getenv(firstKey);
+    if (value == nullptr) {
+        value = getenv(secondKey);
+    }
+    return value;
+}
+
 } // namespace logtail

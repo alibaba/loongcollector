@@ -22,9 +22,8 @@
 #include <string>
 #include <unordered_set>
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "common/memory/SourceBuffer.h"
-#include "constants/Constants.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
