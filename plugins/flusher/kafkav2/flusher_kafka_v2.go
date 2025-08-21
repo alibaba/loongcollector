@@ -26,6 +26,7 @@ import (
 	"github.com/IBM/sarama"
 
 	"github.com/alibaba/ilogtail/pkg/fmtstr"
+	"github.com/alibaba/ilogtail/pkg/kafkacommon"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -54,7 +55,7 @@ type FlusherKafka struct {
 	Timeout time.Duration
 
 	// Authentication using SASL/PLAIN
-	Authentication Authentication
+	Authentication kafkacommon.Authentication
 	// Kafka output broker event partitioning strategy.
 	// Must be one of random, roundrobin, or hash. By default, the random partitioner is used
 	PartitionerType string
@@ -193,8 +194,8 @@ func NewFlusherKafka() *FlusherKafka {
 			Max:  60 * time.Second,
 		},
 		ChanBufferSize: 256,
-		Authentication: Authentication{
-			PlainText: &PlainTextConfig{
+		Authentication: kafkacommon.Authentication{
+			PlainText: &kafkacommon.PlainTextConfig{
 				Username: "",
 				Password: "",
 			},

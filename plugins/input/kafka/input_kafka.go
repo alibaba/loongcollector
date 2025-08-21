@@ -23,6 +23,7 @@ import (
 
 	"github.com/IBM/sarama"
 
+	"github.com/alibaba/ilogtail/pkg/kafkacommon"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -53,6 +54,9 @@ type InputKafka struct {
 	Format            string
 	FieldsExtend      bool
 	DisableUncompress bool
+
+	// Authentication using SASL/PLAIN
+	Authentication kafkacommon.Authentication
 
 	ready               chan bool
 	readyCloser         sync.Once
@@ -108,12 +112,10 @@ func (k *InputKafka) Init(context pipeline.Context) (int, error) {
 	}
 	config.Consumer.Return.Errors = true
 
-	if k.SASLUsername != "" && k.SASLPassword != "" {
-		logger.Infof(k.context.GetRuntimeContext(), "Using SASL auth with username '%s',",
-			k.SASLUsername)
-		config.Net.SASL.User = k.SASLUsername
-		config.Net.SASL.Password = k.SASLPassword
-		config.Net.SASL.Enable = true
+	// configure Authentication
+	err = k.Authentication.ConfigureAuthentication(config)
+	if err != nil {
+		return 0, err
 	}
 
 	switch strings.ToLower(k.Offset) {
