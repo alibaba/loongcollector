@@ -323,6 +323,46 @@ func (m *k8sMetaCache) preProcessIngress(obj interface{}) interface{} {
 				IngressClassName: ingress.Spec.IngressClassName,
 			},
 		}
+
+		// 转换 Rules 字段
+		if len(ingress.Spec.Rules) > 0 {
+			v1Ingress.Spec.Rules = make([]networking.IngressRule, 0, len(ingress.Spec.Rules))
+			for _, rule := range ingress.Spec.Rules {
+				v1Rule := networking.IngressRule{
+					Host: rule.Host,
+				}
+
+				if rule.HTTP != nil {
+					v1Rule.HTTP = &networking.HTTPIngressRuleValue{
+						Paths: make([]networking.HTTPIngressPath, 0, len(rule.HTTP.Paths)),
+					}
+
+					for _, path := range rule.HTTP.Paths {
+						v1Path := networking.HTTPIngressPath{
+							Path:     path.Path,
+							PathType: (*networking.PathType)(path.PathType),
+						}
+
+						// 转换 Backend 字段
+						if path.Backend.ServiceName != "" {
+							v1Path.Backend = networking.IngressBackend{
+								Service: &networking.IngressServiceBackend{
+									Name: path.Backend.ServiceName,
+									Port: networking.ServiceBackendPort{
+										Number: path.Backend.ServicePort.IntVal,
+									},
+								},
+							}
+						}
+
+						v1Rule.HTTP.Paths = append(v1Rule.HTTP.Paths, v1Path)
+					}
+				}
+
+				v1Ingress.Spec.Rules = append(v1Ingress.Spec.Rules, v1Rule)
+			}
+		}
+
 		return m.preProcessCommon(v1Ingress)
 	}
 
