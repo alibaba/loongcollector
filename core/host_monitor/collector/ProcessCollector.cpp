@@ -531,20 +531,25 @@ bool ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
 }
 
 void ProcessCollector::ClearProcessCpuTimeCache() {
-    // 清除超时的cache
-    const auto now = std::chrono::steady_clock::now();
-    auto it = cpuTimeCache.begin();
+    try {
+        // 清除超时的cache
+        const auto now = std::chrono::steady_clock::now();
+        auto it = cpuTimeCache.begin();
 
-    while (it != cpuTimeCache.end()) {
-        // 检查当前元素是否超过120秒未访问
-        if (now - it->second.lastTime > ProcessSortInterval) {
-            // 超过120秒，删除该元素
-            it = cpuTimeCache.erase(it);
-        } else {
-            // 未超过120秒，继续检查下一个元素
-            ++it;
+        while (it != cpuTimeCache.end()) {
+            // 检查当前元素是否超时
+            if (now - it->second.lastTime > ProcessSortInterval) {
+                // 超时，删除该元素
+                it = cpuTimeCache.erase(it);
+            } else {
+                // 未超时，继续检查下一个元素
+                ++it;
+            }
         }
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("ClearProcessCpuTimeCache error", e.what()));
     }
+
     return;
 }
 
