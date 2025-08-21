@@ -62,7 +62,9 @@ set(DEP_NAME_LIST
         yamlcpp
         zlib
         zstd
+#ifndef __ENTERPRISE__
         rdkafka
+#endif
         )
 
 if (NOT NO_TCMALLOC)

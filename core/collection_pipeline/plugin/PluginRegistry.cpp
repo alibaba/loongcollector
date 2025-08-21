@@ -173,7 +173,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseApsaraNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseDelimiterNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorDesensitizeNative>());
+#ifndef __ENTERPRISE__
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseJsonNative>());
+#endif
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseRegexNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseTimestampNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
@@ -182,7 +184,6 @@ void PluginRegistry::LoadStaticPlugins() {
         RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSPL>());
     }
 #endif
-
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
