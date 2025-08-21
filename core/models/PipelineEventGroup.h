@@ -16,8 +16,11 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include <memory>
 #include <string>
+#include <unordered_set>
 
 #include "checkpoint/RangeCheckpoint.h"
 #include "common/memory/SourceBuffer.h"
@@ -72,11 +75,14 @@ using GroupTags = std::map<StringView, StringView>;
 // DeepCopy is required if we want to support no-linear topology
 // We cannot just use default copy constructor as it won't deep copy PipelineEvent pointed in Events vector.
 using EventsContainer = std::vector<PipelineEventPtr>;
+using SourceBufferSet = std::unordered_set<std::shared_ptr<SourceBuffer>>;
 
 // only movable
 class PipelineEventGroup {
 public:
     PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer) : mSourceBuffer(sourceBuffer) {}
+    PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer, SourceBufferSet& extraSourceBuffers)
+        : mSourceBuffer(sourceBuffer), mExtraSourceBuffers(extraSourceBuffers) {}
     ~PipelineEventGroup();
     PipelineEventGroup(PipelineEventGroup&&) noexcept;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
@@ -98,6 +104,8 @@ public:
     void ReserveEvents(size_t size) { mEvents.reserve(size); }
 
     std::shared_ptr<SourceBuffer>& GetSourceBuffer() { return mSourceBuffer; }
+    void AddSourceBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer);
+    SourceBufferSet& GetExtraSourceBuffers() { return mExtraSourceBuffers; }
 
     void SetMetadata(EventGroupMetaKey key, StringView val);
     void SetMetadata(EventGroupMetaKey key, const std::string& val);
@@ -142,6 +150,8 @@ private:
     EventsContainer mEvents;
     std::shared_ptr<SourceBuffer> mSourceBuffer;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
+
+    SourceBufferSet mExtraSourceBuffers;
 };
 
 } // namespace logtail

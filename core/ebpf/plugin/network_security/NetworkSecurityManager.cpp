@@ -166,7 +166,7 @@ int NetworkSecurityManager::SendEvents() {
         }
         aggTree.ForEach(node, [&](const NetworkEventGroup* group) {
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_ERROR(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
                 return;

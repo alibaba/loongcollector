@@ -32,6 +32,7 @@
 #include "ebpf/plugin/RetryableEventCache.h"
 #include "ebpf/type/CommonDataEvent.h"
 #include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "monitor/metric_models/MetricTypes.h"
 
 namespace logtail::ebpf {
@@ -66,7 +67,7 @@ public:
     void RecordDataEvent(msg_data* eventPtr);
     void MarkProcessEventFlushStatus(bool isFlush) { mFlushProcessEvent = isFlush; }
 
-    bool FinalizeProcessTags(uint32_t pid, uint64_t ktime, LogEvent& logEvent);
+    bool AttachProcessData(uint32_t pid, uint64_t ktime, LogEvent& logEvent, PipelineEventGroup& eventGroup);
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
     ProcessCache& GetProcessCache() { return mProcessCache; }

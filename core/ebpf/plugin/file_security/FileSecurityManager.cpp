@@ -149,7 +149,7 @@ int FileSecurityManager::SendEvents() {
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }

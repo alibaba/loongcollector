@@ -963,7 +963,8 @@ void ProcessCacheManagerUnittest::TestFinalizeProcessTags() {
     // 测试进程标签生成
     PipelineEventGroup sharedEventGroup(std::make_shared<SourceBuffer>());
     auto sharedEvent = sharedEventGroup.CreateLogEvent();
-    APSARA_TEST_TRUE(mWrapper.mProcessCacheManager->FinalizeProcessTags(key.pid, key.time, *sharedEvent));
+    auto processCacheValue = mWrapper.mProcessCacheManager->AttachProcessData(key.pid, key.time, *sharedEvent);
+    APSARA_TEST_NOT_EQUAL(processCacheValue, nullptr);
     APSARA_TEST_EQUAL(sharedEvent->GetContent(kProcessId.LogKey()), StringView("1234"));
     APSARA_TEST_EQUAL(sharedEvent->GetContent(kKtime.LogKey()), StringView("5678"));
     APSARA_TEST_EQUAL(sharedEvent->GetContent(kUid.LogKey()), StringView("1000"));

@@ -201,7 +201,7 @@ int ProcessSecurityManager::SendEvents() {
                 LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            auto hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
