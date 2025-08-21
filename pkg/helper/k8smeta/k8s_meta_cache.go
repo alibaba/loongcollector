@@ -193,6 +193,11 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", m.resourceType)
 		return factory, nil
 	}
+
+	// 如果 informer 为 nil，直接返回，不再watch error
+	if informer == nil {
+		return factory, nil
+	}
 	// add watch error handler
 	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
 		if err != nil {
