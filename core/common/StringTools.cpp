@@ -72,6 +72,33 @@ std::string ToString(const std::vector<std::string>& vec) {
     return ret;
 }
 
+std::string ToString(const std::vector<std::filesystem::path>& vec) {
+    if (vec.empty()) {
+        return "";
+    }
+    size_t size = 0;
+    {
+        auto iter = vec.begin();
+        size += iter->string().size();
+        ++iter;
+        for (; iter != vec.end(); ++iter) {
+            size += 1 + iter->string().size();
+        }
+    }
+    std::string ret;
+    ret.reserve(size);
+    {
+        auto iter = vec.begin();
+        ret.append(iter->string());
+        ++iter;
+        for (; iter != vec.end(); ++iter) {
+            ret.push_back(',');
+            ret.append(iter->string());
+        }
+    }
+    return ret;
+}
+
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim) {
     std::vector<std::string> tokens;
     boost::split(tokens, str, boost::is_any_of(delim));

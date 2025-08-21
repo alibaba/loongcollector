@@ -26,6 +26,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/AggregateTree.h"
+#include "ebpf/util/Converger.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 
@@ -224,6 +225,8 @@ private:
         std::set<std::string> containerIds;
     };
 
+    bool reportAgentInfo(const time_t& now, size_t workloadKey, const WorkloadConfig& workloadConfig);
+
     mutable ReadWriteLock mAppConfigLock;
     std::atomic_int mConfigVersion = 0;
     std::atomic_int mLastConfigVersion = -1;
@@ -234,7 +237,7 @@ private:
     // replica of mContainerConfigs, only used in poller thread ...
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
 
-    std::shared_ptr<Sampler> mSampler;
+    std::shared_ptr<AppConvergerManager> mConvergerManager;
 
     std::string mClusterId; // inited in Init()
     std::string mHostName; // host
@@ -261,6 +264,7 @@ private:
     friend class NetworkObserverManagerUnittest;
     friend class HttpRetryableEventUnittest;
     friend class NetworkObserverConfigUpdateUnittest;
+    std::vector<PipelineEventGroup> mAgentInfoEventGroups;
     std::vector<PipelineEventGroup> mMetricEventGroups;
     std::vector<PipelineEventGroup> mLogEventGroups;
     std::vector<PipelineEventGroup> mSpanEventGroups;

@@ -62,6 +62,7 @@ public:
                                                                      mRetryableEventCache);
         ProtocolParserManager::GetInstance().AddParser(support_proto_e::ProtoHTTP);
         mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue);
+        mManager->Init();
         EBPFServer::GetInstance()->updatePluginState(
             PluginType::NETWORK_OBSERVE, "pipeline", "project", PluginStateOperation::kAddPipeline, mManager);
     }

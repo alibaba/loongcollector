@@ -66,6 +66,8 @@ public:
 
     [[nodiscard]] ConnId GetConnId() const { return mConnId; };
 
+    bool IsServer();
+
     bool ReadyToDestroy(const std::chrono::time_point<std::chrono::steady_clock>& now) {
         if (mIsClose && this->mEpoch < 0) {
             return true;

@@ -108,7 +108,7 @@ protected:
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
-        config.reset(new CollectionConfig(mConfigName, std::move(configJson)));
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson), filesystem::path(".")));
         APSARA_TEST_TRUE(config->Parse());
         pipeline.reset(new CollectionPipeline());
         APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
