@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	LOONG_COLLECTOR_ENRTITY_COLLECTOR_USER_AGENT = "loongcollector-singleton"
+	EntityCollectorUserAgent = "loongcollector-singleton"
 
 	// entity type
 	POD                   = "pod"
