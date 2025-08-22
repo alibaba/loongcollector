@@ -62,8 +62,11 @@ set(DEP_NAME_LIST
         yamlcpp
         zlib
         zstd
-        rdkafka
         )
+
+if (NOT ENABLE_ENTERPRISE)
+    list(APPEND DEP_NAME_LIST "rdkafka")
+endif()
 
 if (NOT NO_TCMALLOC)
     list(APPEND DEP_NAME_LIST "tcmalloc") # (gperftools)

@@ -199,7 +199,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#ifndef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
+#endif
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif

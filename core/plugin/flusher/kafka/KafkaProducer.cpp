@@ -108,12 +108,29 @@ public:
             return false;
         }
 
-        if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)
-            || !SetConfig(KAFKA_CONFIG_CLIENT_ID, mConfig.ClientID)
-            || !SetConfig(KAFKA_CONFIG_RETRIES, std::to_string(mConfig.Retries))
-            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.TimeoutMs))
-            || !SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.BatchNumMessages))
-            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.LingerMs))) {
+
+        if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
+            return false;
+        }
+
+
+        if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.Producer.BatchNumMessages))
+            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.Producer.LingerMs))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES,
+                          std::to_string(mConfig.Producer.QueueBufferingMaxKbytes))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES,
+                          std::to_string(mConfig.Producer.QueueBufferingMaxMessages))
+            || !SetConfig(KAFKA_CONFIG_BATCH_SIZE, std::to_string(mConfig.Producer.BatchSize))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.Producer.MaxMessageBytes))) {
+            return false;
+        }
+
+
+        if (!SetConfig(KAFKA_CONFIG_ACKS, mConfig.Delivery.Acks)
+            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Delivery.RequestTimeoutMs))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.Delivery.MessageTimeoutMs))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES, std::to_string(mConfig.Delivery.MaxRetries))
+            || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.Delivery.RetryBackoffMs))) {
             return false;
         }
 
@@ -128,10 +145,8 @@ public:
         char errstr[512];
         mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
         if (!mProducer) {
-            mConf = nullptr;
             return false;
         }
-        mConf = nullptr;
 
         mIsRunning = true;
         mPollThread = std::thread([this]() {
@@ -207,6 +222,7 @@ private:
     bool SetConfig(const std::string& key, const std::string& value) {
         char errstr[512];
         if (rd_kafka_conf_set(mConf, key.c_str(), value.c_str(), errstr, sizeof(errstr)) != RD_KAFKA_CONF_OK) {
+            LOG_ERROR(sLogger, ("Failed to set Kafka config", key)("value", value)("error", errstr));
             return false;
         }
         return true;
