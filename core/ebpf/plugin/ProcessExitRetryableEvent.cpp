@@ -124,11 +124,7 @@ bool ProcessExitRetryableEvent::decrementRef() {
         data_event_id key{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
         auto& value = mProcessCacheValue->mParent;
         if (!value) {
-            value = mProcessCache.Lookup(key);
-            if (!value) {
-                return false;
-            }
-            mProcessCacheValue->mParent = value;
+            return false;
         }
         mProcessCache.DecRef(key, value);
         LOG_DEBUG(

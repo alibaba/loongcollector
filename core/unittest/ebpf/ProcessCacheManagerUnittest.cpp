@@ -1063,15 +1063,15 @@ void ProcessCacheManagerUnittest::TestProcessEventCloneExecveExitExitOutOfOrder(
     // appCloneEvent cannot find parent
     // appExecveEvent write cache but cannot inc ref parent
     // daemonCloneEvent is done
-    // appExitEvent is done, will dec app and daemon ref to 0
-    // daemonExitEvent is done, will dec daemon ref to -1
+    // appExitEvent is done, no parent, will not dec app and daemon
+    // daemonExitEvent is done, will dec daemon ref to 0
     auto daemonProc = mWrapper.mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{daemonCloneEvent.tgid, daemonCloneEvent.ktime});
     APSARA_TEST_TRUE_FATAL(daemonProc != nullptr);
     APSARA_TEST_EQUAL((*daemonProc).Get<kBinary>().to_string(), shBinary);
     APSARA_TEST_EQUAL((*daemonProc).mPPid, shExecveEvent.process.pid);
     APSARA_TEST_EQUAL((*daemonProc).mPKtime, shExecveEvent.process.ktime);
-    APSARA_TEST_EQUAL(daemonProc->mRefCount, -1);
+    APSARA_TEST_EQUAL(daemonProc->mRefCount, 0);
 
     auto appProc = mWrapper.mProcessCacheManager->mProcessCache.Lookup(
         data_event_id{appExecveEvent.process.pid, appExecveEvent.process.ktime});
@@ -1079,7 +1079,7 @@ void ProcessCacheManagerUnittest::TestProcessEventCloneExecveExitExitOutOfOrder(
     APSARA_TEST_EQUAL((*appProc).Get<kBinary>().to_string(), appBinary);
     APSARA_TEST_EQUAL((*appProc).mPPid, daemonCloneEvent.tgid);
     APSARA_TEST_EQUAL((*appProc).mPKtime, daemonCloneEvent.ktime);
-    APSARA_TEST_EQUAL(appProc->mRefCount, 0);
+    APSARA_TEST_EQUAL(appProc->mRefCount, 1);
 
     ConsumeKernelProcessEvents(mWrapper.mProcessCacheManager.get(), rawEvents);
     // appCloneEvent is done, will recover daemon ref to 0

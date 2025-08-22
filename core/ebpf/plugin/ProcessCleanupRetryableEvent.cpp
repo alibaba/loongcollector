@@ -39,9 +39,9 @@ bool ProcessCleanupRetryableEvent::decrementRef() {
         data_event_id parentKey{mProcessCacheValue->mPPid, mProcessCacheValue->mPKtime};
         auto& parent = mProcessCacheValue->mParent;
         if (!parent) {
-            // dec parent's ref count
             return false;
         }
+        // dec parent's ref count
         mProcessCache.DecRef(parentKey, parent);
         LOG_DEBUG(sLogger,
                   ("pid", mKey.pid)("ktime", mKey.time)("event", "cleanup")("action", "DecRef parent")(
