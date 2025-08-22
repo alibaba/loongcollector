@@ -64,7 +64,7 @@ set(DEP_NAME_LIST
         zstd
         )
 
-if (NOT ENABLE_ENTERPRISE)
+if (NOT ENABLE_ENTERPRISE AND UNIX)
     list(APPEND DEP_NAME_LIST "rdkafka")
 endif()
 
