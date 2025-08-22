@@ -17,21 +17,137 @@
 #define APSARA_UNIT_TEST_MAIN
 #endif
 
+#include <cassert>
+
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "plugin/flusher/kafka/FlusherKafka.h"
+#include "plugin/flusher/kafka/KafkaConfig.h"
+#include "plugin/flusher/kafka/KafkaProducer.h"
 #include "unittest/Unittest.h"
-#include "unittest/flusher/MockKafkaProducer.h"
+
 
 using namespace std;
 
 namespace logtail {
+
+struct ProduceRequest {
+    std::string Topic;
+    std::string Value;
+    KafkaProducer::Callback Callback;
+};
+
+class MockKafkaProducer : public KafkaProducer {
+public:
+    MockKafkaProducer() = default;
+    ~MockKafkaProducer() override = default;
+
+    bool Init(const KafkaConfig& config) override {
+        mInitialized = true;
+        mConfig = config;
+        return mInitSuccess;
+    }
+
+    void ProduceAsync(const std::string& topic, std::string&& value, Callback callback) override {
+        ProduceRequest request{topic, std::move(value), std::move(callback)};
+        mRequests.emplace_back(std::move(request));
+
+        if (mAutoComplete) {
+            CompleteLastRequest();
+        }
+    }
+
+    bool Flush(int timeoutMs) override {
+        mFlushCalled = true;
+        return mFlushSuccess;
+    }
+
+    void Close() override { mClosed = true; }
+
+    void SetInitSuccess(bool success) { mInitSuccess = success; }
+    void SetFlushSuccess(bool success) { mFlushSuccess = success; }
+    void SetAutoComplete(bool autoComplete) { mAutoComplete = autoComplete; }
+    void CompleteLastRequest(bool success = true, const std::string& errorMsg = "") {
+        KafkaProducer::ErrorInfo errorInfo;
+        errorInfo.type = success ? KafkaProducer::ErrorType::SUCCESS : KafkaProducer::ErrorType::OTHER_ERROR;
+        errorInfo.message = errorMsg;
+        errorInfo.code = success ? 0 : -1;
+        CompleteLastRequest(success, errorInfo);
+    }
+
+    void CompleteLastRequest(bool success, const KafkaProducer::ErrorInfo& errorInfo) {
+        if (!mRequests.empty()) {
+            auto& last = mRequests.back();
+            last.Callback(success, errorInfo);
+            mCompletedRequests.emplace_back(std::move(last));
+            mRequests.pop_back();
+        }
+    }
+
+    void CompleteAllRequests(bool success = true, const std::string& errorMsg = "") {
+        KafkaProducer::ErrorInfo errorInfo;
+        errorInfo.type = success ? KafkaProducer::ErrorType::SUCCESS : KafkaProducer::ErrorType::OTHER_ERROR;
+        errorInfo.message = errorMsg;
+        errorInfo.code = success ? 0 : -1;
+        CompleteAllRequests(success, errorInfo);
+    }
+
+    void CompleteAllRequests(bool success, const KafkaProducer::ErrorInfo& errorInfo) {
+        for (auto& request : mRequests) {
+            request.Callback(success, errorInfo);
+            mCompletedRequests.emplace_back(std::move(request));
+        }
+        mRequests.clear();
+    }
+
+    bool IsInitialized() const { return mInitialized; }
+    bool IsClosed() const { return mClosed; }
+    bool IsFlushCalled() const { return mFlushCalled; }
+    const KafkaConfig& GetConfig() const { return mConfig; }
+    const std::vector<ProduceRequest>& GetRequests() const { return mRequests; }
+    const std::vector<ProduceRequest>& GetCompletedRequests() const { return mCompletedRequests; }
+    size_t GetRequestCount() const { return mRequests.size() + mCompletedRequests.size(); }
+
+private:
+    bool mInitialized = false;
+    bool mClosed = false;
+    bool mFlushCalled = false;
+    bool mInitSuccess = true;
+    bool mFlushSuccess = true;
+    bool mAutoComplete = true;
+
+    KafkaConfig mConfig;
+    std::vector<ProduceRequest> mRequests;
+    std::vector<ProduceRequest> mCompletedRequests;
+};
+
+class MockEventGroupSerializer : public EventGroupSerializer {
+public:
+    MockEventGroupSerializer(Flusher* flusher) : EventGroupSerializer(flusher), mShouldFail(false) {}
+
+    bool Serialize(BatchedEvents&& group, std::string& res, std::string& errorMsg) override {
+        if (mShouldFail) {
+            errorMsg = "mock serialization error";
+            return false;
+        }
+        res = "serialized_data";
+        return true;
+    }
+
+    void SetShouldFail(bool fail) { mShouldFail = fail; }
+
+private:
+    bool mShouldFail;
+};
+
 
 Json::Value CreateKafkaTestConfig(const std::string& topic) {
     Json::Value config;
@@ -59,6 +175,9 @@ public:
     void TestSendParamsError();
     void TestSendQueueFullError();
     void TestFlushFailure();
+    void TestInitWithFullConfig();
+    void TestSendOnUnstarted();
+    void TestSendSerializationFailure();
 
 protected:
     void SetUp();
@@ -298,6 +417,38 @@ void FlusherKafkaUnittest::TestFlushFailure() {
     APSARA_TEST_TRUE(mMockProducer->IsFlushCalled());
 }
 
+void FlusherKafkaUnittest::TestInitWithFullConfig() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Producer"]["BatchSize"] = 2000000;
+    config["Producer"]["LingerMs"] = 10;
+    config["Delivery"]["Acks"] = "all";
+    config["Delivery"]["RetryBackoffMs"] = 2000;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(2000000, mFlusher->mKafkaConfig.Producer.BatchSize);
+    APSARA_TEST_EQUAL(10, mFlusher->mKafkaConfig.Producer.LingerMs);
+    APSARA_TEST_EQUAL("all", mFlusher->mKafkaConfig.Delivery.Acks);
+    APSARA_TEST_EQUAL(2000, mFlusher->mKafkaConfig.Delivery.RetryBackoffMs);
+}
+
+void FlusherKafkaUnittest::TestSendSerializationFailure() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+
+    auto mockSerializer = std::make_unique<MockEventGroupSerializer>(mFlusher);
+    mockSerializer->SetShouldFail(true);
+    mFlusher->SetSerializerForTest(std::move(mockSerializer));
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("key"), StringView("value"));
+
+    APSARA_TEST_FALSE(mFlusher->Send(std::move(group)));
+    APSARA_TEST_EQUAL(1, mFlusher->mDiscardCnt->GetValue());
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -312,6 +463,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendServerError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendParamsError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendQueueFullError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestFlushFailure)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithFullConfig)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendSerializationFailure)
 
 } // namespace logtail
 

@@ -56,7 +56,9 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         return false;
     }
 
-    mSerializer = make_unique<JsonEventGroupSerializer>(this);
+    if (!mSerializer) {
+        mSerializer = make_unique<JsonEventGroupSerializer>(this);
+    }
 
     GenerateQueueKey(mKafkaConfig.Topic);
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);

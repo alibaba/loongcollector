@@ -49,6 +49,7 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetProducerForTest(std::unique_ptr<KafkaProducer> producer) { mProducer = std::move(producer); }
+    void SetSerializerForTest(std::unique_ptr<EventGroupSerializer> serializer) { mSerializer = std::move(serializer); }
 #endif
 
 private:
