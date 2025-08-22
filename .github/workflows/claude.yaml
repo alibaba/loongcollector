@@ -38,7 +38,7 @@ jobs:
         uses: anthropics/claude-code-action@beta
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-
+          mode: experimental-review
           model: kimi-k2
 
           # This is an optional setting that allows Claude to read CI results on PRs
