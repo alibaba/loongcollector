@@ -30,7 +30,6 @@
 #include "plugin/creator/StaticProcessorCreator.h"
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
-#include "plugin/flusher/kafka/FlusherKafka.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
@@ -50,6 +49,9 @@
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__)
+#include "plugin/flusher/kafka/FlusherKafka.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
@@ -199,7 +201,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
-#ifndef __ENTERPRISE__
+#if defined(__linux__)
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
 #endif
 #ifdef __ENTERPRISE__
