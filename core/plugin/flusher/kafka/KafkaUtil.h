@@ -24,11 +24,6 @@ namespace logtail {
 class KafkaUtil {
 public:
     static std::string BrokersToString(const std::vector<std::string>& brokers);
-    static std::string GetErrorString(int err);
-    static bool IsRetriableError(int err);
-    static bool IsNetworkError(int err);
-    static bool IsAuthError(int err);
-    static uint32_t CalculateBackoffDelay(uint32_t attempt, uint32_t baseDelayMs = 50);
 };
 
 } // namespace logtail

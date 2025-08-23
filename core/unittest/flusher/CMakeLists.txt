@@ -27,6 +27,9 @@ if(UNIX AND NOT ENABLE_ENTERPRISE)
 
     add_executable(kafka_util_unittest KafkaUtilUnittest.cpp)
     target_link_libraries(kafka_util_unittest ${UT_BASE_TARGET})
+
+    add_executable(kafka_producer_unittest KafkaProducerUnittest.cpp)
+    target_link_libraries(kafka_producer_unittest ${UT_BASE_TARGET})
 endif()
 
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
@@ -51,6 +54,7 @@ gtest_discover_tests(flusher_sls_unittest)
 if(UNIX AND NOT ENABLE_ENTERPRISE)
     gtest_discover_tests(flusher_kafka_unittest)
     gtest_discover_tests(kafka_util_unittest)
+    gtest_discover_tests(kafka_producer_unittest)
 endif()
 gtest_discover_tests(pack_id_manager_unittest)
 gtest_discover_tests(sls_client_manager_unittest)
