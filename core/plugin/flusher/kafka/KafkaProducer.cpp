@@ -16,8 +16,6 @@
 
 #include "plugin/flusher/kafka/KafkaProducer.h"
 
-#include <librdkafka/rdkafka.h>
-
 #include <atomic>
 #include <mutex>
 #include <thread>
@@ -36,7 +34,9 @@ struct ProducerContext {
     KafkaProducer::ErrorInfo errorInfo;
 };
 
-static KafkaProducer::ErrorType MapKafkaError(rd_kafka_resp_err_t err) {
+} // namespace
+
+KafkaProducer::ErrorType KafkaProducer::MapKafkaError(rd_kafka_resp_err_t err) {
     switch (err) {
         case RD_KAFKA_RESP_ERR_NO_ERROR:
             return KafkaProducer::ErrorType::SUCCESS;
@@ -69,7 +69,7 @@ static KafkaProducer::ErrorType MapKafkaError(rd_kafka_resp_err_t err) {
     }
 }
 
-void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque) {
+void KafkaProducer::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque) {
     auto* context = static_cast<ProducerContext*>(rkmessage->_private);
     if (!context) {
         return;
@@ -79,7 +79,7 @@ void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage,
         context->callback(true, {KafkaProducer::ErrorType::SUCCESS, "", 0});
     } else {
         KafkaProducer::ErrorInfo errorInfo;
-        errorInfo.type = MapKafkaError(rkmessage->err);
+        errorInfo.type = KafkaProducer::MapKafkaError(rkmessage->err);
         errorInfo.message = rd_kafka_err2str(rkmessage->err);
         errorInfo.code = static_cast<int>(rkmessage->err);
         context->callback(false, errorInfo);
@@ -88,12 +88,14 @@ void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage,
     delete context;
 }
 
-} // namespace
-
 class KafkaProducer::Impl {
 public:
-    Impl() : mProducer(nullptr), mConf(nullptr), mIsRunning(false) {}
-    ~Impl() { Close(); }
+    Impl() : mProducer(nullptr), mConf(nullptr), mIsRunning(false), mIsClosed(false) {}
+    ~Impl() {
+        if (!mIsClosed) {
+            Close();
+        }
+    }
 
     bool Init(const KafkaConfig& config) {
         mConfig = config;
@@ -108,11 +110,9 @@ public:
             return false;
         }
 
-
         if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
             return false;
         }
-
 
         if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.Producer.BatchNumMessages))
             || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.Producer.LingerMs))
@@ -124,7 +124,6 @@ public:
             || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.Producer.MaxMessageBytes))) {
             return false;
         }
-
 
         if (!SetConfig(KAFKA_CONFIG_ACKS, mConfig.Delivery.Acks)
             || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Delivery.RequestTimeoutMs))
@@ -140,7 +139,7 @@ public:
             }
         }
 
-        rd_kafka_conf_set_dr_msg_cb(mConf, DeliveryReportCallback);
+        rd_kafka_conf_set_dr_msg_cb(mConf, KafkaProducer::DeliveryReportCallback);
 
         char errstr[512];
         mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
@@ -183,7 +182,7 @@ public:
         if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
             delete context;
             KafkaProducer::ErrorInfo errorInfo;
-            errorInfo.type = MapKafkaError(err);
+            errorInfo.type = KafkaProducer::MapKafkaError(err);
             errorInfo.message = rd_kafka_err2str(err);
             errorInfo.code = static_cast<int>(err);
             callback(false, errorInfo);
@@ -200,6 +199,10 @@ public:
     }
 
     void Close() {
+        if (mIsClosed) {
+            return;
+        }
+
         mIsRunning = false;
         if (mPollThread.joinable()) {
             mPollThread.join();
@@ -216,6 +219,10 @@ public:
             rd_kafka_conf_destroy(mConf);
             mConf = nullptr;
         }
+
+
+        mIsRunning = false;
+        mIsClosed = true;
     }
 
 private:
@@ -234,6 +241,7 @@ private:
     std::atomic<bool> mIsRunning;
     std::thread mPollThread;
     std::mutex mProducerMutex;
+    bool mIsClosed;
 };
 
 KafkaProducer::KafkaProducer() : mImpl(std::make_unique<Impl>()) {

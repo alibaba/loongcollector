@@ -15,6 +15,7 @@
  */
 
 #pragma once
+#include <librdkafka/rdkafka.h>
 
 #include <functional>
 #include <memory>
@@ -45,6 +46,12 @@ public:
     virtual void ProduceAsync(const std::string& topic, std::string&& value, Callback callback);
     virtual bool Flush(int timeoutMs);
     virtual void Close();
+
+
+    static ErrorType MapKafkaError(rd_kafka_resp_err_t err);
+
+
+    static void DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque);
 
     KafkaProducer(const KafkaProducer&) = delete;
     KafkaProducer& operator=(const KafkaProducer&) = delete;
