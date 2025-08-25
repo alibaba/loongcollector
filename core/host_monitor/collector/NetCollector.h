@@ -55,13 +55,11 @@ public:
 
 
 private:
-    std::map<std::string, NetInterfaceMetric> mLastInterfaceStatMap;
     std::chrono::steady_clock::time_point mLastTime;
     std::map<std::string, NetInterfaceMetric> mLastInterfaceMetrics;
     int mCountPerReport = 0;
     int mCount = 0;
     MetricCalculate<ResTCPStat, uint64_t> mTCPCal;
-    // std::map<std::string, MetricCalculate<ResNetPackRate>> mPackRateCalMap;
     std::map<std::string, MetricCalculate<ResNetRatePerSec>> mRatePerSecCalMap;
     std::map<std::string, std::string> mDevIp;
 };

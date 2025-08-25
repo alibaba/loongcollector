@@ -277,7 +277,7 @@ bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat)
     // 获取这个pid的cpu信息
     processStat.pid = pid;
 
-    if (!GetProcessCpuInformation(pid, processStat.processCpu, false)) {
+    if (!GetProcessCpuInformation(pid, processStat.processCpu)) {
         return false;
     }
 
@@ -417,7 +417,7 @@ bool ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
 }
 
 // 给pid做cache
-bool ProcessCollector::GetProcessCpuInCache(pid_t pid, bool includeCTime) {
+bool ProcessCollector::GetProcessCpuInCache(pid_t pid) {
     if (cpuTimeCache.find(pid) != cpuTimeCache.end()) {
         return true;
     } else {
@@ -425,19 +425,19 @@ bool ProcessCollector::GetProcessCpuInCache(pid_t pid, bool includeCTime) {
     }
 }
 
-bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime) {
+bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information) {
     const auto now = std::chrono::steady_clock::now();
     bool findCache = false;
     ProcessCpuInformation* prev = nullptr;
 
     // 由于计算CPU时间需要获取一个时间间隔
     // 但是我们这里不应该睡眠，因此只能做一个cache，保存上一次获取的数据
-    findCache = GetProcessCpuInCache(pid, includeCTime);
+    findCache = GetProcessCpuInCache(pid);
 
     information.lastTime = now;
     ProcessTime processTime{};
 
-    if (!GetProcessTime(pid, processTime, includeCTime)) {
+    if (!GetProcessTime(pid, processTime)) {
         return false;
     }
 
@@ -474,7 +474,7 @@ bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation
     return true;
 }
 
-bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime) {
+bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output) {
     ProcessInformation processInfo;
 
     if (!ReadProcessStat(pid, processInfo.stat)) {
