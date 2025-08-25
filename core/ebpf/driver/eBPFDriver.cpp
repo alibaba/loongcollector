@@ -402,18 +402,11 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::CPU_PROFILING: {
-            gCpuProfiler->Start();
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler started\n");
             auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
             assert(config != nullptr);
-
-            gCpuProfiler->UpdatePids(std::move(config->mPids));
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "cpu profiling: profiler pids updated\n");
-
-            if (config->mHandler != nullptr) {
-                gCpuProfiler->RegisterPollHandler(config->mHandler, config->mCtx);
-            }
+            assert(config->mHandler != nullptr);
+            gCpuProfiler->Start(config->mHandler, config->mCtx);
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler started\n");
             break;
         }
         default: {
@@ -575,10 +568,6 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
             gCpuProfiler->UpdatePids(std::move(config->mPids));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                      "cpu profiling: profiler pids updated\n");
-
-            if (config->mHandler != nullptr) {
-                gCpuProfiler->RegisterPollHandler(config->mHandler, config->mCtx);
-            }
             break;
         }
         default:
