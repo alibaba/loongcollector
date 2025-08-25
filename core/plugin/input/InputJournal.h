@@ -159,6 +159,7 @@ private:
     bool AddMatchPatterns();
     bool ProcessJournalEntries();
     void ProcessJournalEntry(const JournalEntry& entry);
+    void PositionJournalByConfig();
     
     // Seek position constants
     static const std::string SEEK_POSITION_CURSOR;

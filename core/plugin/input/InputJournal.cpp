@@ -22,9 +22,12 @@
 #include <cstring>
 #include <stdexcept>
 #include <iostream>
+#include <filesystem>
 
 #include "common/ParamExtractor.h"
+#include "common/FileSystemUtil.h"
 #include "logger/Logger.h"
+#include "app_config/AppConfig.h"
 
 namespace logtail {
 
@@ -155,16 +158,150 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
 }
 
 bool InputJournal::LoadCheckpoint() {
-    // TODO: Implement checkpoint loading
-    return false;
+    if (!HasContext()) {
+        LOG_WARNING(sLogger, ("no context available for checkpoint", "skip loading"));
+        return false;
+    }
+    
+    // Get checkpoint file path from AppConfig
+    std::string checkpointDir = GetAgentDataDir();
+    if (checkpointDir.empty()) {
+        LOG_INFO(sLogger, ("checkpoint directory not configured", "skip loading"));
+        return false;
+    }
+    
+    // Create checkpoint file path: {checkpointDir}/input_journal_{configName}.json
+    std::string configName = GetContext().GetConfigName();
+    std::string checkpointFile = checkpointDir + "/input_journal_" + configName + ".json";
+    
+    // Check if checkpoint file exists
+    std::error_code ec;
+    std::filesystem::file_status s = std::filesystem::status(checkpointFile, ec);
+    if (ec || !std::filesystem::exists(s)) {
+        LOG_INFO(sLogger, ("checkpoint file not found", checkpointFile));
+        return false;
+    }
+    
+    if (!std::filesystem::is_regular_file(s)) {
+        LOG_WARNING(sLogger, ("checkpoint file is not a regular file", "skip")("filepath", checkpointFile));
+        return false;
+    }
+    
+    // Read checkpoint file content
+    std::string content;
+    if (!ReadFile(checkpointFile, content)) {
+        LOG_WARNING(sLogger, ("failed to read checkpoint file", "skip")("filepath", checkpointFile));
+        return false;
+    }
+    
+    if (content.empty()) {
+        LOG_WARNING(sLogger, ("empty checkpoint file", "skip")("filepath", checkpointFile));
+        return false;
+    }
+    
+    // Parse JSON content
+    Json::Value root;
+    Json::Reader reader;
+    if (!reader.parse(content, root)) {
+        LOG_WARNING(sLogger, ("failed to parse checkpoint file", "skip")("filepath", checkpointFile));
+        return false;
+    }
+    
+    if (!root.isObject()) {
+        LOG_WARNING(sLogger, ("checkpoint file is not a JSON object", "skip")("filepath", checkpointFile));
+        return false;
+    }
+    
+    // Extract cursor from checkpoint
+    if (root.isMember("cursor") && root["cursor"].isString()) {
+        mLastCheckpointCursor = root["cursor"].asString();
+        LOG_INFO(sLogger, ("loaded checkpoint cursor", mLastCheckpointCursor)("filepath", checkpointFile));
+        return true;
+    } else {
+        LOG_WARNING(sLogger, ("checkpoint file missing cursor field", "skip")("filepath", checkpointFile));
+        return false;
+    }
 }
 
 bool InputJournal::SaveCheckpoint(bool force) {
-    // TODO: Implement checkpoint saving
+    if (!HasContext()) {
+        LOG_WARNING(sLogger, ("no context available for checkpoint", "skip saving"));
+        return false;
+    }
+    
+    // Check if we need to save (either forced or time-based)
+    if (!force) {
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - mLastSaveCheckpointTime).count();
+        
+        if (elapsed < mCursorFlushPeriodMs) {
+            return true; // Not time to save yet
+        }
+    }
+    
+    // Get current cursor from journal reader
+    if (!mJournalReader || !mJournalReader->IsOpen()) {
+        LOG_DEBUG(sLogger, ("journal reader not available", "skip saving checkpoint"));
+        return true;
+    }
+    
+    std::string currentCursor = mJournalReader->GetCursor();
+    if (currentCursor.empty()) {
+        LOG_DEBUG(sLogger, ("current cursor is empty", "skip saving checkpoint"));
+        return true;
+    }
+    
+    // Get checkpoint file path from AppConfig
+    std::string checkpointDir = GetAgentDataDir();
+    if (checkpointDir.empty()) {
+        LOG_WARNING(sLogger, ("checkpoint directory not configured", "skip saving"));
+        return false;
+    }
+    
+    // Create checkpoint file path: {checkpointDir}/input_journal_{configName}.json
+    std::string configName = GetContext().GetConfigName();
+    std::string checkpointFile = checkpointDir + "/input_journal_" + configName + ".json";
+    
+    // Create checkpoint directory if it doesn't exist
+    std::error_code ec;
+    if (!std::filesystem::exists(checkpointDir, ec)) {
+        if (!std::filesystem::create_directories(checkpointDir, ec)) {
+            LOG_ERROR(sLogger, ("failed to create checkpoint directory", checkpointDir)("error", ec.message()));
+            return false;
+        }
+    }
+    
+    // Prepare checkpoint data
+    Json::Value root;
+    root["cursor"] = currentCursor;
+    root["timestamp"] = static_cast<Json::UInt64>(std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count());
+    root["config_name"] = configName;
+    root["plugin_type"] = "input_journal";
+    
+    // Convert to JSON string
+    std::string content = root.toStyledString();
+    
+    // Write checkpoint file
+    std::string errMsg;
+    if (!UpdateFileContent(std::filesystem::path(checkpointFile), content, errMsg)) {
+        LOG_ERROR(sLogger, ("failed to save checkpoint file", checkpointFile)("error", errMsg));
+        return false;
+    }
+    
+    // Update internal state
+    mLastCheckpointCursor = currentCursor;
+    mLastSaveCheckpointTime = std::chrono::steady_clock::now();
+    
+    LOG_DEBUG(sLogger, ("saved checkpoint", currentCursor)("filepath", checkpointFile));
     return true;
 }
 
 void InputJournal::MainLoop() {
+    // Load checkpoint at startup
+    LoadCheckpoint();
+    
     while (!mShutdown) {
         if (!InitJournal()) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -187,9 +324,15 @@ void InputJournal::MainLoop() {
                 break;
             }
             
+            // Save checkpoint periodically
+            SaveCheckpoint(false);
+            
             // Small delay to prevent busy waiting
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+        
+        // Save checkpoint before cleanup
+        SaveCheckpoint(true);
         
         // Cleanup for restart
         if (mJournalReader) {
@@ -222,15 +365,50 @@ bool InputJournal::InitJournal() {
         return false;
     }
     
-    // Position journal
-    if (mSeekPosition == SEEK_POSITION_HEAD) {
-        mJournalReader->SeekHead();
+    // Position journal based on checkpoint or configuration
+    if (!mLastCheckpointCursor.empty()) {
+        // Try to seek to checkpoint position
+        if (mJournalReader->SeekCursor(mLastCheckpointCursor)) {
+            LOG_INFO(sLogger, ("positioned journal to checkpoint cursor", mLastCheckpointCursor));
+            // Move to next entry to avoid re-reading the last processed entry
+            mJournalReader->Next();
+        } else {
+            LOG_WARNING(sLogger, ("failed to seek to checkpoint cursor", mLastCheckpointCursor)("falling back to configured position"));
+            // Fall back to configured position
+            PositionJournalByConfig();
+        }
     } else {
-        mJournalReader->SeekTail();
-        mJournalReader->Previous(); // Move back one entry
+        // No checkpoint available, use configured position
+        PositionJournalByConfig();
     }
     
     return true;
+}
+
+void InputJournal::PositionJournalByConfig() {
+    if (mSeekPosition == SEEK_POSITION_HEAD) {
+        mJournalReader->SeekHead();
+        LOG_INFO(sLogger, ("positioned journal to head"));
+    } else if (mSeekPosition == SEEK_POSITION_TAIL) {
+        mJournalReader->SeekTail();
+        mJournalReader->Previous(); // Move back one entry
+        LOG_INFO(sLogger, ("positioned journal to tail"));
+    } else if (mSeekPosition == SEEK_POSITION_CURSOR && !mCursorSeekFallback.empty()) {
+        // Try fallback position
+        if (mCursorSeekFallback == SEEK_POSITION_HEAD) {
+            mJournalReader->SeekHead();
+            LOG_INFO(sLogger, ("positioned journal to head (fallback)"));
+        } else {
+            mJournalReader->SeekTail();
+            mJournalReader->Previous();
+            LOG_INFO(sLogger, ("positioned journal to tail (fallback)"));
+        }
+    } else {
+        // Default to tail
+        mJournalReader->SeekTail();
+        mJournalReader->Previous();
+        LOG_INFO(sLogger, ("positioned journal to tail (default)"));
+    }
 }
 
 bool InputJournal::AddUnits() {
