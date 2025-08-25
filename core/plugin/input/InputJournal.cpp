@@ -14,11 +14,14 @@
  */
 
 #include "InputJournal.h"
-#include "JournalReader.h"
+#include "JournalEntry.h"
 
 #include <chrono>
 #include <thread>
 #include <map>
+#include <cstring>
+#include <stdexcept>
+#include <iostream>
 
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -347,5 +350,142 @@ void InputJournal::ProcessJournalEntry(const JournalEntry& entry) {
     // TODO: Convert entry to log format and send to pipeline
     // This would typically involve creating a LogEvent and sending it through the pipeline
 }
+
+// SystemdJournalReader::Impl implementation
+class InputJournal::SystemdJournalReader::Impl {
+public:
+    Impl() : mIsOpen(false), mCurrentPosition(0) {}
+    
+    ~Impl() = default;
+    
+    bool Open() {
+        mIsOpen = true;
+        return true;
+    }
+    
+    void Close() {
+        mIsOpen = false;
+    }
+    
+    bool IsOpen() const {
+        return mIsOpen;
+    }
+    
+    bool SeekHead() {
+        if (!IsOpen()) return false;
+        mCurrentPosition = 0;
+        return true;
+    }
+    
+    bool SeekTail() {
+        if (!IsOpen()) return false;
+        mCurrentPosition = 1000; // Simulate some entries
+        return true;
+    }
+    
+    bool SeekCursor(const std::string& cursor) {
+        if (!IsOpen()) return false;
+        try {
+            mCurrentPosition = std::stoul(cursor);
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
+    
+    bool Next() {
+        if (!IsOpen()) return false;
+        mCurrentPosition++;
+        return mCurrentPosition < 1000; // Simulate end of journal
+    }
+    
+    bool Previous() {
+        if (!IsOpen()) return false;
+        if (mCurrentPosition > 0) {
+            mCurrentPosition--;
+            return true;
+        }
+        return false;
+    }
+    
+    bool GetEntry(JournalEntry& entry) {
+        if (!IsOpen()) return false;
+        
+        // Simulate journal entry
+        entry.cursor = std::to_string(mCurrentPosition);
+        entry.realtimeTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+        entry.monotonicTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        
+        // Add some sample fields
+        entry.fields.clear();
+        entry.fields["MESSAGE"] = "Sample journal entry " + std::to_string(mCurrentPosition);
+        entry.fields["_SYSTEMD_UNIT"] = "sample.service";
+        entry.fields["PRIORITY"] = "6";
+        entry.fields["SYSLOG_FACILITY"] = "3";
+        
+        return true;
+    }
+    
+    std::string GetCursor() {
+        if (!IsOpen()) return "";
+        return std::to_string(mCurrentPosition);
+    }
+    
+    bool AddMatch(const std::string& field, const std::string& value) {
+        if (!IsOpen()) return false;
+        // Store match for filtering (simplified)
+        return true;
+    }
+    
+    bool AddDisjunction() {
+        if (!IsOpen()) return false;
+        return true;
+    }
+    
+    int Wait(std::chrono::milliseconds timeout) {
+        if (!IsOpen()) return -1;
+        
+        // Simulate waiting for new entries
+        std::this_thread::sleep_for(timeout);
+        return 1; // SD_JOURNAL_APPEND
+    }
+    
+    bool SetDataThreshold(size_t threshold) {
+        if (!IsOpen()) return false;
+        return true;
+    }
+    
+    bool SetTimeout(std::chrono::milliseconds timeout) {
+        if (!IsOpen()) return false;
+        return true;
+    }
+    
+private:
+    bool mIsOpen;
+    size_t mCurrentPosition;
+};
+
+// JournalReader implementation
+InputJournal::SystemdJournalReader::SystemdJournalReader() : mImpl(std::make_unique<Impl>()) {}
+
+InputJournal::SystemdJournalReader::~SystemdJournalReader() = default;
+
+bool InputJournal::SystemdJournalReader::Open() { return mImpl->Open(); }
+void InputJournal::SystemdJournalReader::Close() { mImpl->Close(); }
+bool InputJournal::SystemdJournalReader::IsOpen() const { return mImpl->IsOpen(); }
+bool InputJournal::SystemdJournalReader::SeekHead() { return mImpl->SeekHead(); }
+bool InputJournal::SystemdJournalReader::SeekTail() { return mImpl->SeekTail(); }
+bool InputJournal::SystemdJournalReader::SeekCursor(const std::string& cursor) { return mImpl->SeekCursor(cursor); }
+bool InputJournal::SystemdJournalReader::Next() { return mImpl->Next(); }
+bool InputJournal::SystemdJournalReader::Previous() { return mImpl->Previous(); }
+bool InputJournal::SystemdJournalReader::GetEntry(JournalEntry& entry) { return mImpl->GetEntry(entry); }
+std::string InputJournal::SystemdJournalReader::GetCursor() { return mImpl->GetCursor(); }
+bool InputJournal::SystemdJournalReader::AddMatch(const std::string& field, const std::string& value) { return mImpl->AddMatch(field, value); }
+bool InputJournal::SystemdJournalReader::AddDisjunction() { return mImpl->AddDisjunction(); }
+int InputJournal::SystemdJournalReader::Wait(std::chrono::milliseconds timeout) { return mImpl->Wait(timeout); }
+bool InputJournal::SystemdJournalReader::SetDataThreshold(size_t threshold) { return mImpl->SetDataThreshold(threshold); }
+bool InputJournal::SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout) { return mImpl->SetTimeout(timeout); }
 
 } // namespace logtail 
