@@ -1,0 +1,32 @@
+{
+  "inputs": [
+    {
+      "type": "input_journal",
+      "detail": {
+        "SeekPosition": "tail",
+        "CursorFlushPeriodMs": 5000,
+        "CursorSeekFallback": "tail",
+        "Units": ["nginx.service", "docker.service"],
+        "Kernel": true,
+        "Identifiers": ["nginx", "docker"],
+        "JournalPaths": [],
+        "MatchPatterns": ["_SYSTEMD_UNIT=*.service"],
+        "ParseSyslogFacility": true,
+        "ParsePriority": true,
+        "UseJournalEventTime": true,
+        "ResetIntervalSecond": 3600
+      }
+    }
+  ],
+  "processors": [],
+  "flushers": [
+    {
+      "type": "flusher_sls",
+      "detail": {
+        "Project": "your-project",
+        "Logstore": "your-logstore",
+        "Region": "cn-hangzhou"
+      }
+    }
+  ]
+} 
