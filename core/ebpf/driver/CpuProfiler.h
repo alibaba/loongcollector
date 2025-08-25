@@ -58,13 +58,15 @@ public:
 
     ~CpuProfiler() { Stop(); }
 
-    void Start() {
+    void Start(livetrace_profiler_read_cb_ctx_t handler, void *ctx) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][Start] create profiler");
             mProfiler = livetrace_profiler_create();
             assert(mProfiler != nullptr);
+            mHandler = handler;
+            mCtx = ctx;
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
+                "[CpuProfiler][Start] create profiler, handler: %p ctx: %p", handler, ctx);
         }
     }
 
@@ -72,7 +74,7 @@ public:
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler != nullptr) {
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][Stop] destroy profiler");
+                "[CpuProfiler][Stop] destroy profiler");
             livetrace_profiler_destroy(mProfiler);
             mProfiler = nullptr;
         }
@@ -95,7 +97,7 @@ public:
         if (!toAdd.empty()) {
             std::string pidsToAdd = pidsToString(toAdd);
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][UpdatePids] add pids: %s", pidsToAdd.c_str());
+                "[CpuProfiler][UpdatePids] add pids: %s", pidsToAdd.c_str());
             livetrace_profiler_ctrl(mProfiler, LivetraceCtrlOp::LIVETRACE_ADD,
                                     pidsToAdd.c_str());
         }
@@ -103,21 +105,13 @@ public:
         if (!toRemove.empty()) {
             std::string pidsToRemove = pidsToString(toRemove);
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][UpdatePids] remove pids: %s", pidsToRemove.c_str());
+                "[CpuProfiler][UpdatePids] remove pids: %s", pidsToRemove.c_str());
             livetrace_profiler_ctrl(mProfiler,
                                     LivetraceCtrlOp::LIVETRACE_REMOVE,
                                     pidsToRemove.c_str());
         }
 
         mPids = std::move(newPids);
-    }
-
-    void RegisterPollHandler(livetrace_profiler_read_cb_ctx_t handler, void *ctx) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][RegisterPollHandler] register handler: %p ctx: %p", handler, ctx);
-        mHandler = handler;
-        mCtx = ctx;
     }
 
     void Poll() {
@@ -128,7 +122,7 @@ public:
         }
 
         ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                "[CPUProfiler][Poll] poll");
+                "[CpuProfiler][Poll] poll");
         livetrace_profiler_read(mProfiler, handler_without_ctx);
     }
 
