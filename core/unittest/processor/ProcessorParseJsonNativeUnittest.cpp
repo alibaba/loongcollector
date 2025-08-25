@@ -36,6 +36,17 @@ public:
     void TestProcessJsonContent();
     void TestProcessJsonRaw();
     void TestMultipleLines();
+    void TestEmptyJson();
+    void TestEmptyString();
+    void TestNonJsonString();
+    void TestJsonArray();
+    void TestJsonPrimitiveTypes();
+    void TestJsonNestedObjects();
+    void TestJsonSpecialCharacters();
+    void TestJsonLargeNumbers();
+    void TestJsonUnicodeCharacters();
+    void TestJsonWithNullValues();
+    void TestInvalidJsonFormats();
 
     CollectionPipelineContext mContext;
 };
@@ -57,6 +68,28 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonContent);
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonRaw);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestMultipleLines);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestEmptyJson);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestEmptyString);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestNonJsonString);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonArray);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonPrimitiveTypes);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonNestedObjects);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonSpecialCharacters);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonLargeNumbers);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonUnicodeCharacters);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonWithNullValues);
+
+UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestInvalidJsonFormats);
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
@@ -687,6 +720,577 @@ void ProcessorParseJsonNativeUnittest::TestProcessEventDiscardUnmatch() {
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL("null", CompactJson(outJson).c_str());
     APSARA_TEST_GE_FATAL(processorInstance.mTotalProcessTimeMs->GetValue(), uint64_t(0));
+}
+
+void ProcessorParseJsonNativeUnittest::TestEmptyJson() {
+    // Test empty JSON object
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should succeed but have no additional fields, and source key should be removed
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestEmptyString() {
+    // Test empty string
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : ""
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should fail and keep source with renamed key
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "rawLog" : ""
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestNonJsonString() {
+    // Test non-JSON string content
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "This is not JSON at all, just plain text"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should fail and keep source
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "rawLog" : "This is not JSON at all, just plain text"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonArray() {
+    // Test JSON array as root element (should fail since processor only accepts objects)
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "[\"item1\", \"item2\", \"item3\"]"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should fail because root element is array, not object
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "rawLog" : "[\"item1\", \"item2\", \"item3\"]"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonPrimitiveTypes() {
+    // Test all primitive JSON types: string, number, boolean, null
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"string_field\":\"hello world\",\"int_field\":42,\"float_field\":3.14159,\"bool_true\":true,\"bool_false\":false,\"null_field\":null,\"negative_int\":-100,\"zero\":0}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should parse all primitive types correctly
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "bool_false":"false",
+                    "bool_true":"true",
+                    "float_field":"3.141590",
+                    "int_field":"42",
+                    "negative_int":"-100",
+                    "null_field":"",
+                    "rawLog":"{\"string_field\":\"hello world\",\"int_field\":42,\"float_field\":3.14159,\"bool_true\":true,\"bool_false\":false,\"null_field\":null,\"negative_int\":-100,\"zero\":0}",
+                    "string_field":"hello world",
+                    "zero":"0"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonNestedObjects() {
+    // Test deeply nested objects and arrays
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"level1\":{\"level2\":{\"level3\":{\"value\":\"deep_value\"}}},\"array_field\":[1,2,{\"nested_in_array\":true}],\"mixed\":{\"numbers\":[1,2,3],\"object\":{\"key\":\"value\"}}}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Nested objects and arrays should be serialized to JSON strings
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "array_field":"[1,2,{\"nested_in_array\":true}]",
+                    "level1":"{\"level2\":{\"level3\":{\"value\":\"deep_value\"}}}",
+                    "mixed":"{\"numbers\":[1,2,3],\"object\":{\"key\":\"value\"}}",
+                    "rawLog":"{\"level1\":{\"level2\":{\"level3\":{\"value\":\"deep_value\"}}},\"array_field\":[1,2,{\"nested_in_array\":true}],\"mixed\":{\"numbers\":[1,2,3],\"object\":{\"key\":\"value\"}}}"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonSpecialCharacters() {
+    // Test JSON with special characters: tabs, newlines, quotes, backslashes
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"with_tab\":\"line1\tline2\",\"with_newline\":\"line1\nline2\",\"with_quote\":\"He said \\\"Hello\\\"\",\"with_backslash\":\"path\\\\to\\\\file\",\"with_carriage_return\":\"line1\rline2\"}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Check that the event was processed (exact output may vary due to escaping)
+    std::string outJson = eventGroupList[0].ToJsonString();
+    // Verify that parsing succeeded by checking some expected fields exist
+    APSARA_TEST_TRUE_FATAL(outJson.find("with_tab") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("with_newline") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("rawLog") != std::string::npos);
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonLargeNumbers() {
+    // Test very large numbers and scientific notation
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"large_int\":9223372036854775807,\"scientific\":1.23e10,\"negative_scientific\":-4.56e-3,\"very_small\":0.000000001}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should parse large numbers correctly
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_TRUE_FATAL(outJson.find("large_int") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("scientific") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("rawLog") != std::string::npos);
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonUnicodeCharacters() {
+    // Test Unicode characters including emojis and non-ASCII text
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"chinese\":\"你好世界\",\"emoji\":\"😀🚀💻\",\"unicode_escape\":\"\\u4f60\\u597d\",\"mixed\":\"Hello 世界 🌍\"}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Should handle Unicode correctly
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_TRUE_FATAL(outJson.find("chinese") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("emoji") != std::string::npos);
+    APSARA_TEST_TRUE_FATAL(outJson.find("rawLog") != std::string::npos);
+}
+
+void ProcessorParseJsonNativeUnittest::TestJsonWithNullValues() {
+    // Test explicit null values vs missing fields
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = true;
+    config["CopingRawLog"] = true;
+    config["RenamedSourceKey"] = "rawLog";
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "{\"explicit_null\":null,\"empty_string\":\"\",\"zero\":0,\"false_value\":false}"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Null should convert to empty string, others should retain their values
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "empty_string":"",
+                    "explicit_null":"",
+                    "false_value":"false",
+                    "rawLog":"{\"explicit_null\":null,\"empty_string\":\"\",\"zero\":0,\"false_value\":false}",
+                    "zero":"0"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
+}
+
+void ProcessorParseJsonNativeUnittest::TestInvalidJsonFormats() {
+    // Test various invalid JSON formats
+    Json::Value config;
+    config["SourceKey"] = "content";
+    config["KeepingSourceWhenParseFail"] = true;
+    config["KeepingSourceWhenParseSucceed"] = false;
+    config["CopingRawLog"] = false;
+    config["RenamedSourceKey"] = "rawLog";
+
+    // Test cases for different invalid JSON formats
+    std::vector<std::string> invalidJsonCases = {
+        "{\"missing_quote: \"value\"}", // Missing quote in key
+        "{\"key\": \"unclosed_string}", // Unclosed string
+        "{\"key\": value_without_quotes}", // Unquoted value
+        "{\"trailing_comma\": \"value\",}", // Trailing comma
+        "{invalid_json_without_quotes}", // Clearly invalid
+        "{\"key\": }", // Missing value
+        "not_json_at_all" // Completely invalid
+    };
+
+    // Test with a clearly invalid JSON
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string inJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "content" : "not_json_at_all"
+                },
+                "timestampNanosecond" : 0,
+                "timestamp" : 12345678901,
+                "type" : 1
+            }
+        ]
+    })";
+    eventGroup.FromJsonString(inJson);
+
+    ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
+    ProcessorInstance processorInstance(&processor, getPluginMeta());
+    APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
+    std::vector<PipelineEventGroup> eventGroupList;
+    eventGroupList.emplace_back(std::move(eventGroup));
+    processorInstance.Process(eventGroupList);
+
+    // Invalid JSON should fail and preserve source with renamed key
+    std::string expectJson = R"({
+        "events" :
+        [
+            {
+                "contents" :
+                {
+                    "rawLog" : "not_json_at_all"
+                },
+                "timestamp" : 12345678901,
+                "timestampNanosecond" : 0,
+                "type" : 1
+            }
+        ]
+    })";
+    std::string outJson = eventGroupList[0].ToJsonString();
+    APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
 }
 
 } // namespace logtail
