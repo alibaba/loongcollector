@@ -48,8 +48,8 @@ InputJournal::InputJournal()
     , mParsePriority(false)
     , mUseJournalEventTime(false)
     , mResetIntervalSecond(DEFAULT_RESET_INTERVAL)
-    , mShutdown(false)
-    , mLastSaveCheckpointTime(std::chrono::steady_clock::now()) {
+    , mLastSaveCheckpointTime(std::chrono::steady_clock::now())
+    , mShutdown(false) {
 }
 
 InputJournal::~InputJournal() {
@@ -57,6 +57,7 @@ InputJournal::~InputJournal() {
 }
 
 bool InputJournal::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    (void)optionalGoPipeline; // Suppress unused parameter warning
     std::string errorMsg;
     
     // Parse configuration
@@ -139,6 +140,7 @@ bool InputJournal::Start() {
 }
 
 bool InputJournal::Stop(bool isPipelineRemoving) {
+    (void)isPipelineRemoving; // Suppress unused parameter warning
     if (mShutdown) {
         return true;
     }
@@ -201,9 +203,11 @@ bool InputJournal::LoadCheckpoint() {
     
     // Parse JSON content
     Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(content, root)) {
-        LOG_WARNING(sLogger, ("failed to parse checkpoint file", "skip")("filepath", checkpointFile));
+    Json::CharReaderBuilder builder;
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    std::string errors;
+    if (!reader->parse(content.c_str(), content.c_str() + content.length(), &root, &errors)) {
+        LOG_WARNING(sLogger, ("failed to parse checkpoint file", "skip")("filepath", checkpointFile)("errors", errors));
         return false;
     }
     
@@ -373,7 +377,7 @@ bool InputJournal::InitJournal() {
             // Move to next entry to avoid re-reading the last processed entry
             mJournalReader->Next();
         } else {
-            LOG_WARNING(sLogger, ("failed to seek to checkpoint cursor", mLastCheckpointCursor)("falling back to configured position"));
+            LOG_WARNING(sLogger, ("failed to seek to checkpoint cursor", mLastCheckpointCursor)("falling back to configured position", ""));
             // Fall back to configured position
             PositionJournalByConfig();
         }
@@ -388,26 +392,26 @@ bool InputJournal::InitJournal() {
 void InputJournal::PositionJournalByConfig() {
     if (mSeekPosition == SEEK_POSITION_HEAD) {
         mJournalReader->SeekHead();
-        LOG_INFO(sLogger, ("positioned journal to head"));
+        LOG_INFO(sLogger, ("positioned journal to head", ""));
     } else if (mSeekPosition == SEEK_POSITION_TAIL) {
         mJournalReader->SeekTail();
         mJournalReader->Previous(); // Move back one entry
-        LOG_INFO(sLogger, ("positioned journal to tail"));
+        LOG_INFO(sLogger, ("positioned journal to tail", ""));
     } else if (mSeekPosition == SEEK_POSITION_CURSOR && !mCursorSeekFallback.empty()) {
         // Try fallback position
         if (mCursorSeekFallback == SEEK_POSITION_HEAD) {
             mJournalReader->SeekHead();
-            LOG_INFO(sLogger, ("positioned journal to head (fallback)"));
+            LOG_INFO(sLogger, ("positioned journal to head (fallback)", ""));
         } else {
             mJournalReader->SeekTail();
             mJournalReader->Previous();
-            LOG_INFO(sLogger, ("positioned journal to tail (fallback)"));
+            LOG_INFO(sLogger, ("positioned journal to tail (fallback)", ""));
         }
     } else {
         // Default to tail
         mJournalReader->SeekTail();
         mJournalReader->Previous();
-        LOG_INFO(sLogger, ("positioned journal to tail (default)"));
+        LOG_INFO(sLogger, ("positioned journal to tail (default)", ""));
     }
 }
 
@@ -612,6 +616,8 @@ public:
     }
     
     bool AddMatch(const std::string& field, const std::string& value) {
+        (void)field; // Suppress unused parameter warning
+        (void)value; // Suppress unused parameter warning
         if (!IsOpen()) return false;
         // Store match for filtering (simplified)
         return true;
@@ -631,11 +637,13 @@ public:
     }
     
     bool SetDataThreshold(size_t threshold) {
+        (void)threshold; // Suppress unused parameter warning
         if (!IsOpen()) return false;
         return true;
     }
     
     bool SetTimeout(std::chrono::milliseconds timeout) {
+        (void)timeout; // Suppress unused parameter warning
         if (!IsOpen()) return false;
         return true;
     }
