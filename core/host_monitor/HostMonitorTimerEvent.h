@@ -24,32 +24,72 @@
 
 namespace logtail {
 
+enum class HostMonitorCollectType {
+    kSingleValue,
+    kMultiValue,
+    kUnknown,
+};
+
 class HostMonitorTimerEvent : public TimerEvent {
 public:
-    struct CollectConfig {
+    struct CollectTime {
+        std::chrono::steady_clock::time_point mScheduleTime;
+        time_t mMetricTime;
+
+        std::chrono::steady_clock::time_point GetShiftSteadyTime(time_t shiftMetricTime) const {
+            return mScheduleTime + std::chrono::seconds(shiftMetricTime - mMetricTime);
+        }
+    };
+
+    struct CollectContext {
+        std::string mConfigName;
         std::string mCollectorName;
         QueueKey mProcessQueueKey;
         size_t mInputIndex;
-        std::chrono::seconds mInterval;
 
-        CollectConfig(const std::string& collectorName,
-                      QueueKey processQueueKey,
-                      size_t inputIndex,
-                      const std::chrono::seconds& interval)
-            : mCollectorName(collectorName),
+        std::chrono::seconds mCollectInterval;
+        std::chrono::seconds mReportInterval;
+        // basic multi-value metrics
+        int mCountPerReport = 0;
+        int mCount = 0;
+
+        CollectTime mCollectTime;
+        std::chrono::steady_clock::time_point mStartTime;
+        HostMonitorCollectType mCollectType;
+
+        CollectContext(const std::string& configName,
+                       const std::string& collectorName,
+                       QueueKey processQueueKey,
+                       size_t inputIndex,
+                       const std::chrono::seconds& reportInterval)
+            : mConfigName(configName),
+              mCollectorName(collectorName),
               mProcessQueueKey(processQueueKey),
               mInputIndex(inputIndex),
-              mInterval(interval) {}
+              mReportInterval(reportInterval),
+              mStartTime(std::chrono::steady_clock::now()) {}
+
+        void SetTime(const std::chrono::steady_clock::time_point& scheduleTime, time_t metricTime) {
+            mCollectTime.mScheduleTime = scheduleTime;
+            mCollectTime.mMetricTime = metricTime;
+        }
+
+        std::chrono::steady_clock::time_point GetScheduleTime() const { return mCollectTime.mScheduleTime; }
+        time_t GetMetricTime() const { return mCollectTime.mMetricTime; }
+
+        void Reset();
+        void CalculateFirstCollectTime(time_t metricTimeNow, std::chrono::steady_clock::time_point steadyClockNow);
+        bool CheckClockRolling();
     };
 
-    HostMonitorTimerEvent(const std::chrono::steady_clock::time_point& execTime, const CollectConfig& collectConfig)
-        : TimerEvent(execTime), mCollectConfig(collectConfig) {}
+    HostMonitorTimerEvent(const CollectContext& collectContext)
+        : TimerEvent(collectContext.GetScheduleTime()), mCollectContext(collectContext) {}
 
     bool IsValid() const override;
     bool Execute() override;
 
 private:
-    CollectConfig mCollectConfig;
+    CollectContext mCollectContext;
 };
 
 } // namespace logtail

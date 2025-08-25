@@ -59,14 +59,12 @@ protected:
 void LinuxSystemInterfaceUnittest::TestGetSystemInformationOnce() const {
     SystemInformation systemInfo;
     LinuxSystemInterface::GetInstance()->GetSystemInformationOnce(systemInfo);
-    APSARA_TEST_TRUE_FATAL(systemInfo.collectTime.time_since_epoch().count() > 0);
     APSARA_TEST_EQUAL_FATAL(systemInfo.bootTime, 1731142542);
 };
 
 void LinuxSystemInterfaceUnittest::TestGetCPUInformationOnce() const {
     CPUInformation cpuInfo;
     LinuxSystemInterface::GetInstance()->GetCPUInformationOnce(cpuInfo);
-    APSARA_TEST_TRUE_FATAL(cpuInfo.collectTime.time_since_epoch().count() > 0);
     auto cpus = cpuInfo.stats;
     APSARA_TEST_EQUAL_FATAL(4, cpus.size());
     APSARA_TEST_EQUAL_FATAL(-1, cpus[0].index);
@@ -118,7 +116,6 @@ void LinuxSystemInterfaceUnittest::TestGetCPUInformationOnce() const {
 void LinuxSystemInterfaceUnittest::TestGetProcessListInformationOnce() const {
     ProcessListInformation processListInfo;
     LinuxSystemInterface::GetInstance()->GetProcessListInformationOnce(processListInfo);
-    APSARA_TEST_TRUE_FATAL(processListInfo.collectTime.time_since_epoch().count() > 0);
     APSARA_TEST_EQUAL_FATAL(1, processListInfo.pids.size());
     APSARA_TEST_EQUAL_FATAL(1, processListInfo.pids[0]);
 };
@@ -126,7 +123,6 @@ void LinuxSystemInterfaceUnittest::TestGetProcessListInformationOnce() const {
 void LinuxSystemInterfaceUnittest::TestGetProcessInformationOnce() const {
     ProcessInformation processInfo;
     LinuxSystemInterface::GetInstance()->GetProcessInformationOnce(1, processInfo);
-    APSARA_TEST_TRUE_FATAL(processInfo.collectTime.time_since_epoch().count() > 0);
     APSARA_TEST_EQUAL_FATAL(1, processInfo.stat.pid);
     APSARA_TEST_EQUAL_FATAL("cat", processInfo.stat.name);
     APSARA_TEST_EQUAL_FATAL('R', processInfo.stat.state);

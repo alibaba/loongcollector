@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include "HostMonitorTimerEvent.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
 #include "host_monitor/collector/BaseCollector.h"
@@ -167,25 +168,39 @@ struct MetricData {
 
 class DiskCollector : public BaseCollector {
 public:
-    DiskCollector();
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+    DiskCollector() = default;
     ~DiskCollector() override = default;
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+
+    bool Init(HostMonitorTimerEvent::CollectContext& collectContext) override;
+    bool Collect(HostMonitorTimerEvent::CollectContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
     static const std::string sName;
     const std::string& Name() const override { return sName; }
 
 private:
-    int GetDeviceMountMap(std::map<std::string, DeviceMountInfo>& mountMap);
-    int GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>& diskCollectStatMap);
-    int GetFileSystemInfos(std::vector<FileSystemInfo>& fileSystemInfos);
-    int GetFileSystemStat(const std::string& dirName, FileSystemUsage& fileSystemUsage);
+    int GetDeviceMountMap(const HostMonitorTimerEvent::CollectTime& collectTime,
+                          std::map<std::string, DeviceMountInfo>& mountMap);
+    int GetDiskCollectStatMap(const HostMonitorTimerEvent::CollectTime& collectTime,
+                              std::map<std::string, DiskCollectStat>& diskCollectStatMap);
+    int GetFileSystemInfos(const HostMonitorTimerEvent::CollectTime& collectTime,
+                           std::vector<FileSystemInfo>& fileSystemInfos);
+    int GetFileSystemStat(const HostMonitorTimerEvent::CollectTime& collectTime,
+                          const std::string& dirName,
+                          FileSystemUsage& fileSystemUsage);
     std::string GetDiskName(const std::string& dev);
-    int GetDiskStat(dev_t rDev, DiskUsage& disk, DiskUsage& deviceUsage);
-    int CalDiskUsage(IODev& ioDev, DiskUsage& diskUsage);
-    int GetDiskUsage(DiskUsage& diskUsage, std::string dirName);
-    int GetIOstat(std::string& dirName, DiskUsage& disk, std::shared_ptr<IODev>& ioDev, DiskUsage& deviceUsage);
-    std::shared_ptr<IODev> GetIODev(std::string& dirName);
-    void RefreshLocalDisk();
+    int GetDiskStat(const HostMonitorTimerEvent::CollectTime& collectTime,
+                    dev_t rDev,
+                    DiskUsage& disk,
+                    DiskUsage& deviceUsage);
+    int CalDiskUsage(const HostMonitorTimerEvent::CollectTime& collectTime, IODev& ioDev, DiskUsage& diskUsage);
+    int GetDiskUsage(const HostMonitorTimerEvent::CollectTime& collectTime, DiskUsage& diskUsage, std::string dirName);
+    int GetIOstat(const HostMonitorTimerEvent::CollectTime& collectTime,
+                  std::string& dirName,
+                  DiskUsage& disk,
+                  std::shared_ptr<IODev>& ioDev,
+                  DiskUsage& deviceUsage);
+    std::shared_ptr<IODev> GetIODev(const HostMonitorTimerEvent::CollectTime& collectTime, std::string& dirName);
+    void RefreshLocalDisk(const HostMonitorTimerEvent::CollectTime& collectTime);
     void CalcDiskMetric(const DiskStat& current, const DiskStat& last, double interval, DiskMetric& diskMetric);
 
 private:
@@ -194,8 +209,6 @@ private:
     std::map<std::string, DiskCollectStat> mCurrentDiskCollectStatMap;
     std::map<std::string, DiskCollectStat> mLastDiskCollectStatMap;
     const std::string mModuleName;
-    int mCountPerReport = 0;
-    int mCount = 0;
     static const size_t kMaxDirSize = 1024;
     std::chrono::steady_clock::time_point mLastTime; // 上次获取磁盘信息的时间
     std::unordered_map<uint64_t, std::shared_ptr<IODev>> fileSystemCache;

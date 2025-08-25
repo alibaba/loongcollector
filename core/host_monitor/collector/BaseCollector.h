@@ -27,8 +27,29 @@ class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
 
-    virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
-    virtual const std::string& Name() const = 0;
+    virtual bool Init(HostMonitorTimerEvent::CollectContext& collectContext) {
+        auto collectInterval = GetCollectInterval();
+        switch (collectContext.mCollectType) {
+            case HostMonitorCollectType::kSingleValue:
+                collectContext.mCountPerReport = 1;
+                collectContext.mCount = 0;
+                collectContext.mCollectInterval = collectContext.mReportInterval;
+                return true;
+            case HostMonitorCollectType::kMultiValue:
+                if (collectInterval.count() == 0) {
+                    return false;
+                }
+                collectContext.mCountPerReport = collectContext.mReportInterval.count() / collectInterval.count();
+                collectContext.mCount = 0;
+                collectContext.mCollectInterval = collectInterval;
+                return true;
+            default:
+                return false;
+        }
+    }
+    virtual bool Collect(HostMonitorTimerEvent::CollectContext& collectContext, PipelineEventGroup* group) = 0;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
+    [[nodiscard]] virtual const std::chrono::seconds GetCollectInterval() const = 0;
 
 protected:
     bool mValidState = true;

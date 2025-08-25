@@ -101,7 +101,8 @@ void NetCollectorUnittest::TestCollect() const {
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
     NetCollector collector = NetCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectContext collectconfig("test", NetCollector::sName, 0, 0, std::chrono::seconds(1));
+    collectconfig.mCountPerReport = 3;
 
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
@@ -180,7 +181,8 @@ void NetCollectorUnittest::TestIpv6FileNoExist() const {
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
     NetCollector collector = NetCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectconfig(NetCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectContext collectconfig("test", NetCollector::sName, 0, 0, std::chrono::seconds(1));
+    collectconfig.mCountPerReport = 3;
 
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
