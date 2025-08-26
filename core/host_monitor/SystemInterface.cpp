@@ -172,6 +172,19 @@ bool SystemInterface::GetDiskStateInformation(DiskStateInformation& diskStateInf
         diskStateInfo,
         errorType);
 }
+
+bool SystemInterface::GetFileSystemInformation(std::string dirName, FileSystemInformation& fileSystemInfo) {
+    const std::string errorType = "filesystem state";
+    return MemoizedCall(
+        mFileSystemInformationCache,
+        [this](BaseInformation& info, std::string dirName) {
+            return this->GetFileSystemInformationOnce(dirName, static_cast<FileSystemInformation&>(info));
+        },
+        fileSystemInfo,
+        errorType,
+        dirName);
+}
+
 bool SystemInterface::GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& processCmdlineString) {
     const std::string errorType = "processCmdline";
     return MemoizedCall(

@@ -594,6 +594,20 @@ struct DiskState {
     uint64_t qTime; // 输入/输出操作花费的加权毫秒数
 };
 
+struct FileSystemState {
+    double use_percent = 0;
+    uint64_t total = 0;
+    uint64_t free = 0;
+    uint64_t used = 0;
+    uint64_t avail = 0;
+    uint64_t files = 0;
+    uint64_t freeFiles = 0;
+};
+
+struct FileSystemInformation : public BaseInformation {
+    FileSystemState fileSystemState;
+};
+
 struct DiskStateInformation : public BaseInformation {
     std::vector<DiskState> diskStats;
 };
@@ -656,6 +670,7 @@ public:
     bool GetSystemUptimeInformation(SystemUptimeInformation& systemUptimeInfo);
     bool GetDiskSerialIdInformation(std::string diskName, SerialIdInformation& serialIdInfo);
     bool GetDiskStateInformation(DiskStateInformation& diskStateInfo);
+    bool GetFileSystemInformation(std::string dirName, FileSystemInformation& fileSystemInfo);
     bool GetProcessCmdlineString(pid_t pid, ProcessCmdlineString& cmdline);
     bool GetPorcessStatm(pid_t pid, ProcessMemoryInformation& processMemory);
     bool GetProcessCredNameObj(pid_t pid, ProcessCredName& credName);
@@ -677,6 +692,7 @@ public:
           mSystemUptimeInformationCache(ttl),
           mSerialIdInformationCache(ttl),
           mDiskStateInformationCache(ttl),
+          mFileSystemInformationCache(ttl),
           mProcessCmdlineCache(ttl),
           mProcessStatmCache(ttl),
           mProcessStatusCache(ttl),
@@ -705,6 +721,7 @@ private:
     virtual bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) = 0;
     virtual bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) = 0;
     virtual bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) = 0;
+    virtual bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) = 0;
     virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
     virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
     virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
@@ -724,6 +741,7 @@ private:
     SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
     SystemInformationCache<SerialIdInformation, std::string> mSerialIdInformationCache;
     SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
+    SystemInformationCache<FileSystemInformation, std::string> mFileSystemInformationCache;
     SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
     SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
     SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;
