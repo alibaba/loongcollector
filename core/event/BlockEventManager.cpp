@@ -86,7 +86,8 @@ void BlockedEventManager::FeedBack(const LogstoreFeedBackKey& key) {
         for (std::unordered_map<int64_t, BlockedEvent>::iterator iter = mBlockEventMap.begin();
              iter != mBlockEventMap.end();) {
             BlockedEvent& blockedEvent = iter->second;
-            if (blockedEvent.mEvent != NULL && blockedEvent.mLogstoreKey == key) {
+            if (blockedEvent.mEvent != NULL && blockedEvent.mLogstoreKey == key
+                && !blockedEvent.mEvent->IsReaderFlushTimeout()) {
                 eventVec.push_back(blockedEvent.mEvent);
                 // LOG_DEBUG(sLogger, ("Get feedback block event  ",
                 // blockedEvent.mEvent->GetSource())(blockedEvent.mEvent->GetObject(),
