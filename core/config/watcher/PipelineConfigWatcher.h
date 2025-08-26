@@ -48,7 +48,7 @@ public:
         return &instance;
     }
 
-    std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff();
+    std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff(bool builtinOnly = false);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }

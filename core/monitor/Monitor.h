@@ -97,6 +97,10 @@ public:
     // LogInput use it to do flow control.
     float GetRealtimeCpuLevel() { return mRealtimeCpuStat.mCpuUsage / mScaledCpuUsageUpLimit; }
 
+
+    // UpdateCpuMem updates CPU and Memory statistics and sets them to LoongCollectorMonitor
+    void UpdateCpuMem();
+
 private:
     LogtailMonitor();
     ~LogtailMonitor() = default;
@@ -192,6 +196,7 @@ public:
 
     void Init();
     void Stop();
+    void SendStartMetric();
 
     bool GetAgentMetric(SelfMonitorMetricEvent& event);
     void SetAgentMetric(const SelfMonitorMetricEvent& event);

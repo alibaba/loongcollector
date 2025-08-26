@@ -276,6 +276,21 @@ void Application::Start() { // GCOVR_EXCL_START
 
     OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
+#ifdef __ENTERPRISE__
+    // Wait for all runners to be started, then load built-in pipelines first, followed by sending start metrics.
+    auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff(true);
+    if (!configDiff.first.IsEmpty()) {
+        CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
+    }
+    if (!configDiff.second.IsEmpty()) {
+        TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
+    }
+    if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
+        OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
+    }
+    LoongCollectorMonitor::GetInstance()->SendStartMetric();
+#endif
+
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
            lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
     while (true) {

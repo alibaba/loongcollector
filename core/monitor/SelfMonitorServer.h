@@ -38,6 +38,11 @@ public:
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
+    // send start metric (agent/runner)
+    void SendStartMetric();
+    // update app_info.json 
+    void UpdateAppInfoJson(const PipelineEventGroup& pipelineEventGroup);
+
     static const std::string INTERNAL_DATA_TYPE_ALARM;
     static const std::string INTERNAL_DATA_TYPE_METRIC;
 
@@ -51,7 +56,7 @@ private:
     std::condition_variable mStopCV;
 
     // metrics
-    void SendMetrics();
+    void SendMetrics(bool updateAppInfo = false);
     bool ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& event, const SelfMonitorMetricRule& rule);
     void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events);
     void ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEventGroup);
