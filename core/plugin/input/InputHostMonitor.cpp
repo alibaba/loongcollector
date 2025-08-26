@@ -25,6 +25,7 @@
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
+#include "host_monitor/collector/GPUCollector.h"
 
 namespace logtail {
 
@@ -160,6 +161,21 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
         mCollectors.push_back(NetCollector::sName);
     }
 
+    // gpu
+    bool enableGPU = true;
+    if (!GetOptionalBoolParam(config, "EnableGPU", enableGPU, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableGPU) {
+        mCollectors.push_back(GPUCollector::sName);
+    }
 
     return true;
 }

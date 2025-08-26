@@ -26,6 +26,9 @@ using namespace std::chrono;
 #include <mntent.h>
 #include <pwd.h>
 
+#include <boost/system.hpp>
+#include <boost/dll/shared_library.hpp>
+#include <boost/process.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/program_options.hpp>
@@ -36,6 +39,13 @@ using namespace std::chrono;
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
+
+#include "_thirdparty/DCGM/dcgmlib/dcgm_agent.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_fields.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_structs.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_api_export.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_errors.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_helpers.h"
 
 namespace logtail {
 
@@ -1089,5 +1099,409 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
     processFd.exact = true;
 
     return true;
+}
+
+template<typename Signature>
+class FunctionProxy;
+
+template<typename R, typename... Args>
+class FunctionProxy<R(Args...)> {
+public:
+    FunctionProxy() = default;
+    FunctionProxy(const boost::dll::shared_library& lib, const char* name) : mName(name) {
+        if (lib.has(mName)) {
+            mFunction = lib.get<R(Args...)>(mName);
+        }
+    }
+
+    std::optional<R> operator()(Args... args) const {
+        if (!isBound()) return std::nullopt;
+        try {
+            if constexpr (std::is_same_v<R, void>) {
+                mFunction(std::forward<Args>(args)...);
+                return std::make_optional(true);
+            } else {
+                return mFunction(std::forward<Args>(args)...);
+            }
+        } catch (const boost::system::system_error& e) { 
+            LOG_ERROR(sLogger, ("failed to call function", e.what()));
+            return std::nullopt;
+        }
+    }
+
+    bool isBound() const { return static_cast<bool>(mFunction); }
+private:
+    std::string mName;
+    std::function<R(Args...)> mFunction;
+};
+
+template<typename Signature>
+class FallbackFunction;
+
+template<typename R, typename... Args>
+class FallbackFunction<R(Args...)> {
+public:
+    FallbackFunction() = default;
+    template<size_t N>
+    FallbackFunction(const boost::dll::shared_library& lib, const char* (&names)[N]) {
+        for (const char* name : names) {
+            mProxies.emplace_back(lib, name);
+        }
+    }
+
+    std::optional<R> operator()(Args... args) const {
+        std:: string unboundFunctionsName = "";
+        for (const auto& proxy : mProxies) {
+            if (proxy.isBound()) {
+                return proxy(std::forward<Args>(args)...);
+            }
+            unboundFunctionsName += proxy.name() + ", ";
+        }
+        LOG_ERROR(sLogger, ("all functions failed", unboundFunctionsName));
+        return std::nullopt;
+    }
+
+    bool isBound() const {
+        return std::any_of(mProxies.begin(), mProxies.end(), [](const auto& p) { return p.isBound(); });
+    }
+private:
+    std::vector<FunctionProxy<R(Args...)>> mProxies;
+};
+
+class DCGMCollector {
+public:
+    DCGMCollector(std::string dcgmLib) {
+        try {
+            mLibrary.load(dcgmLib, boost::dll::load_mode::search_system_folders);
+            LOG_INFO(sLogger, ("DCGM library loaded", mLibrary.location()));
+            initializeFunctionProxies();
+        } catch (const boost::system::system_error& e) {
+            LOG_ERROR(sLogger, ("DCGM library load failed", e.what()));
+            mLibrary.unload();
+        }
+    }
+
+    ~DCGMCollector() {
+        Shutdown();
+    }
+
+    bool Initialize(const FieldMap& fieldMap) {
+        if (!isReady() || mIsInitialized.load()){
+            LOG_WARNING(sLogger, ("DCGM initialization skipped", "already initialized or not ready"));
+            return mIsInitialized.load();
+        }
+
+        mFieldMap = fieldMap;
+
+        int numFields = fieldMap.int64Fields.size() + fieldMap.stringFields.size() + fieldMap.doubleFields.size();
+        
+        if (numFields == 0) {
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "no fields to watch"));
+            return false;
+        }
+        
+        if (numFields > DCGM_MAX_FIELD_IDS_PER_FIELD_GROUP) {
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "too many fields")("count", numFields)("max", DCGM_MAX_FIELD_IDS_PER_FIELD_GROUP));
+            return false;
+        }
+
+        std::vector<unsigned short> fieldsToWatch;
+        fieldsToWatch.reserve(numFields);
+        
+        for (const auto& pair : fieldMap.int64Fields){
+            fieldsToWatch.push_back(pair.first);
+        }
+        for (const auto& pair : fieldMap.doubleFields){
+            fieldsToWatch.push_back(pair.first);
+        }
+        for (const auto& pair : fieldMap.stringFields){
+            fieldsToWatch.push_back(pair.first);
+        }
+        
+        if (!DcgmCall(mDcgmInit)){
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "dcgmInit call failed"));
+            return false;
+        }
+        if (!startEmbedded(DCGM_OPERATION_MODE_MANUAL, &mDcgmHandle)){
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "start embedded engine failed"));
+            Shutdown();
+            return false;
+        }
+        std::string fieldGroupName = "LOONGCOLLECTOR_FIELD_GROUP";
+        if (!DcgmCall(mDcgmFieldGroupCreate, mDcgmHandle, numFields, fieldsToWatch.data(), fieldGroupName.c_str(), &mFieldGroupId)) {
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "field group creation failed")("group_name", fieldGroupName)("field_count", numFields));
+            Shutdown();
+            return false;
+        }
+        double maxKeepAge = 0;
+        int maxKeepSamples = 0;
+        long long updateFreq = 10000; // Invalid value in manual mode
+        if (!DcgmCall(mDcgmWatchFields, mDcgmHandle, DCGM_GROUP_ALL_GPUS, mFieldGroupId, updateFreq, maxKeepAge, maxKeepSamples)) {
+            LOG_ERROR(sLogger, ("DCGM initialization failed", "watch fields failed")("update_freq", updateFreq));
+            Shutdown();
+            return false;
+        }
+
+        mIsInitialized.store(true);
+        LOG_INFO(sLogger, ("DCGM initialization successful", "manual mode")("field_count", numFields)("group_name", fieldGroupName));
+        return true;
+    }
+
+    void Shutdown() {
+        if (!mLibrary.is_loaded())
+            LOG_WARNING(sLogger, ("DCGM shutdown skipped", "library not loaded"));
+            return;
+        if (mIsInitialized.load()) {
+            DcgmCall(mDcgmFieldGroupDestroy, mDcgmHandle, mFieldGroupId);
+            DcgmCall(mDcgmStopEmbedded, mDcgmHandle);
+            DcgmCall(mDcgmShutdown);
+            mIsInitialized.store(false);
+            LOG_INFO(sLogger, ("DCGM shutdown completed", "all resources cleaned"));
+        }
+    }
+
+    bool Collect(GPUInformation& outData) {
+        if (!mIsInitialized.load()) {
+            LOG_ERROR(sLogger, ("GPU data collection failed", "DCGM not initialized"));
+            return false;
+        }
+
+        if (!DcgmCall(mDcgmUpdateAllFields, mDcgmHandle, 1)){   // wait for the update loop to complete before return
+            LOG_ERROR(sLogger, ("GPU data collection failed", "update all fields failed"));
+            return false;
+        }
+
+        outData.stats.clear();
+        CallbackContext context = {&outData, &mFieldMap, {}};
+
+        if (!getLatestValues(mDcgmHandle,
+                            DCGM_GROUP_ALL_GPUS,
+                            mFieldGroupId,
+                            &context)) {
+            LOG_ERROR(sLogger, ("GPU data collection failed", "get latest values failed"));
+            return false;
+        }
+        LOG_DEBUG(sLogger, ("GPU data collection successful", "data retrieved")("gpu_count", outData.stats.size()));
+        return true;
+    }
+
+    bool isReady() const { return mLibrary.is_loaded() && mDcgmInit.isBound(); }
+
+private:
+    struct CallbackContext {
+        GPUInformation* gpuInfo;
+        const FieldMap* fieldMap;
+        std::unordered_map<unsigned int, size_t> gpuIdToIndex;
+    };
+
+    static int dcgmDataCallback_v1(unsigned int gpuId, dcgmFieldValue_v1* values, int numValues, void* userData) {
+        auto* context = static_cast<CallbackContext*>(userData);
+        if (!context || !context->gpuInfo || !context->fieldMap) return 0;
+
+        auto it = context->gpuIdToIndex.find(gpuId);
+        if (it == context->gpuIdToIndex.end()) {
+            size_t newIndex = context->gpuInfo->stats.size();
+            context->gpuInfo->stats.emplace_back();
+            context->gpuIdToIndex[gpuId] = newIndex;
+            it = context->gpuIdToIndex.find(gpuId);
+        }
+        auto& currentStat = context->gpuInfo->stats[it->second];
+
+        for (int i = 0; i < numValues; ++i) {
+            const auto& fieldValue = values[i];
+            if (fieldValue.status != DCGM_ST_OK) continue;
+
+            switch (fieldValue.fieldType) {
+                case DCGM_FT_INT64: {
+                    auto it = context->fieldMap->int64Fields.find(fieldValue.fieldId);
+                    if (it != context->fieldMap->int64Fields.end()) currentStat.*(it->second) = fieldValue.value.i64;
+                    break;
+                }
+                case DCGM_FT_STRING: {
+                    auto it = context->fieldMap->stringFields.find(fieldValue.fieldId);
+                    if (it != context->fieldMap->stringFields.end()) currentStat.*(it->second) = fieldValue.value.str;
+                    break;
+                }
+                case DCGM_FT_DOUBLE: {
+                    auto it = context->fieldMap->doubleFields.find(fieldValue.fieldId);
+                    if (it != context->fieldMap->doubleFields.end()) currentStat.*(it->second) = fieldValue.value.dbl;
+                    break;
+                }
+            }
+        }
+        return 0;
+    }
+
+    static int dcgmDataCallback_v2(dcgm_field_entity_group_t entityGroupId, dcgm_field_eid_t entityId, dcgmFieldValue_v1 *values, int numValues, void *userData) {
+        // we only request all GPU entity group data
+        if(entityGroupId != DCGM_FE_GPU){
+            return -1;
+        }
+        return dcgmDataCallback_v1(entityId, values, numValues, userData);
+    }
+
+    bool getLatestValues(dcgmHandle_t pDcgmHandle, dcgmGpuGrp_t groupId, dcgmFieldGrp_t fieldGroupId, void *userData){
+        if(mDcgmGetLatestValues_v2.isBound()){
+            return DcgmCall(mDcgmGetLatestValues_v2, pDcgmHandle, groupId, fieldGroupId, &DCGMCollector::dcgmDataCallback_v2, userData);
+        }
+        if(mDcgmGetLatestValues_v1.isBound()){
+            return DcgmCall(mDcgmGetLatestValues_v1, pDcgmHandle, groupId, fieldGroupId, &DCGMCollector::dcgmDataCallback_v1, userData);
+        }
+        return false;
+    }
+
+    bool startEmbedded(dcgmOperationMode_t opMode, dcgmHandle_t* dcgmHandle) {
+        dcgmStartEmbeddedV2Params_v1 params = {
+            .version = dcgmStartEmbeddedV2Params_version1,
+            .opMode = opMode,
+            .dcgmHandle = *dcgmHandle,
+            .logFile = nullptr,
+            .severity = DcgmLoggingSeverityError,
+            .denyListCount = 0,
+        };
+
+        if(mDcgmStartEmbedded_v2.isBound()){
+            if (DcgmCall(mDcgmStartEmbedded_v2, &params)) {
+                *dcgmHandle = params.dcgmHandle;
+                return true;
+            }
+            return false;
+        }
+        if(mDcgmStartEmbedded_v1.isBound()){
+            return DcgmCall(mDcgmStartEmbedded_v1, opMode, dcgmHandle);
+        }
+        return false;
+    }
+
+    template<typename Func, typename... Args>
+    bool DcgmCall(const Func& funcToCall, Args&&... args) {
+        auto result = funcToCall(std::forward<Args>(args)...);
+        if (!result.has_value()) {
+            LOG_ERROR(sLogger, ("DCGM API call failed", "function not bound or library unloaded"));
+            return false;
+        }
+        dcgmReturn_t ret = result.value();
+        if (ret != DCGM_ST_OK) {
+            std::string errMsg = "N/A";
+            if (auto errStrOpt = mDcgmErrorString(ret)) {
+                if (errStrOpt.value() != nullptr) errMsg = errStrOpt.value();
+            }
+            LOG_ERROR(sLogger, ("DCGM API call failed", errMsg)("error_code", ret));
+            return false;
+        }
+        return true;
+    }
+    
+    void initializeFunctionProxies() {
+        mDcgmInit = FunctionProxy<decltype(dcgmInit)>(mLibrary, "dcgmInit");
+        mDcgmShutdown = FunctionProxy<decltype(dcgmShutdown)>(mLibrary, "dcgmShutdown");
+        mDcgmErrorString = FunctionProxy<decltype(errorString)>(mLibrary, "errorString");
+        mDcgmStartEmbedded_v1 = FunctionProxy<decltype(dcgmStartEmbedded)>(mLibrary, "dcgmStartEmbedded");
+        mDcgmStartEmbedded_v2 = FunctionProxy<decltype(dcgmStartEmbedded_v2)>(mLibrary, "dcgmStartEmbedded_v2");
+        mDcgmStopEmbedded = FunctionProxy<decltype(dcgmStopEmbedded)>(mLibrary, "dcgmStopEmbedded");
+        mDcgmFieldGroupCreate = FunctionProxy<decltype(dcgmFieldGroupCreate)>(mLibrary, "dcgmFieldGroupCreate");
+        mDcgmFieldGroupDestroy = FunctionProxy<decltype(dcgmFieldGroupDestroy)>(mLibrary, "dcgmFieldGroupDestroy");
+        mDcgmWatchFields = FunctionProxy<decltype(dcgmWatchFields)>(mLibrary, "dcgmWatchFields");
+        mDcgmUpdateAllFields = FunctionProxy<decltype(dcgmUpdateAllFields)>(mLibrary, "dcgmUpdateAllFields");
+        mDcgmGetLatestValues_v1 = FunctionProxy<decltype(dcgmGetLatestValues)>(mLibrary, "dcgmGetLatestValues");
+        mDcgmGetLatestValues_v2 = FunctionProxy<decltype(dcgmGetLatestValues_v2)>(mLibrary, "dcgmGetLatestValues_v2");
+    }
+
+    boost::dll::shared_library mLibrary;
+    std::atomic<bool> mIsInitialized{false};
+    dcgmHandle_t mDcgmHandle = 0;
+    dcgmFieldGrp_t mFieldGroupId = 0;
+    FieldMap mFieldMap;
+
+    FunctionProxy<decltype(dcgmInit)> mDcgmInit;
+    FunctionProxy<decltype(dcgmShutdown)> mDcgmShutdown;
+    FunctionProxy<decltype(errorString)> mDcgmErrorString;
+    FunctionProxy<decltype(dcgmStartEmbedded)> mDcgmStartEmbedded_v1;
+    FunctionProxy<decltype(dcgmStartEmbedded_v2)> mDcgmStartEmbedded_v2;
+    FunctionProxy<decltype(dcgmStopEmbedded)> mDcgmStopEmbedded;
+    FunctionProxy<decltype(dcgmFieldGroupCreate)> mDcgmFieldGroupCreate;
+    FunctionProxy<decltype(dcgmFieldGroupDestroy)> mDcgmFieldGroupDestroy;
+    FunctionProxy<decltype(dcgmWatchFields)> mDcgmWatchFields;
+    FunctionProxy<decltype(dcgmUpdateAllFields)> mDcgmUpdateAllFields;
+    FunctionProxy<decltype(dcgmGetLatestValues)> mDcgmGetLatestValues_v1;
+    FunctionProxy<decltype(dcgmGetLatestValues_v2)> mDcgmGetLatestValues_v2;
+};
+
+bool CheckGPUExist() {
+    if(!std::filesystem::exists(NVIDIACTL)){
+        LOG_ERROR(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
+        return false;
+    }
+
+    auto binary_path = boost::process::search_path(NVSMI);
+    if(binary_path.empty()){
+        LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
+        return false;
+    }
+
+    boost::process::ipstream pipe_stream;
+    std::string cmd = "nvidia-smi -L";
+    std::error_code ec;
+
+    int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
+    if (ec || exit_code != 0){
+        LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code", exit_code));
+        return false;
+    }
+
+    std::string line;
+    bool has_output = false;
+    while (std::getline(pipe_stream, line)) {
+        if (!line.empty()) {
+            has_output = true;
+            LOG_DEBUG(sLogger, ("GPU detected", line));
+        }
+    }
+
+    if (!has_output) {
+        LOG_ERROR(sLogger, ("GPU check failed", "no GPU devices found"));
+        return false;
+    }
+
+    LOG_INFO(sLogger, ("GPU check successful", "GPU monitoring available"));
+    return true;
+}
+
+static std::unique_ptr<DCGMCollector> dcgmCollector;
+
+bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
+    if (!CheckGPUExist()){
+        LOG_WARNING(sLogger, ("GPU collector initialization skipped", "no GPU hardware detected"));
+        return false;
+    }
+    dcgmCollector = std::make_unique<DCGMCollector>(LIB_DCGM);
+    if (!dcgmCollector->Initialize(fieldMap)){
+        LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM initialization error"));
+        return false;
+    }
+    
+    if (!dcgmCollector->isReady()) {
+        LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM not ready after initialization"));
+        return false;
+    }
+
+    LOG_INFO(sLogger, ("GPU collector initialization successful", "ready for monitoring"));
+    return true;
+}
+
+bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
+    if (!dcgmCollector || !dcgmCollector->isReady()){
+        LOG_ERROR(sLogger, ("GPU data retrieval failed", "DCGM collector not ready"));
+        return false;
+    }
+    
+    bool success = dcgmCollector->Collect(gpuInfo);
+    if (!success) {
+        LOG_ERROR(sLogger, ("GPU data retrieval failed", "collection operation failed"));
+    } else {
+        LOG_DEBUG(sLogger, ("GPU data retrieval successful", "metrics collected")("gpu_count", gpuInfo.stats.size()));
+    }
+    
+    return success;
 }
 } // namespace logtail
