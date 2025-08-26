@@ -1,3 +1,6 @@
 [submodule "core/_thirdparty/coolbpf"]
 	path = core/_thirdparty/coolbpf
 	url = https://gitee.com/anolis/coolbpf.git
+[submodule "core/_thirdparty/DCGM"]
+	path = core/_thirdparty/DCGM
+	url = https://github.com/NVIDIA/DCGM.git

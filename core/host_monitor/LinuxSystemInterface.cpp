@@ -36,6 +36,7 @@ using namespace std::chrono;
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/SystemInformationTools.h"
 #include "host_monitor/common/FastFieldParser.h"
 #include "logger/Logger.h"
 
@@ -1146,5 +1147,49 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
     processFd.exact = true;
 
     return true;
+}
+
+bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
+    if (!CheckGPUDeveice()) {
+        return false;
+    }
+
+    if (!mDcgmCollector.IsLibraryLoaded()) {
+        LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM library not loaded"));
+        return false;
+    }
+
+    if (!mDcgmCollector.CanInitialize()) {
+        if (mDcgmCollector.IsFullyInitialized()) {
+            LOG_INFO(sLogger, ("GPU collector already initialized", "skipping initialization"));
+            return true;
+        } else {
+            LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM collector in invalid state"));
+            return false;
+        }
+    }
+
+    if (!mDcgmCollector.Initialize(fieldMap)) {
+        LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM initialization error"));
+        return false;
+    }
+
+    return true;
+}
+
+bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
+    if (!mDcgmCollector.IsFullyInitialized()) {
+        LOG_ERROR(sLogger, ("GPU data retrieval failed", "DCGM collector not ready"));
+        return false;
+    }
+
+    bool success = mDcgmCollector.Collect(gpuInfo);
+    if (!success) {
+        LOG_ERROR(sLogger, ("GPU data retrieval failed", "collection operation failed"));
+    } else {
+        LOG_DEBUG(sLogger, ("GPU data retrieval successful", "metrics collected")("gpu_count", gpuInfo.stats.size()));
+    }
+
+    return success;
 }
 } // namespace logtail

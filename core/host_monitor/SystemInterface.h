@@ -614,6 +614,37 @@ struct DiskStateInformation : public BaseInformation {
     std::vector<DiskState> diskStats;
 };
 
+struct GPUStat {
+    std::string gpuId;
+    int64_t decoderUtilization;
+    int64_t encoderUtilization;
+    int64_t gpuUtilization;
+    int64_t memoryTotal;
+    int64_t memoryFree;
+    int64_t memoryUsed;
+    int64_t memoryReserved;
+    int64_t gpuTemperature;
+    double powerUsage;
+};
+
+struct GPUInformation : public BaseInformation {
+    std::vector<GPUStat> stats;
+};
+
+using Int64FieldMap = std::unordered_map<unsigned short, int64_t GPUStat::*>;
+using StringFieldMap = std::unordered_map<unsigned short, std::string GPUStat::*>;
+using DoubleFieldMap = std::unordered_map<unsigned short, double GPUStat::*>;
+// using TimestampFieldMap = ... ; // Placeholder for future expansion
+// using BinaryFieldMap = ... ; // Placeholder for future expansion
+
+struct FieldMap {
+    Int64FieldMap int64Fields;
+    StringFieldMap stringFields;
+    DoubleFieldMap doubleFields;
+    // TimestampFieldMap timestampFields;
+    // BinaryFieldMap binaryFields;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -698,6 +729,8 @@ public:
 
     bool GetTCPStatInformation(time_t now, TCPStatInformation& tcpStatInfo);
     bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
+    bool InitGPUCollector(const FieldMap& fieldMap);
+    bool GetGPUInformation(time_t now, GPUInformation& gpuInfo);
     explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
           mCPUInformationCache(cacheSize),
@@ -717,7 +750,8 @@ public:
           mProcessFdCache(cacheSize),
           mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
-          mNetInterfaceInformationCache(cacheSize) {}
+          mNetInterfaceInformationCache(cacheSize),
+          mGPUInformationCache(cacheSize) {}
     virtual ~SystemInterface() = default;
 
 private:
@@ -748,6 +782,8 @@ private:
     virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
+    virtual bool InitGPUCollectorOnce(const FieldMap& fieldMap) = 0;
+    virtual bool GetGPUInformationOnce(GPUInformation& gpuInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -768,6 +804,7 @@ private:
     SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
+    SystemInformationCache<GPUInformation> mGPUInformationCache;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

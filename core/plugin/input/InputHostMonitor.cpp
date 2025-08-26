@@ -21,6 +21,7 @@
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
+#include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
@@ -160,6 +161,21 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
         mCollectors.push_back(NetCollector::sName);
     }
 
+    // gpu
+    bool enableGPU = true;
+    if (!GetOptionalBoolParam(config, "EnableGPU", enableGPU, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableGPU) {
+        mCollectors.push_back(GPUCollector::sName);
+    }
 
     return true;
 }
