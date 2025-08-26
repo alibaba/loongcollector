@@ -644,6 +644,10 @@ void LoongCollectorMonitor::Stop() {
     LOG_INFO(sLogger, ("LoongCollector monitor", "stopped successfully"));
 }
 
+void LoongCollectorMonitor::SendStartMetric() {
+    SelfMonitorServer::GetInstance()->SendStartMetric();
+}
+
 bool LoongCollectorMonitor::GetAgentMetric(SelfMonitorMetricEvent& event) {
     lock_guard<mutex> lock(mGlobalMetricsMux);
     event = mGlobalMetrics.mAgentMetric;
@@ -673,6 +677,16 @@ void LoongCollectorMonitor::SetRunnerMetric(const std::string& runnerName, const
     }
     lock_guard<mutex> lock(mGlobalMetricsMux);
     mGlobalMetrics.mRunnerMetrics[runnerName] = event;
+}
+
+void LogtailMonitor::UpdateCpuMem() {
+    CpuStat curCpuStat;
+    if (GetCpuStat(curCpuStat)) {
+        GetMemStat();
+        LoongCollectorMonitor::GetInstance()->SetAgentMemory(mMemStat.mRss);
+        CalCpuStat(curCpuStat, mCpuStat);
+        LoongCollectorMonitor::GetInstance()->SetAgentCpu(mCpuStat.mCpuUsage);
+    }
 }
 
 } // namespace logtail

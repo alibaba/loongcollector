@@ -37,15 +37,18 @@ PipelineConfigWatcher::PipelineConfigWatcher()
       mTaskPipelineManager(TaskPipelineManager::GetInstance()) {
 }
 
-pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff() {
+pair<CollectionConfigDiff, TaskConfigDiff> PipelineConfigWatcher::CheckConfigDiff(bool builtinOnly) {
     CollectionConfigDiff pDiff;
     TaskConfigDiff tDiff;
     unordered_set<string> configSet;
     SingletonConfigCache singletonCache;
     // builtin pipeline configs
     InsertBuiltInPipelines(pDiff, tDiff, configSet, singletonCache);
-    // file pipeline configs
-    InsertPipelines(pDiff, tDiff, configSet, singletonCache);
+    
+    if (!builtinOnly) {
+        // file pipeline configs
+        InsertPipelines(pDiff, tDiff, configSet, singletonCache);
+    }
 
     CheckSingletonInput(pDiff, singletonCache);
     for (const auto& name : mCollectionPipelineManager->GetAllConfigNames()) {
@@ -100,6 +103,13 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
     for (const auto& pipeline : builtInPipelines) {
         const string& pipelineName = pipeline.first;
         const string& pipleineDetail = pipeline.second;
+        if (configSet.find(pipelineName) != configSet.end()) {
+            LOG_WARNING(sLogger,
+                        ("more than 1 config with the same name is found", "skip current config")("inner pipeline",
+                                                                                                  pipelineName));
+            continue;
+        }
+        configSet.insert(pipelineName);
 
         string errorMsg;
         auto iter = mInnerConfigMap.find(pipelineName);

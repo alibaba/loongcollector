@@ -16,8 +16,14 @@
 
 #include "monitor/SelfMonitorServer.h"
 
+#include <json/json.h>
+
+#include <fstream>
+
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "app_config/AppConfig.h"
+#include "common/FileSystemUtil.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -100,7 +106,7 @@ void SelfMonitorServer::RemoveMetricPipeline() {
     LOG_INFO(sLogger, ("self-monitor metrics pipeline", "removed"));
 }
 
-void SelfMonitorServer::SendMetrics() {
+void SelfMonitorServer::SendMetrics(bool updateAppInfo) {
     ReadMetrics::GetInstance()->UpdateMetrics();
 
     ReadLock lock(mMetricPipelineLock);
@@ -116,6 +122,10 @@ void SelfMonitorServer::SendMetrics() {
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
     pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
+
+    if (updateAppInfo) {
+        UpdateAppInfoJson(pipelineEventGroup);
+    }
 
     if (pipelineEventGroup.GetEvents().size() > 0) {
         ProcessorRunner::GetInstance()->PushQueue(
@@ -211,6 +221,81 @@ void SelfMonitorServer::SendAlarms() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
+}
+
+void SelfMonitorServer::SendStartMetric() {
+    // 等待mMetricPipelineCtx存在，最多等待1秒
+    auto startTime = std::chrono::steady_clock::now();
+    while (true) {
+        ReadLock lock(mMetricPipelineLock);
+        if (mMetricPipelineCtx != nullptr && mSelfMonitorMetricRules != nullptr) {
+            auto endTime = std::chrono::steady_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+            LOG_INFO(sLogger,
+                     ("send start metric", "wait metric pipeline ready")("cost milliseconds", duration.count()));
+            break;
+        }
+        lock.unlock();
+
+        // 检查是否超时
+        auto currentTime = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime);
+        if (elapsed.count() >= 1000) { // 1秒超时，实测正常启动应该1ms内完成
+            LOG_WARNING(sLogger, ("send start metric", "wait metric pipeline ready timeout, skip"));
+            return;
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    // 启动时需要立刻更新一下cpu和memory指标，因为正常启动时，cpu和memory指标会等30s更新一次
+    LogtailMonitor::GetInstance()->UpdateCpuMem();
+
+    // 调用SendMetrics，并启用UpdateAppInfo
+    // TODO: SendMetrics(true);
+    SendMetrics();
+    LOG_INFO(sLogger, ("send start metric", "sent successfully"));
+}
+
+void SelfMonitorServer::UpdateAppInfoJson(const PipelineEventGroup& pipelineEventGroup) {
+    // 读取现有的app_info.json
+    string appInfoFile = GetAgentAppInfoFile();
+    Json::Value appInfoJson;
+
+    // 尝试读取现有文件
+    ifstream file(appInfoFile);
+    if (file.is_open()) {
+        Json::CharReaderBuilder builder;
+        string errors;
+        if (Json::parseFromStream(builder, file, &appInfoJson, &errors)) {
+            file.close();
+        } else {
+            file.close();
+            LOG_WARNING(sLogger, ("failed to parse existing app_info.json", errors));
+        }
+    }
+
+    const auto& events = pipelineEventGroup.GetEvents();
+    for (const auto& eventPtr : events) {
+        if (!eventPtr.Is<MetricEvent>()) {
+            continue;
+        }
+
+        const auto& metricEvent = eventPtr.Cast<MetricEvent>();
+        const std::string metricName = metricEvent.GetName().to_string();
+
+        // 检查是否是agent指标
+        if (metricName == MetricCategory::METRIC_CATEGORY_AGENT) {
+            // TODO: 从metricEvent中提取agent指标设置到appInfoJson
+        }
+        // 检查是否是runner指标
+        else if (metricName == MetricCategory::METRIC_CATEGORY_RUNNER) {
+            // TODO: 从metricEvent中提取runner指标，例如所有已经启动的runner的名字
+        }
+    }
+    // 写入更新后的app_info.json
+    string appInfo = appInfoJson.toStyledString();
+    OverwriteFile(appInfoFile, appInfo);
+    LOG_INFO(sLogger, ("updated app_info.json with additional metric info", appInfo));
 }
 
 } // namespace logtail
