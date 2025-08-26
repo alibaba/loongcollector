@@ -26,26 +26,25 @@ using namespace std::chrono;
 #include <mntent.h>
 #include <pwd.h>
 
-#include <boost/system.hpp>
-#include <boost/dll/shared_library.hpp>
-#include <boost/process.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/dll/shared_library.hpp>
+#include <boost/process.hpp>
 #include <boost/program_options.hpp>
+#include <boost/system.hpp>
 #include <filesystem>
 #include <iostream>
 
+#include "_thirdparty/DCGM/dcgmlib/dcgm_agent.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_api_export.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_errors.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_fields.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_helpers.h"
+#include "_thirdparty/DCGM/dcgmlib/dcgm_structs.h"
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
 #include "logger/Logger.h"
-
-#include "_thirdparty/DCGM/dcgmlib/dcgm_agent.h"
-#include "_thirdparty/DCGM/dcgmlib/dcgm_fields.h"
-#include "_thirdparty/DCGM/dcgmlib/dcgm_structs.h"
-#include "_thirdparty/DCGM/dcgmlib/dcgm_api_export.h"
-#include "_thirdparty/DCGM/dcgmlib/dcgm_errors.h"
-#include "_thirdparty/DCGM/dcgmlib/dcgm_helpers.h"
 
 namespace logtail {
 
@@ -1101,10 +1100,10 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
     return true;
 }
 
-template<typename Signature>
+template <typename Signature>
 class FunctionProxy;
 
-template<typename R, typename... Args>
+template <typename R, typename... Args>
 class FunctionProxy<R(Args...)> {
 public:
     FunctionProxy() = default;
@@ -1115,7 +1114,8 @@ public:
     }
 
     std::optional<R> operator()(Args... args) const {
-        if (!isBound()) return std::nullopt;
+        if (!isBound())
+            return std::nullopt;
         try {
             if constexpr (std::is_same_v<R, void>) {
                 mFunction(std::forward<Args>(args)...);
@@ -1123,26 +1123,27 @@ public:
             } else {
                 return mFunction(std::forward<Args>(args)...);
             }
-        } catch (const boost::system::system_error& e) { 
+        } catch (const boost::system::system_error& e) {
             LOG_ERROR(sLogger, ("failed to call function", e.what()));
             return std::nullopt;
         }
     }
 
     bool isBound() const { return static_cast<bool>(mFunction); }
+
 private:
     std::string mName;
     std::function<R(Args...)> mFunction;
 };
 
-template<typename Signature>
+template <typename Signature>
 class FallbackFunction;
 
-template<typename R, typename... Args>
+template <typename R, typename... Args>
 class FallbackFunction<R(Args...)> {
 public:
     FallbackFunction() = default;
-    template<size_t N>
+    template <size_t N>
     FallbackFunction(const boost::dll::shared_library& lib, const char* (&names)[N]) {
         for (const char* name : names) {
             mProxies.emplace_back(lib, name);
@@ -1150,7 +1151,7 @@ public:
     }
 
     std::optional<R> operator()(Args... args) const {
-        std:: string unboundFunctionsName = "";
+        std::string unboundFunctionsName = "";
         for (const auto& proxy : mProxies) {
             if (proxy.isBound()) {
                 return proxy(std::forward<Args>(args)...);
@@ -1164,6 +1165,7 @@ public:
     bool isBound() const {
         return std::any_of(mProxies.begin(), mProxies.end(), [](const auto& p) { return p.isBound(); });
     }
+
 private:
     std::vector<FunctionProxy<R(Args...)>> mProxies;
 };
@@ -1181,12 +1183,10 @@ public:
         }
     }
 
-    ~DCGMCollector() {
-        Shutdown();
-    }
+    ~DCGMCollector() { Shutdown(); }
 
     bool Initialize(const FieldMap& fieldMap) {
-        if (!isReady() || mIsInitialized.load()){
+        if (!isReady() || mIsInitialized.load()) {
             LOG_WARNING(sLogger, ("DCGM initialization skipped", "already initialized or not ready"));
             return mIsInitialized.load();
         }
@@ -1194,63 +1194,80 @@ public:
         mFieldMap = fieldMap;
 
         int numFields = fieldMap.int64Fields.size() + fieldMap.stringFields.size() + fieldMap.doubleFields.size();
-        
+
         if (numFields == 0) {
             LOG_ERROR(sLogger, ("DCGM initialization failed", "no fields to watch"));
             return false;
         }
-        
+
         if (numFields > DCGM_MAX_FIELD_IDS_PER_FIELD_GROUP) {
-            LOG_ERROR(sLogger, ("DCGM initialization failed", "too many fields")("count", numFields)("max", DCGM_MAX_FIELD_IDS_PER_FIELD_GROUP));
+            LOG_ERROR(sLogger,
+                      ("DCGM initialization failed",
+                       "too many fields")("count", numFields)("max", DCGM_MAX_FIELD_IDS_PER_FIELD_GROUP));
             return false;
         }
 
         std::vector<unsigned short> fieldsToWatch;
         fieldsToWatch.reserve(numFields);
-        
-        for (const auto& pair : fieldMap.int64Fields){
+
+        for (const auto& pair : fieldMap.int64Fields) {
             fieldsToWatch.push_back(pair.first);
         }
-        for (const auto& pair : fieldMap.doubleFields){
+        for (const auto& pair : fieldMap.doubleFields) {
             fieldsToWatch.push_back(pair.first);
         }
-        for (const auto& pair : fieldMap.stringFields){
+        for (const auto& pair : fieldMap.stringFields) {
             fieldsToWatch.push_back(pair.first);
         }
-        
-        if (!DcgmCall(mDcgmInit)){
+
+        if (!DcgmCall(mDcgmInit)) {
             LOG_ERROR(sLogger, ("DCGM initialization failed", "dcgmInit call failed"));
             return false;
         }
-        if (!startEmbedded(DCGM_OPERATION_MODE_MANUAL, &mDcgmHandle)){
+        if (!startEmbedded(DCGM_OPERATION_MODE_MANUAL, &mDcgmHandle)) {
             LOG_ERROR(sLogger, ("DCGM initialization failed", "start embedded engine failed"));
             Shutdown();
             return false;
         }
         std::string fieldGroupName = "LOONGCOLLECTOR_FIELD_GROUP";
-        if (!DcgmCall(mDcgmFieldGroupCreate, mDcgmHandle, numFields, fieldsToWatch.data(), fieldGroupName.c_str(), &mFieldGroupId)) {
-            LOG_ERROR(sLogger, ("DCGM initialization failed", "field group creation failed")("group_name", fieldGroupName)("field_count", numFields));
+        if (!DcgmCall(mDcgmFieldGroupCreate,
+                      mDcgmHandle,
+                      numFields,
+                      fieldsToWatch.data(),
+                      fieldGroupName.c_str(),
+                      &mFieldGroupId)) {
+            LOG_ERROR(sLogger,
+                      ("DCGM initialization failed",
+                       "field group creation failed")("group_name", fieldGroupName)("field_count", numFields));
             Shutdown();
             return false;
         }
         double maxKeepAge = 0;
         int maxKeepSamples = 0;
         long long updateFreq = 10000; // Invalid value in manual mode
-        if (!DcgmCall(mDcgmWatchFields, mDcgmHandle, DCGM_GROUP_ALL_GPUS, mFieldGroupId, updateFreq, maxKeepAge, maxKeepSamples)) {
+        if (!DcgmCall(mDcgmWatchFields,
+                      mDcgmHandle,
+                      DCGM_GROUP_ALL_GPUS,
+                      mFieldGroupId,
+                      updateFreq,
+                      maxKeepAge,
+                      maxKeepSamples)) {
             LOG_ERROR(sLogger, ("DCGM initialization failed", "watch fields failed")("update_freq", updateFreq));
             Shutdown();
             return false;
         }
 
         mIsInitialized.store(true);
-        LOG_INFO(sLogger, ("DCGM initialization successful", "manual mode")("field_count", numFields)("group_name", fieldGroupName));
+        LOG_INFO(
+            sLogger,
+            ("DCGM initialization successful", "manual mode")("field_count", numFields)("group_name", fieldGroupName));
         return true;
     }
 
     void Shutdown() {
         if (!mLibrary.is_loaded())
             LOG_WARNING(sLogger, ("DCGM shutdown skipped", "library not loaded"));
-            return;
+        return;
         if (mIsInitialized.load()) {
             DcgmCall(mDcgmFieldGroupDestroy, mDcgmHandle, mFieldGroupId);
             DcgmCall(mDcgmStopEmbedded, mDcgmHandle);
@@ -1266,7 +1283,7 @@ public:
             return false;
         }
 
-        if (!DcgmCall(mDcgmUpdateAllFields, mDcgmHandle, 1)){   // wait for the update loop to complete before return
+        if (!DcgmCall(mDcgmUpdateAllFields, mDcgmHandle, 1)) { // wait for the update loop to complete before return
             LOG_ERROR(sLogger, ("GPU data collection failed", "update all fields failed"));
             return false;
         }
@@ -1274,10 +1291,7 @@ public:
         outData.stats.clear();
         CallbackContext context = {&outData, &mFieldMap, {}};
 
-        if (!getLatestValues(mDcgmHandle,
-                            DCGM_GROUP_ALL_GPUS,
-                            mFieldGroupId,
-                            &context)) {
+        if (!getLatestValues(mDcgmHandle, DCGM_GROUP_ALL_GPUS, mFieldGroupId, &context)) {
             LOG_ERROR(sLogger, ("GPU data collection failed", "get latest values failed"));
             return false;
         }
@@ -1296,7 +1310,8 @@ private:
 
     static int dcgmDataCallback_v1(unsigned int gpuId, dcgmFieldValue_v1* values, int numValues, void* userData) {
         auto* context = static_cast<CallbackContext*>(userData);
-        if (!context || !context->gpuInfo || !context->fieldMap) return 0;
+        if (!context || !context->gpuInfo || !context->fieldMap)
+            return 0;
 
         auto it = context->gpuIdToIndex.find(gpuId);
         if (it == context->gpuIdToIndex.end()) {
@@ -1309,22 +1324,26 @@ private:
 
         for (int i = 0; i < numValues; ++i) {
             const auto& fieldValue = values[i];
-            if (fieldValue.status != DCGM_ST_OK) continue;
+            if (fieldValue.status != DCGM_ST_OK)
+                continue;
 
             switch (fieldValue.fieldType) {
                 case DCGM_FT_INT64: {
                     auto it = context->fieldMap->int64Fields.find(fieldValue.fieldId);
-                    if (it != context->fieldMap->int64Fields.end()) currentStat.*(it->second) = fieldValue.value.i64;
+                    if (it != context->fieldMap->int64Fields.end())
+                        currentStat.*(it->second) = fieldValue.value.i64;
                     break;
                 }
                 case DCGM_FT_STRING: {
                     auto it = context->fieldMap->stringFields.find(fieldValue.fieldId);
-                    if (it != context->fieldMap->stringFields.end()) currentStat.*(it->second) = fieldValue.value.str;
+                    if (it != context->fieldMap->stringFields.end())
+                        currentStat.*(it->second) = fieldValue.value.str;
                     break;
                 }
                 case DCGM_FT_DOUBLE: {
                     auto it = context->fieldMap->doubleFields.find(fieldValue.fieldId);
-                    if (it != context->fieldMap->doubleFields.end()) currentStat.*(it->second) = fieldValue.value.dbl;
+                    if (it != context->fieldMap->doubleFields.end())
+                        currentStat.*(it->second) = fieldValue.value.dbl;
                     break;
                 }
             }
@@ -1332,20 +1351,34 @@ private:
         return 0;
     }
 
-    static int dcgmDataCallback_v2(dcgm_field_entity_group_t entityGroupId, dcgm_field_eid_t entityId, dcgmFieldValue_v1 *values, int numValues, void *userData) {
+    static int dcgmDataCallback_v2(dcgm_field_entity_group_t entityGroupId,
+                                   dcgm_field_eid_t entityId,
+                                   dcgmFieldValue_v1* values,
+                                   int numValues,
+                                   void* userData) {
         // we only request all GPU entity group data
-        if(entityGroupId != DCGM_FE_GPU){
+        if (entityGroupId != DCGM_FE_GPU) {
             return -1;
         }
         return dcgmDataCallback_v1(entityId, values, numValues, userData);
     }
 
-    bool getLatestValues(dcgmHandle_t pDcgmHandle, dcgmGpuGrp_t groupId, dcgmFieldGrp_t fieldGroupId, void *userData){
-        if(mDcgmGetLatestValues_v2.isBound()){
-            return DcgmCall(mDcgmGetLatestValues_v2, pDcgmHandle, groupId, fieldGroupId, &DCGMCollector::dcgmDataCallback_v2, userData);
+    bool getLatestValues(dcgmHandle_t pDcgmHandle, dcgmGpuGrp_t groupId, dcgmFieldGrp_t fieldGroupId, void* userData) {
+        if (mDcgmGetLatestValues_v2.isBound()) {
+            return DcgmCall(mDcgmGetLatestValues_v2,
+                            pDcgmHandle,
+                            groupId,
+                            fieldGroupId,
+                            &DCGMCollector::dcgmDataCallback_v2,
+                            userData);
         }
-        if(mDcgmGetLatestValues_v1.isBound()){
-            return DcgmCall(mDcgmGetLatestValues_v1, pDcgmHandle, groupId, fieldGroupId, &DCGMCollector::dcgmDataCallback_v1, userData);
+        if (mDcgmGetLatestValues_v1.isBound()) {
+            return DcgmCall(mDcgmGetLatestValues_v1,
+                            pDcgmHandle,
+                            groupId,
+                            fieldGroupId,
+                            &DCGMCollector::dcgmDataCallback_v1,
+                            userData);
         }
         return false;
     }
@@ -1360,20 +1393,20 @@ private:
             .denyListCount = 0,
         };
 
-        if(mDcgmStartEmbedded_v2.isBound()){
+        if (mDcgmStartEmbedded_v2.isBound()) {
             if (DcgmCall(mDcgmStartEmbedded_v2, &params)) {
                 *dcgmHandle = params.dcgmHandle;
                 return true;
             }
             return false;
         }
-        if(mDcgmStartEmbedded_v1.isBound()){
+        if (mDcgmStartEmbedded_v1.isBound()) {
             return DcgmCall(mDcgmStartEmbedded_v1, opMode, dcgmHandle);
         }
         return false;
     }
 
-    template<typename Func, typename... Args>
+    template <typename Func, typename... Args>
     bool DcgmCall(const Func& funcToCall, Args&&... args) {
         auto result = funcToCall(std::forward<Args>(args)...);
         if (!result.has_value()) {
@@ -1384,14 +1417,15 @@ private:
         if (ret != DCGM_ST_OK) {
             std::string errMsg = "N/A";
             if (auto errStrOpt = mDcgmErrorString(ret)) {
-                if (errStrOpt.value() != nullptr) errMsg = errStrOpt.value();
+                if (errStrOpt.value() != nullptr)
+                    errMsg = errStrOpt.value();
             }
             LOG_ERROR(sLogger, ("DCGM API call failed", errMsg)("error_code", ret));
             return false;
         }
         return true;
     }
-    
+
     void initializeFunctionProxies() {
         mDcgmInit = FunctionProxy<decltype(dcgmInit)>(mLibrary, "dcgmInit");
         mDcgmShutdown = FunctionProxy<decltype(dcgmShutdown)>(mLibrary, "dcgmShutdown");
@@ -1428,13 +1462,13 @@ private:
 };
 
 bool CheckGPUExist() {
-    if(!std::filesystem::exists(NVIDIACTL)){
+    if (!std::filesystem::exists(NVIDIACTL)) {
         LOG_ERROR(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
         return false;
     }
 
     auto binary_path = boost::process::search_path(NVSMI);
-    if(binary_path.empty()){
+    if (binary_path.empty()) {
         LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
         return false;
     }
@@ -1444,8 +1478,10 @@ bool CheckGPUExist() {
     std::error_code ec;
 
     int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
-    if (ec || exit_code != 0){
-        LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code", exit_code));
+    if (ec || exit_code != 0) {
+        LOG_ERROR(sLogger,
+                  ("GPU check failed", "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code",
+                                                                                                            exit_code));
         return false;
     }
 
@@ -1470,16 +1506,16 @@ bool CheckGPUExist() {
 static std::unique_ptr<DCGMCollector> dcgmCollector;
 
 bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
-    if (!CheckGPUExist()){
+    if (!CheckGPUExist()) {
         LOG_WARNING(sLogger, ("GPU collector initialization skipped", "no GPU hardware detected"));
         return false;
     }
     dcgmCollector = std::make_unique<DCGMCollector>(LIB_DCGM);
-    if (!dcgmCollector->Initialize(fieldMap)){
+    if (!dcgmCollector->Initialize(fieldMap)) {
         LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM initialization error"));
         return false;
     }
-    
+
     if (!dcgmCollector->isReady()) {
         LOG_ERROR(sLogger, ("GPU collector initialization failed", "DCGM not ready after initialization"));
         return false;
@@ -1490,18 +1526,18 @@ bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
 }
 
 bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
-    if (!dcgmCollector || !dcgmCollector->isReady()){
+    if (!dcgmCollector || !dcgmCollector->isReady()) {
         LOG_ERROR(sLogger, ("GPU data retrieval failed", "DCGM collector not ready"));
         return false;
     }
-    
+
     bool success = dcgmCollector->Collect(gpuInfo);
     if (!success) {
         LOG_ERROR(sLogger, ("GPU data retrieval failed", "collection operation failed"));
     } else {
         LOG_DEBUG(sLogger, ("GPU data retrieval successful", "metrics collected")("gpu_count", gpuInfo.stats.size()));
     }
-    
+
     return success;
 }
 } // namespace logtail

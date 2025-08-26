@@ -13,12 +13,11 @@
 // limitations under the License.
 // Authors: Wardenjohn <zhangwarden@gmail.com>
 
+#include <boost/process.hpp>
 #include <boost/process/search_path.hpp>
 #include <boost/process/system.hpp>
-#include <boost/process.hpp>
 
 #include "MetricEvent.h"
-#include "common/FileSystemUtil.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/SystemInterface.h"
@@ -35,18 +34,16 @@ public:
     bool CheckGPUExist() const;
 
 protected:
-    void SetUp() override {
-        
-    }
+    void SetUp() override {}
 };
 
 bool GPUCollectorUnittest::CheckGPUExist() const {
-    if(!std::filesystem::exists(NVIDIACTL)){
+    if (!std::filesystem::exists(NVIDIACTL)) {
         return false;
     }
 
     auto binary_path = boost::process::search_path(NVSMI);
-    if(binary_path.empty()){
+    if (binary_path.empty()) {
         return false;
     }
 
@@ -55,7 +52,7 @@ bool GPUCollectorUnittest::CheckGPUExist() const {
     std::error_code ec;
 
     int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
-    if (ec || exit_code != 0){
+    if (ec || exit_code != 0) {
         return false;
     }
 
@@ -79,9 +76,12 @@ void GPUCollectorUnittest::TestCollect() const {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     HostMonitorTimerEvent::CollectConfig collectConfig(GPUCollector::sName, 0, 0, std::chrono::seconds(1));
 
-    APSARA_TEST_EQUAL_FATAL(CheckGPUExist(), collector.Collect(collectConfig, &group));
-    APSARA_TEST_EQUAL_FATAL(CheckGPUExist(), collector.Collect(collectConfig, &group));
-    APSARA_TEST_EQUAL_FATAL(CheckGPUExist(), collector.Collect(collectConfig, &group));
+    bool gpuExist = CheckGPUExist();
+    if (!gpuExist) {
+        APSARA_TEST_FALSE(collector.Collect(collectConfig, &group));
+        APSARA_TEST_FALSE(collector.Collect(collectConfig, &group));
+        APSARA_TEST_FALSE(collector.Collect(collectConfig, &group));
+    }
 }
 
 

@@ -14,72 +14,72 @@
  * limitations under the License.
  */
 
- #pragma once
+#pragma once
 
- #include <string>
- #include <vector>
- #include <unordered_map>
- #include <functional>
- 
- #include "host_monitor/SystemInterface.h"
- #include "host_monitor/collector/BaseCollector.h"
- #include "host_monitor/collector/MetricCalculate.h"
- #include "plugin/input/InputHostMonitor.h"
- 
- namespace logtail {
- 
- extern const uint32_t kHostMonitorMinInterval;
- extern const uint32_t kHostMonitorDefaultInterval;
- 
- struct GPUMetric {
-     double decoderUtilization;
-     double encoderUtilization;
-     double gpuUsedUtilization;
-     double memoryFreeSpace;
-     double memoryFreeUtilization;
-     double memoryUsedSpace;
-     double memoryUsedUtilization;
-     double gpuTemperature;
-     double powerReadingsPowerDraw;
- 
-     // Define the field descriptors
-     static inline const FieldName<GPUMetric> GPUMetricFields[] = {
-         FIELD_ENTRY(GPUMetric, decoderUtilization),
-         FIELD_ENTRY(GPUMetric, encoderUtilization),
-         FIELD_ENTRY(GPUMetric, gpuUsedUtilization),
-         FIELD_ENTRY(GPUMetric, memoryFreeSpace),
-         FIELD_ENTRY(GPUMetric, memoryFreeUtilization),
-         FIELD_ENTRY(GPUMetric, memoryUsedSpace),
-         FIELD_ENTRY(GPUMetric, memoryUsedUtilization),
-         FIELD_ENTRY(GPUMetric, gpuTemperature),
-         FIELD_ENTRY(GPUMetric, powerReadingsPowerDraw),
-     };
- 
-     // Define the enumerate function for your metric type
-     static void enumerate(const std::function<void(const FieldName<GPUMetric, double>&)>& callback) {
-         for (const auto& field : GPUMetricFields) {
-             callback(field);
-         }
-     }
- };
- 
- 
- class GPUCollector : public BaseCollector {
- public:
-     GPUCollector();
-     int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
- 
-     ~GPUCollector() override = default;
- 
-     bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
- 
-     static const std::string sName;
-     const std::string& Name() const override { return sName; }
- 
- private:
-     int mCountPerReport = 0;
-     int mCount = 0;
-     std::unordered_map<std::string, MetricCalculate<GPUMetric>> mCalculateMap;
- };
- 
- } // namespace logtail
+#include <functional>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/MetricCalculate.h"
+#include "plugin/input/InputHostMonitor.h"
+
+namespace logtail {
+
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
+
+struct GPUMetric {
+    double decoderUtilization;
+    double encoderUtilization;
+    double gpuUsedUtilization;
+    double memoryFreeSpace;
+    double memoryFreeUtilization;
+    double memoryUsedSpace;
+    double memoryUsedUtilization;
+    double gpuTemperature;
+    double powerReadingsPowerDraw;
+
+    // Define the field descriptors
+    static inline const FieldName<GPUMetric> GPUMetricFields[] = {
+        FIELD_ENTRY(GPUMetric, decoderUtilization),
+        FIELD_ENTRY(GPUMetric, encoderUtilization),
+        FIELD_ENTRY(GPUMetric, gpuUsedUtilization),
+        FIELD_ENTRY(GPUMetric, memoryFreeSpace),
+        FIELD_ENTRY(GPUMetric, memoryFreeUtilization),
+        FIELD_ENTRY(GPUMetric, memoryUsedSpace),
+        FIELD_ENTRY(GPUMetric, memoryUsedUtilization),
+        FIELD_ENTRY(GPUMetric, gpuTemperature),
+        FIELD_ENTRY(GPUMetric, powerReadingsPowerDraw),
+    };
+
+    // Define the enumerate function for your metric type
+    static void enumerate(const std::function<void(const FieldName<GPUMetric, double>&)>& callback) {
+        for (const auto& field : GPUMetricFields) {
+            callback(field);
+        }
+    }
+};
+
+
+class GPUCollector : public BaseCollector {
+public:
+    GPUCollector();
+    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+
+    ~GPUCollector() override = default;
+
+    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+
+    static const std::string sName;
+    const std::string& Name() const override { return sName; }
+
+private:
+    int mCountPerReport = 0;
+    int mCount = 0;
+    std::unordered_map<std::string, MetricCalculate<GPUMetric>> mCalculateMap;
+};
+
+} // namespace logtail

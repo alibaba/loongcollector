@@ -261,9 +261,7 @@ bool SystemInterface::GetGPUInformation(GPUInformation& gpuInfo) {
     const std::string errorType = "gpu";
     return MemoizedCall(
         mGPUInformationCache,
-        [this](BaseInformation& info) {
-            return this->GetGPUInformationOnce(static_cast<GPUInformation&>(info));
-        },
+        [this](BaseInformation& info) { return this->GetGPUInformationOnce(static_cast<GPUInformation&>(info)); },
         gpuInfo,
         errorType);
 }

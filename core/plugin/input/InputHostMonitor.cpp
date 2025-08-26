@@ -21,11 +21,11 @@
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
+#include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
-#include "host_monitor/collector/GPUCollector.h"
 
 namespace logtail {
 
