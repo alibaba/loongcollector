@@ -62,6 +62,9 @@ public:
     // Configuration
     virtual bool SetDataThreshold(size_t threshold) = 0;
     virtual bool SetTimeout(std::chrono::milliseconds timeout) = 0;
+    
+    // Journal paths
+    virtual bool SetJournalPaths(const std::vector<std::string>& paths) = 0;
 };
 
 /**
@@ -93,6 +96,8 @@ public:
     
     bool SetDataThreshold(size_t threshold) override;
     bool SetTimeout(std::chrono::milliseconds timeout) override;
+    
+    bool SetJournalPaths(const std::vector<std::string>& paths) override;
 
 private:
     class Impl;

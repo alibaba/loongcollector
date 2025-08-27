@@ -131,6 +131,9 @@ bool InputJournal::Start() {
     
     LOG_INFO(sLogger, ("starting InputJournal", "")("config", mContext->GetConfigName())("idx", mIndex));
     
+    // Initialize JournalServer if not already initialized
+    JournalServer::GetInstance()->Init();
+    
     // Create journal configuration for JournalServer
     JournalConfig config;
     config.seekPosition = mSeekPosition;
@@ -154,7 +157,6 @@ bool InputJournal::Start() {
     
     LOG_INFO(sLogger, ("InputJournal registered with JournalServer", "")("config", mContext->GetConfigName())("idx", mIndex));
     
-    // JournalServer 会处理所有数据，不再需要自己的主线程
     return true;
 }
 

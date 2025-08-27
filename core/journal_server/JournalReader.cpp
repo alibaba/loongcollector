@@ -310,11 +310,17 @@ public:
         return true;
     }
     
+    bool SetJournalPaths(const std::vector<std::string>& paths) {
+        mJournalPaths = paths;
+        return true;
+    }
+    
 private:
     bool mIsOpen;
     sd_journal* mJournal;  // Always define, but only use when __linux__ is defined
     size_t mDataThreshold;
     int mTimeout;
+    std::vector<std::string> mJournalPaths;
 };
 
 // JournalReader implementation
@@ -337,5 +343,6 @@ bool SystemdJournalReader::AddDisjunction() { return mImpl->AddDisjunction(); }
 int SystemdJournalReader::Wait(std::chrono::milliseconds timeout) { return mImpl->Wait(timeout); }
 bool SystemdJournalReader::SetDataThreshold(size_t threshold) { return mImpl->SetDataThreshold(threshold); }
 bool SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout) { return mImpl->SetTimeout(timeout); }
+bool SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& paths) { return mImpl->SetJournalPaths(paths); }
 
 } // namespace logtail 

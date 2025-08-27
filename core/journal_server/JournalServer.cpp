@@ -41,8 +41,10 @@ using namespace std;
 namespace logtail {
 
 void JournalServer::Init() {
+    LOG_INFO(sLogger, ("JournalServer initializing", ""));
     mThreadRes = async(launch::async, &JournalServer::Run, this);
     mStartTime = time(nullptr);
+    LOG_INFO(sLogger, ("JournalServer initialized", ""));
 }
 
 void JournalServer::Stop() {
@@ -173,12 +175,14 @@ void JournalServer::ClearJournalCheckpoint(const string& configName, size_t idx)
 
 void JournalServer::Run() {
     LOG_INFO(sLogger, ("journal server", "started"));
+    LOG_INFO(sLogger, ("journal server thread", "entering main loop"));
     unique_lock<mutex> lock(mThreadRunningMux);
     time_t lastDumpCheckpointTime = time(nullptr);
     
     while (mIsThreadRunning) {
         lock.unlock();
         
+        LOG_INFO(sLogger, ("journal server loop", "iteration"));
         // Process journal entries for all registered configurations
         ProcessJournalEntries();
         
@@ -197,12 +201,21 @@ void JournalServer::Run() {
 }
 
 void JournalServer::ProcessJournalEntries() {
+    LOG_INFO(sLogger, ("ProcessJournalEntries", "called"));
     // Get current configurations snapshot to avoid long lock holding
     unordered_map<string, map<size_t, JournalConfig>> currentConfigs;
     {
         lock_guard<mutex> lock(mUpdateMux);
         currentConfigs = mPipelineNameJournalConfigsMap;
     }
+    
+    // Add debug logging
+    if (currentConfigs.empty()) {
+        LOG_INFO(sLogger, ("no journal configurations to process", ""));
+        return;
+    }
+    
+    LOG_INFO(sLogger, ("processing journal entries", "")("configs_count", currentConfigs.size()));
     
     // Process each configuration
     for (const auto& pipelineConfig : currentConfigs) {
@@ -211,6 +224,8 @@ void JournalServer::ProcessJournalEntries() {
         for (const auto& idxConfig : pipelineConfig.second) {
             size_t idx = idxConfig.first;
             const JournalConfig& config = idxConfig.second;
+            
+            LOG_DEBUG(sLogger, ("processing config", "")("config", configName)("idx", idx));
             
             // Check if this input has been deleted
             {
@@ -227,6 +242,8 @@ void JournalServer::ProcessJournalEntries() {
 }
 
 void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, const JournalConfig& config) {
+    LOG_INFO(sLogger, ("ProcessJournalConfig", "started")("config", configName)("idx", idx));
+    
     if (!config.ctx) {
         LOG_WARNING(sLogger, ("no context available for journal config", "skip")("config", configName)("idx", idx));
         return;
@@ -248,14 +265,25 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     LOG_DEBUG(sLogger, ("processing journal config", "")("config", configName)("idx", idx)("queue", queueKey));
     
     // Create a journal reader for this configuration
+    LOG_INFO(sLogger, ("creating journal reader", "")("config", configName)("idx", idx));
     auto journalReader = std::make_unique<SystemdJournalReader>();
     
+    // Set custom journal paths if specified
+    if (!config.journalPaths.empty()) {
+        LOG_INFO(sLogger, ("setting custom journal paths", "")("config", configName)("idx", idx)("paths_count", config.journalPaths.size()));
+        for (const auto& path : config.journalPaths) {
+            LOG_INFO(sLogger, ("journal path", path)("config", configName)("idx", idx));
+        }
+        journalReader->SetJournalPaths(config.journalPaths);
+    }
+    
     // Open the journal
+    LOG_INFO(sLogger, ("opening journal", "")("config", configName)("idx", idx)("paths_count", config.journalPaths.size()));
     if (!journalReader->Open()) {
         LOG_ERROR(sLogger, ("failed to open journal", "skip processing")("config", configName)("idx", idx));
         return;
     }
-    LOG_DEBUG(sLogger, ("journal opened successfully", "")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("journal opened successfully", "")("config", configName)("idx", idx));
     
     // Apply journal filters based on configuration
     bool filtersApplied = true;
@@ -313,6 +341,17 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         } else {
             LOG_DEBUG(sLogger, ("seeking to tail", "")("config", configName)("idx", idx));
             seekSuccess = journalReader->SeekTail();
+            
+            // After seeking to tail, move to the last actual entry
+            if (seekSuccess) {
+                LOG_DEBUG(sLogger, ("seeking to tail succeeded, moving to last entry", "")("config", configName)("idx", idx));
+                if (!journalReader->Previous()) {
+                    LOG_DEBUG(sLogger, ("no previous entry available after seeking to tail", "")("config", configName)("idx", idx));
+                    // This is normal if journal is empty, continue processing
+                } else {
+                    LOG_DEBUG(sLogger, ("moved to last entry after seeking to tail", "")("config", configName)("idx", idx));
+                }
+            }
         }
         
         if (!seekSuccess) {
@@ -327,17 +366,24 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     
     LOG_DEBUG(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx));
     
+    // If we're at tail position and moved to last entry, process it first
+    bool shouldProcessCurrentEntry = (config.seekPosition == "tail" || 
+                                    (config.seekPosition == "cursor" && config.cursorSeekFallback == "tail"));
+    
     while (entryCount < maxEntriesPerBatch) {
-        // Move to next entry
-        if (!journalReader->Next()) {
-            LOG_DEBUG(sLogger, ("no more entries available", "")("config", configName)("idx", idx)("entries_read", entryCount));
-            break;
+        // Move to next entry (except for the first iteration if we're at tail)
+        if (entryCount > 0 || !shouldProcessCurrentEntry) {
+            if (!journalReader->Next()) {
+                LOG_DEBUG(sLogger, ("no more entries available", "")("config", configName)("idx", idx)("entries_read", entryCount));
+                break;
+            }
         }
         
         // Get the entry
         JournalEntry entry;
+        LOG_DEBUG(sLogger, ("attempting to get journal entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
         if (!journalReader->GetEntry(entry)) {
-            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx));
+            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx)("entry_count", entryCount));
             continue;
         }
         
