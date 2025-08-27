@@ -36,15 +36,32 @@ macro(all_link target_name)
     endif ()
 endmacro()
 
-# Add systemd journal library linking
+# # Add systemd journal library linking
+# macro(link_systemd_journal target_name)
+#     if (LINUX)
+#         find_library(SYSTEMD_JOURNAL_LIB systemd-journal)
+#         if (SYSTEMD_JOURNAL_LIB)
+#             target_link_libraries(${target_name} ${SYSTEMD_JOURNAL_LIB})
+#             message(STATUS "Found systemd-journal library: ${SYSTEMD_JOURNAL_LIB}")
+#         else()
+#             message(WARNING "systemd-journal library not found, journal input plugin may not work")
+#         endif()
+#     endif()
+# endmacro()
+
 macro(link_systemd_journal target_name)
     if (LINUX)
-        find_library(SYSTEMD_JOURNAL_LIB systemd-journal)
-        if (SYSTEMD_JOURNAL_LIB)
-            target_link_libraries(${target_name} ${SYSTEMD_JOURNAL_LIB})
-            message(STATUS "Found systemd-journal library: ${SYSTEMD_JOURNAL_LIB}")
+        # 使用 pkg-config 查找 libsystemd
+        find_package(PkgConfig REQUIRED)
+        pkg_search_module(SYSTEMD REQUIRED IMPORTED_TARGET libsystemd)
+
+        if (SYSTEMD_FOUND)
+            # 链接 libsystemd（现代方式）
+            target_link_libraries(${target_name} PkgConfig::SYSTEMD)
+            target_include_directories(${target_name} PRIVATE ${SYSTEMD_INCLUDE_DIRS})
+            message(STATUS "Linked with libsystemd via pkg-config: ${SYSTEMD_LIBRARIES}")
         else()
-            message(WARNING "systemd-journal library not found, journal input plugin may not work")
+            message(FATAL_ERROR "libsystemd not found. Please install libsystemd-dev or systemd-devel.")
         endif()
     endif()
 endmacro()
