@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include <vector>
 
@@ -24,6 +25,18 @@ namespace logtail {
 class KafkaUtil {
 public:
     static std::string BrokersToString(const std::vector<std::string>& brokers);
+
+    struct Version {
+        int major = 0;
+        int minor = 0;
+        int patch = 0;
+        int build = 0;
+    };
+
+    static bool ParseKafkaVersion(const std::string& in, Version& out);
+
+    static void DeriveApiVersionConfigs(const std::string& userKafkaVersion,
+                                        std::map<std::string, std::string>& outConfigs);
 };
 
 } // namespace logtail

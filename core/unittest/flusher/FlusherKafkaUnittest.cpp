@@ -65,6 +65,7 @@ Json::Value CreateKafkaTestConfig(const std::string& topic) {
     config["Brokers"] = Json::Value(Json::arrayValue);
     config["Brokers"].append("test.mock.brokers");
     config["Topic"] = topic;
+    config["KafkaVersion"] = "2.6.0";
     config["Kafka"] = Json::Value(Json::objectValue);
     config["Kafka"]["test.mock.num.brokers"] = "3";
     return config;
@@ -86,6 +87,7 @@ public:
     void TestSendParamsError();
     void TestSendQueueFullError();
     void TestFlushFailure();
+    void TestInitMissingKafkaVersion();
     void TestInitWithFullConfig();
     void TestSendOnUnstarted();
     void TestSendSerializationFailure();
@@ -150,6 +152,7 @@ void FlusherKafkaUnittest::TestInitMissingTopic() {
     Json::Value optionalGoPipeline;
     config["Brokers"] = Json::Value(Json::arrayValue);
     config["Brokers"].append("dummy:9092");
+    config["KafkaVersion"] = "2.6.0";
     APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
 }
 
@@ -215,6 +218,15 @@ void FlusherKafkaUnittest::TestInitProducerFailure() {
     Json::Value config = CreateKafkaTestConfig(mTopic);
     mMockProducer->SetInitSuccess(false);
 
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitMissingKafkaVersion() {
+    Json::Value optionalGoPipeline;
+    Json::Value config;
+    config["Brokers"] = Json::Value(Json::arrayValue);
+    config["Brokers"].append("dummy:9092");
+    config["Topic"] = mTopic;
     APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
 }
 
@@ -368,6 +380,7 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendFailure)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestStartStop)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestFlush)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitProducerFailure)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingKafkaVersion)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendNetworkError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendAuthError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendServerError)

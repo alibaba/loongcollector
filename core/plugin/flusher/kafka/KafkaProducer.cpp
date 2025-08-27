@@ -19,6 +19,7 @@
 #include <atomic>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 #include "common/StringTools.h"
 #include "logger/Logger.h"
@@ -69,31 +70,36 @@ KafkaProducer::ErrorType KafkaProducer::MapKafkaError(rd_kafka_resp_err_t err) {
     }
 }
 
-void KafkaProducer::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque) {
-    auto* context = static_cast<ProducerContext*>(rkmessage->_private);
-    if (!context) {
-        return;
-    }
-
-    if (rkmessage->err == RD_KAFKA_RESP_ERR_NO_ERROR) {
-        context->callback(true, {KafkaProducer::ErrorType::SUCCESS, "", 0});
-    } else {
-        KafkaProducer::ErrorInfo errorInfo;
-        errorInfo.type = KafkaProducer::MapKafkaError(rkmessage->err);
-        errorInfo.message = rd_kafka_err2str(rkmessage->err);
-        errorInfo.code = static_cast<int>(rkmessage->err);
-        context->callback(false, errorInfo);
-    }
-
-    delete context;
-}
-
 class KafkaProducer::Impl {
 public:
     Impl() : mProducer(nullptr), mConf(nullptr), mIsRunning(false), mIsClosed(false) {}
     ~Impl() {
         if (!mIsClosed) {
             Close();
+        }
+        for (auto& ctx : mContextPool) {
+            delete ctx;
+        }
+    }
+
+    ProducerContext* GetContext() {
+        std::lock_guard<std::mutex> lock(mContextPoolMutex);
+        if (mContextPool.empty()) {
+            return new ProducerContext();
+        }
+        auto* ctx = mContextPool.back();
+        mContextPool.pop_back();
+        return ctx;
+    }
+
+    void ReleaseContext(ProducerContext* ctx) {
+        ctx->callback = nullptr;
+        ctx->errorInfo = {KafkaProducer::ErrorType::SUCCESS, "", 0};
+        std::lock_guard<std::mutex> lock(mContextPoolMutex);
+        if (mContextPool.size() < kMaxContextCache) {
+            mContextPool.push_back(ctx);
+        } else {
+            delete ctx;
         }
     }
 
@@ -133,6 +139,28 @@ public:
             return false;
         }
 
+        std::map<std::string, std::string> derivedConfigs;
+        KafkaUtil::DeriveApiVersionConfigs(mConfig.KafkaVersion, derivedConfigs);
+        if (!derivedConfigs.empty()) {
+            LOG_INFO(sLogger,
+                     ("Apply KafkaVersion derived configs",
+                      "")(KAFKA_CONFIG_API_VERSION_REQUEST,
+                          derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
+                              ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]
+                              : "<unset>")(KAFKA_CONFIG_BROKER_VERSION_FALLBACK,
+                                           derivedConfigs.count(KAFKA_CONFIG_BROKER_VERSION_FALLBACK)
+                                               ? derivedConfigs[KAFKA_CONFIG_BROKER_VERSION_FALLBACK]
+                                               : "<unset>")(KAFKA_CONFIG_API_VERSION_FALLBACK_MS,
+                                                            derivedConfigs.count(KAFKA_CONFIG_API_VERSION_FALLBACK_MS)
+                                                                ? derivedConfigs[KAFKA_CONFIG_API_VERSION_FALLBACK_MS]
+                                                                : "<unset>"));
+            for (const auto& kv : derivedConfigs) {
+                if (!SetConfig(kv.first, kv.second)) {
+                    return false;
+                }
+            }
+        }
+
         for (const auto& kv : mConfig.CustomConfig) {
             if (!SetConfig(kv.first, kv.second)) {
                 return false;
@@ -140,6 +168,7 @@ public:
         }
 
         rd_kafka_conf_set_dr_msg_cb(mConf, KafkaProducer::DeliveryReportCallback);
+        rd_kafka_conf_set_opaque(mConf, this);
 
         char errstr[512];
         mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
@@ -150,10 +179,7 @@ public:
         mIsRunning = true;
         mPollThread = std::thread([this]() {
             while (mIsRunning.load(std::memory_order_relaxed)) {
-                std::lock_guard<std::mutex> lock(mProducerMutex);
-                if (mProducer) {
-                    rd_kafka_poll(mProducer, 100);
-                }
+                rd_kafka_poll(mProducer, KAFKA_POLL_INTERVAL_MS);
             }
         });
 
@@ -161,7 +187,12 @@ public:
     }
 
     void ProduceAsync(const std::string& topic, std::string&& value, KafkaProducer::Callback callback) {
-        if (!mProducer) {
+        rd_kafka_t* producer = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(mProducerMutex);
+            producer = mProducer;
+        }
+        if (!producer) {
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::ErrorType::OTHER_ERROR;
             errorInfo.message = "producer not initialized";
@@ -170,9 +201,10 @@ public:
             return;
         }
 
-        auto* context = new ProducerContext{std::move(callback), {KafkaProducer::ErrorType::SUCCESS, "", 0}};
+        auto* context = GetContext();
+        context->callback = std::move(callback);
 
-        rd_kafka_resp_err_t err = rd_kafka_producev(mProducer,
+        rd_kafka_resp_err_t err = rd_kafka_producev(producer,
                                                     RD_KAFKA_V_TOPIC(topic.c_str()),
                                                     RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
                                                     RD_KAFKA_V_VALUE(value.data(), value.size()),
@@ -180,7 +212,7 @@ public:
                                                     RD_KAFKA_V_END);
 
         if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
-            delete context;
+            ReleaseContext(context);
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::MapKafkaError(err);
             errorInfo.message = rd_kafka_err2str(err);
@@ -242,7 +274,35 @@ private:
     std::thread mPollThread;
     std::mutex mProducerMutex;
     bool mIsClosed;
+
+    std::vector<ProducerContext*> mContextPool;
+    std::mutex mContextPoolMutex;
+    static constexpr size_t kMaxContextCache = 65536;
 };
+
+void KafkaProducer::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque) {
+    auto* context = static_cast<ProducerContext*>(rkmessage->_private);
+    if (!context) {
+        return;
+    }
+
+    if (rkmessage->err == RD_KAFKA_RESP_ERR_NO_ERROR) {
+        context->callback(true, {KafkaProducer::ErrorType::SUCCESS, "", 0});
+    } else {
+        KafkaProducer::ErrorInfo errorInfo;
+        errorInfo.type = KafkaProducer::MapKafkaError(rkmessage->err);
+        errorInfo.message = rd_kafka_err2str(rkmessage->err);
+        errorInfo.code = static_cast<int>(rkmessage->err);
+        context->callback(false, errorInfo);
+    }
+
+    auto* producerImpl = static_cast<KafkaProducer::Impl*>(rd_kafka_opaque(rk));
+    if (producerImpl) {
+        producerImpl->ReleaseContext(context);
+    } else {
+        delete context;
+    }
+}
 
 KafkaProducer::KafkaProducer() : mImpl(std::make_unique<Impl>()) {
 }

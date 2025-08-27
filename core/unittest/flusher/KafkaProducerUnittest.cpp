@@ -66,6 +66,7 @@ void KafkaProducerUnittest::SetUp() {
 
     mConfig.Brokers = {"test.broker1:9092", "test.broker2:9092"};
     mConfig.Topic = "test_topic";
+    mConfig.KafkaVersion = "2.6.0";
     mConfig.Producer.BatchSize = 1000000;
     mConfig.Producer.LingerMs = 100;
     mConfig.Producer.BatchNumMessages = 1000;

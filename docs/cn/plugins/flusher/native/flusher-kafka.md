@@ -6,6 +6,7 @@
 | :--- | :--- | :--- | :--- |
 | `Brokers` | String数组 | 是 | Kafka 集群的连接地址列表。例如：`["host1:9092", "host2:9092"]`。 |
 | `Topic` | String | 是 | 消息默认发送到的 Topic 名称。 |
+| `KafkaVersion` | String | 是 | Kafka Broker 的实际版本号，例如：`"0.8.2.2"`, `"0.9.0.1"`, `"0.10.2.1"`, `"2.6.0"`, `"3.7.0"`。必填，用于按照兼容策略推导底层 librdkafka 参数。 |
 | `Producer.QueueBufferingMaxKbytes` | Int | 否 | 生产者本地消息队列的最大总容量（单位：KB）。默认值：`1048576` (1GB)。 |
 | `Producer.QueueBufferingMaxMessages` | Int | 否 | 生产者本地消息队列允许缓存的最大消息数量。默认值：`100000`。 |
 | `Producer.LingerMs` | Int | 否 | 发送消息前在队列中累积的最大等待时间（单位：毫秒）。增加此值可提高吞吐量，但会增加延迟。默认值：`5`。 |

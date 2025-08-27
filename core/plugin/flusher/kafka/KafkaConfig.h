@@ -23,12 +23,15 @@
 #include <vector>
 
 #include "common/ParamExtractor.h"
+#include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
 
 struct KafkaConfig {
     std::vector<std::string> Brokers;
     std::string Topic;
+
+    std::string KafkaVersion;
 
 
     struct Producer {
@@ -61,6 +64,15 @@ struct KafkaConfig {
             return false;
         }
 
+        if (!GetMandatoryStringParam(config, "KafkaVersion", KafkaVersion, errorMsg)) {
+            return false;
+        }
+
+        KafkaUtil::Version parsed;
+        if (!KafkaUtil::ParseKafkaVersion(KafkaVersion, parsed)) {
+            errorMsg = "invalid KafkaVersion format, expected x.y.z[.n]";
+            return false;
+        }
 
         if (config.isMember("Producer") && config["Producer"].isObject()) {
             const Json::Value& producerConfig = config["Producer"];

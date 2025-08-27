@@ -35,6 +35,10 @@ const std::string KAFKA_CONFIG_MESSAGE_TIMEOUT_MS = "message.timeout.ms";
 const std::string KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES = "message.send.max.retries";
 const std::string KAFKA_CONFIG_RETRY_BACKOFF_MS = "retry.backoff.ms";
 
+const std::string KAFKA_CONFIG_API_VERSION_REQUEST = "api.version.request";
+const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK = "broker.version.fallback";
+const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS = "api.version.fallback.ms";
+
 const int KAFKA_POLL_INTERVAL_MS = 100;
 const int KAFKA_FLUSH_TIMEOUT_MS = 5000;
 
