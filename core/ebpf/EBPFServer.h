@@ -86,6 +86,8 @@ public:
 
     void Stop() override;
 
+    void EventGC() override;
+
     bool EnablePlugin(const std::string& pipelineName,
                       uint32_t pluginIndex,
                       PluginType type,
@@ -107,6 +109,9 @@ public:
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
+
+    void RegisterPluginPerfBuffers(PluginType type);
+    void UnregisterPluginPerfBuffers(PluginType type);
 
 private:
     bool startPluginInternal(const std::string& pipelineName,
@@ -136,9 +141,7 @@ private:
     void handleEpollEvents();
 
     // Unified epoll monitoring methods
-    void initUnifiedEpollMonitoring();
-    void registerPluginPerfBuffers(PluginType type);
-    void unregisterPluginPerfBuffers(PluginType type);
+    bool initUnifiedEpollMonitoring();
     void cleanupUnifiedEpollMonitoring();
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
@@ -171,6 +174,7 @@ private:
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionCacheSize;
+    CounterPtr mPushLogFailedTotal;
 
     int mUnifiedEpollFd = -1;
     std::vector<struct epoll_event> mEpollEvents;
@@ -178,6 +182,8 @@ private:
     RetryableEventCache mRetryableEventCache;
     IntGaugePtr mRetryableEventCacheSize;
     int64_t mLastEventCacheRetryTime = 0;
+
+    EventPool mEventPool;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif

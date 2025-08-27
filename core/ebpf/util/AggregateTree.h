@@ -44,6 +44,8 @@ private:
 
     size_t mNodeCount = 0UL;
 
+    size_t mEventCount = 0UL;
+
     std::unique_ptr<AggNode<Data, KeyType>> mRootNode;
 
     std::function<void(std::unique_ptr<Data>& base, const Value& n)> mAggregateFunc;
@@ -65,6 +67,7 @@ public:
     AggTree(AggTree<Data, Value, KeyType, NeedSourceBuffer>&& other) noexcept
         : mMaxNodes(other.mMaxNodes),
           mNodeCount(other.mNodeCount),
+          mEventCount(other.mEventCount),
           mRootNode(std::move(other.mRootNode)),
           mAggregateFunc(other.mAggregateFunc),
           mBuildFunc(other.mBuildFunc) {}
@@ -72,6 +75,7 @@ public:
     AggTree& operator=(AggTree<Data, Value, KeyType, NeedSourceBuffer>&& other) noexcept {
         mMaxNodes = other.mMaxNodes;
         mNodeCount = other.mNodeCount;
+        mEventCount = other.mEventCount;
         mRootNode = std::move(other.mRootNode);
         mAggregateFunc = other.mAggregateFunc;
         mBuildFunc = other.mBuildFunc;
@@ -99,7 +103,7 @@ public:
                 if (!p->mSourceBuffer) {
                     if (NeedSourceBuffer) {
                         // level1 nodes will setup new sourcebuffer ...
-                        newNode->mSourceBuffer = std::make_shared<SourceBuffer>();
+                        newNode->mSourceBuffer = std::make_shared<SourceBuffer>(kDefaultNodeSourceBufferSize);
                     }
                 } else {
                     // level2 or lower nodes will hold the ref of level1 node's
@@ -118,6 +122,7 @@ public:
             p->mData = mBuildFunc(d, p->mSourceBuffer);
         }
         mAggregateFunc(p->mData, d);
+        mEventCount++;
         return true;
     }
 
@@ -133,6 +138,7 @@ public:
         // mRootNode = std::make_unique<AggNode<Data, KeyType>>(nullptr);
         mRootNode = std::make_unique<AggNode<Data, KeyType>>();
         mNodeCount = 0;
+        mEventCount = 0;
     }
 
     void ForEach(const AggNode<Data, KeyType>* root, const std::function<void(const Data*)>& call) {
@@ -148,6 +154,8 @@ public:
     }
 
     [[nodiscard]] size_t NodeCount() const { return mNodeCount; }
+
+    [[nodiscard]] size_t EventCount() const { return mEventCount; }
 
 private:
     void GetNodes(size_t depth,

@@ -21,8 +21,9 @@
 namespace logtail::ebpf {
 AbstractManager::AbstractManager(const std::shared_ptr<ProcessCacheManager>& processCacheMgr,
                                  const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                 moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : mProcessCacheManager(processCacheMgr), mEBPFAdapter(eBPFAdapter), mCommonEventQueue(queue) {
+                                 moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                 EventPool* pool)
+    : mProcessCacheManager(processCacheMgr), mEBPFAdapter(eBPFAdapter), mCommonEventQueue(queue), mEventPool(pool) {
 }
 
 AbstractManager::~AbstractManager() {

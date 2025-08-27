@@ -20,8 +20,12 @@ func (m *metaCollector) processDeploymentEntity(data *k8smeta.ObjectWrapper, met
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		if obj.Spec.Selector != nil {
 			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
 		} else {
@@ -54,8 +58,12 @@ func (m *metaCollector) processDaemonSetEntity(data *k8smeta.ObjectWrapper, meth
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		if obj.Spec.Selector != nil {
 			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
 		} else {
@@ -85,8 +93,12 @@ func (m *metaCollector) processStatefulSetEntity(data *k8smeta.ObjectWrapper, me
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		if obj.Spec.Selector != nil {
 			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
 		} else {
@@ -117,8 +129,12 @@ func (m *metaCollector) processReplicaSetEntity(data *k8smeta.ObjectWrapper, met
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		if obj.Spec.Selector != nil {
 			log.Contents.Add("match_labels", m.processEntityJSONObject(obj.Spec.Selector.MatchLabels))
 		} else {

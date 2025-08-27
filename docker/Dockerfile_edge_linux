@@ -1,7 +1,15 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.us-east-1.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.8 AS builder
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.9 AS builder
+
+# Build arguments
+ARG VERSION=edge
+ARG ENABLE_COMPATIBLE_MODE=OFF
+ARG ENABLE_STATIC_LINK_CRT=OFF
+ARG WITHOUTGDB=ON
+ARG WITHSPL=ON
+ARG MAKE_JOBS=16
 
 USER root
 WORKDIR /src
@@ -31,17 +39,28 @@ RUN sh ./scripts/build_edge_linux.sh && \
 #########################################################################################################################
 # Step 2: Build image
 #########################################################################################################################
-FROM ubuntu:25.04
+FROM ubuntu:25.10 AS loongcollector
 
 ENV container=docker
 
+# Build arguments for final image
+ARG HOST_OS
+ARG VERSION=edge
 ARG TARGETPLATFORM
 
 WORKDIR /usr/local
 COPY --from=builder --chown=$(whoami) /src/dist/loongcollector-edge loongcollector
 
+# Install iproute2 if HOST_OS is Linux for e2e
+RUN if [ "$HOST_OS" = "Linux" ]; then \
+        apt-get update && apt-get install -y iproute2 && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 WORKDIR /usr/local/loongcollector
 ENV HTTP_PROBE_PORT=7953 \
     ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
-    docker_file_cache_path=checkpoint/docker_path_config.json
+    docker_file_cache_path=checkpoint/docker_path_config.json \
+    LOONGCOLLECTOR_VERSION=$VERSION \
+    HOST_OS=$HOST_OS
 CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

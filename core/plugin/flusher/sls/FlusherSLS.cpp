@@ -986,6 +986,9 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                     std::move(group.GetExactlyOnceCheckpoint()));
+    for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
+        g.mSourceBuffers.emplace_back(extraSourceBuffer);
+    }
     AddPackId(g);
     string errorMsg;
     if (!mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg)) {

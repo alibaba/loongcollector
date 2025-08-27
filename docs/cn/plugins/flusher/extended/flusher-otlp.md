@@ -64,7 +64,8 @@ flushers:
 
 ```yaml
 enable: true
-version: v2
+global:
+  StructureType: v2
 inputs:
   - Type: service_otlp
     Protocals:
@@ -82,7 +83,8 @@ flushers:
 
 ```yaml
 enable: true
-version: v2
+global:
+  StructureType: v2
 inputs:
   - Type: service_otlp
     Protocals:

@@ -128,7 +128,7 @@ void AggregatorUnittest::TestAggregator() {
         },
         [this](const std::shared_ptr<FileEvent>& in, std::shared_ptr<SourceBuffer>& sourceBuffer) {
             LOG_INFO(sLogger, ("generate node", ""));
-            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+            return std::make_unique<FileEventGroup>(in->mPid, in->mKtime);
         });
 
     std::vector<std::shared_ptr<FileEvent>> events;
@@ -170,7 +170,7 @@ void AggregatorUnittest::TestAggregator() {
             APSARA_TEST_EQUAL(group->mPid, pid);
             APSARA_TEST_EQUAL(group->mKtime, ktime);
             globalNodeCnt++;
-            LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime)("path", group->mPath));
+            LOG_WARNING(sLogger, ("pid", group->mPid)("ktime", group->mKtime));
             for (const auto& innerEvent : group->mInnerEvents) {
                 globalEventCnt++;
                 auto* fe = static_cast<NetworkEvent*>(innerEvent.get());

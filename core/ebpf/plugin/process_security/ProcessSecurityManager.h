@@ -38,13 +38,15 @@ public:
     ProcessSecurityManager() = delete;
     ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           EventPool* pool);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool) {
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     ~ProcessSecurityManager() = default;
@@ -82,6 +84,8 @@ public:
         return 0;
     }
 
+    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
+
 private:
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
@@ -95,6 +99,7 @@ private:
     uint32_t mPluginIndex{0};
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 };
 
 } // namespace logtail::ebpf

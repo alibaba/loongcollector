@@ -33,14 +33,16 @@ public:
 
     NetworkSecurityManager(const std::shared_ptr<ProcessCacheManager>& base,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           EventPool* pool);
     ~NetworkSecurityManager() override {}
 
     static std::shared_ptr<NetworkSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool) {
+        return std::make_shared<NetworkSecurityManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     int Init() override;
@@ -58,9 +60,10 @@ public:
 
     int RegisteredConfigCount() override { return mRegisteredConfigCount; }
 
-    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal) {
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, CounterPtr lossLogsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mLossKernelEventsTotal = std::move(lossEventsTotal);
+        mPushLogFailedTotal = std::move(lossLogsTotal);
     }
 
     int AddOrUpdateConfig(const CollectionPipelineContext*,
@@ -98,6 +101,7 @@ private:
     // plugin metrics, guarded by mContextMutex
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;

@@ -159,8 +159,9 @@ GetAppDetail(const std::unordered_map<size_t, std::shared_ptr<AppDetail>>& curre
 
 NetworkObserverManager::NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
       mAppAggregator(
           10240,
           [](std::unique_ptr<AppMetricData>& base, L7Record* other) {
@@ -560,7 +561,7 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
                     init = true;
                 }
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (size_t i = 0; i < kConnTrackerElementsTableSize; i++) {
                     if (kConnTrackerTable.ColLogKey(i) == "" || ctAttrVal[i] == "") {
                         continue;
@@ -594,13 +595,13 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
 
 #else
         if (init && needPush) {
-            pushEventsWithRetry(EventDataType::LOG,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushLogsTotal,
-                                pushLogGroupTotal);
+            pushEvents(EventDataType::LOG,
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushLogsTotal,
+                       pushLogGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push log ", ""));
         }
@@ -770,13 +771,13 @@ bool NetworkObserverManager::ConsumeNetMetricAggregateTree() { // handler
         ADD_COUNTER(pushMetricGroupTotal, 1);
         mMetricEventGroups.emplace_back(std::move(eventGroup));
 #else
-        pushEventsWithRetry(EventDataType::NET_METRIC,
-                            std::move(eventGroup),
-                            configName,
-                            queueKey,
-                            pluginIdx,
-                            pushMetricsTotal,
-                            pushMetricGroupTotal);
+        pushEvents(EventDataType::NET_METRIC,
+                   std::move(eventGroup),
+                   configName,
+                   queueKey,
+                   pluginIdx,
+                   pushMetricsTotal,
+                   pushMetricGroupTotal);
 #endif
     }
     return true;
@@ -958,13 +959,13 @@ bool NetworkObserverManager::ConsumeMetricAggregateTree() { // handler
         }
 #else
         if (init) {
-            pushEventsWithRetry(EventDataType::APP_METRIC,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushMetricsTotal,
-                                pushMetricGroupTotal);
+            pushEvents(EventDataType::APP_METRIC,
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushMetricsTotal,
+                       pushMetricGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("appid is empty, no need to push", ""));
         }
@@ -1103,13 +1104,13 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
 
 #else
         if (init && needPush) {
-            pushEventsWithRetry(EventDataType::APP_SPAN,
-                                std::move(eventGroup),
-                                configName,
-                                queueKey,
-                                pluginIdx,
-                                pushSpansTotal,
-                                pushSpanGroupTotal);
+            pushEvents(EventDataType::APP_SPAN,
+                       std::move(eventGroup),
+                       configName,
+                       queueKey,
+                       pluginIdx,
+                       pushSpansTotal,
+                       pushSpanGroupTotal);
         } else {
             LOG_DEBUG(sLogger, ("NetworkObserver skip push span ", ""));
         }
@@ -1693,14 +1694,13 @@ const static std::string kAgentInfoPropertiesKeyInstanceId = "instanceId";
 const static std::string kAgentInfoPropertiesKeyRegionId = "regionId";
 const static std::string kAgentInfoPropertiesKeyEcsMeta = "acs.ecs.metadata";
 
-void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
-                                                 PipelineEventGroup&& eventGroup,
-                                                 const StringView& configName,
-                                                 QueueKey queueKey,
-                                                 uint32_t pluginIdx,
-                                                 CounterPtr& eventCounter,
-                                                 CounterPtr& eventGroupCounter,
-                                                 size_t retryTimes) {
+void NetworkObserverManager::pushEvents(EventDataType dataType,
+                                        PipelineEventGroup&& eventGroup,
+                                        const StringView& configName,
+                                        QueueKey queueKey,
+                                        uint32_t pluginIdx,
+                                        CounterPtr& eventCounter,
+                                        CounterPtr& eventGroupCounter) {
     size_t eventsSize = eventGroup.GetEvents().size();
     if (eventsSize > 0) {
         // push
@@ -1708,20 +1708,16 @@ void NetworkObserverManager::pushEventsWithRetry(EventDataType dataType,
         ADD_COUNTER(eventGroupCounter, 1);
         LOG_DEBUG(sLogger, ("agentinfo group size", eventsSize));
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIdx);
-        for (size_t times = 0; times < retryTimes; times++) {
-            auto result = ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item));
-            if (QueueStatus::OK != result) {
-                LOG_WARNING(
-                    sLogger,
-                    ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
-                        "[NetworkObserver] push to queue failed!", magic_enum::enum_name(result)));
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            } else {
-                LOG_DEBUG(sLogger,
-                          ("NetworkObserver push events successful, eventSize:",
-                           eventsSize)("dataType", magic_enum::enum_name(dataType)));
-                break;
-            }
+
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", configName)("pluginIdx", pluginIdx)("dataType", magic_enum::enum_name(dataType))(
+                            "[NetworkObserver] push to queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventsSize);
+        } else {
+            LOG_DEBUG(sLogger,
+                      ("NetworkObserver push events successful, eventSize:",
+                       eventsSize)("dataType", magic_enum::enum_name(dataType)));
         }
     }
 }
@@ -1740,7 +1736,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
     eventGroup.SetTagNoCopy(kDataType.LogKey(), kAgentInfoValue);
     if (workloadKey == kGlobalWorkloadKey) {
         // instance level ...
-        auto* event = eventGroup.AddLogEvent();
+        auto* event = eventGroup.AddLogEvent(true, mEventPool);
         event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
@@ -1772,7 +1768,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             }
             LOG_DEBUG(sLogger, ("[AgentInfo] generate for cid", containerId)("podName", podMeta->mPodName));
 
-            auto* event = eventGroup.AddLogEvent();
+            auto* event = eventGroup.AddLogEvent(true, mEventPool);
             event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
             event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
             event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
@@ -1838,13 +1834,13 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
     mAgentInfoEventGroups.emplace_back(std::move(eventGroup));
     return true;
 #endif
-    pushEventsWithRetry(EventDataType::AGENT_INFO,
-                        std::move(eventGroup),
-                        appConfig->mConfigName,
-                        appConfig->mQueueKey,
-                        appConfig->mPluginIndex,
-                        appConfig->mPushLogsTotal,
-                        appConfig->mPushLogGroupTotal);
+    pushEvents(EventDataType::AGENT_INFO,
+               std::move(eventGroup),
+               appConfig->mConfigName,
+               appConfig->mQueueKey,
+               appConfig->mPluginIndex,
+               appConfig->mPushLogsTotal,
+               appConfig->mPushLogGroupTotal);
     return true;
 }
 

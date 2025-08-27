@@ -29,10 +29,9 @@ public:
 
 class FileEventGroup {
 public:
-    FileEventGroup(uint32_t pid, uint64_t ktime, const std::string& path) : mPid(pid), mKtime(ktime), mPath(path) {}
+    FileEventGroup(uint32_t pid, uint64_t ktime) : mPid(pid), mKtime(ktime) {}
     uint32_t mPid;
     uint64_t mKtime;
-    std::string mPath;
     // attrs
     std::vector<std::shared_ptr<CommonEvent>> mInnerEvents;
 };
