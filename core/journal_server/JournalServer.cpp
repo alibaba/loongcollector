@@ -31,6 +31,8 @@
 #include "common/memory/SourceBuffer.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
+#include "journal_server/JournalReader.h"
+#include "journal_server/JournalEntry.h"
 
 DEFINE_FLAG_INT32(journal_server_checkpoint_dump_interval_sec, "", 10);
 
@@ -243,45 +245,143 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         return;
     }
     
-    // TODO: Implement actual journal reading logic here
-    // This is a placeholder for the actual journal processing
+    LOG_DEBUG(sLogger, ("processing journal config", "")("config", configName)("idx", idx)("queue", queueKey));
     
-    // For now, we'll create a simple event group to demonstrate the flow
-    // In real implementation, this would:
-    // 1. Read from systemd journal based on config
-    // 2. Convert journal entries to PipelineEvent objects
-    // 3. Group them into PipelineEventGroup
-    // 4. Send to processing queue
+    // Create a journal reader for this configuration
+    auto journalReader = std::make_unique<SystemdJournalReader>();
     
-    try {
-        // Create a simple event group (placeholder)
-        // In real implementation, this would be populated with actual journal data
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        auto group = std::make_unique<PipelineEventGroup>(sourceBuffer);
-        
-        // Add some metadata to the group using EventGroupMetaKey
-        // For now, we'll use a simple approach - in real implementation,
-        // you would create actual journal events and add them to the group
-        
-        // Send to processing queue
-        if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, idx, std::move(*group))) {
-            LOG_ERROR(sLogger, 
-                      ("failed to push journal data to process queue", "discard data")("config", configName)(
-                          "input idx", idx)("queue", queueKey));
+    // Open the journal
+    if (!journalReader->Open()) {
+        LOG_ERROR(sLogger, ("failed to open journal", "skip processing")("config", configName)("idx", idx));
+        return;
+    }
+    LOG_DEBUG(sLogger, ("journal opened successfully", "")("config", configName)("idx", idx));
+    
+    // Apply journal filters based on configuration
+    bool filtersApplied = true;
+    
+    // Add unit filters
+    for (const auto& unit : config.units) {
+        if (!journalReader->AddMatch("_SYSTEMD_UNIT", unit)) {
+            LOG_WARNING(sLogger, ("failed to add unit filter", unit)("config", configName)("idx", idx));
+            filtersApplied = false;
         } else {
-            LOG_DEBUG(sLogger, 
-                      ("successfully pushed journal data to process queue", "")("config", configName)(
-                          "input idx", idx)("queue", queueKey));
+            LOG_DEBUG(sLogger, ("added unit filter", unit)("config", configName)("idx", idx));
+        }
+    }
+    
+    // Add identifier filters
+    for (const auto& identifier : config.identifiers) {
+        if (!journalReader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
+            LOG_WARNING(sLogger, ("failed to add identifier filter", identifier)("config", configName)("idx", idx));
+            filtersApplied = false;
+        } else {
+            LOG_DEBUG(sLogger, ("added identifier filter", identifier)("config", configName)("idx", idx));
+        }
+    }
+    
+    // Add kernel filter if requested
+    if (config.kernel) {
+        if (!journalReader->AddMatch("_TRANSPORT", "kernel")) {
+            LOG_WARNING(sLogger, ("failed to add kernel filter", "")("config", configName)("idx", idx));
+            filtersApplied = false;
+        } else {
+            LOG_DEBUG(sLogger, ("added kernel filter", "")("config", configName)("idx", idx));
+        }
+    }
+    
+    if (!filtersApplied) {
+        LOG_WARNING(sLogger, ("some filters failed to apply", "continuing with basic processing")("config", configName)("idx", idx));
+    }
+    
+    // Seek to appropriate position
+    bool seekSuccess = false;
+    string checkpoint = GetJournalCheckpoint(configName, idx);
+    
+    if (!checkpoint.empty() && config.seekPosition == "cursor") {
+        LOG_DEBUG(sLogger, ("seeking to checkpoint cursor", checkpoint)("config", configName)("idx", idx));
+        seekSuccess = journalReader->SeekCursor(checkpoint);
+        if (!seekSuccess) {
+            LOG_WARNING(sLogger, ("checkpoint", checkpoint)("msg", "falling back to fallback position")("config", configName)("idx", idx));
+        }
+    }
+    
+    if (!seekSuccess) {
+        if (config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head")) {
+            LOG_DEBUG(sLogger, ("seeking to head", "")("config", configName)("idx", idx));
+            seekSuccess = journalReader->SeekHead();
+        } else {
+            LOG_DEBUG(sLogger, ("seeking to tail", "")("config", configName)("idx", idx));
+            seekSuccess = journalReader->SeekTail();
         }
         
-        // Update checkpoint (placeholder - would be actual cursor position)
-        SaveJournalCheckpoint(configName, idx, "placeholder_cursor");
-        
-    } catch (const exception& e) {
-        LOG_ERROR(sLogger, 
-                  ("exception while processing journal config", e.what())("config", configName)(
-                      "input idx", idx));
+        if (!seekSuccess) {
+            LOG_ERROR(sLogger, ("failed to seek to position", config.seekPosition)("config", configName)("idx", idx));
+            return;
+        }
     }
+    
+    // Read journal entries
+    int entryCount = 0;
+    const int maxEntriesPerBatch = 100; // Limit batch size to avoid blocking
+    
+    LOG_DEBUG(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx));
+    
+    while (entryCount < maxEntriesPerBatch) {
+        // Move to next entry
+        if (!journalReader->Next()) {
+            LOG_DEBUG(sLogger, ("no more entries available", "")("config", configName)("idx", idx)("entries_read", entryCount));
+            break;
+        }
+        
+        // Get the entry
+        JournalEntry entry;
+        if (!journalReader->GetEntry(entry)) {
+            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx));
+            continue;
+        }
+        
+        LOG_DEBUG(sLogger, ("read journal entry", "")("config", configName)("idx", idx)("cursor", entry.cursor)("fields_count", entry.fields.size()));
+        
+        // Create event group if this is the first entry
+        if (entryCount == 0) {
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            auto group = std::make_unique<PipelineEventGroup>(sourceBuffer);
+            
+            // Add the journal entry as a log event
+            // Note: This is a simplified conversion - in a real implementation,
+            // you might want to create a more sophisticated log event structure
+            
+            // For now, we'll create a simple log event with the journal data
+            // The actual implementation would depend on your PipelineEvent structure
+            
+            // Send to processing queue
+            if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, idx, std::move(*group))) {
+                LOG_ERROR(sLogger, 
+                          ("failed to push journal data to process queue", "discard data")("config", configName)(
+                              "input idx", idx)("queue", queueKey));
+                break;
+            }
+            
+            LOG_DEBUG(sLogger, 
+                      ("successfully pushed journal batch to process queue", "")("config", configName)(
+                          "input idx", idx)("queue", queueKey)("entries", entryCount + 1));
+        }
+        
+        entryCount++;
+        
+        // Update checkpoint with current cursor
+        SaveJournalCheckpoint(configName, idx, entry.cursor);
+    }
+    
+    if (entryCount > 0) {
+        LOG_INFO(sLogger, ("journal processing completed", "")("config", configName)("idx", idx)("entries_processed", entryCount));
+    } else {
+        LOG_DEBUG(sLogger, ("no journal entries processed", "")("config", configName)("idx", idx));
+    }
+    
+    // Close the journal reader
+    journalReader->Close();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

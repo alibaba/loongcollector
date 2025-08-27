@@ -14,23 +14,12 @@
  */
 
 #include "InputJournal.h"
-#include "JournalEntry.h"
 
 #include <chrono>
-#include <thread>
-#include <map>
-#include <cstring>
-#include <stdexcept>
-#include <iostream>
-#include <filesystem>
-
-// Systemd journal headers
-#ifdef __linux__
-#include <systemd/sd-journal.h>
-#endif
+#include <string>
+#include <vector>
 
 #include "common/ParamExtractor.h"
-#include "common/FileSystemUtil.h"
 #include "journal_server/JournalServer.h"
 #include "logger/Logger.h"
 #include "app_config/AppConfig.h"
@@ -136,8 +125,11 @@ bool InputJournal::Init(const Json::Value& config, Json::Value& optionalGoPipeli
 
 bool InputJournal::Start() {
     if (mShutdown) {
+        LOG_WARNING(sLogger, ("InputJournal already shutdown", "cannot start")("config", mContext->GetConfigName())("idx", mIndex));
         return false;
     }
+    
+    LOG_INFO(sLogger, ("starting InputJournal", "")("config", mContext->GetConfigName())("idx", mIndex));
     
     // Create journal configuration for JournalServer
     JournalConfig config;
@@ -151,11 +143,16 @@ bool InputJournal::Start() {
     config.resetIntervalSecond = mResetIntervalSecond;
     config.ctx = mContext;
     
+    LOG_DEBUG(sLogger, ("journal config created", "")("config", mContext->GetConfigName())("idx", mIndex));
+    LOG_DEBUG(sLogger, ("journal config details", "")("seek_position", mSeekPosition)("units_count", mUnits.size())("identifiers_count", mIdentifiers.size())("journal_paths_count", mJournalPaths.size()));
+    
     // Register with JournalServer
     JournalServer::GetInstance()->AddJournalInput(
         mContext->GetConfigName(), 
         mIndex, 
         config);
+    
+    LOG_INFO(sLogger, ("InputJournal registered with JournalServer", "")("config", mContext->GetConfigName())("idx", mIndex));
     
     // JournalServer 会处理所有数据，不再需要自己的主线程
     return true;
@@ -173,320 +170,9 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
     mShutdown = true;
     
     // 不再需要等待线程结束，JournalServer 会处理清理工作
-    if (mJournalReader) {
-        mJournalReader->Close();
-    }
+    // 不再需要 JournalReader，JournalServer 会处理所有数据
     
     return true;
 }
-
-// SystemdJournalReader::Impl implementation
-class InputJournal::SystemdJournalReader::Impl {
-public:
-    Impl() : mIsOpen(false), mJournal(nullptr), mDataThreshold(64 * 1024), mTimeout(1000) {}
-    
-    ~Impl() {
-        Close();
-    }
-    
-    bool Open() {
-#ifdef __linux__
-        if (mIsOpen) {
-            return true; // Already open
-        }
-        
-        // Open the journal
-        int ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to open journal", std::string(strerror(-ret))));
-            return false;
-        }
-        
-        // Set data threshold
-        ret = sd_journal_set_data_threshold(mJournal, mDataThreshold);
-        if (ret < 0) {
-            // Continue anyway, this is not critical
-        }
-        
-        mIsOpen = true;
-        return true;
-#else
-        // On non-Linux systems, simulate success
-        mIsOpen = true;
-        return true;
-#endif
-    }
-    
-    void Close() {
-#ifdef __linux__
-        if (mJournal) {
-            sd_journal_close(mJournal);
-            mJournal = nullptr;
-        }
-#endif
-        mIsOpen = false;
-    }
-    
-    bool IsOpen() const {
-        return mIsOpen && mJournal != nullptr;
-    }
-    
-    bool SeekHead() {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_seek_head(mJournal);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to seek to head", strerror(-ret)));
-            return false;
-        }
-        return true;
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool SeekTail() {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_seek_tail(mJournal);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to seek to tail", strerror(-ret)));
-            return false;
-        }
-        return true;
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool SeekCursor(const std::string& cursor) {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_seek_cursor(mJournal, cursor.c_str());
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to seek to cursor", cursor)("error", strerror(-ret)));
-            return false;
-        }
-        return true;
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool Next() {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_next(mJournal);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to move to next entry", strerror(-ret)));
-            return false;
-        }
-        return ret > 0; // ret > 0 means we have a next entry
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool Previous() {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_previous(mJournal);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to move to previous entry", strerror(-ret)));
-            return false;
-        }
-        return ret > 0; // ret > 0 means we have a previous entry
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool GetEntry(JournalEntry& entry) {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        // Clear previous entry data
-        entry.fields.clear();
-        
-        // Get cursor
-        char* cursor;
-        int ret = sd_journal_get_cursor(mJournal, &cursor);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to get cursor", strerror(-ret)));
-            return false;
-        }
-        entry.cursor = cursor;
-        
-        // Get realtime timestamp
-        uint64_t realtime;
-        ret = sd_journal_get_realtime_usec(mJournal, &realtime);
-        if (ret < 0) {
-            realtime = std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count();
-        }
-        entry.realtimeTimestamp = realtime;
-        
-        // Get monotonic timestamp
-        uint64_t monotonic;
-        ret = sd_journal_get_monotonic_usec(mJournal, &monotonic, nullptr);
-        if (ret < 0) {
-            monotonic = std::chrono::duration_cast<std::chrono::microseconds>(
-                std::chrono::steady_clock::now().time_since_epoch()).count();
-        }
-        entry.monotonicTimestamp = monotonic;
-        
-        // Iterate through all fields
-        const void* data;
-        size_t length;
-        const char* field;
-        int r = sd_journal_enumerate_data(mJournal, &data, &length);
-        while (r > 0) {
-            field = static_cast<const char*>(data);
-            std::string fieldStr(field);
-            std::string valueStr(static_cast<const char*>(data) + strlen(field) + 1, length - strlen(field) - 1);
-            entry.fields[fieldStr] = valueStr;
-            r = sd_journal_enumerate_data(mJournal, &data, &length);
-        }
-        
-        return true;
-#else
-        // On non-Linux systems, simulate entry
-        if (!mIsOpen) return false;
-        
-        entry.cursor = "simulated_cursor";
-        entry.realtimeTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        entry.monotonicTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::steady_clock::now().time_since_epoch()).count();
-        
-        entry.fields.clear();
-        entry.fields["MESSAGE"] = "Simulated journal entry";
-        entry.fields["_SYSTEMD_UNIT"] = "simulated.service";
-        entry.fields["PRIORITY"] = "6";
-        entry.fields["SYSLOG_FACILITY"] = "3";
-        
-        return true;
-#endif
-    }
-    
-    std::string GetCursor() {
-#ifdef __linux__
-        if (!IsOpen()) return "";
-        
-        char* cursor;
-        int ret = sd_journal_get_cursor(mJournal, &cursor);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to get cursor", strerror(-ret)));
-            return "";
-        }
-        return cursor;
-#else
-        return mIsOpen ? "simulated_cursor" : "";
-#endif
-    }
-    
-    bool AddMatch(const std::string& field, const std::string& value) {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        // 组合字段和值为 "FIELD=value" 格式
-        std::string matchString = field + "=" + value;
-        int ret = sd_journal_add_match(mJournal, matchString.c_str(), matchString.length());
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to add match", field)("value", value)("error", strerror(-ret)));
-            return false;
-        }
-        return true;
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    bool AddDisjunction() {
-#ifdef __linux__
-        if (!IsOpen()) return false;
-        
-        int ret = sd_journal_add_disjunction(mJournal);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to add disjunction", strerror(-ret)));
-            return false;
-        }
-        return true;
-#else
-        return mIsOpen;
-#endif
-    }
-    
-    int Wait(std::chrono::milliseconds timeout) {
-#ifdef __linux__
-        if (!IsOpen()) return -1;
-        
-        uint64_t timeout_us = std::chrono::duration_cast<std::chrono::microseconds>(timeout).count();
-        int ret = sd_journal_wait(mJournal, timeout_us);
-        if (ret < 0) {
-            LOG_ERROR(sLogger, ("failed to wait for journal events", strerror(-ret)));
-            return -1;
-        }
-        return ret; // SD_JOURNAL_NOP, SD_JOURNAL_APPEND, SD_JOURNAL_INVALIDATE
-#else
-        // On non-Linux systems, simulate waiting
-        if (!mIsOpen) return -1;
-        std::this_thread::sleep_for(timeout);
-        return 1; // SD_JOURNAL_APPEND
-#endif
-    }
-    
-    bool SetDataThreshold(size_t threshold) {
-        mDataThreshold = threshold;
-#ifdef __linux__
-        if (IsOpen()) {
-            int ret = sd_journal_set_data_threshold(mJournal, mDataThreshold);
-            if (ret < 0) {
-                return false;
-            }
-        }
-#endif
-        return true;
-    }
-    
-    bool SetTimeout(std::chrono::milliseconds timeout) {
-        mTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count();
-        return true;
-    }
-    
-private:
-    bool mIsOpen;
-#ifdef __linux__
-    sd_journal* mJournal;
-#endif
-    size_t mDataThreshold;
-    int mTimeout;
-};
-
-// JournalReader implementation
-InputJournal::SystemdJournalReader::SystemdJournalReader() : mImpl(std::make_unique<Impl>()) {}
-
-InputJournal::SystemdJournalReader::~SystemdJournalReader() = default;
-
-bool InputJournal::SystemdJournalReader::Open() { return mImpl->Open(); }
-void InputJournal::SystemdJournalReader::Close() { mImpl->Close(); }
-bool InputJournal::SystemdJournalReader::IsOpen() const { return mImpl->IsOpen(); }
-bool InputJournal::SystemdJournalReader::SeekHead() { return mImpl->SeekHead(); }
-bool InputJournal::SystemdJournalReader::SeekTail() { return mImpl->SeekTail(); }
-bool InputJournal::SystemdJournalReader::SeekCursor(const std::string& cursor) { return mImpl->SeekCursor(cursor); }
-bool InputJournal::SystemdJournalReader::Next() { return mImpl->Next(); }
-bool InputJournal::SystemdJournalReader::Previous() { return mImpl->Previous(); }
-bool InputJournal::SystemdJournalReader::GetEntry(JournalEntry& entry) { return mImpl->GetEntry(entry); }
-std::string InputJournal::SystemdJournalReader::GetCursor() { return mImpl->GetCursor(); }
-bool InputJournal::SystemdJournalReader::AddMatch(const std::string& field, const std::string& value) { return mImpl->AddMatch(field, value); }
-bool InputJournal::SystemdJournalReader::AddDisjunction() { return mImpl->AddDisjunction(); }
-int InputJournal::SystemdJournalReader::Wait(std::chrono::milliseconds timeout) { return mImpl->Wait(timeout); }
-bool InputJournal::SystemdJournalReader::SetDataThreshold(size_t threshold) { return mImpl->SetDataThreshold(threshold); }
-bool InputJournal::SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout) { return mImpl->SetTimeout(timeout); }
 
 } // namespace logtail 

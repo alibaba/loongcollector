@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-#include "plugin/input/JournalEntry.h"
+#include "journal_server/JournalEntry.h"
 
 #include <chrono>
 
