@@ -83,8 +83,59 @@
      bool SeekCursor(const std::string& c) {
          return call([&](auto j){ return sd_journal_seek_cursor(j, c.c_str()); });
      }
-     bool Next()      { return call([](auto j){ return sd_journal_next(j) > 0; }); }
-     bool Previous()  { return call([](auto j){ return sd_journal_previous(j) > 0; }); }
+         bool Next() { 
+#ifdef __linux__
+        if (!IsOpen()) {
+            std::cerr << "[JournalReader] Next() called but journal not open" << std::endl;
+            return false;
+        }
+        
+        int ret = sd_journal_next(mJournal);
+        std::cerr << "[JournalReader] sd_journal_next() returned: " << ret << std::endl;
+        
+        if (ret < 0) {
+            std::cerr << "[JournalReader] sd_journal_next() error: " << strerror(-ret) 
+                      << " (code: " << ret << ")" << std::endl;
+            return false;
+        } else if (ret == 0) {
+            std::cerr << "[JournalReader] sd_journal_next() reached end - no more entries" << std::endl;
+            return false;
+        } else {
+            std::cerr << "[JournalReader] sd_journal_next() success - moved to next entry (return: " 
+                      << ret << ")" << std::endl;
+            return true;
+        }
+#else
+        return mIsOpen;
+#endif
+    }
+    
+    bool Previous() { 
+#ifdef __linux__
+        if (!IsOpen()) {
+            std::cerr << "[JournalReader] Previous() called but journal not open" << std::endl;
+            return false;
+        }
+        
+        int ret = sd_journal_previous(mJournal);
+        std::cerr << "[JournalReader] sd_journal_previous() returned: " << ret << std::endl;
+        
+        if (ret < 0) {
+            std::cerr << "[JournalReader] sd_journal_previous() error: " << strerror(-ret) 
+                      << " (code: " << ret << ")" << std::endl;
+            return false;
+        } else if (ret == 0) {
+            std::cerr << "[JournalReader] sd_journal_previous() reached beginning - no more entries" << std::endl;
+            return false;
+        } else {
+            std::cerr << "[JournalReader] sd_journal_previous() success - moved to previous entry (return: " 
+                      << ret << ")" << std::endl;
+            return true;
+        }
+#else
+        return mIsOpen;
+#endif
+    }
  
      /*---------------  读取单条  ----------------*/
      bool GetEntry(JournalEntry& entry) {
