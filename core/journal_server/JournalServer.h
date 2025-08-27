@@ -46,12 +46,19 @@ struct JournalConfig {
     bool kernel;
     std::vector<std::string> identifiers;
     std::vector<std::string> journalPaths;
+    std::vector<std::string> matchPatterns;  // Custom match patterns
     int resetIntervalSecond;
+    
+    // Field parsing options (like Go version)
+    bool parsePriority;          // Convert priority numbers to text
+    bool parseSyslogFacility;    // Convert facility numbers to text  
+    bool useJournalEventTime;    // Use journal timestamp vs current time
     
     // Pipeline context
     const CollectionPipelineContext* ctx;
     
-    JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600) {}
+    JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
+                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true) {}
 };
 
 /**

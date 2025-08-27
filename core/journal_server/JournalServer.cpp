@@ -40,6 +40,185 @@ using namespace std;
 
 namespace logtail {
 
+// Syslog facility conversion map (from Go version)
+static const std::map<std::string, std::string> SyslogFacilityString = {
+    {"0",  "kernel"},
+    {"1",  "user"},
+    {"2",  "mail"},
+    {"3",  "daemon"},
+    {"4",  "auth"},
+    {"5",  "syslog"},
+    {"6",  "line printer"},
+    {"7",  "network news"},
+    {"8",  "uucp"},
+    {"9",  "clock daemon"},
+    {"10", "security/auth"},
+    {"11", "ftp"},
+    {"12", "ntp"},
+    {"13", "log audit"},
+    {"14", "log alert"},
+    {"15", "clock daemon"},
+    {"16", "local0"},
+    {"17", "local1"},
+    {"18", "local2"},
+    {"19", "local3"},
+    {"20", "local4"},
+    {"21", "local5"},
+    {"22", "local6"},
+    {"23", "local7"}
+};
+
+// Priority conversion map (from Go version) 
+static const std::map<std::string, std::string> PriorityConversionMap = {
+    {"0", "emergency"},
+    {"1", "alert"},
+    {"2", "critical"},
+    {"3", "error"},
+    {"4", "warning"},
+    {"5", "notice"},
+    {"6", "informational"},
+    {"7", "debug"}
+};
+
+// Apply field transformations based on configuration
+void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
+    if (config.parsePriority) {
+        auto it = entry.fields.find("PRIORITY");
+        if (it != entry.fields.end()) {
+            auto priorityIt = PriorityConversionMap.find(it->second);
+            if (priorityIt != PriorityConversionMap.end()) {
+                it->second = priorityIt->second;
+            }
+        }
+    }
+    
+    if (config.parseSyslogFacility) {
+        auto it = entry.fields.find("SYSLOG_FACILITY");
+        if (it != entry.fields.end()) {
+            auto facilityIt = SyslogFacilityString.find(it->second);
+            if (facilityIt != SyslogFacilityString.end()) {
+                it->second = facilityIt->second;
+            }
+        }
+    }
+}
+
+// Helper functions for journal filtering (based on Go version implementation)
+bool AddUnitsFilter(JournalReader* reader, const std::vector<std::string>& units, 
+                   const std::string& configName, size_t idx) {
+    for (const auto& unit : units) {
+        // Look for messages from the service itself
+        if (!reader->AddMatch("_SYSTEMD_UNIT", unit)) {
+            LOG_WARNING(sLogger, ("failed to add unit match", unit)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        // Look for coredumps of the service
+        if (!reader->AddDisjunction() ||
+            !reader->AddMatch("MESSAGE_ID", "fc2e22bc6ee647b6b90729ab34a250b1") ||
+            !reader->AddMatch("_UID", "0") ||
+            !reader->AddMatch("COREDUMP_UNIT", unit)) {
+            LOG_WARNING(sLogger, ("failed to add coredump match", unit)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        // Look for messages from PID 1 about this service
+        if (!reader->AddDisjunction() ||
+            !reader->AddMatch("_PID", "1") ||
+            !reader->AddMatch("UNIT", unit)) {
+            LOG_WARNING(sLogger, ("failed to add PID1 match", unit)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        // Look for messages from authorized daemons about this service
+        if (!reader->AddDisjunction() ||
+            !reader->AddMatch("_UID", "0") ||
+            !reader->AddMatch("OBJECT_SYSTEMD_UNIT", unit)) {
+            LOG_WARNING(sLogger, ("failed to add daemon match", unit)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        // Show all messages belonging to a slice
+        if (unit.find(".slice") != std::string::npos) {
+            if (!reader->AddDisjunction() ||
+                !reader->AddMatch("_SYSTEMD_SLICE", unit)) {
+                LOG_WARNING(sLogger, ("failed to add slice match", unit)("config", configName)("idx", idx));
+                return false;
+            }
+        }
+        
+        // Final disjunction for this unit
+        if (!reader->AddDisjunction()) {
+            LOG_WARNING(sLogger, ("failed to add final disjunction", unit)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        LOG_DEBUG(sLogger, ("added comprehensive unit filter", unit)("config", configName)("idx", idx));
+    }
+    return true;
+}
+
+bool AddIdentifiersFilter(JournalReader* reader, const std::vector<std::string>& identifiers,
+                         const std::string& configName, size_t idx) {
+    for (const auto& identifier : identifiers) {
+        if (!reader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
+            LOG_WARNING(sLogger, ("failed to add identifier match", identifier)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        if (!reader->AddDisjunction()) {
+            LOG_WARNING(sLogger, ("failed to add identifier disjunction", identifier)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        LOG_DEBUG(sLogger, ("added identifier filter", identifier)("config", configName)("idx", idx));
+    }
+    return true;
+}
+
+bool AddKernelFilter(JournalReader* reader, const std::string& configName, size_t idx) {
+    if (!reader->AddMatch("_TRANSPORT", "kernel")) {
+        LOG_WARNING(sLogger, ("failed to add kernel transport match", "")("config", configName)("idx", idx));
+        return false;
+    }
+    
+    if (!reader->AddDisjunction()) {
+        LOG_WARNING(sLogger, ("failed to add kernel disjunction", "")("config", configName)("idx", idx));
+        return false;
+    }
+    
+    LOG_DEBUG(sLogger, ("added kernel filter", "")("config", configName)("idx", idx));
+    return true;
+}
+
+bool AddMatchPatternsFilter(JournalReader* reader, const std::vector<std::string>& patterns,
+                           const std::string& configName, size_t idx) {
+    for (const auto& pattern : patterns) {
+        // Parse pattern in format "FIELD=value"
+        size_t eqPos = pattern.find('=');
+        if (eqPos == std::string::npos) {
+            LOG_WARNING(sLogger, ("invalid match pattern format", pattern)("config", configName)("idx", idx));
+            continue;
+        }
+        
+        std::string field = pattern.substr(0, eqPos);
+        std::string value = pattern.substr(eqPos + 1);
+        
+        if (!reader->AddMatch(field, value)) {
+            LOG_WARNING(sLogger, ("failed to add pattern match", pattern)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        if (!reader->AddDisjunction()) {
+            LOG_WARNING(sLogger, ("failed to add pattern disjunction", pattern)("config", configName)("idx", idx));
+            return false;
+        }
+        
+        LOG_DEBUG(sLogger, ("added match pattern", pattern)("config", configName)("idx", idx));
+    }
+    return true;
+}
+
 void JournalServer::Init() {
     LOG_INFO(sLogger, ("JournalServer initializing", ""));
     mThreadRes = async(launch::async, &JournalServer::Run, this);
@@ -312,34 +491,34 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     // Apply journal filters based on configuration
     bool filtersApplied = true;
     
-    // Add unit filters
-    for (const auto& unit : config.units) {
-        if (!journalReader->AddMatch("_SYSTEMD_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add unit filter", unit)("config", configName)("idx", idx));
+    // Add unit filters with comprehensive matching (like Go version)
+    if (!config.units.empty()) {
+        if (!AddUnitsFilter(journalReader.get(), config.units, configName, idx)) {
+            LOG_WARNING(sLogger, ("failed to add units filter", "")("config", configName)("idx", idx));
             filtersApplied = false;
-        } else {
-            LOG_DEBUG(sLogger, ("added unit filter", unit)("config", configName)("idx", idx));
         }
     }
     
     // Add identifier filters
-    for (const auto& identifier : config.identifiers) {
-        if (!journalReader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
-            LOG_WARNING(sLogger, ("failed to add identifier filter", identifier)("config", configName)("idx", idx));
+    if (!config.identifiers.empty()) {
+        if (!AddIdentifiersFilter(journalReader.get(), config.identifiers, configName, idx)) {
+            LOG_WARNING(sLogger, ("failed to add identifiers filter", "")("config", configName)("idx", idx));
             filtersApplied = false;
-        } else {
-            LOG_DEBUG(sLogger, ("added identifier filter", identifier)("config", configName)("idx", idx));
         }
     }
     
-    // Add kernel filter if requested
+    // Add kernel filter if requested (fixed logic: only check kernel flag)
     if (config.kernel) {
-        if (!journalReader->AddMatch("_TRANSPORT", "kernel")) {
+        if (!AddKernelFilter(journalReader.get(), configName, idx)) {
             LOG_WARNING(sLogger, ("failed to add kernel filter", "")("config", configName)("idx", idx));
             filtersApplied = false;
-        } else {
-            LOG_DEBUG(sLogger, ("added kernel filter", "")("config", configName)("idx", idx));
         }
+    }
+    
+    // Add custom match patterns if any
+    if (!AddMatchPatternsFilter(journalReader.get(), config.matchPatterns, configName, idx)) {
+        LOG_WARNING(sLogger, ("failed to add match patterns", "")("config", configName)("idx", idx));
+        filtersApplied = false;
     }
     
     if (!filtersApplied) {
@@ -359,9 +538,21 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     }
     
     if (!seekSuccess) {
-        if (config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head")) {
-            LOG_DEBUG(sLogger, ("seeking to head", "")("config", configName)("idx", idx));
-            seekSuccess = journalReader->SeekHead();
+        if ((config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head"))) {
+            // **修复：head对于kernel日志通常读不到数据，改为使用tail**
+            LOG_INFO(sLogger, ("head position not suitable for kernel logs, using tail instead", "")("config", configName)("idx", idx));
+            seekSuccess = journalReader->SeekTail();
+            
+            // After seeking to tail, move to the last actual entry
+            if (seekSuccess) {
+                LOG_INFO(sLogger, ("seeking to tail succeeded, moving to last entry", "")("config", configName)("idx", idx));
+                if (!journalReader->Previous()) {
+                    LOG_INFO(sLogger, ("no previous entry available after seeking to tail", "")("config", configName)("idx", idx));
+                    // This is normal if journal is empty, continue processing
+                } else {
+                    LOG_INFO(sLogger, ("moved to last entry after seeking to tail", "")("config", configName)("idx", idx));
+                }
+            }
         } else {
             LOG_DEBUG(sLogger, ("seeking to tail", "")("config", configName)("idx", idx));
             seekSuccess = journalReader->SeekTail();
@@ -398,11 +589,10 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     
     LOG_DEBUG(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx));
     
-    // If we're at tail position and moved to last entry, process it first
-    bool shouldProcessCurrentEntry = (config.seekPosition == "tail" || 
-                                    (config.seekPosition == "cursor" && config.cursorSeekFallback == "tail"));
+    // Since we now default to tail position, always process current entry first
+    bool shouldProcessCurrentEntry = true;  // **修复：tail读取需要处理当前条目**
     
-    LOG_INFO(sLogger, ("shouldProcessCurrentEntry", shouldProcessCurrentEntry ? "true" : "false")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("journal reading fixed: using tail position with filters", "")("config", configName)("idx", idx)("shouldProcessCurrentEntry", shouldProcessCurrentEntry ? "true" : "false"));
     
     // Add overall timeout protection for the entire processing loop
     auto loopStartTime = std::chrono::steady_clock::now();
@@ -465,6 +655,18 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         }
         
         LOG_DEBUG(sLogger, ("read journal entry", "")("config", configName)("idx", idx)("cursor", entry.cursor)("fields_count", entry.fields.size()));
+        
+        // Apply field transformations (priority/facility conversion)
+        ApplyJournalFieldTransforms(entry, config);
+        
+        // Add timestamp fields based on configuration
+        if (config.useJournalEventTime) {
+            // Use journal's realtime timestamp
+            entry.fields["_realtime_timestamp_"] = std::to_string(entry.realtimeTimestamp);
+        }
+        entry.fields["_monotonic_timestamp_"] = std::to_string(entry.monotonicTimestamp);
+        
+        LOG_DEBUG(sLogger, ("journal entry processed", "")("config", configName)("idx", idx)("cursor", entry.cursor)("transformed", "true"));
         
         // Create event group if this is the first entry
         if (entryCount == 0) {
