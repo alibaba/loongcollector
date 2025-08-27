@@ -285,6 +285,14 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     }
     LOG_INFO(sLogger, ("journal opened successfully", "")("config", configName)("idx", idx));
     
+    // Verify journal reader is open after opening
+    if (!journalReader->IsOpen()) {
+        LOG_ERROR(sLogger, ("journal reader not open after Open() call", "")("config", configName)("idx", idx));
+        return;
+    }
+    
+    LOG_INFO(sLogger, ("journal reader IsOpen() check passed", "")("config", configName)("idx", idx));
+    
     // Apply journal filters based on configuration
     bool filtersApplied = true;
     
@@ -344,12 +352,12 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
             
             // After seeking to tail, move to the last actual entry
             if (seekSuccess) {
-                LOG_DEBUG(sLogger, ("seeking to tail succeeded, moving to last entry", "")("config", configName)("idx", idx));
+                LOG_INFO(sLogger, ("seeking to tail succeeded, moving to last entry", "")("config", configName)("idx", idx));
                 if (!journalReader->Previous()) {
-                    LOG_DEBUG(sLogger, ("no previous entry available after seeking to tail", "")("config", configName)("idx", idx));
+                    LOG_INFO(sLogger, ("no previous entry available after seeking to tail", "")("config", configName)("idx", idx));
                     // This is normal if journal is empty, continue processing
                 } else {
-                    LOG_DEBUG(sLogger, ("moved to last entry after seeking to tail", "")("config", configName)("idx", idx));
+                    LOG_INFO(sLogger, ("moved to last entry after seeking to tail", "")("config", configName)("idx", idx));
                 }
             }
         }
@@ -359,6 +367,14 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
             return;
         }
     }
+    
+    // Verify journal reader is still open after seek operations
+    if (!journalReader->IsOpen()) {
+        LOG_ERROR(sLogger, ("journal reader not open after seek operations", "")("config", configName)("idx", idx));
+        return;
+    }
+    
+    LOG_INFO(sLogger, ("journal reader still open after seek operations", "")("config", configName)("idx", idx));
     
     // Read journal entries
     int entryCount = 0;
@@ -370,6 +386,8 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     bool shouldProcessCurrentEntry = (config.seekPosition == "tail" || 
                                     (config.seekPosition == "cursor" && config.cursorSeekFallback == "tail"));
     
+    LOG_INFO(sLogger, ("shouldProcessCurrentEntry", shouldProcessCurrentEntry ? "true" : "false")("config", configName)("idx", idx));
+    
     while (entryCount < maxEntriesPerBatch) {
         // Move to next entry (except for the first iteration if we're at tail)
         if (entryCount > 0 || !shouldProcessCurrentEntry) {
@@ -377,11 +395,21 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
                 LOG_DEBUG(sLogger, ("no more entries available", "")("config", configName)("idx", idx)("entries_read", entryCount));
                 break;
             }
+            LOG_INFO(sLogger, ("moved to next entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+        } else {
+            LOG_INFO(sLogger, ("processing current entry (first iteration at tail)", "")("config", configName)("idx", idx)("entry_count", entryCount));
         }
         
         // Get the entry
         JournalEntry entry;
-        LOG_DEBUG(sLogger, ("attempting to get journal entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+        LOG_INFO(sLogger, ("attempting to get journal entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+        
+        // Check if journal reader is open before calling GetEntry
+        if (!journalReader->IsOpen()) {
+            LOG_ERROR(sLogger, ("journal reader not open before GetEntry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+            break;
+        }
+        
         if (!journalReader->GetEntry(entry)) {
             LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx)("entry_count", entryCount));
             continue;
