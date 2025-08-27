@@ -45,8 +45,20 @@ public:
             return true; // Already open
         }
         
-        // Open the journal
-        int ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
+        // Open the journal with custom paths if specified
+        int ret;
+        if (!mJournalPaths.empty()) {
+            // Convert vector of paths to array of const char*
+            std::vector<const char*> pathPtrs;
+            for (const auto& path : mJournalPaths) {
+                pathPtrs.push_back(path.c_str());
+            }
+            ret = sd_journal_open_files(&mJournal, pathPtrs.data(), pathPtrs.size());
+        } else {
+            // Open local journal
+            ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
+        }
+        
         if (ret < 0) {
             return false;
         }
@@ -191,16 +203,29 @@ public:
         }
         entry.monotonicTimestamp = monotonic;
         
-        // Iterate through all fields
+        // Iterate through all fields with timeout protection
         const void* data;
         size_t length;
         const char* field;
+        
+        // Set a reasonable timeout for field enumeration to prevent hanging
+        auto startTime = std::chrono::steady_clock::now();
+        const auto maxEnumerationTime = std::chrono::milliseconds(mTimeout > 0 ? mTimeout : 5000); // Default 5 seconds
+        
         int r = sd_journal_enumerate_data(mJournal, &data, &length);
         while (r > 0) {
+            // Check timeout
+            auto currentTime = std::chrono::steady_clock::now();
+            if (currentTime - startTime > maxEnumerationTime) {
+                // Timeout reached, break to prevent hanging
+                break;
+            }
+            
             field = static_cast<const char*>(data);
             std::string fieldStr(field);
             std::string valueStr(static_cast<const char*>(data) + strlen(field) + 1, length - strlen(field) - 1);
             entry.fields[fieldStr] = valueStr;
+            
             r = sd_journal_enumerate_data(mJournal, &data, &length);
         }
         

@@ -268,6 +268,9 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     LOG_INFO(sLogger, ("creating journal reader", "")("config", configName)("idx", idx));
     auto journalReader = std::make_unique<SystemdJournalReader>();
     
+    // Set timeout to prevent hanging (5 seconds)
+    journalReader->SetTimeout(std::chrono::milliseconds(5000));
+    
     // Set custom journal paths if specified
     if (!config.journalPaths.empty()) {
         LOG_INFO(sLogger, ("setting custom journal paths", "")("config", configName)("idx", idx)("paths_count", config.journalPaths.size()));
@@ -281,7 +284,20 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     LOG_INFO(sLogger, ("opening journal", "")("config", configName)("idx", idx)("paths_count", config.journalPaths.size()));
     if (!journalReader->Open()) {
         LOG_ERROR(sLogger, ("failed to open journal", "skip processing")("config", configName)("idx", idx));
-        return;
+        
+        // Try to open with default journal if custom paths failed
+        if (!config.journalPaths.empty()) {
+            LOG_INFO(sLogger, ("attempting to open default journal as fallback", "")("config", configName)("idx", idx));
+            journalReader->SetJournalPaths({}); // Clear custom paths
+            if (!journalReader->Open()) {
+                LOG_ERROR(sLogger, ("failed to open default journal as well", "skip processing")("config", configName)("idx", idx));
+                return;
+            } else {
+                LOG_INFO(sLogger, ("successfully opened default journal as fallback", "")("config", configName)("idx", idx));
+            }
+        } else {
+            return;
+        }
     }
     LOG_INFO(sLogger, ("journal opened successfully", "")("config", configName)("idx", idx));
     
@@ -388,7 +404,17 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     
     LOG_INFO(sLogger, ("shouldProcessCurrentEntry", shouldProcessCurrentEntry ? "true" : "false")("config", configName)("idx", idx));
     
+    // Add overall timeout protection for the entire processing loop
+    auto loopStartTime = std::chrono::steady_clock::now();
+    const auto maxLoopTime = std::chrono::milliseconds(30000); // 30 seconds max for entire loop
+    
     while (entryCount < maxEntriesPerBatch) {
+        // Check overall timeout
+        if (std::chrono::steady_clock::now() - loopStartTime > maxLoopTime) {
+            LOG_WARNING(sLogger, ("journal processing loop timeout reached", "breaking")("config", configName)("idx", idx)("entries_processed", entryCount));
+            break;
+        }
+        
         // Move to next entry (except for the first iteration if we're at tail)
         if (entryCount > 0 || !shouldProcessCurrentEntry) {
             if (!journalReader->Next()) {
@@ -410,8 +436,31 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
             break;
         }
         
-        if (!journalReader->GetEntry(entry)) {
-            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx)("entry_count", entryCount));
+        // Add timeout protection for GetEntry call
+        auto startTime = std::chrono::steady_clock::now();
+        const auto maxGetEntryTime = std::chrono::milliseconds(10000); // 10 seconds max for GetEntry
+        
+        bool getEntrySuccess = false;
+        int retryCount = 0;
+        const int maxRetries = 3;
+        
+        while (!getEntrySuccess && (std::chrono::steady_clock::now() - startTime) < maxGetEntryTime && retryCount < maxRetries) {
+            getEntrySuccess = journalReader->GetEntry(entry);
+            if (!getEntrySuccess) {
+                retryCount++;
+                LOG_DEBUG(sLogger, ("GetEntry attempt failed", "")("config", configName)("idx", idx)("attempt", retryCount)("max_attempts", maxRetries));
+                // Brief pause before retry
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        }
+        
+        if (!getEntrySuccess) {
+            LOG_WARNING(sLogger, ("failed to get journal entry after timeout/retries", "skipping")("config", configName)("idx", idx)("entry_count", entryCount)("retries", retryCount));
+            // If we're having persistent issues, try to move to next entry
+            if (!journalReader->Next()) {
+                LOG_WARNING(sLogger, ("cannot move to next entry, breaking loop", "")("config", configName)("idx", idx));
+                break;
+            }
             continue;
         }
         
@@ -452,6 +501,13 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         LOG_INFO(sLogger, ("journal processing completed", "")("config", configName)("idx", idx)("entries_processed", entryCount));
     } else {
         LOG_DEBUG(sLogger, ("no journal entries processed", "")("config", configName)("idx", idx));
+    }
+    
+    // Log any timeout issues
+    auto loopEndTime = std::chrono::steady_clock::now();
+    auto totalLoopTime = std::chrono::duration_cast<std::chrono::milliseconds>(loopEndTime - loopStartTime);
+    if (totalLoopTime > std::chrono::milliseconds(1000)) { // Log if processing took more than 1 second
+        LOG_INFO(sLogger, ("journal processing timing", "")("config", configName)("idx", idx)("total_time_ms", totalLoopTime.count())("entries_processed", entryCount));
     }
     
     // Close the journal reader
