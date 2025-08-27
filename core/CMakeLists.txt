@@ -143,6 +143,7 @@ set(SUB_DIRECTORIES_LIST
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
+        journal_server
         parser
         )
 if (LINUX)
@@ -258,7 +259,10 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
+    
+    # Add systemd journal library linking
     if (LINUX)
+        link_systemd_journal(${LOGTAIL_TARGET})
         add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
     endif()
 endif()

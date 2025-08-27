@@ -24,8 +24,14 @@
 #include <iostream>
 #include <filesystem>
 
+// Systemd journal headers
+#ifdef __linux__
+#include <systemd/sd-journal.h>
+#endif
+
 #include "common/ParamExtractor.h"
 #include "common/FileSystemUtil.h"
+#include "journal_server/JournalServer.h"
 #include "logger/Logger.h"
 #include "app_config/AppConfig.h"
 
@@ -48,7 +54,6 @@ InputJournal::InputJournal()
     , mParsePriority(false)
     , mUseJournalEventTime(false)
     , mResetIntervalSecond(DEFAULT_RESET_INTERVAL)
-    , mLastSaveCheckpointTime(std::chrono::steady_clock::now())
     , mShutdown(false) {
 }
 
@@ -134,8 +139,25 @@ bool InputJournal::Start() {
         return false;
     }
     
-    mMainThread = std::thread(&InputJournal::MainLoop, this);
+    // Create journal configuration for JournalServer
+    JournalConfig config;
+    config.seekPosition = mSeekPosition;
+    config.cursorFlushPeriodMs = mCursorFlushPeriodMs;
+    config.cursorSeekFallback = mCursorSeekFallback;
+    config.units = mUnits;
+    config.kernel = mKernel;
+    config.identifiers = mIdentifiers;
+    config.journalPaths = mJournalPaths;
+    config.resetIntervalSecond = mResetIntervalSecond;
+    config.ctx = mContext;
     
+    // Register with JournalServer
+    JournalServer::GetInstance()->AddJournalInput(
+        mContext->GetConfigName(), 
+        mIndex, 
+        config);
+    
+    // JournalServer 会处理所有数据，不再需要自己的主线程
     return true;
 }
 
@@ -145,13 +167,12 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         return true;
     }
     
+    // Unregister from JournalServer
+    JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName(), mIndex);
+    
     mShutdown = true;
-    mCondition.notify_all();
     
-    if (mMainThread.joinable()) {
-        mMainThread.join();
-    }
-    
+    // 不再需要等待线程结束，JournalServer 会处理清理工作
     if (mJournalReader) {
         mJournalReader->Close();
     }
@@ -159,498 +180,292 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
     return true;
 }
 
-bool InputJournal::LoadCheckpoint() {
-    if (!HasContext()) {
-        LOG_WARNING(sLogger, ("no context available for checkpoint", "skip loading"));
-        return false;
-    }
-    
-    // Get checkpoint file path from AppConfig
-    std::string checkpointDir = GetAgentDataDir();
-    if (checkpointDir.empty()) {
-        LOG_INFO(sLogger, ("checkpoint directory not configured", "skip loading"));
-        return false;
-    }
-    
-    // Create checkpoint file path: {checkpointDir}/input_journal_{configName}.json
-    std::string configName = GetContext().GetConfigName();
-    std::string checkpointFile = checkpointDir + "/input_journal_" + configName + ".json";
-    
-    // Check if checkpoint file exists
-    std::error_code ec;
-    std::filesystem::file_status s = std::filesystem::status(checkpointFile, ec);
-    if (ec || !std::filesystem::exists(s)) {
-        LOG_INFO(sLogger, ("checkpoint file not found", checkpointFile));
-        return false;
-    }
-    
-    if (!std::filesystem::is_regular_file(s)) {
-        LOG_WARNING(sLogger, ("checkpoint file is not a regular file", "skip")("filepath", checkpointFile));
-        return false;
-    }
-    
-    // Read checkpoint file content
-    std::string content;
-    if (!ReadFile(checkpointFile, content)) {
-        LOG_WARNING(sLogger, ("failed to read checkpoint file", "skip")("filepath", checkpointFile));
-        return false;
-    }
-    
-    if (content.empty()) {
-        LOG_WARNING(sLogger, ("empty checkpoint file", "skip")("filepath", checkpointFile));
-        return false;
-    }
-    
-    // Parse JSON content
-    Json::Value root;
-    Json::CharReaderBuilder builder;
-    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-    std::string errors;
-    if (!reader->parse(content.c_str(), content.c_str() + content.length(), &root, &errors)) {
-        LOG_WARNING(sLogger, ("failed to parse checkpoint file", "skip")("filepath", checkpointFile)("errors", errors));
-        return false;
-    }
-    
-    if (!root.isObject()) {
-        LOG_WARNING(sLogger, ("checkpoint file is not a JSON object", "skip")("filepath", checkpointFile));
-        return false;
-    }
-    
-    // Extract cursor from checkpoint
-    if (root.isMember("cursor") && root["cursor"].isString()) {
-        mLastCheckpointCursor = root["cursor"].asString();
-        LOG_INFO(sLogger, ("loaded checkpoint cursor", mLastCheckpointCursor)("filepath", checkpointFile));
-        return true;
-    } else {
-        LOG_WARNING(sLogger, ("checkpoint file missing cursor field", "skip")("filepath", checkpointFile));
-        return false;
-    }
-}
-
-bool InputJournal::SaveCheckpoint(bool force) {
-    if (!HasContext()) {
-        LOG_WARNING(sLogger, ("no context available for checkpoint", "skip saving"));
-        return false;
-    }
-    
-    // Check if we need to save (either forced or time-based)
-    if (!force) {
-        auto now = std::chrono::steady_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            now - mLastSaveCheckpointTime).count();
-        
-        if (elapsed < mCursorFlushPeriodMs) {
-            return true; // Not time to save yet
-        }
-    }
-    
-    // Get current cursor from journal reader
-    if (!mJournalReader || !mJournalReader->IsOpen()) {
-        LOG_DEBUG(sLogger, ("journal reader not available", "skip saving checkpoint"));
-        return true;
-    }
-    
-    std::string currentCursor = mJournalReader->GetCursor();
-    if (currentCursor.empty()) {
-        LOG_DEBUG(sLogger, ("current cursor is empty", "skip saving checkpoint"));
-        return true;
-    }
-    
-    // Get checkpoint file path from AppConfig
-    std::string checkpointDir = GetAgentDataDir();
-    if (checkpointDir.empty()) {
-        LOG_WARNING(sLogger, ("checkpoint directory not configured", "skip saving"));
-        return false;
-    }
-    
-    // Create checkpoint file path: {checkpointDir}/input_journal_{configName}.json
-    std::string configName = GetContext().GetConfigName();
-    std::string checkpointFile = checkpointDir + "/input_journal_" + configName + ".json";
-    
-    // Create checkpoint directory if it doesn't exist
-    std::error_code ec;
-    if (!std::filesystem::exists(checkpointDir, ec)) {
-        if (!std::filesystem::create_directories(checkpointDir, ec)) {
-            LOG_ERROR(sLogger, ("failed to create checkpoint directory", checkpointDir)("error", ec.message()));
-            return false;
-        }
-    }
-    
-    // Prepare checkpoint data
-    Json::Value root;
-    root["cursor"] = currentCursor;
-    root["timestamp"] = static_cast<Json::UInt64>(std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count());
-    root["config_name"] = configName;
-    root["plugin_type"] = "input_journal";
-    
-    // Convert to JSON string
-    std::string content = root.toStyledString();
-    
-    // Write checkpoint file
-    std::string errMsg;
-    if (!UpdateFileContent(std::filesystem::path(checkpointFile), content, errMsg)) {
-        LOG_ERROR(sLogger, ("failed to save checkpoint file", checkpointFile)("error", errMsg));
-        return false;
-    }
-    
-    // Update internal state
-    mLastCheckpointCursor = currentCursor;
-    mLastSaveCheckpointTime = std::chrono::steady_clock::now();
-    
-    LOG_DEBUG(sLogger, ("saved checkpoint", currentCursor)("filepath", checkpointFile));
-    return true;
-}
-
-void InputJournal::MainLoop() {
-    // Load checkpoint at startup
-    LoadCheckpoint();
-    
-    while (!mShutdown) {
-        if (!InitJournal()) {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
-            continue;
-        }
-        
-        // Main processing loop
-        auto startTime = std::chrono::steady_clock::now();
-        while (!mShutdown) {
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - startTime).count();
-            
-            // Check if we need to restart journal
-            if (elapsed >= mResetIntervalSecond) {
-                break;
-            }
-            
-            // Process journal entries
-            if (!ProcessJournalEntries()) {
-                break;
-            }
-            
-            // Save checkpoint periodically
-            SaveCheckpoint(false);
-            
-            // Small delay to prevent busy waiting
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        }
-        
-        // Save checkpoint before cleanup
-        SaveCheckpoint(true);
-        
-        // Cleanup for restart
-        if (mJournalReader) {
-            mJournalReader->Close();
-        }
-    }
-}
-
-bool InputJournal::InitJournal() {
-    mJournalReader = std::make_unique<SystemdJournalReader>();
-    
-    if (!mJournalReader->Open()) {
-        return false;
-    }
-    
-    // Add filters
-    if (!AddUnits()) {
-        return false;
-    }
-    
-    if (!AddKernel()) {
-        return false;
-    }
-    
-    if (!AddSyslogIdentifiers()) {
-        return false;
-    }
-    
-    if (!AddMatchPatterns()) {
-        return false;
-    }
-    
-    // Position journal based on checkpoint or configuration
-    if (!mLastCheckpointCursor.empty()) {
-        // Try to seek to checkpoint position
-        if (mJournalReader->SeekCursor(mLastCheckpointCursor)) {
-            LOG_INFO(sLogger, ("positioned journal to checkpoint cursor", mLastCheckpointCursor));
-            // Move to next entry to avoid re-reading the last processed entry
-            mJournalReader->Next();
-        } else {
-            LOG_WARNING(sLogger, ("failed to seek to checkpoint cursor", mLastCheckpointCursor)("falling back to configured position", ""));
-            // Fall back to configured position
-            PositionJournalByConfig();
-        }
-    } else {
-        // No checkpoint available, use configured position
-        PositionJournalByConfig();
-    }
-    
-    return true;
-}
-
-void InputJournal::PositionJournalByConfig() {
-    if (mSeekPosition == SEEK_POSITION_HEAD) {
-        mJournalReader->SeekHead();
-        LOG_INFO(sLogger, ("positioned journal to head", ""));
-    } else if (mSeekPosition == SEEK_POSITION_TAIL) {
-        mJournalReader->SeekTail();
-        mJournalReader->Previous(); // Move back one entry
-        LOG_INFO(sLogger, ("positioned journal to tail", ""));
-    } else if (mSeekPosition == SEEK_POSITION_CURSOR && !mCursorSeekFallback.empty()) {
-        // Try fallback position
-        if (mCursorSeekFallback == SEEK_POSITION_HEAD) {
-            mJournalReader->SeekHead();
-            LOG_INFO(sLogger, ("positioned journal to head (fallback)", ""));
-        } else {
-            mJournalReader->SeekTail();
-            mJournalReader->Previous();
-            LOG_INFO(sLogger, ("positioned journal to tail (fallback)", ""));
-        }
-    } else {
-        // Default to tail
-        mJournalReader->SeekTail();
-        mJournalReader->Previous();
-        LOG_INFO(sLogger, ("positioned journal to tail (default)", ""));
-    }
-}
-
-bool InputJournal::AddUnits() {
-    for (const auto& unit : mUnits) {
-        if (!mJournalReader->AddMatch("_SYSTEMD_UNIT", unit)) {
-            return false;
-        }
-        if (!mJournalReader->AddDisjunction()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool InputJournal::AddKernel() {
-    if (mKernel && !mUnits.empty()) {
-        if (!mJournalReader->AddMatch("_TRANSPORT", "kernel")) {
-            return false;
-        }
-        if (!mJournalReader->AddDisjunction()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool InputJournal::AddSyslogIdentifiers() {
-    for (const auto& identifier : mIdentifiers) {
-        if (!mJournalReader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
-            return false;
-        }
-        if (!mJournalReader->AddDisjunction()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool InputJournal::AddMatchPatterns() {
-    for (const auto& pattern : mMatchPatterns) {
-        if (!mJournalReader->AddMatch(pattern, "")) {
-            return false;
-        }
-        if (!mJournalReader->AddDisjunction()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool InputJournal::ProcessJournalEntries() {
-    while (!mShutdown) {
-        if (!mJournalReader->Next()) {
-            // No more entries, wait for new ones
-            int event = mJournalReader->Wait(std::chrono::milliseconds(300));
-            if (event == 1) { // SD_JOURNAL_APPEND
-                continue;
-            } else if (event == -1) { // Error or timeout
-                break;
-            }
-            continue;
-        }
-        
-        JournalEntry entry;
-        if (!mJournalReader->GetEntry(entry)) {
-            continue;
-        }
-        
-        ProcessJournalEntry(entry);
-    }
-    
-    return true;
-}
-
-void InputJournal::ProcessJournalEntry(const JournalEntry& entry) {
-    // Parse priority if enabled
-    if (mParsePriority && entry.HasField("PRIORITY")) {
-        std::string priority = entry.GetField("PRIORITY");
-        // Convert numeric priority to text (simplified)
-        static const std::map<std::string, std::string> priorityMap = {
-            {"0", "emergency"}, {"1", "alert"}, {"2", "critical"},
-            {"3", "error"}, {"4", "warning"}, {"5", "notice"},
-            {"6", "informational"}, {"7", "debug"}
-        };
-        
-        auto it = priorityMap.find(priority);
-        if (it != priorityMap.end()) {
-            // Note: In a real implementation, you would modify the entry
-            // For now, we just process it silently
-        }
-    }
-    
-    // Parse syslog facility if enabled
-    if (mParseSyslogFacility && entry.HasField("SYSLOG_FACILITY")) {
-        std::string facility = entry.GetField("SYSLOG_FACILITY");
-        // Convert numeric facility to text (simplified)
-        static const std::map<std::string, std::string> facilityMap = {
-            {"0", "kernel"}, {"1", "user"}, {"2", "mail"}, {"3", "daemon"},
-            {"4", "auth"}, {"5", "syslog"}, {"6", "lpr"}, {"7", "news"}
-        };
-        
-        auto it = facilityMap.find(facility);
-        if (it != facilityMap.end()) {
-            // Note: In a real implementation, you would modify the entry
-            // For now, we just process it silently
-        }
-    }
-    
-    // Determine event time
-    std::chrono::system_clock::time_point eventTime;
-    if (mUseJournalEventTime) {
-        eventTime = entry.GetRealtimeTimestamp();
-    } else {
-        eventTime = std::chrono::system_clock::now();
-    }
-    
-    // TODO: Convert entry to log format and send to pipeline
-    // This would typically involve creating a LogEvent and sending it through the pipeline
-}
-
 // SystemdJournalReader::Impl implementation
 class InputJournal::SystemdJournalReader::Impl {
 public:
-    Impl() : mIsOpen(false), mCurrentPosition(0) {}
+    Impl() : mIsOpen(false), mJournal(nullptr), mDataThreshold(64 * 1024), mTimeout(1000) {}
     
-    ~Impl() = default;
+    ~Impl() {
+        Close();
+    }
     
     bool Open() {
+#ifdef __linux__
+        if (mIsOpen) {
+            return true; // Already open
+        }
+        
+        // Open the journal
+        int ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to open journal", std::string(strerror(-ret))));
+            return false;
+        }
+        
+        // Set data threshold
+        ret = sd_journal_set_data_threshold(mJournal, mDataThreshold);
+        if (ret < 0) {
+            // Continue anyway, this is not critical
+        }
+        
         mIsOpen = true;
         return true;
+#else
+        // On non-Linux systems, simulate success
+        mIsOpen = true;
+        return true;
+#endif
     }
     
     void Close() {
+#ifdef __linux__
+        if (mJournal) {
+            sd_journal_close(mJournal);
+            mJournal = nullptr;
+        }
+#endif
         mIsOpen = false;
     }
     
     bool IsOpen() const {
-        return mIsOpen;
+        return mIsOpen && mJournal != nullptr;
     }
     
     bool SeekHead() {
+#ifdef __linux__
         if (!IsOpen()) return false;
-        mCurrentPosition = 0;
+        
+        int ret = sd_journal_seek_head(mJournal);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to seek to head", strerror(-ret)));
+            return false;
+        }
         return true;
+#else
+        return mIsOpen;
+#endif
     }
     
     bool SeekTail() {
+#ifdef __linux__
         if (!IsOpen()) return false;
-        mCurrentPosition = 1000; // Simulate some entries
+        
+        int ret = sd_journal_seek_tail(mJournal);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to seek to tail", strerror(-ret)));
+            return false;
+        }
         return true;
+#else
+        return mIsOpen;
+#endif
     }
     
     bool SeekCursor(const std::string& cursor) {
+#ifdef __linux__
         if (!IsOpen()) return false;
-        try {
-            mCurrentPosition = std::stoul(cursor);
-            return true;
-        } catch (...) {
+        
+        int ret = sd_journal_seek_cursor(mJournal, cursor.c_str());
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to seek to cursor", cursor)("error", strerror(-ret)));
             return false;
         }
+        return true;
+#else
+        return mIsOpen;
+#endif
     }
     
     bool Next() {
+#ifdef __linux__
         if (!IsOpen()) return false;
-        mCurrentPosition++;
-        return mCurrentPosition < 1000; // Simulate end of journal
+        
+        int ret = sd_journal_next(mJournal);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to move to next entry", strerror(-ret)));
+            return false;
+        }
+        return ret > 0; // ret > 0 means we have a next entry
+#else
+        return mIsOpen;
+#endif
     }
     
     bool Previous() {
+#ifdef __linux__
         if (!IsOpen()) return false;
-        if (mCurrentPosition > 0) {
-            mCurrentPosition--;
-            return true;
+        
+        int ret = sd_journal_previous(mJournal);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to move to previous entry", strerror(-ret)));
+            return false;
         }
-        return false;
+        return ret > 0; // ret > 0 means we have a previous entry
+#else
+        return mIsOpen;
+#endif
     }
     
     bool GetEntry(JournalEntry& entry) {
+#ifdef __linux__
         if (!IsOpen()) return false;
         
-        // Simulate journal entry
-        entry.cursor = std::to_string(mCurrentPosition);
+        // Clear previous entry data
+        entry.fields.clear();
+        
+        // Get cursor
+        char* cursor;
+        int ret = sd_journal_get_cursor(mJournal, &cursor);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to get cursor", strerror(-ret)));
+            return false;
+        }
+        entry.cursor = cursor;
+        
+        // Get realtime timestamp
+        uint64_t realtime;
+        ret = sd_journal_get_realtime_usec(mJournal, &realtime);
+        if (ret < 0) {
+            realtime = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+        entry.realtimeTimestamp = realtime;
+        
+        // Get monotonic timestamp
+        uint64_t monotonic;
+        ret = sd_journal_get_monotonic_usec(mJournal, &monotonic, nullptr);
+        if (ret < 0) {
+            monotonic = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count();
+        }
+        entry.monotonicTimestamp = monotonic;
+        
+        // Iterate through all fields
+        const void* data;
+        size_t length;
+        const char* field;
+        int r = sd_journal_enumerate_data(mJournal, &data, &length);
+        while (r > 0) {
+            field = static_cast<const char*>(data);
+            std::string fieldStr(field);
+            std::string valueStr(static_cast<const char*>(data) + strlen(field) + 1, length - strlen(field) - 1);
+            entry.fields[fieldStr] = valueStr;
+            r = sd_journal_enumerate_data(mJournal, &data, &length);
+        }
+        
+        return true;
+#else
+        // On non-Linux systems, simulate entry
+        if (!mIsOpen) return false;
+        
+        entry.cursor = "simulated_cursor";
         entry.realtimeTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
         entry.monotonicTimestamp = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
         
-        // Add some sample fields
         entry.fields.clear();
-        entry.fields["MESSAGE"] = "Sample journal entry " + std::to_string(mCurrentPosition);
-        entry.fields["_SYSTEMD_UNIT"] = "sample.service";
+        entry.fields["MESSAGE"] = "Simulated journal entry";
+        entry.fields["_SYSTEMD_UNIT"] = "simulated.service";
         entry.fields["PRIORITY"] = "6";
         entry.fields["SYSLOG_FACILITY"] = "3";
         
         return true;
+#endif
     }
     
     std::string GetCursor() {
+#ifdef __linux__
         if (!IsOpen()) return "";
-        return std::to_string(mCurrentPosition);
+        
+        char* cursor;
+        int ret = sd_journal_get_cursor(mJournal, &cursor);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to get cursor", strerror(-ret)));
+            return "";
+        }
+        return cursor;
+#else
+        return mIsOpen ? "simulated_cursor" : "";
+#endif
     }
     
     bool AddMatch(const std::string& field, const std::string& value) {
-        (void)field; // Suppress unused parameter warning
-        (void)value; // Suppress unused parameter warning
+#ifdef __linux__
         if (!IsOpen()) return false;
-        // Store match for filtering (simplified)
+        
+        // 组合字段和值为 "FIELD=value" 格式
+        std::string matchString = field + "=" + value;
+        int ret = sd_journal_add_match(mJournal, matchString.c_str(), matchString.length());
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to add match", field)("value", value)("error", strerror(-ret)));
+            return false;
+        }
         return true;
+#else
+        return mIsOpen;
+#endif
     }
     
     bool AddDisjunction() {
+#ifdef __linux__
         if (!IsOpen()) return false;
+        
+        int ret = sd_journal_add_disjunction(mJournal);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to add disjunction", strerror(-ret)));
+            return false;
+        }
         return true;
+#else
+        return mIsOpen;
+#endif
     }
     
     int Wait(std::chrono::milliseconds timeout) {
+#ifdef __linux__
         if (!IsOpen()) return -1;
         
-        // Simulate waiting for new entries
+        uint64_t timeout_us = std::chrono::duration_cast<std::chrono::microseconds>(timeout).count();
+        int ret = sd_journal_wait(mJournal, timeout_us);
+        if (ret < 0) {
+            LOG_ERROR(sLogger, ("failed to wait for journal events", strerror(-ret)));
+            return -1;
+        }
+        return ret; // SD_JOURNAL_NOP, SD_JOURNAL_APPEND, SD_JOURNAL_INVALIDATE
+#else
+        // On non-Linux systems, simulate waiting
+        if (!mIsOpen) return -1;
         std::this_thread::sleep_for(timeout);
         return 1; // SD_JOURNAL_APPEND
+#endif
     }
     
     bool SetDataThreshold(size_t threshold) {
-        (void)threshold; // Suppress unused parameter warning
-        if (!IsOpen()) return false;
+        mDataThreshold = threshold;
+#ifdef __linux__
+        if (IsOpen()) {
+            int ret = sd_journal_set_data_threshold(mJournal, mDataThreshold);
+            if (ret < 0) {
+                return false;
+            }
+        }
+#endif
         return true;
     }
     
     bool SetTimeout(std::chrono::milliseconds timeout) {
-        (void)timeout; // Suppress unused parameter warning
-        if (!IsOpen()) return false;
+        mTimeout = std::chrono::duration_cast<std::chrono::milliseconds>(timeout).count();
         return true;
     }
     
 private:
     bool mIsOpen;
-    size_t mCurrentPosition;
+#ifdef __linux__
+    sd_journal* mJournal;
+#endif
+    size_t mDataThreshold;
+    int mTimeout;
 };
 
 // JournalReader implementation

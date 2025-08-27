@@ -18,11 +18,8 @@
 
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
 #include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
 #include <functional>
 
@@ -135,31 +132,16 @@ private:
 
     // Runtime state
     std::unique_ptr<JournalReader> mJournalReader;
-    std::string mLastCheckpointCursor;
-    std::chrono::steady_clock::time_point mLastSaveCheckpointTime;
     
     // Threading
     std::atomic<bool> mShutdown;
-    std::thread mMainThread;
-    std::mutex mMutex;
-    std::condition_variable mCondition;
+    // 不再需要线程管理，JournalServer 会处理所有数据
 
     // Constants
     static constexpr int DEFAULT_RESET_INTERVAL = 3600; // 1 hour
     static constexpr int DEFAULT_CURSOR_FLUSH_PERIOD_MS = 5000; // 5 seconds
 
-    // Helper methods
-    bool LoadCheckpoint();
-    bool SaveCheckpoint(bool force = false);
-    void MainLoop();
-    bool InitJournal();
-    bool AddUnits();
-    bool AddKernel();
-    bool AddSyslogIdentifiers();
-    bool AddMatchPatterns();
-    bool ProcessJournalEntries();
-    void ProcessJournalEntry(const JournalEntry& entry);
-    void PositionJournalByConfig();
+    // 不再需要这些辅助方法，JournalServer 会处理所有 journal 操作
     
     // Seek position constants
     static const std::string SEEK_POSITION_CURSOR;

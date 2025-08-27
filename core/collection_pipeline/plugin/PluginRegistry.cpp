@@ -170,6 +170,7 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputJournal>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 
