@@ -148,9 +148,14 @@
          entry.cursor = cursor;
          free(cursor);
  
-         uint64_t ts = 0;
-         sd_journal_get_realtime_usec(mJournal, &ts);
-         entry.realtimeTimestamp = ts;
+                 uint64_t ts = 0;
+        sd_journal_get_realtime_usec(mJournal, &ts);
+        entry.realtimeTimestamp = ts;
+        
+        uint64_t monotonic_ts = 0;
+        sd_id128_t boot_id;
+        sd_journal_get_monotonic_usec(mJournal, &monotonic_ts, &boot_id);
+        entry.monotonicTimestamp = monotonic_ts;
  
          const void* data = nullptr;
          size_t len = 0;

@@ -552,14 +552,42 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         // 应用字段转换
         ApplyJournalFieldTransforms(entry, config);
         
-        // 添加时间戳字段
-        if (config.useJournalEventTime) {
-            entry.fields["_realtime_timestamp_"] = std::to_string(entry.realtimeTimestamp);
-        }
-        entry.fields["_monotonic_timestamp_"] = std::to_string(entry.monotonicTimestamp);
+        // 创建PipelineEventGroup并添加LogEvent
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
         
-        // 这里应该处理entry到pipeline的转换
-        // 简化实现：直接记录处理的条目数
+        // 添加LogEvent并设置字段
+        LogEvent* logEvent = eventGroup.AddLogEvent();
+        
+        // 设置所有journal字段到LogEvent
+        for (const auto& field : entry.fields) {
+            logEvent->SetContent(field.first, field.second);
+        }
+        
+        // 添加时间戳字段（始终透出）
+        logEvent->SetContent("_realtime_timestamp_", std::to_string(entry.realtimeTimestamp));
+        logEvent->SetContent("_monotonic_timestamp_", std::to_string(entry.monotonicTimestamp));
+        
+        // 设置时间戳
+        if (config.useJournalEventTime && entry.realtimeTimestamp > 0) {
+            // 转换微秒到纳秒 (LogEvent期望纳秒时间戳)
+            logEvent->SetTimestamp(entry.realtimeTimestamp * 1000);
+        } else {
+            // 使用当前时间
+            logEvent->SetTimestamp(time(nullptr) * 1000000000ULL);
+        }
+        
+        LOG_DEBUG(sLogger, ("created LogEvent", "")("config", configName)("idx", idx)("fields", entry.fields.size())("timestamp", logEvent->GetTimestamp()));
+        
+        // 推送到处理队列
+        if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, idx, std::move(eventGroup))) {
+            LOG_ERROR(sLogger, ("failed to push journal data to process queue", "discard data")
+                      ("config", configName)("input idx", idx)("queue", queueKey));
+        } else {
+            LOG_DEBUG(sLogger, ("successfully pushed journal event to process queue", "")
+                      ("config", configName)("input idx", idx)("queue", queueKey));
+        }
+        
         entryCount++;
         isFirstEntry = false;
         
