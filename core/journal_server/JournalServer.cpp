@@ -268,12 +268,18 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         return;
     }
     
-    // 0. 获取或创建journal连接（使用连接管理器）
-    LOG_INFO(sLogger, ("getting journal connection from manager", "")("config", configName)("idx", idx));
-    auto journalReader = JournalConnectionManager::GetInstance()->GetOrCreateConnection(configName, idx, config);
+    // 0. 获取或创建journal连接（使用连接管理器和RAII守护）
+    LOG_INFO(sLogger, ("getting guarded journal connection from manager", "")("config", configName)("idx", idx));
+    auto connectionGuard = JournalConnectionManager::GetInstance()->GetGuardedConnection(configName, idx, config);
     
+    if (!connectionGuard) {
+        LOG_ERROR(sLogger, ("failed to get guarded journal connection", "skip processing")("config", configName)("idx", idx));
+        return;
+    }
+    
+    auto journalReader = connectionGuard->GetReader();
     if (!journalReader) {
-        LOG_ERROR(sLogger, ("failed to get journal connection", "skip processing")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("failed to get journal reader from guard", "skip processing")("config", configName)("idx", idx));
         return;
     }
     
@@ -282,7 +288,7 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         return;
     }
     
-    LOG_INFO(sLogger, ("journal connection obtained successfully", "")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("guarded journal connection obtained successfully", "")("config", configName)("idx", idx));
     
     // 1. 根据seekPosition处理定位逻辑  
     bool seekSuccess = false;
@@ -326,21 +332,79 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     }
     
     // 2. 读取entry并处理
+    // 优化说明：
+    // - 使用可配置的批处理大小，默认1000而不是硬编码的100
+    // - 集成journal wait功能，避免无效轮询，提高处理效率
+    // - 动态调整等待时间：初次等待较长时间，后续等待较短时间以保持响应性
     int entryCount = 0;
-    const int maxEntriesPerBatch = 100;
+    const int maxEntriesPerBatch = config.maxEntriesPerBatch;  // 使用配置的批处理大小
     bool isFirstEntry = true;
     
-    LOG_INFO(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
+    LOG_INFO(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx)("seek_position", config.seekPosition)("max_batch_size", maxEntriesPerBatch));
     
     while (entryCount < maxEntriesPerBatch) {
         // 对于head模式或者非首次读取，需要调用Next()移动到下一条
         if (config.seekPosition == "head" || !isFirstEntry) {
             bool nextSuccess = journalReader->Next();
             if (!nextSuccess) {
-                LOG_INFO(sLogger, ("no more entries available", "")("config", configName)("idx", idx)("entries_read", entryCount));
-                break;
+                // 检查连接是否仍然有效
+                if (!journalReader->IsOpen()) {
+                    LOG_WARNING(sLogger, ("journal connection closed during processing", "aborting batch")("config", configName)("idx", idx)("entries_processed", entryCount));
+                    break;
+                }
+                
+                // 没有更多entries时，使用wait功能等待新的entries
+                // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
+                int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
+                
+                LOG_DEBUG(sLogger, ("no entries available, waiting for new entries", "")("config", configName)("idx", idx)("wait_timeout_ms", waitTimeout)("entries_processed", entryCount));
+                
+                int waitResult = journalReader->Wait(std::chrono::milliseconds(waitTimeout));
+                if (waitResult > 0) {
+                    // 有新的数据可用，继续尝试读取
+                    LOG_DEBUG(sLogger, ("new entries detected after wait", "")("config", configName)("idx", idx)("entries_processed", entryCount));
+                    
+                    // 在wait之后重新检查连接状态
+                    if (!journalReader->IsOpen()) {
+                        LOG_WARNING(sLogger, ("journal connection closed during wait", "aborting batch")("config", configName)("idx", idx));
+                        break;
+                    }
+                    
+                    nextSuccess = journalReader->Next();
+                    if (!nextSuccess) {
+                        LOG_DEBUG(sLogger, ("wait indicated new data but Next() failed", "")("config", configName)("idx", idx));
+                        // 再次检查连接状态
+                        if (!journalReader->IsOpen()) {
+                            LOG_WARNING(sLogger, ("connection lost after wait", "")("config", configName)("idx", idx));
+                        }
+                        break;
+                    }
+                } else if (waitResult == 0) {
+                    // 超时，没有新数据
+                    if (entryCount == 0) {
+                        LOG_DEBUG(sLogger, ("wait timeout, no new entries found", "")("config", configName)("idx", idx));
+                    } else {
+                        LOG_DEBUG(sLogger, ("wait timeout, batch completed with entries", "")("config", configName)("idx", idx)("entries_processed", entryCount));
+                    }
+                    break;
+                } else {
+                    // 错误，可能是连接被重置或其他问题
+                    LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
+                    
+                    // 检查连接是否还有效
+                    if (!journalReader->IsOpen()) {
+                        LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
+                    }
+                    break;
+                }
             }
             LOG_DEBUG(sLogger, ("moved to next entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+        }
+        
+        // 在读取entry之前再次验证连接状态
+        if (!journalReader->IsOpen()) {
+            LOG_WARNING(sLogger, ("journal connection closed before GetEntry", "aborting batch")("config", configName)("idx", idx)("entries_processed", entryCount));
+            break;
         }
         
         // 读取当前entry
@@ -349,6 +413,12 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         
         if (!getEntrySuccess) {
             LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx)("entry_count", entryCount));
+            
+            // 检查是否是连接问题导致的失败
+            if (!journalReader->IsOpen()) {
+                LOG_WARNING(sLogger, ("GetEntry failed due to closed connection", "aborting batch")("config", configName)("idx", idx));
+                break;
+            }
             continue;
         }
         
@@ -395,7 +465,7 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
 
             if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
                 adjustedSeconds += GetTimeDelta();
-                adjustedNanoSeconds += GetTimeDelta()*1000;
+                adjustedNanoSeconds += GetTimeDelta()*1000000;
                 LOG_DEBUG(sLogger, ("new timestamp", "adjustedSeconds")("new nanoSeconds", adjustedNanoSeconds));
 
             }

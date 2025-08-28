@@ -77,6 +77,12 @@ bool JournalConnectionInfo::ShouldReset(int resetIntervalSec) const {
 bool JournalConnectionInfo::ResetConnection() {
     std::lock_guard<std::mutex> lock(mMutex);
     
+    // 检查连接是否正在使用中，如果是则跳过重置
+    if (IsInUse()) {
+        LOG_INFO(sLogger, ("connection is in use, postponing reset", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
+        return false; // 返回false表示重置被推迟，但连接仍然有效
+    }
+    
     LOG_INFO(sLogger, ("resetting journal connection", "")("config", mConfigName)("idx", mIndex));
     
     // 关闭旧连接
@@ -236,6 +242,60 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
     }
 }
 
+std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConnection(
+    const std::string& configName,
+    size_t idx,
+    const JournalConfig& config) {
+    
+    std::string key = makeConnectionKey(configName, idx);
+    
+    LOG_INFO(sLogger, ("GetGuardedConnection called", "")("config", configName)("idx", idx)("key", key));
+    
+    std::lock_guard<std::mutex> lock(mConnectionsMutex);
+    
+    auto it = mConnections.find(key);
+    std::shared_ptr<JournalConnectionInfo> connInfo;
+    
+    if (it != mConnections.end()) {
+        LOG_INFO(sLogger, ("existing connection found for guarded access", "")("config", configName)("idx", idx));
+        connInfo = it->second;
+        
+        // 检查是否需要重置，但不强制重置正在使用的连接
+        if (connInfo->ShouldReset(3600) && !connInfo->IsInUse()) {
+            LOG_INFO(sLogger, ("connection can be reset for guarded access", "")("config", configName)("idx", idx));
+            if (!connInfo->ResetConnection()) {
+                LOG_WARNING(sLogger, ("failed to reset connection, creating new one", "")("config", configName)("idx", idx));
+                mConnections.erase(it);
+                connInfo = nullptr;
+            }
+        }
+    }
+    
+    // 如果连接不存在或重置失败，创建新连接
+    if (!connInfo) {
+        LOG_INFO(sLogger, ("creating new journal connection for guarded access", "")("config", configName)("idx", idx));
+        
+        try {
+            connInfo = std::make_shared<JournalConnectionInfo>(configName, idx, config);
+            LOG_INFO(sLogger, ("JournalConnectionInfo created for guarded access", "")("config", configName)("idx", idx)("valid", connInfo->IsValid()));
+            
+            if (connInfo->IsValid()) {
+                mConnections[key] = connInfo;
+                LOG_INFO(sLogger, ("journal connection created and cached for guarded access", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
+            } else {
+                LOG_ERROR(sLogger, ("failed to create valid journal connection for guarded access", "")("config", configName)("idx", idx));
+                return nullptr;
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR(sLogger, ("exception creating journal connection for guarded access", e.what())("config", configName)("idx", idx));
+            return nullptr;
+        }
+    }
+    
+    // 创建守护对象
+    return std::make_unique<JournalConnectionGuard>(connInfo);
+}
+
 void JournalConnectionManager::RemoveConnection(const std::string& configName, size_t idx) {
     std::string key = makeConnectionKey(configName, idx);
     
@@ -256,11 +316,24 @@ size_t JournalConnectionManager::CleanupExpiredConnections(int resetIntervalSec)
     while (it != mConnections.end()) {
         auto& connInfo = it->second;
         
-        // 检查连接是否过期或无效
-        if (!connInfo->IsValid() || connInfo->ShouldReset(resetIntervalSec)) {
-            LOG_INFO(sLogger, ("cleaning up expired/invalid connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+        // 检查连接是否过期或无效，但不清理正在使用中的连接
+        if (!connInfo->IsValid()) {
+            // 连接已无效，可以安全清理
+            LOG_INFO(sLogger, ("cleaning up invalid connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
             it = mConnections.erase(it);
             removedCount++;
+        } else if (connInfo->ShouldReset(resetIntervalSec)) {
+            // 连接需要重置
+            if (!connInfo->IsInUse()) {
+                // 连接未在使用中，可以清理
+                LOG_INFO(sLogger, ("cleaning up expired connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                it = mConnections.erase(it);
+                removedCount++;
+            } else {
+                // 连接正在使用中，跳过清理
+                LOG_INFO(sLogger, ("skipping cleanup of in-use expired connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex())("usage_count", connInfo->IsInUse()));
+                ++it;
+            }
         } else {
             ++it;
         }
@@ -321,6 +394,24 @@ void JournalConnectionInfo::ClearCheckpoint() {
 bool JournalConnectionInfo::HasCheckpoint() const {
     std::lock_guard<std::mutex> lock(mMutex);
     return !mCurrentCheckpoint.empty();
+}
+
+void JournalConnectionInfo::IncrementUsageCount() {
+    mUsageCount.fetch_add(1);
+    LOG_DEBUG(sLogger, ("connection usage incremented", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
+}
+
+void JournalConnectionInfo::DecrementUsageCount() {
+    int oldCount = mUsageCount.fetch_sub(1);
+    if (oldCount <= 1) {
+        LOG_DEBUG(sLogger, ("connection usage decremented to zero", "")("config", mConfigName)("idx", mIndex));
+    } else {
+        LOG_DEBUG(sLogger, ("connection usage decremented", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
+    }
+}
+
+bool JournalConnectionInfo::IsInUse() const {
+    return mUsageCount.load() > 0;
 }
 
 void JournalConnectionInfo::loadCheckpointFromDisk() {

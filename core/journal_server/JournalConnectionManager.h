@@ -22,12 +22,17 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <atomic>
 
 #include "journal_server/JournalReader.h"
 #include "journal_server/JournalServer.h"
 #include "journal_server/JournalFilter.h"
 
 namespace logtail {
+
+// Forward declarations
+class JournalConnectionInfo;
+class JournalConnectionGuard;
 
 /**
  * @brief 管理单个config的journal连接信息
@@ -63,6 +68,11 @@ public:
     void ClearCheckpoint();
     bool HasCheckpoint() const;
     
+    // 连接使用状态管理 - 防止在使用中的连接被重置
+    void IncrementUsageCount();
+    void DecrementUsageCount();
+    bool IsInUse() const;
+    
     // 获取连接信息
     const std::string& GetConfigName() const { return mConfigName; }
     size_t GetIndex() const { return mIndex; }
@@ -85,6 +95,9 @@ private:
     std::string mCurrentCheckpoint;
     bool mCheckpointChanged;
     std::chrono::steady_clock::time_point mLastCheckpointSaveTime;
+    
+    // 连接使用计数 - 防止重置正在使用的连接
+    std::atomic<int> mUsageCount{0};
     
     mutable std::mutex mMutex;
     bool mIsValid;
@@ -116,6 +129,18 @@ public:
      * @return journal reader智能指针，失败返回nullptr
      */
     std::shared_ptr<SystemdJournalReader> GetOrCreateConnection(
+        const std::string& configName,
+        size_t idx,
+        const JournalConfig& config);
+
+    /**
+     * @brief 获取带守护的journal连接（推荐使用）
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @param config journal配置
+     * @return 连接守护对象，自动管理使用计数
+     */
+    std::unique_ptr<JournalConnectionGuard> GetGuardedConnection(
         const std::string& configName,
         size_t idx,
         const JournalConfig& config);
@@ -201,6 +226,44 @@ private:
     
     // 生成连接的唯一key
     std::string makeConnectionKey(const std::string& configName, size_t idx) const;
+};
+
+/**
+ * @brief RAII连接守护类，自动管理连接使用计数
+ * 
+ * 确保在连接使用期间不会被意外重置或清理
+ */
+class JournalConnectionGuard {
+public:
+    JournalConnectionGuard(std::shared_ptr<JournalConnectionInfo> connection)
+        : mConnection(connection) {
+        if (mConnection) {
+            mConnection->IncrementUsageCount();
+        }
+    }
+    
+    ~JournalConnectionGuard() {
+        if (mConnection) {
+            mConnection->DecrementUsageCount();
+        }
+    }
+    
+    // 禁用拷贝和移动
+    JournalConnectionGuard(const JournalConnectionGuard&) = delete;
+    JournalConnectionGuard& operator=(const JournalConnectionGuard&) = delete;
+    JournalConnectionGuard(JournalConnectionGuard&&) = delete;
+    JournalConnectionGuard& operator=(JournalConnectionGuard&&) = delete;
+    
+    std::shared_ptr<SystemdJournalReader> GetReader() {
+        return mConnection ? mConnection->GetReader() : nullptr;
+    }
+    
+    bool IsValid() const {
+        return mConnection && mConnection->IsValid();
+    }
+    
+private:
+    std::shared_ptr<JournalConnectionInfo> mConnection;
 };
 
 } // namespace logtail 
