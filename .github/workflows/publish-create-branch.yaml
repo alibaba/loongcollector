@@ -197,8 +197,11 @@ jobs:
 
   build-windows:
     needs: create-release-branch
-    runs-on: windows-2022
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    strategy:
+      matrix:
+        runner: [Windows]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -206,59 +209,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.create-release-branch.outputs.branch_name }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: ${{ env.GO_VERSION }}
 
       - name: Build Windows package
         run: |
-          $VERSION = "${{ github.event.inputs.version }}"
-          
-          # 设置环境变量
-          $env:LOONCOLLECTOR_VERSION = $VERSION
-          $env:BUILD_LOGTAIL_UT = "OFF"
-          
-          # 检查并设置依赖路径
-          # GitHub Windows runner 已经安装了 Visual Studio 2022
-          $env:CMAKE_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-          if (!(Test-Path $env:CMAKE_BIN)) {
-            $env:CMAKE_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-          }
-          if (!(Test-Path $env:CMAKE_BIN)) {
-            $env:CMAKE_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
-          }
-          
-          # 设置 devenv 路径 (使用 VS2022)
-          $env:DEVENV_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\IDE\devenv.com"
-          if (!(Test-Path $env:DEVENV_BIN)) {
-            $env:DEVENV_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\devenv.com"
-          }
-          if (!(Test-Path $env:DEVENV_BIN)) {
-            $env:DEVENV_BIN = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\devenv.com"
-          }
-          
-          # 下载并设置 Boost 依赖
-          if (!(Test-Path "D:\loongcollector-windows-build\boost_1_68_0")) {
-            Write-Host "Downloading Boost 1.68..."
-            New-Item -ItemType Directory -Path "D:\loongcollector-windows-build" -Force
-            # 使用官方下载链接，速度更快
-            Invoke-WebRequest -Uri "https://archives.boost.io/release/1.68.0/binaries/boost_1_68_0-msvc-14.1-64.exe" -OutFile "D:\loongcollector-windows-build\boost_1_68_0-msvc-14.1-64.exe"
-            Start-Process -FilePath "D:\loongcollector-windows-build\boost_1_68_0-msvc-14.1-64.exe" -ArgumentList "/S" -Wait
-          }
-          $env:BOOST_ROOT = "D:\loongcollector-windows-build\boost_1_68_0"
-          
-          # 下载并设置 LoongCollector 依赖
-          if (!(Test-Path "D:\loongcollector-windows-build\ilogtail-deps.windows-x64")) {
-            Write-Host "Downloading LoongCollector dependencies..."
-            Invoke-WebRequest -Uri "https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/ilogtail-deps.windows-x64.zip" -OutFile "D:\loongcollector-windows-build\ilogtail-deps.windows-x64.zip"
-            Expand-Archive -Path "D:\loongcollector-windows-build\ilogtail-deps.windows-x64.zip" -DestinationPath "D:\loongcollector-windows-build" -Force
-          }
-          $env:LOONCOLLECTOR_DEPS_PATH = "D:\loongcollector-windows-build\ilogtail-deps.windows-x64\ilogtail-deps.windows-x64"
-          
-          # 执行 Windows 构建脚本
           Write-Host "Starting Windows build..."
-          .\scripts\windows64_build_github_actions.bat $env:LOONCOLLECTOR_VERSION
+          .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
           
           # 检查构建结果
           if (Test-Path "output") {
