@@ -29,8 +29,15 @@ ROOTDIR=$(cd $(dirname $0) && cd .. && pwd)
 
 # GitHub repository information
 # 从GitHub Actions环境变量中获取，如果没有则使用默认值
-REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-alibaba}"
-REPO_NAME="${GITHUB_REPOSITORY_NAME:-ilogtail}"
+if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+    # 从GITHUB_REPOSITORY中解析owner和name
+    REPO_OWNER=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f1)
+    REPO_NAME=$(echo "$GITHUB_REPOSITORY" | cut -d'/' -f2)
+else
+    # 如果没有GITHUB_REPOSITORY，尝试使用单独的变量
+    REPO_OWNER="${GITHUB_REPOSITORY_OWNER:-alibaba}"
+    REPO_NAME="${GITHUB_REPOSITORY_NAME:-ilogtail}"
+fi
 
 function createReleaseFile() {
     local version=$1
@@ -211,7 +218,9 @@ echo "Generating release markdown for version: $version"
 echo "Using milestone ID: $milestone_id"
 
 # 验证milestone
-validateMilestone $milestone_id
+if ! validateMilestone $milestone_id; then
+    echo "Warning: Milestone validation failed, but continuing with release generation..." >&2
+fi
 
 # 创建release文件
 createReleaseFile $version $milestone_id

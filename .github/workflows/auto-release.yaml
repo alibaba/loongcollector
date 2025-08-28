@@ -63,7 +63,6 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-      milestons: write
     outputs:
       branch_name: ${{ steps.create-branch.outputs.branch_name }}
       version: ${{ github.event.inputs.version }}
