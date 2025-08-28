@@ -17,10 +17,7 @@
 #include "journal_server/JournalServer.h"
 
 #include <chrono>
-#include <filesystem>
-#include <fstream>
-#include <sstream>
-#include <algorithm>
+
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -29,6 +26,8 @@
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/memory/SourceBuffer.h"
+#include "common/TimeUtil.h"
+#include "app_config/AppConfig.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 #include "journal_server/JournalReader.h"
@@ -570,11 +569,23 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         
         // 设置时间戳
         if (config.useJournalEventTime && entry.realtimeTimestamp > 0) {
-            // 转换微秒到纳秒 (LogEvent期望纳秒时间戳)
-            logEvent->SetTimestamp(entry.realtimeTimestamp * 1000);
+            // journal的realtimeTimestamp是微秒，需要转换为秒和纳秒
+            uint64_t seconds = entry.realtimeTimestamp / 1000000;
+            uint64_t nanoseconds = (entry.realtimeTimestamp % 1000000) * 1000;
+            logEvent->SetTimestamp(seconds, nanoseconds);
         } else {
-            // 使用当前时间
-            logEvent->SetTimestamp(time(nullptr) * 1000000000ULL);
+            // 使用当前时间（保持纳秒精度，应用秒级时间自动调整）
+            auto currentTime = GetCurrentLogtailTime();
+            time_t adjustedSeconds = currentTime.tv_sec;
+            time_t adjustedNanoSeconds = currentTime.tv_nsec;
+
+            if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
+                adjustedSeconds += GetTimeDelta();
+                adjustedNanoSeconds += GetTimeDelta()*1000;
+                LOG_DEBUG(sLogger, ("new timestamp", "adjustedSeconds")("new nanoSeconds", adjustedNanoSeconds));
+
+            }
+            logEvent->SetTimestamp(adjustedSeconds, adjustedNanoSeconds);
         }
         
         LOG_DEBUG(sLogger, ("created LogEvent", "")("config", configName)("idx", idx)("fields", entry.fields.size())("timestamp", logEvent->GetTimestamp()));
