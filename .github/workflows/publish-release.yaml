@@ -1,0 +1,190 @@
+# Copyright 2021 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name (e.g., 3.1)'
+        required: true
+        type: string
+        pattern: '^[0-9]+\.[0-9]+$'
+      version:
+        description: 'Release version (e.g., 3.1.4)'
+        required: true
+        type: string
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+.*$'
+
+env:
+  GO_VERSION: 1.19.10
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      releases: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Set version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using version: $VERSION"
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="v$VERSION"
+          
+          # 检查标签是否已存在
+          if git tag -l | grep -q "^$TAG_NAME$"; then
+            echo "Tag $TAG_NAME already exists. Deleting it..."
+            git tag -d "$TAG_NAME"
+            git push origin ":refs/tags/$TAG_NAME" || true
+          fi
+          
+          # 创建新标签
+          echo "Creating tag $TAG_NAME..."
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          
+          echo "Tag $TAG_NAME created and pushed successfully"
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # 检查 release notes 文件是否存在
+          if [ ! -f "changes/v${VERSION}.md" ]; then
+            echo "Error: Release notes file changes/v${VERSION}.md not found"
+            exit 1
+          fi
+          
+          # 获取上一个 release tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Previous tag found: $PREVIOUS_TAG"
+            # 生成比较链接
+            COMPARE_URL="https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...v${VERSION}"
+            echo "Compare URL: $COMPARE_URL"
+          else
+            echo "No previous tag found, this appears to be the first release"
+            COMPARE_URL=""
+          fi
+          
+          # 读取 release notes 内容
+          RELEASE_NOTES=$(cat "changes/v${VERSION}.md")
+          
+          # 如果有比较链接，添加到 release notes 中
+          if [ -n "$COMPARE_URL" ]; then
+            RELEASE_NOTES="$RELEASE_NOTES
+
+## Changes since $PREVIOUS_TAG
+
+See [full changelog]($COMPARE_URL) for all changes since $PREVIOUS_TAG."
+          fi
+          
+          # 添加 Docker 镜像信息
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          RELEASE_NOTES="$RELEASE_NOTES
+
+## Docker Images
+
+This release includes Docker images for multiple architectures:
+
+### GitHub Container Registry (ghcr.io)
+
+\`\`\`bash
+# Pull the latest version
+docker pull ghcr.io/$REPO_OWNER/loongcollector:latest
+
+# Pull a specific version
+docker pull ghcr.io/$REPO_OWNER/loongcollector:$VERSION
+
+# Run the container
+docker run -d --name loongcollector ghcr.io/$REPO_OWNER/loongcollector:$VERSION
+\`\`\`
+
+**Supported architectures:**
+- linux/amd64
+- linux/arm64
+
+### Alibaba Cloud Container Registry
+
+\`\`\`bash
+# Pull from Alibaba Cloud Container Registry
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongcollector:$VERSION
+\`\`\`
+
+**Supported architectures:**
+- linux/amd64
+- linux/arm64"
+          
+          # 保存到文件
+          echo "$RELEASE_NOTES" > release_notes.md
+          echo "Release notes generated successfully"
+
+      - name: Download build artifacts from create-branch workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz
+          path: dist/
+
+      - name: Download Linux ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz
+          path: dist/
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
+          path: dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+          files: |
+            dist/loongcollector-${{ env.VERSION }}.linux-amd64.tar.gz
+            dist/loongcollector-${{ env.VERSION }}.linux-arm64.tar.gz
+            dist/loongcollector-${{ env.VERSION }}.windows-amd64.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Output release info
+        run: |
+          echo "Release v${{ env.VERSION }} has been published successfully!"
+          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+          echo "Branch: ${{ github.event.inputs.branch }}"
+          echo "Version: ${{ env.VERSION }}" 
