@@ -16,9 +16,15 @@
 
 #include "JournalCheckpointManager.h"
 #include "logger/Logger.h"
+#include "app_config/AppConfig.h"
+#include "common/FileSystemUtil.h"
 #include <sstream>
 #include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <thread>
+#include <iterator>
+#include "json/json.h"
 
 namespace logtail {
 
@@ -207,42 +213,160 @@ std::string JournalCheckpointManager::makeCheckpointKey(const std::string& confi
 }
 
 bool JournalCheckpointManager::saveCheckpointToDisk(const std::string& key, const JournalCheckpoint& checkpoint) {
-    (void)key;        // TODO: 使用key作为存储标识
-    (void)checkpoint; // TODO: 序列化checkpoint数据
+    std::string checkpointFile = GetAgentDataDir() + "journal_check_point";
     
-    // TODO: 与现有的checkpoint持久化机制集成
-    // 可以使用类似file_server/checkpoint/CheckPointManager的方式
-    // 或者集成Go版本的leveldb-based checkpoint manager
+    // 读取现有文件（如果存在）
+    Json::Value root;
+    std::ifstream infile(checkpointFile.c_str());
+    if (infile.is_open()) {
+        Json::CharReaderBuilder builder;
+        builder["collectComments"] = false;
+        std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        std::string jsonParseErrs;
+        std::string content((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+        infile.close();
+        if (!reader->parse(content.data(), content.data() + content.size(), &root, &jsonParseErrs)) {
+            LOG_WARNING(sLogger, ("failed to parse existing journal checkpoint file", checkpointFile)("error", jsonParseErrs));
+            root = Json::Value(Json::objectValue);
+        }
+    }
     
-    // 目前先返回true，表示"保存成功"
-    // 实际实现时需要：
-    // 1. 序列化checkpoint数据（JSON格式）
-    // 2. 写入到持久化存储（文件或数据库）
-    // 3. 处理错误情况
+    // 如果root为空或格式错误，初始化
+    if (root.isNull() || !root.isObject()) {
+        root = Json::Value(Json::objectValue);
+    }
     
+    // 构建checkpoint数据
+    Json::Value checkpointJson;
+    checkpointJson["cursor"] = checkpoint.cursor;
+    checkpointJson["update_time"] = Json::Value(static_cast<int64_t>(time(NULL)));
+    
+    // 确保checkpoints对象存在
+    if (!root.isMember("checkpoints")) {
+        root["checkpoints"] = Json::Value(Json::objectValue);
+    }
+    root["checkpoints"][key] = checkpointJson;
+    root["version"] = Json::Value(1);
+    
+    // 写入文件
+    std::ofstream fout(checkpointFile.c_str());
+    if (!fout.is_open()) {
+        LOG_ERROR(sLogger, ("failed to open journal checkpoint file for write", checkpointFile));
+        return false;
+    }
+    
+    fout << root.toStyledString();
+    fout.close();
+    
+    if (fout.bad()) {
+        LOG_ERROR(sLogger, ("failed to write journal checkpoint file", checkpointFile));
+        return false;
+    }
+    
+    LOG_DEBUG(sLogger, ("journal checkpoint saved", key)("cursor", checkpoint.cursor));
     return true;
 }
 
 bool JournalCheckpointManager::loadCheckpointFromDisk(const std::string& key, JournalCheckpoint& checkpoint) {
-    (void)key;        // TODO: 使用key从存储中读取
-    (void)checkpoint; // TODO: 反序列化到checkpoint对象
+    std::string checkpointFile = GetAgentDataDir() + "journal_check_point";
     
-    // TODO: 从磁盘加载checkpoint数据
-    // 对应saveCheckpointToDisk的反向操作：
-    // 1. 从持久化存储读取数据
-    // 2. 反序列化为JournalCheckpoint对象
-    // 3. 处理文件不存在或损坏的情况
+    std::ifstream infile(checkpointFile.c_str());
+    if (!infile.is_open()) {
+        LOG_DEBUG(sLogger, ("journal checkpoint file not found", checkpointFile));
+        return false;
+    }
     
-    return false;  // 暂时返回false，表示没有找到
+    Json::Value root;
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    std::string jsonParseErrs;
+    std::string content((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+    infile.close();
+    
+    if (!reader->parse(content.data(), content.data() + content.size(), &root, &jsonParseErrs)) {
+        LOG_WARNING(sLogger, ("failed to parse journal checkpoint file", checkpointFile)("error", jsonParseErrs));
+        return false;
+    }
+    
+    // 查找checkpoint
+    if (!root.isMember("checkpoints") || !root["checkpoints"].isMember(key)) {
+        LOG_DEBUG(sLogger, ("journal checkpoint not found", key));
+        return false;
+    }
+    
+    const Json::Value& checkpointJson = root["checkpoints"][key];
+    if (!checkpointJson.isMember("cursor")) {
+        LOG_WARNING(sLogger, ("invalid journal checkpoint format", key));
+        return false;
+    }
+    
+    // 加载数据
+    checkpoint.cursor = checkpointJson["cursor"].asString();
+    checkpoint.createTime = std::chrono::steady_clock::now();
+    checkpoint.updateTime = std::chrono::steady_clock::now();
+    checkpoint.changed = false;
+    
+    LOG_DEBUG(sLogger, ("journal checkpoint loaded", key)("cursor", checkpoint.cursor));
+    return true;
 }
 
 bool JournalCheckpointManager::removeCheckpointFromDisk(const std::string& key) {
-    (void)key; // TODO: 使用key删除对应的存储记录
+    std::string checkpointFile = GetAgentDataDir() + "journal_check_point";
     
-    // TODO: 从磁盘删除checkpoint数据
-    // 删除对应的持久化文件或数据库记录
+    // 读取现有文件
+    Json::Value root;
+    std::ifstream infile(checkpointFile.c_str());
+    if (!infile.is_open()) {
+        LOG_DEBUG(sLogger, ("journal checkpoint file not found during removal", checkpointFile));
+        return true; // 文件不存在，认为删除成功
+    }
     
-    return true;  // 暂时返回true
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+    std::string jsonParseErrs;
+    std::string content((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
+    infile.close();
+    
+    if (!reader->parse(content.data(), content.data() + content.size(), &root, &jsonParseErrs)) {
+        LOG_WARNING(sLogger, ("failed to parse journal checkpoint file during removal", checkpointFile)("error", jsonParseErrs));
+        return false;
+    }
+    
+    // 检查并删除checkpoint
+    if (!root.isMember("checkpoints") || !root["checkpoints"].isMember(key)) {
+        LOG_DEBUG(sLogger, ("journal checkpoint not found for removal", key));
+        return true; // checkpoint不存在，认为删除成功
+    }
+    
+    root["checkpoints"].removeMember(key);
+    
+    // 如果没有checkpoint了，删除文件
+    if (root["checkpoints"].empty()) {
+        if (remove(checkpointFile.c_str()) == 0) {
+            LOG_DEBUG(sLogger, ("journal checkpoint file removed", checkpointFile));
+        }
+        return true;
+    }
+    
+    // 写回文件
+    std::ofstream fout(checkpointFile.c_str());
+    if (!fout.is_open()) {
+        LOG_ERROR(sLogger, ("failed to open journal checkpoint file for removal", checkpointFile));
+        return false;
+    }
+    
+    fout << root.toStyledString();
+    fout.close();
+    
+    if (fout.bad()) {
+        LOG_ERROR(sLogger, ("failed to write journal checkpoint file during removal", checkpointFile));
+        return false;
+    }
+    
+    LOG_DEBUG(sLogger, ("journal checkpoint removed", key));
+    return true;
 }
 
 } // namespace logtail 
