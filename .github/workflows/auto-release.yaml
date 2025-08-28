@@ -614,8 +614,13 @@ jobs:
         run: |
           echo "Checking GitHub CLI status..."
           gh --version
-          gh auth status
           echo "Current repository: ${{ github.repository }}"
+          
+          # 使用GitHub token进行认证
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          
+          # 验证认证状态
+          gh auth status
 
       - name: Set version
         run: |
