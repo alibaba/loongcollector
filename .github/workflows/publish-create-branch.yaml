@@ -335,7 +335,8 @@ jobs:
               echo "Generated SHA256 for $file"
             fi
           done
-          ls -la .
+          cd ..
+          ls -la dist/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
