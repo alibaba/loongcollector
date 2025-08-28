@@ -610,6 +610,13 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Check GitHub CLI status
+        run: |
+          echo "Checking GitHub CLI status..."
+          gh --version
+          gh auth status
+          echo "Current repository: ${{ github.repository }}"
+
       - name: Set version
         run: |
           VERSION="${{ github.event.inputs.version }}"
@@ -634,6 +641,11 @@ jobs:
           git push origin "$TAG_NAME"
           
           echo "Tag $TAG_NAME created and pushed successfully"
+          
+          # 验证标签是否创建成功
+          echo "Verifying tag creation..."
+          git tag -l | grep "^$TAG_NAME$" || echo "Warning: Tag not found locally"
+          git ls-remote --tags origin | grep "$TAG_NAME" || echo "Warning: Tag not found remotely"
 
       - name: Generate release notes
         run: |
@@ -707,15 +719,30 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           
+          # 检查release notes文件
+          echo "Checking release notes file..."
+          if [ ! -f "release_notes.md" ]; then
+            echo "Error: release_notes.md not found"
+            exit 1
+          fi
+          
+          echo "Release notes content (first 500 chars):"
+          head -c 500 release_notes.md
+          echo ""
+          
           # 检查是否有可用的 artifacts
           if [ "$(ls -A dist/ 2>/dev/null)" ]; then
             echo "Found artifacts, creating release with files..."
+            echo "Artifacts to upload:"
+            ls -la dist/
+            
+            # 创建release并上传文件
             gh release create "v$VERSION" \
               --title "Release v$VERSION" \
               --notes-file release_notes.md \
               --draft false \
               --prerelease false \
-              dist/*.tar.gz dist/*.zip dist/*.sha256 2>/dev/null || true
+              dist/*.tar.gz dist/*.zip dist/*.sha256
           else
             echo "No artifacts found, creating release without files..."
             gh release create "v$VERSION" \
@@ -723,6 +750,15 @@ jobs:
               --notes-file release_notes.md \
               --draft false \
               --prerelease false
+          fi
+          
+          # 检查release是否创建成功
+          if [ $? -eq 0 ]; then
+            echo "Release created successfully!"
+            gh release view "v$VERSION"
+          else
+            echo "Failed to create release"
+            exit 1
           fi
 
       - name: Output release info
