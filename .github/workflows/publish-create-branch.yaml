@@ -139,29 +139,31 @@ jobs:
     needs: create-release-branch
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-    if: |
-      (matrix.arch == 'amd64' && github.event.inputs.build_linux_amd64 == 'true') ||
-      (matrix.arch == 'arm64' && github.event.inputs.build_linux_arm64 == 'true')
     strategy:
       matrix:
         include:
           - arch: amd64
             runner: ubuntu-latest
+            should_build: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
           - arch: arm64
             runner: ubuntu-24.04-arm
+            should_build: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
     steps:
       - name: Check out code
+        if: matrix.should_build
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.create-release-branch.outputs.branch_name }}
 
       - name: Set up Go
+        if: matrix.should_build
         uses: actions/setup-go@v4
         with:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Set custom submodule URL and fetch
+        if: matrix.should_build
         run: |
           SUBMODULE_PATH="core/_thirdparty/coolbpf"
           git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
@@ -170,12 +172,14 @@ jobs:
           echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Build Linux ${{ matrix.arch }} package
+        if: matrix.should_build
         run: |
           VERSION="${{ github.event.inputs.version }}"
           make dist
           ls -la dist/
 
       - name: Upload Linux ${{ matrix.arch }} artifacts
+        if: matrix.should_build
         uses: actions/upload-artifact@v4
         with:
           name: loongcollector-${{ github.event.inputs.version }}.linux-${{ matrix.arch }}.tar.gz
@@ -186,19 +190,19 @@ jobs:
     needs: create-release-branch
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
-    if: github.event.inputs.build_windows == 'true'
     strategy:
       matrix:
         runner: [Windows]
     steps:
       - name: Check out code
+        if: github.event.inputs.build_windows == 'true'
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.create-release-branch.outputs.branch_name }}
 
-
       - name: Build Windows package
+        if: github.event.inputs.build_windows == 'true'
         run: |
           Write-Host "Starting Windows build..."
           .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
@@ -213,6 +217,7 @@ jobs:
           }
 
       - name: Upload Windows artifacts
+        if: github.event.inputs.build_windows == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
