@@ -120,7 +120,7 @@ This release includes Docker images for multiple architectures:
 
 ### GitHub Container Registry (ghcr.io)
 
-\`\`\`bash
+\`bash
 # Pull the latest version
 docker pull ghcr.io/\$REPO_OWNER/loongcollector:latest
 
@@ -129,7 +129,7 @@ docker pull ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION
 
 # Run the container
 docker run -d --name loongcollector ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION
-\`\`\`
+\`
 
 **Supported architectures:**
 - linux/amd64
@@ -137,10 +137,10 @@ docker run -d --name loongcollector ghcr.io/\$REPO_OWNER/loongcollector:\$VERSIO
 
 ### Alibaba Cloud Container Registry
 
-\`\`\`bash
+\`bash
 # Pull from Alibaba Cloud Container Registry
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongcollector:\$VERSION
-\`\`\`
+\`
 
 **Supported architectures:**
 - linux/amd64
@@ -150,37 +150,81 @@ docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongco
           echo "$RELEASE_NOTES" > release_notes.md
           echo "Release notes generated successfully"
 
-      - name: Download build artifacts from create-branch workflow
-        uses: actions/download-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz
-          path: dist/
+      - name: Download build artifacts from OSS
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          mkdir -p dist/
+          
+          # 尝试从 OSS 下载构建产物
+          echo "Downloading build artifacts from OSS..."
+          
+          # 下载 Linux AMD64
+          LINUX_AMD64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-amd64.tar.gz"
+          if curl -f -s -o "dist/loongcollector-${VERSION}.linux-amd64.tar.gz" "$LINUX_AMD64_URL"; then
+            echo "✓ Downloaded Linux AMD64 package"
+            # 下载对应的 SHA256 文件
+            curl -f -s -o "dist/loongcollector-${VERSION}.linux-amd64.tar.gz.sha256" "${LINUX_AMD64_URL}.sha256" || echo "SHA256 file not found"
+          else
+            echo "✗ Failed to download Linux AMD64 package"
+          fi
+          
+          # 下载 Linux ARM64
+          LINUX_ARM64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-arm64.tar.gz"
+          if curl -f -s -o "dist/loongcollector-${VERSION}.linux-arm64.tar.gz" "$LINUX_ARM64_URL"; then
+            echo "✓ Downloaded Linux ARM64 package"
+            # 下载对应的 SHA256 文件
+            curl -f -s -o "dist/loongcollector-${VERSION}.linux-arm64.tar.gz.sha256" "${LINUX_ARM64_URL}.sha256" || echo "SHA256 file not found"
+          else
+            echo "✗ Failed to download Linux ARM64 package"
+          fi
+          
+          # 下载 Windows
+          WINDOWS_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.windows-amd64.zip"
+          if curl -f -s -o "dist/loongcollector-${VERSION}.windows-amd64.zip" "$WINDOWS_URL"; then
+            echo "✓ Downloaded Windows package"
+            # 下载对应的 SHA256 文件
+            curl -f -s -o "dist/loongcollector-${VERSION}.windows-amd64.zip.sha256" "${WINDOWS_URL}.sha256" || echo "SHA256 file not found"
+          else
+            echo "✗ Failed to download Windows package"
+          fi
+          
+          echo "Downloaded artifacts:"
+          ls -la dist/ || echo "No artifacts downloaded"
 
-      - name: Download Linux ARM64 artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz
-          path: dist/
-
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
-          path: dist/
+      - name: Check available artifacts
+        run: |
+          echo "Checking available artifacts in dist/ directory:"
+          ls -la dist/ || echo "No artifacts found in dist/ directory"
+          
+          if [ ! "$(ls -A dist/ 2>/dev/null)" ]; then
+            echo "No artifacts found. The release will be created without files."
+            echo "Make sure the build artifacts have been uploaded to OSS by running publish-create-branch.yaml first."
+          else
+            echo "Found artifacts:"
+            ls -la dist/
+          fi
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ env.VERSION }}
-          name: Release v${{ env.VERSION }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-          files: |
-            dist/loongcollector-${{ env.VERSION }}.linux-amd64.tar.gz
-            dist/loongcollector-${{ env.VERSION }}.linux-arm64.tar.gz
-            dist/loongcollector-${{ env.VERSION }}.windows-amd64.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ env.VERSION }}"
+          
+          # 检查是否有可用的 artifacts
+          if [ "$(ls -A dist/ 2>/dev/null)" ]; then
+            echo "Found artifacts, creating release with files..."
+            gh release create "v$VERSION" \
+              --title "Release v$VERSION" \
+              --notes-file release_notes.md \
+              --draft false \
+              --prerelease false \
+              dist/*.tar.gz dist/*.zip dist/*.sha256 2>/dev/null || true
+          else
+            echo "No artifacts found, creating release without files..."
+            gh release create "v$VERSION" \
+              --title "Release v$VERSION" \
+              --notes-file release_notes.md \
+              --draft false \
+              --prerelease false
+          fi
 
       - name: Output release info
         run: |

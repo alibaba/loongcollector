@@ -42,6 +42,11 @@ on:
         required: false
         type: boolean
         default: true
+      test_mode:
+        description: 'Enable test mode (creates mock packages instead of real builds)'
+        required: false
+        type: boolean
+        default: false
 
 env:
   GO_VERSION: 1.19.10
@@ -144,10 +149,10 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-latest
-            should_build: ${{ github.event.inputs.build_linux_amd64 != 'true' }}
+            should_build: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
           - arch: arm64
             runner: ubuntu-24.04-arm
-            should_build: ${{ github.event.inputs.build_linux_arm64 != 'true' }}
+            should_build: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
     steps:
       - name: Check out code
         if: matrix.should_build
@@ -175,7 +180,28 @@ jobs:
         if: matrix.should_build
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          make dist
+          
+          # 快速测试模式：创建模拟的构建产物
+          if [[ "${{ github.event.inputs.test_mode }}" == "true" ]]; then
+            echo "Running in test mode - creating mock packages..."
+            mkdir -p dist/
+            
+            # 创建模拟的 loongcollector 目录结构
+            mkdir -p mock_loongcollector/loongcollector-$VERSION
+            echo "Mock loongcollector binary for ${{ matrix.arch }}" > mock_loongcollector/loongcollector-$VERSION/loongcollector
+            echo "Mock config" > mock_loongcollector/loongcollector-$VERSION/ilogtail_config.json
+            echo "Mock script" > mock_loongcollector/loongcollector-$VERSION/loongcollector_control.sh
+            chmod +x mock_loongcollector/loongcollector-$VERSION/loongcollector
+            chmod +x mock_loongcollector/loongcollector-$VERSION/loongcollector_control.sh
+            
+            # 创建 tar.gz 包
+            tar -czf dist/loongcollector-$VERSION.linux-${{ matrix.arch }}.tar.gz -C mock_loongcollector loongcollector-$VERSION
+            echo "Created mock package: dist/loongcollector-$VERSION.linux-${{ matrix.arch }}.tar.gz"
+          else
+            # 正常构建模式
+            make dist
+          fi
+          
           ls -la dist/
 
       - name: Upload Linux ${{ matrix.arch }} artifacts
@@ -203,8 +229,30 @@ jobs:
 
       - name: Build Windows package
         run: |
-          Write-Host "Starting Windows build..."
-          .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
+          $VERSION = "${{ github.event.inputs.version }}"
+          
+          # 快速测试模式：创建模拟的构建产物
+          if ("${{ github.event.inputs.test_mode }}" -eq "true") {
+            Write-Host "Running in test mode - creating mock Windows package..."
+            
+            # 创建模拟的 output 目录结构
+            New-Item -ItemType Directory -Path "output" -Force | Out-Null
+            "Mock loongcollector.exe for Windows" | Out-File -FilePath "output\loongcollector.exe" -Encoding UTF8
+            "Mock GoPluginAdapter.dll" | Out-File -FilePath "output\GoPluginAdapter.dll" -Encoding UTF8
+            "Mock GoPluginBase.dll" | Out-File -FilePath "output\GoPluginBase.dll" -Encoding UTF8
+            "{}" | Out-File -FilePath "output\ilogtail_config.json" -Encoding UTF8
+            
+            # 创建 dist 目录
+            New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+            
+            # 创建 zip 包
+            Compress-Archive -Path "output\*" -DestinationPath "dist\loongcollector-$VERSION.windows-amd64.zip" -Force
+            Write-Host "Created mock Windows package: dist\loongcollector-$VERSION.windows-amd64.zip"
+          } else {
+            # 正常构建模式
+            Write-Host "Starting Windows build..."
+            .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
+          }
           
           # 检查构建结果
           if (Test-Path "output") {
@@ -303,7 +351,7 @@ jobs:
               echo "Generated SHA256 for $file"
             fi
           done
-          ls -la dist/
+          ls -la .
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
