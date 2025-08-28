@@ -18,12 +18,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., 1.2.3)'
+        description: 'Release version (e.g., 3.1.4)'
         required: true
         type: string
         pattern: '^[0-9]+\.[0-9]+\.[0-9]+.*$'
       milestone_id:
-        description: 'Milestone ID from GitHub (e.g., 26 for https://github.com/${GITHUB_REPOSITORY}/milestone/26)'
+        description: 'Milestone ID from GitHub (e.g., 26 for https://github.com/alibaba/ilogtail/milestone/26)'
         required: true
         type: string
         pattern: '^[0-9]+$'
@@ -38,6 +38,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      branch_name: ${{ steps.create-branch.outputs.branch_name }}
+      version: ${{ github.event.inputs.version }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -64,12 +67,13 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Create release branch
+        id: create-branch
         run: |
           VERSION="${{ github.event.inputs.version }}"
           MILESTONE_ID="${{ github.event.inputs.milestone_id }}"
           # 提取大版本号，如3.1.4 -> 3.1
           MAJOR_VERSION=$(echo $VERSION | cut -d. -f1,2)
-          MAJOR_BRANCH_NAME="v${MAJOR_VERSION}"
+          MAJOR_BRANCH_NAME="${MAJOR_VERSION}"
           
           # 确保我们在main分支上
           git checkout main
@@ -104,6 +108,8 @@ jobs:
           
           # 推送分支
           git push origin "$MAJOR_BRANCH_NAME"
+          
+          echo "branch_name=$MAJOR_BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Output branch name
         run: |
@@ -111,4 +117,248 @@ jobs:
           MAJOR_VERSION=$(echo $VERSION | cut -d. -f1,2)
           MAJOR_BRANCH_NAME="v${MAJOR_VERSION}"
           echo "Release prepared on branch: $MAJOR_BRANCH_NAME"
-          echo "Please trigger the publish-release workflow with branch name: $MAJOR_BRANCH_NAME and version: $VERSION" 
+          echo "Please trigger the publish-release workflow with branch name: $MAJOR_BRANCH_NAME and version: $VERSION"
+
+  # 第一步：构建不同架构的安装包
+  build-linux-amd64:
+    needs: create-release-branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Linux AMD64 package
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          make dist
+          ls -la dist/
+
+      - name: Upload Linux AMD64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-amd64-package
+          path: dist/
+          retention-days: 1
+
+  build-linux-arm64:
+    needs: create-release-branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Linux ARM64 package
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          # 使用 Docker 在 ARM64 环境下构建
+          docker run --rm --platform linux/arm64 -v $(pwd):/workspace -w /workspace golang:1.19.10-bullseye bash -c "
+            apt-get update && apt-get install -y make gcc g++ git
+            cd /workspace
+            SUBMODULE_PATH='core/_thirdparty/coolbpf'
+            git config submodule.\$SUBMODULE_PATH.url 'https://github.com/aliyun/coolbpf.git'
+            git submodule update --init
+            make dist
+          "
+          ls -la dist/
+
+      - name: Upload Linux ARM64 artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-package
+          path: dist/
+          retention-days: 1
+
+  build-windows:
+    needs: create-release-branch
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Windows package
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          make dist
+          ls -la dist/
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: dist/
+          retention-days: 1
+
+      - name: Upload to OSS
+        env:
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          # 这里需要配置 OSS 上传逻辑
+          # 使用 oss-browser 或其他工具上传 Windows 包
+          echo "Uploading Windows package to OSS for version $VERSION"
+          # TODO: 实现具体的 OSS 上传逻辑
+
+  # 第二步：合并包并上传
+  upload-packages:
+    needs: [build-linux-amd64, build-linux-arm64, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+      OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Download Linux AMD64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-amd64-package
+          path: temp-amd64/
+
+      - name: Download Linux ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-arm64-package
+          path: temp-arm64/
+
+      - name: Merge artifacts
+        run: |
+          mkdir -p dist/
+          cp temp-amd64/* dist/ || true
+          cp temp-arm64/* dist/ || true
+          ls -la dist/
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Upload packages to OSS
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          chmod +x scripts/upload_release_assets.sh
+          ./scripts/upload_release_assets.sh package $VERSION
+          ./scripts/upload_release_assets.sh image $VERSION
+
+  # 第三步：测试链接和产物
+  test-release:
+    needs: upload-packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Generate release markdown
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          MILESTONE_ID="${{ github.event.inputs.milestone_id }}"
+          chmod +x scripts/gen_release_markdown.sh
+          ./scripts/gen_release_markdown.sh $VERSION $MILESTONE_ID
+
+      - name: Test release links
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          DOC_FILE="changes/v${VERSION}.md"
+          
+          if [ ! -f "$DOC_FILE" ]; then
+            echo "Error: Release document $DOC_FILE not found"
+            exit 1
+          fi
+          
+          echo "Testing links in $DOC_FILE..."
+          
+          # 等待一段时间让 OSS 上传完成
+          echo "Waiting for OSS upload to complete..."
+          sleep 30
+          
+          # 提取所有链接并测试
+          grep -o 'https://[^)]*' "$DOC_FILE" | while read -r url; do
+            echo "Testing URL: $url"
+            if curl -f -s -o /dev/null "$url"; then
+              echo "✓ URL accessible: $url"
+            else
+              echo "✗ URL failed: $url"
+              exit 1
+            fi
+          done
+          
+          # 测试下载链接
+          LINUX_AMD64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-amd64.tar.gz"
+          LINUX_ARM64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-arm64.tar.gz"
+          WINDOWS_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.windows-amd64.zip"
+          
+          echo "Testing download URLs..."
+          for url in "$LINUX_AMD64_URL" "$LINUX_ARM64_URL" "$WINDOWS_URL"; do
+            echo "Testing download URL: $url"
+            if curl -f -s -I "$url" | grep -q "200 OK"; then
+              echo "✓ Download URL accessible: $url"
+            else
+              echo "✗ Download URL failed: $url"
+              exit 1
+            fi
+          done
+          
+          echo "All tests passed!" 
