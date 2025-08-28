@@ -679,14 +679,6 @@ jobs:
             RELEASE_NOTES="$RELEASE_NOTES$COMPARE_SECTION"
           fi
           
-          # 添加 Docker 镜像信息
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          # 构建 Docker 镜像信息
-          DOCKER_INFO="\n\n## Docker Images\n\nThis release includes Docker images for multiple architectures:\n\n### GitHub Container Registry (ghcr.io)\n\n\`\`\`bash\n# Pull the latest version\ndocker pull ghcr.io/\$REPO_OWNER/loongcollector:latest\n\n# Pull a specific version\ndocker pull ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION\n\n# Run the container\ndocker run -d --name loongcollector ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION\n\`\`\`\n\n**Supported architectures:**\n- linux/amd64\n- linux/arm64\n\n### Alibaba Cloud Container Registry\n\n\`\`\`bash\n# Pull from Alibaba Cloud Container Registry\ndocker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongcollector:\$VERSION\n\`\`\`\n\n**Supported architectures:**\n- linux/amd64\n- linux/arm64"
-          
-          RELEASE_NOTES="$RELEASE_NOTES$DOCKER_INFO"
-          
           # 保存到文件
           echo "$RELEASE_NOTES" > release_notes.md
           echo "Release notes generated successfully"

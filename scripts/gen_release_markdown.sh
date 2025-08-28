@@ -155,10 +155,14 @@ function appendDockerImageLinks() {
 **Docker Pull Command**
 \`\`\` bash
 docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:${version}
+docker pull ghcr.io/${REPO_OWNER}/loongcollector:${version}
+docker pull ghcr.io/${REPO_OWNER}/loongcollector:latest
 \`\`\`
 
 **Docker Image Tags**
 - \`sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:${version}\`
+- \`ghcr.io/${REPO_OWNER}/loongcollector:${version}\`
+- \`ghcr.io/${REPO_OWNER}/loongcollector:latest\`
 EOF
 }
 
