@@ -675,8 +675,10 @@ jobs:
           
           # 如果有比较链接，添加到 release notes 中
           if [ -n "$COMPARE_URL" ]; then
-            COMPARE_SECTION="\n\n## Changes since $PREVIOUS_TAG\n\nSee [full changelog]($COMPARE_URL) for all changes since $PREVIOUS_TAG."
-            RELEASE_NOTES="$RELEASE_NOTES$COMPARE_SECTION"
+            echo "" >> release_notes.md
+            echo "## Changes since $PREVIOUS_TAG" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "See [full changelog]($COMPARE_URL) for all changes since $PREVIOUS_TAG." >> release_notes.md
           fi
           
           # 保存到文件
