@@ -29,8 +29,10 @@ namespace logtail {
  * 负责处理所有journal相关的过滤逻辑：
  * - Units过滤：指定systemd unit过滤，不配置则全采集
  * - Identifiers过滤：指定syslog identifier过滤，同units逻辑
- * - Kernel过滤：kernel日志过滤，默认启用
+ * - Kernel过滤：kernel日志过滤，仅在配置了units且启用时生效
  * - 自定义匹配模式过滤
+ * 
+ * 所有过滤器之间使用OR逻辑关系，与Golang版本保持一致
  */
 class JournalFilter {
 public:
@@ -98,8 +100,8 @@ public:
     /**
      * @brief Kernel过滤：采集kernel日志
      * 
-     * 默认启用kernel日志采集
-     * 匹配_TRANSPORT=kernel
+     * 与Golang版本保持一致：只有在配置了units且enableKernel=true时才添加kernel过滤器
+     * 匹配_TRANSPORT=kernel，并调用AddDisjunction()形成OR逻辑关系
      * 
      * @param reader journal reader实例
      * @param configName 配置名称（用于日志）

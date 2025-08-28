@@ -56,8 +56,9 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
             }
         }
 
-        // 3. 应用kernel过滤（如果启用）
-        if (config.enableKernel) {
+        // 3. 应用kernel过滤（如果配置了units且启用kernel）
+        // 与Golang版本保持一致：只有在配置了units且enableKernel=true时才添加kernel过滤器
+        if (!config.units.empty() && config.enableKernel) {
             LOG_INFO(sLogger, ("applying kernel filter", "")("config", config.configName)("idx", config.configIndex));
             if (!AddKernelFilter(reader, config.configName, config.configIndex)) {
                 LOG_ERROR(sLogger, ("kernel filter failed", "")("config", config.configName)("idx", config.configIndex));
@@ -226,8 +227,12 @@ bool JournalFilter::AddKernelFilter(JournalReader* reader,
         return false;
     }
     
-    // 注意：对于单个条件，不应该调用AddDisjunction()
-    // AddDisjunction()只在需要OR逻辑时使用
+    // 添加AddDisjunction()以与其他过滤器形成OR逻辑关系，与Golang版本保持一致
+    if (!reader->AddDisjunction()) {
+        LOG_WARNING(sLogger, ("failed to add kernel disjunction", "")("config", configName)("idx", configIndex));
+        return false;
+    }
+    
     LOG_DEBUG(sLogger, ("kernel filter added", "")("config", configName)("idx", configIndex));
     return true;
 }

@@ -11,4 +11,5 @@
   - [processor_csv](processor/processor_csv.md)
 - service_input
   - [service_docker_stdout](service_input/service_docker_stdout.md)
+  - [service_journal](service_input/input_journal.md)
   - [service_prometheus](service_input/service_prometheus.md)
