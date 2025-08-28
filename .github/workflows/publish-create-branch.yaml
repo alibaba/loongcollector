@@ -144,10 +144,10 @@ jobs:
         include:
           - arch: amd64
             runner: ubuntu-latest
-            should_build: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
+            should_build: ${{ github.event.inputs.build_linux_amd64 != 'true' }}
           - arch: arm64
             runner: ubuntu-24.04-arm
-            should_build: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
+            should_build: ${{ github.event.inputs.build_linux_arm64 != 'true' }}
     steps:
       - name: Check out code
         if: matrix.should_build
@@ -190,19 +190,18 @@ jobs:
     needs: create-release-branch
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
+    if: github.event.inputs.build_windows == 'true'
     strategy:
       matrix:
         runner: [Windows]
     steps:
       - name: Check out code
-        if: github.event.inputs.build_windows == 'true'
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.create-release-branch.outputs.branch_name }}
 
       - name: Build Windows package
-        if: github.event.inputs.build_windows == 'true'
         run: |
           Write-Host "Starting Windows build..."
           .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
@@ -217,7 +216,6 @@ jobs:
           }
 
       - name: Upload Windows artifacts
-        if: github.event.inputs.build_windows == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
@@ -269,6 +267,26 @@ jobs:
         run: |
           echo "Available artifacts:"
           ls -la temp-amd64/ temp-arm64/ temp-windows/ || true
+
+      - name: Install ossutil
+        run: |
+          # 下载并安装 ossutil
+          curl -o ossutil-2.1.2-linux-amd64.zip https://gosspublic.alicdn.com/ossutil/v2/2.1.2/ossutil-2.1.2-linux-amd64.zip
+          unzip ossutil-2.1.2-linux-amd64.zip
+          cd ossutil-2.1.2-linux-amd64
+          chmod 755 ossutil
+          sudo mv ossutil /usr/local/bin/ && sudo ln -s /usr/local/bin/ossutil /usr/bin/ossutil
+          ossutil
+
+      - name: Configure ossutil
+        run: |
+          # 配置 ossutil
+          ossutil config \
+            --endpoint https://oss-cn-shanghai.aliyuncs.com \
+            --access-key-id ${{ secrets.OSS_ACCESS_KEY_ID }} \
+            --access-key-secret ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
+            --sts-token "" \
+            --output-dir /tmp/ossutil
 
       - name: Merge artifacts and generate SHA256
         run: |
@@ -425,3 +443,11 @@ jobs:
           fi
           
           echo "All tests passed!" 
+
+  actions-timeline:
+    needs: [test-release]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2
