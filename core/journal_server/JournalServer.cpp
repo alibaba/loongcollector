@@ -68,11 +68,22 @@ bool JournalServer::HasRegisteredPlugins() const {
 }
 
 void JournalServer::addJournalInput(const string& configName, size_t idx, const JournalConfig& config) {
+    // 首先验证配置
+    QueueKey queueKey;
+    if (!validateJournalConfig(configName, idx, config, queueKey)) {
+        LOG_ERROR(sLogger, ("journal input validation failed", "config not added")("config", configName)("idx", idx));
+        return;
+    }
+    
+    // 验证成功后，缓存queueKey并添加配置
+    JournalConfig validatedConfig = config;
+    validatedConfig.queueKey = queueKey;
+    
     {
         lock_guard<mutex> lock(mUpdateMux);
-        mPipelineNameJournalConfigsMap[configName][idx] = config;
+        mPipelineNameJournalConfigsMap[configName][idx] = validatedConfig;
         
-        LOG_INFO(sLogger, ("journal input added", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
+        LOG_INFO(sLogger, ("journal input added after validation", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
     
     // Note: Checkpoint management is now handled automatically by JournalConnectionManager
@@ -199,25 +210,26 @@ void JournalServer::processJournalEntries() {
 void JournalServer::processJournalConfig(const string& configName, size_t idx, const JournalConfig& config) {
     LOG_INFO(sLogger, ("processJournalConfig", "started")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr));
 
-    // Step 1: Validate configuration
-    QueueKey queueKey;
-    if (!validateJournalConfig(configName, idx, config, queueKey)) {
+    // 使用已验证的queueKey（在addJournalInput时已验证并缓存）
+    QueueKey queueKey = config.queueKey;
+    if (queueKey == -1) {
+        LOG_ERROR(sLogger, ("invalid queue key in config", "config not properly validated")("config", configName)("idx", idx));
         return;
     }
     
-    // Step 2: Setup journal connection
+    // Step 1: Setup journal connection
     std::unique_ptr<JournalConnectionGuard> connectionGuard;
     auto journalReader = setupJournalConnection(configName, idx, config, connectionGuard);
     if (!journalReader) {
         return;
     }
     
-    // Step 3: Perform seek operation
+    // Step 2: Perform seek operation
     if (!performJournalSeek(configName, idx, config, journalReader)) {
         return;
     }
     
-    // Step 4: Read and process entries
+    // Step 3: Read and process entries
     readJournalEntriesForConfig(configName, idx, config, journalReader, queueKey);
 }
 

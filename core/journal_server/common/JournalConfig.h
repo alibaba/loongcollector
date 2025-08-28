@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include "collection_pipeline/queue/QueueKey.h"
 
 namespace logtail {
 
@@ -54,6 +55,9 @@ struct JournalConfig {
 
     // Context reference
     const CollectionPipelineContext* ctx;
+    
+    // Runtime state (set during validation)
+    mutable QueueKey queueKey = -1;  // Cached queue key after validation (-1 = not validated)
     
     JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
                      maxEntriesPerBatch(1000), waitTimeoutMs(1000),
