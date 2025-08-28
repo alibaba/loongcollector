@@ -59,7 +59,10 @@ struct JournalConfig {
     const CollectionPipelineContext* ctx;
     
     JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
-                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true), ctx(nullptr) {}
+                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true), ctx(nullptr) {
+        // Note: kernel默认为false，这样默认采集所有日志而不仅仅是内核日志
+        // 用户可以根据需要手动启用kernel过滤器
+    }
 };
 
 /**

@@ -35,6 +35,8 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         return false;
     }
 
+
+
     try {
         // 1. 应用units过滤（如果配置了）
         if (!config.units.empty()) {
@@ -77,6 +79,13 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
             !config.enableKernel && config.matchPatterns.empty()) {
             LOG_WARNING(sLogger, ("no filters configured, will collect all journal entries", "")
                         ("config", config.configName)("idx", config.configIndex));
+        }
+
+        // 如果只有kernel过滤器，提醒用户这会只收集内核消息
+        if (config.units.empty() && config.identifiers.empty() && 
+            config.enableKernel && config.matchPatterns.empty()) {
+            LOG_INFO(sLogger, ("kernel-only filter active, will collect only kernel messages", "")
+                     ("config", config.configName)("idx", config.configIndex));
         }
 
         LOG_INFO(sLogger, ("all filters applied successfully", "")("config", config.configName)("idx", config.configIndex));
@@ -217,12 +226,8 @@ bool JournalFilter::AddKernelFilter(JournalReader* reader,
         return false;
     }
     
-    // 与Go版本保持一致，即使单个条件也调用AddDisjunction
-    if (!reader->AddDisjunction()) {
-        LOG_WARNING(sLogger, ("failed to add kernel disjunction", "")("config", configName)("idx", configIndex));
-        return false;
-    }
-    
+    // 注意：对于单个条件，不应该调用AddDisjunction()
+    // AddDisjunction()只在需要OR逻辑时使用
     LOG_DEBUG(sLogger, ("kernel filter added", "")("config", configName)("idx", configIndex));
     return true;
 }

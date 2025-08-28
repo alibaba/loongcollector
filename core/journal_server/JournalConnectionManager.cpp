@@ -208,10 +208,8 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
             }
         } else {
             // 连接未到重置时间，直接返回
-            LOG_INFO(sLogger, ("returning existing connection", "")("config", configName)("idx", idx));
-            auto reader = connInfo->GetReader();
-            LOG_INFO(sLogger, ("existing connection reader status", "")("config", configName)("idx", idx)("reader_valid", reader != nullptr)("reader_open", reader ? reader->IsOpen() : false));
-            return reader;
+            LOG_DEBUG(sLogger, ("reusing existing connection", "")("config", configName)("idx", idx));
+            return connInfo->GetReader();
         }
     } else {
         LOG_INFO(sLogger, ("no existing connection found", "")("config", configName)("idx", idx));
@@ -227,9 +225,7 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
         if (connInfo->IsValid()) {
             mConnections[key] = connInfo;
             LOG_INFO(sLogger, ("journal connection created and cached", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
-            auto reader = connInfo->GetReader();
-            LOG_INFO(sLogger, ("new connection reader status", "")("config", configName)("idx", idx)("reader_valid", reader != nullptr)("reader_open", reader ? reader->IsOpen() : false));
-            return reader;
+            return connInfo->GetReader();
         } else {
             LOG_ERROR(sLogger, ("failed to create valid journal connection", "")("config", configName)("idx", idx));
             return nullptr;
