@@ -733,7 +733,7 @@ jobs:
           echo "Version: ${{ env.VERSION }}"
 
   actions-timeline:
-    needs: [test-release, create-release]
+    needs: [create-release]
     runs-on: ubuntu-latest
     permissions:
       actions: read

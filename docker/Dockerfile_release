@@ -29,15 +29,6 @@ ARG HOST_OS=Linux
 ARG VERSION=0.0.1
 ARG TARGETPLATFORM
 
-# Install minimal dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        iproute2 \
-        ca-certificates \
-        curl \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY --from=build /usr/local/loongcollector-${VERSION} /usr/local/loongcollector
 RUN chown -R $(whoami) /usr/local/loongcollector/ && \
     chmod 755 /usr/local/loongcollector/loongcollector && \
