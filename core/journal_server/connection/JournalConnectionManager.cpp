@@ -15,7 +15,6 @@
  */
 
 #include "JournalConnectionManager.h"
-#include "../checkpoint/JournalCheckpointManager.h"
 #include "logger/Logger.h"
 #include <sstream>
 
@@ -36,9 +35,6 @@ JournalConnectionInfo::JournalConnectionInfo(const std::string& configName,
     , mIsValid(false) {
     
     // Connection created
-    
-    // 加载已保存的checkpoint  
-    JournalCheckpointManager::GetInstance().LoadCheckpointFromDisk(mConfigName, mIndex);
     
     initializeConnection();
 }
@@ -322,24 +318,8 @@ std::string JournalConnectionManager::makeConnectionKey(const std::string& confi
 }
 
 //==============================================================================
-// JournalConnectionInfo Checkpoint Implementation
+// JournalConnectionInfo Usage Count Management
 //==============================================================================
-
-void JournalConnectionInfo::SaveCheckpoint(const std::string& cursor) {
-    JournalCheckpointManager::GetInstance().SaveCheckpoint(mConfigName, mIndex, cursor);
-}
-
-std::string JournalConnectionInfo::GetCheckpoint() const {
-    return JournalCheckpointManager::GetInstance().GetCheckpoint(mConfigName, mIndex);
-}
-
-void JournalConnectionInfo::ClearCheckpoint() {
-    JournalCheckpointManager::GetInstance().ClearCheckpoint(mConfigName, mIndex);
-}
-
-bool JournalConnectionInfo::HasCheckpoint() const {
-    return JournalCheckpointManager::GetInstance().HasCheckpoint(mConfigName, mIndex);
-}
 
 void JournalConnectionInfo::IncrementUsageCount() {
     mUsageCount.fetch_add(1);
@@ -351,29 +331,6 @@ void JournalConnectionInfo::DecrementUsageCount() {
 
 bool JournalConnectionInfo::IsInUse() const {
     return mUsageCount.load() > 0;
-}
-
-// Checkpoint处理已迁移到JournalCheckpointManager
-
-//==============================================================================
-// JournalConnectionManager Checkpoint Implementation
-//==============================================================================
-
-void JournalConnectionManager::SaveCheckpoint(const std::string& configName, size_t idx, const std::string& cursor) {
-    // 直接委托给JournalCheckpointManager，不需要检查连接是否存在
-    JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, cursor);
-}
-
-std::string JournalConnectionManager::GetCheckpoint(const std::string& configName, size_t idx) const {
-    return JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
-}
-
-void JournalConnectionManager::ClearCheckpoint(const std::string& configName, size_t idx) {
-    JournalCheckpointManager::GetInstance().ClearCheckpoint(configName, idx);
-}
-
-size_t JournalConnectionManager::FlushAllCheckpoints(bool forceAll) {
-    return JournalCheckpointManager::GetInstance().FlushAllCheckpoints(forceAll);
 }
 
 } // namespace logtail 

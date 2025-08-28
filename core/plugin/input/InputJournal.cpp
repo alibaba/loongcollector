@@ -150,7 +150,7 @@ bool InputJournal::Start() {
     LOG_DEBUG(sLogger, ("journal config details", "")("seek_position", mSeekPosition)("units_count", mUnits.size())("identifiers_count", mIdentifiers.size())("journal_paths_count", mJournalPaths.size()));
     
     // Register with JournalServer
-    JournalServer::GetInstance()->AddJournalInput(
+    JournalServer::GetInstance()->addJournalInput(
         mContext->GetConfigName(), 
         mIndex, 
         config);
@@ -167,7 +167,7 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
     }
     
     // Unregister from JournalServer
-    JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName(), mIndex);
+    JournalServer::GetInstance()->removeJournalInput(mContext->GetConfigName(), mIndex);
     
     mShutdown = true;
     

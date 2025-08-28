@@ -33,7 +33,10 @@ namespace logtail {
 
 // Forward declarations
 class JournalConnectionManager;
+class SystemdJournalReader;
+class JournalConnectionGuard;
 class PipelineEventGroup;
+struct JournalEntry;
 
 /**
  * @brief JournalServer manages all journal input plugins
@@ -58,24 +61,23 @@ public:
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
-    void ClearUnusedCheckpoints() override;
-
+    
     // Plugin registration interface
-    void AddJournalInput(const std::string& configName,
+    void addJournalInput(const std::string& configName,
                         size_t idx,
                         const JournalConfig& config);
-    void RemoveJournalInput(const std::string& configName, size_t idx);
+    void removeJournalInput(const std::string& configName, size_t idx);
 
     // Configuration management
-    JournalConfig GetJournalConfig(const std::string& name, size_t idx) const;
-    const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& GetAllJournalConfigs() const {
+    JournalConfig getJournalConfig(const std::string& name, size_t idx) const;
+    const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& getAllJournalConfigs() const {
         return mPipelineNameJournalConfigsMap;
     }
 
     // Checkpoint management moved to JournalConnectionManager
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void Clear();
+    void clear();
 #endif
 
 private:
@@ -83,8 +85,23 @@ private:
     ~JournalServer() = default;
 
     void Run();
-    void ProcessJournalEntries();
-    void ProcessJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config);
+    void processJournalEntries();
+    void processJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config);
+    
+    // Helper functions for processJournalConfig to reduce cognitive complexity
+    bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
+    std::shared_ptr<SystemdJournalReader> setupJournalConnection(const std::string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard);
+    bool performJournalSeek(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader);
+    void readJournalEntriesForConfig(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, QueueKey queueKey);
+    
+    // Helper functions for readJournalEntriesForConfig to reduce cognitive complexity
+    bool moveToNextJournalEntry(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool isFirstEntry, int entryCount);
+    bool readAndValidateEntry(const std::string& configName, size_t idx, std::shared_ptr<SystemdJournalReader> journalReader, JournalEntry& entry);
+    bool createAndPushEventGroup(const std::string& configName, size_t idx, const JournalConfig& config, const JournalEntry& entry, QueueKey queueKey);
+    
+    // Low-level helper functions
+    bool handleJournalWait(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, int entryCount);
+    LogEvent* createLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, PipelineEventGroup& eventGroup);
 
     std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;
@@ -92,15 +109,10 @@ private:
     mutable std::condition_variable mStopCV;
 
     time_t mStartTime = 0;
-    bool mIsUnusedCheckpointsCleared = false;
 
     // Configuration storage - accessed by main thread and journal runner thread
     mutable std::mutex mUpdateMux;
     std::unordered_map<std::string, std::map<size_t, JournalConfig>> mPipelineNameJournalConfigsMap;
-    
-    // Added/removed inputs tracking
-    std::multimap<std::string, size_t> mAddedInputs;
-    std::set<std::pair<std::string, size_t>> mDeletedInputs;
 };
 
 } // namespace logtail 

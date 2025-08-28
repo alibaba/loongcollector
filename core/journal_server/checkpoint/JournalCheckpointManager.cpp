@@ -17,14 +17,11 @@
 #include "JournalCheckpointManager.h"
 #include "logger/Logger.h"
 #include "app_config/AppConfig.h"
-#include "common/FileSystemUtil.h"
 #include <sstream>
 #include <algorithm>
 #include <chrono>
 #include <fstream>
-#include <thread>
 #include <iterator>
-#include "json/json.h"
 
 namespace logtail {
 

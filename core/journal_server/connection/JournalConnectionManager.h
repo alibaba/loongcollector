@@ -42,7 +42,7 @@ class JournalConnectionGuard;
  * - 独立的journal reader实例
  * - 创建时间（用于重置周期判断）
  * - 配置信息的缓存
- * - checkpoint状态管理
+ * - 连接使用状态管理
  */
 class JournalConnectionInfo {
 public:
@@ -62,12 +62,6 @@ public:
     
     // 检查连接是否有效
     bool IsValid() const;
-    
-    // Checkpoint management - 委托给JournalCheckpointManager
-    void SaveCheckpoint(const std::string& cursor);
-    std::string GetCheckpoint() const;
-    void ClearCheckpoint();
-    bool HasCheckpoint() const;
     
     // 连接使用状态管理 - 防止在使用中的连接被重置
     void IncrementUsageCount();
@@ -173,40 +167,6 @@ public:
      * @brief 清理所有连接（用于测试和关闭）
      */
     void Clear();
-
-    /**
-     * @brief Checkpoint管理接口 - 统一管理所有config的checkpoint
-     */
-    
-    /**
-     * @brief 保存checkpoint
-     * @param configName 配置名称
-     * @param idx 配置索引  
-     * @param cursor journal cursor位置
-     */
-    void SaveCheckpoint(const std::string& configName, size_t idx, const std::string& cursor);
-    
-    /**
-     * @brief 获取checkpoint
-     * @param configName 配置名称
-     * @param idx 配置索引
-     * @return checkpoint cursor，如果不存在返回空字符串
-     */
-    std::string GetCheckpoint(const std::string& configName, size_t idx) const;
-    
-    /**
-     * @brief 清除checkpoint
-     * @param configName 配置名称
-     * @param idx 配置索引
-     */
-    void ClearCheckpoint(const std::string& configName, size_t idx);
-    
-    /**
-     * @brief 定期保存所有变更的checkpoint到磁盘
-     * @param forceAll 是否强制保存所有checkpoint
-     * @return 保存的checkpoint数量
-     */
-    size_t FlushAllCheckpoints(bool forceAll = false);
 
 private:
     JournalConnectionManager() = default;
