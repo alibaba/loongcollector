@@ -44,7 +44,12 @@ upload_package() {
 
 upload_image() {
     echo "Building and pushing Docker image for version $VERSION"
-    DOCKER_REPOSITORY=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector make multi-arch-docker
+    docker buildx build --platform linux/amd64,linux/arm64 \
+        --file docker/Dockerfile_release \
+        --build-arg VERSION=$VERSION \
+        --build-arg HOST_OS=Linux \
+        --tag sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:$VERSION \
+        --push .
     echo "Docker image pushed to sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:$VERSION"
 }
 
