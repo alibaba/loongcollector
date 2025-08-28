@@ -463,21 +463,21 @@ jobs:
           # 确定要构建的平台
           PLATFORMS=""
           if [ -f "$LINUX_AMD64_FILE" ]; then
-            PLATFORMS="$PLATFORMS linux/amd64"
+            PLATFORMS="$PLATFORMS,linux/amd64"
             echo "Found Linux AMD64 package: $LINUX_AMD64_FILE"
           fi
           if [ -f "$LINUX_ARM64_FILE" ]; then
-            PLATFORMS="$PLATFORMS linux/arm64"
+            PLATFORMS="$PLATFORMS,linux/arm64"
             echo "Found Linux ARM64 package: $LINUX_ARM64_FILE"
           fi
           
-          # 移除开头的空格
-          PLATFORMS=$(echo $PLATFORMS | sed 's/^ *//')
+          # 移除开头的逗号
+          PLATFORMS=$(echo $PLATFORMS | sed 's/^,//')
           
           echo "Building Docker images for platforms: $PLATFORMS"
           
           # 构建并推送多架构镜像到两个仓库
-          docker buildx build --platform $PLATFORMS \
+          docker buildx build --platform "$PLATFORMS" \
             --file docker/Dockerfile_release \
             --build-arg VERSION=$VERSION \
             --build-arg HOST_OS=Linux \
