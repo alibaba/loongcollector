@@ -122,13 +122,13 @@ This release includes Docker images for multiple architectures:
 
 \`\`\`bash
 # Pull the latest version
-docker pull ghcr.io/$REPO_OWNER/loongcollector:latest
+docker pull ghcr.io/\$REPO_OWNER/loongcollector:latest
 
 # Pull a specific version
-docker pull ghcr.io/$REPO_OWNER/loongcollector:$VERSION
+docker pull ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION
 
 # Run the container
-docker run -d --name loongcollector ghcr.io/$REPO_OWNER/loongcollector:$VERSION
+docker run -d --name loongcollector ghcr.io/\$REPO_OWNER/loongcollector:\$VERSION
 \`\`\`
 
 **Supported architectures:**
@@ -139,7 +139,7 @@ docker run -d --name loongcollector ghcr.io/$REPO_OWNER/loongcollector:$VERSION
 
 \`\`\`bash
 # Pull from Alibaba Cloud Container Registry
-docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongcollector:$VERSION
+docker pull sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/ilogtail/loongcollector:\$VERSION
 \`\`\`
 
 **Supported architectures:**
