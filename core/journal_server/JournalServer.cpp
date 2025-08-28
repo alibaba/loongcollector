@@ -31,58 +31,21 @@
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 #include "journal_server/JournalEntry.h"
+#include "journal_server/JournalConstants.h"
 
 using namespace std;
 
 namespace logtail {
 
-// Syslog facility conversion map (from Go version)
-static const std::map<std::string, std::string> SyslogFacilityString = {
-    {"0",  "kernel"},
-    {"1",  "user"},
-    {"2",  "mail"},
-    {"3",  "daemon"},
-    {"4",  "auth"},
-    {"5",  "syslog"},
-    {"6",  "line printer"},
-    {"7",  "network news"},
-    {"8",  "uucp"},
-    {"9",  "clock daemon"},
-    {"10", "security/auth"},
-    {"11", "ftp"},
-    {"12", "ntp"},
-    {"13", "log audit"},
-    {"14", "log alert"},
-    {"15", "clock daemon"},
-    {"16", "local0"},
-    {"17", "local1"},
-    {"18", "local2"},
-    {"19", "local3"},
-    {"20", "local4"},
-    {"21", "local5"},
-    {"22", "local6"},
-    {"23", "local7"}
-};
-
-// Priority conversion map (from Go version) 
-static const std::map<std::string, std::string> PriorityConversionMap = {
-    {"0", "emergency"},
-    {"1", "alert"},
-    {"2", "critical"},
-    {"3", "error"},
-    {"4", "warning"},
-    {"5", "notice"},
-    {"6", "informational"},
-    {"7", "debug"}
-};
+// Moved to JournalConstants.h/.cpp for better organization
 
 // Apply field transformations based on configuration
 void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
     if (config.parsePriority) {
         auto it = entry.fields.find("PRIORITY");
         if (it != entry.fields.end()) {
-            auto priorityIt = PriorityConversionMap.find(it->second);
-            if (priorityIt != PriorityConversionMap.end()) {
+            auto priorityIt = JournalConstants::PriorityConversionMap.find(it->second);
+            if (priorityIt != JournalConstants::PriorityConversionMap.end()) {
                 it->second = priorityIt->second;
             }
         }
@@ -91,8 +54,8 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
     if (config.parseSyslogFacility) {
         auto it = entry.fields.find("SYSLOG_FACILITY");
         if (it != entry.fields.end()) {
-            auto facilityIt = SyslogFacilityString.find(it->second);
-            if (facilityIt != SyslogFacilityString.end()) {
+            auto facilityIt = JournalConstants::SyslogFacilityString.find(it->second);
+            if (facilityIt != JournalConstants::SyslogFacilityString.end()) {
                 it->second = facilityIt->second;
             }
         }
