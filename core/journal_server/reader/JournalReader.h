@@ -24,7 +24,7 @@
 #include <functional>
 #include <map>
 
-#include "journal_server/JournalEntry.h"
+#include "JournalEntry.h"
 
 namespace logtail {
 

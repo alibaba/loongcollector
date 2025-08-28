@@ -24,9 +24,10 @@
 #include <vector>
 #include <atomic>
 
-#include "journal_server/JournalReader.h"
-#include "journal_server/JournalServer.h"
-#include "journal_server/JournalFilter.h"
+#include "../reader/JournalReader.h"
+#include "../common/JournalConfig.h"
+#include "../filter/JournalFilter.h"
+#include "JournalConnectionGuard.h"
 
 namespace logtail {
 
@@ -62,7 +63,7 @@ public:
     // 检查连接是否有效
     bool IsValid() const;
     
-    // Checkpoint management - 集成checkpoint管理
+    // Checkpoint management - 委托给JournalCheckpointManager
     void SaveCheckpoint(const std::string& cursor);
     std::string GetCheckpoint() const;
     void ClearCheckpoint();
@@ -80,8 +81,6 @@ public:
 
 private:
     bool initializeConnection();
-    void loadCheckpointFromDisk();
-    void saveCheckpointToDisk();
     
     std::string mConfigName;
     size_t mIndex;
@@ -90,11 +89,6 @@ private:
     std::shared_ptr<SystemdJournalReader> mReader;
     std::chrono::steady_clock::time_point mCreateTime;
     std::chrono::steady_clock::time_point mLastResetTime;
-    
-    // Checkpoint状态
-    std::string mCurrentCheckpoint;
-    bool mCheckpointChanged;
-    std::chrono::steady_clock::time_point mLastCheckpointSaveTime;
     
     // 连接使用计数 - 防止重置正在使用的连接
     std::atomic<int> mUsageCount{0};
@@ -226,44 +220,6 @@ private:
     
     // 生成连接的唯一key
     std::string makeConnectionKey(const std::string& configName, size_t idx) const;
-};
-
-/**
- * @brief RAII连接守护类，自动管理连接使用计数
- * 
- * 确保在连接使用期间不会被意外重置或清理
- */
-class JournalConnectionGuard {
-public:
-    JournalConnectionGuard(std::shared_ptr<JournalConnectionInfo> connection)
-        : mConnection(connection) {
-        if (mConnection) {
-            mConnection->IncrementUsageCount();
-        }
-    }
-    
-    ~JournalConnectionGuard() {
-        if (mConnection) {
-            mConnection->DecrementUsageCount();
-        }
-    }
-    
-    // 禁用拷贝和移动
-    JournalConnectionGuard(const JournalConnectionGuard&) = delete;
-    JournalConnectionGuard& operator=(const JournalConnectionGuard&) = delete;
-    JournalConnectionGuard(JournalConnectionGuard&&) = delete;
-    JournalConnectionGuard& operator=(JournalConnectionGuard&&) = delete;
-    
-    std::shared_ptr<SystemdJournalReader> GetReader() {
-        return mConnection ? mConnection->GetReader() : nullptr;
-    }
-    
-    bool IsValid() const {
-        return mConnection && mConnection->IsValid();
-    }
-    
-private:
-    std::shared_ptr<JournalConnectionInfo> mConnection;
 };
 
 } // namespace logtail 

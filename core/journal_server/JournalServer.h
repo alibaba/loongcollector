@@ -27,49 +27,13 @@
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "runner/InputRunner.h"
+#include "common/JournalConfig.h"
 
 namespace logtail {
 
 // Forward declarations
 class JournalConnectionManager;
-struct JournalConfig;
 class PipelineEventGroup;
-
-/**
- * @brief Configuration for journal input plugin
- */
-struct JournalConfig {
-    // Journal reading configuration
-    std::string seekPosition;
-    int cursorFlushPeriodMs;
-    std::string cursorSeekFallback;
-    std::vector<std::string> units;
-    bool kernel;
-    std::vector<std::string> identifiers;
-    std::vector<std::string> journalPaths;
-    std::vector<std::string> matchPatterns;  // Custom match patterns
-    int resetIntervalSecond;
-    
-    // Journal processing configuration
-    int maxEntriesPerBatch;     // Maximum entries to process per batch
-    int waitTimeoutMs;          // Wait timeout in milliseconds for new entries
-    
-    // Field parsing options (like Go version)
-    bool parsePriority;          // Convert priority numbers to text
-    bool parseSyslogFacility;    // Convert facility numbers to text  
-    bool useJournalEventTime;    // Use journal timestamp vs current time
-    
-    // Pipeline context
-    const CollectionPipelineContext* ctx;
-    
-    JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
-                     maxEntriesPerBatch(1000), waitTimeoutMs(1000),
-                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true), ctx(nullptr) {
-        // Note: kernel默认为false，这样默认采集所有日志而不仅仅是内核日志
-        // 用户可以根据需要手动启用kernel过滤器
-        // maxEntriesPerBatch默认1000，waitTimeoutMs默认1000ms
-    }
-};
 
 /**
  * @brief JournalServer manages all journal input plugins

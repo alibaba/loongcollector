@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "journal_server/JournalFilter.h"
+#include "JournalFilter.h"
 #include "logger/Logger.h"
 #include <sstream>
 

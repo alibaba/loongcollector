@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-#include "journal_server/JournalConnectionManager.h"
+#include "JournalConnectionManager.h"
+#include "../checkpoint/JournalCheckpointManager.h"
 #include "logger/Logger.h"
 #include <sstream>
 
@@ -32,14 +33,12 @@ JournalConnectionInfo::JournalConnectionInfo(const std::string& configName,
     , mConfig(config)
     , mCreateTime(std::chrono::steady_clock::now())
     , mLastResetTime(std::chrono::steady_clock::now())
-    , mCheckpointChanged(false)
-    , mLastCheckpointSaveTime(std::chrono::steady_clock::now())
     , mIsValid(false) {
     
-    LOG_INFO(sLogger, ("JournalConnectionInfo created", "")("config", mConfigName)("idx", mIndex));
+    // Connection created
     
-    // 加载已保存的checkpoint
-    loadCheckpointFromDisk();
+    // 加载已保存的checkpoint  
+    JournalCheckpointManager::GetInstance().LoadCheckpointFromDisk(mConfigName, mIndex);
     
     initializeConnection();
 }
@@ -49,7 +48,7 @@ JournalConnectionInfo::~JournalConnectionInfo() {
     if (mReader) {
         mReader->Close();
     }
-    LOG_INFO(sLogger, ("JournalConnectionInfo destroyed", "")("config", mConfigName)("idx", mIndex));
+    // Connection destroyed
 }
 
 std::shared_ptr<SystemdJournalReader> JournalConnectionInfo::GetReader() {
@@ -57,11 +56,7 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionInfo::GetReader() {
     
     // 如果连接无效、reader为空，或者reader已关闭，尝试重新初始化
     if (!mIsValid || !mReader || !mReader->IsOpen()) {
-        if (!mIsValid || !mReader) {
-            LOG_INFO(sLogger, ("attempting to reinitialize connection", "invalid or null reader")("config", mConfigName)("idx", mIndex));
-        } else {
-            LOG_INFO(sLogger, ("attempting to reinitialize connection", "reader closed")("config", mConfigName)("idx", mIndex));
-        }
+        // Reinitializing connection due to invalid state
         initializeConnection();
     }
     
@@ -79,11 +74,8 @@ bool JournalConnectionInfo::ResetConnection() {
     
     // 检查连接是否正在使用中，如果是则跳过重置
     if (IsInUse()) {
-        LOG_INFO(sLogger, ("connection is in use, postponing reset", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
         return false; // 返回false表示重置被推迟，但连接仍然有效
     }
-    
-    LOG_INFO(sLogger, ("resetting journal connection", "")("config", mConfigName)("idx", mIndex));
     
     // 关闭旧连接
     if (mReader) {
@@ -96,7 +88,7 @@ bool JournalConnectionInfo::ResetConnection() {
     mLastResetTime = std::chrono::steady_clock::now();
     
     if (success) {
-        LOG_INFO(sLogger, ("journal connection reset successful", "")("config", mConfigName)("idx", mIndex));
+        LOG_INFO(sLogger, ("journal connection reset successfully", "")("config", mConfigName)("idx", mIndex));
     } else {
         LOG_ERROR(sLogger, ("journal connection reset failed", "")("config", mConfigName)("idx", mIndex));
     }
@@ -107,9 +99,7 @@ bool JournalConnectionInfo::ResetConnection() {
 bool JournalConnectionInfo::IsValid() const {
     std::lock_guard<std::mutex> lock(mMutex);
     bool valid = mIsValid && mReader && mReader->IsOpen();
-    if (!valid && mIsValid && mReader) {
-        LOG_DEBUG(sLogger, ("connection marked invalid due to closed reader", "")("config", mConfigName)("idx", mIndex));
-    }
+    // Connection validity check
     return valid;
 }
 
@@ -117,39 +107,31 @@ bool JournalConnectionInfo::initializeConnection() {
     // 此方法在锁内调用，不需要再加锁
     mIsValid = false;
     
-    LOG_INFO(sLogger, ("initializeConnection started", "")("config", mConfigName)("idx", mIndex));
-    
     try {
         mReader = std::make_shared<SystemdJournalReader>();
-        LOG_INFO(sLogger, ("SystemdJournalReader created", "")("config", mConfigName)("idx", mIndex));
         
         // 设置超时
         mReader->SetTimeout(std::chrono::milliseconds(5000));
         
         // 设置自定义journal路径（如果指定）
         if (!mConfig.journalPaths.empty()) {
-            LOG_INFO(sLogger, ("setting custom journal paths", "")("config", mConfigName)("idx", mIndex)("paths_count", mConfig.journalPaths.size()));
             mReader->SetJournalPaths(mConfig.journalPaths);
         }
         
         // 打开journal连接
-        LOG_INFO(sLogger, ("calling mReader->Open()", "")("config", mConfigName)("idx", mIndex));
         if (!mReader->Open()) {
             LOG_ERROR(sLogger, ("failed to open journal", "")("config", mConfigName)("idx", mIndex));
             mReader.reset();
             return false;
         }
-        LOG_INFO(sLogger, ("mReader->Open() succeeded", "")("config", mConfigName)("idx", mIndex));
         
         if (!mReader->IsOpen()) {
             LOG_ERROR(sLogger, ("journal reader not open after Open() call", "")("config", mConfigName)("idx", mIndex));
             mReader.reset();
             return false;
         }
-        LOG_INFO(sLogger, ("journal reader is open", "")("config", mConfigName)("idx", mIndex));
         
         // 应用过滤器
-        LOG_INFO(sLogger, ("preparing to apply filters", "")("config", mConfigName)("idx", mIndex));
         JournalFilter::FilterConfig filterConfig;
         filterConfig.units = mConfig.units;
         filterConfig.identifiers = mConfig.identifiers;
@@ -158,20 +140,14 @@ bool JournalConnectionInfo::initializeConnection() {
         filterConfig.configName = mConfigName;
         filterConfig.configIndex = mIndex;
         
-        LOG_INFO(sLogger, ("applying filters", "")("config", mConfigName)("idx", mIndex)
-                 ("units_count", filterConfig.units.size())("identifiers_count", filterConfig.identifiers.size())
-                 ("match_patterns_count", filterConfig.matchPatterns.size())("enable_kernel", filterConfig.enableKernel));
-        
         if (!JournalFilter::ApplyAllFilters(mReader.get(), filterConfig)) {
             LOG_ERROR(sLogger, ("failed to apply journal filters", "")("config", mConfigName)("idx", mIndex));
             mReader.reset();
             return false;
         }
-        LOG_INFO(sLogger, ("filters applied successfully", "")("config", mConfigName)("idx", mIndex));
         
         mIsValid = true;
-        LOG_INFO(sLogger, ("journal connection initialized with filters", "")("config", mConfigName)("idx", mIndex)
-                 ("filter_desc", JournalFilter::GetConfigDescription(filterConfig)));
+        LOG_INFO(sLogger, ("journal connection initialized successfully", "")("config", mConfigName)("idx", mIndex));
         return true;
         
     } catch (const std::exception& e) {
@@ -192,19 +168,15 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
     
     std::string key = makeConnectionKey(configName, idx);
     
-    LOG_INFO(sLogger, ("GetOrCreateConnection called", "")("config", configName)("idx", idx)("key", key));
-    
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     
     auto it = mConnections.find(key);
     if (it != mConnections.end()) {
-        LOG_INFO(sLogger, ("existing connection found", "")("config", configName)("idx", idx));
         // 连接存在，检查是否需要重置
         auto& connInfo = it->second;
         
         // 检查是否超过重置周期（默认1小时）
         if (connInfo->ShouldReset(3600)) {
-            LOG_INFO(sLogger, ("connection reached reset interval, resetting", "")("config", configName)("idx", idx));
             if (!connInfo->ResetConnection()) {
                 LOG_WARNING(sLogger, ("failed to reset connection, removing", "")("config", configName)("idx", idx));
                 mConnections.erase(it);
@@ -214,23 +186,17 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
             }
         } else {
             // 连接未到重置时间，直接返回
-            LOG_DEBUG(sLogger, ("reusing existing connection", "")("config", configName)("idx", idx));
             return connInfo->GetReader();
         }
-    } else {
-        LOG_INFO(sLogger, ("no existing connection found", "")("config", configName)("idx", idx));
     }
     
     // 创建新连接
-    LOG_INFO(sLogger, ("creating new journal connection", "")("config", configName)("idx", idx));
-    
     try {
         auto connInfo = std::make_shared<JournalConnectionInfo>(configName, idx, config);
-        LOG_INFO(sLogger, ("JournalConnectionInfo created", "")("config", configName)("idx", idx)("valid", connInfo->IsValid()));
         
         if (connInfo->IsValid()) {
             mConnections[key] = connInfo;
-            LOG_INFO(sLogger, ("journal connection created and cached", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
+            LOG_INFO(sLogger, ("new journal connection created", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
             return connInfo->GetReader();
         } else {
             LOG_ERROR(sLogger, ("failed to create valid journal connection", "")("config", configName)("idx", idx));
@@ -249,20 +215,16 @@ std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConn
     
     std::string key = makeConnectionKey(configName, idx);
     
-    LOG_INFO(sLogger, ("GetGuardedConnection called", "")("config", configName)("idx", idx)("key", key));
-    
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     
     auto it = mConnections.find(key);
     std::shared_ptr<JournalConnectionInfo> connInfo;
     
     if (it != mConnections.end()) {
-        LOG_INFO(sLogger, ("existing connection found for guarded access", "")("config", configName)("idx", idx));
         connInfo = it->second;
         
         // 检查是否需要重置，但不强制重置正在使用的连接
         if (connInfo->ShouldReset(3600) && !connInfo->IsInUse()) {
-            LOG_INFO(sLogger, ("connection can be reset for guarded access", "")("config", configName)("idx", idx));
             if (!connInfo->ResetConnection()) {
                 LOG_WARNING(sLogger, ("failed to reset connection, creating new one", "")("config", configName)("idx", idx));
                 mConnections.erase(it);
@@ -273,15 +235,12 @@ std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConn
     
     // 如果连接不存在或重置失败，创建新连接
     if (!connInfo) {
-        LOG_INFO(sLogger, ("creating new journal connection for guarded access", "")("config", configName)("idx", idx));
-        
         try {
             connInfo = std::make_shared<JournalConnectionInfo>(configName, idx, config);
-            LOG_INFO(sLogger, ("JournalConnectionInfo created for guarded access", "")("config", configName)("idx", idx)("valid", connInfo->IsValid()));
             
             if (connInfo->IsValid()) {
                 mConnections[key] = connInfo;
-                LOG_INFO(sLogger, ("journal connection created and cached for guarded access", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
+                LOG_INFO(sLogger, ("new guarded journal connection created", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
             } else {
                 LOG_ERROR(sLogger, ("failed to create valid journal connection for guarded access", "")("config", configName)("idx", idx));
                 return nullptr;
@@ -302,7 +261,6 @@ void JournalConnectionManager::RemoveConnection(const std::string& configName, s
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     auto it = mConnections.find(key);
     if (it != mConnections.end()) {
-        LOG_INFO(sLogger, ("removing journal connection", "")("config", configName)("idx", idx));
         mConnections.erase(it);
     }
 }
@@ -319,19 +277,16 @@ size_t JournalConnectionManager::CleanupExpiredConnections(int resetIntervalSec)
         // 检查连接是否过期或无效，但不清理正在使用中的连接
         if (!connInfo->IsValid()) {
             // 连接已无效，可以安全清理
-            LOG_INFO(sLogger, ("cleaning up invalid connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
             it = mConnections.erase(it);
             removedCount++;
         } else if (connInfo->ShouldReset(resetIntervalSec)) {
             // 连接需要重置
             if (!connInfo->IsInUse()) {
                 // 连接未在使用中，可以清理
-                LOG_INFO(sLogger, ("cleaning up expired connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
                 it = mConnections.erase(it);
                 removedCount++;
             } else {
                 // 连接正在使用中，跳过清理
-                LOG_INFO(sLogger, ("skipping cleanup of in-use expired connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex())("usage_count", connInfo->IsInUse()));
                 ++it;
             }
         } else {
@@ -355,7 +310,9 @@ void JournalConnectionManager::Clear() {
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     size_t count = mConnections.size();
     mConnections.clear();
-    LOG_INFO(sLogger, ("all journal connections cleared", "")("count", count));
+    if (count > 0) {
+        LOG_INFO(sLogger, ("journal connections cleared", "")("count", count));
+    }
 }
 
 std::string JournalConnectionManager::makeConnectionKey(const std::string& configName, size_t idx) const {
@@ -369,128 +326,54 @@ std::string JournalConnectionManager::makeConnectionKey(const std::string& confi
 //==============================================================================
 
 void JournalConnectionInfo::SaveCheckpoint(const std::string& cursor) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (mCurrentCheckpoint != cursor) {
-        mCurrentCheckpoint = cursor;
-        mCheckpointChanged = true;
-        LOG_DEBUG(sLogger, ("checkpoint updated", "")("config", mConfigName)("idx", mIndex)("cursor", cursor.substr(0, 50)));
-    }
+    JournalCheckpointManager::GetInstance().SaveCheckpoint(mConfigName, mIndex, cursor);
 }
 
 std::string JournalConnectionInfo::GetCheckpoint() const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    return mCurrentCheckpoint;
+    return JournalCheckpointManager::GetInstance().GetCheckpoint(mConfigName, mIndex);
 }
 
 void JournalConnectionInfo::ClearCheckpoint() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (!mCurrentCheckpoint.empty()) {
-        mCurrentCheckpoint.clear();
-        mCheckpointChanged = true;
-        LOG_DEBUG(sLogger, ("checkpoint cleared", "")("config", mConfigName)("idx", mIndex));
-    }
+    JournalCheckpointManager::GetInstance().ClearCheckpoint(mConfigName, mIndex);
 }
 
 bool JournalConnectionInfo::HasCheckpoint() const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    return !mCurrentCheckpoint.empty();
+    return JournalCheckpointManager::GetInstance().HasCheckpoint(mConfigName, mIndex);
 }
 
 void JournalConnectionInfo::IncrementUsageCount() {
     mUsageCount.fetch_add(1);
-    LOG_DEBUG(sLogger, ("connection usage incremented", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
 }
 
 void JournalConnectionInfo::DecrementUsageCount() {
-    int oldCount = mUsageCount.fetch_sub(1);
-    if (oldCount <= 1) {
-        LOG_DEBUG(sLogger, ("connection usage decremented to zero", "")("config", mConfigName)("idx", mIndex));
-    } else {
-        LOG_DEBUG(sLogger, ("connection usage decremented", "")("config", mConfigName)("idx", mIndex)("usage_count", mUsageCount.load()));
-    }
+    mUsageCount.fetch_sub(1);
 }
 
 bool JournalConnectionInfo::IsInUse() const {
     return mUsageCount.load() > 0;
 }
 
-void JournalConnectionInfo::loadCheckpointFromDisk() {
-    // TODO: 从磁盘加载checkpoint
-    // 这里可以集成现有的checkpoint持久化机制
-    // 暂时留空，保持向后兼容
-    LOG_DEBUG(sLogger, ("loading checkpoint from disk", "")("config", mConfigName)("idx", mIndex));
-}
-
-void JournalConnectionInfo::saveCheckpointToDisk() {
-    std::lock_guard<std::mutex> lock(mMutex);
-    if (mCheckpointChanged) {
-        // TODO: 保存checkpoint到磁盘
-        // 这里可以集成现有的checkpoint持久化机制
-        LOG_DEBUG(sLogger, ("saving checkpoint to disk", "")("config", mConfigName)("idx", mIndex)("cursor", mCurrentCheckpoint.substr(0, 50)));
-        mCheckpointChanged = false;
-        mLastCheckpointSaveTime = std::chrono::steady_clock::now();
-    }
-}
+// Checkpoint处理已迁移到JournalCheckpointManager
 
 //==============================================================================
 // JournalConnectionManager Checkpoint Implementation
 //==============================================================================
 
 void JournalConnectionManager::SaveCheckpoint(const std::string& configName, size_t idx, const std::string& cursor) {
-    std::string key = makeConnectionKey(configName, idx);
-    
-    std::lock_guard<std::mutex> lock(mConnectionsMutex);
-    auto it = mConnections.find(key);
-    if (it != mConnections.end()) {
-        it->second->SaveCheckpoint(cursor);
-    } else {
-        LOG_WARNING(sLogger, ("attempt to save checkpoint for non-existent connection", "")("config", configName)("idx", idx));
-    }
+    // 直接委托给JournalCheckpointManager，不需要检查连接是否存在
+    JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, cursor);
 }
 
 std::string JournalConnectionManager::GetCheckpoint(const std::string& configName, size_t idx) const {
-    std::string key = makeConnectionKey(configName, idx);
-    
-    std::lock_guard<std::mutex> lock(mConnectionsMutex);
-    auto it = mConnections.find(key);
-    if (it != mConnections.end()) {
-        return it->second->GetCheckpoint();
-    }
-    
-    // 如果连接不存在，尝试从磁盘加载checkpoint（向后兼容）
-    LOG_DEBUG(sLogger, ("connection not found for checkpoint retrieval", "")("config", configName)("idx", idx));
-    return "";
+    return JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
 }
 
 void JournalConnectionManager::ClearCheckpoint(const std::string& configName, size_t idx) {
-    std::string key = makeConnectionKey(configName, idx);
-    
-    std::lock_guard<std::mutex> lock(mConnectionsMutex);
-    auto it = mConnections.find(key);
-    if (it != mConnections.end()) {
-        it->second->ClearCheckpoint();
-    }
+    JournalCheckpointManager::GetInstance().ClearCheckpoint(configName, idx);
 }
 
 size_t JournalConnectionManager::FlushAllCheckpoints(bool forceAll) {
-    std::lock_guard<std::mutex> lock(mConnectionsMutex);
-    
-    size_t flushedCount = 0;
-    if (forceAll) {
-        // 强制保存所有checkpoint
-        flushedCount = mConnections.size();
-        // TODO: 实现checkpoint的批量刷新
-        // for (auto& pair : mConnections) {
-        //     auto& connInfo = pair.second;
-        //     connInfo->FlushCheckpoint();
-        // }
-    }
-    
-    if (flushedCount > 0) {
-        LOG_INFO(sLogger, ("checkpoints flushed to disk", "")("count", flushedCount)("force", forceAll));
-    }
-    
-    return flushedCount;
+    return JournalCheckpointManager::GetInstance().FlushAllCheckpoints(forceAll);
 }
 
 } // namespace logtail 

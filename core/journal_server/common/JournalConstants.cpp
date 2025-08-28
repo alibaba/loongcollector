@@ -1,4 +1,4 @@
-#include "journal_server/JournalConstants.h"
+#include "JournalConstants.h"
 
 namespace logtail {
 

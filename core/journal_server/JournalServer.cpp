@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-#include "journal_server/JournalServer.h"
+#include "JournalServer.h"
 
 #include <chrono>
 
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "journal_server/JournalConnectionManager.h"
+#include "connection/JournalConnectionManager.h"
+#include "connection/JournalConnectionGuard.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "models/PipelineEventGroup.h"
-#include "common/Flags.h"
 #include "common/memory/SourceBuffer.h"
 #include "common/TimeUtil.h"
 #include "app_config/AppConfig.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
-#include "journal_server/JournalEntry.h"
-#include "journal_server/JournalConstants.h"
+#include "reader/JournalEntry.h"
+#include "common/JournalConstants.h"
 
 using namespace std;
 

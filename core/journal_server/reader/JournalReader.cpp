@@ -5,7 +5,7 @@
  * ...
  */
 
- #include "journal_server/JournalReader.h"
+ #include "JournalReader.h"
  #include "logger/Logger.h"
  
  #include <chrono>
@@ -46,10 +46,9 @@
              const std::string& p = mJournalPaths[0];
              ret = std::filesystem::is_directory(p) ? openDir(p) : openFile(p);
          }
-         if (ret < 0) {
-             std::cerr << "journal open failed: " << strerror(-ret) << '\n';
-             return false;
-         }
+                 if (ret < 0) {
+            return false;
+        }
          (void)sd_journal_set_data_threshold(mJournal, mDataThreshold);
          mIsOpen = true;
          return true;
@@ -86,23 +85,16 @@
          bool Next() { 
 #ifdef __linux__
         if (!IsOpen()) {
-            std::cerr << "[JournalReader] Next() called but journal not open" << std::endl;
             return false;
         }
         
         int ret = sd_journal_next(mJournal);
-        std::cerr << "[JournalReader] sd_journal_next() returned: " << ret << std::endl;
         
         if (ret < 0) {
-            std::cerr << "[JournalReader] sd_journal_next() error: " << strerror(-ret) 
-                      << " (code: " << ret << ")" << std::endl;
             return false;
         } else if (ret == 0) {
-            std::cerr << "[JournalReader] sd_journal_next() reached end - no more entries" << std::endl;
             return false;
         } else {
-            std::cerr << "[JournalReader] sd_journal_next() success - moved to next entry (return: " 
-                      << ret << ")" << std::endl;
             return true;
         }
 #else
@@ -113,23 +105,16 @@
     bool Previous() { 
 #ifdef __linux__
         if (!IsOpen()) {
-            std::cerr << "[JournalReader] Previous() called but journal not open" << std::endl;
             return false;
         }
         
         int ret = sd_journal_previous(mJournal);
-        std::cerr << "[JournalReader] sd_journal_previous() returned: " << ret << std::endl;
         
         if (ret < 0) {
-            std::cerr << "[JournalReader] sd_journal_previous() error: " << strerror(-ret) 
-                      << " (code: " << ret << ")" << std::endl;
             return false;
         } else if (ret == 0) {
-            std::cerr << "[JournalReader] sd_journal_previous() reached beginning - no more entries" << std::endl;
             return false;
         } else {
-            std::cerr << "[JournalReader] sd_journal_previous() success - moved to previous entry (return: " 
-                      << ret << ")" << std::endl;
             return true;
         }
 #else
