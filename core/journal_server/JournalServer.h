@@ -31,6 +31,7 @@
 namespace logtail {
 
 // Forward declarations
+class JournalConnectionManager;
 struct JournalConfig;
 class PipelineEventGroup;
 
@@ -58,7 +59,7 @@ struct JournalConfig {
     const CollectionPipelineContext* ctx;
     
     JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
-                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true) {}
+                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true), ctx(nullptr) {}
 };
 
 /**
@@ -98,10 +99,7 @@ public:
         return mPipelineNameJournalConfigsMap;
     }
 
-    // Checkpoint management
-    void SaveJournalCheckpoint(const std::string& configName, size_t idx, const std::string& cursor);
-    std::string GetJournalCheckpoint(const std::string& configName, size_t idx) const;
-    void ClearJournalCheckpoint(const std::string& configName, size_t idx);
+    // Checkpoint management moved to JournalConnectionManager
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -126,9 +124,6 @@ private:
     // Configuration storage - accessed by main thread and journal runner thread
     mutable std::mutex mUpdateMux;
     std::unordered_map<std::string, std::map<size_t, JournalConfig>> mPipelineNameJournalConfigsMap;
-    
-    // Checkpoint storage
-    std::unordered_map<std::string, std::map<size_t, std::string>> mJournalCheckpoints;
     
     // Added/removed inputs tracking
     std::multimap<std::string, size_t> mAddedInputs;

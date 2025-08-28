@@ -21,19 +21,16 @@
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "journal_server/JournalConnectionManager.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "models/PipelineEventGroup.h"
 #include "common/Flags.h"
-#include "common/LogtailCommonFlags.h"
 #include "common/memory/SourceBuffer.h"
 #include "common/TimeUtil.h"
 #include "app_config/AppConfig.h"
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
-#include "journal_server/JournalReader.h"
 #include "journal_server/JournalEntry.h"
-
-DEFINE_FLAG_INT32(journal_server_checkpoint_dump_interval_sec, "", 10);
 
 using namespace std;
 
@@ -102,124 +99,7 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
     }
 }
 
-// Helper functions for journal filtering (based on Go version implementation)
-bool AddUnitsFilter(JournalReader* reader, const std::vector<std::string>& units, 
-                   const std::string& configName, size_t idx) {
-    for (const auto& unit : units) {
-        // Look for messages from the service itself
-        if (!reader->AddMatch("_SYSTEMD_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add unit match", unit)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        // Look for coredumps of the service
-        if (!reader->AddDisjunction() ||
-            !reader->AddMatch("MESSAGE_ID", "fc2e22bc6ee647b6b90729ab34a250b1") ||
-            !reader->AddMatch("_UID", "0") ||
-            !reader->AddMatch("COREDUMP_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add coredump match", unit)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        // Look for messages from PID 1 about this service
-        if (!reader->AddDisjunction() ||
-            !reader->AddMatch("_PID", "1") ||
-            !reader->AddMatch("UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add PID1 match", unit)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        // Look for messages from authorized daemons about this service
-        if (!reader->AddDisjunction() ||
-            !reader->AddMatch("_UID", "0") ||
-            !reader->AddMatch("OBJECT_SYSTEMD_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add daemon match", unit)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        // Show all messages belonging to a slice
-        if (unit.find(".slice") != std::string::npos) {
-            if (!reader->AddDisjunction() ||
-                !reader->AddMatch("_SYSTEMD_SLICE", unit)) {
-                LOG_WARNING(sLogger, ("failed to add slice match", unit)("config", configName)("idx", idx));
-                return false;
-            }
-        }
-        
-        // Final disjunction for this unit
-        if (!reader->AddDisjunction()) {
-            LOG_WARNING(sLogger, ("failed to add final disjunction", unit)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        LOG_DEBUG(sLogger, ("added comprehensive unit filter", unit)("config", configName)("idx", idx));
-    }
-    return true;
-}
-
-bool AddIdentifiersFilter(JournalReader* reader, const std::vector<std::string>& identifiers,
-                         const std::string& configName, size_t idx) {
-    for (const auto& identifier : identifiers) {
-        if (!reader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
-            LOG_WARNING(sLogger, ("failed to add identifier match", identifier)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        // **恢复：与Go版本保持一致，每个identifier后都调用AddDisjunction**
-        if (!reader->AddDisjunction()) {
-            LOG_WARNING(sLogger, ("failed to add identifier disjunction", identifier)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        LOG_DEBUG(sLogger, ("added identifier filter", identifier)("config", configName)("idx", idx));
-    }
-    
-    return true;
-}
-
-bool AddKernelFilter(JournalReader* reader, const std::string& configName, size_t idx) {
-    if (!reader->AddMatch("_TRANSPORT", "kernel")) {
-        LOG_WARNING(sLogger, ("failed to add kernel transport match", "")("config", configName)("idx", idx));
-        return false;
-    }
-    
-    // **恢复：与Go版本保持一致，即使单个条件也调用AddDisjunction**
-    if (!reader->AddDisjunction()) {
-        LOG_WARNING(sLogger, ("failed to add kernel disjunction", "")("config", configName)("idx", idx));
-        return false;
-    }
-    
-    LOG_DEBUG(sLogger, ("added kernel filter with disjunction", "")("config", configName)("idx", idx));
-    return true;
-}
-
-bool AddMatchPatternsFilter(JournalReader* reader, const std::vector<std::string>& patterns,
-                           const std::string& configName, size_t idx) {
-    for (const auto& pattern : patterns) {
-        // Parse pattern in format "FIELD=value"
-        size_t eqPos = pattern.find('=');
-        if (eqPos == std::string::npos) {
-            LOG_WARNING(sLogger, ("invalid match pattern format", pattern)("config", configName)("idx", idx));
-            continue;
-        }
-        
-        std::string field = pattern.substr(0, eqPos);
-        std::string value = pattern.substr(eqPos + 1);
-        
-        if (!reader->AddMatch(field, value)) {
-            LOG_WARNING(sLogger, ("failed to add pattern match", pattern)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        if (!reader->AddDisjunction()) {
-            LOG_WARNING(sLogger, ("failed to add pattern disjunction", pattern)("config", configName)("idx", idx));
-            return false;
-        }
-        
-        LOG_DEBUG(sLogger, ("added match pattern", pattern)("config", configName)("idx", idx));
-    }
-    return true;
-}
+// 过滤函数已移至JournalFilter类中处理
 
 void JournalServer::Init() {
     LOG_INFO(sLogger, ("JournalServer initializing", ""));
@@ -244,6 +124,10 @@ void JournalServer::Stop() {
     } else {
         LOG_WARNING(sLogger, ("journal server", "forced to stopped"));
     }
+    
+    // 清理所有journal连接
+    JournalConnectionManager::GetInstance()->Clear();
+    LOG_INFO(sLogger, ("journal server connections cleared", ""));
 }
 
 bool JournalServer::HasRegisteredPlugins() const {
@@ -252,7 +136,7 @@ bool JournalServer::HasRegisteredPlugins() const {
 }
 
 void JournalServer::ClearUnusedCheckpoints() {
-    if (mIsUnusedCheckpointsCleared || time(nullptr) - mStartTime < INT32_FLAG(unused_checkpoints_clear_interval_sec)) {
+    if (mIsUnusedCheckpointsCleared || time(nullptr) - mStartTime < 3600) {
         return;
     }
     
@@ -270,14 +154,7 @@ void JournalServer::ClearUnusedCheckpoints() {
             }
         }
         
-        // Clear checkpoint
-        auto checkpointItr = mJournalCheckpoints.find(configName);
-        if (checkpointItr != mJournalCheckpoints.end()) {
-            checkpointItr->second.erase(idx);
-            if (checkpointItr->second.empty()) {
-                mJournalCheckpoints.erase(checkpointItr);
-            }
-        }
+        // Note: Checkpoint cleanup is now handled automatically by JournalConnectionManager
     }
     
     mDeletedInputs.clear();
@@ -289,12 +166,11 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
         lock_guard<mutex> lock(mUpdateMux);
         mPipelineNameJournalConfigsMap[configName][idx] = config;
         mAddedInputs.emplace(configName, idx);
+        
+        LOG_INFO(sLogger, ("journal input added", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
     
-    // Save initial checkpoint if not exists
-    if (GetJournalCheckpoint(configName, idx).empty()) {
-        SaveJournalCheckpoint(configName, idx, "");
-    }
+    // Note: Checkpoint management is now handled automatically by JournalConnectionManager
 }
 
 void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
@@ -310,8 +186,9 @@ void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
         mDeletedInputs.emplace(configName, idx);
     }
     
-    // Clear checkpoint
-    ClearJournalCheckpoint(configName, idx);
+    // 移除对应的连接（会自动清理checkpoint）
+    JournalConnectionManager::GetInstance()->RemoveConnection(configName, idx);
+    LOG_INFO(sLogger, ("journal input removed with automatic connection and checkpoint cleanup", "")("config", configName)("idx", idx));
 }
 
 JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) const {
@@ -326,39 +203,13 @@ JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) co
     return JournalConfig();
 }
 
-void JournalServer::SaveJournalCheckpoint(const string& configName, size_t idx, const string& cursor) {
-    lock_guard<mutex> lock(mUpdateMux);
-    mJournalCheckpoints[configName][idx] = cursor;
-}
-
-std::string JournalServer::GetJournalCheckpoint(const std::string& configName, size_t idx) const {
-    lock_guard<mutex> lock(mUpdateMux);
-    auto configItr = mJournalCheckpoints.find(configName);
-    if (configItr != mJournalCheckpoints.end()) {
-        auto idxItr = configItr->second.find(idx);
-        if (idxItr != configItr->second.end()) {
-            return idxItr->second;
-        }
-    }
-    return "";
-}
-
-void JournalServer::ClearJournalCheckpoint(const string& configName, size_t idx) {
-    lock_guard<mutex> lock(mUpdateMux);
-    auto configItr = mJournalCheckpoints.find(configName);
-    if (configItr != mJournalCheckpoints.end()) {
-        configItr->second.erase(idx);
-        if (configItr->second.empty()) {
-            mJournalCheckpoints.erase(configItr);
-        }
-    }
-}
+// Checkpoint methods removed - now handled by JournalConnectionManager
 
 void JournalServer::Run() {
     LOG_INFO(sLogger, ("journal server", "started"));
     LOG_INFO(sLogger, ("journal server thread", "entering main loop"));
     unique_lock<mutex> lock(mThreadRunningMux);
-    time_t lastDumpCheckpointTime = time(nullptr);
+    time_t lastConnectionCleanupTime = time(nullptr);
     
     while (mIsThreadRunning) {
         lock.unlock();
@@ -367,11 +218,20 @@ void JournalServer::Run() {
         // Process journal entries for all registered configurations
         ProcessJournalEntries();
         
-        // Periodically dump checkpoints
         auto cur = time(nullptr);
-        if (cur - lastDumpCheckpointTime >= INT32_FLAG(journal_server_checkpoint_dump_interval_sec)) {
-            // TODO: Implement checkpoint persistence to disk
-            lastDumpCheckpointTime = cur;
+        
+        // 智能清理策略：根据重置周期动态调整清理频率
+        // 对于1小时重置周期，建议15分钟检查一次（3600/4 = 900秒）
+        const int resetInterval = 3600; // 1小时重置周期
+        const int cleanupInterval = JournalConnectionManager::GetRecommendedCleanupInterval(resetInterval);
+        
+        if (cur - lastConnectionCleanupTime >= cleanupInterval) {
+            LOG_INFO(sLogger, ("cleaning up expired journal connections", ""));
+            size_t cleanedCount = JournalConnectionManager::GetInstance()->CleanupExpiredConnections(3600);
+            if (cleanedCount > 0) {
+                LOG_INFO(sLogger, ("expired connections cleaned", "")("count", cleanedCount));
+            }
+            lastConnectionCleanupTime = cur;
         }
         
         lock.lock();
@@ -388,11 +248,12 @@ void JournalServer::ProcessJournalEntries() {
     {
         lock_guard<mutex> lock(mUpdateMux);
         currentConfigs = mPipelineNameJournalConfigsMap;
+        LOG_INFO(sLogger, ("configurations loaded from map", "")("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
     
     // Add debug logging
     if (currentConfigs.empty()) {
-        LOG_INFO(sLogger, ("no journal configurations to process", ""));
+        LOG_WARNING(sLogger, ("no journal configurations to process", "server may not have any registered journal inputs"));
         return;
     }
     
@@ -423,11 +284,11 @@ void JournalServer::ProcessJournalEntries() {
 }
 
 void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, const JournalConfig& config) {
-    LOG_INFO(sLogger, ("ProcessJournalConfig", "started")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("ProcessJournalConfig", "started")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr));
     
     // Basic validation
     if (!config.ctx) {
-        LOG_WARNING(sLogger, ("no context available for journal config", "skip")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("CRITICAL: no context available for journal config", "this indicates initialization problem")("config", configName)("idx", idx));
         return;
     }
     
@@ -444,35 +305,25 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         return;
     }
     
-    // 0. 建立和journal的连接
-    LOG_INFO(sLogger, ("establishing journal connection", "")("config", configName)("idx", idx));
-    auto journalReader = std::make_unique<SystemdJournalReader>();
+    // 0. 获取或创建journal连接（使用连接管理器）
+    LOG_INFO(sLogger, ("getting journal connection from manager", "")("config", configName)("idx", idx));
+    auto journalReader = JournalConnectionManager::GetInstance()->GetOrCreateConnection(configName, idx, config);
     
-    // Set timeout
-    journalReader->SetTimeout(std::chrono::milliseconds(5000));
-    
-    // Set custom journal paths if specified
-    if (!config.journalPaths.empty()) {
-        LOG_INFO(sLogger, ("setting custom journal paths", "")("config", configName)("idx", idx)("paths_count", config.journalPaths.size()));
-        journalReader->SetJournalPaths(config.journalPaths);
-    }
-    
-    // Open the journal
-    if (!journalReader->Open()) {
-        LOG_ERROR(sLogger, ("failed to open journal", "skip processing")("config", configName)("idx", idx));
+    if (!journalReader) {
+        LOG_ERROR(sLogger, ("failed to get journal connection", "skip processing")("config", configName)("idx", idx));
         return;
     }
     
     if (!journalReader->IsOpen()) {
-        LOG_ERROR(sLogger, ("journal reader not open after Open() call", "")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("journal reader not open", "skip processing")("config", configName)("idx", idx));
         return;
     }
     
-    LOG_INFO(sLogger, ("journal connection established successfully", "")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("journal connection obtained successfully", "")("config", configName)("idx", idx));
     
-    // 1. 根据seekPosition处理定位逻辑
+    // 1. 根据seekPosition处理定位逻辑  
     bool seekSuccess = false;
-    string checkpoint = GetJournalCheckpoint(configName, idx);
+    string checkpoint = JournalConnectionManager::GetInstance()->GetCheckpoint(configName, idx);
     
     // 首先尝试使用checkpoint
     if (!checkpoint.empty() && config.seekPosition == "cursor") {
@@ -498,7 +349,7 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
                     LOG_INFO(sLogger, ("moved to last actual entry after tail seek", "")("config", configName)("idx", idx));
                 } else {
                     LOG_INFO(sLogger, ("no entries found after tail seek", "")("config", configName)("idx", idx));
-                    journalReader->Close();
+                    // 注意：使用长连接时不应该关闭reader，只是没有新条目而已
                     return;
                 }
             }
@@ -507,7 +358,7 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
     
     if (!seekSuccess) {
         LOG_ERROR(sLogger, ("failed to seek to position", config.seekPosition)("config", configName)("idx", idx));
-        journalReader->Close();
+        // 注意：seek失败时也不应该关闭长连接，连接管理器会在适当时候处理
         return;
     }
     
@@ -602,8 +453,8 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         entryCount++;
         isFirstEntry = false;
         
-        // 更新checkpoint
-        SaveJournalCheckpoint(configName, idx, entry.cursor);
+        // 更新checkpoint - 使用ConnectionManager统一管理
+        JournalConnectionManager::GetInstance()->SaveCheckpoint(configName, idx, entry.cursor);
         
         LOG_DEBUG(sLogger, ("journal entry processed", "")("config", configName)("idx", idx)("entry", entryCount)("cursor", entry.cursor.substr(0, 50)));
     }
@@ -614,18 +465,17 @@ void JournalServer::ProcessJournalConfig(const string& configName, size_t idx, c
         LOG_WARNING(sLogger, ("no journal entries processed", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
     }
     
-    // 关闭连接
-    journalReader->Close();
-    LOG_INFO(sLogger, ("journal connection closed", "")("config", configName)("idx", idx));
+    // 注意：不需要关闭连接，因为使用连接管理器维持长连接
+    LOG_DEBUG(sLogger, ("journal processing completed, connection remains open", "")("config", configName)("idx", idx));
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void JournalServer::Clear() {
     lock_guard<mutex> lock(mUpdateMux);
     mPipelineNameJournalConfigsMap.clear();
-    mJournalCheckpoints.clear();
     mAddedInputs.clear();
     mDeletedInputs.clear();
+    // Note: Checkpoint cleanup is now handled by JournalConnectionManager
 }
 #endif
 
