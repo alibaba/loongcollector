@@ -58,6 +58,8 @@ struct JournalConfig {
     
     // Runtime state (set during validation)
     mutable QueueKey queueKey = -1;  // Cached queue key after validation (-1 = not validated)
+    mutable std::string lastSeekCheckpoint;  // Last checkpoint we successfully seeked to
+    mutable bool needsSeek = true;  // Whether we need to perform seek on next read
     
     JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
                      maxEntriesPerBatch(1000), waitTimeoutMs(1000),

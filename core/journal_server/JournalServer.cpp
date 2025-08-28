@@ -43,7 +43,7 @@ namespace logtail {
 // =============================================================================
 
 void JournalServer::Init() {
-    mThreadRes = async(launch::async, &JournalServer::Run, this);
+    mThreadRes = async(launch::async, &JournalServer::run, this);
     mStartTime = time(nullptr);
     LOG_INFO(sLogger, ("JournalServer initialized", ""));
 }
@@ -130,7 +130,7 @@ JournalConfig JournalServer::getJournalConfig(const string& name, size_t idx) co
 // 2. 主线程运行逻辑 - Main Thread Logic
 // =============================================================================
 
-void JournalServer::Run() {
+void JournalServer::run() {
     LOG_INFO(sLogger, ("JournalServer thread", "started"));
     
     while (true) {
@@ -219,13 +219,20 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, c
     
     // Step 1: Setup journal connection
     std::unique_ptr<JournalConnectionGuard> connectionGuard;
-    auto journalReader = setupJournalConnection(configName, idx, config, connectionGuard);
+    bool isNewConnection = false;
+    auto journalReader = setupJournalConnection(configName, idx, config, connectionGuard, isNewConnection);
     if (!journalReader) {
+        // 连接失败，标记需要重新seek
+        const_cast<JournalConfig&>(config).needsSeek = true;
         return;
     }
     
-    // Step 2: Perform seek operation
-    if (!performJournalSeek(configName, idx, config, journalReader)) {
+    // Step 2: Perform seek operation (only when necessary)
+    // 强制seek的条件：新连接
+    bool forceSeek = isNewConnection;
+    if (!performJournalSeek(configName, idx, const_cast<JournalConfig&>(config), journalReader, forceSeek)) {
+        // Seek失败，标记需要重新seek以便下次尝试
+        const_cast<JournalConfig&>(config).needsSeek = true;
         return;
     }
     
@@ -262,39 +269,64 @@ bool JournalServer::validateJournalConfig(const string& configName, size_t idx, 
 }
 
 // 设置并获取journal连接，返回可用的Reader
-std::shared_ptr<SystemdJournalReader> JournalServer::setupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard) {
+std::shared_ptr<SystemdJournalReader> JournalServer::setupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection) {
     LOG_INFO(sLogger, ("getting guarded journal connection from manager", "")("config", configName)("idx", idx));
+    
+    // 记录连接获取前的连接数，用于判断是否创建了新连接
+    size_t connectionCountBefore = JournalConnectionManager::GetInstance()->GetConnectionCount();
+    
     connectionGuard = JournalConnectionManager::GetInstance()->GetGuardedConnection(configName, idx, config);
     
     if (!connectionGuard) {
         LOG_ERROR(sLogger, ("failed to get guarded journal connection", "skip processing")("config", configName)("idx", idx));
+        isNewConnection = false;
         return nullptr;
     }
     
     auto journalReader = connectionGuard->GetReader();
     if (!journalReader) {
         LOG_ERROR(sLogger, ("failed to get journal reader from guard", "skip processing")("config", configName)("idx", idx));
+        isNewConnection = false;
         return nullptr;
     }
     
     if (!journalReader->IsOpen()) {
         LOG_ERROR(sLogger, ("journal reader not open", "skip processing")("config", configName)("idx", idx));
+        isNewConnection = false;
         return nullptr;
     }
     
-    LOG_INFO(sLogger, ("guarded journal connection obtained successfully", "")("config", configName)("idx", idx));
+    // 检查是否创建了新连接（简化的启发式方法）
+    // 更准确的方法可能需要JournalConnectionManager提供额外的API
+    size_t connectionCountAfter = JournalConnectionManager::GetInstance()->GetConnectionCount();
+    isNewConnection = (connectionCountAfter > connectionCountBefore);
+    
+    LOG_INFO(sLogger, ("guarded journal connection obtained successfully", "")("config", configName)("idx", idx)("is_new_connection", isNewConnection));
     return journalReader;
 }
 
-// 根据配置执行journal定位操作（head/tail/cursor）
-bool JournalServer::performJournalSeek(const string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader) {
+// 智能journal定位操作（仅在必要时执行seek）
+bool JournalServer::performJournalSeek(const string& configName, size_t idx, JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek) {
+    // 获取当前checkpoint
+    string currentCheckpoint = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
+    
+    // 判断是否需要执行seek操作
+    bool shouldSeek = forceSeek || config.needsSeek || 
+                      (config.lastSeekCheckpoint != currentCheckpoint);
+    
+    if (!shouldSeek) {
+        LOG_DEBUG(sLogger, ("skipping seek operation", "position unchanged")("config", configName)("idx", idx)("last_checkpoint", config.lastSeekCheckpoint.substr(0, 20)));
+        return true; // 位置没有变化，无需seek
+    }
+    
+    LOG_INFO(sLogger, ("performing journal seek", "")("config", configName)("idx", idx)("reason", forceSeek ? "forced" : (config.needsSeek ? "required" : "checkpoint_changed"))("current_checkpoint", currentCheckpoint.substr(0, 50)));
+    
     bool seekSuccess = false;
-    string checkpoint = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
     
     // 首先尝试使用checkpoint
-    if (!checkpoint.empty() && config.seekPosition == "cursor") {
-        LOG_INFO(sLogger, ("seeking to checkpoint cursor", checkpoint.substr(0, 50))("config", configName)("idx", idx));
-        seekSuccess = journalReader->SeekCursor(checkpoint);
+    if (!currentCheckpoint.empty() && config.seekPosition == "cursor") {
+        LOG_INFO(sLogger, ("seeking to checkpoint cursor", currentCheckpoint.substr(0, 50))("config", configName)("idx", idx));
+        seekSuccess = journalReader->SeekCursor(currentCheckpoint);
         if (!seekSuccess) {
             LOG_WARNING(sLogger, ("failed to seek to checkpoint, using fallback position", config.cursorSeekFallback)("config", configName)("idx", idx));
         }
@@ -326,6 +358,11 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, con
         return false;
     }
     
+    // 更新seek状态
+    config.lastSeekCheckpoint = currentCheckpoint;
+    config.needsSeek = false;
+    
+    LOG_DEBUG(sLogger, ("seek operation completed", "")("config", configName)("idx", idx)("checkpoint", currentCheckpoint.substr(0, 20)));
     return true;
 }
 

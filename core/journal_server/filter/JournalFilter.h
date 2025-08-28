@@ -31,11 +31,6 @@ namespace logtail {
  * - Identifiers过滤：指定syslog identifier过滤，同units逻辑
  * - Kernel过滤：kernel日志过滤，默认启用
  * - 自定义匹配模式过滤
- * 
- * 分离过滤逻辑的好处：
- * - 职责分离：JournalServer专注调度，JournalFilter专注过滤
- * - 易于测试：过滤逻辑可独立测试
- * - 易于扩展：新增过滤类型只需修改此类
  */
 class JournalFilter {
 public:

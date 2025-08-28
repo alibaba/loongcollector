@@ -84,14 +84,14 @@ private:
     JournalServer() = default;
     ~JournalServer() = default;
 
-    void Run();
+    void run();
     void processJournalEntries();
     void processJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config);
     
     // Helper functions for processJournalConfig to reduce cognitive complexity
     bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
-    std::shared_ptr<SystemdJournalReader> setupJournalConnection(const std::string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard);
-    bool performJournalSeek(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader);
+    std::shared_ptr<SystemdJournalReader> setupJournalConnection(const std::string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection);
+    bool performJournalSeek(const std::string& configName, size_t idx, JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek = false);
     void readJournalEntriesForConfig(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, QueueKey queueKey);
     
     // Helper functions for readJournalEntriesForConfig to reduce cognitive complexity

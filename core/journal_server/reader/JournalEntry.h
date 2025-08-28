@@ -28,15 +28,14 @@ namespace logtail {
 class JournalEntry {
 public:
     JournalEntry() = default;
-    ~JournalEntry() = default;
 
     // Fields map (key-value pairs from journal)
     std::map<std::string, std::string> fields;
     
     // Journal metadata
     std::string cursor;
-    uint64_t realtimeTimestamp;
-    uint64_t monotonicTimestamp;
+    uint64_t realtimeTimestamp = 0;
+    uint64_t monotonicTimestamp = 0;
     
     // Helper methods
     bool HasField(const std::string& key) const;

@@ -21,7 +21,7 @@
 namespace logtail {
 
 //==============================================================================
-// JournalConnectionInfo Implementation
+// JournalConnectionInfo 实现
 //==============================================================================
 
 JournalConnectionInfo::JournalConnectionInfo(const std::string& configName, 
@@ -34,7 +34,7 @@ JournalConnectionInfo::JournalConnectionInfo(const std::string& configName,
     , mLastResetTime(std::chrono::steady_clock::now())
     , mIsValid(false) {
     
-    // Connection created
+            // 连接已创建
     
     initializeConnection();
 }
@@ -44,7 +44,7 @@ JournalConnectionInfo::~JournalConnectionInfo() {
     if (mReader) {
         mReader->Close();
     }
-    // Connection destroyed
+    // 连接已销毁
 }
 
 std::shared_ptr<SystemdJournalReader> JournalConnectionInfo::GetReader() {
@@ -52,7 +52,7 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionInfo::GetReader() {
     
     // 如果连接无效、reader为空，或者reader已关闭，尝试重新初始化
     if (!mIsValid || !mReader || !mReader->IsOpen()) {
-        // Reinitializing connection due to invalid state
+        // 由于无效状态，重新初始化连接
         initializeConnection();
     }
     
@@ -95,7 +95,7 @@ bool JournalConnectionInfo::ResetConnection() {
 bool JournalConnectionInfo::IsValid() const {
     std::lock_guard<std::mutex> lock(mMutex);
     bool valid = mIsValid && mReader && mReader->IsOpen();
-    // Connection validity check
+    // 连接有效性检查
     return valid;
 }
 
@@ -154,7 +154,7 @@ bool JournalConnectionInfo::initializeConnection() {
 }
 
 //==============================================================================
-// JournalConnectionManager Implementation  
+// JournalConnectionManager 实现  
 //==============================================================================
 
 std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConnection(
@@ -171,8 +171,8 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
         // 连接存在，检查是否需要重置
         auto& connInfo = it->second;
         
-        // 检查是否超过重置周期（默认1小时）
-        if (connInfo->ShouldReset(3600)) {
+        // 检查是否超过重置周期（使用配置的重置间隔）
+        if (connInfo->ShouldReset(config.resetIntervalSecond)) {
             if (!connInfo->ResetConnection()) {
                 LOG_WARNING(sLogger, ("failed to reset connection, removing", "")("config", configName)("idx", idx));
                 mConnections.erase(it);
@@ -220,7 +220,7 @@ std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConn
         connInfo = it->second;
         
         // 检查是否需要重置，但不强制重置正在使用的连接
-        if (connInfo->ShouldReset(3600) && !connInfo->IsInUse()) {
+        if (connInfo->ShouldReset(config.resetIntervalSecond) && !connInfo->IsInUse()) {
             if (!connInfo->ResetConnection()) {
                 LOG_WARNING(sLogger, ("failed to reset connection, creating new one", "")("config", configName)("idx", idx));
                 mConnections.erase(it);
@@ -318,7 +318,7 @@ std::string JournalConnectionManager::makeConnectionKey(const std::string& confi
 }
 
 //==============================================================================
-// JournalConnectionInfo Usage Count Management
+// JournalConnectionInfo 使用计数管理
 //==============================================================================
 
 void JournalConnectionInfo::IncrementUsageCount() {
