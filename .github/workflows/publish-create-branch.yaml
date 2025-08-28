@@ -318,23 +318,7 @@ jobs:
 
       - name: Install ossutil
         run: |
-          # 下载并安装 ossutil
-          curl -o ossutil-2.1.2-linux-amd64.zip https://gosspublic.alicdn.com/ossutil/v2/2.1.2/ossutil-2.1.2-linux-amd64.zip
-          unzip ossutil-2.1.2-linux-amd64.zip
-          cd ossutil-2.1.2-linux-amd64
-          chmod 755 ossutil
-          sudo mv ossutil /usr/local/bin/ && sudo ln -s /usr/local/bin/ossutil /usr/bin/ossutil
-          ossutil
-
-      - name: Configure ossutil
-        run: |
-          # 配置 ossutil
-          ossutil config \
-            --endpoint https://oss-cn-shanghai.aliyuncs.com \
-            --access-key-id ${{ secrets.OSS_ACCESS_KEY_ID }} \
-            --access-key-secret ${{ secrets.OSS_ACCESS_KEY_SECRET }} \
-            --sts-token "" \
-            --output-dir /tmp/ossutil
+          sudo -v ; curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
 
       - name: Merge artifacts and generate SHA256
         run: |

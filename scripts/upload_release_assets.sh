@@ -33,7 +33,7 @@ usage() {
 
 SCRIPT_DIR=$(dirname ${BASH_SOURCE[0]})
 VERSION=$2
-OSSUTIL="ossutil -e oss-cn-shanghai.aliyuncs.com"
+OSSUTIL="ossutil -e oss-cn-shanghai.aliyuncs.com -i $OSS_ACCESS_KEY_ID -k $OSS_ACCESS_KEY_SECRET"
 
 upload_package() {
     # Upload Linux packages
