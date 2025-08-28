@@ -219,12 +219,9 @@ jobs:
 
   build-windows:
     needs: create-release-branch
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ github.event.inputs.test_mode == 'true' && 'windows-latest' || 'Windows' }}
     timeout-minutes: 60
     if: github.event.inputs.build_windows == 'true'
-    strategy:
-      matrix:
-        runner: [Windows]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
