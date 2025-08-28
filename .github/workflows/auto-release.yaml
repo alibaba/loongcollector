@@ -253,13 +253,32 @@ jobs:
           } else {
             # 正常构建模式
             Write-Host "Starting Windows build..."
-            .\scripts\windows64_build.bat $env:LOONCOLLECTOR_VERSION
+            Write-Host "Using version: $VERSION"
+            .\scripts\windows64_build.bat $VERSION
           }
           
           # 检查构建结果
           if (Test-Path "output") {
             Write-Host "Build successful. Output files:"
             Get-ChildItem -Path "output" -Recurse
+            
+            # 创建 dist 目录并打包
+            Write-Host "Creating dist directory and packaging..."
+            New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+            
+            # 创建 zip 包
+            $zipPath = "dist\loongcollector-$VERSION.windows-amd64.zip"
+            Compress-Archive -Path "output\*" -DestinationPath $zipPath -Force
+            Write-Host "Created Windows package: $zipPath"
+            
+            # 验证zip文件
+            if (Test-Path $zipPath) {
+              $zipSize = (Get-Item $zipPath).Length
+              Write-Host "Zip file created successfully, size: $zipSize bytes"
+            } else {
+              Write-Error "Failed to create zip file"
+              exit 1
+            }
           } else {
             Write-Error "Build failed - output directory not found"
             exit 1
