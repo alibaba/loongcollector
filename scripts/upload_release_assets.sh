@@ -33,13 +33,28 @@ usage() {
 
 SCRIPT_DIR=$(dirname ${BASH_SOURCE[0]})
 VERSION=$2
-ARCH=
 OSSUTIL="ossutil64 -e oss-cn-shanghai.aliyuncs.com"
 
 upload_package() {
-    sha256sum dist/loongcollector-$VERSION.linux-${ARCH}.tar.gz > dist/loongcollector-$VERSION.linux-${ARCH}.tar.gz.sha256
-    $OSSUTIL cp dist/loongcollector-$VERSION.linux-${ARCH}.tar.gz oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-${ARCH}.tar.gz
-    $OSSUTIL cp dist/loongcollector-$VERSION.linux-${ARCH}.tar.gz.sha256 oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-${ARCH}.tar.gz.sha256
+    # Upload Linux packages
+    for arch in amd64 arm64; do
+        if [ -f "dist/loongcollector-$VERSION.linux-$arch.tar.gz" ]; then
+            echo "Uploading Linux $arch package..."
+            $OSSUTIL cp dist/loongcollector-$VERSION.linux-$arch.tar.gz oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-$arch.tar.gz
+            if [ -f "dist/loongcollector-$VERSION.linux-$arch.tar.gz.sha256" ]; then
+                $OSSUTIL cp dist/loongcollector-$VERSION.linux-$arch.tar.gz.sha256 oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-$arch.tar.gz.sha256
+            fi
+        fi
+    done
+    
+    # Upload Windows package
+    if [ -f "dist/loongcollector-$VERSION.windows-amd64.zip" ]; then
+        echo "Uploading Windows package..."
+        $OSSUTIL cp dist/loongcollector-$VERSION.windows-amd64.zip oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.windows-amd64.zip
+        if [ -f "dist/loongcollector-$VERSION.windows-amd64.zip.sha256" ]; then
+            $OSSUTIL cp dist/loongcollector-$VERSION.windows-amd64.zip.sha256 oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.windows-amd64.zip.sha256
+        fi
+    fi
 }
 
 upload_image() {
@@ -54,9 +69,6 @@ upload_image() {
 }
 
 if [[ $1 == "package" ]]; then
-    ARCH=amd64
-    upload_package
-    ARCH=arm64
     upload_package
 elif [[ $1 == "image" ]]; then
     upload_image

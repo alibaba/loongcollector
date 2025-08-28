@@ -33,7 +33,7 @@ env:
 
 jobs:
   create-release-branch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: write
@@ -150,13 +150,6 @@ jobs:
           make dist
           ls -la dist/
 
-      - name: Generate SHA256 for Linux AMD64
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          cd dist
-          sha256sum loongcollector-$VERSION.linux-amd64.tar.gz > loongcollector-$VERSION.linux-amd64.tar.gz.sha256
-          ls -la *.sha256
-
       - name: Upload Linux AMD64 artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -164,16 +157,9 @@ jobs:
           path: dist/loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz
           retention-days: 1
 
-      - name: Upload Linux AMD64 SHA256
-        uses: actions/upload-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz.sha256
-          path: dist/loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz.sha256
-          retention-days: 1
-
   build-linux-arm64:
     needs: create-release-branch
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 60
     steps:
       - name: Check out code
@@ -182,51 +168,25 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: ${{ needs.create-release-branch.outputs.branch_name }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
 
       - name: Build Linux ARM64 package
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          # 使用 ARM64 的 Docker-in-Docker 环境
-          docker run --rm --platform linux/arm64 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $(pwd):/workspace \
-            -w /workspace \
-            --privileged \
-            docker:24.0.5-dind \
-            sh -c "
-              # 启动 Docker daemon
-              dockerd --host=unix:///var/run/docker.sock &
-              sleep 10
-              
-              # 安装必要的工具
-              apk add --no-cache make git go
-              
-              # 设置子模块
-              SUBMODULE_PATH='core/_thirdparty/coolbpf'
-              git config submodule.\$SUBMODULE_PATH.url 'https://github.com/aliyun/coolbpf.git'
-              git submodule update --init
-              
-              # 设置 Go 环境
-              export GOPROXY='https://goproxy.cn,direct'
-              export GOARCH=arm64
-              export GOOS=linux
-              
-              # 执行构建
-              make dist
-            "
+          # 在原生 ARM64 环境中直接构建
+          make dist
           ls -la dist/
-
-      - name: Generate SHA256 for Linux ARM64
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          cd dist
-          sha256sum loongcollector-$VERSION.linux-arm64.tar.gz > loongcollector-$VERSION.linux-arm64.tar.gz.sha256
-          ls -la *.sha256
 
       - name: Upload Linux ARM64 artifacts
         uses: actions/upload-artifact@v4
@@ -235,16 +195,9 @@ jobs:
           path: dist/loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz
           retention-days: 1
 
-      - name: Upload Linux ARM64 SHA256
-        uses: actions/upload-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz.sha256
-          path: dist/loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz.sha256
-          retention-days: 1
-
   build-windows:
     needs: create-release-branch
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 60
     steps:
       - name: Check out code
@@ -289,7 +242,8 @@ jobs:
           if (!(Test-Path "D:\loongcollector-windows-build\boost_1_68_0")) {
             Write-Host "Downloading Boost 1.68..."
             New-Item -ItemType Directory -Path "D:\loongcollector-windows-build" -Force
-            Invoke-WebRequest -Uri "https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/prebuilt-dependencies/boost_1_68_0-msvc-14.1-64.exe" -OutFile "D:\loongcollector-windows-build\boost_1_68_0-msvc-14.1-64.exe"
+            # 使用官方下载链接，速度更快
+            Invoke-WebRequest -Uri "https://archives.boost.io/release/1.68.0/binaries/boost_1_68_0-msvc-14.1-64.exe" -OutFile "D:\loongcollector-windows-build\boost_1_68_0-msvc-14.1-64.exe"
             Start-Process -FilePath "D:\loongcollector-windows-build\boost_1_68_0-msvc-14.1-64.exe" -ArgumentList "/S" -Wait
           }
           $env:BOOST_ROOT = "D:\loongcollector-windows-build\boost_1_68_0"
@@ -315,37 +269,12 @@ jobs:
             exit 1
           }
 
-      - name: Generate SHA256 for Windows
-        run: |
-          $VERSION = "${{ github.event.inputs.version }}"
-          cd dist
-          Get-FileHash -Algorithm SHA256 "loongcollector-$VERSION.windows-amd64.zip" | ForEach-Object { "$($_.Hash.ToLower())  loongcollector-$VERSION.windows-amd64.zip" } | Out-File -FilePath "loongcollector-$VERSION.windows-amd64.zip.sha256" -Encoding ASCII
-          Get-Content "loongcollector-$VERSION.windows-amd64.zip.sha256"
-
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
           path: dist/loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
           retention-days: 1
-
-      - name: Upload Windows SHA256
-        uses: actions/upload-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip.sha256
-          path: dist/loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip.sha256
-          retention-days: 1
-
-      - name: Upload to OSS
-        env:
-          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
-          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          # 这里需要配置 OSS 上传逻辑
-          # 使用 oss-browser 或其他工具上传 Windows 包
-          echo "Uploading Windows package to OSS for version $VERSION"
-          # TODO: 实现具体的 OSS 上传逻辑
 
   # 第二步：合并包并上传
   upload-packages:
@@ -368,29 +297,33 @@ jobs:
           name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz
           path: temp-amd64/
 
-      - name: Download Linux AMD64 SHA256
-        uses: actions/download-artifact@v4
-        with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz.sha256
-          path: temp-amd64/
-
       - name: Download Linux ARM64 artifacts
         uses: actions/download-artifact@v4
         with:
           name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz
           path: temp-arm64/
 
-      - name: Download Linux ARM64 SHA256
+      - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz.sha256
-          path: temp-arm64/
+          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
+          path: temp-windows/
 
-      - name: Merge artifacts
+      - name: Merge artifacts and generate SHA256
         run: |
           mkdir -p dist/
           cp temp-amd64/* dist/ || true
           cp temp-arm64/* dist/ || true
+          cp temp-windows/* dist/ || true
+          
+          # Generate SHA256 files for OSS upload
+          cd dist
+          for file in *.tar.gz *.zip; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "$file.sha256"
+              echo "Generated SHA256 for $file"
+            fi
+          done
           ls -la dist/
 
       - name: Set up Docker Buildx
