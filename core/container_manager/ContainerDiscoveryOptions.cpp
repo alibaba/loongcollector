@@ -17,6 +17,8 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+#include <boost/regex.hpp>
+
 
 using namespace std;
 
@@ -24,7 +26,7 @@ DEFINE_FLAG_INT32(default_plugin_log_queue_size, "", 10);
 
 namespace logtail {
 
-bool ContainerFilters::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
+bool ContainerFilterConfig::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
     string errorMsg;
 
     // K8pluginNamespaceRegex
@@ -138,6 +140,85 @@ bool ContainerFilters::Init(const Json::Value& config, const CollectionPipelineC
     return true;
 }
 
+
+bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& inputs, FieldFilter& fieldFilter) {
+    std::unordered_map<std::string, std::string> staticResult;
+    std::unordered_map<std::string, std::shared_ptr<boost::regex>> regexResult;
+
+    for (const auto& input: inputs) {
+        // 检查前缀
+        if (input.second.empty() || input.second[0] == '^') {
+            try {
+                // 编译正则表达式
+                auto reg = std::make_shared<boost::regex>(input.second);
+                regexResult[input.first] = reg;
+            } catch (const std::exception& e) {
+                return false;
+            }
+        } else {
+            staticResult[input.first] = input.second;
+        }
+    }
+    fieldFilter.mFieldsMap = staticResult;
+    fieldFilter.mFieldsRegMap = regexResult;
+    return true;
+}
+
+bool ContainerFilterConfig::GetContainerFilters(ContainerFilters& filters) {
+    /// 为 K8sFilter 设置正则表达式
+    if (!mK8sNamespaceRegex.empty()) {
+        filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(mK8sNamespaceRegex);
+    }
+
+    if (!mK8sPodRegex.empty()) {
+        filters.mK8SFilter.mPodReg = std::make_shared<boost::regex>(mK8sPodRegex);
+    }
+
+    if (!mK8sContainerRegex.empty()) {
+        filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>(mK8sContainerRegex);
+    }
+    bool success = false;
+    if (!mIncludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(mIncludeK8sLabel, filters.mK8SFilter.mK8sLabelFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!mExcludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(mExcludeK8sLabel, filters.mK8SFilter.mK8sLabelFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!mIncludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(mIncludeContainerLabel, filters.mContainerLabelFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!mExcludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(mExcludeContainerLabel, filters.mContainerLabelFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!mIncludeEnv.empty()) {
+        success = SplitRegexFromMap(mIncludeEnv, filters.mEnvFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!mExcludeEnv.empty()) {
+        success = SplitRegexFromMap(mExcludeEnv, filters.mEnvFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    return true;
+}
+
+
+
 bool ContainerDiscoveryOptions::Init(const Json::Value& config,
                                      const CollectionPipelineContext& ctx,
                                      const string& pluginType) {
@@ -156,7 +237,7 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
                                  ctx.GetLogstoreName(),
                                  ctx.GetRegion());
         } else {
-            mContainerFilters.Init(*itr, ctx, pluginType);
+            mContainerFilterConfig.Init(*itr, ctx, pluginType);
         }
     }
 
@@ -199,66 +280,4 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
 
     return true;
 }
-
-void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
-    Json::Value& res, const FileDiscoveryOptions* fileDiscovery, const PluginInstance::PluginMeta& pluginMeta) const {
-    Json::Value plugin(Json::objectValue);
-    Json::Value detail(Json::objectValue);
-    Json::Value object(Json::objectValue);
-
-    auto ConvertMapToJsonObj = [&](const char* key, const unordered_map<string, string>& map) {
-        if (!map.empty()) {
-            object.clear();
-            for (const auto& item : map) {
-                object[item.first] = Json::Value(item.second);
-            }
-            detail[key] = object;
-        }
-    };
-
-    if (fileDiscovery) {
-        if (!fileDiscovery->GetWildcardPaths().empty()) {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetWildcardPaths()[0]);
-            detail["MaxDepth"] = Json::Value(static_cast<int32_t>(fileDiscovery->GetWildcardPaths().size())
-                                             + fileDiscovery->mMaxDirSearchDepth - 1);
-        } else {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetBasePath());
-            detail["MaxDepth"] = Json::Value(fileDiscovery->mMaxDirSearchDepth);
-        }
-        detail["FilePattern"] = Json::Value(fileDiscovery->GetFilePattern());
-    }
-    // 传递给 metric_container_info 的配置
-    // 容器过滤
-    if (!mContainerFilters.mK8sNamespaceRegex.empty()) {
-        detail["K8sNamespaceRegex"] = Json::Value(mContainerFilters.mK8sNamespaceRegex);
-    }
-    if (!mContainerFilters.mK8sPodRegex.empty()) {
-        detail["K8sPodRegex"] = Json::Value(mContainerFilters.mK8sPodRegex);
-    }
-    if (!mContainerFilters.mK8sContainerRegex.empty()) {
-        detail["K8sContainerRegex"] = Json::Value(mContainerFilters.mK8sContainerRegex);
-    }
-    ConvertMapToJsonObj("IncludeK8sLabel", mContainerFilters.mIncludeK8sLabel);
-    ConvertMapToJsonObj("ExcludeK8sLabel", mContainerFilters.mExcludeK8sLabel);
-    ConvertMapToJsonObj("IncludeEnv", mContainerFilters.mIncludeEnv);
-    ConvertMapToJsonObj("ExcludeEnv", mContainerFilters.mExcludeEnv);
-    ConvertMapToJsonObj("IncludeContainerLabel", mContainerFilters.mIncludeContainerLabel);
-    ConvertMapToJsonObj("ExcludeContainerLabel", mContainerFilters.mExcludeContainerLabel);
-    // 日志标签富化
-    ConvertMapToJsonObj("ExternalK8sLabelTag", mExternalK8sLabelTag);
-    ConvertMapToJsonObj("ExternalEnvTag", mExternalEnvTag);
-    // 启用容器元信息预览
-    if (mCollectingContainersMeta) {
-        detail["CollectingContainersMeta"] = Json::Value(true);
-    }
-    plugin["type"]
-        = Json::Value(CollectionPipeline::GenPluginTypeWithID("metric_container_info", pluginMeta.mPluginID));
-    plugin["detail"] = detail;
-
-    res["inputs"].append(plugin);
-    // these param will be overriden if the same param appears in the global module of config, which will be parsed
-    // later.
-    res["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-}
-
 } // namespace logtail

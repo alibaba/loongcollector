@@ -14,6 +14,8 @@
 
 #include "file_server/FileServer.h"
 
+#include "checkpoint/CheckPointManager.h"
+#include "container_manager/ContainerManager.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
@@ -100,7 +102,7 @@ void FileServer::PauseInner() {
 void FileServer::Resume(bool isConfigUpdate) {
     if (isConfigUpdate) {
         ClearContainerInfo();
-        ConfigManager::GetInstance()->DoUpdateContainerPaths();
+        ContainerManager::GetInstance()->ApplyContainerDiffs();
         ConfigManager::GetInstance()->SaveDockerConfig();
     }
 

@@ -442,11 +442,6 @@ public:
 
     // std::string GetAllProjectsSet();
 
-    bool UpdateContainerPath(ConfigContainerInfoUpdateCmd* cmd);
-    bool IsUpdateContainerPaths();
-    bool DoUpdateContainerPaths();
-
-    bool UpdateContainerStopped(ConfigContainerInfoUpdateCmd* cmd);
     void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
 
     void SaveDockerConfig();

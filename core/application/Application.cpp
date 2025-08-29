@@ -49,6 +49,7 @@
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
+#include "container_manager/ContainerManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "runner/FlusherRunner.h"
@@ -240,6 +241,7 @@ void Application::Start() { // GCOVR_EXCL_START
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     ProcessorRunner::GetInstance()->Init();
+    //ContainerManager::GetInstance()->Init();
 
     // flusher_sls resource should be explicitly initialized to allow internal metrics and alarms to be sent
     FlusherSLS::InitResource();
@@ -338,7 +340,7 @@ void Application::Start() { // GCOVR_EXCL_START
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
-        if (ConfigManager::GetInstance()->IsUpdateContainerPaths()) {
+        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
             FileServer::GetInstance()->Pause();
             FileServer::GetInstance()->Resume();
         }
@@ -392,6 +394,7 @@ void Application::Exit() {
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
+    ContainerManager::GetInstance()->Stop();
     FlusherRunner::GetInstance()->Stop();
     HttpSink::GetInstance()->Stop();
 

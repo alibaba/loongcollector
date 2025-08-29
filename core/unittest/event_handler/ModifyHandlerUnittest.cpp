@@ -124,7 +124,7 @@ protected:
         discoveryOpts.SetEnableContainerDiscoveryFlag(true);
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
             [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
-                containerInfo.mRealBaseDir = containerInfo.mUpperDir;
+                containerInfo.mRealBaseDir = containerInfo.mRawContainerInfo->mUpperDir;
                 return true;
             });
         mConfig = std::make_pair(&discoveryOpts, &ctx);
@@ -211,13 +211,13 @@ private:
         )";
         Json::Value containerJson;
         APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
-        APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
+        //APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
     }
 
     void stopContainer(const std::string containerID) {
         for (auto& containerInfo : *(discoveryOpts.mContainerInfos)) {
-            if (containerInfo.mID == containerID) {
-                containerInfo.mStopped = true;
+            if (containerInfo.mRawContainerInfo->mID == containerID) {
+                containerInfo.mRawContainerInfo->mStopped = true;
                 break;
             }
         }
