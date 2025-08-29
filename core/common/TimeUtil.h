@@ -43,7 +43,7 @@ typedef timespec LogtailTime;
 
 // Convert @tm to string according to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
 std::string ConvertToTimeStamp(const time_t& tm, const std::string& format = "%Y%m%d%H%M%S");
-std::string GetTimeStamp(time_t tm, const std::string& format = "%Y%m%d%H%M%S");
+std::string GetTimeStamp(time_t tm, const std::string& format = "%Y%m%d%H%M%S", bool isLocal = true);
 
 // Get current time in us or ms.
 uint64_t GetCurrentTimeInMicroSeconds();

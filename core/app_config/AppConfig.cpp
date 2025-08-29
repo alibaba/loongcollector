@@ -1509,7 +1509,7 @@ void AppConfig::ReadFlagsFromMap(const std::unordered_map<std::string, std::stri
  *    - 记录无法转换的值
  */
 void AppConfig::RecurseParseJsonToFlags(const Json::Value& confJson, std::string prefix) {
-    const static unordered_set<string> sIgnoreKeySet = {"data_server_list", "data_servers"};
+    const static unordered_set<string> sIgnoreKeySet = {"data_server_list", "data_servers", "auth_config"};
     const static unordered_set<string> sForceKeySet = {"config_server_address_list", "config_servers"};
     for (auto name : confJson.getMemberNames()) {
         auto jsonvalue = confJson[name];
