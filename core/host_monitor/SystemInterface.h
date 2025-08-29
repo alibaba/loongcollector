@@ -171,7 +171,7 @@ struct ProcessCred {
 struct ProcessAllStat {
     pid_t pid;
     ProcessStat processState;
-    ProcessInfo processInfo;
+    // ProcessInfo processInfo;
     ProcessCpuInformation processCpu;
     ProcessMemoryInformation processMemory;
     double memPercent = 0.0;
@@ -181,10 +181,10 @@ struct ProcessAllStat {
 
 struct ProcessPushMertic {
     pid_t pid;
-    std::string name;
-    std::string user;
-    std::string path;
-    std::string args;
+    // std::string name;
+    // std::string user;
+    // std::string path;
+    // std::string args;
     double cpuPercent = 0.0;
     double memPercent = 0.0;
     double fdNum = 0.0;
