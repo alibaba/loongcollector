@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cstdint>
+
 #include <chrono>
 #include <future>
 #include <thread>
@@ -23,7 +25,10 @@
 
 using namespace std;
 
-DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
+DECLARE_FLAG_INT32(system_interface_cache_queue_size);
+DECLARE_FLAG_INT32(system_interface_cache_entry_expire_seconds);
+DECLARE_FLAG_INT32(system_interface_cache_cleanup_interval_seconds);
+DECLARE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size);
 
 namespace logtail {
 
@@ -35,281 +40,291 @@ public:
 };
 
 void SystemInterfaceUnittest::TestSystemInterfaceCache() const {
-    auto timeout = std::chrono::milliseconds{100};
+    size_t cacheSize = 5;
     // No args
-    { // case1: cache stale -> thread1 query -> thread1 update -> thread2 query
-        SystemInterface::SystemInformationCache<MockInformation> cache(timeout);
-        // add data into cache
+    { // case1: basic cache functionality
+        SystemInterface::SystemInformationCache<MockInformation> cache(cacheSize);
         MockInformation info;
+        auto now = time(nullptr);
+
+        // Should miss initially
+        APSARA_TEST_FALSE_FATAL(cache.Get(now, info));
+
+        // Add data and retrieve it
         info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
-        // thread1 query and update
-        auto future1 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout));
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info);
-        });
-        future1.get();
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout));
-            APSARA_TEST_EQUAL_FATAL(2, info.id);
-        });
-        future2.get();
-    }
-    { // case2: cache stale -> thread1 query -> thread2 query -> thread1 update
-        SystemInterface::SystemInformationCache<MockInformation> cache(timeout);
-        // add data into cache
-        MockInformation info;
-        info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
+        info.collectTime = now;
         cache.Set(info);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
+
+        MockInformation info3;
+        info3.id = 3;
+        info3.collectTime = now + 2;
+        cache.Set(info3);
+
+        MockInformation info2;
+        info2.id = 2;
+        info2.collectTime = now + 1;
+        cache.Set(info2);
+
+        APSARA_TEST_EQUAL_FATAL(3, cache.mCache.size());
+        for (size_t i = 0; i < cache.mCache.size(); ++i) {
+            APSARA_TEST_EQUAL_FATAL(i + 1, cache.mCache[i].id);
+            APSARA_TEST_EQUAL_FATAL(now + i, cache.mCache[i].collectTime);
+        }
+    }
+
+    { // case2: concurrent access without args
+        SystemInterface::SystemInformationCache<MockInformation> cache(cacheSize);
         auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
             info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
+            info.collectTime = time(nullptr);
             cache.Set(info);
         });
-        // thread2 query
         auto future2 = async(std::launch::async, [&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10));
-            APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout * 2));
-            APSARA_TEST_EQUAL_FATAL(2, info.id);
+            auto now = time(nullptr);
+            if (cache.Get(now, info)) {
+                APSARA_TEST_EQUAL_FATAL(2, info.id);
+            }
         });
         future1.get();
         future2.get();
     }
-    { // case3: cache stale -> thread1 query -> thread2 query -> thread1 update -> thread2 update
-        SystemInterface::SystemInformationCache<MockInformation> cache(timeout);
-        // add data into cache
+
+    { // case3: now is between two entries, so return the closest entry after now
+        SystemInterface::SystemInformationCache<MockInformation> cache(cacheSize);
         MockInformation info;
+        auto now = time(nullptr);
+        APSARA_TEST_FALSE_FATAL(cache.Get(now, info));
         info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
+        info.collectTime = now - 1;
         cache.Set(info);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{1100});
-        auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info);
-        });
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread2 update
-            info.id = 3;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info);
-        });
-        future1.get();
-        future2.get();
-        // check if cache is updated
-        APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout));
-        APSARA_TEST_EQUAL_FATAL(3, info.id);
+
+        MockInformation info2;
+        info2.id = 2;
+        info2.collectTime = now + 1;
+        cache.Set(info2);
+
+        MockInformation info3;
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info3));
+        APSARA_TEST_EQUAL_FATAL(2, info3.id);
+        APSARA_TEST_EQUAL_FATAL(now + 1, info3.collectTime);
+
+        MockInformation info4;
+        APSARA_TEST_TRUE_FATAL(cache.Get(now - 2, info4));
+        APSARA_TEST_EQUAL_FATAL(1, info4.id);
+        APSARA_TEST_EQUAL_FATAL(now - 1, info4.collectTime);
+
+        MockInformation info5;
+        APSARA_TEST_FALSE_FATAL(cache.Get(now + 2, info5));
     }
-    { // case4: cache stale -> thread1 query -> thread2 query -> thread2 update -> thread1 update
-        SystemInterface::SystemInformationCache<MockInformation> cache(timeout);
-        // add data into cache
+    { // case4: cache is full, so the oldest entry is removed
+        SystemInterface::SystemInformationCache<MockInformation> cache(3);
+        auto now = time(nullptr);
+        for (int i = 0; i < 3; ++i) {
+            MockInformation info;
+            info.id = i;
+            info.collectTime = now + i;
+            cache.Set(info);
+        }
+        APSARA_TEST_EQUAL_FATAL(3, cache.mCache.size());
         MockInformation info;
-        info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
-        cache.Set(info);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
-        auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info);
-        });
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10));
-            // thread2 update
-            info.id = 3;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info);
-        });
-        future1.get();
-        future2.get();
-        // check if cache is updated
-        APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout));
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info));
+        APSARA_TEST_EQUAL_FATAL(0, info.id);
+        APSARA_TEST_EQUAL_FATAL(now, info.collectTime);
+        APSARA_TEST_TRUE_FATAL(cache.Get(now + 1, info));
+
+        MockInformation info2;
+        info2.id = 2;
+        info2.collectTime = now + 2;
+        cache.Set(info2);
+        APSARA_TEST_EQUAL_FATAL(3, cache.mCache.size());
+        APSARA_TEST_TRUE_FATAL(cache.Get(now + 2, info));
         APSARA_TEST_EQUAL_FATAL(2, info.id);
+
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info));
+        APSARA_TEST_EQUAL_FATAL(1, info.id);
+        APSARA_TEST_EQUAL_FATAL(now + 1, info.collectTime);
     }
+
     // With args
-    { // case1: cache stale -> thread1 query -> thread1 update -> thread2 query
-        SystemInterface::SystemInformationCache<MockInformation, int> cache(timeout);
-        // add data into cache
+    { // case1: basic cache functionality with args
+        SystemInterface::SystemInformationCache<MockInformation, int> cache(cacheSize);
         MockInformation info;
+        auto now = time(nullptr);
+
+        // Should miss initially
+        APSARA_TEST_FALSE_FATAL(cache.Get(now, info, 1));
+
+        // Add data and retrieve it
         info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
+        info.collectTime = now;
         cache.Set(info, 1);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
-        // thread1 query and update
-        auto future1 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info, 1);
-        });
-        future1.get();
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-            APSARA_TEST_EQUAL_FATAL(2, info.id);
-        });
-        future2.get();
+
+        MockInformation info3;
+        info3.id = 3;
+        info3.collectTime = now + 2;
+        cache.Set(info3, 1);
+
+        MockInformation info2;
+        info2.id = 2;
+        info2.collectTime = now + 1;
+        cache.Set(info2, 1);
+
+        auto cacheEntry = cache.mCache[1];
+        APSARA_TEST_EQUAL_FATAL(3, cacheEntry.data.size());
+        for (size_t i = 0; i < cacheEntry.data.size(); ++i) {
+            APSARA_TEST_EQUAL_FATAL(i + 1, cacheEntry.data[i].id);
+            APSARA_TEST_EQUAL_FATAL(now + i, cacheEntry.data[i].collectTime);
+        }
     }
-    { // case2: cache stale -> thread1 query -> thread2 query -> thread1 update
-        SystemInterface::SystemInformationCache<MockInformation, int> cache(timeout);
-        // add data into cache
-        MockInformation info;
-        info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
-        cache.Set(info, 1);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
+
+    { // case2: concurrent access with args
+        SystemInterface::SystemInformationCache<MockInformation, int> cache(cacheSize);
         auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
             info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
+            info.collectTime = time(nullptr);
             cache.Set(info, 1);
         });
-        // thread2 query
         auto future2 = async(std::launch::async, [&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10, 1));
-            APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout * 2, 1));
-            APSARA_TEST_EQUAL_FATAL(2, info.id);
+            auto now = time(nullptr);
+            if (cache.Get(now, info, 1)) {
+                APSARA_TEST_EQUAL_FATAL(2, info.id);
+            }
         });
         future1.get();
         future2.get();
     }
-    { // case3: cache stale -> thread1 query -> thread2 query -> thread1 update -> thread2 update
-        SystemInterface::SystemInformationCache<MockInformation, int> cache(timeout);
-        // add data into cache
+
+    { // case3: now is between two entries, so return the closest entry after now
+        SystemInterface::SystemInformationCache<MockInformation, int> cache(cacheSize);
         MockInformation info;
+        auto now = time(nullptr);
+        APSARA_TEST_FALSE_FATAL(cache.Get(now, info, 1));
         info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
+        info.collectTime = now - 1;
         cache.Set(info, 1);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{1100});
-        auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info, 1);
-        });
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
-            MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10, 1));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread2 update
-            info.id = 3;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info, 1);
-        });
-        future1.get();
-        future2.get();
-        // check if cache is updated
-        APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-        APSARA_TEST_EQUAL_FATAL(3, info.id);
+
+        MockInformation info2;
+        info2.id = 2;
+        info2.collectTime = now + 1;
+        cache.Set(info2, 1);
+
+        MockInformation info3;
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info3, 1));
+        APSARA_TEST_EQUAL_FATAL(2, info3.id);
+        APSARA_TEST_EQUAL_FATAL(now + 1, info3.collectTime);
+
+        MockInformation info4;
+        APSARA_TEST_TRUE_FATAL(cache.Get(now - 2, info4, 1));
+        APSARA_TEST_EQUAL_FATAL(1, info4.id);
+        APSARA_TEST_EQUAL_FATAL(now - 1, info4.collectTime);
+
+        MockInformation info5;
+        APSARA_TEST_FALSE_FATAL(cache.Get(now + 2, info5, 1));
     }
-    { // case4: cache stale -> thread1 query -> thread2 query -> thread2 update -> thread1 update
-        SystemInterface::SystemInformationCache<MockInformation, int> cache(timeout);
-        // add data into cache
+    { // case4: cache is full, so the oldest entry is removed
+        SystemInterface::SystemInformationCache<MockInformation, int> cache(3);
+        auto now = time(nullptr);
+        for (int i = 0; i < 3; ++i) {
+            MockInformation info;
+            info.id = i;
+            info.collectTime = now + i;
+            cache.Set(info, 1);
+        }
         MockInformation info;
-        info.id = 1;
-        info.collectTime = std::chrono::steady_clock::now();
-        cache.Set(info, 1);
-        // wait for cache to be stale
-        this_thread::sleep_for(std::chrono::milliseconds{200});
-        auto future1 = async(std::launch::async, [&]() {
-            // thread1 query
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info, 1));
+        APSARA_TEST_EQUAL_FATAL(0, info.id);
+        APSARA_TEST_EQUAL_FATAL(now, info.collectTime);
+        APSARA_TEST_TRUE_FATAL(cache.Get(now + 1, info, 1));
+
+        MockInformation info2;
+        info2.id = 4;
+        info2.collectTime = now + 4;
+        cache.Set(info2, 1);
+        APSARA_TEST_TRUE_FATAL(cache.Get(now + 4, info, 1));
+        APSARA_TEST_EQUAL_FATAL(4, info.id);
+        APSARA_TEST_EQUAL_FATAL(now + 4, info.collectTime);
+
+        APSARA_TEST_TRUE_FATAL(cache.Get(now, info, 1));
+        APSARA_TEST_EQUAL_FATAL(1, info.id);
+        APSARA_TEST_EQUAL_FATAL(now + 1, info.collectTime);
+    }
+    { // case5: multiple keys with args
+        SystemInterface::SystemInformationCache<MockInformation, int> cache(cacheSize);
+        auto now = time(nullptr);
+
+        // Add multiple entries with different keys
+        for (int i = 1; i <= 3; ++i) {
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-            this_thread::sleep_for(std::chrono::milliseconds{200});
-            // thread1 update
-            info.id = 2;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info, 1);
-        });
-        // thread2 query
-        auto future2 = async(std::launch::async, [&]() {
+            info.id = i;
+            info.collectTime = now;
+            cache.Set(info, i);
+        }
+
+        // Verify all entries exist
+        for (int i = 1; i <= 3; ++i) {
             MockInformation info;
-            APSARA_TEST_FALSE_FATAL(cache.GetWithTimeout(info, timeout / 10, 1));
-            // thread2 update
-            info.id = 3;
-            info.collectTime = std::chrono::steady_clock::now();
-            cache.Set(info, 1);
-        });
-        future1.get();
-        future2.get();
-        // check if cache is updated
-        APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-        APSARA_TEST_EQUAL_FATAL(2, info.id);
+            APSARA_TEST_TRUE_FATAL(cache.Get(now, info, i));
+            APSARA_TEST_EQUAL_FATAL(i, info.id);
+        }
+
+        // Verify cache size
+        APSARA_TEST_EQUAL_FATAL(3, cache.GetCacheSize());
     }
 }
 
 void SystemInterfaceUnittest::TestSystemInterfaceCacheGC() const {
-    auto timeout = std::chrono::milliseconds{100};
-    SystemInterface::SystemInformationCache<MockInformation, int> cache(timeout);
-    // add data into cache
-    MockInformation info;
-    info.id = 1;
-    info.collectTime = std::chrono::steady_clock::now();
-    cache.Set(info, 1);
-    APSARA_TEST_TRUE_FATAL(cache.GetWithTimeout(info, timeout, 1));
-    // wait for cache to be stale
-    this_thread::sleep_for(std::chrono::milliseconds{200});
-    cache.GC();
-    APSARA_TEST_EQUAL_FATAL(cache.mCache.size(), 0);
+    int32_t defaultCacheSize = INT32_FLAG(system_interface_cache_queue_size);
+    int32_t defaultEntryExpireSeconds = INT32_FLAG(system_interface_cache_entry_expire_seconds);
+    int32_t defaultCleanupIntervalSeconds = INT32_FLAG(system_interface_cache_cleanup_interval_seconds);
+    int32_t defaultMaxCleanupBatchSize = INT32_FLAG(system_interface_cache_max_cleanup_batch_size);
+    INT32_FLAG(system_interface_cache_queue_size) = 5;
+    INT32_FLAG(system_interface_cache_entry_expire_seconds) = 1;
+    INT32_FLAG(system_interface_cache_cleanup_interval_seconds) = 1;
+    INT32_FLAG(system_interface_cache_max_cleanup_batch_size) = 1;
+
+    SystemInterface::SystemInformationCache<MockInformation, int> cache(5);
+    auto defaultLastCleanupTime = std::chrono::steady_clock::now() - std::chrono::seconds(1);
+    cache.mLastCleanupTime = defaultLastCleanupTime;
+    auto now = time(nullptr);
+    for (int i = 0; i < 5; ++i) {
+        MockInformation info;
+        info.id = i;
+        info.collectTime = now + i;
+        cache.Set(info, i);
+    }
+    std::this_thread::sleep_for(std::chrono::seconds{2});
+    // partial cleanup
+    cache.PerformGarbageCollection();
+    APSARA_TEST_EQUAL_FATAL(4, cache.GetCacheSize());
+    APSARA_TEST_NOT_EQUAL_FATAL(cache.mLastCleanupTime, defaultLastCleanupTime);
+
+    // restore flags
+    INT32_FLAG(system_interface_cache_queue_size) = defaultCacheSize;
+    INT32_FLAG(system_interface_cache_entry_expire_seconds) = defaultEntryExpireSeconds;
+    INT32_FLAG(system_interface_cache_cleanup_interval_seconds) = defaultCleanupIntervalSeconds;
+    INT32_FLAG(system_interface_cache_max_cleanup_batch_size) = defaultMaxCleanupBatchSize;
 }
 
 void SystemInterfaceUnittest::TestMemoizedCall() const {
+    int32_t defaultCacheSize = INT32_FLAG(system_interface_cache_queue_size);
+    int32_t defaultEntryExpireSeconds = INT32_FLAG(system_interface_cache_entry_expire_seconds);
+    int32_t defaultCleanupIntervalSeconds = INT32_FLAG(system_interface_cache_cleanup_interval_seconds);
+    int32_t defaultMaxCleanupBatchSize = INT32_FLAG(system_interface_cache_max_cleanup_batch_size);
+    INT32_FLAG(system_interface_cache_queue_size) = 5;
+    INT32_FLAG(system_interface_cache_entry_expire_seconds) = 1;
+    INT32_FLAG(system_interface_cache_cleanup_interval_seconds) = 1;
+    INT32_FLAG(system_interface_cache_max_cleanup_batch_size) = 1;
     {
         MockSystemInterface mockSystemInterface;
-        mockSystemInterface.mBlockTime = 100;
-        mockSystemInterface.mMockCalledCount = 0;
         SystemInformation info;
         mockSystemInterface.GetSystemInformation(info);
-        this_thread::sleep_for(std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
         mockSystemInterface.GetSystemInformation(info);
         // SystemInformation is static, cache will never be stale
         APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
@@ -318,62 +333,59 @@ void SystemInterfaceUnittest::TestMemoizedCall() const {
         MockSystemInterface mockSystemInterface;
         mockSystemInterface.mBlockTime = 10;
         mockSystemInterface.mMockCalledCount = 0;
-        auto future1 = async(std::launch::async, [&]() {
-            CPUInformation info;
-            mockSystemInterface.GetCPUInformation(info);
-        });
-        auto future2 = async(std::launch::async, [&]() {
-            CPUInformation info;
-            mockSystemInterface.GetCPUInformation(info);
-        });
-        future1.get();
-        future2.get();
+        auto now = time(nullptr);
+        CPUInformation info1;
+        info1.collectTime = now;
+        mockSystemInterface.GetCPUInformation(now, info1);
+        CPUInformation info2;
+        info2.collectTime = now;
+        mockSystemInterface.GetCPUInformation(now, info2);
         APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
-        this_thread::sleep_for(std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
         CPUInformation info;
-        mockSystemInterface.GetCPUInformation(info);
-        APSARA_TEST_EQUAL_FATAL(2, mockSystemInterface.mMockCalledCount);
+        info.collectTime = now + 10;
+        mockSystemInterface.GetCPUInformation(now, info);
+        APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
     }
     {
         MockSystemInterface mockSystemInterface;
-        mockSystemInterface.mBlockTime = 100;
+        mockSystemInterface.mBlockTime = 10;
         mockSystemInterface.mMockCalledCount = 0;
-        auto future1 = async(std::launch::async, [&]() {
-            ProcessListInformation info;
-            mockSystemInterface.GetProcessListInformation(info);
-        });
-        auto future2 = async(std::launch::async, [&]() {
-            ProcessListInformation info;
-            mockSystemInterface.GetProcessListInformation(info);
-        });
-        future1.get();
-        future2.get();
+        auto now = time(nullptr);
+        ProcessListInformation info1;
+        info1.collectTime = now;
+        mockSystemInterface.GetProcessListInformation(now, info1);
+        ProcessListInformation info2;
+        info2.collectTime = now;
+        mockSystemInterface.GetProcessListInformation(now, info2);
         APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
-        this_thread::sleep_for(std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
         ProcessListInformation info;
-        mockSystemInterface.GetProcessListInformation(info);
-        APSARA_TEST_EQUAL_FATAL(2, mockSystemInterface.mMockCalledCount);
+        mockSystemInterface.GetProcessListInformation(now, info);
+        APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
     }
     {
         MockSystemInterface mockSystemInterface;
-        mockSystemInterface.mBlockTime = 100;
+        mockSystemInterface.mBlockTime = 10;
         mockSystemInterface.mMockCalledCount = 0;
-        auto future1 = async(std::launch::async, [&]() {
-            ProcessInformation info;
-            mockSystemInterface.GetProcessInformation(1, info);
-        });
-        auto future2 = async(std::launch::async, [&]() {
-            ProcessInformation info;
-            mockSystemInterface.GetProcessInformation(1, info);
-        });
-        future1.get();
-        future2.get();
+        auto now = time(nullptr);
+        ProcessInformation info1;
+        info1.collectTime = now;
+        mockSystemInterface.GetProcessInformation(now, 1, info1);
+        ProcessInformation info2;
+        info2.collectTime = now;
+        mockSystemInterface.GetProcessInformation(now, 1, info2);
         APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
-        this_thread::sleep_for(std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)});
+        std::this_thread::sleep_for(std::chrono::milliseconds{10});
         ProcessInformation info;
-        mockSystemInterface.GetProcessInformation(1, info);
-        APSARA_TEST_EQUAL_FATAL(2, mockSystemInterface.mMockCalledCount);
+        mockSystemInterface.GetProcessInformation(now, 1, info);
+        APSARA_TEST_EQUAL_FATAL(1, mockSystemInterface.mMockCalledCount);
     }
+
+    // restore flags
+    INT32_FLAG(system_interface_cache_queue_size) = defaultCacheSize;
+    INT32_FLAG(system_interface_cache_entry_expire_seconds) = defaultEntryExpireSeconds;
+    INT32_FLAG(system_interface_cache_cleanup_interval_seconds) = defaultCleanupIntervalSeconds;
+    INT32_FLAG(system_interface_cache_max_cleanup_batch_size) = defaultMaxCleanupBatchSize;
 }
 
 UNIT_TEST_CASE(SystemInterfaceUnittest, TestSystemInterfaceCache);

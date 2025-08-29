@@ -115,23 +115,40 @@ protected:
         ofs_cmdline.close();
         PROCESS_DIR = ".";
     }
+
+    void TearDown() override {
+        bfs::remove_all("./12345");
+        bfs::remove("./meminfo");
+    }
 };
 
 void ProcessCollectorUnittest::TestGetHostPidStat() const {
     auto collector = ProcessCollector();
     pid_t pid = 12345;
     ProcessAllStat stat;
-    APSARA_TEST_TRUE(collector.GetProcessAllStat(pid, stat));
+    HostMonitorTimerEvent::CollectTime collectTime{std::chrono::steady_clock::now(), time(nullptr)};
+    APSARA_TEST_TRUE(collector.GetProcessAllStat(collectTime, pid, stat));
 }
 
 void ProcessCollectorUnittest::TestCollect() const {
     auto collector = ProcessCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectConfig(ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
+    HostMonitorTimerEvent::CollectContext collectContext(
+        "test", ProcessCollector::sName, 0, 0, std::chrono::seconds(1));
+    collector.Init(collectContext);
+    collectContext.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectConfig, &group));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
 
     vector<string> expectedVMProcessNames = {
         "vm_process_min",

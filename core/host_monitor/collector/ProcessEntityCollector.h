@@ -26,6 +26,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "HostMonitorTimerEvent.h"
 #include "common/ProcParser.h"
 #include "common/StringView.h"
 #include "constants/EntityConstants.h"
@@ -57,15 +58,19 @@ public:
     ProcessEntityCollector();
     ~ProcessEntityCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorTimerEvent::CollectContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override { return std::chrono::seconds(0); }
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
 
 private:
     system_clock::time_point TicksToUnixTime(int64_t startTicks);
-    void GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats, size_t topN);
-    ExtendedProcessStatPtr GetProcessStat(pid_t pid, bool& isFirstCollect);
+    time_t GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats,
+                            size_t topN,
+                            const HostMonitorTimerEvent::CollectTime& collectTime);
+    ExtendedProcessStatPtr
+    GetProcessStat(pid_t pid, bool& isFirstCollect, const HostMonitorTimerEvent::CollectTime& collectTime);
 
     std::string GetProcessEntityID(StringView pid, StringView createTime, StringView hostEntityID);
     void FetchDomainInfo(std::string& domain,
@@ -73,7 +78,7 @@ private:
                          std::string& hostEntityType,
                          StringView& hostEntityID);
 
-    steady_clock::time_point mProcessSortTime;
+    std::chrono::steady_clock::time_point mProcessSortTime;
     std::unordered_map<pid_t, ExtendedProcessStatPtr> mPrevProcessStat;
     ProcParser mProcParser;
 
