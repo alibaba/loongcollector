@@ -51,6 +51,9 @@ private:
     bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override;
     bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override;
 
+    bool InitGPUCollectorOnce(const FieldMap& fieldMap) override;
+    bool GetGPUInformationOnce(GPUInformation& gpuInfo) override;
+
     uint64_t GetMemoryValue(char unit, uint64_t value);
     bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
     bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override;

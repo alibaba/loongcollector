@@ -253,6 +253,19 @@ bool SystemInterface::GetNetInterfaceInformation(NetInterfaceInformation& netInt
         errorType);
 }
 
+bool SystemInterface::InitGPUCollector(const FieldMap& fieldMap) {
+    return InitGPUCollectorOnce(fieldMap);
+}
+
+bool SystemInterface::GetGPUInformation(GPUInformation& gpuInfo) {
+    const std::string errorType = "gpu";
+    return MemoizedCall(
+        mGPUInformationCache,
+        [this](BaseInformation& info) { return this->GetGPUInformationOnce(static_cast<GPUInformation&>(info)); },
+        gpuInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(
     SystemInformationCache<InfoT, Args...>& cache, F&& func, InfoT& info, const std::string& errorType, Args... args) {
