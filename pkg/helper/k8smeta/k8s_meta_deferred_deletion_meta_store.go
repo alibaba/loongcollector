@@ -221,11 +221,11 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 	// 1. update event
 	// 2. add event when the previous object is between deleted and deferred delete
 	if obj, ok := m.Items[key]; ok {
-		existingIdxKeys := m.getIdxKeys(obj)
+		oldIdxKeys := m.getIdxKeys(obj)
 		event.Object.FirstObservedTime = obj.FirstObservedTime
 
 		// Use incremental index update: only modify changed index keys
-		keysToRemove, keysToAdd := m.getIndexKeyDiff(existingIdxKeys, newIdxKeys)
+		keysToRemove, keysToAdd := m.getIndexKeyDiff(oldIdxKeys, newIdxKeys)
 
 		// Remove only the keys that are no longer needed
 		for _, idxKey := range keysToRemove {
