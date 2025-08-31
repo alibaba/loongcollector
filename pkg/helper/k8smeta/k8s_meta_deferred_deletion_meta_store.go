@@ -215,17 +215,17 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
-	idxKeys := m.getIdxKeys(event.Object)
+	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	// should delete oldIdxKeys in two cases:
 	// 1. update event
 	// 2. add event when the previous object is between deleted and deferred delete
 	if obj, ok := m.Items[key]; ok {
-		oldIdxKeys := m.getIdxKeys(obj)
+		existingIdxKeys := m.getIdxKeys(obj)
 		event.Object.FirstObservedTime = obj.FirstObservedTime
 
 		// Use incremental index update: only modify changed index keys
-		keysToRemove, keysToAdd := m.getIndexKeyDiff(oldIdxKeys, idxKeys)
+		keysToRemove, keysToAdd := m.getIndexKeyDiff(existingIdxKeys, newIdxKeys)
 
 		// Remove only the keys that are no longer needed
 		for _, idxKey := range keysToRemove {
@@ -248,7 +248,7 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		obj.Raw = nil
 	} else {
 		// New object: add all index keys
-		for _, idxKey := range idxKeys {
+		for _, idxKey := range newIdxKeys {
 			if _, ok := m.Index[idxKey]; !ok {
 				m.Index[idxKey] = NewIndexItem()
 			}
@@ -298,13 +298,13 @@ func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEven
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handleDeferredDeleteEvent keyFunc error", err)
 		return
 	}
-	idxKeys := m.getIdxKeys(event.Object)
+	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if obj, ok := m.Items[key]; ok {
 		if obj.Deleted {
 			delete(m.Items, key)
-			for _, idxKey := range idxKeys {
+			for _, idxKey := range newIdxKeys {
 				if _, ok := m.Index[idxKey]; !ok {
 					continue
 				}
