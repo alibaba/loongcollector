@@ -356,6 +356,11 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 
 // getIndexKeyDiff returns keys to remove and keys to add for incremental index update
 func (m *DeferredDeletionMetaStore) getIndexKeyDiff(oldKeys, newKeys []string) (toRemove, toAdd []string) {
+
+	if len(oldKeys) == 0 && len(newKeys) == 0 {
+		return nil, nil
+	}
+
 	oldKeySet := make(map[string]struct{})
 	newKeySet := make(map[string]struct{})
 
