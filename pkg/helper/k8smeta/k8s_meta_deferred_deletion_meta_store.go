@@ -229,9 +229,11 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 
 		// Remove only the keys that are no longer needed
 		for _, idxKey := range keysToRemove {
-			m.Index[idxKey].Remove(key)
-			if len(m.Index[idxKey].Keys) == 0 {
-				delete(m.Index, idxKey)
+			if indexItem, ok := m.Index[idxKey]; ok {
+				indexItem.Remove(key)
+				if len(indexItem.Keys) == 0 {
+					delete(m.Index, idxKey)
+				}
 			}
 		}
 
