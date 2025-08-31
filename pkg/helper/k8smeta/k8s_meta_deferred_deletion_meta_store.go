@@ -244,10 +244,6 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 			}
 			m.Index[idxKey].Add(key)
 		}
-
-		// Safe memory cleanup: clear Raw after index operations but before unlock
-		// This ensures no concurrent readers can access the old Raw during cleanup
-		obj.Raw = nil
 	} else {
 		// New object: add all index keys
 		for _, idxKey := range newIdxKeys {
