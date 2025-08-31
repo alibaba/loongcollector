@@ -221,21 +221,41 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 	// 1. update event
 	// 2. add event when the previous object is between deleted and deferred delete
 	if obj, ok := m.Items[key]; ok {
-		var oldIdxKeys []string
+		oldIdxKeys := m.getIdxKeys(obj)
 		event.Object.FirstObservedTime = obj.FirstObservedTime
-		oldIdxKeys = m.getIdxKeys(obj)
-		for _, idxKey := range oldIdxKeys {
+
+		// Use incremental index update: only modify changed index keys
+		keysToRemove, keysToAdd := m.getIndexKeyDiff(oldIdxKeys, idxKeys)
+
+		// Remove only the keys that are no longer needed
+		for _, idxKey := range keysToRemove {
 			m.Index[idxKey].Remove(key)
+			if len(m.Index[idxKey].Keys) == 0 {
+				delete(m.Index, idxKey)
+			}
+		}
+
+		// Add only the new keys
+		for _, idxKey := range keysToAdd {
+			if _, ok := m.Index[idxKey]; !ok {
+				m.Index[idxKey] = NewIndexItem()
+			}
+			m.Index[idxKey].Add(key)
+		}
+
+		// Release memory by setting Raw to nil before overwriting
+		obj.Raw = nil
+	} else {
+		// New object: add all index keys
+		for _, idxKey := range idxKeys {
+			if _, ok := m.Index[idxKey]; !ok {
+				m.Index[idxKey] = NewIndexItem()
+			}
+			m.Index[idxKey].Add(key)
 		}
 	}
 
 	m.Items[key] = event.Object
-	for _, idxKey := range idxKeys {
-		if _, ok := m.Index[idxKey]; !ok {
-			m.Index[idxKey] = NewIndexItem()
-		}
-		m.Index[idxKey].Add(key)
-	}
 	m.lock.Unlock()
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
@@ -329,4 +349,33 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 		result = append(result, idxKeys...)
 	}
 	return result
+}
+
+// getIndexKeyDiff returns keys to remove and keys to add for incremental index update
+func (m *DeferredDeletionMetaStore) getIndexKeyDiff(oldKeys, newKeys []string) (toRemove, toAdd []string) {
+	oldKeySet := make(map[string]struct{})
+	newKeySet := make(map[string]struct{})
+
+	for _, key := range oldKeys {
+		oldKeySet[key] = struct{}{}
+	}
+	for _, key := range newKeys {
+		newKeySet[key] = struct{}{}
+	}
+
+	// Find keys to remove (in old but not in new)
+	for _, key := range oldKeys {
+		if _, exists := newKeySet[key]; !exists {
+			toRemove = append(toRemove, key)
+		}
+	}
+
+	// Find keys to add (in new but not in old)
+	for _, key := range newKeys {
+		if _, exists := oldKeySet[key]; !exists {
+			toAdd = append(toAdd, key)
+		}
+	}
+
+	return toRemove, toAdd
 }
