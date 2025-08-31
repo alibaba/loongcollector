@@ -243,7 +243,8 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 			m.Index[idxKey].Add(key)
 		}
 
-		// Release memory by setting Raw to nil before overwriting
+		// Safe memory cleanup: clear Raw after index operations but before unlock
+		// This ensures no concurrent readers can access the old Raw during cleanup
 		obj.Raw = nil
 	} else {
 		// New object: add all index keys
