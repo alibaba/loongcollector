@@ -37,7 +37,7 @@ struct KafkaConfig {
     struct Producer {
         uint32_t QueueBufferingMaxKbytes = 1048576;
         uint32_t QueueBufferingMaxMessages = 100000;
-        uint32_t LingerMs = 5;
+        uint32_t LingerMs = 0;
         uint32_t BatchNumMessages = 10000;
         uint32_t MaxMessageBytes = 1000000;
     } Producer;
@@ -45,10 +45,10 @@ struct KafkaConfig {
 
     struct Delivery {
         std::string Acks = "1";
-        uint32_t RequestTimeoutMs = 30000;
+        uint32_t RequestTimeoutMs = 5000;
         uint32_t MessageTimeoutMs = 300000;
-        uint32_t MaxRetries = 2147483647;
-        uint32_t RetryBackoffMs = 1000;
+        uint32_t MaxRetries = 2;
+        uint32_t RetryBackoffMs = 100;
     } Delivery;
 
 

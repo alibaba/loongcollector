@@ -53,6 +53,7 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     }
 
     if (!mProducer->Init(mKafkaConfig)) {
+        LOG_ERROR(mContext->GetLogger(), ("failed to init kafka producer", ""));
         return false;
     }
 
