@@ -161,7 +161,9 @@ func (k *KafkaSubscriber) testKafkaConnection() error {
 			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "failed to connect to kafka broker %s: %v", address, err)
 			continue
 		}
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "failed to close connection to kafka broker %s: %v", address, err)
+		}
 		return nil
 	}
 	return fmt.Errorf("cannot connect to any kafka broker")

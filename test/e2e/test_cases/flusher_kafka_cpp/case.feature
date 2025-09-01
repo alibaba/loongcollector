@@ -22,7 +22,7 @@ Feature: flusher kafka cpp
           topic: "test-topic"
     flushers:
       - Type: flusher_kafka_cpp
-        Brokers: ["kafka:9092"]
+        Brokers: ["kafka:29092"]
         Topic: "test-topic"
         KafkaVersion: "2.8.0"
         Producer:
