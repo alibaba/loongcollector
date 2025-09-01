@@ -26,7 +26,6 @@ extern const std::string KAFKA_CONFIG_BATCH_NUM_MESSAGES;
 extern const std::string KAFKA_CONFIG_LINGER_MS;
 extern const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES;
 extern const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES;
-extern const std::string KAFKA_CONFIG_BATCH_SIZE;
 extern const std::string KAFKA_CONFIG_MESSAGE_MAX_BYTES;
 
 extern const std::string KAFKA_CONFIG_ACKS;

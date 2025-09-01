@@ -26,7 +26,6 @@ const std::string KAFKA_CONFIG_BATCH_NUM_MESSAGES = "batch.num.messages";
 const std::string KAFKA_CONFIG_LINGER_MS = "linger.ms";
 const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES = "queue.buffering.max.kbytes";
 const std::string KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES = "queue.buffering.max.messages";
-const std::string KAFKA_CONFIG_BATCH_SIZE = "batch.size";
 const std::string KAFKA_CONFIG_MESSAGE_MAX_BYTES = "message.max.bytes";
 
 const std::string KAFKA_CONFIG_ACKS = "acks";

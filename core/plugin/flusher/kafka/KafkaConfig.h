@@ -39,7 +39,6 @@ struct KafkaConfig {
         uint32_t QueueBufferingMaxMessages = 100000;
         uint32_t LingerMs = 5;
         uint32_t BatchNumMessages = 10000;
-        uint32_t BatchSize = 1000000;
         uint32_t MaxMessageBytes = 1000000;
     } Producer;
 
@@ -81,7 +80,6 @@ struct KafkaConfig {
                 producerConfig, "QueueBufferingMaxMessages", Producer.QueueBufferingMaxMessages, errorMsg);
             GetOptionalUIntParam(producerConfig, "LingerMs", Producer.LingerMs, errorMsg);
             GetOptionalUIntParam(producerConfig, "BatchNumMessages", Producer.BatchNumMessages, errorMsg);
-            GetOptionalUIntParam(producerConfig, "BatchSize", Producer.BatchSize, errorMsg);
             GetOptionalUIntParam(producerConfig, "MaxMessageBytes", Producer.MaxMessageBytes, errorMsg);
         }
 

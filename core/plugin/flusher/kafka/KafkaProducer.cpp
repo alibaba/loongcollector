@@ -126,7 +126,6 @@ public:
                           std::to_string(mConfig.Producer.QueueBufferingMaxKbytes))
             || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES,
                           std::to_string(mConfig.Producer.QueueBufferingMaxMessages))
-            || !SetConfig(KAFKA_CONFIG_BATCH_SIZE, std::to_string(mConfig.Producer.BatchSize))
             || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.Producer.MaxMessageBytes))) {
             return false;
         }

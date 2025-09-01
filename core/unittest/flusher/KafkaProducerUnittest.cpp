@@ -67,7 +67,6 @@ void KafkaProducerUnittest::SetUp() {
     mConfig.Brokers = {"test.broker1:9092", "test.broker2:9092"};
     mConfig.Topic = "test_topic";
     mConfig.KafkaVersion = "2.6.0";
-    mConfig.Producer.BatchSize = 1000000;
     mConfig.Producer.LingerMs = 100;
     mConfig.Producer.BatchNumMessages = 1000;
     mConfig.Producer.QueueBufferingMaxKbytes = 1048576;
@@ -176,7 +175,6 @@ void KafkaProducerUnittest::TestCloseWithoutInit() {
 void KafkaProducerUnittest::TestConfigValidation() {
     KafkaConfig testConfig = mConfig;
 
-    testConfig.Producer.BatchSize = 0;
     testConfig.Producer.LingerMs = 0;
     testConfig.Producer.MaxMessageBytes = 0;
     mProducer->Init(testConfig);
@@ -200,7 +198,6 @@ void KafkaProducerUnittest::TestCustomConfig() {
 
 void KafkaProducerUnittest::TestBatchConfig() {
     KafkaConfig batchConfig = mConfig;
-    batchConfig.Producer.BatchSize = 2000000;
     batchConfig.Producer.LingerMs = 200;
     batchConfig.Producer.BatchNumMessages = 2000;
     mProducer->Init(batchConfig);

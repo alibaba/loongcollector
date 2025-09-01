@@ -343,13 +343,11 @@ void FlusherKafkaUnittest::TestFlushFailure() {
 void FlusherKafkaUnittest::TestInitWithFullConfig() {
     Json::Value optionalGoPipeline;
     Json::Value config = CreateKafkaTestConfig(mTopic);
-    config["Producer"]["BatchSize"] = 2000000;
     config["Producer"]["LingerMs"] = 10;
     config["Delivery"]["Acks"] = "all";
     config["Delivery"]["RetryBackoffMs"] = 2000;
 
     APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
-    APSARA_TEST_EQUAL(2000000, mFlusher->mKafkaConfig.Producer.BatchSize);
     APSARA_TEST_EQUAL(10, mFlusher->mKafkaConfig.Producer.LingerMs);
     APSARA_TEST_EQUAL("all", mFlusher->mKafkaConfig.Delivery.Acks);
     APSARA_TEST_EQUAL(2000, mFlusher->mKafkaConfig.Delivery.RetryBackoffMs);

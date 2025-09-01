@@ -31,7 +31,7 @@ using namespace std;
 
 namespace logtail {
 
-const std::string FlusherKafka::sName = "flusher_kafka";
+const std::string FlusherKafka::sName = "flusher_kafka_cpp";
 
 FlusherKafka::FlusherKafka() : mProducer(std::make_unique<KafkaProducer>()) {
 }
