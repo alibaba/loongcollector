@@ -110,6 +110,7 @@ func NewDockerComposeEnv() *DockerComposeEnv {
 	env := &DockerComposeEnv{}
 	root, _ := filepath.Abs(".")
 	config.ConfigDir = root + "/config"
+	config.OnetimeConfigDir = root + "/onetime_pipeline_config"
 	env.BootType = dockercompose.DockerComposeBootTypeE2E
 	return env
 }
