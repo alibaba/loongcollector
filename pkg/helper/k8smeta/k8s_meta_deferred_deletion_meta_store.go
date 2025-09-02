@@ -231,9 +231,6 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		for _, idxKey := range keysToRemove {
 			if indexItem, ok := m.Index[idxKey]; ok {
 				indexItem.Remove(key)
-				if len(indexItem.Keys) == 0 {
-					delete(m.Index, idxKey)
-				}
 			}
 		}
 
