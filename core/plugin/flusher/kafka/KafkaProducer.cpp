@@ -119,6 +119,7 @@ public:
         if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
             return false;
         }
+        LOG_INFO(sLogger, ("Kafka bootstrap.servers", brokersStr));
 
         if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.Producer.BatchNumMessages))
             || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.Producer.LingerMs))
@@ -137,6 +138,12 @@ public:
             || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.Delivery.RetryBackoffMs))) {
             return false;
         }
+        LOG_INFO(sLogger,
+                 ("Kafka delivery configs", "")("acks", mConfig.Delivery.Acks)(
+                     "request.timeout.ms", mConfig.Delivery.RequestTimeoutMs)("message.timeout.ms",
+                                                                              mConfig.Delivery.MessageTimeoutMs)(
+                     "message.send.max.retries", mConfig.Delivery.MaxRetries)("retry.backoff.ms",
+                                                                              mConfig.Delivery.RetryBackoffMs));
 
         std::map<std::string, std::string> derivedConfigs;
         KafkaUtil::DeriveApiVersionConfigs(mConfig.KafkaVersion, derivedConfigs);
@@ -172,6 +179,7 @@ public:
         char errstr[512];
         mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
         if (!mProducer) {
+            LOG_ERROR(sLogger, ("create rdkafka producer failed", errstr));
             return false;
         }
 
@@ -211,6 +219,9 @@ public:
                                                     RD_KAFKA_V_END);
 
         if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+            LOG_ERROR(sLogger,
+                      ("rd_kafka_producev error", rd_kafka_err2str(err))("code", static_cast<int>(err))("topic", topic)(
+                          "value_size", value.size()));
             ReleaseContext(context);
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::MapKafkaError(err);

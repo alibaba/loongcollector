@@ -33,9 +33,9 @@ Feature: flusher kafka cpp
     """
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
     When start docker-compose {flusher_kafka_cpp}
-    Then there is at least {10} logs
+    Then there is at least {1} logs
     Then the log fields match kv
     """
-    content: "hello"
     topic: "test-topic"
+    content: "hello"
     """

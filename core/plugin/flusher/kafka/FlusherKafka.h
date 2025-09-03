@@ -55,6 +55,7 @@ public:
 private:
     bool SerializeAndSend(PipelineEventGroup&& group);
     void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
+    void GenerateGoPlugin(Json::Value& res) const;
 
     KafkaConfig mKafkaConfig;
     std::unique_ptr<KafkaProducer> mProducer;

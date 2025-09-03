@@ -15,10 +15,19 @@
 version: '3.8'
 
 services:
+  container:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: container
+    volumes:
+      - .:/root
+    environment:
+      - STDOUT_SWITCH=true
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     hostname: zookeeper
-    # Do not publish 2181 to host to avoid port conflicts on CI/Windows.
     expose:
       - "2181"
     environment:
@@ -38,7 +47,6 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      # Use distinct listener names to avoid cross-network metadata confusion.
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
