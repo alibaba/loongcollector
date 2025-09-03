@@ -53,16 +53,6 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
                            mContext->GetRegion());
     }
 
-    // extra diagnostics for troubleshooting
-    LOG_INFO(
-        mContext->GetLogger(),
-        ("Initializing Kafka producer",
-         "")("topic", mKafkaConfig.Topic)("brokers", KafkaUtil::BrokersToString(mKafkaConfig.Brokers))(
-            "KafkaVersion", mKafkaConfig.KafkaVersion.empty() ? std::string("<unset>") : mKafkaConfig.KafkaVersion)(
-            "Acks", mKafkaConfig.Delivery.Acks)("RequestTimeoutMs", mKafkaConfig.Delivery.RequestTimeoutMs)(
-            "MessageTimeoutMs", mKafkaConfig.Delivery.MessageTimeoutMs)("MaxMessageBytes",
-                                                                        mKafkaConfig.Producer.MaxMessageBytes));
-
     if (!mProducer->Init(mKafkaConfig)) {
         LOG_ERROR(mContext->GetLogger(), ("failed to init kafka producer", ""));
         return false;
@@ -90,8 +80,6 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         ("FlusherKafka initialized successfully", "")("topic", mKafkaConfig.Topic)("brokers",
                                                                                    mKafkaConfig.Brokers.size())(
             "KafkaVersion", mKafkaConfig.KafkaVersion.empty() ? std::string("<unset>") : mKafkaConfig.KafkaVersion));
-
-    GenerateGoPlugin(optionalGoPipeline);
 
     return true;
 }
@@ -202,68 +190,6 @@ void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::Error
                                                mContext->GetConfigName(),
                                                mKafkaConfig.Topic);
     }
-}
-
-void FlusherKafka::GenerateGoPlugin(Json::Value& res) const {
-    if (!mContext->IsFlushingThroughGoPipeline()) {
-        return;
-    }
-
-    Json::Value detail(Json::objectValue);
-
-    // Brokers
-    Json::Value brokers(Json::arrayValue);
-    for (const auto& b : mKafkaConfig.Brokers) {
-        brokers.append(b);
-    }
-    if (!brokers.empty()) {
-        detail["Brokers"] = std::move(brokers);
-    }
-
-    // Topic
-    if (!mKafkaConfig.Topic.empty()) {
-        detail["Topic"] = mKafkaConfig.Topic;
-    }
-
-    // Version (map from KafkaVersion)
-    if (!mKafkaConfig.KafkaVersion.empty()) {
-        detail["Version"] = mKafkaConfig.KafkaVersion;
-    }
-
-    // Map delivery/producer basics when available
-    if (mKafkaConfig.Producer.MaxMessageBytes > 0) {
-        detail["MaxMessageBytes"] = static_cast<int>(mKafkaConfig.Producer.MaxMessageBytes);
-    }
-
-    // RequiredACKs mapping: "-1"/"all" => -1, "0" => 0, others => 1
-    int requiredAcks = 1;
-    if (!mKafkaConfig.Delivery.Acks.empty()) {
-        const auto& a = mKafkaConfig.Delivery.Acks;
-        if (a == "-1" || a == "all" || a == "ALL") {
-            requiredAcks = -1;
-        } else if (a == "0") {
-            requiredAcks = 0;
-        } else {
-            requiredAcks = 1;
-        }
-    }
-    detail["RequiredACKs"] = requiredAcks;
-
-    // BrokerTimeout/Timeout from RequestTimeoutMs (convert ms to seconds string like "30s")
-    if (mKafkaConfig.Delivery.RequestTimeoutMs > 0) {
-        int secs = static_cast<int>(mKafkaConfig.Delivery.RequestTimeoutMs / 1000);
-        if (secs <= 0) {
-            secs = 1;
-        }
-        detail["BrokerTimeout"] = std::to_string(secs) + "s";
-        detail["Timeout"] = std::to_string(secs) + "s";
-    }
-
-    Json::Value plugin(Json::objectValue);
-    plugin["type"]
-        = CollectionPipeline::GenPluginTypeWithID("flusher_kafka_v2", mContext->GetPipeline().GetNowPluginID());
-    plugin["detail"] = std::move(detail);
-    res["flushers"].append(plugin);
 }
 
 } // namespace logtail

@@ -182,6 +182,7 @@ public:
             LOG_ERROR(sLogger, ("create rdkafka producer failed", errstr));
             return false;
         }
+        mConf = nullptr;
 
         mIsRunning = true;
         mPollThread = std::thread([this]() {
@@ -214,6 +215,7 @@ public:
         rd_kafka_resp_err_t err = rd_kafka_producev(producer,
                                                     RD_KAFKA_V_TOPIC(topic.c_str()),
                                                     RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
                                                     RD_KAFKA_V_VALUE(value.data(), value.size()),
                                                     RD_KAFKA_V_OPAQUE(context),
                                                     RD_KAFKA_V_END);

@@ -27,6 +27,9 @@ Feature: flusher kafka cpp static
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "test-topic"
+        KafkaVersion: "2.8.0"
+        Producer:
+          MaxMessageBytes: 5242880
     """
     Given loongcollector container mount {./a.log} to {/root/test/1/2/3/axxxx.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
