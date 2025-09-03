@@ -193,6 +193,23 @@ private:
         return true;
     }
 
+    bool InitGPUCollectorOnce(const FieldMap& fieldMap) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetGPUInformationOnce(GPUInformation& gpuInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        gpuInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
 
