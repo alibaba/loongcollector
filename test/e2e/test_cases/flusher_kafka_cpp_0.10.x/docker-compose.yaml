@@ -26,7 +26,7 @@ services:
       - STDOUT_SWITCH=true
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
+    image: confluentinc/cp-zookeeper:3.2.2
     hostname: zookeeper
     expose:
       - "2181"
@@ -49,7 +49,7 @@ services:
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
       KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: EXTERNAL://localhost:9092,INTERNAL://kafka:29092
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_MESSAGE_MAX_BYTES: '5242880'
       KAFKA_REPLICA_FETCH_MAX_BYTES: '6291456'

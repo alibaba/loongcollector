@@ -10,6 +10,7 @@ Feature: flusher kafka cpp 0.10.x
     brokers:
       - "localhost:9092"
     topic: "test-topic-010x"
+    version: "0.10.2.0"
     """
     Given {flusher-kafka-cpp-0.10.x-case} local config as below
     """
@@ -40,4 +41,3 @@ Feature: flusher kafka cpp 0.10.x
     topic: "test-topic-010x"
     content: "^\\d+===="
     """
-

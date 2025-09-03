@@ -33,9 +33,10 @@ import (
 const kafkaName = "kafka"
 
 type KafkaSubscriber struct {
-	Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
-	Topic   string   `mapstructure:"topic" comment:"kafka topic to consume from"`
-	GroupID string   `mapstructure:"group_id" comment:"kafka consumer group id"`
+    Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
+    Topic   string   `mapstructure:"topic" comment:"kafka topic to consume from"`
+    GroupID string   `mapstructure:"group_id" comment:"kafka consumer group id"`
+    Version string   `mapstructure:"version" comment:"kafka broker version, e.g. 0.10.2.0 (optional)"`
 }
 
 func (k *KafkaSubscriber) Name() string {
@@ -47,16 +48,25 @@ func (k *KafkaSubscriber) Description() string {
 }
 
 func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
-	logger.Debugf(context.Background(), "Kafka subscriber getting data from topic: %s, brokers: %v", k.Topic, k.Brokers)
+    logger.Debugf(context.Background(), "Kafka subscriber getting data from topic: %s, brokers: %v", k.Topic, k.Brokers)
 
-	if err := k.testKafkaConnection(); err != nil {
-		return nil, fmt.Errorf("kafka connection test failed: %w", err)
-	}
+    if err := k.testKafkaConnection(); err != nil {
+        return nil, fmt.Errorf("kafka connection test failed: %w", err)
+    }
 
-	config := sarama.NewConfig()
-	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
-	config.Consumer.Offsets.Initial = sarama.OffsetNewest
-	config.Consumer.Offsets.AutoCommit.Enable = true
+    config := sarama.NewConfig()
+    config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+    config.Consumer.Offsets.Initial = sarama.OffsetNewest
+    config.Consumer.Offsets.AutoCommit.Enable = true
+
+    // For older Kafka clusters (e.g., 0.10.x), explicit version avoids EOF during metadata negotiation.
+    if k.Version != "" {
+        if ver, err := sarama.ParseKafkaVersion(k.Version); err == nil {
+            config.Version = ver
+        } else {
+            logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "invalid kafka version %s: %v", k.Version, err)
+        }
+    }
 
 	consumer, err := sarama.NewConsumer(k.Brokers, config)
 	if err != nil {
