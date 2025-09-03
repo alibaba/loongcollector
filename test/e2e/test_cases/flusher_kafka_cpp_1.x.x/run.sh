@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # Copyright 2025 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,9 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-FROM bash
-COPY run.sh /run.sh
-RUN chmod 755 /run.sh
-CMD ["sh", "-c","/run.sh >> /root/a.log"]
+sleep 3
+for i in {1..1000} ; do
+  number=$((i+4))
+  echo $number"====="
+done
+sleep 3600
 
