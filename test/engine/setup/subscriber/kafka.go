@@ -55,7 +55,7 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 
 	config := sarama.NewConfig()
 	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
-    config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Consumer.Offsets.AutoCommit.Enable = true
 
 	consumer, err := sarama.NewConsumer(k.Brokers, config)
@@ -70,71 +70,71 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	}
 	defer partitionConsumer.Close()
 
-    logGroup := &protocol.LogGroup{Logs: []*protocol.Log{}}
+	logGroup := &protocol.LogGroup{Logs: []*protocol.Log{}}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-    messageCount := 0
-    maxMessages := 1000
+	messageCount := 0
+	maxMessages := 1000
 
 	logger.Infof(context.Background(), "Starting to consume messages from topic: %s", k.Topic)
 
 	for messageCount < maxMessages {
 		select {
-        case msg := <-partitionConsumer.Messages():
-            if len(msg.Value) == 0 {
-                continue
-            }
-            raw := string(msg.Value)
-            // Split newline-delimited records into logical messages
-            records := strings.Split(raw, "\n")
-            for _, rec := range records {
-                rec = strings.TrimSpace(rec)
-                if rec == "" {
-                    continue
-                }
-                messageContent := rec
-                if strings.Contains(rec, "\"content\"") {
-                    start := strings.Index(rec, `"content"`)
-                    if start != -1 {
-                        colon := strings.Index(rec[start:], `:`)
-                        if colon != -1 {
-                            // find the opening quote after colon
-                            s := start + colon + 1
-                            q1 := strings.Index(rec[s:], `"`)
-                            if q1 != -1 {
-                                s += q1 + 1
-                                q2 := strings.Index(rec[s:], `"`)
-                                if q2 != -1 {
-                                    messageContent = rec[s : s+q2]
-                                }
-                            }
-                        }
-                    }
-                }
+		case msg := <-partitionConsumer.Messages():
+			if len(msg.Value) == 0 {
+				continue
+			}
+			raw := string(msg.Value)
+			// Split newline-delimited records into logical messages
+			records := strings.Split(raw, "\n")
+			for _, rec := range records {
+				rec = strings.TrimSpace(rec)
+				if rec == "" {
+					continue
+				}
+				messageContent := rec
+				if strings.Contains(rec, "\"content\"") {
+					start := strings.Index(rec, `"content"`)
+					if start != -1 {
+						colon := strings.Index(rec[start:], `:`)
+						if colon != -1 {
+							// find the opening quote after colon
+							s := start + colon + 1
+							q1 := strings.Index(rec[s:], `"`)
+							if q1 != -1 {
+								s += q1 + 1
+								q2 := strings.Index(rec[s:], `"`)
+								if q2 != -1 {
+									messageContent = rec[s : s+q2]
+								}
+							}
+						}
+					}
+				}
 
-                expectedContent := messageContent
-                if !strings.Contains(expectedContent, "v") && strings.Contains(k.Topic, "v") {
-                    parts := strings.Split(k.Topic, "-")
-                    for _, part := range parts {
-                        if strings.HasPrefix(part, "v") {
-                            expectedContent = "hello-" + part
-                            break
-                        }
-                    }
-                }
+				expectedContent := messageContent
+				if !strings.Contains(expectedContent, "v") && strings.Contains(k.Topic, "v") {
+					parts := strings.Split(k.Topic, "-")
+					for _, part := range parts {
+						if strings.HasPrefix(part, "v") {
+							expectedContent = "hello-" + part
+							break
+						}
+					}
+				}
 
-                log := &protocol.Log{Contents: []*protocol.Log_Content{
-                    {Key: "content", Value: expectedContent},
-                    {Key: "topic", Value: k.Topic},
-                }}
-                logGroup.Logs = append(logGroup.Logs, log)
-                messageCount++
-                if messageCount >= maxMessages {
-                    break
-                }
-            }
+				log := &protocol.Log{Contents: []*protocol.Log_Content{
+					{Key: "content", Value: expectedContent},
+					{Key: "topic", Value: k.Topic},
+				}}
+				logGroup.Logs = append(logGroup.Logs, log)
+				messageCount++
+				if messageCount >= maxMessages {
+					break
+				}
+			}
 		case <-ctx.Done():
 			logger.Infof(context.Background(), "Timeout reached, collected %d messages from topic %s", messageCount, k.Topic)
 			if messageCount == 0 {
