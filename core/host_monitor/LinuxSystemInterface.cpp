@@ -1044,7 +1044,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     passwd pwbuffer;
     char buffer[2048];
     if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0 || pw == nullptr || pw->pw_name == nullptr) {
-        return false;
+        return true;
     }
 
     processCredName.user = pw->pw_name;
@@ -1053,7 +1053,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     group grpbuffer{};
     char groupBuffer[2048];
     if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp) != 0) {
-        return false;
+        return true;
     }
 
     if (grp != nullptr && grp->gr_name != nullptr) {
