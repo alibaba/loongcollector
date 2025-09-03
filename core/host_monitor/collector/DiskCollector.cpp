@@ -342,32 +342,19 @@ int DiskCollector::GetDiskCollectStatMap(std::map<std::string, DiskCollectStat>&
 }
 
 int DiskCollector::GetFileSystemStat(const std::string& dirName, FileSystemUsage& fileSystemUsage) {
-    struct statvfs buffer {};
-    int status = statvfs(dirName.c_str(), &buffer);
-    if (status != 0) {
-        return status;
+    FileSystemInformation fileSystemInfo;
+
+    if (!SystemInterface::GetInstance()->GetFileSystemInformation(dirName, fileSystemInfo)) {
+        return -1;
     }
 
-    // 单位是: KB
-    uint64_t bsize = buffer.f_frsize / 512;
-    fileSystemUsage.total = ((buffer.f_blocks * bsize) >> 1);
-    fileSystemUsage.free = ((buffer.f_bfree * bsize) >> 1);
-    fileSystemUsage.avail = ((buffer.f_bavail * bsize) >> 1); // 非超级用户最大可使用的磁盘量
-    fileSystemUsage.used = DiffOrZero(fileSystemUsage.total, fileSystemUsage.free);
-    fileSystemUsage.files = buffer.f_files;
-    fileSystemUsage.freeFiles = buffer.f_ffree;
-
-    // 此处为用户可使用的磁盘量，可能会与fileSystemUsage.total有差异。也就是说:
-    // 当total < fileSystemUsage.total时，表明即使磁盘仍有空间，用户也申请不到了
-    // 毕竟OS维护磁盘，会占掉一部分，比如文件分配表，目录文件等。
-    uint64_t total = fileSystemUsage.used + fileSystemUsage.avail;
-    uint64_t used = fileSystemUsage.used;
-    double percent = 0;
-    if (total != 0) {
-        // 磁盘占用率，使用的是用户最大可用磁盘总量来的，而非物理磁盘总量
-        percent = (double)used / (double)total;
-    }
-    fileSystemUsage.use_percent = percent;
+    fileSystemUsage.total = fileSystemInfo.fileSystemState.total;
+    fileSystemUsage.free = fileSystemInfo.fileSystemState.free;
+    fileSystemUsage.avail = fileSystemInfo.fileSystemState.avail;
+    fileSystemUsage.used = fileSystemInfo.fileSystemState.used;
+    fileSystemUsage.files = fileSystemInfo.fileSystemState.files;
+    fileSystemUsage.freeFiles = fileSystemInfo.fileSystemState.freeFiles;
+    fileSystemUsage.use_percent = fileSystemInfo.fileSystemState.use_percent;
 
     GetDiskUsage(fileSystemUsage.disk, dirName);
 
