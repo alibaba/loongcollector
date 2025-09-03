@@ -25,7 +25,9 @@ public:
     MockCollector() = default;
     ~MockCollector() = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override {
+    bool Init(HostMonitorContext& collectContext) override { return true; }
+
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override {
         auto event = group->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
@@ -34,10 +36,13 @@ public:
         event->SetContent(key, value);
         return true;
     }
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override { return mCollectInterval; }
     static const std::string sName;
     const std::string& Name() const { return sName; }
+
+    static std::chrono::seconds mCollectInterval;
 };
 
 const std::string MockCollector::sName = "mock";
-
+std::chrono::seconds MockCollector::mCollectInterval = std::chrono::seconds(1);
 } // namespace logtail

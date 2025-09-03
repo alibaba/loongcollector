@@ -88,7 +88,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
                                chrono::duration_cast<chrono::milliseconds>(currSystemTime.time_since_epoch()).count());
     auto firstExecTime = chrono::steady_clock::now() + chrono::milliseconds(randSleepMilliSec);
     auto firstSubscribeTime = currSystemTime + chrono::milliseconds(randSleepMilliSec);
-    targetSubscriber->SetFirstExecTime(firstExecTime, firstSubscribeTime);
+    targetSubscriber->CalculateFirstExecTime(firstExecTime, firstSubscribeTime);
     // 1. add subscriber to mTargetSubscriberSchedulerMap
     {
         WriteLock lock(mSubscriberMapRWLock);

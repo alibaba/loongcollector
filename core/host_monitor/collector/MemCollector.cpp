@@ -25,53 +25,45 @@
 #include "MetricValue.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
+
+DEFINE_FLAG_INT32(basic_host_monitor_mem_collect_interval, "basic host monitor mem collect interval, seconds", 5);
 
 namespace logtail {
 
 const std::string MemCollector::sName = "memory";
 
-MemCollector::MemCollector() {
-    Init();
-}
-
-int MemCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
-    return 0;
-}
-
-bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool MemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
+    collectContext.mCount++;
 
     MemoryInformation meminfo;
-    if (!GetHostMeminfoStat(meminfo)) {
+    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(collectContext.GetMetricTime(), meminfo)) {
         return false;
     }
 
 
     mCalculateMeminfo.AddValue(meminfo.memStat);
-    mCount++;
-    if (mCount < mCountPerReport) {
+    if (collectContext.mCount < collectContext.mCountPerReport) {
         return true;
     }
     MemoryStat minMem, maxMem, avgMem, lastMem;
 
     mCalculateMeminfo.Stat(maxMem, minMem, avgMem, &lastMem);
 
-    mCount = 0;
+    collectContext.mCount = 0;
     mCalculateMeminfo.Reset();
-    const time_t now = time(nullptr);
 
     MetricEvent* metricEvent = group->AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }
-    metricEvent->SetTimestamp(now, 0);
+    metricEvent->SetTimestamp(meminfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     multiDoubleValues->SetValue(std::string("memory_usedutilization_min"),
@@ -114,12 +106,8 @@ bool MemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     return true;
 }
 
-bool MemCollector::GetHostMeminfoStat(MemoryInformation& meminfo) {
-    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(meminfo)) {
-        return false;
-    }
-
-    return true;
+const std::chrono::seconds MemCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_mem_collect_interval));
 }
 
 } // namespace logtail

@@ -16,7 +16,7 @@
 
 #include "MetricEvent.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "unittest/Unittest.h"
 
@@ -43,7 +43,14 @@ void SystemCollectorUnittest::TestCollect() const {
     double cores = static_cast<double>(std::thread::hardware_concurrency());
     auto collector = SystemCollector();
     PipelineEventGroup group(make_shared<SourceBuffer>());
-    HostMonitorTimerEvent::CollectConfig collectconfig(SystemCollector::sName, 0, 0, std::chrono::seconds(1));
+    auto systemCollector = std::make_unique<SystemCollector>();
+    HostMonitorContext collectconfig("test",
+                                     SystemCollector::sName,
+                                     QueueKey{},
+                                     0,
+                                     std::chrono::seconds(1),
+                                     CollectorInstance(std::move(systemCollector)));
+    collectconfig.mCountPerReport = 3;
 
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));

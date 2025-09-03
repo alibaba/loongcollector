@@ -16,16 +16,20 @@
 
 #include "host_monitor/HostMonitorTimerEvent.h"
 
+#include "AlarmManager.h"
 #include "host_monitor/HostMonitorInputRunner.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 
 bool HostMonitorTimerEvent::IsValid() const {
-    return HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(GetExecTime(), mCollectConfig.mCollectorName);
+    bool valid = HostMonitorInputRunner::GetInstance()->IsCollectTaskValid(
+        mCollectContext->mStartTime, mCollectContext->mConfigName, mCollectContext->mCollectorName);
+    return valid;
 }
 
 bool HostMonitorTimerEvent::Execute() {
-    HostMonitorInputRunner::GetInstance()->ScheduleOnce(GetExecTime(), mCollectConfig);
+    HostMonitorInputRunner::GetInstance()->ScheduleOnce(mCollectContext);
     return true;
 }
 

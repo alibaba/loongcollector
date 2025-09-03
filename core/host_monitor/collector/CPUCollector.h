@@ -55,12 +55,11 @@ struct CPUPercent {
 
 class CPUCollector : public BaseCollector {
 public:
-    CPUCollector();
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-
+    CPUCollector() = default;
     ~CPUCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
@@ -69,8 +68,6 @@ private:
     bool CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& cpu);
 
 private:
-    int mCountPerReport = 0;
-    int mCount = 0;
     int cpuCount = 0;
     MetricCalculate<CPUPercent> mCalculate;
     CPUStat lastCpu{};

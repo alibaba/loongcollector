@@ -166,13 +166,17 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
+    std::vector<CollectorInfo> collectorInfos;
+    for (const auto& collectorName : mCollectors) {
+        collectorInfos.push_back({collectorName, mInterval, HostMonitorCollectType::kMultiValue});
+    }
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mCollectors, std::vector(mCollectors.size(), mInterval), mContext->GetProcessQueueKey(), mIndex);
+        mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
 bool InputHostMonitor::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector(mCollectors);
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
     return true;
 }
 

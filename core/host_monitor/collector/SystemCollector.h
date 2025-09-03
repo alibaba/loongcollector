@@ -26,26 +26,19 @@
 
 namespace logtail {
 
-extern const uint32_t kHostMonitorMinInterval;
-extern const uint32_t kHostMonitorDefaultInterval;
-
-
 class SystemCollector : public BaseCollector {
 public:
-    SystemCollector();
-
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
+    SystemCollector() = default;
     ~SystemCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
 
 
 private:
-    int mCountPerReport = 0;
-    int mCount = 0;
     MetricCalculate<SystemStat> mCalculate;
 };
 

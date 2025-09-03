@@ -28,6 +28,7 @@
 #include <utility>
 #include <vector>
 
+#include "HostMonitorTimerEvent.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/MachineInfoUtil.h"
@@ -35,6 +36,7 @@
 #include "common/StringView.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -60,8 +62,7 @@ system_clock::time_point ProcessEntityCollector::TicksToUnixTime(int64_t startTi
     return system_clock::time_point{static_cast<milliseconds>(startTicks) + milliseconds{systemInfo.bootTime * 1000}};
 }
 
-bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
-                                     PipelineEventGroup* group) {
+bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
@@ -71,7 +72,7 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
         systemInfo.bootTime = 0;
     }
     std::vector<ExtendedProcessStatPtr> processes;
-    GetSortedProcess(processes, ProcessTopN);
+    GetSortedProcess(processes, ProcessTopN, collectContext.mCollectTime);
     for (const auto& extentedProcess : processes) {
         auto process = extentedProcess->stat;
         auto* event = group->AddLogEvent();
@@ -96,7 +97,7 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
 
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
-        int keepAliveSeconds = collectConfig.mInterval.count() * 2;
+        int keepAliveSeconds = collectContext.mReportInterval.count() * 2;
         event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
 
         // custom fields
@@ -129,10 +130,11 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
     return true;
 }
 
-void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats, size_t topN) {
-    steady_clock::time_point now = steady_clock::now();
+time_t ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats,
+                                                size_t topN,
+                                                const CollectTime& collectTime) {
     auto compare = [](const std::pair<ExtendedProcessStatPtr, double>& a,
-                      const std::pair<ExtendedProcessStatPtr, double>& b) { return a.second > b.second; };
+                      const std::pair<ExtendedProcessStatPtr, double>& b) { return a.second < b.second; };
     std::priority_queue<std::pair<ExtendedProcessStatPtr, double>,
                         std::vector<std::pair<ExtendedProcessStatPtr, double>>,
                         decltype(compare)>
@@ -141,10 +143,12 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
     int readCount = 0;
     std::unordered_map<pid_t, ExtendedProcessStatPtr> newProcessStat;
     ProcessListInformation processListInfo;
-    if (!SystemInterface::GetInstance()->GetProcessListInformation(processListInfo)) {
+    if (!SystemInterface::GetInstance()->GetProcessListInformation(collectTime.mMetricTime, processListInfo)) {
         LOG_ERROR(sLogger, ("failed to get process list information", "skip collect"));
-        return;
+        return 0;
     }
+    CollectTime shiftCollectTime{collectTime.GetShiftSteadyTime(processListInfo.collectTime),
+                                 processListInfo.collectTime};
 
     for (const auto& pid : processListInfo.pids) {
         if (pid == 0) {
@@ -155,7 +159,7 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
             std::this_thread::sleep_for(milliseconds{100});
         }
         bool isFirstCollect = false;
-        auto ptr = GetProcessStat(pid, isFirstCollect);
+        auto ptr = GetProcessStat(pid, isFirstCollect, shiftCollectTime);
         if (ptr == nullptr) {
             continue;
         }
@@ -182,12 +186,12 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
     LOG_DEBUG(sLogger, ("collect Process Cpu info, top", processStats.size()));
 
     mPrevProcessStat = std::move(newProcessStat);
-    mProcessSortTime = now;
+    mProcessSortTime = collectTime.GetShiftSteadyTime(processListInfo.collectTime);
+    return processListInfo.collectTime;
 }
 
-ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect) {
-    const auto now = steady_clock::now();
-
+ExtendedProcessStatPtr
+ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect, const CollectTime& collectTime) {
     // TODO: more accurate cache
     auto prev = mPrevProcessStat.find(pid);
     if (prev == mPrevProcessStat.end() || prev->second == nullptr
@@ -197,12 +201,13 @@ ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& i
         isFirstCollect = false;
     }
     // proc/[pid]/stat的统计粒度通常为10ms，两次采样之间需要足够大才能平滑。
-    if (prev != mPrevProcessStat.end() && prev->second && now < prev->second->lastStatTime + seconds{1}) {
+    if (prev != mPrevProcessStat.end() && prev->second
+        && collectTime.mScheduleTime < prev->second->lastStatTime + seconds{1}) {
         return prev->second;
     }
     auto ptr = std::make_shared<ExtendedProcessStat>();
     ProcessInformation processInfo;
-    if (SystemInterface::GetInstance()->GetProcessInformation(pid, processInfo)) {
+    if (SystemInterface::GetInstance()->GetProcessInformation(collectTime.mMetricTime, pid, processInfo)) {
         ptr->stat = processInfo.stat;
     } else {
         LOG_ERROR(sLogger, ("failed to get process information", pid));
@@ -211,7 +216,7 @@ ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& i
 
     // calculate CPU related fields
     {
-        ptr->lastStatTime = now;
+        ptr->lastStatTime = collectTime.mScheduleTime;
         constexpr const uint64_t MILLISECOND = 1000;
         ptr->cpuInfo.user = (ptr->stat.utimeTicks + ptr->stat.cutimeTicks) * MILLISECOND / SYSTEM_HERTZ;
         ptr->cpuInfo.sys = (ptr->stat.stimeTicks + ptr->stat.cstimeTicks) * MILLISECOND / SYSTEM_HERTZ;

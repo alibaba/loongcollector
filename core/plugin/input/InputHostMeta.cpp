@@ -56,12 +56,15 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
 bool InputHostMeta::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        {ProcessEntityCollector::sName}, {mInterval}, mContext->GetProcessQueueKey(), mIndex);
+        mContext->GetConfigName(),
+        {{ProcessEntityCollector::sName, mInterval, HostMonitorCollectType::kSingleValue}},
+        mContext->GetProcessQueueKey(),
+        mIndex);
     return true;
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector({ProcessEntityCollector::sName});
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
     return true;
 }
 

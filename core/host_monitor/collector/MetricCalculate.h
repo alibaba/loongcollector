@@ -16,6 +16,7 @@
 #pragma once
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 #include "common/FieldEntry.h"
 
