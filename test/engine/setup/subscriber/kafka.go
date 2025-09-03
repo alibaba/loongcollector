@@ -28,15 +28,16 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
 
 const kafkaName = "kafka"
 
 type KafkaSubscriber struct {
-    Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
-    Topic   string   `mapstructure:"topic" comment:"kafka topic to consume from"`
-    GroupID string   `mapstructure:"group_id" comment:"kafka consumer group id"`
-    Version string   `mapstructure:"version" comment:"kafka broker version, e.g. 0.10.2.0 (optional)"`
+	Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
+	Topic   string   `mapstructure:"topic" comment:"kafka topic to consume from"`
+	GroupID string   `mapstructure:"group_id" comment:"kafka consumer group id"`
+	Version string   `mapstructure:"version" comment:"kafka broker version, e.g. 0.10.2.0 (optional)"`
 }
 
 func (k *KafkaSubscriber) Name() string {
@@ -48,35 +49,75 @@ func (k *KafkaSubscriber) Description() string {
 }
 
 func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogGroup, error) {
-    logger.Debugf(context.Background(), "Kafka subscriber getting data from topic: %s, brokers: %v", k.Topic, k.Brokers)
+	logger.Debugf(context.Background(), "Kafka subscriber getting data from topic: %s, brokers: %v", k.Topic, k.Brokers)
 
-    if err := k.testKafkaConnection(); err != nil {
-        return nil, fmt.Errorf("kafka connection test failed: %w", err)
-    }
+	if err := k.testKafkaConnection(); err != nil {
+		return nil, fmt.Errorf("kafka connection test failed: %w", err)
+	}
 
-    config := sarama.NewConfig()
-    config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
-    config.Consumer.Offsets.Initial = sarama.OffsetNewest
-    config.Consumer.Offsets.AutoCommit.Enable = true
+	config := sarama.NewConfig()
+	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	config.Consumer.Offsets.Initial = sarama.OffsetNewest
+	config.Consumer.Offsets.AutoCommit.Enable = true
 
-    // For older Kafka clusters (e.g., 0.10.x), explicit version avoids EOF during metadata negotiation.
-    if k.Version != "" {
-        if ver, err := sarama.ParseKafkaVersion(k.Version); err == nil {
-            config.Version = ver
-        } else {
-            logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "invalid kafka version %s: %v", k.Version, err)
-        }
-    }
+	// For older Kafka clusters (e.g., 0.10.x), explicit version avoids EOF during metadata negotiation.
+	if k.Version != "" {
+		if ver, err := sarama.ParseKafkaVersion(k.Version); err == nil {
+			config.Version = ver
+		} else {
+			logger.Warningf(context.Background(), "KAFKA_SUBSCRIBER_ALARM", "invalid kafka version %s: %v", k.Version, err)
+		}
+	}
 
-	consumer, err := sarama.NewConsumer(k.Brokers, config)
+	// Rewrite brokers using docker-compose network mapping if present (e.g., "kafka:9092" -> "127.0.0.1:9092").
+	brokers := make([]string, 0, len(k.Brokers))
+	for _, b := range k.Brokers {
+		host, port, err := net.SplitHostPort(b)
+		if err != nil {
+			// if port missing, assume 9092
+			host = b
+			port = "9092"
+		}
+		virtual := fmt.Sprintf("%s:%s", host, port)
+		if physical := dockercompose.GetPhysicalAddress(virtual); physical != "" {
+			brokers = append(brokers, physical)
+		} else {
+			brokers = append(brokers, virtual)
+		}
+	}
+
+	consumer, err := sarama.NewConsumer(brokers, config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kafka consumer: %w", err)
 	}
 	defer consumer.Close()
 
-	partitionConsumer, err := consumer.ConsumePartition(k.Topic, 0, sarama.OffsetOldest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create partition consumer: %w", err)
+	// Wait for topic/partition availability (older Kafka may need time to auto-create topics)
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		parts, err := consumer.Partitions(k.Topic)
+		if err == nil && len(parts) > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			if err != nil {
+				return nil, fmt.Errorf("failed to get partitions for topic %s: %v", k.Topic, err)
+			}
+			return nil, fmt.Errorf("no partitions available for topic %s", k.Topic)
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	var partitionConsumer sarama.PartitionConsumer
+	for {
+		partitionConsumer, err = consumer.ConsumePartition(k.Topic, 0, sarama.OffsetOldest)
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("failed to create partition consumer: %w", err)
+		}
+		time.Sleep(1 * time.Second)
 	}
 	defer partitionConsumer.Close()
 
@@ -171,6 +212,10 @@ func (k *KafkaSubscriber) testKafkaConnection() error {
 		address := broker
 		if !strings.Contains(address, ":") {
 			address += ":9092"
+		}
+		// try docker-compose physical mapping first
+		if physical := dockercompose.GetPhysicalAddress(address); physical != "" {
+			address = physical
 		}
 
 		conn, err := net.DialTimeout("tcp", address, 5*time.Second)
