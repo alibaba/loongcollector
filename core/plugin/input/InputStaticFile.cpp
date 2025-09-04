@@ -24,8 +24,8 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/ParamExtractor.h"
-#include "file_server/StaticFileServer.h"
 #include "file_server/FileServer.h"
+#include "file_server/StaticFileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
@@ -144,10 +144,10 @@ bool InputStaticFile::Start() {
         // TODO: get container info
         // mFileDiscovery.SetContainerInfo();
     }
-    
+
     // Add plugin metric manager
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
-    
+
     optional<vector<filesystem::path>> files;
     if (!mContext->IsOnetimePipelineRunningBeforeStart()) {
         files = GetFiles();
@@ -159,10 +159,10 @@ bool InputStaticFile::Start() {
 
 bool InputStaticFile::Stop(bool isPipelineRemoving) {
     StaticFileServer::GetInstance()->RemoveInput(mContext->GetConfigName(), mIndex);
-    
+
     // Remove plugin metric manager
     FileServer::GetInstance()->RemovePluginMetricManager(mContext->GetConfigName());
-    
+
     return true;
 }
 

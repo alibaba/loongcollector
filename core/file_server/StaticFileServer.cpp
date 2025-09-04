@@ -87,7 +87,7 @@ void StaticFileServer::AddInput(const string& configName,
     if (!mThreadRes.valid()) {
         Init();
     }
-    
+
     InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files);
     {
         lock_guard<mutex> lock(mUpdateMux);
@@ -264,6 +264,7 @@ FileTagConfig StaticFileServer::GetFileTagConfig(const std::string& name, size_t
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void StaticFileServer::Clear() {
+    Stop();
     lock_guard<mutex> lock(mUpdateMux);
     mInputFileDiscoveryConfigsMap.clear();
     mInputFileReaderConfigsMap.clear();
