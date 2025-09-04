@@ -158,7 +158,7 @@ if (LINUX)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        host_monitor host_monitor/collector forward forward/loongsuite
+        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
 elseif(MSVC)
 endif ()

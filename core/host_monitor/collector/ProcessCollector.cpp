@@ -34,6 +34,7 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/common/FastFieldParser.h"
 #include "logger/Logger.h"
 
 
@@ -324,10 +325,16 @@ bool ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args)
         return false;
     }
     cmdline = processCMDline.cmdline.front();
-    std::vector<std::string> cmdlineMetric;
-    boost::algorithm::split(cmdlineMetric, cmdline, boost::is_any_of(" "), boost::token_compress_on);
-    for (auto const& metric : cmdlineMetric) {
-        args.push_back(metric);
+
+    FastFieldParser parser(cmdline);
+    size_t fieldCount = parser.GetFieldCount();
+
+    args.reserve(fieldCount);
+    for (size_t i = 0; i < fieldCount; ++i) {
+        auto field = parser.GetField(i);
+        if (!field.empty()) {
+            args.emplace_back(field);
+        }
     }
     return true;
 }
