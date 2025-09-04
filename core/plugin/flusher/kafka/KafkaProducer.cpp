@@ -264,8 +264,6 @@ public:
             mConf = nullptr;
         }
 
-
-        mIsRunning = false;
         mIsClosed = true;
     }
 
