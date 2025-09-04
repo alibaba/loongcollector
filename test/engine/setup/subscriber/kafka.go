@@ -56,11 +56,19 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	}
 
 	config := sarama.NewConfig()
+
+	config.Net.DialTimeout = 10 * time.Second
+	config.Net.ReadTimeout = 10 * time.Second
+	config.Net.WriteTimeout = 10 * time.Second
+	config.Net.MaxOpenRequests = 1
+	config.Metadata.Retry.Max = 10
+	config.Metadata.Retry.Backoff = 1 * time.Second
+	config.Metadata.Full = true
 	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
 	config.Consumer.Offsets.Initial = sarama.OffsetNewest
 	config.Consumer.Offsets.AutoCommit.Enable = true
+	config.Consumer.Return.Errors = true
 
-	// For older Kafka clusters (e.g., 0.10.x), explicit version avoids EOF during metadata negotiation.
 	if k.Version != "" {
 		if ver, err := sarama.ParseKafkaVersion(k.Version); err == nil {
 			config.Version = ver
@@ -69,12 +77,10 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 		}
 	}
 
-	// Rewrite brokers using docker-compose network mapping if present (e.g., "kafka:9092" -> "127.0.0.1:9092").
 	brokers := make([]string, 0, len(k.Brokers))
 	for _, b := range k.Brokers {
 		host, port, err := net.SplitHostPort(b)
 		if err != nil {
-			// if port missing, assume 9092
 			host = b
 			port = "9092"
 		}
@@ -92,16 +98,15 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	}
 	defer consumer.Close()
 
-	// Wait for topic/partition availability (older Kafka may need time to auto-create topics)
 	deadline := time.Now().Add(30 * time.Second)
 	for {
-		parts, err := consumer.Partitions(k.Topic)
-		if err == nil && len(parts) > 0 {
+		parts, err2 := consumer.Partitions(k.Topic)
+		if err2 == nil && len(parts) > 0 {
 			break
 		}
 		if time.Now().After(deadline) {
-			if err != nil {
-				return nil, fmt.Errorf("failed to get partitions for topic %s: %v", k.Topic, err)
+			if err2 != nil {
+				return nil, fmt.Errorf("failed to get partitions for topic %s: %v", k.Topic, err2)
 			}
 			return nil, fmt.Errorf("no partitions available for topic %s", k.Topic)
 		}
@@ -138,7 +143,7 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 				continue
 			}
 			raw := string(msg.Value)
-			// Split newline-delimited records into logical messages
+
 			records := strings.Split(raw, "\n")
 			for _, rec := range records {
 				rec = strings.TrimSpace(rec)
@@ -151,7 +156,6 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 					if start != -1 {
 						colon := strings.Index(rec[start:], `:`)
 						if colon != -1 {
-							// find the opening quote after colon
 							s := start + colon + 1
 							q1 := strings.Index(rec[s:], `"`)
 							if q1 != -1 {
@@ -213,7 +217,7 @@ func (k *KafkaSubscriber) testKafkaConnection() error {
 		if !strings.Contains(address, ":") {
 			address += ":9092"
 		}
-		// try docker-compose physical mapping first
+
 		if physical := dockercompose.GetPhysicalAddress(address); physical != "" {
 			address = physical
 		}
