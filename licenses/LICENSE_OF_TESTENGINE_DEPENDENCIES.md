@@ -50,6 +50,10 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/go-openapi/swag](github.com/go-openapi/swag)
 - [github.com/google/gnostic](https://pkg.go.dev/github.com/google/gnostic?tab=licenses)
 - [google.golang.org/genproto/googleapis/rpc](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc?tab=licenses)
+- [github.com/jcmturner/aescts](https://pkg.go.dev/github.com/jcmturner/aescts?tab=licenses)
+- [github.com/jcmturner/dnsutils](https://pkg.go.dev/github.com/jcmturner/dnsutils?tab=licenses)
+- [github.com/jcmturner/gokrb5](https://pkg.go.dev/github.com/jcmturner/gokrb5?tab=licenses)
+- [github.com/jcmturner/rpc](https://pkg.go.dev/github.com/jcmturner/rpc?tab=licenses)
 
 ## BSD licenses
 
@@ -80,6 +84,9 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/PuerkitoBio/purell](https://pkg.go.dev/github.com/PuerkitoBio/purell?tab=licenses)
 - [github.com/PuerkitoBio/urlesc](https://pkg.go.dev/github.com/PuerkitoBio/urlesc?tab=licenses)
 - [github.com/munnerz/goautoneg](https://pkg.go.dev/github.com/munnerz/goautoneg?tab=licenses)
+- [github.com/golang/snappy](https://pkg.go.dev/github.com/golang/snappy?tab=licenses)
+- [github.com/jcmturner/gofork](https://pkg.go.dev/github.com/jcmturner/gofork?tab=licenses)
+- [github.com/rcrowley/go-metrics](https://pkg.go.dev/github.com/rcrowley/go-metrics?tab=licenses)
 
 ## MIT licenses
 
@@ -109,12 +116,19 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/cucumber/godog](https://pkg.go.dev/github.com/cucumber/godog?tab=licenses)
 - [github.com/cucumber/messages/go](https://pkg.go.dev/github.com/cucumber/messages/go?tab=licenses)
 - [github.com/gofrs/uuid](https://pkg.go.dev/github.com/gofrs/uuid?tab=licenses)
+- [github.com/IBM/sarama](https://pkg.go.dev/github.com/IBM/sarama?tab=licenses)
+- [github.com/eapache/go-resiliency](https://pkg.go.dev/github.com/eapache/go-resiliency?tab=licenses)
+- [github.com/eapache/go-xerial-snappy](https://pkg.go.dev/github.com/eapache/go-xerial-snappy?tab=licenses)
+- [github.com/eapache/queue](https://pkg.go.dev/github.com/eapache/queue?tab=licenses)
 
 ## Mozilla Public License 2.0 licenses
 
 - [github.com/hashicorp/go-immutable-radix](https://pkg.go.dev/github.com/hashicorp/go-immutable-radix?tab=licenses)
 - [github.com/hashicorp/go-memdb](https://pkg.go.dev/github.com/hashicorp/go-memdb?tab=licenses)
 - [github.com/hashicorp/golang-lru](https://pkg.go.dev/github.com/hashicorp/golang-lru?tab=licenses)
+- [github.com/hashicorp/errwrap](https://pkg.go.dev/github.com/hashicorp/errwrap?tab=licenses)
+- [github.com/hashicorp/go-multierror](https://pkg.go.dev/github.com/hashicorp/go-multierror?tab=licenses)
+- [github.com/hashicorp/go-uuid](https://pkg.go.dev/github.com/hashicorp/go-uuid?tab=licenses)
 
 ## LGPL v3 licenses
 
