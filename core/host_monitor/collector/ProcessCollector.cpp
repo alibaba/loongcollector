@@ -134,10 +134,6 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         pushMertic.numThreads = stat.processState.numThreads;
         pushMertic.memPercent = stat.memPercent;
         pushMertic.cpuPercent = stat.processCpu.percent;
-        // pushMertic.name = stat.processInfo.name;
-        // pushMertic.user = stat.processInfo.user;
-        // pushMertic.args = stat.processInfo.args;
-        // pushMertic.path = stat.processInfo.path;
         pushMerticList.push_back(pushMertic);
     }
 
@@ -149,7 +145,6 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     // 为pid，对应的value为多值vector，里面存储了每一个pid的多值体系
     for (auto& metric : pushMerticList) {
         uint64_t thisPid = metric.pid;
-        // auto met = mProcessPushMertic.find(thisPid);
         if (mProcessPushMertic.find(thisPid) != mProcessPushMertic.end()) {
             // 这个pid存在了
             // 多值添加对象
@@ -168,31 +163,12 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         return true;
     }
 
-    GetProcessCpuSorted(allPidStats);//排序
+    GetProcessCpuSorted(allPidStats); // 排序
 
     // 记录count满足条件以后，计算并推送多值指标；如果没有到达条件，只需要往多值体系内添加统计对象即可
     VMProcessNumStat minVMProcessNum, maxVMProcessNum, avgVMProcessNum, lastVMProcessNum;
     mVMProcessNumStat.Stat(minVMProcessNum, maxVMProcessNum, avgVMProcessNum, &lastVMProcessNum);
 
-/*
-    for (auto& metric : pushMerticList) {
-        //只需要处理前五
-        // 处理每一个pid的推送数据
-        uint64_t thisPid = metric.pid;
-
-        // 分别计算每个指标下对应pid的多值,分别算入对应的指标对象
-        ProcessPushMertic minMetric, maxMetric, avgMetric;
-        mProcessPushMertic[thisPid].Stat(minMetric, maxMetric, avgMetric);
-        // map，比如mAvgProcessCpuPercent，存储的是pid对应的CPU平均利用率
-        mAvgProcessCpuPercent.insert(std::make_pair(thisPid, avgMetric.cpuPercent));
-        mAvgProcessMemPercent.insert(std::make_pair(thisPid, avgMetric.memPercent));
-        mAvgProcessFd.insert(std::make_pair(thisPid, avgMetric.fdNum));
-        mMinProcessNumThreads.insert(std::make_pair(thisPid, minMetric.numThreads));
-        mMaxProcessNumThreads.insert(std::make_pair(thisPid, maxMetric.numThreads));
-        mAvgProcessNumThreads.insert(std::make_pair(thisPid, avgMetric.numThreads));
-        // 每个pid下的多值体系添加完毕
-    }
-*/
     // 指标推送
     MetricEvent* metricEvent = group->AddMetricEvent(true);
     if (!metricEvent) {
@@ -310,10 +286,6 @@ bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat)
     }
     processStat.fdNum = procFd.total;
     processStat.fdNumExact = procFd.exact;
-
-    // if (!GetProcessInfo(pid, processStat.processInfo)) {
-    //     return false;
-    // }
 
     processStat.memPercent = mTotalMemory == 0 ? 0 : 100.0 * processStat.processMemory.resident / mTotalMemory;
     return true;
