@@ -18,7 +18,6 @@ on:
   push:
     branches:
       - main
-      - update-auto-release
     paths-ignore:
       - 'docs/**'
       - 'example_config/**'
@@ -167,57 +166,6 @@ jobs:
           echo "- ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
           echo "- ghcr.io/$REPO_OWNER/loongcollector:$TIMESTAMPED_TAG"
 
-      - name: Clean up old edge images
-        run: |
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          echo "Cleaning up old edge images..."
-          
-          # 获取所有edge相关的镜像标签，按时间排序，保留最新的20个
-          echo "Fetching edge image tags..."
-          
-          # 使用GitHub API获取包的所有版本
-          PACKAGE_NAME="loongcollector"
-          REPO_NAME="${{ github.repository }}"
-          
-          # 获取所有edge相关的标签
-          TAGS=$(gh api repos/$REPO_NAME/packages/container/$PACKAGE_NAME/versions --jq '.[] | select(.metadata.container.tags[] | startswith("edge")) | .id' 2>/dev/null || echo "")
-          
-          if [ -n "$TAGS" ]; then
-            echo "Found edge-related tags, keeping only the latest 20..."
-            
-            # 按创建时间排序，保留最新的20个
-            KEEP_TAGS=$(echo "$TAGS" | head -20)
-            DELETE_TAGS=$(echo "$TAGS" | tail -n +21)
-            
-            if [ -n "$DELETE_TAGS" ]; then
-              echo "Deleting old edge images..."
-              for tag_id in $DELETE_TAGS; do
-                echo "Deleting tag ID: $tag_id"
-                gh api -X DELETE repos/$REPO_NAME/packages/container/$PACKAGE_NAME/versions/$tag_id || echo "Failed to delete tag ID: $tag_id"
-              done
-            else
-              echo "No old edge images to delete"
-            fi
-          else
-            echo "No edge-related tags found"
-          fi
-          
-          # 清理untagged的镜像
-          echo "Cleaning up untagged images..."
-          UNTAGGED_VERSIONS=$(gh api repos/$REPO_NAME/packages/container/$PACKAGE_NAME/versions --jq '.[] | select(.metadata.container.tags | length == 0) | .id' 2>/dev/null || echo "")
-          
-          if [ -n "$UNTAGGED_VERSIONS" ]; then
-            echo "Found untagged images, deleting them..."
-            for version_id in $UNTAGGED_VERSIONS; do
-              echo "Deleting untagged version ID: $version_id"
-              gh api -X DELETE repos/$REPO_NAME/packages/container/$PACKAGE_NAME/versions/$version_id || echo "Failed to delete untagged version ID: $version_id"
-            done
-          else
-            echo "No untagged images found"
-          fi
-          
-          echo "Cleanup completed"
 
   # Benchmark:
   #   runs-on: ${{ matrix.runner }}
