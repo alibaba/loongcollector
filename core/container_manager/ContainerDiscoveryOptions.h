@@ -48,12 +48,6 @@ struct K8sFilter {
     MatchCriteriaFilter mK8sLabelFilter;
 };
 
-struct ContainerFilters {
-    K8sFilter mK8SFilter;
-    MatchCriteriaFilter mEnvFilter;
-    MatchCriteriaFilter mContainerLabelFilter;
-};
-
 struct ContainerFilterConfig {
     std::string mK8sNamespaceRegex;
     std::string mK8sPodRegex;
@@ -70,8 +64,14 @@ struct ContainerFilterConfig {
     std::unordered_map<std::string, std::string> mExcludeContainerLabel;
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
+};
 
-    bool GetContainerFilters(ContainerFilters& mContainerFilters);
+struct ContainerFilters {
+    K8sFilter mK8SFilter;
+    MatchCriteriaFilter mEnvFilter;
+    MatchCriteriaFilter mContainerLabelFilter;
+
+    bool Init(const ContainerFilterConfig& config);
 };
 
 

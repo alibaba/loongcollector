@@ -190,9 +190,7 @@ void ContainerDiscoveryOptionsUnittest::TestInitWithInvalidConfig() const {
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     config.reset(new ContainerDiscoveryOptions());
-    APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
-    // Should handle regex compilation errors gracefully
-    APSARA_TEST_TRUE(true); // Just verify it doesn't crash
+    APSARA_TEST_FALSE(config->Init(configJson, ctx, pluginType));
 }
 
 void ContainerDiscoveryOptionsUnittest::TestContainerFilterConfigInit() const {
@@ -246,7 +244,7 @@ void ContainerDiscoveryOptionsUnittest::TestContainerFilterConfigInit() const {
 
     // Test GetContainerFilters
     ContainerFilters filters;
-    APSARA_TEST_TRUE(filterConfig.GetContainerFilters(filters));
+    APSARA_TEST_TRUE(filters.Init(filterConfig));
     APSARA_TEST_TRUE(filters.mK8SFilter.mNamespaceReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mPodReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mContainerReg != nullptr);
@@ -275,7 +273,7 @@ void ContainerDiscoveryOptionsUnittest::TestRegexCompilation() const {
     APSARA_TEST_TRUE(filterConfig.Init(configJson, ctx, pluginType));
 
     ContainerFilters filters;
-    APSARA_TEST_TRUE(filterConfig.GetContainerFilters(filters));
+    APSARA_TEST_TRUE(filters.Init(filterConfig));
 
     // Verify regex compilation - only valid regex (^...$) should be in mFieldsRegMap
     APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap.count("valid_regex"));
@@ -369,7 +367,7 @@ void ContainerDiscoveryOptionsUnittest::TestComplexFilterCombination() const {
 
     // Verify regex compilation
     ContainerFilters filters;
-    APSARA_TEST_TRUE(config->mContainerFilterConfig.GetContainerFilters(filters));
+    APSARA_TEST_TRUE(filters.Init(config->mContainerFilterConfig));
     APSARA_TEST_TRUE(filters.mK8SFilter.mNamespaceReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mPodReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mContainerReg != nullptr);

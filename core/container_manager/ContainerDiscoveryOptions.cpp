@@ -139,7 +139,6 @@ bool ContainerFilterConfig::Init(const Json::Value& config,
                              ctx.GetLogstoreName(),
                              ctx.GetRegion());
     }
-
     return true;
 }
 
@@ -172,52 +171,60 @@ bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& input
     return true;
 }
 
-bool ContainerFilterConfig::GetContainerFilters(ContainerFilters& filters) {
+bool ContainerFilters::Init(const ContainerFilterConfig& config) {
     /// 为 K8sFilter 设置正则表达式
-    if (!mK8sNamespaceRegex.empty()) {
-        filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(mK8sNamespaceRegex);
-    }
+    try {
+        if (!config.mK8sNamespaceRegex.empty()) {
+            mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(config.mK8sNamespaceRegex);
+        }
 
-    if (!mK8sPodRegex.empty()) {
-        filters.mK8SFilter.mPodReg = std::make_shared<boost::regex>(mK8sPodRegex);
-    }
+        if (!config.mK8sPodRegex.empty()) {
+            mK8SFilter.mPodReg = std::make_shared<boost::regex>(config.mK8sPodRegex);
+        }
 
-    if (!mK8sContainerRegex.empty()) {
-        filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>(mK8sContainerRegex);
+        if (!config.mK8sContainerRegex.empty()) {
+            mK8SFilter.mContainerReg = std::make_shared<boost::regex>(config.mK8sContainerRegex);
+        }
+    } catch (const boost::regex_error& e) {
+        // Handle regex compilation errors gracefully
+        return false;
+    } catch (const std::exception& e) {
+        // Handle other exceptions gracefully
+        return false;
     }
     bool success = false;
-    if (!mIncludeK8sLabel.empty()) {
-        success = SplitRegexFromMap(mIncludeK8sLabel, filters.mK8SFilter.mK8sLabelFilter.mIncludeFields);
+    if (!config.mIncludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(config.mIncludeK8sLabel, mK8SFilter.mK8sLabelFilter.mIncludeFields);
         if (!success) {
             return success;
         }
     }
-    if (!mExcludeK8sLabel.empty()) {
-        success = SplitRegexFromMap(mExcludeK8sLabel, filters.mK8SFilter.mK8sLabelFilter.mExcludeFields);
+    if (!config.mExcludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(config.mExcludeK8sLabel, mK8SFilter.mK8sLabelFilter.mExcludeFields);
         if (!success) {
             return success;
         }
     }
-    if (!mIncludeContainerLabel.empty()) {
-        success = SplitRegexFromMap(mIncludeContainerLabel, filters.mContainerLabelFilter.mIncludeFields);
+    if (!config.mIncludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(config.mIncludeContainerLabel, mContainerLabelFilter.mIncludeFields);
         if (!success) {
             return success;
         }
     }
-    if (!mExcludeContainerLabel.empty()) {
-        success = SplitRegexFromMap(mExcludeContainerLabel, filters.mContainerLabelFilter.mExcludeFields);
+    if (!config.mExcludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(config.mExcludeContainerLabel, mContainerLabelFilter.mExcludeFields);
         if (!success) {
             return success;
         }
     }
-    if (!mIncludeEnv.empty()) {
-        success = SplitRegexFromMap(mIncludeEnv, filters.mEnvFilter.mIncludeFields);
+    if (!config.mIncludeEnv.empty()) {
+        success = SplitRegexFromMap(config.mIncludeEnv, mEnvFilter.mIncludeFields);
         if (!success) {
             return success;
         }
     }
-    if (!mExcludeEnv.empty()) {
-        success = SplitRegexFromMap(mExcludeEnv, filters.mEnvFilter.mExcludeFields);
+    if (!config.mExcludeEnv.empty()) {
+        success = SplitRegexFromMap(config.mExcludeEnv, mEnvFilter.mExcludeFields);
         if (!success) {
             return success;
         }
@@ -244,7 +251,14 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
                                  ctx.GetLogstoreName(),
                                  ctx.GetRegion());
         } else {
-            mContainerFilterConfig.Init(*itr, ctx, pluginType);
+            bool success = mContainerFilterConfig.Init(*itr, ctx, pluginType);
+            if (!success) {
+                return false;
+            }
+            success = mContainerFilters.Init(mContainerFilterConfig);
+            if (!success) {
+                return false;
+            }
         }
     }
 
@@ -287,6 +301,7 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
 
     return true;
 }
+
 
 void ContainerDiscoveryOptions::GetCustomExternalTags(
     const std::unordered_map<std::string, std::string>& containerEnvs,
