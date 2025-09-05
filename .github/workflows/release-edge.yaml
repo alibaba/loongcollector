@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Benchmark
+name: Build Edge Image
 
 on:
   push:
@@ -27,25 +27,28 @@ on:
       - 'CHANGELOG.md'
 
 jobs:
-  Build-LoongCollector-Linux:
+  # 第一步：构建不同架构的安装包
+  build-linux:
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     strategy:
       matrix:
         include:
           - arch: amd64
-            runner: [self-hosted, Linux, X64]
+            runner: ubuntu-latest
           - arch: arm64
-            runner: [self-hosted, Linux, ARM64]
-      fail-fast: false
-    permissions:
-      contents: write
-      packages: write
+            runner: ubuntu-24.04-arm
     steps:
       - name: Check out code
         uses: actions/checkout@v4
         with:
           submodules: false
-  
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19.10
+
       - name: Set custom submodule URL and fetch
         run: |
           SUBMODULE_PATH="core/_thirdparty/coolbpf"
@@ -54,26 +57,115 @@ jobs:
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
 
-      - name: Build linux/${{ matrix.arch }} image
+      - name: Build Linux ${{ matrix.arch }} package
+        env:
+          VERSION: edge
         run: |
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker build --tag ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }} \
-              --file ./docker/Dockerfile_edge_linux .
-          docker push ghcr.io/$REPO_OWNER/loongcollector:edge-linux-${{ matrix.arch }}
+          make dist
+          ls -la dist/
 
-  Build-LoongCollector-Image:
+      - name: Upload Linux ${{ matrix.arch }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loongcollector-edge.linux-${{ matrix.arch }}.tar.gz
+          path: dist/loongcollector-edge.linux-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+
+  # 第二步：构建和上传 Docker 镜像
+  upload-images:
+    needs: build-linux
     runs-on: ubuntu-latest
-    needs: [ Build-LoongCollector-Linux ]
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - name: Create and push manifest
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download Linux AMD64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-edge.linux-amd64.tar.gz
+          path: dist/
+
+      - name: Download Linux ARM64 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-edge.linux-arm64.tar.gz
+          path: dist/
+
+      - name: List artifacts for Docker build
         run: |
+          echo "Artifacts available for Docker build:"
+          ls -la dist/ || echo "No artifacts found"
+
+      - name: Build and push Docker images
+        run: |
+          VERSION="edge"
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $REPO_OWNER --password-stdin
-          docker manifest create ghcr.io/$REPO_OWNER/loongcollector:edge \
-            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-amd64 \
-            --amend ghcr.io/$REPO_OWNER/loongcollector:edge-linux-arm64
-          docker manifest push ghcr.io/$REPO_OWNER/loongcollector:edge
+          
+          # 获取当前时间戳
+          TIMESTAMP=$(date +"%Y%m%d%H%M%S")
+          TIMESTAMPED_TAG="edge-$TIMESTAMP"
+          
+          echo "Building and pushing Docker images for version $VERSION and $TIMESTAMPED_TAG"
+          
+          # 检查是否有Linux构建产物
+          LINUX_AMD64_FILE="dist/loongcollector-$VERSION.linux-amd64.tar.gz"
+          LINUX_ARM64_FILE="dist/loongcollector-$VERSION.linux-arm64.tar.gz"
+          
+          if [ ! -f "$LINUX_AMD64_FILE" ] && [ ! -f "$LINUX_ARM64_FILE" ]; then
+            echo "Error: No Linux packages found for Docker build"
+            echo "Available files in dist/:"
+            ls -la dist/ || echo "dist/ directory is empty"
+            echo "Expected files:"
+            echo "- $LINUX_AMD64_FILE"
+            echo "- $LINUX_ARM64_FILE"
+            exit 1
+          fi
+          
+          # 确定要构建的平台
+          PLATFORMS=""
+          if [ -f "$LINUX_AMD64_FILE" ]; then
+            PLATFORMS="$PLATFORMS,linux/amd64"
+            echo "Found Linux AMD64 package: $LINUX_AMD64_FILE"
+          fi
+          if [ -f "$LINUX_ARM64_FILE" ]; then
+            PLATFORMS="$PLATFORMS,linux/arm64"
+            echo "Found Linux ARM64 package: $LINUX_ARM64_FILE"
+          fi
+          
+          # 移除开头的逗号
+          PLATFORMS=$(echo $PLATFORMS | sed 's/^,//')
+          
+          echo "Building Docker images for platforms: $PLATFORMS"
+          
+          # 构建并推送多架构镜像，同时打两个标签
+          docker buildx build --platform "$PLATFORMS" \
+            --file docker/Dockerfile_release \
+            --build-arg VERSION=$VERSION \
+            --build-arg HOST_OS=Linux \
+            --tag ghcr.io/$REPO_OWNER/loongcollector:$VERSION \
+            --tag ghcr.io/$REPO_OWNER/loongcollector:$TIMESTAMPED_TAG \
+            --push .
+          
+          echo "Docker images pushed successfully:"
+          echo "- ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
+          echo "- ghcr.io/$REPO_OWNER/loongcollector:$TIMESTAMPED_TAG"
+
 
   # Benchmark:
   #   runs-on: ${{ matrix.runner }}
@@ -192,7 +284,7 @@ jobs:
   #       run: git push 'https://${{ github.repository_owner }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository_owner }}/LoongCollector.git' gh-pages:gh-pages
 
   actions-timeline:
-    needs: [Build-LoongCollector-Image]
+    needs: [upload-images]
     runs-on: ubuntu-latest
     permissions:
       actions: read
