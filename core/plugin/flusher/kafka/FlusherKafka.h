@@ -29,6 +29,7 @@
 #include "monitor/MetricManager.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
 #include "plugin/flusher/kafka/KafkaProducer.h"
+#include "plugin/flusher/kafka/TopicFormatParser.h"
 
 namespace logtail {
 
@@ -59,6 +60,9 @@ private:
     KafkaConfig mKafkaConfig;
     std::unique_ptr<KafkaProducer> mProducer;
     std::unique_ptr<EventGroupSerializer> mSerializer;
+
+    std::unique_ptr<TopicFormatParser> mTopicParser;
+    std::set<std::string> mTopicSet;
 
     CounterPtr mSendCnt;
     CounterPtr mSuccessCnt;
