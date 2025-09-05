@@ -244,6 +244,16 @@ func CtlCmd(configName string, cmdID int, cmdDetail string) {
 	logger.Info(context.Background(), "execute cmd", cmdID, "detail", cmdDetail, "config", configName)
 }
 
+//export GetAllContainers
+func GetAllContainers() *C.char {
+	return C.CString(pluginmanager.GetAllContainers())
+}
+
+//export GetDiffContainers
+func GetDiffContainers() *C.char {
+	return C.CString(pluginmanager.GetDiffContainers())
+}
+
 //export GetContainerMeta
 func GetContainerMeta(containerID string) *C.struct_containerMeta {
 	logger.InitLogger()

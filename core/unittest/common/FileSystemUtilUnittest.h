@@ -17,12 +17,15 @@
 #include <fstream>
 #include <string>
 
+#include "boost/filesystem.hpp"
 #include "boost/format.hpp"
 
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "unittest/Unittest.h"
+
+namespace bfs = boost::filesystem;
 
 namespace logtail {
 
@@ -514,6 +517,72 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
 
 #if defined(__linux__)
     ret = ReadFileContent("/proc/self/cgroup", content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_GT(content.size(), 0UL);
+#endif
+}
+
+TEST_F(FileSystemUtilUnittest, TestReadFileContentUnlimited) {
+    auto filePath = (mTestRoot / "file").string();
+
+    // Test with non-existing file
+    std::string content;
+    FileReadResult ret = ReadFileContentUnlimited((mTestRoot / "not-exist-file").string(), content);
+    EXPECT_EQ(FileReadResult::kError, ret);
+
+    // Test with small file (1MB)
+    {
+        std::ofstream out(filePath);
+        std::vector<char> fileContent(1024 * 1024, 'A');
+        out.write(fileContent.data(), fileContent.size());
+    }
+
+    ret = ReadFileContentUnlimited(filePath, content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_EQ(1024 * 1024UL, content.size());
+    EXPECT_EQ(std::string(1024 * 1024, 'A'), content);
+
+    // Test with large file (2MB) - this should succeed unlike ReadFileContent
+    {
+        std::ofstream out(filePath);
+        std::vector<char> fileContent(1024 * 1024, 'B');
+        for (int i = 0; i < 2; ++i) {
+            out.write(fileContent.data(), fileContent.size());
+        }
+    }
+
+    ret = ReadFileContentUnlimited(filePath, content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_EQ(2UL * 1024 * 1024, content.size());
+    EXPECT_EQ(std::string(2 * 1024 * 1024, 'B'), content);
+
+    // Test with empty file
+    {
+        std::ofstream out(filePath);
+        // Create empty file
+    }
+
+    ret = ReadFileContentUnlimited(filePath, content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_EQ(0UL, content.size());
+
+    // Test with very large file (5MB)
+    {
+        std::ofstream out(filePath);
+        std::vector<char> fileContent(1024 * 1024, 'C');
+        for (int i = 0; i < 5; ++i) {
+            out.write(fileContent.data(), fileContent.size());
+        }
+    }
+
+    ret = ReadFileContentUnlimited(filePath, content);
+    EXPECT_EQ(FileReadResult::kOK, ret);
+    EXPECT_EQ(5UL * 1024 * 1024, content.size());
+    EXPECT_EQ(std::string(5 * 1024 * 1024, 'C'), content);
+
+#if defined(__linux__)
+    // Test with special file (/proc/self/cgroup)
+    ret = ReadFileContentUnlimited("/proc/self/cgroup", content);
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_GT(content.size(), 0UL);
 #endif

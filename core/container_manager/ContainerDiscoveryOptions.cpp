@@ -14,9 +14,12 @@
 
 #include "container_manager/ContainerDiscoveryOptions.h"
 
+#include <boost/regex.hpp>
+
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+
 
 using namespace std;
 
@@ -24,7 +27,9 @@ DEFINE_FLAG_INT32(default_plugin_log_queue_size, "", 10);
 
 namespace logtail {
 
-bool ContainerFilters::Init(const Json::Value& config, const CollectionPipelineContext& ctx, const string& pluginType) {
+bool ContainerFilterConfig::Init(const Json::Value& config,
+                                 const CollectionPipelineContext& ctx,
+                                 const string& pluginType) {
     string errorMsg;
 
     // K8pluginNamespaceRegex
@@ -134,9 +139,99 @@ bool ContainerFilters::Init(const Json::Value& config, const CollectionPipelineC
                              ctx.GetLogstoreName(),
                              ctx.GetRegion());
     }
-
     return true;
 }
+
+
+bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& inputs, FieldFilter& fieldFilter) {
+    std::unordered_map<std::string, std::string> staticResult;
+    std::unordered_map<std::string, std::shared_ptr<boost::regex>> regexResult;
+
+    for (const auto& input : inputs) {
+        // 检查是否是有效的正则表达式：必须以^开头并且以$结尾
+        bool isValidRegex = false;
+        if (!input.second.empty() && input.second[0] == '^' && input.second.back() == '$') {
+            isValidRegex = true;
+        }
+
+        if (isValidRegex) {
+            try {
+                // 编译正则表达式
+                auto reg = std::make_shared<boost::regex>(input.second);
+                regexResult[input.first] = reg;
+            } catch (const std::exception& e) {
+                return false;
+            }
+        } else {
+            staticResult[input.first] = input.second;
+        }
+    }
+    fieldFilter.mFieldsMap = staticResult;
+    fieldFilter.mFieldsRegMap = regexResult;
+    return true;
+}
+
+bool ContainerFilters::Init(const ContainerFilterConfig& config) {
+    /// 为 K8sFilter 设置正则表达式
+    try {
+        if (!config.mK8sNamespaceRegex.empty()) {
+            mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(config.mK8sNamespaceRegex);
+        }
+
+        if (!config.mK8sPodRegex.empty()) {
+            mK8SFilter.mPodReg = std::make_shared<boost::regex>(config.mK8sPodRegex);
+        }
+
+        if (!config.mK8sContainerRegex.empty()) {
+            mK8SFilter.mContainerReg = std::make_shared<boost::regex>(config.mK8sContainerRegex);
+        }
+    } catch (const boost::regex_error& e) {
+        // Handle regex compilation errors gracefully
+        return false;
+    } catch (const std::exception& e) {
+        // Handle other exceptions gracefully
+        return false;
+    }
+    bool success = false;
+    if (!config.mIncludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(config.mIncludeK8sLabel, mK8SFilter.mK8sLabelFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!config.mExcludeK8sLabel.empty()) {
+        success = SplitRegexFromMap(config.mExcludeK8sLabel, mK8SFilter.mK8sLabelFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!config.mIncludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(config.mIncludeContainerLabel, mContainerLabelFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!config.mExcludeContainerLabel.empty()) {
+        success = SplitRegexFromMap(config.mExcludeContainerLabel, mContainerLabelFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!config.mIncludeEnv.empty()) {
+        success = SplitRegexFromMap(config.mIncludeEnv, mEnvFilter.mIncludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    if (!config.mExcludeEnv.empty()) {
+        success = SplitRegexFromMap(config.mExcludeEnv, mEnvFilter.mExcludeFields);
+        if (!success) {
+            return success;
+        }
+    }
+    return true;
+}
+
 
 bool ContainerDiscoveryOptions::Init(const Json::Value& config,
                                      const CollectionPipelineContext& ctx,
@@ -156,7 +251,14 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
                                  ctx.GetLogstoreName(),
                                  ctx.GetRegion());
         } else {
-            mContainerFilters.Init(*itr, ctx, pluginType);
+            bool success = mContainerFilterConfig.Init(*itr, ctx, pluginType);
+            if (!success) {
+                return false;
+            }
+            success = mContainerFilters.Init(mContainerFilterConfig);
+            if (!success) {
+                return false;
+            }
         }
     }
 
@@ -200,65 +302,36 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
     return true;
 }
 
-void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
-    Json::Value& res, const FileDiscoveryOptions* fileDiscovery, const PluginInstance::PluginMeta& pluginMeta) const {
-    Json::Value plugin(Json::objectValue);
-    Json::Value detail(Json::objectValue);
-    Json::Value object(Json::objectValue);
 
-    auto ConvertMapToJsonObj = [&](const char* key, const unordered_map<string, string>& map) {
-        if (!map.empty()) {
-            object.clear();
-            for (const auto& item : map) {
-                object[item.first] = Json::Value(item.second);
-            }
-            detail[key] = object;
+void ContainerDiscoveryOptions::GetCustomExternalTags(
+    const std::unordered_map<std::string, std::string>& containerEnvs,
+    const std::unordered_map<std::string, std::string>& containerK8sLabels,
+    std::vector<std::pair<std::string, std::string>>& tags) const {
+    if (mExternalEnvTag.empty() && mExternalK8sLabelTag.empty()) {
+        return;
+    }
+
+    // Process environment variable mappings
+    for (const auto& envMapping : mExternalEnvTag) {
+        const std::string& envKey = envMapping.first;
+        const std::string& tagKey = envMapping.second;
+
+        auto envIt = containerEnvs.find(envKey);
+        if (envIt != containerEnvs.end()) {
+            tags.emplace_back(tagKey, envIt->second);
         }
-    };
+    }
 
-    if (fileDiscovery) {
-        if (!fileDiscovery->GetWildcardPaths().empty()) {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetWildcardPaths()[0]);
-            detail["MaxDepth"] = Json::Value(static_cast<int32_t>(fileDiscovery->GetWildcardPaths().size())
-                                             + fileDiscovery->mMaxDirSearchDepth - 1);
-        } else {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetBasePath());
-            detail["MaxDepth"] = Json::Value(fileDiscovery->mMaxDirSearchDepth);
+    // Process K8s label mappings
+    for (const auto& labelMapping : mExternalK8sLabelTag) {
+        const std::string& labelKey = labelMapping.first;
+        const std::string& tagKey = labelMapping.second;
+
+        auto labelIt = containerK8sLabels.find(labelKey);
+        if (labelIt != containerK8sLabels.end()) {
+            tags.emplace_back(tagKey, labelIt->second);
         }
-        detail["FilePattern"] = Json::Value(fileDiscovery->GetFilePattern());
     }
-    // 传递给 metric_container_info 的配置
-    // 容器过滤
-    if (!mContainerFilters.mK8sNamespaceRegex.empty()) {
-        detail["K8sNamespaceRegex"] = Json::Value(mContainerFilters.mK8sNamespaceRegex);
-    }
-    if (!mContainerFilters.mK8sPodRegex.empty()) {
-        detail["K8sPodRegex"] = Json::Value(mContainerFilters.mK8sPodRegex);
-    }
-    if (!mContainerFilters.mK8sContainerRegex.empty()) {
-        detail["K8sContainerRegex"] = Json::Value(mContainerFilters.mK8sContainerRegex);
-    }
-    ConvertMapToJsonObj("IncludeK8sLabel", mContainerFilters.mIncludeK8sLabel);
-    ConvertMapToJsonObj("ExcludeK8sLabel", mContainerFilters.mExcludeK8sLabel);
-    ConvertMapToJsonObj("IncludeEnv", mContainerFilters.mIncludeEnv);
-    ConvertMapToJsonObj("ExcludeEnv", mContainerFilters.mExcludeEnv);
-    ConvertMapToJsonObj("IncludeContainerLabel", mContainerFilters.mIncludeContainerLabel);
-    ConvertMapToJsonObj("ExcludeContainerLabel", mContainerFilters.mExcludeContainerLabel);
-    // 日志标签富化
-    ConvertMapToJsonObj("ExternalK8sLabelTag", mExternalK8sLabelTag);
-    ConvertMapToJsonObj("ExternalEnvTag", mExternalEnvTag);
-    // 启用容器元信息预览
-    if (mCollectingContainersMeta) {
-        detail["CollectingContainersMeta"] = Json::Value(true);
-    }
-    plugin["type"]
-        = Json::Value(CollectionPipeline::GenPluginTypeWithID("metric_container_info", pluginMeta.mPluginID));
-    plugin["detail"] = detail;
-
-    res["inputs"].append(plugin);
-    // these param will be overriden if the same param appears in the global module of config, which will be parsed
-    // later.
-    res["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
 }
 
 } // namespace logtail

@@ -26,29 +26,10 @@ package logtail
 import "C"
 
 import (
-	"fmt"
 	"unsafe"
 
 	"github.com/alibaba/ilogtail/pkg/util"
 )
-
-func ExecuteCMD(configName string, cmdType int, params []byte) error {
-	var rstVal C.int
-	if len(params) == 0 {
-		rstVal = C.LogtailCtlCmd((*C.char)(util.StringPointer(configName)), C.int(len(configName)),
-			C.int(cmdType),
-			(*C.char)(unsafe.Pointer(nil)), C.int(0))
-	} else {
-		rstVal = C.LogtailCtlCmd((*C.char)(util.StringPointer(configName)), C.int(len(configName)),
-			C.int(cmdType),
-			(*C.char)(unsafe.Pointer(&params[0])), C.int(len(params)))
-	}
-
-	if rstVal < C.int(0) {
-		return fmt.Errorf("execute cmd error %d", int(rstVal))
-	}
-	return nil
-}
 
 func SendPb(configName string, logstore string, pbBuffer []byte, lines int) int {
 	rstVal := C.LogtailSendPb((*C.char)(util.StringPointer(configName)), C.int(len(configName)),
