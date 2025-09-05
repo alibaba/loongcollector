@@ -69,7 +69,7 @@ void ContainerManager::pollingLoop() {
             break;
         }
         time_t now = time(nullptr);
-        if (now - lastUpdateAllTime >= 600) {
+        if (now - lastUpdateAllTime >= 3600) {
             refreshAllContainersSnapshot();
             lastUpdateAllTime = now;
         } else if (now - lastUpdateDiffTime >= 1) {
