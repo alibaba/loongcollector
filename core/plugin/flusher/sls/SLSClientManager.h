@@ -45,7 +45,8 @@ public:
                               AuthType& type,
                               std::string& accessKeyId,
                               std::string& accessKeySecret,
-                              std::string& secToken);
+                              std::string& secToken,
+                              std::string& errorMsg);
 
     virtual bool UsingHttps(const std::string& region) const { return true; }
 

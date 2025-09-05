@@ -7,7 +7,7 @@ CompileFlags:
     # - -DAPSARA_UNIT_TEST_MAIN  # 允许编译UT特殊方法
     - -I/opt/rh/devtoolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9/include
     - -I/opt/logtail/deps/include
-  CompilationDatabase: build
+  CompilationDatabase: /core/build
 
 Diagnostics:
   ClangTidy:

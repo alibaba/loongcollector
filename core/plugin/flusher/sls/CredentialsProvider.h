@@ -28,8 +28,11 @@ public:
     CredentialsProvider() = default;
     virtual ~CredentialsProvider() = default;
 
-    virtual bool
-    GetCredentials(AuthType& type, std::string& accessKeyId, std::string& accessKeySecret, std::string& secToken)
+    virtual bool GetCredentials(AuthType& type,
+                                std::string& accessKeyId,
+                                std::string& accessKeySecret,
+                                std::string& secToken,
+                                std::string& errorMsg)
         = 0;
 
     // Record the number of errors using credentails. The caller can reset the provider or do something else based on

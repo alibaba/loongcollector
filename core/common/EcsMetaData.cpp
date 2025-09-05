@@ -100,7 +100,7 @@ bool ParseCredentials(const Json::Value& doc,
     return !accessKeyId.empty() && !accessKeySecret.empty() && !secToken.empty() && expTime != 0;
 }
 
-bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
+bool FetchEcsMetaData(EcsMetaDataType type, std::string& result, std::string& errorMsg) {
     CURL* curl = nullptr;
     for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
         curl = curl_easy_init();
@@ -114,6 +114,8 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
         auto* tokenHeaders = curl_slist_append(nullptr, "X-aliyun-ecs-metadata-token-ttl-seconds:3600");
         if (!tokenHeaders) {
             curl_easy_cleanup(curl);
+            errorMsg = "curl handler cannot be initialized during user environment identification, token headers "
+                       "cannot be appended";
             return false;
         }
         curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/api/token");
@@ -130,6 +132,7 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
         curl_slist_free_all(tokenHeaders);
 
         if (res != CURLE_OK) {
+            errorMsg = "failed to fetch ecs token: " + std::string(curl_easy_strerror(res));
             LOG_INFO(sLogger, ("fetch ecs token fail", curl_easy_strerror(res)));
             curl_easy_cleanup(curl);
             return false;
@@ -161,7 +164,16 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
                 res = curl_easy_perform(curl);
 
                 if (res != CURLE_OK) {
+                    errorMsg = "failed to fetch ecs ram role name: " + std::string(curl_easy_strerror(res));
                     LOG_ERROR(sLogger, ("fetch ecs ram role name fail", curl_easy_strerror(res)));
+                    curl_slist_free_all(metaHeaders);
+                    curl_easy_cleanup(curl);
+                    return false;
+                }
+                if (roleName.empty() || roleName.find("Not Found") != std::string::npos) {
+                    errorMsg
+                        = "failed to fetch ecs ram role name, this ecs instance may not be associated with a ram role";
+                    LOG_WARNING(sLogger, ("ECS RAM role name not found", roleName));
                     curl_slist_free_all(metaHeaders);
                     curl_easy_cleanup(curl);
                     return false;
@@ -187,6 +199,7 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
         curl_slist_free_all(metaHeaders);
 
         if (res != CURLE_OK) {
+            errorMsg = "failed to fetch ecs meta data: " + std::string(curl_easy_strerror(res));
             LOG_INFO(sLogger, ("fetch ecs meta data fail", curl_easy_strerror(res))("url", url));
             curl_easy_cleanup(curl);
             return false;
@@ -194,6 +207,7 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
         curl_easy_cleanup(curl);
         return true;
     }
+    errorMsg = "curl handler cannot be initialized during user environment identification, ecs meta may be mislabeled";
     LOG_WARNING(
         sLogger,
         ("curl handler cannot be initialized during user environment identification", "ecs meta may be mislabeled"));
@@ -201,8 +215,8 @@ bool FetchEcsMetaData(EcsMetaDataType type, std::string& result) {
 }
 
 bool FetchECSMeta(ECSMeta& metaObj) {
-    std::string meta;
-    if (!FetchEcsMetaData(EcsMetaDataType::META, meta)) {
+    std::string meta, errorMsg;
+    if (!FetchEcsMetaData(EcsMetaDataType::META, meta, errorMsg)) {
         return false;
     }
     if (!ParseECSMeta(meta, metaObj)) {
@@ -214,19 +228,22 @@ bool FetchECSMeta(ECSMeta& metaObj) {
 bool FetchECSRamCredentials(std::string& accessKeyId,
                             std::string& accessKeySecret,
                             std::string& secToken,
-                            int64_t& expTime) {
+                            int64_t& expTime,
+                            std::string& errorMsg) {
     std::string cred;
-    if (!FetchEcsMetaData(EcsMetaDataType::RAM_CREDENTIALS, cred)) {
-        LOG_WARNING(sLogger, ("fetch ecs ram credentials fail, errMsg", ""));
+    if (!FetchEcsMetaData(EcsMetaDataType::RAM_CREDENTIALS, cred, errorMsg)) {
+        LOG_WARNING(sLogger, ("fetch ecs ram credentials fail, errMsg", errorMsg));
         return false;
     }
     Json::Value doc;
     std::string errMsg;
     if (!ParseJsonTable(cred, doc, errMsg)) {
+        errorMsg = "failed to parse ecs credentials as json: " + errMsg;
         LOG_WARNING(sLogger, ("parse ecs ram credentials fail, errMsg", errMsg)("credentials", cred));
         return false;
     }
     if (!ParseCredentials(doc, accessKeyId, accessKeySecret, secToken, expTime)) {
+        errorMsg = "failed to parse ecs credentials";
         LOG_WARNING(sLogger, ("parse ecs ram credentials fail", "")("credentials", cred));
         return false;
     }
