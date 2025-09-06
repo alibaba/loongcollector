@@ -65,6 +65,7 @@ services:
       - ALICLOUD_LOG_DOCKER_ENV_CONFIG=true
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
+      - MY_ENV=prod
     healthcheck:
       test: "cat /usr/local/loongcollector/log/loongcollector.LOG"
       interval: 15s
