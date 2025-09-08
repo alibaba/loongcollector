@@ -28,9 +28,17 @@ Feature: flusher kafka cpp 0.10.x
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "test-topic-010x"
-        KafkaVersion: "0.10.2.1"
-        Producer:
-          MaxMessageBytes: 5242880
+        Version: "0.10.2.1"
+        BulkFlushFrequency: 0
+        BulkMaxSize: 2048
+        MaxMessageBytes: 5242880
+        QueueBufferingMaxKbytes: 1048576
+        QueueBufferingMaxMessages: 100000
+        RequiredAcks: 1
+        Timeout: 30000
+        MessageTimeoutMs: 300000
+        MaxRetries: 3
+        RetryBackoffMs: 100
     """
     Given loongcollector container mount {./flusher_test_0.10.x.log} to {/root/test/1/2/3/flusher_testxxxx.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}

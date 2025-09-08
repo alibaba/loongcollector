@@ -121,35 +121,37 @@ public:
         }
         LOG_INFO(sLogger, ("Kafka bootstrap.servers", brokersStr));
 
-        if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.Producer.BatchNumMessages))
-            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.Producer.LingerMs))
-            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES,
-                          std::to_string(mConfig.Producer.QueueBufferingMaxKbytes))
-            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES,
-                          std::to_string(mConfig.Producer.QueueBufferingMaxMessages))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.Producer.MaxMessageBytes))) {
+        if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.BulkMaxSize))
+            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.BulkFlushFrequency))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES, std::to_string(mConfig.QueueBufferingMaxKbytes))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES, std::to_string(mConfig.QueueBufferingMaxMessages))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.MaxMessageBytes))) {
             return false;
         }
 
-        if (!SetConfig(KAFKA_CONFIG_ACKS, mConfig.Delivery.Acks)
-            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Delivery.RequestTimeoutMs))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.Delivery.MessageTimeoutMs))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES, std::to_string(mConfig.Delivery.MaxRetries))
-            || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.Delivery.RetryBackoffMs))) {
+        std::string acksStr;
+        if (mConfig.RequiredAcks < 0) {
+            acksStr = "all";
+        } else {
+            acksStr = std::to_string(mConfig.RequiredAcks);
+        }
+        if (!SetConfig(KAFKA_CONFIG_ACKS, acksStr)
+            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Timeout))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.MessageTimeoutMs))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES, std::to_string(mConfig.MaxRetries))
+            || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.RetryBackoffMs))) {
             return false;
         }
         LOG_INFO(sLogger,
-                 ("Kafka delivery configs", "")("acks", mConfig.Delivery.Acks)(
-                     "request.timeout.ms", mConfig.Delivery.RequestTimeoutMs)("message.timeout.ms",
-                                                                              mConfig.Delivery.MessageTimeoutMs)(
-                     "message.send.max.retries", mConfig.Delivery.MaxRetries)("retry.backoff.ms",
-                                                                              mConfig.Delivery.RetryBackoffMs));
+                 ("Kafka delivery configs", "")("acks", acksStr)("request.timeout.ms", mConfig.Timeout)(
+                     "message.timeout.ms", mConfig.MessageTimeoutMs)("message.send.max.retries", mConfig.MaxRetries)(
+                     "retry.backoff.ms", mConfig.RetryBackoffMs));
 
         std::map<std::string, std::string> derivedConfigs;
-        KafkaUtil::DeriveApiVersionConfigs(mConfig.KafkaVersion, derivedConfigs);
+        KafkaUtil::DeriveApiVersionConfigs(mConfig.Version, derivedConfigs);
         if (!derivedConfigs.empty()) {
             LOG_INFO(sLogger,
-                     ("Apply KafkaVersion derived configs",
+                     ("Apply Version derived configs",
                       "")(KAFKA_CONFIG_API_VERSION_REQUEST,
                           derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
                               ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]

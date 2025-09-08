@@ -75,11 +75,10 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     mParamsErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_PARAMS_ERROR_TOTAL);
     mOtherErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL);
 
-    LOG_INFO(
-        mContext->GetLogger(),
-        ("FlusherKafka initialized successfully", "")("topic", mKafkaConfig.Topic)("brokers",
-                                                                                   mKafkaConfig.Brokers.size())(
-            "KafkaVersion", mKafkaConfig.KafkaVersion.empty() ? std::string("<unset>") : mKafkaConfig.KafkaVersion));
+    LOG_INFO(mContext->GetLogger(),
+             ("FlusherKafka initialized successfully", "")("topic", mKafkaConfig.Topic)("brokers",
+                                                                                        mKafkaConfig.Brokers.size())(
+                 "Version", mKafkaConfig.Version.empty() ? std::string("<unset>") : mKafkaConfig.Version));
 
     return true;
 }

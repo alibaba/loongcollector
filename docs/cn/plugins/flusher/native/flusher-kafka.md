@@ -1,43 +1,45 @@
 # Kafka
 
+## 版本
+
+[Alpha](../../stability-level.md)
+
 ## 配置文件
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | :--- | :--- | :--- | :--- |
 | `Brokers` | String数组 | 是 | Kafka 集群的连接地址列表。例如：`["host1:9092", "host2:9092"]`。 |
-| `Topic` | String | 是 | 消息默认发送到的 Topic 名称。 |
-| `KafkaVersion` | String | 是 | Kafka Broker 的实际版本号，例如：`"0.8.2.2"`, `"0.9.0.1"`, `"0.10.2.1"`, `"2.6.0"`, `"3.7.0"`。必填，用于按照兼容策略推导底层 librdkafka 参数。 |
-| `Producer.QueueBufferingMaxKbytes` | Int | 否 | 生产者本地消息队列的最大总容量（单位：KB）。默认值：`1048576` (1GB)。 |
-| `Producer.QueueBufferingMaxMessages` | Int | 否 | 生产者本地消息队列允许缓存的最大消息数量。默认值：`100000`。 |
-| `Producer.LingerMs` | Int | 否 | 发送消息前在队列中累积的最大等待时间（单位：毫秒）。增加此值可提高吞吐量，但会增加延迟。默认值：`0`。 |
-| `Producer.BatchNumMessages` | Int | 否 | 单个批次中允许包含的最大消息数量。默认值：`10000`。 |
-| `Producer.MaxMessageBytes` | Int | 否 | 允许插件发送的单条消息的最大字节数。默认值：`1000000` (1MB)。 |
-| `Delivery.Acks` | Int | 否 | 消息发送的确认级别。`0`: 不等待响应；`1`: 等待 Leader 确认；`-1` (或 `all`): 等待所有 ISR 副本确认。默认值：`1`。 |
-| `Delivery.RequestTimeoutMs` | Int | 否 | 等待 Kafka Broker 响应 ACK 的超时时间（单位：毫秒）。默认值：`5000` (30秒)。 |
-| `Delivery.MessageTimeoutMs` | Int | 否 | 消息在本地发送（包括重试）的最大总时间（单位：毫秒）。若超时，则消息发送失败。`0` 表示无限等待。默认值：`300000` (5分钟)。 |
-| `Delivery.MaxRetries` | Int | 否 | 消息发送失败时的最大重试次数。默认值：`2`。 |
-| `Delivery.RetryBackoffMs` | Int | 否 | 每次重试间的最大退避等待时间（单位：毫秒）。默认值：`100` (1秒)。 |
+| `Topic` | String | 是 | 消息默认发送到的 Topic 名称。支持动态 Topic 同 v2（仅字符串替换）。 |
+| `Version` | String | 否 | Kafka 协议版本号，如：`"0.10.2.1"`、`"2.6.0"`、`"3.6.0"`。默认：`"1.0.0"`。用于推导底层 librdkafka 兼容参数。 |
+| `BulkFlushFrequency` | Int | 否 | 批次发送等待时间（毫秒），映射 `linger.ms`，默认：`0`。 |
+| `BulkMaxSize` | Int | 否 | 单批最大消息数，映射 `batch.num.messages`，默认：`2048`。 |
+| `MaxMessageBytes` | Int | 否 | 单条消息最大字节数，映射 `message.max.bytes`，默认：`1000000`。 |
+| `QueueBufferingMaxKbytes` | Int | 否 | 本地队列总容量（KB），映射 `queue.buffering.max.kbytes`，默认：`1048576`。 |
+| `QueueBufferingMaxMessages` | Int | 否 | 本地队列最大消息数，映射 `queue.buffering.max.messages`，默认：`100000`。 |
+| `RequiredAcks` | Int | 否 | 确认级别：`0`/`1`/`-1`（-1 等价于 `all`），映射 `acks`，默认：`1`。 |
+| `Timeout` | Int | 否 | 请求超时（毫秒），映射 `request.timeout.ms`，默认：`30000`。 |
+| `MessageTimeoutMs` | Int | 否 | 消息发送（含重试）超时（毫秒），映射 `message.timeout.ms`，默认：`300000`。 |
+| `MaxRetries` | Int | 否 | 失败重试次数，映射 `message.send.max.retries`，默认：`3`。 |
+| `RetryBackoffMs` | Int | 否 | 重试退避（毫秒），映射 `retry.backoff.ms`，默认：`100`。 |
 
 ## 样例配置
 
 ```yaml
 enable: true
 global:
-    UsingOldContentTag: true
-    DefaultLogQueueSize: 10
+  UsingOldContentTag: true
+  DefaultLogQueueSize: 10
 inputs:
-    - Type: input_file
-      FilePaths:
-        - "/root/test/**/flusher_test*.log"
-      MaxDirSearchDepth: 10
-      TailingAllMatchedFiles: true
+  - Type: input_file
+    FilePaths:
+      - "/root/test/**/flusher_test*.log"
+    MaxDirSearchDepth: 10
+    TailingAllMatchedFiles: true
 flushers:
-    - Type: flusher_kafka_cpp
-      Brokers: ["kafka:29092"]
-      Topic: "test-topic-3x"
-      KafkaVersion: "3.6.0"
-      Producer:
-        MaxMessageBytes: 5242880
-      Delivery:
-        MaxRetries: 2
+  - Type: flusher_kafka_cpp
+    Brokers: ["kafka:29092"]
+    Topic: "test-topic-3x"
+    Version: "3.6.0"
+    MaxMessageBytes: 5242880
+    MaxRetries: 2
 ```

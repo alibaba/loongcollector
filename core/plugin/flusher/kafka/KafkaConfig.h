@@ -31,26 +31,20 @@ struct KafkaConfig {
     std::vector<std::string> Brokers;
     std::string Topic;
 
-    std::string KafkaVersion;
+    std::string Version = "1.0.0";
 
+    uint32_t QueueBufferingMaxKbytes = 1048576;
+    uint32_t QueueBufferingMaxMessages = 100000;
 
-    struct Producer {
-        uint32_t QueueBufferingMaxKbytes = 1048576;
-        uint32_t QueueBufferingMaxMessages = 100000;
-        uint32_t LingerMs = 0;
-        uint32_t BatchNumMessages = 10000;
-        uint32_t MaxMessageBytes = 1000000;
-    } Producer;
+    uint32_t BulkFlushFrequency = 0;
+    uint32_t BulkMaxSize = 2048;
+    uint32_t MaxMessageBytes = 1000000;
 
-
-    struct Delivery {
-        std::string Acks = "1";
-        uint32_t RequestTimeoutMs = 5000;
-        uint32_t MessageTimeoutMs = 300000;
-        uint32_t MaxRetries = 2;
-        uint32_t RetryBackoffMs = 100;
-    } Delivery;
-
+    int32_t RequiredAcks = 1;
+    uint32_t Timeout = 30000;
+    uint32_t MessageTimeoutMs = 300000;
+    uint32_t MaxRetries = 3;
+    uint32_t RetryBackoffMs = 100;
 
     std::map<std::string, std::string> CustomConfig;
 
@@ -63,36 +57,34 @@ struct KafkaConfig {
             return false;
         }
 
-        if (!GetMandatoryStringParam(config, "KafkaVersion", KafkaVersion, errorMsg)) {
+        std::string versionStr;
+        if (!GetOptionalStringParam(config, "Version", versionStr, errorMsg)) {
             return false;
+        }
+        if (versionStr.empty()) {
+            GetOptionalStringParam(config, "KafkaVersion", versionStr, errorMsg);
+        }
+        if (!versionStr.empty()) {
+            Version = versionStr;
         }
 
         KafkaUtil::Version parsed;
-        if (!KafkaUtil::ParseKafkaVersion(KafkaVersion, parsed)) {
-            errorMsg = "invalid KafkaVersion format, expected x.y.z[.n]";
+        if (!KafkaUtil::ParseKafkaVersion(Version, parsed)) {
+            errorMsg = "invalid Version format, expected x.y.z[.n]";
             return false;
         }
 
-        if (config.isMember("Producer") && config["Producer"].isObject()) {
-            const Json::Value& producerConfig = config["Producer"];
-            GetOptionalUIntParam(producerConfig, "QueueBufferingMaxKbytes", Producer.QueueBufferingMaxKbytes, errorMsg);
-            GetOptionalUIntParam(
-                producerConfig, "QueueBufferingMaxMessages", Producer.QueueBufferingMaxMessages, errorMsg);
-            GetOptionalUIntParam(producerConfig, "LingerMs", Producer.LingerMs, errorMsg);
-            GetOptionalUIntParam(producerConfig, "BatchNumMessages", Producer.BatchNumMessages, errorMsg);
-            GetOptionalUIntParam(producerConfig, "MaxMessageBytes", Producer.MaxMessageBytes, errorMsg);
-        }
+        GetOptionalUIntParam(config, "BulkFlushFrequency", BulkFlushFrequency, errorMsg);
+        GetOptionalUIntParam(config, "BulkMaxSize", BulkMaxSize, errorMsg);
+        GetOptionalUIntParam(config, "MaxMessageBytes", MaxMessageBytes, errorMsg);
+        GetOptionalIntParam(config, "RequiredAcks", RequiredAcks, errorMsg);
+        GetOptionalUIntParam(config, "Timeout", Timeout, errorMsg);
+        GetOptionalUIntParam(config, "MessageTimeoutMs", MessageTimeoutMs, errorMsg);
+        GetOptionalUIntParam(config, "MaxRetries", MaxRetries, errorMsg);
+        GetOptionalUIntParam(config, "RetryBackoffMs", RetryBackoffMs, errorMsg);
 
-
-        if (config.isMember("Delivery") && config["Delivery"].isObject()) {
-            const Json::Value& deliveryConfig = config["Delivery"];
-            GetOptionalStringParam(deliveryConfig, "Acks", Delivery.Acks, errorMsg);
-            GetOptionalUIntParam(deliveryConfig, "RequestTimeoutMs", Delivery.RequestTimeoutMs, errorMsg);
-            GetOptionalUIntParam(deliveryConfig, "MessageTimeoutMs", Delivery.MessageTimeoutMs, errorMsg);
-            GetOptionalUIntParam(deliveryConfig, "MaxRetries", Delivery.MaxRetries, errorMsg);
-            GetOptionalUIntParam(deliveryConfig, "RetryBackoffMs", Delivery.RetryBackoffMs, errorMsg);
-        }
-
+        GetOptionalUIntParam(config, "QueueBufferingMaxKbytes", QueueBufferingMaxKbytes, errorMsg);
+        GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
 
         if (config.isMember("Kafka") && config["Kafka"].isObject()) {
             const Json::Value& kafkaConfig = config["Kafka"];

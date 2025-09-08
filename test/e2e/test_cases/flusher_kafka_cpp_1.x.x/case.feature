@@ -27,9 +27,8 @@ Feature: flusher kafka cpp 1.x.x
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "test-topic-1x"
-        KafkaVersion: "1.1.0"
-        Producer:
-          MaxMessageBytes: 5242880
+        Version: "1.1.0"
+        MaxMessageBytes: 5242880
     """
     Given loongcollector container mount {./flusher_test_1.x.x.log} to {/root/test/1/2/3/flusher_testxxxx.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
@@ -40,4 +39,3 @@ Feature: flusher kafka cpp 1.x.x
     topic: "test-topic-1x"
     content: "^\\d+===="
     """
-

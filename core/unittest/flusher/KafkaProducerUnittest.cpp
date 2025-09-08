@@ -66,17 +66,17 @@ void KafkaProducerUnittest::SetUp() {
 
     mConfig.Brokers = {"test.broker1:9092", "test.broker2:9092"};
     mConfig.Topic = "test_topic";
-    mConfig.KafkaVersion = "2.6.0";
-    mConfig.Producer.LingerMs = 100;
-    mConfig.Producer.BatchNumMessages = 1000;
-    mConfig.Producer.QueueBufferingMaxKbytes = 1048576;
-    mConfig.Producer.QueueBufferingMaxMessages = 10000;
-    mConfig.Producer.MaxMessageBytes = 1000000;
-    mConfig.Delivery.Acks = "all";
-    mConfig.Delivery.RequestTimeoutMs = 30000;
-    mConfig.Delivery.MessageTimeoutMs = 300000;
-    mConfig.Delivery.MaxRetries = 3;
-    mConfig.Delivery.RetryBackoffMs = 100;
+    mConfig.Version = "2.6.0";
+    mConfig.BulkFlushFrequency = 100;
+    mConfig.BulkMaxSize = 1000;
+    mConfig.QueueBufferingMaxKbytes = 1048576;
+    mConfig.QueueBufferingMaxMessages = 10000;
+    mConfig.MaxMessageBytes = 1000000;
+    mConfig.RequiredAcks = -1;
+    mConfig.Timeout = 30000;
+    mConfig.MessageTimeoutMs = 300000;
+    mConfig.MaxRetries = 3;
+    mConfig.RetryBackoffMs = 100;
 }
 
 void KafkaProducerUnittest::TearDown() {
@@ -175,8 +175,8 @@ void KafkaProducerUnittest::TestCloseWithoutInit() {
 void KafkaProducerUnittest::TestConfigValidation() {
     KafkaConfig testConfig = mConfig;
 
-    testConfig.Producer.LingerMs = 0;
-    testConfig.Producer.MaxMessageBytes = 0;
+    testConfig.BulkFlushFrequency = 0;
+    testConfig.MaxMessageBytes = 0;
     mProducer->Init(testConfig);
     APSARA_TEST_TRUE(mProducer->IsInitialized());
 }
@@ -198,19 +198,19 @@ void KafkaProducerUnittest::TestCustomConfig() {
 
 void KafkaProducerUnittest::TestBatchConfig() {
     KafkaConfig batchConfig = mConfig;
-    batchConfig.Producer.LingerMs = 200;
-    batchConfig.Producer.BatchNumMessages = 2000;
+    batchConfig.BulkFlushFrequency = 200;
+    batchConfig.BulkMaxSize = 2000;
     mProducer->Init(batchConfig);
     APSARA_TEST_TRUE(mProducer->IsInitialized());
 }
 
 void KafkaProducerUnittest::TestDeliveryConfig() {
     KafkaConfig deliveryConfig = mConfig;
-    deliveryConfig.Delivery.Acks = "1";
-    deliveryConfig.Delivery.RequestTimeoutMs = 60000;
-    deliveryConfig.Delivery.MessageTimeoutMs = 600000;
-    deliveryConfig.Delivery.MaxRetries = 5;
-    deliveryConfig.Delivery.RetryBackoffMs = 200;
+    deliveryConfig.RequiredAcks = 1;
+    deliveryConfig.Timeout = 60000;
+    deliveryConfig.MessageTimeoutMs = 600000;
+    deliveryConfig.MaxRetries = 5;
+    deliveryConfig.RetryBackoffMs = 200;
     mProducer->Init(deliveryConfig);
     APSARA_TEST_TRUE(mProducer->IsInitialized());
 }

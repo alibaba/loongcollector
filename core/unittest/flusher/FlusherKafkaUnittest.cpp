@@ -65,7 +65,7 @@ Json::Value CreateKafkaTestConfig(const std::string& topic) {
     config["Brokers"] = Json::Value(Json::arrayValue);
     config["Brokers"].append("test.mock.brokers");
     config["Topic"] = topic;
-    config["KafkaVersion"] = "2.6.0";
+    config["Version"] = "2.6.0";
     config["Kafka"] = Json::Value(Json::objectValue);
     config["Kafka"]["test.mock.num.brokers"] = "3";
     return config;
@@ -152,7 +152,7 @@ void FlusherKafkaUnittest::TestInitMissingTopic() {
     Json::Value optionalGoPipeline;
     config["Brokers"] = Json::Value(Json::arrayValue);
     config["Brokers"].append("dummy:9092");
-    config["KafkaVersion"] = "2.6.0";
+    config["Version"] = "2.6.0";
     APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
 }
 
@@ -227,7 +227,7 @@ void FlusherKafkaUnittest::TestInitMissingKafkaVersion() {
     config["Brokers"] = Json::Value(Json::arrayValue);
     config["Brokers"].append("dummy:9092");
     config["Topic"] = mTopic;
-    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
 
 void FlusherKafkaUnittest::TestSendNetworkError() {
@@ -343,14 +343,14 @@ void FlusherKafkaUnittest::TestFlushFailure() {
 void FlusherKafkaUnittest::TestInitWithFullConfig() {
     Json::Value optionalGoPipeline;
     Json::Value config = CreateKafkaTestConfig(mTopic);
-    config["Producer"]["LingerMs"] = 10;
-    config["Delivery"]["Acks"] = "all";
-    config["Delivery"]["RetryBackoffMs"] = 2000;
+    config["BulkFlushFrequency"] = 10;
+    config["RequiredAcks"] = -1;
+    config["RetryBackoffMs"] = 2000;
 
     APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
-    APSARA_TEST_EQUAL(10, mFlusher->mKafkaConfig.Producer.LingerMs);
-    APSARA_TEST_EQUAL("all", mFlusher->mKafkaConfig.Delivery.Acks);
-    APSARA_TEST_EQUAL(2000, mFlusher->mKafkaConfig.Delivery.RetryBackoffMs);
+    APSARA_TEST_EQUAL(10, mFlusher->mKafkaConfig.BulkFlushFrequency);
+    APSARA_TEST_EQUAL(-1, mFlusher->mKafkaConfig.RequiredAcks);
+    APSARA_TEST_EQUAL(2000, mFlusher->mKafkaConfig.RetryBackoffMs);
 }
 
 void FlusherKafkaUnittest::TestSendSerializationFailure() {
