@@ -209,7 +209,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
         // 获取pid对应的processinfo
         ProcessInfo processInfo;
-        if (!GetProcessInfo(pid, processInfo)) {
+        if (!GetProcessInfo(collectContext.mCollectTime.mMetricTime, pid, processInfo)) {
             continue;
         }
 
@@ -413,7 +413,6 @@ bool ProcessCollector::GetProcessCpuInCache(pid_t pid) {
 bool ProcessCollector::GetProcessCpuInformation(const CollectTime& collectTime,
                                                 pid_t pid,
                                                 ProcessCpuInformation& information) {
-    const auto now = std::chrono::steady_clock::now();
     bool findCache = false;
     ProcessCpuInformation* prev = nullptr;
 
