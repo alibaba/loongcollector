@@ -694,7 +694,7 @@ public:
     bool GetSystemUptimeInformation(time_t now, SystemUptimeInformation& systemUptimeInfo);
     bool GetDiskSerialIdInformation(time_t now, std::string diskName, SerialIdInformation& serialIdInfo);
     bool GetDiskStateInformation(time_t now, DiskStateInformation& diskStateInfo);
-    bool GetFileSystemInformation(std::string dirName, FileSystemInformation& fileSystemInfo);
+    bool GetFileSystemInformation(time_t now, std::string dirName, FileSystemInformation& fileSystemInfo);
     bool GetProcessCmdlineString(time_t now, pid_t pid, ProcessCmdlineString& cmdline);
     bool GetPorcessStatm(time_t now, pid_t pid, ProcessMemoryInformation& processMemory);
     bool GetProcessCredNameObj(time_t now, pid_t pid, ProcessCredName& credName);
@@ -715,7 +715,7 @@ public:
           mSystemUptimeInformationCache(cacheSize),
           mSerialIdInformationCache(cacheSize),
           mDiskStateInformationCache(cacheSize),
-          mFileSystemInformationCache(ttl),
+          mFileSystemInformationCache(cacheSize),
           mProcessCmdlineCache(cacheSize),
           mProcessStatmCache(cacheSize),
           mProcessStatusCache(cacheSize),

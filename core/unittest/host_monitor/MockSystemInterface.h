@@ -201,7 +201,7 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        fileSystemInfo.collectTime = std::chrono::steady_clock::now();
+        fileSystemInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }

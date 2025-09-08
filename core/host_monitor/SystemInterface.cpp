@@ -187,10 +187,11 @@ bool SystemInterface::GetDiskStateInformation(time_t now, DiskStateInformation& 
         errorType);
 }
 
-bool SystemInterface::GetFileSystemInformation(std::string dirName, FileSystemInformation& fileSystemInfo) {
+bool SystemInterface::GetFileSystemInformation(time_t now, std::string dirName, FileSystemInformation& fileSystemInfo) {
     const std::string errorType = "filesystem state";
     return MemoizedCall(
         mFileSystemInformationCache,
+        now,
         [this](BaseInformation& info, std::string dirName) {
             return this->GetFileSystemInformationOnce(dirName, static_cast<FileSystemInformation&>(info));
         },

@@ -349,7 +349,7 @@ int DiskCollector::GetFileSystemStat(const CollectTime& collectTime,
                                      FileSystemUsage& fileSystemUsage) {
     FileSystemInformation fileSystemInfo;
 
-    if (!SystemInterface::GetInstance()->GetFileSystemInformation(dirName, fileSystemInfo)) {
+    if (!SystemInterface::GetInstance()->GetFileSystemInformation(collectTime.mMetricTime, dirName, fileSystemInfo)) {
         return -1;
     }
 
