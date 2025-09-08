@@ -16,13 +16,12 @@
 
 #pragma once
 
-#include <filesystem>
-#include <string>
-#include <vector>
 namespace logtail {
 
-bool GetHostSystemStatWithPath(std::vector<std::string>& lines,
-                               std::string& errorMessage,
-                               std::filesystem::path PROC_DIR);
+enum class HostMonitorCollectType {
+    kUnknown = 0,
+    kSingleValue,
+    kMultiValue,
+};
 
 } // namespace logtail

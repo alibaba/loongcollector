@@ -870,9 +870,10 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     }
 #endif
 
-    SLSClientManager::AuthType type;
-    string accessKeyId, accessKeySecret;
-    if (!SLSClientManager::GetInstance()->GetAccessKey(bufferMeta.aliuid(), type, accessKeyId, accessKeySecret)) {
+    AuthType type;
+    string accessKeyId, accessKeySecret, secToken;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(
+            bufferMeta.aliuid(), type, accessKeyId, accessKeySecret, secToken)) {
 #ifdef __ENTERPRISE__
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 bufferMeta.project(), type, accessKeyId, accessKeySecret)) {
@@ -920,6 +921,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             return PostLogStoreLogs(accessKeyId,
                                     accessKeySecret,
+                                    secToken,
                                     type,
                                     host,
                                     httpsFlag,
@@ -933,6 +935,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
             return PostMetricStoreLogs(accessKeyId,
                                        accessKeySecret,
+                                       secToken,
                                        type,
                                        host,
                                        httpsFlag,
@@ -949,6 +952,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
             headers.insert({APM_HEADER_PROJECT, bufferMeta.project()});
             return PostAPMBackendLogs(accessKeyId,
                                       accessKeySecret,
+                                      secToken,
                                       type,
                                       host,
                                       httpsFlag,

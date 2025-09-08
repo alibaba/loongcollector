@@ -41,13 +41,12 @@ extern const uint32_t kHostMonitorDefaultInterval;
 
 class NetCollector : public BaseCollector {
 public:
-    NetCollector();
-
-    int Init(int totalCount = kHostMonitorDefaultInterval / kHostMonitorMinInterval);
-
+    NetCollector() = default;
     ~NetCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Init(HostMonitorContext& collectContext) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;
 
@@ -58,8 +57,6 @@ private:
     std::map<std::string, NetInterfaceMetric> mLastInterfaceStatMap;
     std::chrono::steady_clock::time_point mLastTime;
     std::map<std::string, NetInterfaceMetric> mLastInterfaceMetrics;
-    int mCountPerReport = 0;
-    int mCount = 0;
     MetricCalculate<ResTCPStat, uint64_t> mTCPCal;
     // std::map<std::string, MetricCalculate<ResNetPackRate>> mPackRateCalMap;
     std::map<std::string, MetricCalculate<ResNetRatePerSec>> mRatePerSecCalMap;

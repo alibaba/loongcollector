@@ -10,7 +10,7 @@
 
 ## 版本说明
 
-* 推荐版本：LoongCollector v3.0.5 及以上
+* 推荐版本：LoongCollector v3.1.5 及以上, 在 CPU >= westmere 型号的情况下，json解析会使用 SIMD 指令进行计算加速，跟原来相比性能有一倍的提升。
 
 ## 配置参数
 
