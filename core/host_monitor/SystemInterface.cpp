@@ -51,7 +51,8 @@ SystemInterface* SystemInterface::GetInstance() {
 }
 
 bool SystemInterface::GetSystemInformation(SystemInformation& systemInfo) {
-    // SystemInformation is static and will not be changed. So cache will never be expired.
+    // SystemInformation is static and will not be changed. So cache will never be
+    // expired.
     if (mSystemInformationCache.collectTime.time_since_epoch().count() > 0) {
         systemInfo = mSystemInformationCache;
         return true;
@@ -301,7 +302,8 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::GetWithTimeout(Inf
             return true;
         }
         if (!it->second.second) {
-            // the cache is stale and no thread is updating, will update by this thread
+            // the cache is stale and no thread is updating, will update by this
+            // thread
             it->second.second.store(true);
             return false;
         }
@@ -395,9 +397,8 @@ bool SystemInterface::SystemInformationCache<InfoT>::GC() {
 
 std::string MacString(const unsigned char* mac) {
     std::string str;
-    if (mac != nullptr && sizeof(mac) >= 6) {
+    if (mac != nullptr) {
         str = fmt::format("{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        // str = fmt::sprintf("%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
     return str;
 }
