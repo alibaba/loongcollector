@@ -1,6 +1,7 @@
 package k8smeta
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -433,4 +434,100 @@ func TestRegisterAndUnRegisterSendFunc(t *testing.T) {
 	}
 	time.Sleep(time.Duration(interval) * time.Second)
 	assert.Equal(t, 3, counter)
+}
+
+func TestGetIndexKeyDiff(t *testing.T) {
+	eventCh := make(chan *K8sMetaEvent)
+	stopCh := make(chan struct{})
+	store := NewDeferredDeletionMetaStore(eventCh, stopCh, 60, cache.MetaNamespaceKeyFunc)
+
+	// Test case 1: Empty slices
+	toRemove, toAdd := store.getIndexKeyDiff([]string{}, []string{})
+	assert.Empty(t, toRemove, "Should have no keys to remove when both slices are empty")
+	assert.Empty(t, toAdd, "Should have no keys to add when both slices are empty")
+
+	// Test case 2: Only old keys (all should be removed)
+	oldKeys := []string{"key1", "key2", "key3"}
+	toRemove, toAdd = store.getIndexKeyDiff(oldKeys, []string{})
+	assert.ElementsMatch(t, oldKeys, toRemove, "All old keys should be removed")
+	assert.Empty(t, toAdd, "Should have no keys to add")
+
+	// Test case 3: Only new keys (all should be added)
+	newKeys := []string{"key4", "key5", "key6"}
+	toRemove, toAdd = store.getIndexKeyDiff([]string{}, newKeys)
+	assert.Empty(t, toRemove, "Should have no keys to remove")
+	assert.ElementsMatch(t, newKeys, toAdd, "All new keys should be added")
+
+	// Test case 4: Partial overlap
+	oldKeys = []string{"key1", "key2", "key3"}
+	newKeys = []string{"key2", "key3", "key4"}
+	toRemove, toAdd = store.getIndexKeyDiff(oldKeys, newKeys)
+	assert.ElementsMatch(t, []string{"key1"}, toRemove, "key1 should be removed")
+	assert.ElementsMatch(t, []string{"key4"}, toAdd, "key4 should be added")
+
+	// Test case 5: Complete overlap (no changes)
+	oldKeys = []string{"key1", "key2", "key3"}
+	newKeys = []string{"key1", "key2", "key3"}
+	toRemove, toAdd = store.getIndexKeyDiff(oldKeys, newKeys)
+	assert.Empty(t, toRemove, "Should have no keys to remove when keys are identical")
+	assert.Empty(t, toAdd, "Should have no keys to add when keys are identical")
+
+	// Test case 6: Different order (should still work correctly)
+	oldKeys = []string{"key1", "key2", "key3"}
+	newKeys = []string{"key3", "key1", "key2"}
+	toRemove, toAdd = store.getIndexKeyDiff(oldKeys, newKeys)
+	assert.Empty(t, toRemove, "Should have no keys to remove when keys are identical but in different order")
+	assert.Empty(t, toAdd, "Should have no keys to add when keys are identical but in different order")
+
+	// Test case 7: Duplicate keys in input (edge case)
+	oldKeys = []string{"key1", "key2", "key2", "key3"}
+	newKeys = []string{"key2", "key3", "key3", "key4"}
+	toRemove, toAdd = store.getIndexKeyDiff(oldKeys, newKeys)
+	assert.ElementsMatch(t, []string{"key1"}, toRemove, "key1 should be removed (duplicates handled)")
+	assert.ElementsMatch(t, []string{"key4"}, toAdd, "key4 should be added (duplicates handled)")
+
+	// // Test case 8: Large dataset performance test
+	// largeOldKeys := make([]string, 1000)
+	// largeNewKeys := make([]string, 1000)
+	// for i := 0; i < 1000; i++ {
+	// largeOldKeys[i] = fmt.Sprintf("old_key_%d", i)
+	// largeNewKeys[i] = fmt.Sprintf("new_key_%d", i)
+	// }
+
+	// start := time.Now()
+	// toRemove, toAdd = store.getIndexKeyDiff(largeOldKeys, largeNewKeys)
+	// duration := time.Since(start)
+
+	// assert.Len(t, toRemove, 1000, "Should remove all 1000 old keys")
+	// assert.Len(t, toAdd, 1000, "Should add all 1000 new keys")
+	// assert.Less(t, duration, 10*time.Millisecond, "Should complete within 10ms for 1000 keys")
+}
+
+func TestGetIndexKeyDiffEdgeCases(t *testing.T) {
+	eventCh := make(chan *K8sMetaEvent)
+	stopCh := make(chan struct{})
+	store := NewDeferredDeletionMetaStore(eventCh, stopCh, 60, cache.MetaNamespaceKeyFunc)
+
+	// Test case 1: Single key scenarios
+	toRemove, toAdd := store.getIndexKeyDiff([]string{"single"}, []string{"different"})
+	assert.ElementsMatch(t, []string{"single"}, toRemove, "Single old key should be removed")
+	assert.ElementsMatch(t, []string{"different"}, toAdd, "Single new key should be added")
+
+	// Test case 2: Empty string keys
+	toRemove, toAdd = store.getIndexKeyDiff([]string{""}, []string{""})
+	assert.Empty(t, toRemove, "Empty string key should not be removed when present in both")
+	assert.Empty(t, toAdd, "Empty string key should not be added when present in both")
+
+	// Test case 3: Very long key names
+	longKey1 := strings.Repeat("a", 1000)
+	longKey2 := strings.Repeat("b", 1000)
+	toRemove, toAdd = store.getIndexKeyDiff([]string{longKey1}, []string{longKey2})
+	assert.ElementsMatch(t, []string{longKey1}, toRemove, "Long key should be removed")
+	assert.ElementsMatch(t, []string{longKey2}, toAdd, "Long key should be added")
+
+	// Test case 4: Special characters in keys
+	specialKeys := []string{"key/with/slashes", "key:with:colons", "key.with.dots", "key-with-dashes"}
+	toRemove, toAdd = store.getIndexKeyDiff(specialKeys[:2], specialKeys[2:])
+	assert.Len(t, toRemove, 2, "Should remove 2 keys with special characters")
+	assert.Len(t, toAdd, 2, "Should add 2 keys with special characters")
 }
