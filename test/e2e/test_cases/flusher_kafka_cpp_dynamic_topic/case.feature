@@ -28,9 +28,17 @@ Feature: flusher kafka cpp dynamic topic
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "app-%{content.service}"
-        KafkaVersion: "2.8.0"
-        Producer:
-          MaxMessageBytes: 5242880
+        Version: "2.8.0"
+        BulkFlushFrequency: 0
+        BulkMaxSize: 2048
+        MaxMessageBytes: 5242880
+        QueueBufferingMaxKbytes: 1048576
+        QueueBufferingMaxMessages: 100000
+        RequiredAcks: 1
+        Timeout: 30000
+        MessageTimeoutMs: 300000
+        MaxRetries: 3
+        RetryBackoffMs: 100
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
@@ -68,9 +76,17 @@ Feature: flusher kafka cpp dynamic topic
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "app-%{tag.__hostname__}"
-        KafkaVersion: "2.8.0"
-        Producer:
-          MaxMessageBytes: 5242880
+        Version: "2.8.0"
+        BulkFlushFrequency: 0
+        BulkMaxSize: 2048
+        MaxMessageBytes: 5242880
+        QueueBufferingMaxKbytes: 1048576
+        QueueBufferingMaxMessages: 100000
+        RequiredAcks: 1
+        Timeout: 30000
+        MessageTimeoutMs: 300000
+        MaxRetries: 3
+        RetryBackoffMs: 100
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
@@ -108,9 +124,17 @@ Feature: flusher kafka cpp dynamic topic
       - Type: flusher_kafka_cpp
         Brokers: ["kafka:29092"]
         Topic: "app-${MY_ENV}"
-        KafkaVersion: "2.8.0"
-        Producer:
-          MaxMessageBytes: 5242880
+        Version: "2.8.0"
+        BulkFlushFrequency: 0
+        BulkMaxSize: 2048
+        MaxMessageBytes: 5242880
+        QueueBufferingMaxKbytes: 1048576
+        QueueBufferingMaxMessages: 100000
+        RequiredAcks: 1
+        Timeout: 30000
+        MessageTimeoutMs: 300000
+        MaxRetries: 3
+        RetryBackoffMs: 100
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
