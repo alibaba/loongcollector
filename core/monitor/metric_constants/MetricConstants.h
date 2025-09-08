@@ -342,6 +342,7 @@ extern const std::string METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL;
 
 /**********************************************************
  *   k8s metadata

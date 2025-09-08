@@ -87,6 +87,9 @@ bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                     std::move(group.GetExactlyOnceCheckpoint()));
+    for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
+        g.mSourceBuffers.emplace_back(extraSourceBuffer);
+    }
     mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg);
     if (errorMsg.empty()) {
         if (!serializedData.empty() && serializedData.back() == '\n') {

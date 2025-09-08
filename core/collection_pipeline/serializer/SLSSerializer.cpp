@@ -22,6 +22,7 @@
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
 #include "common/compression/CompressType.h"
+#include "constants/Constants.h"
 #include "constants/SpanConstants.h"
 #include "logger/Logger.h"
 #include "models/MetricValue.h"

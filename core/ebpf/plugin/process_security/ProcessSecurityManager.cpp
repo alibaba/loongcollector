@@ -28,6 +28,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -39,8 +40,9 @@
 namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+                                               moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                               EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
@@ -167,9 +169,13 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
 
@@ -188,20 +194,21 @@ int ProcessSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         // convert to a item and push to process queue
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             // represent a process ...
             auto processCacheMgr = GetProcessCacheManager();
             if (processCacheMgr == nullptr) {
                 LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            auto hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
             }
+
             for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
@@ -250,22 +257,16 @@ int ProcessSecurityManager::SendEvents() {
             return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        size_t eventCount = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        int maxRetry = 5;
-        for (int retry = 0; retry < maxRetry; ++retry) {
-            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (retry == maxRetry - 1) {
-                LOG_WARNING(sLogger,
-                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                "[ProcessSecurityEvent] push queue failed!", ""));
-                // TODO: Alarm discard data
-            }
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[ProcessSecurityEvent] push queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventCount);
         }
     }
 

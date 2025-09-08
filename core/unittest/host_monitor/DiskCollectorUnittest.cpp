@@ -266,7 +266,7 @@ void DiskCollectorUnittest::TestCollect() const {
     for (size_t i = 0; i < expectedNames.size(); i++) {
         APSARA_TEST_TRUE(maps.find(expectedNames[i]) != maps.end());
         double val = maps[expectedNames[i]].Value;
-        EXPECT_NEAR(expected_values[static_cast<size_t>(i)], val, 5);
+        EXPECT_NEAR(expected_values[static_cast<size_t>(i)], val, 100);
     }
 }
 

@@ -26,6 +26,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "ebpf/util/AggregateTree.h"
+#include "ebpf/util/Converger.h"
 #include "ebpf/util/FrequencyManager.h"
 #include "ebpf/util/sampler/Sampler.h"
 
@@ -60,8 +61,9 @@ public:
     static std::shared_ptr<NetworkObserverManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue) {
-        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue);
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool) {
+        return std::make_shared<NetworkObserverManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     NetworkObserverManager() = delete;
@@ -69,7 +71,8 @@ public:
     PluginType GetPluginType() override { return PluginType::NETWORK_OBSERVE; }
     NetworkObserverManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
-                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue);
+                           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                           EventPool* pool);
 
     int Init() override;
 
@@ -119,10 +122,14 @@ public:
         return 0;
     }
 
-    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr lossEventsTotal, IntGaugePtr connCacheSize) {
+    void SetMetrics(CounterPtr pollEventsTotal,
+                    CounterPtr lossEventsTotal,
+                    IntGaugePtr connCacheSize,
+                    CounterPtr lossLogsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mLossKernelEventsTotal = std::move(lossEventsTotal);
         mConnectionNum = std::move(connCacheSize);
+        mPushLogFailedTotal = std::move(lossLogsTotal);
     }
 
     // periodically tasks ...
@@ -170,14 +177,13 @@ private:
         LOG,
     };
 
-    void pushEventsWithRetry(EventDataType dataType,
-                             PipelineEventGroup&& eventGroup,
-                             const StringView& configName,
-                             QueueKey queueKey,
-                             uint32_t pluginIdx,
-                             CounterPtr& eventCounter,
-                             CounterPtr& eventGroupCounter,
-                             size_t retryTimes = 5);
+    void pushEvents(EventDataType dataType,
+                    PipelineEventGroup&& eventGroup,
+                    const StringView& configName,
+                    QueueKey queueKey,
+                    uint32_t pluginIdx,
+                    CounterPtr& eventCounter,
+                    CounterPtr& eventGroupCounter);
 
     std::unique_ptr<ConnectionManager> mConnectionManager; // hold connection cache ...
 
@@ -224,6 +230,8 @@ private:
         std::set<std::string> containerIds;
     };
 
+    bool reportAgentInfo(const time_t& now, size_t workloadKey, const WorkloadConfig& workloadConfig);
+
     mutable ReadWriteLock mAppConfigLock;
     std::atomic_int mConfigVersion = 0;
     std::atomic_int mLastConfigVersion = -1;
@@ -234,7 +242,7 @@ private:
     // replica of mContainerConfigs, only used in poller thread ...
     std::unordered_map<size_t, std::shared_ptr<AppDetail>> mContainerConfigsReplica;
 
-    std::shared_ptr<Sampler> mSampler;
+    std::shared_ptr<AppConvergerManager> mConvergerManager;
 
     std::string mClusterId; // inited in Init()
     std::string mHostName; // host
@@ -256,11 +264,13 @@ private:
     CounterPtr mRecvKernelEventsTotal;
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionNum;
+    CounterPtr mPushLogFailedTotal;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class NetworkObserverManagerUnittest;
     friend class HttpRetryableEventUnittest;
     friend class NetworkObserverConfigUpdateUnittest;
+    std::vector<PipelineEventGroup> mAgentInfoEventGroups;
     std::vector<PipelineEventGroup> mMetricEventGroups;
     std::vector<PipelineEventGroup> mLogEventGroups;
     std::vector<PipelineEventGroup> mSpanEventGroups;

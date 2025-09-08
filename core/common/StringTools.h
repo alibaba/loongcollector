@@ -19,6 +19,7 @@
 #include <charconv>
 
 #include <algorithm>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -94,6 +95,7 @@ inline std::string ToString(bool value) {
     return value ? "true" : "false";
 }
 std::string ToString(const std::vector<std::string>& vec);
+std::string ToString(const std::vector<std::filesystem::path>& vec);
 
 template <typename T>
 std::string ToHexString(const T& value) {

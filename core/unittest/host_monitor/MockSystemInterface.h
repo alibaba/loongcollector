@@ -197,6 +197,15 @@ private:
         return true;
     }
 
+    bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        fileSystemInfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        return true;
+    }
+
     int64_t mBlockTime = 0;
     int64_t mMockCalledCount = 0;
 

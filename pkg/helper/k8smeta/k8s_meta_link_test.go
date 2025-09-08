@@ -1474,7 +1474,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		Object:    cronjob2,
 	})
 
-	jobList := []*K8sMetaEvent{
+	cronjobList := []*K8sMetaEvent{
 		{
 			EventType: "update",
 			Object:    cronjob1,
@@ -1489,7 +1489,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getCronJobNamespaceLink(jobList)
+	results := linkGenerator.getCronJobNamespaceLink(cronjobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*CronJobNamespace).Namespace.Name)
 	assert.Equal(t, "cronjob1", results[0].Object.Raw.(*CronJobNamespace).CronJob.Name)
@@ -1499,7 +1499,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 }
 
 func TestGetPVCNamespaceLink(t *testing.T) {
-	pvcCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUME)
+	pvcCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUMECLAIM)
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
@@ -1594,7 +1594,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		Object:    ingress2,
 	})
 
-	jobList := []*K8sMetaEvent{
+	ingressList := []*K8sMetaEvent{
 		{
 			EventType: "update",
 			Object:    ingress1,
@@ -1609,7 +1609,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getIngressNamespaceLink(jobList)
+	results := linkGenerator.getIngressNamespaceLink(ingressList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*IngressNamespace).Namespace.Name)
 	assert.Equal(t, "ingress1", results[0].Object.Raw.(*IngressNamespace).Ingress.Name)

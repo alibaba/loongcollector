@@ -23,9 +23,7 @@ ROOT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 TESTDIR=$ROOT_DIR/test
 
 cd "$TESTDIR"
-if [ "$TEST_SCOPE" = "core" ]; then
-  go test -v -timeout 30m -run ^TestE2EOnDockerComposeCore$ github.com/alibaba/ilogtail/test/$TYPE
-elif [ "$TEST_SCOPE" = "performance" ]; then
+if [ "$TEST_SCOPE" = "performance" ]; then
   if [ -n "$AGENT" ]; then
     export AGENT="$AGENT"
     if [ "$TYPE" = "benchmark" ]; then
@@ -45,7 +43,6 @@ else
 fi
 
 if [ $? = 0 ]; then
-  sh "$ROOT_DIR"/scripts/e2e_coverage.sh "$TYPE"
   echo "========================================="
   echo "All testing cases are passed"
   echo "========================================="

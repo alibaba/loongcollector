@@ -31,6 +31,9 @@ type ServiceK8sMeta struct {
 	StorageClass          bool
 	Ingress               bool
 	Container             bool
+	// labels and annotations switch
+	EnableLabels      bool
+	EnableAnnotations bool
 	// link switch
 	Node2Pod                  string
 	Deployment2Pod            string
@@ -132,10 +135,12 @@ func (s *ServiceK8sMeta) initDomain() {
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
-			Interval:      60,
-			clusterID:     *flags.ClusterID,
-			clusterName:   *flags.ClusterName,
-			clusterRegion: *flags.ClusterRegion,
+			Interval:          60,
+			EnableLabels:      false,
+			EnableAnnotations: false,
+			clusterID:         *flags.ClusterID,
+			clusterName:       *flags.ClusterName,
+			clusterRegion:     *flags.ClusterRegion,
 		}
 	}
 }

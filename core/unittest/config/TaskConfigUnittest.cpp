@@ -39,6 +39,7 @@ protected:
 
 private:
     const string configName = "test";
+    const filesystem::path filepath = "/path/to/test";
 };
 
 void TaskConfigUnittest::HandleValidConfig() const {
@@ -56,7 +57,7 @@ void TaskConfigUnittest::HandleValidConfig() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
     APSARA_TEST_EQUAL(configName, config->mName);
     APSARA_TEST_EQUAL(1234567890U, config->mCreateTime);
@@ -77,7 +78,7 @@ void TaskConfigUnittest::HandleInvalidCreateTime() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->Parse());
     APSARA_TEST_EQUAL(0U, config->mCreateTime);
 }
@@ -96,7 +97,7 @@ void TaskConfigUnittest::HandleInvalidTask() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_FALSE(config->Parse());
 
     // no Type
@@ -110,7 +111,7 @@ void TaskConfigUnittest::HandleInvalidTask() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_FALSE(config->Parse());
 
     // Type is not of type string
@@ -124,7 +125,7 @@ void TaskConfigUnittest::HandleInvalidTask() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_FALSE(config->Parse());
 
     // unsupported Task
@@ -138,7 +139,7 @@ void TaskConfigUnittest::HandleInvalidTask() const {
     )";
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
-    config.reset(new TaskConfig(configName, std::move(configJson)));
+    config.reset(new TaskConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_FALSE(config->Parse());
 }
 

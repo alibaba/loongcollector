@@ -26,6 +26,9 @@ DECLARE_FLAG_INT32(mem_limit_num);
 DECLARE_FLAG_DOUBLE(cpu_usage_up_limit);
 DECLARE_FLAG_INT64(memory_usage_up_limit);
 
+// checkpoint
+DECLARE_FLAG_INT32(unused_checkpoints_clear_interval_sec);
+
 // epoll
 DECLARE_FLAG_INT32(ilogtail_epoll_time_out);
 DECLARE_FLAG_INT32(ilogtail_epoll_wait_events);
@@ -60,3 +63,4 @@ DECLARE_FLAG_STRING(third_party_dir);
 // ebpf event retry flags
 DECLARE_FLAG_INT32(ebpf_event_retry_interval_sec);
 DECLARE_FLAG_INT32(ebpf_event_retry_limit);
+DECLARE_FLAG_INT32(ebpf_max_aggregate_events);

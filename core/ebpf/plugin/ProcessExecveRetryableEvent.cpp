@@ -101,8 +101,11 @@ void ProcessExecveRetryableEvent::fillProcessPlainFields(const msg_execve_event&
     StringView ebpfDockerId(mRawEvent->kube.docker_id);
     if (!ebpfDockerId.empty()) {
         StringView containerId;
-        ProcParser::LookupContainerId(ebpfDockerId, true, containerId);
-        cacheValue.SetContentNoCopy<kContainerId>(containerId);
+        int offset = ProcParser::LookupContainerId(ebpfDockerId, true, containerId);
+        if (offset >= 0) {
+            // Must use SetContent because containerId points to temporary memory mRawEvent->kube.docker_id
+            cacheValue.SetContent<kContainerId>(containerId);
+        }
     }
 }
 
@@ -272,6 +275,7 @@ bool ProcessExecveRetryableEvent::incrementParentRef() {
         if (!value) {
             return false;
         }
+        mProcessCacheValue->mParent = value;
         mProcessCache.IncRef(key, value);
         LOG_DEBUG(sLogger,
                   ("pid", mProcessCacheValue->Get<kProcessId>())("ktime", mProcessCacheValue->Get<kKtime>())(

@@ -42,17 +42,14 @@ func (wrapper *ProcessorWrapperV2) Process(in *models.PipelineGroupEvents, conte
 	startTime := time.Now().UnixMilli()
 
 	wrapper.inEventGroupsTotal.Add(1)
-	wrapper.inEventsTotal.Add(int64(len(in.Events)))
-	for _, event := range in.Events {
-		wrapper.inSizeBytes.Add(event.GetSize())
-	}
+	wrapper.inEventsTotal.Add(in.GetEventCount())
+	wrapper.inSizeBytes.Add(in.GetSize())
 
 	wrapper.Processor.Process(in, context)
 
 	wrapper.outEventGroupsTotal.Add(1)
-	wrapper.outEventsTotal.Add(int64(len(in.Events)))
-	for _, event := range in.Events {
-		wrapper.outSizeBytes.Add(event.GetSize())
-	}
+	wrapper.outEventsTotal.Add(in.GetEventCount())
+	wrapper.outSizeBytes.Add(in.GetSize())
+
 	wrapper.totalProcessTimeMs.Add(time.Now().UnixMilli() - startTime)
 }

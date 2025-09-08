@@ -16,10 +16,10 @@
 
 #include <fstream>
 
-#include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"

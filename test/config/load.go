@@ -28,17 +28,13 @@ var (
 	CaseHome      string
 	CaseName      string
 	EngineLogFile string
-	ReportFile    string
-	PprofDir      string
-	ProfileFlag   bool
-	CoverageFile  string
 	FlusherFile   string
 	ConfigDir     string
 	LogDir        string
 )
 
 // Load E2E engine config and define the global variables.
-func Load(path string, profile bool) error {
+func Load(path string) error {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -49,11 +45,7 @@ func Load(path string, profile bool) error {
 	root, _ := filepath.Abs(".")
 	reportDir := root + "/report/"
 	EngineLogFile = reportDir + CaseName + "_engine.log"
-	CoverageFile = reportDir + CaseName + "_coverage.out"
-	ReportFile = reportDir + CaseName + "_report.json"
-	PprofDir = reportDir + CaseName + "_pprof"
 	LogDir = reportDir + CaseName + "_log"
-	ProfileFlag = profile
 
 	FlusherFile = reportDir + CaseName + "default_flusher.json"
 	return nil

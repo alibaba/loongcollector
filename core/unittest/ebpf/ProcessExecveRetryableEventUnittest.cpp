@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdint>
+#include <cstdio>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -55,11 +56,18 @@ void ProcessExecveRetryableEventUnittest::TestMsgExecveEventToProcessCacheValueN
 
     event.cleanup_key.pid = 1234;
     event.cleanup_key.ktime = 123456780;
+    snprintf(static_cast<char*>(event.kube.docker_id),
+             sizeof(event.kube.docker_id),
+             "%s",
+             "8d86bfbc2357a258945d40fe65c1553fe5e316f5d57edd451f65fec7fed58615");
 
     std::unique_ptr<ProcessExecveRetryableEvent> processExecveRetryableEvent(
         mWrapper.mProcessCacheManager->CreateProcessExecveRetryableEvent(&event));
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     processExecveRetryableEvent->fillProcessPlainFields(event, *cacheValue);
+    // deliberately set docker_id to empty, should not affect cacheValue->Get<kContainerId>()
+    snprintf(static_cast<char*>(event.kube.docker_id), sizeof(event.kube.docker_id), "%s", "");
+
     APSARA_TEST_EQUAL(cacheValue->mPPid, event.cleanup_key.pid);
     APSARA_TEST_EQUAL(cacheValue->mPKtime, event.cleanup_key.ktime);
     APSARA_TEST_EQUAL(cacheValue->Get<kProcessId>().to_string(), std::to_string(event.process.pid));
@@ -74,6 +82,8 @@ void ProcessExecveRetryableEventUnittest::TestMsgExecveEventToProcessCacheValueN
     APSARA_TEST_EQUAL(cacheValue->Get<kCapEffective>().to_string(),
                       std::string("CAP_CHOWN DAC_OVERRIDE CAP_FSETID CAP_KILL"));
     APSARA_TEST_EQUAL(cacheValue->Get<kCapInheritable>().to_string(), std::string("DAC_OVERRIDE CAP_KILL"));
+    APSARA_TEST_EQUAL(cacheValue->Get<kContainerId>().to_string(),
+                      std::string("8d86bfbc2357a258945d40fe65c1553fe5e316f5d57edd451f65fec7fed58615"));
 }
 
 void ProcessExecveRetryableEventUnittest::TestMsgExecveEventToProcessCacheValueLongFilename() {

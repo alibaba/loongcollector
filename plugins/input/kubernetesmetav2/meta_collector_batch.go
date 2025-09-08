@@ -19,8 +19,12 @@ func (m *metaCollector) processJobEntity(data *k8smeta.ObjectWrapper, method str
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", m.processEntityJSONObject(obj.Status))
 		containerInfos := []map[string]string{}
 		for _, container := range obj.Spec.Template.Spec.Containers {
@@ -49,8 +53,12 @@ func (m *metaCollector) processCronJobEntity(data *k8smeta.ObjectWrapper, method
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("schedule", obj.Spec.Schedule)
 		log.Contents.Add("suspend", safeGetBoolString(obj.Spec.Suspend))
 		return []models.PipelineEvent{log}

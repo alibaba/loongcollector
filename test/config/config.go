@@ -36,9 +36,6 @@ type Config struct {
 	SSHPassword string `mapstructure:"ssh_password" yaml:"ssh_password"`
 	// K8s
 	KubeConfigPath string `mapstructure:"kube_config_path" yaml:"kube_config_path"`
-	// docker compose
-	Profile          bool     `mapstructure:"profile" yaml:"profile"`
-	CoveragePackages []string `mapstructure:"coverage_packages" yaml:"coverage_packages"`
 	// SLS
 	Project         string        `mapstructure:"project" yaml:"project"`
 	Logstore        string        `mapstructure:"logstore" yaml:"logstore"`

@@ -18,6 +18,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
@@ -97,8 +98,9 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         EventPool* pool,
                                          RetryableEventCache& retryableEventCache)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
 
       mRetryableEventCache(retryableEventCache),
       mAggregateTree(
@@ -108,7 +110,7 @@ FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManag
           },
           [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>&) {
               auto* in = static_cast<FileEvent*>(ce.get());
-              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime);
           }) {
 }
 
@@ -117,13 +119,15 @@ int FileSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
-    WriteLock lk(this->mLock);
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
-    lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
@@ -131,7 +135,6 @@ int FileSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("empty nodes...", ""));
         return 0;
     }
-
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -145,22 +148,22 @@ int FileSecurityManager::SendEvents() {
         }
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
+            bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }
 
-            auto pathSb = sourceBuffer->CopyString(group->mPath);
             for (const auto& commonEvent : group->mInnerEvents) {
-                FileEvent* innerEvent = static_cast<FileEvent*>(commonEvent.get());
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 // attach process tags
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
+                auto pathSb = sourceBuffer->CopyString(innerEvent->mPath);
                 logEvent->SetContentNoCopy(kFilePath.LogKey(), StringView(pathSb.data, pathSb.size));
                 // set callnames
                 switch (innerEvent->mEventType) {
@@ -203,25 +206,18 @@ int FileSecurityManager::SendEvents() {
             return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        size_t eventCount = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        int maxRetry = 5;
-        for (int retry = 0; retry < maxRetry; ++retry) {
-            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (retry == maxRetry - 1) {
-                LOG_WARNING(sLogger,
-                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                "[ProcessSecurityEvent] push queue failed!", ""));
-                // TODO: Alarm discard data
-            }
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[FileSecurityEvent] push queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventCount);
         }
     }
-    mLastSendTimeMs = nowMs;
     return 0;
 }
 
