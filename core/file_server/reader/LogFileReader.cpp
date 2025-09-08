@@ -335,8 +335,9 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             // last update time is new and the file's container is not stopped we
             // we should use first modify
             if ((checkPointPtr->mFileOpenFlag
-                || ((int32_t)time(NULL) - checkPointPtr->mLastUpdateTime < INT32_FLAG(skip_first_modify_time)
-                    && !mContainerStopped)) && (mIdxInReaderArrayFromLastCpt!=LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP)) {
+                 || ((int32_t)time(NULL) - checkPointPtr->mLastUpdateTime < INT32_FLAG(skip_first_modify_time)
+                     && !mContainerStopped))
+                && (mIdxInReaderArrayFromLastCpt != LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP)) {
                 mSkipFirstModify = false;
             } else {
                 mSkipFirstModify = true;
