@@ -33,6 +33,9 @@ if (ENABLE_ENTERPRISE)
 
     add_executable(enterprise_flusher_sls_monitor_unittest EnterpriseFlusherSLSMonitorUnittest.cpp)
     target_link_libraries(enterprise_flusher_sls_monitor_unittest ${UT_BASE_TARGET})
+
+    add_executable(enterprise_credentials_provider_unittest EnterpriseCredentialsProviderUnittest.cpp)
+    target_link_libraries(enterprise_credentials_provider_unittest ${UT_BASE_TARGET})
 endif ()
 
 include(GoogleTest)
@@ -42,4 +45,5 @@ gtest_discover_tests(sls_client_manager_unittest)
 if (ENABLE_ENTERPRISE)
     gtest_discover_tests(enterprise_sls_client_manager_unittest)
     gtest_discover_tests(enterprise_flusher_sls_monitor_unittest)
+    gtest_discover_tests(enterprise_credentials_provider_unittest)
 endif ()

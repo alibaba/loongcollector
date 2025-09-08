@@ -25,6 +25,7 @@ using namespace std::chrono;
 #include <grp.h>
 #include <mntent.h>
 #include <pwd.h>
+#include <sys/statvfs.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -404,7 +405,6 @@ bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInf
             break;
         }
     }
-    systemInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -446,7 +446,6 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
             cpuInfo.stats.push_back(cpuStat);
         }
     }
-    cpuInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -477,7 +476,6 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
             }
         }
     }
-    processListInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -489,7 +487,6 @@ bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformati
         return false;
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
-    processInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -799,6 +796,10 @@ bool LinuxSystemInterface::GetDiskSerialIdInformationOnce(std::string diskName, 
     return true;
 }
 
+template <typename T>
+T DiffOrZero(const T& a, const T& b) {
+    return a > b ? a - b : T{0};
+}
 bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) {
     std::vector<std::string> diskLines = {};
     std::string errorMessage;
@@ -868,6 +869,40 @@ bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& dis
 
     return true;
 }
+
+bool LinuxSystemInterface::GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) {
+    struct statvfs buffer {};
+    int status = statvfs(dirName.c_str(), &buffer);
+    if (status != 0) {
+        LOG_ERROR(sLogger, ("get filesystem infomation error", dirName)("error status", status));
+        return false;
+    }
+
+    // 单位是: KB
+    uint64_t bsize = buffer.f_frsize / 512;
+    fileSystemInfo.fileSystemState.total = ((buffer.f_blocks * bsize) >> 1);
+    fileSystemInfo.fileSystemState.free = ((buffer.f_bfree * bsize) >> 1);
+    fileSystemInfo.fileSystemState.avail = ((buffer.f_bavail * bsize) >> 1); // 非超级用户最大可使用的磁盘量
+    fileSystemInfo.fileSystemState.used
+        = DiffOrZero(fileSystemInfo.fileSystemState.total, fileSystemInfo.fileSystemState.free);
+    fileSystemInfo.fileSystemState.files = buffer.f_files;
+    fileSystemInfo.fileSystemState.freeFiles = buffer.f_ffree;
+
+    // 此处为用户可使用的磁盘量，可能会与fileSystemInfo.total有差异。也就是说:
+    // 当total < fileSystemInfo.total时，表明即使磁盘仍有空间，用户也申请不到了
+    // 毕竟OS维护磁盘，会占掉一部分，比如文件分配表，目录文件等。
+    uint64_t total = fileSystemInfo.fileSystemState.used + fileSystemInfo.fileSystemState.avail;
+    uint64_t used = fileSystemInfo.fileSystemState.used;
+    double percent = 0;
+    if (total != 0) {
+        // 磁盘占用率，使用的是用户最大可用磁盘总量来的，而非物理磁盘总量
+        percent = (double)used / (double)total;
+    }
+    fileSystemInfo.fileSystemState.use_percent = percent;
+
+    return true;
+}
+
 bool LinuxSystemInterface::GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) {
     NetState netState;
 

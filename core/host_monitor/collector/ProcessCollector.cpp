@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <boost/program_options.hpp>
+#include <chrono>
 #include <filesystem>
 #include <string>
 #include <thread>
@@ -38,8 +39,10 @@
 
 namespace logtail {
 
-DEFINE_FLAG_INT32(process_report_top_N, "number of process reported with Top N cpu percent", 5);
-DEFINE_FLAG_INT32(process_total_count, "number of each calculate epoch to report", 3);
+DEFINE_FLAG_INT32(host_monitor_process_report_top_N, "number of process reported with Top N cpu percent", 5);
+DEFINE_FLAG_INT32(basic_host_monitor_process_collect_interval,
+                  "basic host monitor process collect interval, seconds",
+                  5);
 #define PATH_MAX 4096
 
 // topN进行的缓存为55s
@@ -68,50 +71,47 @@ std::string GetPathBase(std::string filePath) {
     return {&sep, &sep + 1};
 }
 
-ProcessCollector::ProcessCollector() {
-    Init(INT32_FLAG(process_total_count), INT32_FLAG(process_report_top_N));
-}
-
 static inline void GetProcessCpuSorted(std::vector<ProcessAllStat>& allPidStats) {
     std::sort(allPidStats.begin(), allPidStats.end(), [](const ProcessAllStat& a, const ProcessAllStat& b) {
         return a.processCpu.percent > b.processCpu.percent;
     });
 }
 
-int ProcessCollector::Init(int processTotalCount, int processReportTopN) {
-    MemoryInformation meminfo;
+ProcessCollector::ProcessCollector() : mTopN(INT32_FLAG(host_monitor_process_report_top_N)) {
+}
 
-    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(meminfo)) {
+bool ProcessCollector::Init(HostMonitorContext& collectContext) {
+    if (!BaseCollector::Init(collectContext)) {
         return false;
     }
 
+    MemoryInformation meminfo;
+    if (!SystemInterface::GetInstance()->GetHostMemInformationStat(collectContext.GetMetricTime(), meminfo)) {
+        return false;
+    }
     mTotalMemory = meminfo.memStat.total;
-    mCountPerReport = processTotalCount;
-    mTopN = processReportTopN;
-
-    return 0;
+    return true;
 }
 
-bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
+    collectContext.mCount++;
 
     ProcessListInformation processListInfo;
 
-    if (!SystemInterface::GetInstance()->GetProcessListInformation(processListInfo)) {
+    if (!SystemInterface::GetInstance()->GetProcessListInformation(collectContext.GetMetricTime(), processListInfo)) {
         return false;
     }
 
     pids = processListInfo.pids;
 
-    time_t now = time(nullptr);
-
     // 获取每一个进程的信息
     std::vector<ProcessAllStat> allPidStats;
     for (auto pid : pids) {
         ProcessAllStat stat;
-        if (!GetProcessAllStat(pid, stat)) {
+        if (!GetProcessAllStat(collectContext.mCollectTime, pid, stat)) {
             continue;
         }
         allPidStats.push_back(stat);
@@ -158,8 +158,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
         }
     }
 
-    mCount++;
-    if (mCount < mCountPerReport) {
+    if (collectContext.mCount < collectContext.mCountPerReport) {
         return true;
     }
 
@@ -174,9 +173,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     if (!metricEvent) {
         return false;
     }
-    // refresh the time point
-    now = time(nullptr);
-    metricEvent->SetTimestamp(now, 0);
+    metricEvent->SetTimestamp(processListInfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     std::vector<std::string> vmNames = {
@@ -199,7 +196,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
         MetricEvent* metricEventEachPid = group->AddMetricEvent(true);
-        metricEventEachPid->SetTimestamp(now, 0);
+        metricEventEachPid->SetTimestamp(processListInfo.collectTime, 0);
         metricEventEachPid->SetValue<UntypedMultiDoubleValues>(metricEventEachPid);
         auto* multiDoubleValuesEachPid = metricEventEachPid->MutableValue<UntypedMultiDoubleValues>();
         // 上传每一个pid对应的值
@@ -248,7 +245,7 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失
-    mCount = 0;
+    collectContext.mCount = 0;
     mVMProcessNumStat.Reset();
     mProcessPushMertic.clear();
     mAvgProcessCpuPercent.clear();
@@ -264,24 +261,24 @@ bool ProcessCollector::Collect(const HostMonitorTimerEvent::CollectConfig& colle
 }
 
 // 获取某个pid的信息
-bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat) {
+bool ProcessCollector::GetProcessAllStat(const CollectTime& collectTime, pid_t pid, ProcessAllStat& processStat) {
     // 获取这个pid的cpu信息
     processStat.pid = pid;
 
-    if (!GetProcessCpuInformation(pid, processStat.processCpu)) {
+    if (!GetProcessCpuInformation(collectTime, pid, processStat.processCpu)) {
         return false;
     }
 
-    if (!GetProcessState(pid, processStat.processState)) {
+    if (!GetProcessState(collectTime.mMetricTime, pid, processStat.processState)) {
         return false;
     }
 
-    if (!GetProcessMemory(pid, processStat.processMemory)) {
+    if (!GetProcessMemory(collectTime.mMetricTime, pid, processStat.processMemory)) {
         return false;
     }
 
     ProcessFd procFd;
-    if (!GetProcessFdNumber(pid, procFd)) {
+    if (!GetProcessFdNumber(collectTime.mMetricTime, pid, procFd)) {
         return false;
     }
     processStat.fdNum = procFd.total;
@@ -291,18 +288,18 @@ bool ProcessCollector::GetProcessAllStat(pid_t pid, ProcessAllStat& processStat)
     return true;
 }
 
-bool ProcessCollector::GetProcessCredName(pid_t pid, ProcessCredName& processCredName) {
-    if (!SystemInterface::GetInstance()->GetProcessCredNameObj(pid, processCredName)) {
+bool ProcessCollector::GetProcessCredName(time_t now, pid_t pid, ProcessCredName& processCredName) {
+    if (!SystemInterface::GetInstance()->GetProcessCredNameObj(now, pid, processCredName)) {
         return false;
     }
     return true;
 }
 
-bool ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args) {
+bool ProcessCollector::GetProcessArgs(time_t now, pid_t pid, std::vector<std::string>& args) {
     std::string cmdline;
 
     ProcessCmdlineString processCMDline;
-    if (!SystemInterface::GetInstance()->GetProcessCmdlineString(pid, processCMDline)) {
+    if (!SystemInterface::GetInstance()->GetProcessCmdlineString(now, pid, processCMDline)) {
         return false;
     }
     if (processCMDline.cmdline.empty()) {
@@ -318,9 +315,9 @@ bool ProcessCollector::GetProcessArgs(pid_t pid, std::vector<std::string>& args)
     return true;
 }
 
-std::string ProcessCollector::GetExecutablePath(pid_t pid) {
+std::string ProcessCollector::GetExecutablePath(time_t now, pid_t pid) {
     ProcessExecutePath processExecutePath;
-    if (!SystemInterface::GetInstance()->GetExecutablePathCache(pid, processExecutePath)) {
+    if (!SystemInterface::GetInstance()->GetExecutablePathCache(now, pid, processExecutePath)) {
         return "";
     }
     return processExecutePath.path;
@@ -328,23 +325,23 @@ std::string ProcessCollector::GetExecutablePath(pid_t pid) {
 
 // argus 的进程path是通过readlink /proc/pid/exe 获取的
 // args 是通过 /proc/pid/cmdline 获取的
-bool ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
+bool ProcessCollector::GetProcessInfo(time_t now, pid_t pid, ProcessInfo& processInfo) {
     std::string user = "unknown";
     ProcessCredName processCredName;
 
-    if (GetProcessCredName(pid, processCredName)) {
+    if (GetProcessCredName(now, pid, processCredName)) {
         user = processCredName.user;
     }
 
     std::vector<std::string> args;
-    if (GetProcessArgs(pid, args)) {
+    if (GetProcessArgs(now, pid, args)) {
         processInfo.args = args.front();
         for (size_t i = 1; i < args.size(); i++) {
             processInfo.args += " " + args[i];
         }
     }
 
-    processInfo.path = GetExecutablePath(pid);
+    processInfo.path = GetExecutablePath(now, pid);
     processCredName.name = GetPathBase(processInfo.path);
     if (processCredName.name == ".") {
         processCredName.name = "unknown";
@@ -358,8 +355,8 @@ bool ProcessCollector::GetProcessInfo(pid_t pid, ProcessInfo& processInfo) {
 }
 
 // 获取进程文件数信息
-bool ProcessCollector::GetProcessFdNumber(pid_t pid, ProcessFd& processFd) {
-    if (!SystemInterface::GetInstance()->GetProcessOpenFiles(pid, processFd)) {
+bool ProcessCollector::GetProcessFdNumber(time_t now, pid_t pid, ProcessFd& processFd) {
+    if (!SystemInterface::GetInstance()->GetProcessOpenFiles(now, pid, processFd)) {
         return false;
     }
 
@@ -367,17 +364,17 @@ bool ProcessCollector::GetProcessFdNumber(pid_t pid, ProcessFd& processFd) {
 }
 
 // 获取pid的内存信息
-bool ProcessCollector::GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory) {
-    ProcessStat processStat;
+bool ProcessCollector::GetProcessMemory(time_t now, pid_t pid, ProcessMemoryInformation& processMemory) {
+    ProcessInformation processInfo;
 
-    if (!ReadProcessStat(pid, processStat)) {
+    if (!ReadProcessStat(now, pid, processInfo)) {
         return false;
     }
-    processMemory.minorFaults = processStat.minorFaults;
-    processMemory.majorFaults = processStat.majorFaults;
-    processMemory.pageFaults = processStat.minorFaults + processStat.majorFaults;
+    processMemory.minorFaults = processInfo.stat.minorFaults;
+    processMemory.majorFaults = processInfo.stat.majorFaults;
+    processMemory.pageFaults = processInfo.stat.minorFaults + processInfo.stat.majorFaults;
 
-    if (!SystemInterface::GetInstance()->GetPorcessStatm(pid, processMemory)) {
+    if (!SystemInterface::GetInstance()->GetPorcessStatm(now, pid, processMemory)) {
         return false;
     }
 
@@ -385,10 +382,10 @@ bool ProcessCollector::GetProcessMemory(pid_t pid, ProcessMemoryInformation& pro
 }
 
 // 获取pid的状态信息
-bool ProcessCollector::GetProcessState(pid_t pid, ProcessStat& processState) {
+bool ProcessCollector::GetProcessState(time_t now, pid_t pid, ProcessStat& processState) {
     ProcessInformation processInfo;
 
-    if (!ReadProcessStat(pid, processInfo.stat)) {
+    if (!ReadProcessStat(now, pid, processInfo)) {
         return false;
     }
 
@@ -412,7 +409,10 @@ bool ProcessCollector::GetProcessCpuInCache(pid_t pid) {
     }
 }
 
-bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information) {
+
+bool ProcessCollector::GetProcessCpuInformation(const CollectTime& collectTime,
+                                                pid_t pid,
+                                                ProcessCpuInformation& information) {
     const auto now = std::chrono::steady_clock::now();
     bool findCache = false;
     ProcessCpuInformation* prev = nullptr;
@@ -421,12 +421,12 @@ bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation
     // 但是我们这里不应该睡眠，因此只能做一个cache，保存上一次获取的数据
     findCache = GetProcessCpuInCache(pid);
 
-    information.lastTime = now;
     ProcessTime processTime{};
 
-    if (!GetProcessTime(pid, processTime)) {
+    if (!GetProcessTime(collectTime.mMetricTime, pid, processTime)) {
         return false;
     }
+    information.lastTime = collectTime.GetShiftSteadyTime(processTime.collectTime);
 
     if (findCache) {
         // cache found, calculate the cpu percent
@@ -435,7 +435,6 @@ bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation
             prev = &recordedEntity->second;
         }
     } else {
-        information.lastTime = now;
         information.percent = 0.0;
         information.sys = processTime.sys.count();
         information.user = processTime.user.count();
@@ -444,12 +443,12 @@ bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation
         return true;
     }
 
-    int64_t timeDiff = std::chrono::duration_cast<std::chrono::milliseconds>(now - prev->lastTime).count();
+    int64_t timeDiff
+        = std::chrono::duration_cast<std::chrono::milliseconds>(information.lastTime - prev->lastTime).count();
 
     // update the cache
     using namespace std::chrono;
     information.startTime = processTime.startTime;
-    information.lastTime = now;
     information.user = processTime.user.count();
     information.sys = processTime.sys.count();
     information.total = processTime.total.count();
@@ -461,10 +460,10 @@ bool ProcessCollector::GetProcessCpuInformation(pid_t pid, ProcessCpuInformation
     return true;
 }
 
-bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output) {
+bool ProcessCollector::GetProcessTime(time_t now, pid_t pid, ProcessTime& output) {
     ProcessInformation processInfo;
 
-    if (!ReadProcessStat(pid, processInfo.stat)) {
+    if (!ReadProcessStat(now, pid, processInfo)) {
         return false;
     }
 
@@ -477,6 +476,7 @@ bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output) {
 
     output.total = std::chrono::milliseconds(output.user + output.sys);
 
+    output.collectTime = processInfo.collectTime;
     return true;
 }
 
@@ -485,35 +485,10 @@ bool ProcessCollector::GetProcessTime(pid_t pid, ProcessTime& output) {
 // 171 18446744073709551615 4194304 4238788 140727020025920 0 0 0 0 0 0 0 0 0 17
 // 3 0 0 0 0 0 6336016 6337300 21442560 140727020027760 140727020027777
 // 140727020027777 140727020027887 0
-bool ProcessCollector::ReadProcessStat(pid_t pid, ProcessStat& processStat) {
-    processStat.pid = pid;
-    ProcessInformation processInfo{};
-    if (!SystemInterface::GetInstance()->GetProcessInformation(pid, processInfo)) {
+bool ProcessCollector::ReadProcessStat(time_t now, pid_t pid, ProcessInformation& processInfo) {
+    if (!SystemInterface::GetInstance()->GetProcessInformation(now, pid, processInfo)) {
         return false;
     }
-
-    processStat.name = processInfo.stat.name;
-
-    processStat.state = processInfo.stat.state;
-    processStat.parentPid = processInfo.stat.parentPid;
-    processStat.priority = processInfo.stat.priority;
-    processStat.nice = processInfo.stat.nice;
-    processStat.numThreads = processInfo.stat.numThreads;
-    processStat.tty = processInfo.stat.tty;
-    processStat.minorFaults = processInfo.stat.minorFaults;
-    processStat.majorFaults = processInfo.stat.majorFaults;
-
-    processStat.utimeTicks = processInfo.stat.utimeTicks;
-    processStat.stimeTicks = processInfo.stat.stimeTicks;
-    processStat.cutimeTicks = processInfo.stat.cutimeTicks;
-    processStat.cstimeTicks = processInfo.stat.cstimeTicks;
-
-    // startTicks is int64_t type
-    processStat.startTicks = processInfo.stat.startTicks;
-    processStat.vSize = processInfo.stat.vSize;
-    processStat.rss = processInfo.stat.rss;
-    processStat.processor = processInfo.stat.processor;
-
     return true;
 }
 
@@ -538,6 +513,10 @@ void ProcessCollector::ClearProcessCpuTimeCache() {
     }
 
     return;
+}
+
+const std::chrono::seconds ProcessCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_process_collect_interval));
 }
 
 } // namespace logtail

@@ -26,34 +26,36 @@
 
 #include "MetricValue.h"
 #include "common/StringTools.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "logger/Logger.h"
+
+DEFINE_FLAG_INT32(basic_host_monitor_net_collect_interval, "basic host monitor net collect interval, seconds", 1);
 
 namespace logtail {
 
 const std::string NetCollector::sName = "net";
 
-NetCollector::NetCollector() {
-    Init();
-}
-
-int NetCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
+bool NetCollector::Init(HostMonitorContext& collectContext) {
+    if (!BaseCollector::Init(collectContext)) {
+        return false;
+    }
     mLastTime = std::chrono::steady_clock::now();
-    return 0;
+    return true;
 }
 
-bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
+bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
     if (group == nullptr) {
         return false;
     }
+    collectContext.mCount++;
     TCPStatInformation resTCPStat;
     NetInterfaceInformation netInterfaces;
 
-    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point start = collectContext.GetScheduleTime();
 
-    if (!(SystemInterface::GetInstance()->GetTCPStatInformation(resTCPStat)
-          && SystemInterface::GetInstance()->GetNetInterfaceInformation(netInterfaces))) {
+    if (!(SystemInterface::GetInstance()->GetTCPStatInformation(collectContext.GetMetricTime(), resTCPStat)
+          && SystemInterface::GetInstance()->GetNetInterfaceInformation(collectContext.GetMetricTime(),
+                                                                        netInterfaces))) {
         mLastTime = start;
         return false;
     }
@@ -72,7 +74,6 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         }
     }
 
-    mCount++;
     double interval = std::chrono::duration_cast<std::chrono::duration<double>>(start - mLastTime).count();
 
     // tcp
@@ -145,14 +146,12 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         mLastInterfaceMetrics[curname] = netInterfaceMetric;
     }
 
-    if (mCount < mCountPerReport) {
+    if (collectContext.mCount < collectContext.mCountPerReport) {
         mLastTime = start;
         return true;
     }
 
-    const time_t now = time(nullptr);
     auto hostname = LoongCollectorMonitor::GetInstance()->mHostname;
-
 
     // 入方向、出方向 的 丢包率
     // 每秒发、收 的 字节数、包数
@@ -166,7 +165,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
             return false;
         }
 
-        metricEvent->SetTimestamp(now, 0);
+        metricEvent->SetTimestamp(netInterfaces.collectTime, 0);
         metricEvent->SetTag(std::string("hostname"), hostname);
         metricEvent->SetTag(std::string("device"), curname);
         metricEvent->SetTag(std::string("IP"), mDevIp[curname]);
@@ -231,7 +230,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         mLastTime = start;
         return false;
     }
-    listenEvent->SetTimestamp(now, 0);
+    listenEvent->SetTimestamp(resTCPStat.collectTime, 0);
     listenEvent->SetTag(std::string("state"), std::string("LISTEN"));
     listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
     listenEvent->SetValue<UntypedMultiDoubleValues>(listenEvent);
@@ -253,7 +252,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         mLastTime = start;
         return false;
     }
-    establishedEvent->SetTimestamp(now, 0);
+    establishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
     establishedEvent->SetTag(std::string("state"), std::string("ESTABLISHED"));
     establishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
     establishedEvent->SetValue<UntypedMultiDoubleValues>(establishedEvent);
@@ -275,7 +274,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         mLastTime = start;
         return false;
     }
-    nonestablishedEvent->SetTimestamp(now, 0);
+    nonestablishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
     nonestablishedEvent->SetTag(std::string("state"), std::string("NON_ESTABLISHED"));
     nonestablishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
@@ -297,7 +296,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         mLastTime = start;
         return false;
     }
-    totalEvent->SetTimestamp(now, 0);
+    totalEvent->SetTimestamp(resTCPStat.collectTime, 0);
     totalEvent->SetTag(std::string("state"), std::string("TCP_TOTAL"));
     totalEvent->SetTag(std::string("m"), std::string("system.tcp"));
     totalEvent->SetValue<UntypedMultiDoubleValues>(totalEvent);
@@ -315,7 +314,7 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
 
 
-    mCount = 0;
+    collectContext.mCount = 0;
     mLastTime = start;
 
     // 清理掉mLastInterfaceMetrics中，curDevNames中不存在的设备名
@@ -348,5 +347,8 @@ bool NetCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectCo
     return true;
 }
 
+const std::chrono::seconds NetCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_net_collect_interval));
+}
 
 } // namespace logtail
