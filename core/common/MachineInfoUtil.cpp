@@ -446,7 +446,7 @@ bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashP
     bashPath.append("/etc/redhat-release");
     os.clear();
     std::string content, exception;
-    if (FileReadResult::kOK != ReadFileContent(bashPath, content)) {
+    if (FileReadResult::kOK != ReadFileContent(bashPath, content, kDefaultMaxFileSize)) {
         return false;
     }
     boost::match_results<const char*> what;
@@ -534,7 +534,7 @@ bool InstanceIdentity::InitFromFile() {
     ECSMeta meta;
     if (CheckExistance(mInstanceIdentityFile)) {
         std::string instanceIdentityStr;
-        if (FileReadResult::kOK != ReadFileContent(mInstanceIdentityFile, instanceIdentityStr)) {
+        if (FileReadResult::kOK != ReadFileContent(mInstanceIdentityFile, instanceIdentityStr, kDefaultMaxFileSize)) {
             Json::Value doc;
             std::string errMsg;
             if (!ParseJsonTable(instanceIdentityStr, doc, errMsg)) {
@@ -656,7 +656,7 @@ void InstanceIdentity::getSerialNumberFromEcsAssist() {
         return;
     }
     if (CheckExistance(mEcsAssistMachineIdFile)) {
-        if (FileReadResult::kOK != ReadFileContent(mEcsAssistMachineIdFile, mSerialNumber)) {
+        if (FileReadResult::kOK != ReadFileContent(mEcsAssistMachineIdFile, mSerialNumber, kDefaultMaxFileSize)) {
             mSerialNumber = "";
         }
     }

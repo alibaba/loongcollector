@@ -181,7 +181,7 @@ std::string ProcParser::readPidLink(uint32_t pid, const std::string& filename) c
 std::string ProcParser::readPidFile(uint32_t pid, const std::string& filename) const {
     std::filesystem::path fpath = mProcPath / std::to_string(pid) / filename;
     std::string content;
-    if (FileReadResult::kOK != ReadFileContent(fpath, content)) {
+    if (FileReadResult::kOK != ReadFileContent(fpath, content, kDefaultMaxFileSize)) {
         return "";
     }
     return content;
@@ -344,7 +344,7 @@ int ProcParser::LookupContainerId(const StringView& cgroupline, bool bpfSource, 
 
 int ProcParser::GetContainerId(const std::string& cgroupPath, std::string& containerId) {
     std::string content;
-    if (FileReadResult::kOK != ReadFileContent(cgroupPath, content)) {
+    if (FileReadResult::kOK != ReadFileContent(cgroupPath, content, kDefaultMaxFileSize)) {
         LOG_WARNING(sLogger, ("Failed to read cgroup file", cgroupPath));
         containerId.clear();
         return -1;
@@ -503,7 +503,7 @@ bool ProcParser::ReadProcessStat(pid_t pid, ProcessStat& ps) const {
     auto processStat = mProcPath / std::to_string(pid) / "stat";
 
     std::string line;
-    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
+    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line, kDefaultMaxFileSize)) {
         LOG_WARNING(sLogger, ("read process stat", "fail")("file", processStat));
         return false;
     }
@@ -601,7 +601,7 @@ bool ProcParser::ReadProcessStatus(pid_t pid, ProcessStatus& ps) const {
     auto processStatus = mProcPath / std::to_string(pid) / "status";
 
     std::string content;
-    if (FileReadResult::kOK != ReadFileContent(processStatus.string(), content)) {
+    if (FileReadResult::kOK != ReadFileContent(processStatus.string(), content, kDefaultMaxFileSize)) {
         LOG_WARNING(sLogger, ("read process status", "fail")("file", processStatus));
         return false;
     }

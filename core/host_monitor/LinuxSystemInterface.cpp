@@ -482,7 +482,7 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
 bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) {
     auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
     std::string line;
-    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
+    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line, kDefaultMaxFileSize)) {
         LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
         return false;
     }
