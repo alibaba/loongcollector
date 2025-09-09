@@ -30,6 +30,9 @@ if(UNIX AND NOT ENABLE_ENTERPRISE)
 
     add_executable(kafka_producer_unittest KafkaProducerUnittest.cpp)
     target_link_libraries(kafka_producer_unittest ${UT_BASE_TARGET})
+
+    add_executable(topic_format_parser_unittest TopicFormatParserUnittest.cpp)
+    target_link_libraries(topic_format_parser_unittest ${UT_BASE_TARGET})
 endif()
 
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
@@ -37,10 +40,6 @@ target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
 
 add_executable(sls_client_manager_unittest SLSClientManagerUnittest.cpp)
 target_link_libraries(sls_client_manager_unittest ${UT_BASE_TARGET})
-
-# TopicFormatParser tests do not depend on platform-specific Kafka runtime
-add_executable(topic_format_parser_unittest TopicFormatParserUnittest.cpp)
-target_link_libraries(topic_format_parser_unittest ${UT_BASE_TARGET})
 
 if (ENABLE_ENTERPRISE)
     add_executable(enterprise_sls_client_manager_unittest EnterpriseSLSClientManagerUnittest.cpp SLSNetworkRequestMock.cpp)
@@ -59,10 +58,10 @@ if(UNIX AND NOT ENABLE_ENTERPRISE)
     gtest_discover_tests(flusher_kafka_unittest)
     gtest_discover_tests(kafka_util_unittest)
     gtest_discover_tests(kafka_producer_unittest)
+    gtest_discover_tests(topic_format_parser_unittest)
 endif()
 gtest_discover_tests(pack_id_manager_unittest)
 gtest_discover_tests(sls_client_manager_unittest)
-gtest_discover_tests(topic_format_parser_unittest)
 if (ENABLE_ENTERPRISE)
     gtest_discover_tests(enterprise_sls_client_manager_unittest)
     gtest_discover_tests(enterprise_flusher_sls_monitor_unittest)
