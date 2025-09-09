@@ -66,9 +66,7 @@ public:
     std::string GetExecutablePath(time_t now, pid_t pid);
 
 protected:
-    bool GetProcessCpuInformation(const CollectTime& collectTime,
-                                  pid_t pid,
-                                  ProcessCpuInformation& information);
+    bool GetProcessCpuInformation(const CollectTime& collectTime, pid_t pid, ProcessCpuInformation& information);
 
     bool GetProcessCpuInCache(pid_t pid);
 
