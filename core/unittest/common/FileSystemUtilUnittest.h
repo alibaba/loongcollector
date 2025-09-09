@@ -494,7 +494,7 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     FileReadResult ret = ReadFileContent((mTestRoot / "not—exist-file").string(), content, kDefaultMaxFileSize);
     EXPECT_EQ(FileReadResult::kError, ret);
 
-    ret = ReadFileContent(filePath, conten, kDefaultMaxFileSize);
+    ret = ReadFileContent(filePath, content, kDefaultMaxFileSize);
 
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_EQ(1024 * 1024UL, content.size());
