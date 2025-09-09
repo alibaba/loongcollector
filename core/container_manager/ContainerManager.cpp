@@ -13,10 +13,14 @@
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/StringTools.h"
+#include "constants/Constants.h"
+#include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "monitor/Monitor.h"
+#include "monitor/SelfMonitorServer.h"
 
 namespace logtail {
 
@@ -101,7 +105,20 @@ void ContainerManager::ApplyContainerDiffs() {
         for (const auto& container : diff->mRemoved) {
             options->DeleteRawContainerInfo(container);
         }
+
+        // Collect all container IDs from the diff for creating config result
+        std::vector<std::string> containerIDs;
+        const auto& containerInfos = options->GetContainerInfo();
+        if (containerInfos) {
+            for (const auto& info : *containerInfos) {
+                containerIDs.push_back(info.mRawContainerInfo->mID);
+            }
+        }
+        // Create and store container config result
+        ContainerConfigResult configResult = CreateContainerConfigResult(options, ctx, containerIDs);
+        mConfigContainerResultMap[ctx->GetConfigName()] = configResult;
     }
+    sendConfigContainerInfo();
     mConfigContainerDiffMap.clear();
 }
 
@@ -123,6 +140,66 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
     }
     return isUpdate;
 }
+
+void ContainerManager::UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
+    WriteLock lock(mConfigContainerInfoPipelineMux);
+    mConfigContainerInfoPipelineCtx = ctx;
+    mConfigContainerInfoInputIndex = inputIndex;
+    LOG_INFO(sLogger, ("config container info pipeline", "updated"));
+}
+
+void ContainerManager::RemoveConfigContainerInfoPipeline() {
+    WriteLock lock(mConfigContainerInfoPipelineMux);
+    mConfigContainerInfoPipelineCtx = nullptr;
+    mConfigContainerInfoInputIndex = 0;
+    LOG_INFO(sLogger, ("config container info pipeline", "removed"));
+}
+
+void ContainerManager::sendConfigContainerInfo() {
+    ReadLock lock(mConfigContainerInfoPipelineMux);
+    if (mConfigContainerInfoPipelineCtx == nullptr) {
+        return;
+    }
+
+    PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
+    pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+    //pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, "__config_container_info__");
+    
+    for (const auto& pair : mConfigContainerResultMap) {
+        LogEvent* logEventPtr = pipelineEventGroup.AddLogEvent();
+        time_t logtime = time(nullptr);
+
+        logEventPtr->SetTimestamp(logtime);
+
+        // Set all fields according to Go implementation
+        logEventPtr->SetContent("type", pair.second.DataType);
+        logEventPtr->SetContent("project", pair.second.Project);
+        logEventPtr->SetContent("logstore", pair.second.Logstore);
+
+        // Handle config_name with $ separator logic like Go version
+        std::string configName = pair.second.ConfigName;
+        size_t dollarPos = configName.find('$');
+        if (dollarPos != std::string::npos && dollarPos + 1 < configName.length()) {
+            configName = configName.substr(dollarPos + 1);
+        }
+        logEventPtr->SetContent("config_name", configName);
+
+        logEventPtr->SetContent("input.source_addresses", pair.second.SourceAddress);
+        logEventPtr->SetContent("input.path_exist_container_ids", pair.second.PathExistInputContainerIDs);
+        logEventPtr->SetContent("input.path_not_exist_container_ids", pair.second.PathNotExistInputContainerIDs);
+        logEventPtr->SetContent("input.type", pair.second.InputType);
+        logEventPtr->SetContent("input.container_file", pair.second.InputIsContainerFile);
+        logEventPtr->SetContent("flusher.type", pair.second.FlusherType);
+        logEventPtr->SetContent("flusher.target_addresses", pair.second.FlusherTargetAddress);
+    }
+    mConfigContainerResultMap.clear();
+
+    if (pipelineEventGroup.GetEvents().size() > 0) {
+        ProcessorRunner::GetInstance()->PushQueue(
+            mConfigContainerInfoPipelineCtx->GetProcessQueueKey(), mConfigContainerInfoInputIndex, std::move(pipelineEventGroup));
+    }
+}
+    
 
 bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx) {
@@ -153,6 +230,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     if (diff.IsEmpty()) {
         return false;
     }
+
     LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
     mConfigContainerDiffMap[ctx->GetConfigName()] = std::make_shared<ContainerDiff>(diff);
     return true;
@@ -227,6 +305,51 @@ void ContainerManager::refreshAllContainersSnapshot() {
     mLastUpdateTime = time(nullptr);
 }
 
+
+ContainerConfigResult ContainerManager::CreateContainerConfigResult(
+    const FileDiscoveryOptions* options,
+    const CollectionPipelineContext* ctx,
+    const std::vector<std::string>& containerIDs) {
+    ContainerConfigResult result;
+
+    if (!options || !ctx) {
+        LOG_WARNING(sLogger, ("CreateContainerConfigResult failed", "options or ctx is null"));
+        return result;
+    }
+
+    // Basic config information
+    result.DataType = "container_config_result";
+    result.Project = ctx->GetProjectName();
+    result.Logstore = ctx->GetLogstoreName();
+    result.ConfigName = ctx->GetConfigName();
+
+    // Container IDs - join with semicolon like in Go version
+    if (!containerIDs.empty()) {
+        std::string containerIDStr;
+        for (size_t i = 0; i < containerIDs.size(); ++i) {
+            if (i > 0) {
+                containerIDStr += ";";
+            }
+            // Get short container ID (first 12 characters)
+            if (containerIDs[i].length() >= 12) {
+                containerIDStr += containerIDs[i].substr(0, 12);
+            } else {
+                containerIDStr += containerIDs[i];
+            }
+        }
+        result.PathExistInputContainerIDs = containerIDStr;
+    } else {
+        result.PathExistInputContainerIDs = "";
+    }
+
+    // Source and type information
+    result.SourceAddress = "stdout";  // Similar to input_docker_stdout
+    result.InputType = "input_docker_stdout";  // Plugin name
+    result.FlusherType = "flusher_sls";
+    result.FlusherTargetAddress = ctx->GetProjectName() + "/" + ctx->GetLogstoreName();
+
+    return result;
+}
 
 void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
@@ -336,9 +459,7 @@ void ContainerManager::computeMatchedContainersDiff(
     const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
     const ContainerFilters& filters,
     ContainerDiff& diff) {
-    int newCount = 0;
-    int delCount = 0;
-
+    
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
         if (mContainerMap.find(*it) == mContainerMap.end()) {
@@ -346,8 +467,6 @@ void ContainerManager::computeMatchedContainersDiff(
             it = fullContainerIDList.erase(it); // 删除元素并移到下一个
             if (matchList.find(id) != matchList.end()) {
                 diff.mRemoved.push_back(id);
-                // matchList.erase(id);
-                delCount++;
             }
         } else {
             ++it;
@@ -373,7 +492,6 @@ void ContainerManager::computeMatchedContainersDiff(
             if (IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels)
                 && IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv)
                 && IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo)) {
-                newCount++;
                 diff.mAdded.push_back(pair.second); // 添加到变换列表
             }
         }

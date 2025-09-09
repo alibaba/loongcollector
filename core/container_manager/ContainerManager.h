@@ -19,16 +19,38 @@
 #include <future>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "runner/ProcessorRunner.h"
+#include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/ContainerInfo.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/event/Event.h"
+#include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/Monitor.h"
+#include "monitor/SelfMonitorServer.h"
 
 
 namespace logtail {
+
+struct ContainerConfigResult {
+    std::string DataType;
+    std::string Project;
+    std::string Logstore;
+    std::string ConfigName;
+    std::string PathNotExistInputContainerIDs;
+    std::string PathExistInputContainerIDs;
+    std::string SourceAddress;
+    std::string InputType;
+    std::string InputIsContainerFile;
+    std::string FlusherType;
+    std::string FlusherTargetAddress;
+};
 
 class ContainerManager {
 public:
@@ -46,6 +68,20 @@ public:
     void SaveContainerInfo();
     void LoadContainerInfo();
 
+    /**
+     * @brief Create a container config result similar to input_docker_stdout plugin
+     * @param options FileDiscoveryOptions pointer
+     * @param ctx CollectionPipelineContext pointer
+     * @param containerIDs List of container IDs (optional)
+     * @return ContainerConfigResult containing config result data
+     */
+    ContainerConfigResult CreateContainerConfigResult(
+        const FileDiscoveryOptions* options,
+        const CollectionPipelineContext* ctx,
+        const std::vector<std::string>& containerIDs = {});
+
+    void UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
+    void RemoveConfigContainerInfoPipeline();
 
 private:
     void pollingLoop();
@@ -62,8 +98,11 @@ private:
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
     void loadContainerInfoFromContainersFormat(const Json::Value& root, const std::string& configPath);
 
+    void sendConfigContainerInfo();
+
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
+    std::unordered_map<std::string, ContainerConfigResult> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
@@ -73,6 +112,10 @@ private:
 
     std::atomic<bool> mIsRunning{false};
     friend class ContainerManagerUnittest;
+
+    mutable ReadWriteLock mConfigContainerInfoPipelineMux;
+    CollectionPipelineContext* mConfigContainerInfoPipelineCtx = nullptr;
+    size_t mConfigContainerInfoInputIndex = 0;
 };
 
 } // namespace logtail

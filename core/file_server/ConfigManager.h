@@ -444,6 +444,7 @@ public:
 
     void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
 
+
     /**
      * delete mHandlersToDelete and mReaderToDelete
      */
