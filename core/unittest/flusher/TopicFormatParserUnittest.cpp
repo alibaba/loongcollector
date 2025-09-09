@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+#ifndef APSARA_UNIT_TEST_MAIN
 #define APSARA_UNIT_TEST_MAIN
+#endif
 
 #include <memory>
 #include <string>
