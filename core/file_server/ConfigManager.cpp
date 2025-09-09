@@ -106,7 +106,7 @@ ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot
     }
 
     std::string buffer;
-    if (FileReadResult::kOK != ReadFileContentUnlimited(fullPath, buffer)) {
+    if (FileReadResult::kOK != ReadFileContent(fullPath, buffer)) {
         return CONFIG_NOT_EXIST;
     }
 

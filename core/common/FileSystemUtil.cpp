@@ -169,42 +169,6 @@ FileReadResult ReadFileContent(const std::string& fileName, std::string& content
     return FileReadResult::kOK;
 }
 
-FileReadResult ReadFileContentUnlimited(const std::string& fileName, std::string& content) {
-    std::ifstream ifs(fileName, std::ios::binary);
-    if (!ifs) {
-        return FileReadResult::kError;
-    }
-
-    content.clear();
-    try {
-        constexpr uint64_t kFileReadBufferSize = 32 * 1024;
-        // 设定为32K，对于特殊文件（如 /proc 中的文件）
-        // 尽可能一次性读进来 https://github.com/giampaolo/psutil/issues/2050
-        uint64_t totalRead = 0;
-        uint64_t bytesRead = 0;
-        content.resize(kFileReadBufferSize);
-
-        while (ifs) {
-            ifs.read(content.data() + totalRead, kFileReadBufferSize);
-            bytesRead = ifs.gcount();
-            totalRead += bytesRead;
-
-            if (bytesRead > 0) {
-                content.resize(totalRead + kFileReadBufferSize);
-            }
-        }
-
-        content.resize(totalRead);
-    } catch (const std::ios_base::failure& e) {
-        return FileReadResult::kError;
-    } catch (const std::filesystem::filesystem_error& e) {
-        // Handle filesystem errors (e.g., permissions)
-        return FileReadResult::kError;
-    }
-
-    return FileReadResult::kOK;
-}
-
 int GetLines(std::istream& is,
              bool enableEmptyLine,
              const std::function<void(const std::string&)>& pushBack,

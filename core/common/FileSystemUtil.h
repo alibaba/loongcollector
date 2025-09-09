@@ -94,11 +94,6 @@ FileReadResult ReadFileContent(const std::string& fileName,
                                std::string& content,
                                uint64_t maxFileSize = std::numeric_limits<uint64_t>::max());
 
-// ReadFileContentUnlimited reads entire content of @fileName to @content without size limitation.
-// Cannot garantee the content is complete if the file is changed during reading.
-// Use this function carefully as it may consume large amounts of memory for big files.
-FileReadResult ReadFileContentUnlimited(const std::string& fileName, std::string& content);
-
 int GetLines(std::istream& is,
              bool enableEmptyLine,
              const std::function<void(const std::string&)>& pushBack,

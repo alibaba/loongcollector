@@ -548,7 +548,7 @@ void ContainerManager::LoadContainerInfo() {
     std::string content;
 
     // Load from docker_path_config.json and determine logic based on version
-    if (FileReadResult::kOK != ReadFileContentUnlimited(configPath, content)) {
+    if (FileReadResult::kOK != ReadFileContent(configPath, content)) {
         LOG_INFO(sLogger, ("docker_path_config.json not found", configPath));
         return;
     }
