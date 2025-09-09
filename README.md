@@ -24,6 +24,14 @@
 
 LoongCollector is a high-performance, lightweight observability data collector designed for modern cloud-native environments. Born from Alibaba's 15-year journey handling exponential traffic growth and powering tens of millions of deployments, LoongCollector delivers **10x higher throughput** with **80% lower resource usage** compared to open-source alternatives.
 
+LoongCollector is a key component of LoongSuite(Alibaba's unified observability data collection suite). LoongSuite includes the following key components:
+
+* [LoongCollector](https://github.com/alibaba/loongcollector): universal node agent, which prodivdes log collection, prometheus metric collection, and network and security collection capabilities based on eBPF.
+* [LoongSuite Python Agent](https://github.com/alibaba/loongsuite-python-agent): a process agent providing instrumentaion for python applications.
+* [LoongSuite Go Agent](https://github.com/alibaba/loongsuite-go-agent): a process agent for golang with compile time instrumentation.
+* [LoongSuite Java Agent](https://github.com/alibaba/loongsuite-java-agent): a process agent for Java applications.
+* Other upcoming language agent.
+
 ### 🚀 Core Advantages
 
 - **⚡ High Performance**
@@ -173,8 +181,16 @@ We welcome contributions from the community! Here are some ways you can help:
 - **WeChat/DingTalk**: LoongCollector社区
 
 <div align="center">
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup.png" alt="Community QR Code" width="300"/>
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup.png" alt="Community QR Code" width="60%"/>
 </div>
+
+### Other LoongSuite components's Community contact information
+
+We are looking forward to your feedback and suggestions. You can scan the QR code below to engage with us.
+
+| LoongSuite Python SIG | LoongSuite Go SIG | LoongSuite Java SIG |
+|----|----|----|
+| <img src="https://github.com/alibaba/loongsuite-python-agent/blob/main/docs/_assets/img/loongsuite-python-sig-dingtalk.jpg" height="150"> | <img src="https://github.com/alibaba/loongsuite-python-agent/blob/main/docs/_assets/img/loongsuite-go-sig-dingtalk.png" height="150"> | <img src="https://github.com/alibaba/loongsuite-python-agent/blob/main/docs/_assets/img/loongsuite-java-sig-dingtalk.jpg" height="150"> |
 
 ## 📄 License
 

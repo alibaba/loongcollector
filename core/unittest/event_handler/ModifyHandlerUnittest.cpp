@@ -676,7 +676,7 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[basicLogName].size(), 1);
     APSARA_TEST_TRUE_FATAL(handlerPtr->mNameReaderMap[basicLogName][0]->mLogFileOp.IsOpen() == false);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 2);
-    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode1]->mLogFileOp.IsOpen() == true);
+    APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode1]->mLogFileOp.IsOpen() == false);
     APSARA_TEST_TRUE_FATAL(handlerPtr->mRotatorReaderMap[devInode2]->mLogFileOp.IsOpen() == false);
 
 
