@@ -20,6 +20,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "application/Application.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
@@ -1741,17 +1742,26 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
         event->SetContentNoCopy(kAgentInfoAgentEnvKey, kAgentInfoAgentEnvACKVal);
+
+        event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+        event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
+        event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
         if (Connection::gSelfPodIp.empty()) {
             event->SetContent(kAgentInfoIpKey, GetHostIp());
         } else {
             event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
         }
-
         if (Connection::gSelfPodName.empty()) {
             event->SetContent(kAgentInfoHostnameKey, GetHostName());
         } else {
             event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
         }
+        event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+        event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
+        event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+        auto startTime = Application::GetInstance()->GetStartTime();
+        event->SetContent(kAgentInfoStartTsKey, ToString(startTime * 1000)); // ms
+        event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
         event->SetTimestamp(now, 0);
     } else {
         if (!K8sMetadata::GetInstance().Enable()) {
