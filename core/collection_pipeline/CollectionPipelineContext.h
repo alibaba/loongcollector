@@ -49,6 +49,7 @@ public:
     bool InitGlobalConfig(const Json::Value& config, Json::Value& extendedParams) {
         return mGlobalConfig.Init(config, *this, extendedParams);
     }
+    void SetConfigPriority(uint32_t priority) { mGlobalConfig.mPriority = priority; }
     void SetProcessQueueKey(QueueKey key) { mProcessQueueKey = key; }
     QueueKey GetProcessQueueKey() const { return mProcessQueueKey; }
     void SetIsOnetimePipelineRunningBeforeStart(bool flag) { mIsOnetimePipelineRunningBeforeStart = flag; }
