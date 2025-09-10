@@ -218,6 +218,7 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
             LOG_ERROR(sLogger,
                       ("host monitor collect data failed",
                        "collect error")("collector", context->mCollectorName)("error", e.what()));
+            PushNextTimerEvent(context);
         }
     };
     mThreadPool->Add(collectFn);
@@ -235,6 +236,12 @@ void HostMonitorInputRunner::PushNextTimerEvent(CollectContextPtr context) {
             skipCount = (now - nextScheduleTime) / context->mCollectInterval;
             nextScheduleTime += (skipCount + 1) * context->mCollectInterval;
             nextMetricTime += (skipCount + 1) * context->mCollectInterval.count();
+            LOG_WARNING(sLogger,
+                        ("host monitor skip collect", "may casue data unaccurate")(
+                            "collector", context->mCollectorName)("skip count", skipCount + 1));
+            if (context->mCollectType == HostMonitorCollectType::kMultiValue) {
+                context->mCount = (context->mCount + skipCount + 1) % context->mCountPerReport;
+            }
         }
         context->SetTime(nextScheduleTime, nextMetricTime);
     }

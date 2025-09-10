@@ -99,5 +99,6 @@ bool FetchECSMeta(ECSMeta& metaObj);
 bool FetchECSRamCredentials(std::string& accessKeyId,
                             std::string& accessKeySecret,
                             std::string& secToken,
-                            int64_t& expTime);
+                            int64_t& expTime,
+                            std::string& errorMsg);
 } // namespace logtail

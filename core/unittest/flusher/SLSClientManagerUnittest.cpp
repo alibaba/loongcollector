@@ -32,9 +32,9 @@ private:
 
 void SLSClientManagerUnittest::TestAccessKeyManagement() {
     mManager.Init();
-    string accessKeyId, accessKeySecret, secToken;
+    string accessKeyId, accessKeySecret, secToken, errorMsg;
     AuthType type;
-    mManager.GetAccessKey("", type, accessKeyId, accessKeySecret, secToken);
+    mManager.GetAccessKey("", type, accessKeyId, accessKeySecret, secToken, errorMsg);
     APSARA_TEST_EQUAL(AuthType::AK, type);
     APSARA_TEST_EQUAL(STRING_FLAG(default_access_key_id), accessKeyId);
     APSARA_TEST_EQUAL(STRING_FLAG(default_access_key), accessKeySecret);

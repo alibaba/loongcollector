@@ -65,6 +65,10 @@ set(DEP_NAME_LIST
         zstd
         )
 
+if (NOT ENABLE_ENTERPRISE AND UNIX)
+    list(APPEND DEP_NAME_LIST "rdkafka")
+endif()
+
 if (NOT NO_TCMALLOC)
     list(APPEND DEP_NAME_LIST "tcmalloc") # (gperftools)
 endif()
@@ -734,6 +738,23 @@ macro(link_simdjson target_name)
     endif ()
 endmacro()
 
+
+# rdkafka
+macro(link_rdkafka target_name)
+    if (rdkafka_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${rdkafka_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka.a")
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka++.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "rdkafkad"
+                optimized "rdkafka")
+        target_link_libraries(${target_name}
+                debug "rdkafka++d"
+                optimized "rdkafka++")
+    endif ()
+endmacro()
 
 macro(link_spl target_name)
     logtail_define(spl_${target_name} "" "")

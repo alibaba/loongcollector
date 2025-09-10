@@ -62,9 +62,13 @@ void SLSClientManager::Init() {
     mCredentialsProvider = std::move(staticProvider);
 }
 
-bool SLSClientManager::GetAccessKey(
-    const string& aliuid, AuthType& type, string& accessKeyId, string& accessKeySecret, std::string& secToken) {
-    return mCredentialsProvider->GetCredentials(type, accessKeyId, accessKeySecret, secToken);
+bool SLSClientManager::GetAccessKey(const string& aliuid,
+                                    AuthType& type,
+                                    string& accessKeyId,
+                                    string& accessKeySecret,
+                                    std::string& secToken,
+                                    std::string& errorMsg) {
+    return mCredentialsProvider->GetCredentials(type, accessKeyId, accessKeySecret, secToken, errorMsg);
 }
 
 void SLSClientManager::GenerateUserAgent() {

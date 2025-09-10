@@ -623,11 +623,14 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
     ADD_COUNTER(mSendCnt, 1);
 
     AuthType type;
-    string accessKeyId, accessKeySecret, secToken;
-    if (!SLSClientManager::GetInstance()->GetAccessKey(mAliuid, type, accessKeyId, accessKeySecret, secToken)) {
+    string accessKeyId, accessKeySecret, secToken, errorMsg;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(
+            mAliuid, type, accessKeyId, accessKeySecret, secToken, errorMsg)) {
 #ifdef __ENTERPRISE__
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 mProject, type, accessKeyId, accessKeySecret)) {
+            AlarmManager::GetInstance()->SendAlarmError(
+                GLOBAL_CONFIG_ALARM, "failed to get access key: " + errorMsg, mRegion, mProject, "", mLogstore);
             *keepItem = true;
             *errMsg = "failed to get access key";
             return false;
@@ -685,6 +688,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 
     switch (mTelemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST:
