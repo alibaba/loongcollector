@@ -110,9 +110,9 @@ void NetCollectorUnittest::TestCollect() const {
                                      CollectorInstance(std::move(netCollector)));
     collectconfig.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
 
     APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
 
@@ -196,9 +196,9 @@ void NetCollectorUnittest::TestIpv6FileNoExist() const {
                                      CollectorInstance(std::move(netCollector)));
     collectconfig.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
 
     APSARA_TEST_EQUAL_FATAL(5UL, group.GetEvents().size());
 

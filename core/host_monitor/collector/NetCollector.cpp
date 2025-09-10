@@ -43,11 +43,8 @@ bool NetCollector::Init(HostMonitorContext& collectContext) {
     return true;
 }
 
-bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
+bool NetCollector::Collect(HostMonitorContext& collectContext,
+                           std::optional<std::reference_wrapper<PipelineEventGroup>> group) {
     TCPStatInformation resTCPStat;
     NetInterfaceInformation netInterfaces;
 
@@ -146,7 +143,8 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         mLastInterfaceMetrics[curname] = netInterfaceMetric;
     }
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!group.has_value()) {
         mLastTime = start;
         return true;
     }
@@ -159,7 +157,7 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
     for (auto& packRateCal : mRatePerSecCalMap) {
         std::string curname = packRateCal.first;
 
-        MetricEvent* metricEvent = group->AddMetricEvent(true);
+        MetricEvent* metricEvent = group->get().AddMetricEvent(true);
         if (!metricEvent) {
             mLastTime = start;
             return false;
@@ -225,7 +223,7 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
     mTCPCal.Stat(maxTCP, minTCP, avgTCP);
     mTCPCal.Reset();
 
-    MetricEvent* listenEvent = group->AddMetricEvent(true);
+    MetricEvent* listenEvent = group->get().AddMetricEvent(true);
     if (!listenEvent) {
         mLastTime = start;
         return false;
@@ -247,7 +245,7 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpListen)});
 
-    MetricEvent* establishedEvent = group->AddMetricEvent(true);
+    MetricEvent* establishedEvent = group->get().AddMetricEvent(true);
     if (!establishedEvent) {
         mLastTime = start;
         return false;
@@ -269,7 +267,7 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpEstablished)});
 
-    MetricEvent* nonestablishedEvent = group->AddMetricEvent(true);
+    MetricEvent* nonestablishedEvent = group->get().AddMetricEvent(true);
     if (!nonestablishedEvent) {
         mLastTime = start;
         return false;
@@ -291,7 +289,7 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(avgTCP.tcpNonEstablished)});
 
-    MetricEvent* totalEvent = group->AddMetricEvent(true);
+    MetricEvent* totalEvent = group->get().AddMetricEvent(true);
     if (!totalEvent) {
         mLastTime = start;
         return false;
@@ -313,8 +311,6 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         std::string("net_tcpconnection_avg"),
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
 
-
-    collectContext.mCount = 0;
     mLastTime = start;
 
     // 清理掉mLastInterfaceMetrics中，curDevNames中不存在的设备名

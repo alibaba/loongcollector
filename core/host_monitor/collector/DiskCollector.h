@@ -173,7 +173,8 @@ public:
     ~DiskCollector() override = default;
 
     bool Init(HostMonitorContext& collectContext) override;
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext,
+                 std::optional<std::reference_wrapper<PipelineEventGroup>> group) override;
     [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
     static const std::string sName;
     const std::string& Name() const override { return sName; }

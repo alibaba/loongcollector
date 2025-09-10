@@ -122,9 +122,9 @@ void MemCollectorUnittest::TestCollect() const {
                                       CollectorInstance(std::move(memCollector)));
     collectContext.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
     APSARA_TEST_EQUAL_FATAL(1UL, group.GetEvents().size());
 
     double total = 31534908.0;

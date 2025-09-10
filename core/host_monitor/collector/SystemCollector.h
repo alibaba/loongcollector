@@ -31,7 +31,8 @@ public:
     SystemCollector() = default;
     ~SystemCollector() override = default;
 
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext,
+                 std::optional<std::reference_wrapper<PipelineEventGroup>> group) override;
     [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;

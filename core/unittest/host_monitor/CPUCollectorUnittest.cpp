@@ -59,7 +59,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     collectContext.Reset();
     collectContext.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -71,7 +71,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     ofs << "cpu2 1 1 1 1 1 1 1 1 1 1";
     ofs.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -83,7 +83,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     ofs1 << "cpu2 1 1 1 1 1 1 1 1 1 1";
     ofs1.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -95,7 +95,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     ofs2 << "cpu2 1 1 1 1 1 1 1 1 1 1";
     ofs2.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     APSARA_TEST_EQUAL_FATAL(1UL, group.GetEvents().size());
 
@@ -146,8 +146,8 @@ void CPUCollectorUnittest::TestCpuValue0() const {
     ofs << "cpu0 0 0 0 0 0 0 0 0 0 0 \n";
     ofs.close();
 
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, std::ref(group)));
 }
 
 void CPUCollectorUnittest::TestjiffiesDeltaNegative() const {
@@ -166,7 +166,7 @@ void CPUCollectorUnittest::TestjiffiesDeltaNegative() const {
     ofs << "cpu0 2 2 2 2 2 2 2 2 2 2 \n";
     ofs.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     ofstream ofs1("./stat", std::ios::trunc);
     ofs1 << "cpu 1 1 1 1 1 1 1 1 1 1\n";
@@ -175,7 +175,7 @@ void CPUCollectorUnittest::TestjiffiesDeltaNegative() const {
     ofs1.close();
     PROCESS_DIR = ".";
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, &group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, std::ref(group)));
 }
 
 void CPUCollectorUnittest::TestCpuCount0() const {
@@ -198,7 +198,7 @@ void CPUCollectorUnittest::TestCpuCount0() const {
 
     APSARA_TEST_TRUE(SystemInterface::GetInstance()->GetCPUInformation(time(nullptr), cpuInfo));
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, &group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, std::ref(group)));
 }
 
 void CPUCollectorUnittest::TestGetCPUInformation() const {
@@ -218,7 +218,7 @@ void CPUCollectorUnittest::TestGetCPUInformation() const {
     ofs3.close();
     PROCESS_DIR = ".";
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, &group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, std::ref(group)));
 }
 
 void CPUCollectorUnittest::TestGetCPUInformationInterface() const {
@@ -246,7 +246,6 @@ void CPUCollectorUnittest::TestGetCPUInformationInterface() const {
 
 void CPUCollectorUnittest::TestGroupNull() const {
     auto collector = CPUCollector();
-    PipelineEventGroup* group = nullptr;
 
     auto cpuCollector = std::make_unique<CPUCollector>();
     HostMonitorContext collectContext("test",
@@ -256,7 +255,7 @@ void CPUCollectorUnittest::TestGroupNull() const {
                                       std::chrono::seconds(1),
                                       CollectorInstance(std::move(cpuCollector)));
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, std::nullopt));
 }
 
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectNormal);

@@ -148,15 +148,15 @@ void ProcessCollectorUnittest::TestCollect() const {
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, std::ref(group)));
 
     vector<string> expectedVMProcessNames = {
         "vm_process_min",

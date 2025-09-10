@@ -94,12 +94,8 @@ bool ProcessCollector::Init(HostMonitorContext& collectContext) {
     return true;
 }
 
-bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool ProcessCollector::Collect(HostMonitorContext& collectContext,
+                               std::optional<std::reference_wrapper<PipelineEventGroup>> group) {
     ProcessListInformation processListInfo;
 
     if (!SystemInterface::GetInstance()->GetProcessListInformation(collectContext.GetMetricTime(), processListInfo)) {
@@ -159,7 +155,8 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         }
     }
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!group.has_value()) {
         return true;
     }
 
@@ -170,7 +167,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     mVMProcessNumStat.Stat(minVMProcessNum, maxVMProcessNum, avgVMProcessNum, &lastVMProcessNum);
 
     // 指标推送
-    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    MetricEvent* metricEvent = group->get().AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }
@@ -196,7 +193,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
-        MetricEvent* metricEventEachPid = group->AddMetricEvent(true);
+        MetricEvent* metricEventEachPid = group->get().AddMetricEvent(true);
         metricEventEachPid->SetTimestamp(processListInfo.collectTime, 0);
         metricEventEachPid->SetValue<UntypedMultiDoubleValues>(metricEventEachPid);
         auto* multiDoubleValuesEachPid = metricEventEachPid->MutableValue<UntypedMultiDoubleValues>();
@@ -246,7 +243,6 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失
-    collectContext.mCount = 0;
     mVMProcessNumStat.Reset();
     mProcessPushMertic.clear();
     mAvgProcessCpuPercent.clear();

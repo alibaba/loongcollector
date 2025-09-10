@@ -17,7 +17,9 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "host_monitor/HostMonitorTypes.h"
@@ -33,7 +35,9 @@ public:
     virtual ~BaseCollector() = default;
 
     virtual bool Init(HostMonitorContext& collectContext);
-    virtual bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) = 0;
+    virtual bool Collect(HostMonitorContext& collectContext,
+                         std::optional<std::reference_wrapper<PipelineEventGroup>> group)
+        = 0;
     [[nodiscard]] virtual const std::string& Name() const = 0;
     [[nodiscard]] virtual const std::chrono::seconds GetCollectInterval() const = 0;
 
@@ -47,7 +51,7 @@ public:
 
     bool Init(HostMonitorContext& collectContext);
 
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
+    bool Collect(HostMonitorContext& collectContext, std::optional<std::reference_wrapper<PipelineEventGroup>> group) {
         return mCollector->Collect(collectContext, group);
     }
 

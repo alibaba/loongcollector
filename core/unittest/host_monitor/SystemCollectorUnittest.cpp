@@ -52,9 +52,9 @@ void SystemCollectorUnittest::TestCollect() const {
                                      CollectorInstance(std::move(systemCollector)));
     collectconfig.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, std::ref(group)));
     APSARA_TEST_EQUAL_FATAL(1UL, group.GetEvents().size());
 
     vector<string> expected_names = {"load_1m_min",
