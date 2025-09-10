@@ -59,6 +59,7 @@ const string InputStaticFile::sName = "input_static_file_onetime";
 bool InputStaticFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     string errorMsg;
 
+    // SetConfigPriority must be called before GlobalConfig::Init() to avoid overriding the priority set by the user
     mContext->SetConfigPriority(2);
 
     if (!mFileDiscovery.Init(config, *mContext, sName)) {
