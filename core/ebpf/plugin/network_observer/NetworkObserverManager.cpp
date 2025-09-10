@@ -1758,9 +1758,9 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         }
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
-        event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-        auto startTime = Application::GetInstance()->GetStartTime();
-        event->SetContent(kAgentInfoStartTsKey, ToString(startTime * 1000)); // ms
+        event->SetContentNoCopy(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+        static auto sStartTime = ToString(Application::GetInstance()->GetStartTime() * 1000);
+        event->SetContentNoCopy(kAgentInfoStartTsKey, sStartTime); // ms
         event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
         event->SetTimestamp(now, 0);
     } else {
