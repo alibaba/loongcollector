@@ -246,7 +246,6 @@ void CPUCollectorUnittest::TestGetCPUInformationInterface() const {
 
 void CPUCollectorUnittest::TestGroupNull() const {
     auto collector = CPUCollector();
-    PipelineEventGroup* group = nullptr;
 
     auto cpuCollector = std::make_unique<CPUCollector>();
     HostMonitorContext collectContext("test",
@@ -256,7 +255,7 @@ void CPUCollectorUnittest::TestGroupNull() const {
                                       std::chrono::seconds(1),
                                       CollectorInstance(std::move(cpuCollector)));
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, group));
+    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, nullptr));
 }
 
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectNormal);
