@@ -21,18 +21,12 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/DynamicStringFormatter.h"
 #include "models/PipelineEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 
 namespace logtail {
-
-enum class FieldType { CONTENT, TAG, ENV };
-
-struct FieldRef {
-    FieldType type;
-    std::string fieldName;
-};
 
 class TopicFormatParser {
 public:
@@ -42,18 +36,14 @@ public:
     bool Init(const std::string& formatString);
     bool FormatTopic(const PipelineEventPtr& event, std::string& result, const GroupTags& groupTags) const;
 
-    const std::vector<FieldRef>& GetRequiredFields() const { return mRequiredFields; }
-    bool IsDynamic() const { return !mRequiredFields.empty(); }
+    bool IsDynamic() const { return mFormatter.IsDynamic(); }
 
 private:
-    std::string mFormatTemplate;
-    std::vector<FieldRef> mRequiredFields;
-    std::vector<std::string> mStaticParts;
-    std::vector<size_t> mPlaceholderPositions;
+    DynamicStringFormatter mFormatter;
 
-    std::string
-    ExtractFieldValue(const PipelineEventPtr& event, const FieldRef& fieldRef, const GroupTags& groupTags) const;
-    bool ParseFormatString(const std::string& formatString);
+    std::string CreateValueProvider(const PipelineEventPtr& event,
+                                    const GroupTags& groupTags,
+                                    const std::string& placeholder) const;
 };
 
 } // namespace logtail
