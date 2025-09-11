@@ -18,15 +18,16 @@
 #define APSARA_UNIT_TEST_MAIN
 #endif
 
+#include <chrono>
 #include <memory>
 #include <string>
 
+#include "common/TopicFormatParser.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "plugin/flusher/kafka/TopicFormatParser.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -44,6 +45,7 @@ public:
     void TestEnvVariableSyntax();
     void TestComplexFormat();
     void TestMissingTagFallback();
+    void TestPerformance();
 
 protected:
     void SetUp() override { mBuffer = make_shared<SourceBuffer>(); }
@@ -195,6 +197,42 @@ void TopicFormatParserUnittest::TestMissingTagFallback() {
     APSARA_TEST_FALSE(success);
 }
 
+void TopicFormatParserUnittest::TestPerformance() {
+    TopicFormatParser parser;
+    APSARA_TEST_TRUE(parser.Init("service_%{tag.env}_%{content.app}_logs"));
+
+    PipelineEventGroup group(mBuffer);
+    auto logEvent = group.AddLogEvent();
+    group.SetTag(StringView("env"), StringView("prod"));
+    logEvent->SetContent(StringView("app"), StringView("payment"));
+    logEvent->SetContent(StringView("message"), StringView("test message"));
+
+    PipelineEventPtr eventPtr(logEvent->Copy(), true, nullptr);
+    string result;
+
+    for (int i = 0; i < 1000; ++i) {
+        parser.FormatTopic(eventPtr, result, group.GetTags());
+    }
+
+    const int iterations = 10000000;
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < iterations; ++i) {
+        parser.FormatTopic(eventPtr, result, group.GetTags());
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    printf("TopicFormatParser Performance Test Results:\n");
+    printf("- Total iterations: %d\n", iterations);
+    printf("- Total time: %ld ms\n", duration.count());
+    printf("- Average time per call: %.6f ms\n", static_cast<double>(duration.count()) / iterations);
+    printf("- Calls per second: %.0f\n", static_cast<double>(iterations) / duration.count() * 1000);
+
+    APSARA_TEST_EQUAL("service_prod_payment_logs", result);
+}
+
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestBasicDynamicTopic)
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestMissingFieldFallback)
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestFromTags)
@@ -204,6 +242,7 @@ UNIT_TEST_CASE(TopicFormatParserUnittest, TestStaticTopic)
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestEnvVariableSyntax)
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestComplexFormat)
 UNIT_TEST_CASE(TopicFormatParserUnittest, TestMissingTagFallback)
+UNIT_TEST_CASE(TopicFormatParserUnittest, TestPerformance)
 
 } // namespace logtail
 

@@ -26,10 +26,10 @@
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
+#include "common/TopicFormatParser.h"
 #include "monitor/MetricManager.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
 #include "plugin/flusher/kafka/KafkaProducer.h"
-#include "plugin/flusher/kafka/TopicFormatParser.h"
 
 namespace logtail {
 
