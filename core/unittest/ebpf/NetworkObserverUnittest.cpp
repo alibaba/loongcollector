@@ -792,6 +792,15 @@ void NetworkObserverManagerUnittest::TestReportAgentInfo() {
     mManager->ReportAgentInfo();
     APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 1UL);
     APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[0].GetEvents().size(), 1UL);
+    APSARA_TEST_TRUE(mManager->mAgentInfoEventGroups[0].GetEvents()[0].Is<LogEvent>());
+    auto* logEvent = mManager->mAgentInfoEventGroups[0].GetEvents()[0].Get<LogEvent>();
+    APSARA_TEST_EQUAL(logEvent->GetContent("pid"), "test-app-id");
+    APSARA_TEST_EQUAL(logEvent->GetContent("acs_cms_workspace"), "test-workspace");
+    APSARA_TEST_EQUAL(logEvent->GetContent("acs_arms_service_id"), "test-service-id");
+    APSARA_TEST_EQUAL(logEvent->GetContent("appName"), "test-app");
+    APSARA_TEST_EQUAL(logEvent->GetContent("agentEnv"), "ACSK8S");
+    APSARA_TEST_TRUE(logEvent->GetContent("timestamp") != "");
+    APSARA_TEST_TRUE(logEvent->GetContent("startTimestamp") != "");
 
     // 测试有 workload 配置和 container 时调用 ReportAgentInfo
     options.mSelectors = {{"test-workload", "deployment", "test-namespace"}};
