@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "FileSecurityManager.h"
+#include "ebpf/plugin/file_security/FileSecurityManager.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
@@ -97,9 +98,10 @@ FileRetryableEvent* FileSecurityManager::CreateFileRetryableEvent(file_data_t* e
 FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                         const PluginMetricManagerPtr& metricManager,
+                                         EventPool* pool,
                                          RetryableEventCache& retryableEventCache)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
+
       mRetryableEventCache(retryableEventCache),
       mAggregateTree(
           4096,
@@ -108,7 +110,7 @@ FileSecurityManager::FileSecurityManager(const std::shared_ptr<ProcessCacheManag
           },
           [](const std::shared_ptr<CommonEvent>& ce, std::shared_ptr<SourceBuffer>&) {
               auto* in = static_cast<FileEvent*>(ce.get());
-              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime, in->mPath);
+              return std::make_unique<FileEventGroup>(in->mPid, in->mKtime);
           }) {
 }
 
@@ -117,13 +119,15 @@ int FileSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
-    WriteLock lk(this->mLock);
     SIZETAggTree<FileEventGroup, std::shared_ptr<CommonEvent>> aggTree(this->mAggregateTree.GetAndReset());
-    lk.unlock();
 
     auto nodes = aggTree.GetNodesWithAggDepth(1);
     LOG_DEBUG(sLogger, ("enter aggregator ...", nodes.size()));
@@ -131,7 +135,6 @@ int FileSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("empty nodes...", ""));
         return 0;
     }
-
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup sharedEventGroup(sourceBuffer);
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -145,21 +148,22 @@ int FileSecurityManager::SendEvents() {
         }
         aggTree.ForEach(node, [&](const FileEventGroup* group) {
             // set process tag
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
-            bool hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
+            bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
             }
 
-            auto pathSb = sourceBuffer->CopyString(group->mPath);
-            for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+            for (const auto& commonEvent : group->mInnerEvents) {
+                auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 // attach process tags
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
                 struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
+                auto pathSb = sourceBuffer->CopyString(innerEvent->mPath);
                 logEvent->SetContentNoCopy(kFilePath.LogKey(), StringView(pathSb.data, pathSb.size));
                 // set callnames
                 switch (innerEvent->mEventType) {
@@ -198,60 +202,103 @@ int FileSecurityManager::SendEvents() {
         });
     }
     {
-        std::lock_guard lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        size_t eventCount = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        int maxRetry = 5;
-        for (int retry = 0; retry < maxRetry; ++retry) {
-            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (retry == maxRetry - 1) {
-                LOG_WARNING(sLogger,
-                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                "[ProcessSecurityEvent] push queue failed!", ""));
-                // TODO: Alarm discard data
-            }
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[FileSecurityEvent] push queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventCount);
         }
     }
-    mLastSendTimeMs = nowMs;
     return 0;
 }
 
-int FileSecurityManager::Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
-    pc->mPluginType = PluginType::FILE_SECURITY;
-    FileSecurityConfig config;
-    SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    config.mOptions = opts->mOptionList;
-    config.mPerfBufferSpec
-        = {{"file_secure_output",
-            128,
-            this,
-            [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
-            [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
-    pc->mConfig = std::move(config);
-
-    auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
-    LOG_INFO(sLogger, ("start file probe, status", res));
-    if (!res) {
-        LOG_WARNING(sLogger, ("failed to start file probe", ""));
-        return 1;
-    }
-
+int FileSecurityManager::Init() {
     mInited = true;
     return 0;
 }
 
+int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
+                                           uint32_t index,
+                                           const PluginMetricManagerPtr& metricMgr,
+                                           const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    // init metrics ...
+    if (metricMgr) {
+        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+        auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    }
+
+    if (mConfigName.size()) {
+        // update
+        LOG_DEBUG(sLogger, ("FileSecurity Update", ""));
+        // update config (BPF tailcall, filter map etc.)
+        if (Update(options)) {
+            LOG_WARNING(sLogger, ("FileSecurity Update failed", ""));
+            return 1;
+        }
+        // resume
+        if (Resume(options)) {
+            LOG_WARNING(sLogger, ("FileSecurity Resume failed", ""));
+            return 1;
+        }
+    } else {
+        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+        pc->mPluginType = PluginType::FILE_SECURITY;
+        FileSecurityConfig config;
+        SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        config.mOptions = opts->mOptionList;
+        config.mPerfBufferSpec
+            = {{"file_secure_output",
+                128,
+                this,
+                [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
+                [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
+        pc->mConfig = std::move(config);
+
+        auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
+        LOG_INFO(sLogger, ("start file probe, status", res));
+        if (!res) {
+            LOG_WARNING(sLogger, ("failed to start file probe", ""));
+            return 1;
+        }
+    }
+
+    mConfigName = ctx->GetConfigName();
+    mMetricMgr = metricMgr;
+    mPluginIndex = index;
+    mPipelineCtx = ctx;
+    mQueueKey = ctx->GetProcessQueueKey();
+    mRegisteredConfigCount = 1;
+
+    return 0;
+}
+
+int FileSecurityManager::RemoveConfig(const std::string&) {
+    for (auto& item : mRefAndLabels) {
+        if (mMetricMgr) {
+            mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+        }
+    }
+    mRegisteredConfigCount = 0;
+    auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
+    LOG_INFO(sLogger, ("stop file plugin, status", res)("configCount", mRegisteredConfigCount));
+    mRetryableEventCache.Clear();
+    return res ? 0 : 1;
+}
+
 std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEvent>& ce) {
-    FileEvent* event = static_cast<FileEvent*>(ce.get());
+    auto* event = static_cast<FileEvent*>(ce.get());
     // calculate agg key
     std::array<size_t, 2> result{};
     result.fill(0UL);
@@ -271,7 +318,7 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
     }
     auto* fileEvent = static_cast<FileEvent*>(event.get());
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("path", fileEvent->mPath)(
+              ("receive event, pid", fileEvent->mPid)("ktime", fileEvent->mKtime)("path", fileEvent->mPath)(
                   "eventType", magic_enum::enum_name(event->mEventType)));
     if (fileEvent == nullptr) {
         LOG_ERROR(sLogger,
@@ -293,10 +340,8 @@ int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) 
 
 int FileSecurityManager::Destroy() {
     mInited = false;
-
-    auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
-    LOG_INFO(sLogger, ("stop file plugin, status", res));
-    return res ? 0 : 1;
+    LOG_INFO(sLogger, ("FileSecurityManager destroy", ""));
+    return 0;
 }
 
 } // namespace ebpf

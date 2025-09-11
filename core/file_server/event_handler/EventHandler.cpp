@@ -82,9 +82,9 @@ void NormalEventHandler::Handle(const Event& event) {
                 mCreateHandlerPtr->Handle(event);
             } else if (!buf.IsRegFile()) {
                 LOG_INFO(sLogger, ("path is not file or directory, ignore it", fullPath)("stat mode", buf.GetMode()));
-                AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
-                                                       string("found unexpected type mode: ") + ToString(buf.GetMode())
-                                                           + ", file path: " + fullPath);
+                AlarmManager::GetInstance()->SendAlarmWarning(
+                    UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                    string("found unexpected type mode: ") + ToString(buf.GetMode()) + ", file path: " + fullPath);
                 return;
             } else if (event.IsCreate())
                 fileCreateModify = true;
@@ -234,9 +234,9 @@ void CreateModifyHandler::Handle(const Event& event) {
             isDir = true;
         else if (!buf.IsRegFile()) {
             LOG_INFO(sLogger, ("path is not file or directory, ignore it", path)("stat mode", buf.GetMode()));
-            AlarmManager::GetInstance()->SendAlarm(UNEXPECTED_FILE_TYPE_MODE_ALARM,
-                                                   std::string("found unexpected type mode: ") + ToString(buf.GetMode())
-                                                       + ", file path: " + path);
+            AlarmManager::GetInstance()->SendAlarmWarning(UNEXPECTED_FILE_TYPE_MODE_ALARM,
+                                                          std::string("found unexpected type mode: ")
+                                                              + ToString(buf.GetMode()) + ", file path: " + path);
             return;
         }
     }
@@ -336,7 +336,7 @@ void ModifyHandler::MakeSpaceForNewReader() {
                  "total log reader count exceeds upper limit")("reader count after clean", mDevInodeReaderMap.size()));
     // randomly choose one project to send alarm
     LogFileReaderPtr oneReader = mDevInodeReaderMap.begin()->second;
-    AlarmManager::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarmError(
         FILE_READER_EXCEED_ALARM,
         string("total log reader count exceeds upper limit, delete some of the old readers, reader count after clean:")
             + ToString(mDevInodeReaderMap.size()),
@@ -389,7 +389,7 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
                     "logstore", readerConfig.second->GetLogstoreName())("config", readerConfig.second->GetConfigName())(
                     "log reader queue name", PathJoin(path, name))("max queue length",
                                                                    readerConfig.first->mRotatorQueueSize));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 DROP_LOG_ALARM,
                 string("log reader queue length excceeds upper limit, stop creating new reader, config: ")
                     + readerConfig.second->GetConfigName() + ", log reader queue name: " + PathJoin(path, name)
@@ -418,8 +418,8 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
             readerPtr->ResetLastFilePos();
         }
     } else {
-        backFlag = false;
         // rotate log, push front
+        backFlag = false;
         LOG_DEBUG(sLogger, ("rotator log, push front", readerPtr->GetRealLogPath()));
     }
 
@@ -455,20 +455,28 @@ LogFileReaderPtr ModifyHandler::CreateLogFileReaderPtr(const string& path,
     }
 
     int32_t idx = readerPtr->GetIdxInReaderArrayFromLastCpt();
-    if (backFlag) { // new reader
-        readerArray.push_back(readerPtr);
-        mDevInodeReaderMap[devInode] = readerPtr;
-    } else if (idx == LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY) { // reader not in reader array
+    if (idx == LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP) { // reader not in reader array
         mRotatorReaderMap[devInode] = readerPtr;
     } else if (idx >= 0) { // reader in reader array
         readerArray.push_back(readerPtr);
         mDevInodeReaderMap[devInode] = readerPtr;
         std::stable_sort(readerArray.begin(), readerArray.end(), ModifyHandler::CompareReaderByIdxFromCpt);
-    } else {
-        LOG_WARNING(sLogger,
-                    ("unexpected idx (perhaps because first checkpoint load after upgrade)",
-                     idx)("real log path", readerPtr->GetRealLogPath())("host log path", readerPtr->GetHostLogPath()));
-        return LogFileReaderPtr();
+    } else if (backFlag) { // new reader, or normal log from old version checkpoint
+        readerArray.push_back(readerPtr);
+        mDevInodeReaderMap[devInode] = readerPtr;
+    }
+    // should only happen when upgrade from old version, may cause wrong reader array order
+    else { // rotate log
+        if (idx != LogFileReader::CHECKPOINT_IDX_UNDEFINED) {
+            LOG_ERROR(
+                sLogger,
+                ("unexpected checkpoint reader array index, may cause wrong reader array order",
+                 idx)("dev", devInode.dev)("inode", devInode.inode)("project", readerConfig.second->GetProjectName())(
+                    "logstore", readerConfig.second->GetLogstoreName())("config", readerConfig.second->GetConfigName())(
+                    "log reader queue name", PathJoin(path, name)));
+        }
+        readerArray.push_front(readerPtr);
+        mDevInodeReaderMap[devInode] = readerPtr;
     }
     readerPtr->SetReaderArray(&readerArray);
 
@@ -737,7 +745,7 @@ void ModifyHandler::Handle(const Event& event) {
                              ToString(reader->GetDevInode().inode),
                              reader->GetLastFilePos())("DevInode map size", mDevInodeReaderMap.size()));
                 recreateReaderFlag = true;
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmWarning(
                     INNER_PROFILE_ALARM,
                     string("file dev inode changed, create new reader. new path:") + reader->GetHostLogPath()
                         + " ,project:" + reader->GetProject() + " ,logstore:" + reader->GetLogstore(),
@@ -794,7 +802,7 @@ void ModifyHandler::Handle(const Event& event) {
                                 ("logprocess queue is full, put modify event to event queue again",
                                  reader->GetHostLogPath())(reader->GetProject(), reader->GetLogstore()));
 
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmWarning(
                         PROCESS_QUEUE_BUSY_ALARM,
                         string("logprocess queue is full, put modify event to event queue again, file:")
                             + reader->GetHostLogPath(),
@@ -1011,7 +1019,7 @@ void ModifyHandler::HandleTimeOut() {
 bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
     if (!isRotatorReader) {
         for (DevInodeLogFileReaderMap::iterator it = mDevInodeReaderMap.begin(); it != mDevInodeReaderMap.end(); ++it) {
-            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY;
+            int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP;
             for (size_t i = 0; i < it->second->GetReaderArray()->size(); ++i) {
                 if (it->second->GetReaderArray()->at(i) == it->second) {
                     idxInReaderArray = i;
@@ -1022,7 +1030,7 @@ bool ModifyHandler::DumpReaderMeta(bool isRotatorReader, bool checkConfigFlag) {
         }
     } else {
         for (DevInodeLogFileReaderMap::iterator it = mRotatorReaderMap.begin(); it != mRotatorReaderMap.end(); ++it) {
-            it->second->DumpMetaToMem(checkConfigFlag, LogFileReader::CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY);
+            it->second->DumpMetaToMem(checkConfigFlag, LogFileReader::CHECKPOINT_IDX_OF_ROTATOR_MAP);
         }
     }
     return true;

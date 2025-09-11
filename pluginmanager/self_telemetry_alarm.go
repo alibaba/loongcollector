@@ -19,7 +19,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type InputAlarm struct {
@@ -45,13 +45,13 @@ func (r *InputAlarm) Collect(collector pipeline.Collector) error {
 		}
 	}
 	LogtailConfigLock.RUnlock()
-	util.GlobalAlarm.SerializeToPb(loggroup)
+	selfmonitor.GlobalAlarm.SerializeToPb(loggroup)
 	if len(loggroup.Logs) > 0 && AlarmConfig != nil {
 		for _, log := range loggroup.Logs {
 			AlarmConfig.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log})
 		}
 	}
-	util.RegisterAlarmsSerializeToPb(loggroup)
+	selfmonitor.RegisterAlarmsSerializeToPb(loggroup)
 	logger.Debug(r.context.GetRuntimeContext(), "InputAlarm", *loggroup)
 	return nil
 }

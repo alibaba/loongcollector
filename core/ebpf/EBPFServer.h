@@ -53,9 +53,15 @@ private:
 #endif
 };
 
+enum class PluginStateOperation {
+    kAddPipeline,
+    kRemovePipeline,
+    kRemoveAll,
+};
+
 struct PluginState {
-    std::string mPipelineName;
-    std::string mProject;
+    // pipelineName ==> project
+    std::map<std::string, std::string> mPipelines;
     std::shared_ptr<AbstractManager> mManager;
     // Shared mutex to coordinate access between plugin management operations
     // (EnablePlugin/DisablePlugin/SuspendPlugin) and event handling operations
@@ -80,6 +86,8 @@ public:
 
     void Stop() override;
 
+    void EventGC() override;
+
     bool EnablePlugin(const std::string& pipelineName,
                       uint32_t pluginIndex,
                       PluginType type,
@@ -102,6 +110,9 @@ public:
 
     RetryableEventCache& EventCache() { return mRetryableEventCache; }
 
+    void RegisterPluginPerfBuffers(PluginType type);
+    void UnregisterPluginPerfBuffers(PluginType type);
+
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,
@@ -113,10 +124,11 @@ private:
 
     void pollPerfBuffers();
     void handlerEvents();
-    std::string checkLoadedPipelineName(PluginType type);
+    // std::string checkLoadedPipelineName(PluginType type);
     void updatePluginState(PluginType type,
                            const std::string& name,
                            const std::string& project,
+                           PluginStateOperation op,
                            std::shared_ptr<AbstractManager>);
     PluginState& getPluginState(PluginType type);
     bool checkIfNeedStopProcessCacheManager() const;
@@ -129,9 +141,7 @@ private:
     void handleEpollEvents();
 
     // Unified epoll monitoring methods
-    void initUnifiedEpollMonitoring();
-    void registerPluginPerfBuffers(PluginType type);
-    void unregisterPluginPerfBuffers(PluginType type);
+    bool initUnifiedEpollMonitoring();
     void cleanupUnifiedEpollMonitoring();
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
@@ -154,10 +164,17 @@ private:
 
     moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mCommonEventQueue;
 
-    std::future<void> mPoller;
-    std::future<void> mHandler;
+    std::future<void> mPoller; // used to poll perf buffers and handle retry events
+    std::future<void> mHandler; // used to handle common events, do aggregate and send events
+    std::future<void> mIterator; // used to iterate bpf maps
 
     FrequencyManager mFrequencyMgr;
+
+    // metrics
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
+    IntGaugePtr mConnectionCacheSize;
+    CounterPtr mPushLogFailedTotal;
 
     int mUnifiedEpollFd = -1;
     std::vector<struct epoll_event> mEpollEvents;
@@ -165,6 +182,8 @@ private:
     RetryableEventCache mRetryableEventCache;
     IntGaugePtr mRetryableEventCacheSize;
     int64_t mLastEventCacheRetryTime = 0;
+
+    EventPool mEventPool;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif

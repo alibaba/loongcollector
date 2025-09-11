@@ -22,11 +22,13 @@
 #include <thread>
 #include <utility>
 
+#include "Lock.h"
 #include "TimeKeeper.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "common/queue/blockingconcurrentqueue.h"
@@ -39,24 +41,41 @@ namespace logtail::ebpf {
 ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                                const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                                moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                               const PluginMetricManagerPtr& metricManager)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, metricManager),
+                                               EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool),
       mAggregateTree(
           4096,
           [](std::unique_ptr<ProcessEventGroup>& base, const std::shared_ptr<CommonEvent>& other) {
               base->mInnerEvents.emplace_back(other);
           },
-          [](const std::shared_ptr<CommonEvent>& in, [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) {
-              return std::make_unique<ProcessEventGroup>(in->mPid, in->mKtime);
+          [](const std::shared_ptr<CommonEvent>& in,
+             [[maybe_unused]] std::shared_ptr<SourceBuffer>& sourceBuffer) -> std::unique_ptr<ProcessEventGroup> {
+              auto* processEvent = static_cast<ProcessEvent*>(in.get());
+              if (processEvent) {
+                  return std::make_unique<ProcessEventGroup>(processEvent->mPid, processEvent->mKtime);
+              }
+              return nullptr;
           }) {
 }
 
-int ProcessSecurityManager::Init(
-    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-    // just set timer ...
-    // register base manager ...
+int ProcessSecurityManager::Init() {
     mInited = true;
     mSuspendFlag = false;
+    return 0;
+}
+
+int ProcessSecurityManager::AddOrUpdateConfig(
+    const CollectionPipelineContext* ctx,
+    uint32_t index,
+    const PluginMetricManagerPtr& metricMgr,
+    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    if (metricMgr) {
+        MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
+        auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
+        mRefAndLabels.emplace_back(eventTypeLabels);
+        mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
+        mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
+    }
 
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
@@ -65,21 +84,43 @@ int ProcessSecurityManager::Init(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
+    if (Resume(opt)) {
+        LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
+        return 1;
+    }
+
+    mMetricMgr = metricMgr;
+    mPluginIndex = index;
+    mPipelineCtx = ctx;
+    mQueueKey = ctx->GetProcessQueueKey();
+
+    mRegisteredConfigCount++;
+
     return 0;
 }
 
-int ProcessSecurityManager::Destroy() {
-    mInited = false;
+int ProcessSecurityManager::RemoveConfig(const std::string&) {
+    for (auto& item : mRefAndLabels) {
+        if (mMetricMgr) {
+            mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
+        }
+    }
     auto processCacheMgr = GetProcessCacheManager();
     if (processCacheMgr == nullptr) {
         LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
         return 1;
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
+    mRegisteredConfigCount--;
     return 0;
 }
 
-std::array<size_t, 1> GenerateAggKeyForProcessEvent(const std::shared_ptr<CommonEvent>& event) {
+int ProcessSecurityManager::Destroy() {
+    mInited = false;
+    return 0;
+}
+
+std::array<size_t, 1> GenerateAggKeyForProcessEvent(ProcessEvent* event) {
     // calculate agg key
     std::array<size_t, 1> hashResult{};
     std::hash<uint64_t> hasher;
@@ -97,8 +138,8 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
     auto* processEvent = static_cast<ProcessEvent*>(event.get());
     LOG_DEBUG(sLogger,
-              ("receive event, pid", event->mPid)("ktime", event->mKtime)("eventType",
-                                                                          magic_enum::enum_name(event->mEventType)));
+              ("receive event, pid", processEvent->mPid)("ktime", processEvent->mKtime)(
+                  "eventType", magic_enum::enum_name(event->mEventType)));
     if (processEvent == nullptr) {
         LOG_ERROR(sLogger,
                   ("failed to convert CommonEvent to ProcessEvent, kernel event type",
@@ -108,12 +149,9 @@ int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& even
     }
 
     // calculate agg key
-    std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(event);
-    {
-        WriteLock lk(mLock);
-        bool ret = mAggregateTree.Aggregate(event, hashResult);
-        LOG_DEBUG(sLogger, ("after aggregate", ret));
-    }
+    std::array<size_t, 1> hashResult = GenerateAggKeyForProcessEvent(processEvent);
+    bool ret = mAggregateTree.Aggregate(event, hashResult);
+    LOG_DEBUG(sLogger, ("after aggregate", ret));
 
     return 0;
 }
@@ -131,13 +169,15 @@ int ProcessSecurityManager::SendEvents() {
         return 0;
     }
     auto nowMs = TimeKeeper::GetInstance()->NowMs();
-    if (nowMs - mLastSendTimeMs < mSendIntervalMs) {
+    bool timeTriggered = nowMs - mLastSendTimeMs >= mSendIntervalMs;
+    bool eventCountTriggered
+        = mAggregateTree.EventCount() >= static_cast<size_t>(INT32_FLAG(ebpf_max_aggregate_events));
+    if (!timeTriggered && !eventCountTriggered) {
         return 0;
     }
+    mLastSendTimeMs = nowMs;
 
-    WriteLock lk(mLock);
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> aggTree = this->mAggregateTree.GetAndReset();
-    lk.unlock();
 
     // read aggregator
     auto nodes = aggTree.GetNodesWithAggDepth(1);
@@ -154,24 +194,32 @@ int ProcessSecurityManager::SendEvents() {
         LOG_DEBUG(sLogger, ("child num", node->mChild.size()));
         // convert to a item and push to process queue
         aggTree.ForEach(node, [&](const ProcessEventGroup* group) {
-            auto sharedEvent = sharedEventGroup.CreateLogEvent();
+            auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             // represent a process ...
             auto processCacheMgr = GetProcessCacheManager();
             if (processCacheMgr == nullptr) {
                 LOG_WARNING(sLogger, ("ProcessCacheManager is null", ""));
                 return;
             }
-            auto hit = processCacheMgr->FinalizeProcessTags(group->mPid, group->mKtime, *sharedEvent);
+            auto hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
             if (!hit) {
                 LOG_WARNING(sLogger, ("cannot find tags for pid", group->mPid)("ktime", group->mKtime));
                 return;
             }
+
             for (const auto& innerEvent : group->mInnerEvents) {
-                auto* logEvent = eventGroup.AddLogEvent();
+                auto* logEvent = eventGroup.AddLogEvent(true, mEventPool);
                 for (const auto& it : *sharedEvent) {
                     logEvent->SetContentNoCopy(it.first, it.second);
                 }
-                struct timespec ts = ConvertKernelTimeToUnixTime(innerEvent->mTimestamp);
+                auto* processEvent = static_cast<ProcessEvent*>(innerEvent.get());
+                if (processEvent == nullptr) {
+                    LOG_WARNING(sLogger,
+                                ("failed to convert innerEvent to processEvent",
+                                 magic_enum::enum_name(innerEvent->GetKernelEventType())));
+                    continue;
+                }
+                struct timespec ts = ConvertKernelTimeToUnixTime(processEvent->mTimestamp);
                 logEvent->SetTimestamp(ts.tv_sec, ts.tv_nsec);
                 switch (innerEvent->mEventType) {
                     case KernelEventType::PROCESS_EXECVE_EVENT: {
@@ -205,27 +253,20 @@ int ProcessSecurityManager::SendEvents() {
         });
     }
     {
-        std::lock_guard lk(mContextMutex);
         if (this->mPipelineCtx == nullptr) {
             return 0;
         }
         LOG_DEBUG(sLogger, ("event group size", eventGroup.GetEvents().size()));
-        ADD_COUNTER(mPushLogsTotal, eventGroup.GetEvents().size());
+        size_t eventCount = eventGroup.GetEvents().size();
+        ADD_COUNTER(mPushLogsTotal, eventCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(std::move(eventGroup), this->mPluginIndex);
-        int maxRetry = 5;
-        for (int retry = 0; retry < maxRetry; ++retry) {
-            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (retry == maxRetry - 1) {
-                LOG_WARNING(sLogger,
-                            ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
-                                "[ProcessSecurityEvent] push queue failed!", ""));
-                // TODO: Alarm discard data
-            }
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", mPipelineCtx->GetConfigName())("pluginIdx", this->mPluginIndex)(
+                            "[ProcessSecurityEvent] push queue failed!", ""));
+            ADD_COUNTER(mPushLogFailedTotal, eventCount);
         }
     }
 

@@ -92,6 +92,11 @@ func (m *MetaManager) Init(configPath string) (err error) {
 		// 创建 Kubernetes 客户端配置
 		config = controllerConfig.GetConfigOrDie()
 	}
+	// set protobuf support for config
+	config.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
+	config.ContentType = "application/vnd.kubernetes.protobuf"
+	config.UserAgent = EntityCollectorUserAgent
+
 	// 创建 Kubernetes 客户端
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -111,7 +116,8 @@ func (m *MetaManager) Init(configPath string) (err error) {
 
 	go func() {
 		startTime := time.Now()
-		for _, cache := range m.cacheMap {
+		for resourceType, cache := range m.cacheMap {
+			logger.Info(context.Background(), resourceType, "init success")
 			cache.init(clientset)
 		}
 		m.ready.Store(true)
@@ -163,7 +169,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 		m.linkRegisterMap[configName] = append(m.linkRegisterMap[configName], resourceType)
 		m.registerLock.Unlock()
 	} else {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", resourceType)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "resourceType not support", resourceType)
 	}
 }
 

@@ -15,11 +15,10 @@
 #include "ebpf/plugin/ProcessCacheValue.h"
 
 namespace logtail {
-ProcessCacheValue* ProcessCacheValue::CloneContents() {
+ProcessCacheValue* ProcessCacheValue::ShallowCopyContents() {
     auto* newValue = new ProcessCacheValue();
     for (size_t i = 0; i < mContents.Size(); ++i) {
-        StringBuffer cp = newValue->GetSourceBuffer()->CopyString(mContents[i]);
-        newValue->mContents[i] = {cp.data, cp.size};
+        newValue->mContents[i] = mContents[i];
     }
     return newValue;
 }

@@ -56,7 +56,7 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 	// `(?s)` change the meaning of `.` in Golang to match the every character, and the default meaning is not match a newline.
 	p.re, err = regexp.Compile("(?s)" + p.Regex)
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Regex)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Regex)
 		return err
 	}
 

@@ -3,7 +3,6 @@ package setup
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
@@ -39,7 +38,7 @@ func SetDockerComposeBootType(t dockercompose.BootType) error {
 func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.Context, error) {
 	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
 		path := dependencyHome + "/" + dependencyName
-		err := config.Load(path, config.TestConfig.Profile)
+		err := config.Load(path)
 		if err != nil {
 			logger.Error(ctx, "LOAD_CONFIG_ALARM", "err", err)
 			return ctx, err
@@ -110,9 +109,8 @@ func ExposePort(ctx context.Context, source, target string) (context.Context, er
 func NewDockerComposeEnv() *DockerComposeEnv {
 	env := &DockerComposeEnv{}
 	root, _ := filepath.Abs(".")
-	reportDir := root + "/report/"
-	_ = os.Mkdir(reportDir, 0750)
-	config.ConfigDir = reportDir + "config"
+	config.ConfigDir = root + "/config"
+	config.OnetimeConfigDir = root + "/onetime_pipeline_config"
 	env.BootType = dockercompose.DockerComposeBootTypeE2E
 	return env
 }

@@ -14,6 +14,8 @@
 
 #include "plugin/flusher/sls/SLSClientManager.h"
 
+#include "boost/config.hpp"
+
 #ifdef __linux__
 #include <sys/utsname.h>
 #endif
@@ -33,6 +35,7 @@
 #ifdef __ENTERPRISE__
 #include "plugin/flusher/sls/EnterpriseSLSClientManager.h"
 #endif
+#include "common/EnvUtil.h"
 
 DEFINE_FLAG_STRING(custom_user_agent, "custom user agent appended at the end of the exsiting ones", "");
 DEFINE_FLAG_STRING(default_access_key_id, "", "");
@@ -53,16 +56,19 @@ SLSClientManager* SLSClientManager::GetInstance() {
 
 void SLSClientManager::Init() {
     GenerateUserAgent();
+    auto staticProvider = std::make_unique<StaticCredentialsProvider>(STRING_FLAG(default_access_key_id),
+                                                                      STRING_FLAG(default_access_key));
+    staticProvider->SetAuthType(AuthType::AK);
+    mCredentialsProvider = std::move(staticProvider);
 }
 
 bool SLSClientManager::GetAccessKey(const string& aliuid,
                                     AuthType& type,
                                     string& accessKeyId,
-                                    string& accessKeySecret) {
-    accessKeyId = STRING_FLAG(default_access_key_id);
-    accessKeySecret = STRING_FLAG(default_access_key);
-    type = AuthType::AK;
-    return true;
+                                    string& accessKeySecret,
+                                    std::string& secToken,
+                                    std::string& errorMsg) {
+    return mCredentialsProvider->GetCredentials(type, accessKeyId, accessKeySecret, secToken, errorMsg);
 }
 
 void SLSClientManager::GenerateUserAgent() {
@@ -100,7 +106,7 @@ void SLSClientManager::GenerateUserAgent() {
 
 string SLSClientManager::GetRunningEnvironment() {
     string env;
-    if (getenv("ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
+    if (GetEnv("LOONG_STATIC_CONTAINER_INFO", "ALIYUN_LOG_STATIC_CONTAINER_INFO")) {
         env = "ECI";
     } else if (getenv("ACK_NODE_LOCAL_DNS_ADMISSION_CONTROLLER_SERVICE_HOST")) {
         // logtail-ds installed by ACK will possess the above env
@@ -117,7 +123,7 @@ string SLSClientManager::GetRunningEnvironment() {
         } else {
             env = "K8S-Sidecar";
         }
-    } else if (AppConfig::GetInstance()->IsPurageContainerMode() || getenv("ALIYUN_LOGTAIL_CONFIG")) {
+    } else if (AppConfig::GetInstance()->IsPurageContainerMode() || GetEnv("LOONG_CONFIG", "ALIYUN_LOGTAIL_CONFIG")) {
         env = "Docker";
     } else if (InstanceIdentity::Instance()->GetEntity()->IsECSValid()) {
         env = "ECS";
@@ -136,7 +142,8 @@ bool SLSClientManager::PingEndpoint(const string& host, const string& path) {
 
 void PreparePostLogStoreLogsRequest(const string& accessKeyId,
                                     const string& accessKeySecret,
-                                    SLSClientManager::AuthType type,
+                                    const std::string& secToken,
+                                    AuthType type,
                                     const string& host,
                                     bool isHostIp,
                                     const string& project,
@@ -179,8 +186,10 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
         header[X_LOG_BODYRAWSIZE] = to_string(body.size());
         header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
     }
-    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+    if (type == AuthType::ANONYMOUS) {
         header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    } else if (type == AuthType::STS) {
+        header[X_ACS_SECURITY_TOKEN] = secToken;
     }
 
     map<string, string> parameterList;
@@ -198,7 +207,8 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
 
 void PreparePostHostMetricsRequest(const string& accessKeyId,
                                    const string& accessKeySecret,
-                                   SLSClientManager::AuthType type,
+                                   const string& secToken,
+                                   AuthType type,
                                    const string& compressType,
                                    RawDataType dataType,
                                    const string& body,
@@ -223,8 +233,10 @@ void PreparePostHostMetricsRequest(const string& accessKeyId,
         header[X_LOG_BODYRAWSIZE] = to_string(body.size());
         header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
     }
-    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+    if (type == AuthType::ANONYMOUS) {
         header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    } else if (type == AuthType::STS) {
+        header[X_ACS_SECURITY_TOKEN] = secToken;
     }
 
     map<string, string> parameterList;
@@ -234,7 +246,8 @@ void PreparePostHostMetricsRequest(const string& accessKeyId,
 
 void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
                                        const string& accessKeySecret,
-                                       SLSClientManager::AuthType type,
+                                       const std::string& secToken,
+                                       AuthType type,
                                        const string& host,
                                        bool isHostIp,
                                        const string& project,
@@ -263,8 +276,10 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
         header[X_LOG_COMPRESSTYPE] = compressType;
     }
     header[X_LOG_BODYRAWSIZE] = to_string(rawSize);
-    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+    if (type == AuthType::ANONYMOUS) {
         header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    } else if (type == AuthType::STS) {
+        header[X_ACS_SECURITY_TOKEN] = secToken;
     }
 
     map<string, string> parameterList;
@@ -274,17 +289,16 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
 
 void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   const string& accessKeySecret,
-                                  SLSClientManager::AuthType type,
+                                  const std::string& secToken,
+                                  AuthType type,
                                   const string& host,
                                   bool isHostIp,
                                   const string& project,
-                                  const string& logstore,
                                   const string& compressType,
                                   RawDataType dataType,
                                   const string& body,
                                   size_t rawSize,
                                   const string& path,
-                                  string& query,
                                   map<string, string>& header) {
     if (isHostIp) {
         header[HOST] = project + "." + host;
@@ -307,8 +321,10 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
         header[X_LOG_BODYRAWSIZE] = to_string(body.size());
         header[X_LOG_MODE] = LOG_MODE_BATCH_GROUP;
     }
-    if (type == SLSClientManager::AuthType::ANONYMOUS) {
+    if (type == AuthType::ANONYMOUS) {
         header[X_LOG_KEYPROVIDER] = MD5_SHA1_SALT_KEYPROVIDER;
+    } else if (type == AuthType::STS) {
+        header[X_ACS_SECURITY_TOKEN] = secToken;
     }
 
     map<string, string> parameterList;
@@ -318,7 +334,8 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
 
 SLSResponse PostLogStoreLogs(const string& accessKeyId,
                              const string& accessKeySecret,
-                             SLSClientManager::AuthType type,
+                             const std::string& secToken,
+                             AuthType type,
                              const string& host,
                              bool httpsFlag,
                              const string& project,
@@ -332,6 +349,7 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
     map<string, string> header;
     PreparePostLogStoreLogsRequest(accessKeyId,
                                    accessKeySecret,
+                                   secToken,
                                    type,
                                    host,
                                    false, // sync request always uses vip
@@ -355,7 +373,8 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
 
 SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                 const string& accessKeySecret,
-                                SLSClientManager::AuthType type,
+                                const std::string& secToken,
+                                AuthType type,
                                 const string& host,
                                 bool httpsFlag,
                                 const string& project,
@@ -367,6 +386,7 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
     map<string, string> header;
     PreparePostMetricStoreLogsRequest(accessKeyId,
                                       accessKeySecret,
+                                      secToken,
                                       type,
                                       host,
                                       false, // sync request always uses vip
@@ -385,31 +405,29 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
 
 SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                const string& accessKeySecret,
-                               SLSClientManager::AuthType type,
+                               const std::string& secToken,
+                               AuthType type,
                                const string& host,
                                bool httpsFlag,
                                const string& project,
-                               const string& logstore,
                                const string& compressType,
                                RawDataType dataType,
                                const string& body,
                                size_t rawSize,
-                               const std::string& subpath) {
-    string query;
-    map<string, string> header;
+                               const std::string& subpath,
+                               std::map<std::string, std::string>& header) {
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
+                                 secToken,
                                  type,
                                  host,
                                  false, // sync request always uses vip
                                  project,
-                                 logstore,
                                  compressType,
                                  dataType,
                                  body,
                                  rawSize,
                                  subpath,
-                                 query,
                                  header);
     HttpResponse response;
     SendHttpRequest(

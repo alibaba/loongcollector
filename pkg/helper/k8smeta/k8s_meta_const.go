@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	EntityCollectorUserAgent = "loongcollector-singleton"
+
 	// entity type
 	POD                   = "pod"
 	SERVICE               = "service"

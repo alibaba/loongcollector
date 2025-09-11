@@ -117,9 +117,6 @@ jobs:
         with:
           submodules: false
 
-      - name: Copy Lib
-        run: sudo cp ./pkg/logtail/libGoPluginAdapter.so /usr/lib/
-
       - name: UnitTest
         run: sudo make unittest_plugin
 

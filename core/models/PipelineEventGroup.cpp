@@ -67,7 +67,8 @@ PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
     : mMetadata(std::move(rhs.mMetadata)),
       mTags(std::move(rhs.mTags)),
       mEvents(std::move(rhs.mEvents)),
-      mSourceBuffer(std::move(rhs.mSourceBuffer)) {
+      mSourceBuffer(std::move(rhs.mSourceBuffer)),
+      mExtraSourceBuffers(std::move(rhs.mExtraSourceBuffers)) {
     for (auto& item : mEvents) {
         item->ResetPipelineEventGroup(this);
     }
@@ -101,6 +102,7 @@ PipelineEventGroup& PipelineEventGroup::operator=(PipelineEventGroup&& rhs) noex
         mTags = std::move(rhs.mTags);
         mEvents = std::move(rhs.mEvents);
         mSourceBuffer = std::move(rhs.mSourceBuffer);
+        mExtraSourceBuffers = std::move(rhs.mExtraSourceBuffers);
         for (auto& item : mEvents) {
             item->ResetPipelineEventGroup(this);
         }
@@ -113,6 +115,7 @@ PipelineEventGroup PipelineEventGroup::Copy() const {
     res.mMetadata = mMetadata;
     res.mTags = mTags;
     res.mExactlyOnceCheckpoint = mExactlyOnceCheckpoint;
+    res.mExtraSourceBuffers = mExtraSourceBuffers;
     for (auto& event : mEvents) {
         res.mEvents.emplace_back(event.Copy());
         res.mEvents.back()->ResetPipelineEventGroup(&res);
@@ -236,6 +239,13 @@ RawEvent* PipelineEventGroup::AddRawEvent(bool fromPool, EventPool* pool) {
     return e;
 }
 
+void PipelineEventGroup::AddSourceBuffer(const std::shared_ptr<SourceBuffer>& sourceBuffer) {
+    if (sourceBuffer == nullptr || sourceBuffer == mSourceBuffer) {
+        return;
+    }
+    mExtraSourceBuffers.insert(sourceBuffer);
+}
+
 void PipelineEventGroup::SetMetadata(EventGroupMetaKey key, StringView val) {
     SetMetadataNoCopy(key, mSourceBuffer->CopyString(val));
 }
@@ -304,13 +314,15 @@ void PipelineEventGroup::DelTag(StringView key) {
 }
 
 size_t PipelineEventGroup::GetTagsHash() const {
-    size_t seed = 0;
+    size_t res = 0;
     for (const auto& item : mTags.mInner) {
+        size_t seed = 0;
         HashCombine(seed, hash<string>{}(item.first.to_string()));
         HashCombine(seed, hash<string>{}(item.second.to_string()));
+        res ^= seed;
     }
-    HashCombine(seed, hash<string>{}(GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string()));
-    return seed;
+    HashCombine(res, hash<string>{}(GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string()));
+    return res;
 }
 
 size_t PipelineEventGroup::DataSize() const {

@@ -29,6 +29,8 @@
 #include <condition_variable>
 #include <functional>
 #include <mutex>
+#include <queue>
+#include <shared_mutex>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -38,17 +40,33 @@
 #include "common/Flags.h"
 #include "common/ProcParser.h"
 
-DECLARE_FLAG_INT32(system_interface_default_cache_ttl);
+DECLARE_FLAG_INT32(system_interface_cache_queue_size);
+DECLARE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size);
+DECLARE_FLAG_INT32(system_interface_cache_cleanup_interval_seconds);
+DECLARE_FLAG_INT32(system_interface_cache_entry_expire_seconds);
 
 namespace logtail {
 
 struct BaseInformation {
-    std::chrono::steady_clock::time_point collectTime;
+    time_t collectTime;
 };
 
 struct SystemInformation : public BaseInformation {
     int64_t bootTime;
 };
+
+class ScopeGuard {
+    std::function<void()> fn;
+
+public:
+    explicit ScopeGuard(std::function<void()> f) : fn(std::move(f)) {}
+
+    ~ScopeGuard() { fn(); }
+};
+
+#define defer3(ln, statement) ScopeGuard __##ln##_defer_([&]() { statement; })
+#define defer2(ln, statement) defer3(ln, statement)
+#define deferred(statement) defer2(__LINE__, statement)
 
 // man proc: https://man7.org/linux/man-pages/man5/proc.5.html
 // search key: /proc/stat
@@ -77,6 +95,137 @@ struct CPUStat {
     double steal;
     double guest;
     double guestNice;
+};
+
+struct tagPidTotal {
+    pid_t pid = 0;
+    uint64_t total = 0;
+
+    tagPidTotal() = default;
+
+    tagPidTotal(pid_t p, uint64_t t) : pid(p), total(t) {}
+};
+
+// 单进程CPU信息
+struct ProcessCpuInformation {
+    int64_t startTime = 0;
+    std::chrono::steady_clock::time_point lastTime;
+    uint64_t user = 0;
+    uint64_t sys = 0;
+    uint64_t total = 0;
+    double percent = 0.0;
+};
+
+struct ProcessTime {
+    int64_t startTime;
+    std::chrono::milliseconds cutime{0};
+    std::chrono::milliseconds cstime{0};
+
+    std::chrono::milliseconds user{0}; // utime + cutime
+    std::chrono::milliseconds sys{0}; // stime + cstime
+
+    std::chrono::milliseconds total{0}; // user + sys
+
+    std::chrono::milliseconds utime() const { return user - cutime; }
+
+    std::chrono::milliseconds stime() const { return sys - cstime; }
+
+    time_t collectTime;
+};
+
+struct ProcessInfo {
+    pid_t pid;
+    std::string name;
+    std::string path;
+    std::string cwd;
+    std::string root;
+    std::string args;
+    std::string user;
+};
+
+struct ProcessMemoryInformation : public BaseInformation {
+    uint64_t size = 0;
+    uint64_t resident = 0;
+    uint64_t share = 0;
+    uint64_t minorFaults = 0;
+    uint64_t majorFaults = 0;
+    uint64_t pageFaults = 0;
+};
+
+// 进程打开文件数
+struct ProcessFd : public BaseInformation {
+    uint64_t total = 0;
+    bool exact = true; // total是否是一个精确值，在Linux下进程打开文件数超10,000时，将不再继续统计，以防出现性能问题
+};
+
+struct ProcessCredName : public BaseInformation {
+    std::string user;
+    std::string group;
+    std::string name;
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
+};
+
+struct ProcessCred {
+    uid_t uid; // real user ID
+    gid_t gid; // real group ID
+    uid_t euid; // effective user ID
+    gid_t egid; // effective group ID
+};
+
+struct ProcessAllStat {
+    pid_t pid;
+    ProcessStat processState;
+    ProcessCpuInformation processCpu;
+    ProcessMemoryInformation processMemory;
+    double memPercent = 0.0;
+    uint64_t fdNum = 0;
+    bool fdNumExact = true;
+};
+
+struct ProcessPushMertic {
+    pid_t pid;
+    double cpuPercent = 0.0;
+    double memPercent = 0.0;
+    double fdNum = 0.0;
+    double numThreads = 0.0;
+    double allNumProcess = 0.0;
+
+    static inline const FieldName<ProcessPushMertic> processPushMerticFields[] = {
+        FIELD_ENTRY(ProcessPushMertic, cpuPercent),
+        FIELD_ENTRY(ProcessPushMertic, memPercent),
+        FIELD_ENTRY(ProcessPushMertic, fdNum),
+        FIELD_ENTRY(ProcessPushMertic, numThreads),
+        FIELD_ENTRY(ProcessPushMertic, allNumProcess),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<ProcessPushMertic, double>&)>& callback) {
+        for (const auto& field : processPushMerticFields) {
+            callback(field);
+        }
+    }
+};
+
+struct VMProcessNumStat {
+    double vmProcessNum = 0;
+
+    static inline const FieldName<VMProcessNumStat> vmProcessNumStatMerticFields[] = {
+        FIELD_ENTRY(VMProcessNumStat, vmProcessNum),
+    };
+
+    static void enumerate(const std::function<void(const FieldName<VMProcessNumStat, double>&)>& callback) {
+        for (const auto& field : vmProcessNumStatMerticFields) {
+            callback(field);
+        }
+    }
+};
+
+struct SystemTaskInfo {
+    uint64_t threadCount = 0;
+    uint64_t processCount = 0;
+    uint64_t zombieProcessCount = 0;
 };
 
 struct CPUInformation : public BaseInformation {
@@ -289,6 +438,10 @@ struct CpuCoreNumInformation : public BaseInformation {
     unsigned int cpuCoreNum;
 };
 
+struct ProcessExecutePath : public BaseInformation {
+    std::string path;
+};
+
 struct TCPStatInformation : public BaseInformation {
     ResTCPStat stat;
 };
@@ -307,6 +460,29 @@ struct TupleHash {
             t);
         return seed;
     }
+};
+
+struct MemoryInformationString : public BaseInformation {
+    std::vector<std::string> meminfoString;
+};
+
+struct MTRRInformationString : public BaseInformation {
+    std::vector<std::string> mtrrString;
+};
+
+// /proc/pid/status
+struct ProcessStatusString : public BaseInformation {
+    std::vector<std::string> processStatusString;
+};
+
+// /proc/pid/cmdline
+struct ProcessCmdlineString : public BaseInformation {
+    std::vector<std::string> cmdline;
+};
+
+// /proc/pid/statm
+struct ProcessStatmString : public BaseInformation {
+    std::vector<std::string> processStatmString;
 };
 
 struct MemoryStat {
@@ -347,21 +523,131 @@ struct MemoryInformation : public BaseInformation {
     MemoryStat memStat;
 };
 
+enum FileSystemType {
+    FILE_SYSTEM_TYPE_UNKNOWN = 0,
+    FILE_SYSTEM_TYPE_NONE,
+    FILE_SYSTEM_TYPE_LOCAL_DISK,
+    FILE_SYSTEM_TYPE_NETWORK,
+    FILE_SYSTEM_TYPE_RAM_DISK,
+    FILE_SYSTEM_TYPE_CDROM,
+    FILE_SYSTEM_TYPE_SWAP,
+    FILE_SYSTEM_TYPE_MAX
+};
+
+struct FileSystem {
+    std::string dirName;
+    std::string devName;
+    std::string typeName;
+    std::string sysTypeName;
+    std::string options;
+    FileSystemType type = FILE_SYSTEM_TYPE_UNKNOWN;
+    unsigned long flags = 0;
+};
+
+struct FileSystemListInformation : public BaseInformation {
+    // mounted file systems
+    std::vector<FileSystem> fileSystemList;
+};
+
+struct SystemUptimeInformation : public BaseInformation {
+    double uptime;
+};
+
+struct SerialIdInformation : public BaseInformation {
+    std::string serialId;
+};
+
+enum class EnumDiskState {
+    major,
+    minor,
+    devName,
+
+    reads,
+    readsMerged,
+    readSectors,
+    rMillis,
+
+    writes,
+    writesMerged,
+    writeSectors,
+    wMillis,
+
+    ioCount,
+    rwMillis, // 输入输出花费的毫秒数
+    qMillis, // 输入/输出操作花费的加权毫秒数
+
+    count, // 这个用于收尾，不是实际的列号。
+};
+static_assert((int)EnumDiskState::count == 14, "EnumDiskState::count unexpected");
+
+struct DiskState {
+    unsigned int major;
+    unsigned int minor;
+
+    uint64_t reads;
+    uint64_t readBytes;
+    uint64_t rTime;
+
+    uint64_t writes;
+    uint64_t writeBytes;
+    uint64_t wTime;
+
+    uint64_t time; // 输入输出花费的毫秒数
+    uint64_t qTime; // 输入/输出操作花费的加权毫秒数
+};
+
+struct FileSystemState {
+    double use_percent = 0;
+    uint64_t total = 0;
+    uint64_t free = 0;
+    uint64_t used = 0;
+    uint64_t avail = 0;
+    uint64_t files = 0;
+    uint64_t freeFiles = 0;
+};
+
+struct FileSystemInformation : public BaseInformation {
+    FileSystemState fileSystemState;
+};
+
+struct DiskStateInformation : public BaseInformation {
+    std::vector<DiskState> diskStats;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
     class SystemInformationCache {
+    private:
+        struct CacheEntry {
+            std::deque<InfoT> data;
+            std::chrono::steady_clock::time_point lastAccessTime;
+
+            CacheEntry() : lastAccessTime(std::chrono::steady_clock::now()) {}
+        };
+
     public:
-        SystemInformationCache(std::chrono::milliseconds ttl) : mTTL(ttl) {}
-        bool GetWithTimeout(InfoT& info, std::chrono::milliseconds timeout, Args... args);
+        SystemInformationCache(size_t cacheSize)
+            : mCacheDequeSize(cacheSize),
+              mLastCleanupTime(std::chrono::steady_clock::now()),
+              mMaxCleanupCount(INT32_FLAG(system_interface_cache_max_cleanup_batch_size)),
+              mCleanupInterval(std::chrono::seconds(INT32_FLAG(system_interface_cache_cleanup_interval_seconds))),
+              mExpireThreshold(std::chrono::seconds(INT32_FLAG(system_interface_cache_entry_expire_seconds))) {}
+        bool Get(time_t targetTime, InfoT& info, Args... args);
         bool Set(InfoT& info, Args... args);
-        bool GC();
+        void PerformGarbageCollection();
+        size_t GetCacheSize() const;
+        bool ClearExpiredEntries(std::chrono::steady_clock::duration maxAge);
+        bool ShouldPerformCleanup() const;
 
     private:
-        std::mutex mMutex;
-        std::unordered_map<std::tuple<Args...>, std::pair<InfoT, std::atomic_bool>, TupleHash> mCache;
-        std::condition_variable mConditionVariable;
-        std::chrono::milliseconds mTTL;
+        mutable std::mutex mMutex;
+        std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
+        size_t mCacheDequeSize;
+        std::chrono::steady_clock::time_point mLastCleanupTime;
+        int32_t mMaxCleanupCount;
+        std::chrono::seconds mCleanupInterval;
+        std::chrono::seconds mExpireThreshold;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -371,16 +657,14 @@ public:
     template <typename InfoT>
     class SystemInformationCache<InfoT> {
     public:
-        SystemInformationCache(std::chrono::milliseconds ttl) : mTTL(ttl) {}
-        bool GetWithTimeout(InfoT& info, std::chrono::milliseconds timeout);
+        SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
+        bool Get(time_t targetTime, InfoT& info);
         bool Set(InfoT& info);
-        bool GC();
 
     private:
-        std::mutex mMutex;
-        std::pair<InfoT, std::atomic_bool> mCache;
-        std::condition_variable mConditionVariable;
-        std::chrono::milliseconds mTTL;
+        mutable std::mutex mMutex;
+        std::deque<InfoT> mCache;
+        size_t mCacheDequeSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -395,31 +679,51 @@ public:
     static SystemInterface* GetInstance();
 
     bool GetSystemInformation(SystemInformation& systemInfo);
-    bool GetCPUInformation(CPUInformation& cpuInfo);
-    bool GetProcessListInformation(ProcessListInformation& processListInfo);
-    bool GetProcessInformation(pid_t pid, ProcessInformation& processInfo);
-    bool GetSystemLoadInformation(SystemLoadInformation& systemLoadInfo);
+    bool GetCPUInformation(time_t now, CPUInformation& cpuInfo);
+    bool GetProcessListInformation(time_t now, ProcessListInformation& processListInfo);
+    bool GetProcessInformation(time_t now, pid_t pid, ProcessInformation& processInfo);
+    bool GetSystemLoadInformation(time_t now, SystemLoadInformation& systemLoadInfo);
     bool GetCPUCoreNumInformation(CpuCoreNumInformation& cpuCoreNumInfo);
-    bool GetHostMemInformationStat(MemoryInformation& meminfo);
+    bool GetHostMemInformationStat(time_t now, MemoryInformation& meminfo);
+    bool GetFileSystemListInformation(time_t now, FileSystemListInformation& fileSystemListInfo);
+    bool GetSystemUptimeInformation(time_t now, SystemUptimeInformation& systemUptimeInfo);
+    bool GetDiskSerialIdInformation(time_t now, std::string diskName, SerialIdInformation& serialIdInfo);
+    bool GetDiskStateInformation(time_t now, DiskStateInformation& diskStateInfo);
+    bool GetFileSystemInformation(time_t now, std::string dirName, FileSystemInformation& fileSystemInfo);
+    bool GetProcessCmdlineString(time_t now, pid_t pid, ProcessCmdlineString& cmdline);
+    bool GetPorcessStatm(time_t now, pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessCredNameObj(time_t now, pid_t pid, ProcessCredName& credName);
+    bool GetExecutablePathCache(time_t now, pid_t pid, ProcessExecutePath& executePath);
+    bool GetProcessOpenFiles(time_t now, pid_t pid, ProcessFd& processFd);
 
-    bool GetTCPStatInformation(TCPStatInformation& tcpStatInfo);
-    bool GetNetInterfaceInformation(NetInterfaceInformation& netInterfaceInfo);
-    explicit SystemInterface(std::chrono::milliseconds ttl
-                             = std::chrono::milliseconds{INT32_FLAG(system_interface_default_cache_ttl)})
+    bool GetTCPStatInformation(time_t now, TCPStatInformation& tcpStatInfo);
+    bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
+    explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
-          mCPUInformationCache(ttl),
-          mProcessListInformationCache(ttl),
-          mProcessInformationCache(ttl),
-          mSystemLoadInformationCache(ttl),
-          mCPUCoreNumInformationCache(ttl),
-          mMemInformationCache(ttl),
-          mTCPStatInformationCache(ttl),
-          mNetInterfaceInformationCache(ttl) {}
+          mCPUInformationCache(cacheSize),
+          mProcessListInformationCache(cacheSize),
+          mProcessInformationCache(cacheSize),
+          mSystemLoadInformationCache(cacheSize),
+          mCPUCoreNumInformationCache(),
+          mMemInformationCache(cacheSize),
+          mFileSystemListInformationCache(cacheSize),
+          mSystemUptimeInformationCache(cacheSize),
+          mSerialIdInformationCache(cacheSize),
+          mDiskStateInformationCache(cacheSize),
+          mFileSystemInformationCache(cacheSize),
+          mProcessCmdlineCache(cacheSize),
+          mProcessStatmCache(cacheSize),
+          mProcessStatusCache(cacheSize),
+          mProcessFdCache(cacheSize),
+          mExecutePathCache(cacheSize),
+          mTCPStatInformationCache(cacheSize),
+          mNetInterfaceInformationCache(cacheSize) {}
     virtual ~SystemInterface() = default;
 
 private:
     template <typename F, typename InfoT, typename... Args>
     bool MemoizedCall(SystemInformationCache<InfoT, Args...>& cache,
+                      time_t now,
                       F&& func,
                       InfoT& info,
                       const std::string& errorType,
@@ -432,6 +736,16 @@ private:
     virtual bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) = 0;
     virtual bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) = 0;
     virtual bool GetHostMemInformationStatOnce(MemoryInformation& meminfoStr) = 0;
+    virtual bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) = 0;
+    virtual bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) = 0;
+    virtual bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) = 0;
+    virtual bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) = 0;
+    virtual bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) = 0;
+    virtual bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) = 0;
+    virtual bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) = 0;
+    virtual bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) = 0;
+    virtual bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) = 0;
+    virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
 
@@ -440,8 +754,18 @@ private:
     SystemInformationCache<ProcessListInformation> mProcessListInformationCache;
     SystemInformationCache<ProcessInformation, pid_t> mProcessInformationCache;
     SystemInformationCache<SystemLoadInformation> mSystemLoadInformationCache;
-    SystemInformationCache<CpuCoreNumInformation> mCPUCoreNumInformationCache;
+    CpuCoreNumInformation mCPUCoreNumInformationCache;
     SystemInformationCache<MemoryInformation> mMemInformationCache;
+    SystemInformationCache<FileSystemListInformation> mFileSystemListInformationCache;
+    SystemInformationCache<SystemUptimeInformation> mSystemUptimeInformationCache;
+    SystemInformationCache<SerialIdInformation, std::string> mSerialIdInformationCache;
+    SystemInformationCache<DiskStateInformation> mDiskStateInformationCache;
+    SystemInformationCache<FileSystemInformation, std::string> mFileSystemInformationCache;
+    SystemInformationCache<ProcessCmdlineString, pid_t> mProcessCmdlineCache;
+    SystemInformationCache<ProcessMemoryInformation, pid_t> mProcessStatmCache;
+    SystemInformationCache<ProcessCredName, pid_t> mProcessStatusCache;
+    SystemInformationCache<ProcessFd, pid_t> mProcessFdCache;
+    SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
 

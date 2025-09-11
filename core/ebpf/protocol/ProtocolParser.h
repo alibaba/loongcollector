@@ -23,6 +23,7 @@
 #include "ParserRegistry.h"
 #include "common/Lock.h"
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/Converger.h"
 #include "ebpf/util/sampler/Sampler.h"
 #include "http/HttpParser.h"
 
@@ -49,10 +50,11 @@ public:
     bool RemoveParser(support_proto_e type);
     std::set<support_proto_e> AvaliableProtocolTypes() const;
 
-    std::vector<std::shared_ptr<AbstractRecord>> Parse(support_proto_e type,
-                                                       const std::shared_ptr<Connection>& conn,
-                                                       struct conn_data_event_t* data,
-                                                       const std::shared_ptr<Sampler>& sampler = nullptr);
+    std::vector<std::shared_ptr<L7Record>> Parse(support_proto_e type,
+                                                 const std::shared_ptr<Connection>& conn,
+                                                 struct conn_data_event_t* data,
+                                                 const std::shared_ptr<AppDetail>& appDetail,
+                                                 const std::shared_ptr<AppConvergerManager>& converger);
 
 private:
     ProtocolParserManager() {}

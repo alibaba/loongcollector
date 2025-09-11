@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckpointManagerV2.h"
 #include "common/Flags.h"
+#include "file_server/checkpoint/CheckpointManagerV2.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "unittest/Unittest.h"
 

@@ -35,6 +35,7 @@
 #include "plugin/input/InputFile.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMetrics.h"
+#include "plugin/input/InputStaticFile.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
 #include "plugin/processor/ProcessorFilterNative.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
@@ -44,9 +45,13 @@
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
+#include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+#include "plugin/flusher/kafka/FlusherKafka.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
@@ -66,7 +71,7 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_processor_spl, "", true);
-DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
@@ -95,9 +100,15 @@ void PluginRegistry::UnloadPlugins() {
     mPluginDict.clear();
 }
 
-unique_ptr<InputInstance> PluginRegistry::CreateInput(const string& name,
-                                                      const PluginInstance::PluginMeta& pluginMeta) {
-    return unique_ptr<InputInstance>(static_cast<InputInstance*>(Create(INPUT_PLUGIN, name, pluginMeta).release()));
+unique_ptr<InputInstance>
+PluginRegistry::CreateInput(const string& name, bool isOnetime, const PluginInstance::PluginMeta& pluginMeta) {
+    if (isOnetime) {
+        return unique_ptr<InputInstance>(
+            static_cast<InputInstance*>(Create(ONETIME_INPUT_PLUGIN, name, pluginMeta).release()));
+    } else {
+        return unique_ptr<InputInstance>(
+            static_cast<InputInstance*>(Create(CONTINUOUS_INPUT_PLUGIN, name, pluginMeta).release()));
+    }
 }
 
 unique_ptr<ProcessorInstance> PluginRegistry::CreateProcessor(const string& name,
@@ -116,15 +127,19 @@ bool PluginRegistry::IsValidGoPlugin(const string& name) const {
 #ifndef __ANDROID__
     // If the plugin is not a C++ plugin, iLogtail core considers it is a go plugin.
     // Go PluginManager validates the go plugins instead of C++ core.
-    return !IsValidNativeInputPlugin(name) && !IsValidNativeProcessorPlugin(name) && !IsValidNativeFlusherPlugin(name);
+    return !IsValidNativeInputPlugin(name, true) && !IsValidNativeInputPlugin(name, false)
+        && !IsValidNativeProcessorPlugin(name) && !IsValidNativeFlusherPlugin(name);
 #else
     // android does not support go plugins
     return false;
 #endif
 }
 
-bool PluginRegistry::IsValidNativeInputPlugin(const string& name) const {
-    return mPluginDict.find(PluginKey(INPUT_PLUGIN, name)) != mPluginDict.end();
+bool PluginRegistry::IsValidNativeInputPlugin(const string& name, bool isOnetime) const {
+    if (isOnetime) {
+        return mPluginDict.find(PluginKey(ONETIME_INPUT_PLUGIN, name)) != mPluginDict.end();
+    }
+    return mPluginDict.find(PluginKey(CONTINUOUS_INPUT_PLUGIN, name)) != mPluginDict.end();
 }
 
 bool PluginRegistry::IsValidNativeProcessorPlugin(const string& name) const {
@@ -136,32 +151,35 @@ bool PluginRegistry::IsValidNativeFlusherPlugin(const string& name) const {
 }
 
 void PluginRegistry::LoadStaticPlugins() {
-    RegisterInputCreator(new StaticInputCreator<InputFile>());
-    RegisterInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputFile>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
-    RegisterInputCreator(new StaticInputCreator<InputContainerStdio>());
-    RegisterInputCreator(new StaticInputCreator<InputPrometheus>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
+    // TODO: remove these gflag when plugin is stablized
     if (BOOL_FLAG(enable_ebpf_network_observer)) {
-        RegisterInputCreator(new StaticInputCreator<InputNetworkObserver>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkObserver>(), false);
     }
     if (BOOL_FLAG(enable_ebpf_process_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputProcessSecurity>(), true);
     }
     if (BOOL_FLAG(enable_ebpf_file_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputFileSecurity>(), true);
     }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
-        RegisterInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+        RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
-    RegisterInputCreator(new StaticInputCreator<InputHostMeta>(), true);
-    RegisterInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
 #endif
+    RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseContainerLogNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseFromPBNative>());
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromRelabelMetricNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorPromParseMetricNative>());
@@ -183,6 +201,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
+#endif
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif
@@ -209,8 +230,12 @@ void PluginRegistry::LoadDynamicPlugins(const set<string>& plugins) {
     }
 }
 
-void PluginRegistry::RegisterInputCreator(PluginCreator* creator, bool isSingleton) {
-    RegisterCreator(INPUT_PLUGIN, creator, isSingleton);
+void PluginRegistry::RegisterOnetimeInputCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(ONETIME_INPUT_PLUGIN, creator, isSingleton);
+}
+
+void PluginRegistry::RegisterContinuousInputCreator(PluginCreator* creator, bool isSingleton) {
+    RegisterCreator(CONTINUOUS_INPUT_PLUGIN, creator, isSingleton);
 }
 
 void PluginRegistry::RegisterProcessorCreator(PluginCreator* creator) {
@@ -261,8 +286,12 @@ PluginRegistry::Create(PluginCat cat, const string& name, const PluginInstance::
     return ins;
 }
 
-bool PluginRegistry::IsGlobalSingletonInputPlugin(const string& name) const {
-    return IsGlobalSingleton(INPUT_PLUGIN, name);
+bool PluginRegistry::IsGlobalSingletonInputPlugin(const string& name, bool isOnetime) const {
+    if (isOnetime) {
+        return IsGlobalSingleton(ONETIME_INPUT_PLUGIN, name);
+    } else {
+        return IsGlobalSingleton(CONTINUOUS_INPUT_PLUGIN, name);
+    }
 }
 
 bool PluginRegistry::IsGlobalSingleton(PluginCat cat, const string& name) const {

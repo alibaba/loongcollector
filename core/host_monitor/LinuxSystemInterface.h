@@ -46,7 +46,18 @@ private:
     bool GetSystemLoadInformationOnce(SystemLoadInformation& systemLoadInfo) override;
     bool GetCPUCoreNumInformationOnce(CpuCoreNumInformation& cpuCoreNumInfo) override;
 
+    bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) override;
+    bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) override;
+    bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override;
+    bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override;
+    bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) override;
+
     uint64_t GetMemoryValue(char unit, uint64_t value);
+    bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
+    bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override;
+    bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) override;
+    bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) override;
+    bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) override;
     bool GetHostSystemStat(std::vector<std::string>& lines, std::string& errorMessage);
     bool GetHostLoadavg(std::vector<std::string>& lines, std::string& errorMessage);
     bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp);

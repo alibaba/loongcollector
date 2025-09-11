@@ -115,7 +115,6 @@ protected:
     void TearDown() override {
         mConfig.reset();
         EBPFServer::GetInstance()->Stop();
-        Timer::GetInstance()->Stop();
         AsynCurlRunner::GetInstance()->Stop();
     }
 
@@ -328,10 +327,12 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     auto res = input->Init(configJson, optionalGoPipeline);
+    LOG_INFO(sLogger, ("test start 1", "FILE_SECURITY"));
     res = input->Start();
     EXPECT_TRUE(res);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     // suspend
+    LOG_INFO(sLogger, ("test suspend", "FILE_SECURITY"));
     res = input->Stop(false);
     EXPECT_TRUE(res);
 
@@ -354,13 +355,58 @@ void eBPFServerUnittest::TestUpdateFileSecurity() {
     res = input->Init(configJson, optionalGoPipeline);
     input->CommitMetricsRecordRef();
     EXPECT_TRUE(res);
+    LOG_INFO(sLogger, ("test update", "FILE_SECURITY"));
     res = input->Start();
     EXPECT_TRUE(res);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
+    LOG_INFO(sLogger, ("test real stop", "FILE_SECURITY"));
+
     res = input->Stop(true);
     EXPECT_TRUE(res);
+
+    {
+        LOG_INFO(sLogger, ("test restart", "FILE_SECURITY"));
+        std::string configStr = R"(
+            {
+                "Type": "input_file_security",
+                "ProbeConfig":
+                {
+                    "FilePathFilter": [
+                        "/etc/passwd",
+                        "/etc/shadow",
+                        "/bin"
+                    ]
+                }
+            }
+        )";
+
+        std::shared_ptr<InputFileSecurity> input(new InputFileSecurity());
+
+        std::string errorMsg;
+        Json::Value configJson;
+        Json::Value optionalGoPipeline;
+
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef("test", "1");
+        auto initStatus = input->Init(configJson, optionalGoPipeline);
+        input->CommitMetricsRecordRef();
+        APSARA_TEST_TRUE(initStatus);
+
+        ctx.SetConfigName("test-1");
+        auto res = input->Start();
+        EXPECT_TRUE(res);
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        // stop
+        res = input->Stop(true);
+        EXPECT_TRUE(res);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }
 
 void eBPFServerUnittest::TestUpdateNetworkSecurity() {
@@ -604,6 +650,7 @@ void eBPFServerUnittest::TestEbpfParameters() {
 
 void eBPFServerUnittest::TestUnifiedEpoll() {
     auto* server = ebpf::EBPFServer::GetInstance();
+    server->Init();
     APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
 
     std::string configStr = R"(
@@ -719,11 +766,11 @@ void eBPFServerUnittest::TestUnifiedEpoll() {
 }
 
 void eBPFServerUnittest::TestRetryCache() {
-    ebpf::EBPFServer::GetInstance()->Init();
-    auto& eventCache = ebpf::EBPFServer::GetInstance()->EventCache();
+    auto& server = *ebpf::EBPFServer::GetInstance();
+    server.Init();
+    auto& eventCache = server.EventCache();
     APSARA_TEST_EQUAL(0UL, eventCache.Size());
 
-    auto& server = *ebpf::EBPFServer::GetInstance();
     auto initialRetryTime = server.mLastEventCacheRetryTime;
     server.handleEventCache();
     APSARA_TEST_GE(server.mLastEventCacheRetryTime, initialRetryTime);
@@ -774,19 +821,21 @@ void eBPFServerUnittest::TestEnvManager() {
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
-UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
-// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
-UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
 
+// UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateNetworkSecurity);
+
+// UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkSecurity);
+
+UNIT_TEST_CASE(eBPFServerUnittest, TestUpdateFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestFileSecurity);
+UNIT_TEST_CASE(eBPFServerUnittest, TestProcessSecurity);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestDefaultAndLoadEbpfParameters);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV1);
 UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV2);
 UNIT_TEST_CASE(eBPFServerUnittest, TestUnifiedEpoll);
 UNIT_TEST_CASE(eBPFServerUnittest, TestRetryCache);
-UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager)
+UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager);
 
 } // namespace ebpf
 } // namespace logtail

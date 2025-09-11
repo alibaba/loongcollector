@@ -62,7 +62,7 @@ func newJmxfetchLogReader(agentDirPath string, logPath string, drop bool) *helpe
 
 	reader, err := helper.NewLogFileReader(manager.managerMeta.GetContext(), checkPoint, helper.DefaultLogFileReaderConfig, NewProcessor())
 	if err != nil {
-		logger.Error(manager.managerMeta.GetContext(), JMXAlarmType, "path", checkPoint.Path, "create jmxfetch log reader error", err)
+		logger.Warning(manager.managerMeta.GetContext(), JMXAlarmType, "path", checkPoint.Path, "create jmxfetch log reader error", err)
 		return nil
 	}
 	return reader

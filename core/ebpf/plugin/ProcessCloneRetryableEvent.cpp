@@ -16,8 +16,8 @@
 
 #include <memory>
 
-#include "ProcessEvent.h"
 #include "common/ProcParser.h"
+#include "ebpf/type/ProcessEvent.h"
 #include "logger/Logger.h"
 #include "metadata/ContainerMetadata.h"
 #include "metadata/K8sMetadata.h"
@@ -74,9 +74,10 @@ ProcessCacheValue* ProcessCloneRetryableEvent::cloneProcessCacheValue(const msg_
         return nullptr;
     }
     auto execId = GenerateExecId(mHostname, event.tgid, event.ktime);
-    auto* cacheValue = parent->CloneContents();
+    auto* cacheValue = parent->ShallowCopyContents();
     cacheValue->mPPid = event.parent.pid;
     cacheValue->mPKtime = event.parent.ktime;
+    cacheValue->mParent = parent;
     cacheValue->SetContent<kExecId>(execId);
     cacheValue->SetContent<kProcessId>(event.tgid);
     cacheValue->SetContent<kKtime>(event.ktime);

@@ -39,18 +39,18 @@ public:
     ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           EventPool* pool);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           EventPool* pool) {
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     ~ProcessSecurityManager() = default;
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
     PluginType GetPluginType() override { return PluginType::PROCESS_SECURITY; }
@@ -63,9 +63,14 @@ public:
     int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
     int ConsumePerfBufferData() override { return 0; }
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point&, const std::shared_ptr<ScheduleConfig>&) override {
-        return true;
-    }
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -79,11 +84,22 @@ public:
         return 0;
     }
 
+    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
+
 private:
-    ReadWriteLock mLock;
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
+
+    std::vector<MetricLabels> mRefAndLabels;
+    PluginMetricManagerPtr mMetricMgr;
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    int mRegisteredConfigCount = 0;
+    uint32_t mPluginIndex{0};
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 };
 
 } // namespace logtail::ebpf

@@ -429,9 +429,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
               "  ]\n"
               "}";
 
-        Json::Reader reader;
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -532,9 +534,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    }\n"
                               "  ]\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -551,9 +555,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    \"exp\": \"xxx\",\n"
                               "    \"type\": \"regex\"\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -576,9 +582,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    }\n"
                               "  ]\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -615,9 +623,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    }\n"
                               "  ]\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -650,9 +660,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    }\n"
                               "  ]\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -689,9 +701,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "    }\n"
                               "  ]\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;
@@ -722,9 +736,11 @@ void ProcessorFilterNativeUnittest::TestBaseFilter() {
                               "  \"key\": \"c\",\n"
                               "  \"exp\": \"regex3\"\n"
                               "}";
-        Json::Reader reader;
+        Json::CharReaderBuilder builder;
+        const std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
         Json::Value rootNode;
-        APSARA_TEST_TRUE_FATAL(reader.parse(jsonStr, rootNode));
+        std::string errorMsg;
+        APSARA_TEST_TRUE_FATAL(reader->parse(jsonStr, jsonStr + strlen(jsonStr), &rootNode, &errorMsg));
 
         // init
         Json::Value config;

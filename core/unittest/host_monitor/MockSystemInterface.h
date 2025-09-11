@@ -31,14 +31,18 @@ class MockSystemInterface : public SystemInterface {
 public:
     MockSystemInterface() = default;
     ~MockSystemInterface() override = default;
+    static MockSystemInterface* GetInstance() {
+        static MockSystemInterface instance;
+        return &instance;
+    }
 
 private:
     bool GetSystemInformationOnce(SystemInformation& systemInfo) override {
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        systemInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -46,8 +50,8 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        cpuInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -55,8 +59,8 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processListInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        processListInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -64,8 +68,8 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        processInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        processInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -73,8 +77,8 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        systemLoadInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        systemLoadInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -82,16 +86,16 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        cpuCoreNumInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        cpuCoreNumInfo.collectTime = time(nullptr);
         return true;
     }
     bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) override {
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        tcpStatInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        tcpStatInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -99,8 +103,8 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        netInterfaceInfo.collectTime = std::chrono::steady_clock::now();
         ++mMockCalledCount;
+        netInterfaceInfo.collectTime = time(nullptr);
         return true;
     }
 
@@ -108,7 +112,96 @@ private:
         if (mBlockTime > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
         }
-        meminfo.collectTime = std::chrono::steady_clock::now();
+        ++mMockCalledCount;
+        meminfo.collectTime = time(nullptr);
+        return true;
+    }
+    bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        cmdline.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processMemory.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processCredName.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetExecutablePathOnce(pid_t pid, ProcessExecutePath& executePath) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        executePath.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        processFd.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetFileSystemListInformationOnce(FileSystemListInformation& fileSystemListInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        fileSystemListInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        systemUptimeInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        serialIdInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        diskStateInfo.collectTime = time(nullptr);
+        ++mMockCalledCount;
+        return true;
+    }
+
+    bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) override {
+        if (mBlockTime > 0) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(mBlockTime));
+        }
+        fileSystemInfo.collectTime = time(nullptr);
         ++mMockCalledCount;
         return true;
     }

@@ -20,8 +20,10 @@
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
+#include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 
 namespace logtail {
@@ -108,6 +110,39 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
         mCollectors.push_back(MemCollector::sName);
     }
 
+    // system disk
+    bool enableDisk = true;
+    if (!GetOptionalBoolParam(config, "EnableDisk", enableDisk, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableDisk) {
+        mCollectors.push_back(DiskCollector::sName);
+    }
+
+    bool enableProcess = true;
+    if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableProcess) {
+        mCollectors.push_back(ProcessCollector::sName);
+    }
+
     // net
     bool enableNet = true;
     if (!GetOptionalBoolParam(config, "EnableNet", enableNet, errorMsg)) {
@@ -131,13 +166,17 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 
 bool InputHostMonitor::Start() {
     HostMonitorInputRunner::GetInstance()->Init();
+    std::vector<CollectorInfo> collectorInfos;
+    for (const auto& collectorName : mCollectors) {
+        collectorInfos.push_back({collectorName, mInterval, HostMonitorCollectType::kMultiValue});
+    }
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mCollectors, std::vector(mCollectors.size(), mInterval), mContext->GetProcessQueueKey(), mIndex);
+        mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
 bool InputHostMonitor::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector(mCollectors);
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
     return true;
 }
 

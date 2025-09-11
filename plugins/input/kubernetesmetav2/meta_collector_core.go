@@ -22,8 +22,12 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("instance_ip", obj.Status.PodIP)
 		containerInfos := []map[string]string{}
@@ -120,8 +124,12 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		m.processEntityCommonPart(log.Contents, obj.Kind, "", obj.Name, method, data.FirstObservedTime, data.LastObservedTime, obj.CreationTimestamp)
 
 		// custom fields
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		status := []map[string]string{}
 		for _, condition := range obj.Status.Conditions {
 			conditionInfo := map[string]string{
@@ -165,8 +173,12 @@ func (m *metaCollector) processServiceEntity(data *k8smeta.ObjectWrapper, method
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("selector", m.processEntityJSONObject(obj.Spec.Selector))
 		log.Contents.Add("type", string(obj.Spec.Type))
 		log.Contents.Add("cluster_ip", obj.Spec.ClusterIP)
@@ -201,8 +213,12 @@ func (m *metaCollector) processConfigMapEntity(data *k8smeta.ObjectWrapper, meth
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -219,8 +235,12 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("kind", obj.Kind)
 		log.Contents.Add("name", obj.Name)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -236,8 +256,12 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storage_class_name", obj.Spec.StorageClassName)
 		log.Contents.Add("persistent_volume_reclaim_policy", string(obj.Spec.PersistentVolumeReclaimPolicy))
@@ -271,8 +295,12 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storeage_requests", obj.Spec.Resources.Requests.Storage().String())
 		if obj.Spec.StorageClassName != nil {

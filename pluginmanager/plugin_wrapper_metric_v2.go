@@ -22,7 +22,8 @@ import (
 
 type MetricWrapperV2 struct {
 	MetricWrapper
-	Input pipeline.MetricInputV2
+	pipelineCtxWrapper *PipelineContextWrapper // keep the pointer to avoid alloc and GC
+	Input              pipeline.MetricInputV2
 }
 
 func (wrapper *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInterval int) error {
@@ -36,9 +37,11 @@ func (wrapper *MetricWrapperV2) Init(pluginMeta *pipeline.PluginMeta, inputInter
 		interval = inputInterval
 	}
 	wrapper.Interval = time.Duration(interval) * time.Millisecond
+	wrapper.pipelineCtxWrapper = newPipelineContextWrapper(nil, wrapper.outEventsTotal, wrapper.outEventGroupsTotal, wrapper.outSizeBytes)
 	return nil
 }
 
 func (wrapper *MetricWrapperV2) Read(pipelineContext pipeline.PipelineContext) error {
-	return wrapper.Input.Read(pipelineContext)
+	wrapper.pipelineCtxWrapper.PipelineCollectorWrapper.inner = pipelineContext.Collector()
+	return wrapper.Input.Read(wrapper.pipelineCtxWrapper)
 }

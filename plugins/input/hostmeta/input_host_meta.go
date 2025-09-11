@@ -60,7 +60,7 @@ func (in *InputNodeMeta) Init(context pipeline.Context) (int, error) {
 	in.context = context
 	for _, regStr := range in.ProcessNamesRegex {
 		if reg, err := regexp.Compile(regStr); err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "invalid regex", regStr, "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "invalid regex", regStr, "error", err)
 		} else {
 			in.regexpList = append(in.regexpList, reg)
 		}
@@ -136,7 +136,7 @@ func (in *InputNodeMeta) collectHostMeta() (node *helper.MetaNode, err error) {
 	for _, collect := range in.hostCollects {
 		category, meta, err := collect()
 		if err != nil {
-			logger.Error(in.context.GetRuntimeContext(), "FAILED_COLLECT_HOST_METADATA", "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), "FAILED_COLLECT_HOST_METADATA", "error", err)
 			continue
 		}
 		node.WithAttribute(category, meta)

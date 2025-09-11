@@ -32,12 +32,18 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
+const (
+	pluginType = "processor_grok"
+
+	defaultRegexTimeoutMs = 100
+)
+
 type ProcessorGrok struct {
 	CustomPatternDir    []string          // The paths of the folders where the custom GROK patterns are located. Processor_grok will read all the files in the folder. Doesn't support hot reload
 	CustomPatterns      map[string]string // Custom GROK patterns, key is pattern's name and value is grok expression
 	SourceKey           string            // Target field, default is "content"
 	Match               []string          // Grok expressions to match logs
-	TimeoutMilliSeconds int64             // Maximum attempt time in milliseconds to parse grok expressions, set to 0 to disable timeout, default is 0
+	TimeoutMilliSeconds int64             // Maximum attempt time in milliseconds to parse grok expressions for a single log, set to 0 to disable timeout, default is 100
 	IgnoreParseFailure  bool              // Whether to keep the original field after parsing failure，default is true. Configured to false to discard the log when parsing fails.
 	KeepSource          bool              // Whether to keep the original field after parsing success, default is true
 	NoKeyError          bool              // Whether to report an error if there is no matching original field, default is false
@@ -50,8 +56,6 @@ type ProcessorGrok struct {
 	compiledPatterns  []*regexp2.Regexp // The compiled regexp object of the patterns in Match
 	aliases           map[string]string // Correspondence between alias and original name, e.g. {"pid":"POSINT", "program":"PROG"}
 }
-
-const pluginType = "processor_grok"
 
 // Init called for init some system resources, like socket, mutex...
 func (p *ProcessorGrok) Init(context pipeline.Context) error {
@@ -66,7 +70,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 		for _, path := range p.CustomPatternDir {
 			err = p.addPatternsFromPath(path)
 			if err != nil {
-				logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
+				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
 				return err
 			}
 		}
@@ -78,13 +82,18 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 
 	err = p.buildPatterns()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
 		return err
+	}
+
+	// defaults
+	if p.TimeoutMilliSeconds <= 0 {
+		p.TimeoutMilliSeconds = defaultRegexTimeoutMs
 	}
 
 	err = p.compileMatchs()
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
 		return err
 	}
 
@@ -111,12 +120,14 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 			// no match error
 			if parseResult == matchFail && p.NoMatchError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "all match fail", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "all match fail",
+					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
 			// tome out error
 			if parseResult == matchTimeOut && p.TimeoutError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "match time out", p.SourceKey, cont.Value)
+				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "match time out",
+					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
 			// keep source
@@ -128,13 +139,19 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 	// no key err
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "anchor cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "anchor cannot find key",
+			"source_key", p.SourceKey)
 	}
 }
 
 func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult {
+	deadline := time.Now().Add(time.Duration(p.TimeoutMilliSeconds) * time.Millisecond)
+
 	findMatch := false
 	for _, gr := range p.compiledPatterns {
+		if time.Now().After(deadline) {
+			return matchTimeOut
+		}
 		m, err := gr.FindStringMatch(*val)
 		if err != nil {
 			return matchTimeOut
@@ -143,6 +160,9 @@ func (p *ProcessorGrok) processGrok(log *protocol.Log, val *string) MatchResult 
 		names := []string{}
 		captures := []string{}
 		for m != nil {
+			if time.Now().After(deadline) {
+				return matchTimeOut
+			}
 			gps := m.Groups()
 			for i := range gps {
 				_, err = strconv.ParseInt(gps[i].Name, 10, 32)
@@ -324,11 +344,13 @@ func (p *ProcessorGrok) compileMatchs() error {
 			return err
 		}
 
-		gr := compiledRegex
-
-		if p.TimeoutMilliSeconds != 0 {
-			gr.MatchTimeout = time.Millisecond * time.Duration(p.TimeoutMilliSeconds)
+		// warn about zero-width patterns which can cause infinite matches
+		if ok, _ := compiledRegex.MatchString(""); ok {
+			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "grok match pattern is zero-width (matching empty string), may cause performance issues", "pattern", newPattern)
 		}
+
+		gr := compiledRegex
+		gr.MatchTimeout = time.Millisecond * time.Duration(p.TimeoutMilliSeconds)
 
 		p.compiledPatterns = append(p.compiledPatterns, gr)
 	}

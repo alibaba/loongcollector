@@ -55,9 +55,11 @@ private:
                             const StringView& logPath);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
 
+    const boost::regex& GetReg() const;
+
     bool mSourceKeyOverwritten = false;
     bool mIsWholeLineMode = false;
-    boost::regex mReg;
+    std::vector<boost::regex> mReg;
 
     CounterPtr mDiscardedEventsTotal;
     CounterPtr mOutFailedEventsTotal;

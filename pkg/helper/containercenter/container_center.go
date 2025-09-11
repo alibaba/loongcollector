@@ -29,6 +29,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/events"
 
+	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -380,6 +381,7 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 		return
 	}
 	selfEnvConfig := false
+	envMap := make(map[string]string)
 	for _, env := range did.ContainerInfo.Config.Env {
 		kvPair := strings.SplitN(env, "=", 2)
 		if len(kvPair) != 2 {
@@ -388,17 +390,31 @@ func (did *DockerInfoDetail) FindAllEnvConfig(envConfigPrefix string, selfConfig
 		key := kvPair[0]
 		value := kvPair[1]
 
-		if key == "ALICLOUD_LOG_DOCKER_ENV_CONFIG_SELF" && (value == "true" || value == "TRUE") {
+		if (key == "ALICLOUD_LOG_DOCKER_ENV_CONFIG_SELF" || key == "LOONG_LOG_DOCKER_ENV_CONFIG_SELF") && (value == "true" || value == "TRUE") {
 			logger.Debug(context.Background(), "this container is self env config", did.ContainerInfo.Name)
 			selfEnvConfig = true
 			continue
 		}
-
-		if !strings.HasPrefix(key, envConfigPrefix) {
-			continue
+		logEnvPrefix := envConfigPrefix
+		if !strings.HasPrefix(key, logEnvPrefix) {
+			if strings.HasPrefix(key, flags.LoongcollectorContainerLogEnvPrefix) {
+				logEnvPrefix = flags.LoongcollectorContainerLogEnvPrefix
+			} else {
+				continue
+			}
 		}
-		logger.Debug(context.Background(), "docker env config, name", did.ContainerInfo.Name, "item", key)
-		envKey := key[len(envConfigPrefix):]
+		envKey := key[len(logEnvPrefix):]
+		if _, ok := envMap[envKey]; !ok {
+			envMap[envKey] = value
+		} else if logEnvPrefix == flags.LoongcollectorContainerLogEnvPrefix {
+			// If environment variables with the prefix 'loong_logs_' and 'aliyun_logs_' both exist,
+			// then override the variable with the prefix 'loong_logs_'.
+			envMap[envKey] = value
+		}
+	}
+
+	for envKey, value := range envMap {
+		logger.Debug(context.Background(), "docker env config, name", did.ContainerInfo.Name, "item", envKey)
 		lastIndex := strings.LastIndexByte(envKey, '_')
 		var configName string
 		// end with '_', invalid, just skip
@@ -691,7 +707,7 @@ func getContainerCenterInstance() *ContainerCenter {
 					break
 				}
 				if retryCount%10 == 0 {
-					logger.Error(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
+					logger.Critical(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
 				}
 				retryCount++
 				time.Sleep(time.Second * 1)
@@ -1201,7 +1217,7 @@ func containerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "docker center runtime error", err, "stack", string(trace))
+		logger.Critical(context.Background(), "PLUGIN_RUNTIME_ALARM", "docker center runtime error", err, "stack", string(trace))
 	}
 }
 
@@ -1233,7 +1249,7 @@ func (dc *ContainerCenter) eventListener() {
 			select {
 			case event, ok := <-events:
 				if !ok {
-					logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
+					logger.Criticalf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
 					errorCount++
 					breakFlag = true
 					break
@@ -1260,10 +1276,10 @@ func (dc *ContainerCenter) eventListener() {
 				}
 				dc.eventChanLock.Unlock()
 			case err = <-errors:
-				logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
+				logger.Warning(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
 				breakFlag = true
 			case <-timer.C:
-				logger.Errorf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
+				logger.Warningf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
 				breakFlag = true
 			}
 		}

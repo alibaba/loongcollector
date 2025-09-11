@@ -24,6 +24,8 @@
 
 namespace logtail {
 
+inline constexpr int kDefaultNodeSourceBufferSize = 1024;
+
 class StringBuffer {
     friend class SourceBuffer;
 
@@ -153,6 +155,7 @@ private:
 // only movable
 class SourceBuffer {
 public:
+    explicit SourceBuffer(uint32_t firstChunkSize = 4096) : mAllocator(firstChunkSize) {}
     StringBuffer AllocateStringBuffer(size_t size) {
         char* data = static_cast<char*>(mAllocator.Allocate(size + 1));
         data[size] = '\0';
