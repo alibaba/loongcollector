@@ -52,6 +52,7 @@ extern "C" {
 DEFINE_FLAG_INT32(ebpf_networkobserver_max_connections, "maximum connections", 5000);
 DEFINE_FLAG_STRING(ebpf_networkobserver_enable_protocols, "enable application protocols, split by comma", "HTTP");
 DEFINE_FLAG_DOUBLE(ebpf_networkobserver_default_sample_rate, "ebpf network observer default sample rate", 1.0);
+DEFINE_FLAG_STRING(ebpf_networkobserver_deploy_env, "deploy env: sae,ack,ecs", "ack");
 
 namespace logtail::ebpf {
 
@@ -1682,6 +1683,7 @@ const static std::string kAgentInfoWorkspaceKey = "acs_cms_workspace";
 const static std::string kAgentInfoPropertiesKey = "properties";
 
 const static std::string kAgentInfoAgentEnvACKVal = "ACSK8S";
+const static std::string kAgentInfoAgentEnvServerlessVal = "Serverless";
 const static std::string kAgentInfoAgentEnvECSAutoVal = "ECS_AUTO";
 const static std::string kAgentInfoAgentEnvDefaultVal = "DEFAULT";
 const static std::string kAgentInfoPropertiesKeyClusterId = "k8s.cluster.uid";
@@ -1741,7 +1743,11 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-        event->SetContentNoCopy(kAgentInfoAgentEnvKey, kAgentInfoAgentEnvACKVal);
+        if (STRING_FLAG(ebpf_networkobserver_deploy_env) == "sae") {
+            event->SetContentNoCopy(kAgentInfoAgentEnvKey, kAgentInfoAgentEnvServerlessVal);
+        } else {
+            event->SetContentNoCopy(kAgentInfoAgentEnvKey, kAgentInfoAgentEnvACKVal);
+        }
 
         event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
         event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
@@ -1760,6 +1766,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
         event->SetContentNoCopy(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
         static auto sStartTime = ToString(Application::GetInstance()->GetStartTime() * 1000);
+        LOG_INFO(sLogger, ("startTime", Application::GetInstance()->GetStartTime())("str", sStartTime));
         event->SetContentNoCopy(kAgentInfoStartTsKey, sStartTime); // ms
         event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
         event->SetTimestamp(now, 0);
