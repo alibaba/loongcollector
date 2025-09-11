@@ -81,13 +81,13 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                               mContext->GetRegion());
     }
     if (mEnableContainerDiscovery) {
-        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+        ContainerDiscoveryOptions containerDiscovery;
+        if (!containerDiscovery.Init(config, *mContext, sName)) {
             return false;
         }
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
         mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
-        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
-            optionalGoPipeline, &mFileDiscovery, mContext->GetPipeline().GenNextPluginMeta(false));
+        mFileDiscovery.SetContainerDiscoveryOptions(containerDiscovery);
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {
@@ -260,32 +260,36 @@ bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& 
     }
     size_t pthSize = logPath.size();
 
-    size_t size = containerInfo.mMounts.size();
+    size_t size = containerInfo.mRawContainerInfo->mMounts.size();
     size_t bestMatchedMountsIndex = size;
     // ParseByJSONObj 确保 Destination、Source、mUpperDir 不会以\或者/结尾
     for (size_t i = 0; i < size; ++i) {
-        StringView dst = containerInfo.mMounts[i].mDestination;
+        StringView dst = containerInfo.mRawContainerInfo->mMounts[i].mDestination;
         size_t dstSize = dst.size();
 
         if (StartWith(logPath, dst)
             && (pthSize == dstSize || (pthSize > dstSize && (logPath[dstSize] == '/' || logPath[dstSize] == '\\')))
             && (bestMatchedMountsIndex == size
-                || containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
+                || containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
             bestMatchedMountsIndex = i;
         }
     }
     if (bestMatchedMountsIndex < size) {
         containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path)
-            + containerInfo.mMounts[bestMatchedMountsIndex].mSource
-            + logPath.substr(containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size());
+            + containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource
+            + logPath.substr(containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size());
         LOG_DEBUG(sLogger,
-                  ("set container base dir",
-                   containerInfo.mRealBaseDir)("source", containerInfo.mMounts[bestMatchedMountsIndex].mSource)(
-                      "destination", containerInfo.mMounts[bestMatchedMountsIndex].mDestination)("logPath", logPath));
+                  ("set container base dir", containerInfo.mRealBaseDir)(
+                      "source", containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource)(
+                      "destination", containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination)(
+                      "logPath", logPath));
     } else {
-        containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path) + containerInfo.mUpperDir + logPath;
+        containerInfo.mRealBaseDir
+            = STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mUpperDir + logPath;
     }
-    LOG_INFO(sLogger, ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mID));
+    LOG_INFO(
+        sLogger,
+        ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID));
     return true;
 }
 

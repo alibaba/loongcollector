@@ -14,9 +14,11 @@
 
 #include "file_server/FileServer.h"
 
+#include "checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileTagOptions.h"
@@ -41,7 +43,7 @@ FileServer::FileServer() {
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等
 void FileServer::Start() {
-    ConfigManager::GetInstance()->LoadDockerConfig();
+    ContainerManager::GetInstance()->LoadContainerInfo();
     CheckPointManager::Instance()->LoadCheckPoint();
     LOG_INFO(sLogger, ("watch dirs", "start"));
     auto start = GetCurrentTimeInMilliSeconds();
@@ -100,8 +102,8 @@ void FileServer::PauseInner() {
 void FileServer::Resume(bool isConfigUpdate) {
     if (isConfigUpdate) {
         ClearContainerInfo();
-        ConfigManager::GetInstance()->DoUpdateContainerPaths();
-        ConfigManager::GetInstance()->SaveDockerConfig();
+        ContainerManager::GetInstance()->ApplyContainerDiffs();
+        ContainerManager::GetInstance()->SaveContainerInfo();
     }
 
     LOG_INFO(sLogger, ("file server resume", "starts"));

@@ -499,12 +499,12 @@ void InputFileUnittest::OnPipelineUpdate() {
 void InputFileUnittest::TestSetContainerBaseDir() {
     InputFile inputFile;
     ContainerInfo containerInfo;
-    containerInfo.mID = "testContainer";
-    containerInfo.mUpperDir = "/UpperDir";
-    containerInfo.mMounts.push_back(Mount("/source1", "/data1"));
-    containerInfo.mMounts.push_back(Mount("/source2", "/data1/data2"));
-    containerInfo.mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
-    containerInfo.mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
+    containerInfo.mRawContainerInfo->mID = "testContainer";
+    containerInfo.mRawContainerInfo->mUpperDir = "/UpperDir";
+    containerInfo.mRawContainerInfo->mMounts.push_back(Mount("/source1", "/data1"));
+    containerInfo.mRawContainerInfo->mMounts.push_back(Mount("/source2", "/data1/data2"));
+    containerInfo.mRawContainerInfo->mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
+    containerInfo.mRawContainerInfo->mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data2/log"));

@@ -203,7 +203,7 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
                 GetValidBaseDirs(item.mRealBaseDir, 0, baseDirs);
                 if (baseDirs.empty()) {
                     LOG_DEBUG(sLogger,
-                              ("no files found", "base dir path invalid")("container id", item.mID)(
+                              ("no files found", "base dir path invalid")("container id", item.mRawContainerInfo->mID)(
                                   "real base dir", item.mRealBaseDir)("config", mContext->GetConfigName()));
                     return res;
                 }
@@ -216,13 +216,13 @@ vector<filesystem::path> InputStaticFile::GetFiles() const {
             }
             if (res.size() > prevCnt) {
                 LOG_INFO(sLogger,
-                         ("container files cnt", res.size() - prevCnt)("container id", item.mID)(
+                         ("container files cnt", res.size() - prevCnt)("container id", item.mRawContainerInfo->mID)(
                              "real base dir", item.mRealBaseDir)("files", ToString(res))("config",
                                                                                          mContext->GetConfigName()));
             } else {
                 LOG_DEBUG(sLogger,
-                          ("no files found, container id",
-                           item.mID)("real base dir", item.mRealBaseDir)("config", mContext->GetConfigName()));
+                          ("no files found, container id", item.mRawContainerInfo->mID)(
+                              "real base dir", item.mRealBaseDir)("config", mContext->GetConfigName()));
             }
         }
         LOG_INFO(sLogger, ("total files cnt", res.size())("config", mContext->GetConfigName()));

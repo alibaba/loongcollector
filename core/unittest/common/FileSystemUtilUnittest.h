@@ -17,12 +17,15 @@
 #include <fstream>
 #include <string>
 
+#include "boost/filesystem.hpp"
 #include "boost/format.hpp"
 
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "unittest/Unittest.h"
+
+namespace bfs = boost::filesystem;
 
 namespace logtail {
 
@@ -518,5 +521,4 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     EXPECT_GT(content.size(), 0UL);
 #endif
 }
-
 } // namespace logtail
