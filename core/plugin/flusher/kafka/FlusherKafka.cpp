@@ -62,6 +62,12 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         mSerializer = make_unique<JsonEventGroupSerializer>(this);
     }
 
+    mTopicParser = make_unique<TopicFormatParser>();
+    if (!mTopicParser->Init(mKafkaConfig.Topic)) {
+        LOG_ERROR(mContext->GetLogger(), ("invalid topic format string", mKafkaConfig.Topic));
+        return false;
+    }
+
     GenerateQueueKey(mKafkaConfig.Topic);
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
 
@@ -115,39 +121,65 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         return false;
     }
 
-    BatchedEvents batchedEvents(std::move(group.MutableEvents()),
-                                std::move(group.GetSizedTags()),
-                                std::move(group.GetSourceBuffer()),
-                                group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
-                                std::move(group.GetExactlyOnceCheckpoint()));
+    GroupTags groupTags = group.GetTags();
+    std::map<std::string, EventsContainer> topicToEventsMap;
 
-    string serializedData;
-    string errorMsg;
-    if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to serialize events", errorMsg)("action", "discard data"));
-        mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
-                                               "failed to serialize events: " + errorMsg + "\taction: discard data",
-                                               mContext->GetRegion(),
-                                               mContext->GetProjectName(),
-                                               mContext->GetConfigName(),
-                                               mContext->GetLogstoreName());
-        mDiscardCnt->Add(1);
-        return false;
+    auto events = std::move(group.MutableEvents());
+
+    for (auto& event : events) {
+        std::string topic = mKafkaConfig.Topic;
+        if (mTopicParser && mTopicParser->IsDynamic()) {
+            bool success = mTopicParser->FormatTopic(event, topic, groupTags);
+            if (!success) {
+                topic = mKafkaConfig.Topic;
+                LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mKafkaConfig.Topic));
+            }
+        }
+        mTopicSet.insert(topic);
+        topicToEventsMap[topic].emplace_back(std::move(event));
     }
 
-    mSendCnt->Add(1);
+    bool allSuccess = true;
 
-    size_t bytes = serializedData.size();
-    mProducer->ProduceAsync(mKafkaConfig.Topic,
-                            std::move(serializedData),
-                            [this, bytes](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
-                                if (success) {
-                                    LOG_DEBUG(mContext->GetLogger(), ("kafka message queued", bytes));
-                                }
-                                HandleDeliveryResult(success, errorInfo);
-                            });
+    for (auto& kv : topicToEventsMap) {
+        const std::string& topic = kv.first;
+        EventsContainer& topicEvents = kv.second;
 
-    return true;
+        BatchedEvents batchedEvents;
+        batchedEvents.mEvents = std::move(topicEvents);
+        batchedEvents.mTags = group.GetSizedTags();
+        batchedEvents.mSourceBuffers.emplace_back(group.GetSourceBuffer());
+        batchedEvents.mExactlyOnceCheckpoint = group.GetExactlyOnceCheckpoint();
+
+        string serializedData;
+        string errorMsg;
+        if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
+            LOG_ERROR(mContext->GetLogger(),
+                      ("failed to serialize events", errorMsg)("topic", topic)("action", "discard data"));
+            mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
+                                                   "failed to serialize events: " + errorMsg + "\taction: discard data",
+                                                   mContext->GetRegion(),
+                                                   mContext->GetProjectName(),
+                                                   mContext->GetConfigName(),
+                                                   mContext->GetLogstoreName());
+            mDiscardCnt->Add(1);
+            allSuccess = false;
+            continue;
+        }
+
+        mSendCnt->Add(1);
+
+        size_t bytes = serializedData.size();
+        mProducer->ProduceAsync(
+            topic, std::move(serializedData), [this, bytes](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
+                if (success) {
+                    LOG_DEBUG(mContext->GetLogger(), ("kafka message queued", bytes));
+                }
+                HandleDeliveryResult(success, errorInfo);
+            });
+    }
+
+    return allSuccess;
 }
 
 void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo) {
