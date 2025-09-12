@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "common/ProcParser.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
 #include "host_monitor/collector/BaseCollector.h"
@@ -30,12 +31,11 @@ namespace logtail {
 class ProcessCollector : public BaseCollector {
 public:
     ProcessCollector();
-
-    int Init(int processTotalCount, int processReportTopN = 5);
-
     ~ProcessCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Init(HostMonitorContext& collectContext) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;
 
@@ -43,36 +43,36 @@ public:
     const std::string& Name() const override { return sName; }
 
 public:
-    bool GetProcessTime(pid_t pid, ProcessTime& output, bool includeCTime);
+    bool GetProcessTime(time_t now, pid_t pid, ProcessTime& output);
 
-    bool ReadProcessStat(pid_t pid, ProcessStat& processStat);
+    bool ReadProcessStat(time_t now, pid_t pid, ProcessInformation& processInfo);
 
-    bool GetPidsCpu(const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
+    bool GetPidsCpu(const CollectTime& collectTime, const std::vector<pid_t>& pids, std::map<pid_t, uint64_t>& pidMap);
 
-    bool GetProcessAllStat(pid_t pid, ProcessAllStat& processStat);
+    bool GetProcessAllStat(const CollectTime& collectTime, pid_t pid, ProcessAllStat& processStat);
 
-    bool GetProcessMemory(pid_t pid, ProcessMemoryInformation& processMemory);
+    bool GetProcessMemory(time_t now, pid_t pid, ProcessMemoryInformation& processMemory);
 
-    bool GetProcessFdNumber(pid_t pid, ProcessFd& processFd);
+    bool GetProcessFdNumber(time_t now, pid_t pid, ProcessFd& processFd);
 
-    bool GetProcessInfo(pid_t pid, ProcessInfo& processInfo);
+    bool GetProcessInfo(time_t now, pid_t pid, ProcessInfo& processInfo);
 
-    bool GetProcessCredName(pid_t pid, ProcessCredName& processCredName);
+    bool GetProcessCredName(time_t now, pid_t pid, ProcessCredName& processCredName);
 
-    bool GetProcessArgs(pid_t pid, std::vector<std::string>& args);
+    bool GetProcessArgs(time_t now, pid_t pid, std::vector<std::string>& args);
 
-    bool GetProcessState(pid_t pid, ProcessStat& processState);
+    bool GetProcessState(time_t now, pid_t pid, ProcessStat& processState);
 
-    std::string GetExecutablePath(pid_t pid);
+    std::string GetExecutablePath(time_t now, pid_t pid);
 
 protected:
-    bool GetProcessCpuInformation(pid_t pid, ProcessCpuInformation& information, bool includeCTime);
+    bool GetProcessCpuInformation(const CollectTime& collectTime, pid_t pid, ProcessCpuInformation& information);
 
-    bool GetProcessCpuInCache(pid_t pid, bool includeCTime);
+    bool GetProcessCpuInCache(pid_t pid);
+
+    void ClearProcessCpuTimeCache();
 
 private:
-    int mCountPerReport = 0;
-    int mCount = 0;
     std::vector<pid_t> pids;
     std::vector<pid_t> mSortPids;
     int mSelfPid = 0;

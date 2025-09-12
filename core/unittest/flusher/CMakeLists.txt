@@ -21,6 +21,17 @@ if (ENABLE_ENTERPRISE)
 endif ()
 target_link_libraries(flusher_sls_unittest ${UT_BASE_TARGET})
 
+if(UNIX AND NOT ENABLE_ENTERPRISE)
+    add_executable(flusher_kafka_unittest FlusherKafkaUnittest.cpp)
+    target_link_libraries(flusher_kafka_unittest ${UT_BASE_TARGET})
+
+    add_executable(kafka_util_unittest KafkaUtilUnittest.cpp)
+    target_link_libraries(kafka_util_unittest ${UT_BASE_TARGET})
+
+    add_executable(kafka_producer_unittest KafkaProducerUnittest.cpp)
+    target_link_libraries(kafka_producer_unittest ${UT_BASE_TARGET})
+endif()
+
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)
 target_link_libraries(pack_id_manager_unittest ${UT_BASE_TARGET})
 
@@ -33,13 +44,22 @@ if (ENABLE_ENTERPRISE)
 
     add_executable(enterprise_flusher_sls_monitor_unittest EnterpriseFlusherSLSMonitorUnittest.cpp)
     target_link_libraries(enterprise_flusher_sls_monitor_unittest ${UT_BASE_TARGET})
+
+    add_executable(enterprise_credentials_provider_unittest EnterpriseCredentialsProviderUnittest.cpp)
+    target_link_libraries(enterprise_credentials_provider_unittest ${UT_BASE_TARGET})
 endif ()
 
 include(GoogleTest)
 gtest_discover_tests(flusher_sls_unittest)
+if(UNIX AND NOT ENABLE_ENTERPRISE)
+    gtest_discover_tests(flusher_kafka_unittest)
+    gtest_discover_tests(kafka_util_unittest)
+    gtest_discover_tests(kafka_producer_unittest)
+endif()
 gtest_discover_tests(pack_id_manager_unittest)
 gtest_discover_tests(sls_client_manager_unittest)
 if (ENABLE_ENTERPRISE)
     gtest_discover_tests(enterprise_sls_client_manager_unittest)
     gtest_discover_tests(enterprise_flusher_sls_monitor_unittest)
+    gtest_discover_tests(enterprise_credentials_provider_unittest)
 endif ()

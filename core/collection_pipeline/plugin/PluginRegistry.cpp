@@ -50,6 +50,9 @@
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+#include "plugin/flusher/kafka/FlusherKafka.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
@@ -200,6 +203,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
+#endif
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif

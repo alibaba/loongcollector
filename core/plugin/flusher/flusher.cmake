@@ -17,7 +17,13 @@
 include_directories(flusher)
 
 # Add source files
-file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
+if (NOT ENABLE_ENTERPRISE AND UNIX)
+    file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
+else()
+    # Exclude kafka files on non-UNIX systems
+    file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
+    list(FILTER THIS_SOURCE_FILES_LIST EXCLUDE REGEX ".*kafka.*")
+endif()
 
 # Set source files to parent
 set(PLUGIN_SOURCE_FILES_CORE ${PLUGIN_SOURCE_FILES_CORE} ${THIS_SOURCE_FILES_LIST})

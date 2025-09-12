@@ -127,6 +127,7 @@ function generateCopyScript() {
   echo 'mkdir -p $BINDIR/conf/instance_config/local/' >>$COPY_SCRIPT_FILE
   echo 'echo -e "{\n}" > $BINDIR/conf/instance_config/local/loongcollector_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/conf/continuous_pipeline_config/local' >>$COPY_SCRIPT_FILE
+  echo 'mkdir -p $BINDIR/conf/onetime_pipeline_config/local' >>$COPY_SCRIPT_FILE
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
 }
 

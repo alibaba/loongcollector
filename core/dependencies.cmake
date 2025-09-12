@@ -55,6 +55,7 @@ set(DEP_NAME_LIST
         protobuf
         rapidjson               # header-only
         re2
+        simdjson
         spdlog                  # header-only
         ssl                     # openssl
         unwind                  # google breakpad on Windows
@@ -63,6 +64,10 @@ set(DEP_NAME_LIST
         zlib
         zstd
         )
+
+if (NOT ENABLE_ENTERPRISE AND UNIX)
+    list(APPEND DEP_NAME_LIST "rdkafka")
+endif()
 
 if (NOT NO_TCMALLOC)
     list(APPEND DEP_NAME_LIST "tcmalloc") # (gperftools)
@@ -718,6 +723,39 @@ macro(link_grpc target_name)
     endif()
 endmacro()
 
+
+macro(link_simdjson target_name)
+    if (simdjson_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${simdjson_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        find_library(SIMDJSON_LIB libsimdjson.a PATHS "${simdjson_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(SIMDJSON_LIB)
+            message(STATUS "Found simdjson library: ${SIMDJSON_LIB}")
+            target_link_libraries(${target_name} "${SIMDJSON_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find simdjson library")
+        endif()
+    endif ()
+endmacro()
+
+
+# rdkafka
+macro(link_rdkafka target_name)
+    if (rdkafka_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${rdkafka_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka.a")
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka++.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "rdkafkad"
+                optimized "rdkafka")
+        target_link_libraries(${target_name}
+                debug "rdkafka++d"
+                optimized "rdkafka++")
+    endif ()
+endmacro()
+
 macro(link_spl target_name)
     logtail_define(spl_${target_name} "" "")
 
@@ -857,7 +895,6 @@ macro(link_spl target_name)
     target_link_libraries(${target_name} "libtransport.a")
     target_link_libraries(${target_name} "libprometheus-cpp-core.a")
     target_link_libraries(${target_name} "libprometheus-cpp-pull.a")
-    target_link_libraries(${target_name} "libsimdjson.a")
     target_link_libraries(${target_name} "libsnappy.a")
     target_link_libraries(${target_name} "libbz2.a")
     target_link_libraries(${target_name} "liblzo2.a")

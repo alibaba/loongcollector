@@ -50,6 +50,7 @@ private:
     bool GetSystemUptimeInformationOnce(SystemUptimeInformation& systemUptimeInfo) override;
     bool GetDiskSerialIdInformationOnce(std::string diskName, SerialIdInformation& serialIdInfo) override;
     bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override;
+    bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) override;
 
     uint64_t GetMemoryValue(char unit, uint64_t value);
     bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;

@@ -216,17 +216,29 @@ void Application::Start() { // GCOVR_EXCL_START
 
     // config provider
     {
-        // add local config dir
-        filesystem::path localConfigPath = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
-            / GetContinuousPipelineConfigDir() / "local";
-        error_code ec;
-        filesystem::create_directories(localConfigPath, ec);
-        if (ec) {
+        // add local continuous config dir
+        filesystem::path localContinuousConfigPath
+            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir()
+            / "local";
+        error_code ec1;
+        filesystem::create_directories(localContinuousConfigPath, ec1);
+        if (ec1) {
             LOG_WARNING(sLogger,
                         ("failed to create dir for local continuous_pipeline_config",
-                         "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+                         "manual creation may be required")("error code", ec1.value())("error msg", ec1.message()));
         }
-        PipelineConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
+        PipelineConfigWatcher::GetInstance()->AddSource(localContinuousConfigPath.string());
+        // add local onetime config dir
+        filesystem::path localOnetimeConfigPath = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
+            / "onetime_pipeline_config" / "local";
+        error_code ec2;
+        filesystem::create_directories(localOnetimeConfigPath, ec2);
+        if (ec2) {
+            LOG_WARNING(sLogger,
+                        ("failed to create dir for local onetime_pipeline_config",
+                         "manual creation may be required")("error code", ec2.value())("error msg", ec2.message()));
+        }
+        PipelineConfigWatcher::GetInstance()->AddSource(localOnetimeConfigPath.string());
     }
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Start();

@@ -100,6 +100,13 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
     for (const auto& pipeline : builtInPipelines) {
         const string& pipelineName = pipeline.first;
         const string& pipleineDetail = pipeline.second;
+        if (configSet.find(pipelineName) != configSet.end()) {
+            LOG_WARNING(sLogger,
+                        ("more than 1 built-in config with the same name is found",
+                         "skip current config")("pipeline name", pipelineName));
+            continue;
+        }
+        configSet.insert(pipelineName);
 
         string errorMsg;
         auto iter = mInnerConfigMap.find(pipelineName);

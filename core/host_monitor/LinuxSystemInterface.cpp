@@ -25,6 +25,7 @@ using namespace std::chrono;
 #include <grp.h>
 #include <mntent.h>
 #include <pwd.h>
+#include <sys/statvfs.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -35,6 +36,7 @@ using namespace std::chrono;
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
 #include "host_monitor/Constants.h"
+#include "host_monitor/common/FastFieldParser.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -51,19 +53,6 @@ bool LinuxSystemInterface::GetHostSystemStat(vector<string>& lines, string& erro
         return false;
     }
     return true;
-}
-
-double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) {
-    if (cpuMetric.size() <= static_cast<size_t>(key)) {
-        return 0.0;
-    }
-    double value = 0.0;
-    if (!StringTo(cpuMetric[static_cast<size_t>(key)], value)) {
-        LOG_WARNING(
-            sLogger,
-            ("failed to parse cpu metric", static_cast<size_t>(key))("value", cpuMetric[static_cast<size_t>(key)]));
-    }
-    return value;
 }
 
 unsigned int Hex2Int(const std::string& s) {
@@ -108,13 +97,11 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
         }
 
         for (auto const& line : sockstatLines) {
-            if (line.size() >= 5 && (line.substr(0, 4) == "TCP:" || line.substr(0, 5) == "TCP6:")) {
-                std::vector<std::string> metrics;
-                boost::split(metrics, line, boost::is_any_of(" "), boost::token_compress_on);
-                if (metrics.size() >= 9) {
-                    tcp += static_cast<uint64_t>(std::stoull(metrics[6])); // tw
-                    tcp += static_cast<uint64_t>(std::stoull(metrics[8])); // alloc
-                }
+            if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
+                auto twValue = FastParse::GetFieldAs<uint64_t>(line, 6, 0);
+                auto allocValue = FastParse::GetFieldAs<uint64_t>(line, 8, 0);
+
+                tcp += twValue + allocValue;
             }
         }
     }
@@ -351,16 +338,23 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
         Inet6Scope, // scope
     };
     for (auto& devLine : netInet6Lines) {
-        std::vector<std::string> netInet6Metric;
-        boost::split(netInet6Metric, devLine, boost::is_any_of(" "), boost::token_compress_on);
-        std::string inet6Name = netInet6Metric.back();
+        FastFieldParser parser(devLine);
+
+        size_t fieldCount = parser.GetFieldCount();
+        if (fieldCount == 0)
+            continue;
+
+        auto inet6NameField = parser.GetField(fieldCount - 1);
+        std::string inet6Name(inet6NameField);
         boost::algorithm::trim(inet6Name);
+
         if (inet6Name == name) {
             // Doc: https://ata.atatech.org/articles/11020228072?spm=ata.25287382.0.0.1c647536bhA7NG#lyRD52DR
-            if (Inet6Address < netInet6Metric.size()) {
+            if (Inet6Address < fieldCount) {
                 auto* addr6 = (unsigned char*)&(interfaceConfig.address6.addr.in6);
 
-                std::string addr = netInet6Metric[Inet6Address];
+                auto addrField = parser.GetField(Inet6Address);
+                std::string addr(addrField);
 
                 constexpr const int addrLen = 16;
                 for (size_t i = 0; i < addrLen; ++i) {
@@ -372,11 +366,13 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
                     addr6[i] = static_cast<unsigned char>(Hex2Int(byteStr)); // 转换为字节
                 }
             }
-            if (Inet6PrefixLen < netInet6Metric.size()) {
-                interfaceConfig.prefix6Length = Hex2Int(netInet6Metric[Inet6PrefixLen]);
+            if (Inet6PrefixLen < fieldCount) {
+                auto prefixField = parser.GetField(Inet6PrefixLen);
+                interfaceConfig.prefix6Length = Hex2Int(std::string(prefixField));
             }
-            if (Inet6Scope < netInet6Metric.size()) {
-                interfaceConfig.scope6 = Hex2Int(netInet6Metric[Inet6Scope]);
+            if (Inet6Scope < fieldCount) {
+                auto scopeField = parser.GetField(Inet6Scope);
+                interfaceConfig.scope6 = Hex2Int(std::string(scopeField));
             }
         }
     }
@@ -404,7 +400,6 @@ bool LinuxSystemInterface::GetSystemInformationOnce(SystemInformation& systemInf
             break;
         }
     }
-    systemInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -421,32 +416,29 @@ bool LinuxSystemInterface::GetCPUInformationOnce(CPUInformation& cpuInfo) {
     cpuInfo.stats.clear();
     cpuInfo.stats.reserve(cpuLines.size());
     for (auto const& line : cpuLines) {
-        std::vector<std::string> cpuMetric;
-        boost::split(cpuMetric, line, boost::is_any_of(" "), boost::token_compress_on);
-        if (cpuMetric.size() > 0 && cpuMetric[0].substr(0, 3) == "cpu") {
-            CPUStat cpuStat{};
-            if (cpuMetric[0] == "cpu") {
-                cpuStat.index = -1;
-            } else {
-                if (!StringTo(cpuMetric[0].substr(3), cpuStat.index)) {
-                    LOG_ERROR(sLogger, ("failed to parse cpu index", "skip")("wrong cpu index", cpuMetric[0]));
-                    continue;
-                }
-            }
-            cpuStat.user = ParseMetric(cpuMetric, EnumCpuKey::user);
-            cpuStat.nice = ParseMetric(cpuMetric, EnumCpuKey::nice);
-            cpuStat.system = ParseMetric(cpuMetric, EnumCpuKey::system);
-            cpuStat.idle = ParseMetric(cpuMetric, EnumCpuKey::idle);
-            cpuStat.iowait = ParseMetric(cpuMetric, EnumCpuKey::iowait);
-            cpuStat.irq = ParseMetric(cpuMetric, EnumCpuKey::irq);
-            cpuStat.softirq = ParseMetric(cpuMetric, EnumCpuKey::softirq);
-            cpuStat.steal = ParseMetric(cpuMetric, EnumCpuKey::steal);
-            cpuStat.guest = ParseMetric(cpuMetric, EnumCpuKey::guest);
-            cpuStat.guestNice = ParseMetric(cpuMetric, EnumCpuKey::guest_nice);
-            cpuInfo.stats.push_back(cpuStat);
+        CpuStatParser parser(line);
+
+        int cpuIndex = parser.GetCpuIndex();
+        if (cpuIndex < -1) {
+            continue;
         }
+
+        CPUStat cpuStat{};
+        cpuStat.index = cpuIndex;
+
+        parser.GetCpuStats(cpuStat.user,
+                           cpuStat.nice,
+                           cpuStat.system,
+                           cpuStat.idle,
+                           cpuStat.iowait,
+                           cpuStat.irq,
+                           cpuStat.softirq,
+                           cpuStat.steal,
+                           cpuStat.guest,
+                           cpuStat.guestNice);
+
+        cpuInfo.stats.push_back(cpuStat);
     }
-    cpuInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -477,19 +469,17 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
             }
         }
     }
-    processListInfo.collectTime = steady_clock::now();
     return true;
 }
 
 bool LinuxSystemInterface::GetProcessInformationOnce(pid_t pid, ProcessInformation& processInfo) {
     auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
     std::string line;
-    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
+    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line, kDefaultMaxFileSize)) {
         LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
         return false;
     }
     mProcParser.ParseProcessStat(pid, line, processInfo.stat);
-    processInfo.collectTime = steady_clock::now();
     return true;
 }
 
@@ -503,11 +493,13 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
 
     // cat /proc/loadavg
     // 0.10 0.07 0.03 1/561 78450
-    std::vector<std::string> loadMetric;
-    boost::split(loadMetric, loadLines[0], boost::is_any_of(" "), boost::token_compress_on);
+    const auto& loadLine = loadLines[0];
+    auto load1 = FastParse::GetFieldAs<double>(loadLine, 0, 0.0);
+    auto load5 = FastParse::GetFieldAs<double>(loadLine, 1, 0.0);
+    auto load15 = FastParse::GetFieldAs<double>(loadLine, 2, 0.0);
 
-    if (loadMetric.size() < 3) {
-        LOG_WARNING(sLogger, ("failed to split load metric", "invalid System collector"));
+    if (load1 == 0.0 && load5 == 0.0 && load15 == 0.0) {
+        LOG_WARNING(sLogger, ("failed to parse load metric", "invalid System collector"));
         return false;
     }
 
@@ -516,9 +508,9 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
         LOG_WARNING(sLogger, ("failed to get cpu core num", "invalid System collector"));
         return false;
     }
-    systemLoadInfo.systemStat.load1 = std::stod(loadMetric[0]);
-    systemLoadInfo.systemStat.load5 = std::stod(loadMetric[1]);
-    systemLoadInfo.systemStat.load15 = std::stod(loadMetric[2]);
+    systemLoadInfo.systemStat.load1 = load1;
+    systemLoadInfo.systemStat.load5 = load5;
+    systemLoadInfo.systemStat.load15 = load15;
 
     systemLoadInfo.systemStat.load1PerCore
         = systemLoadInfo.systemStat.load1 / static_cast<double>(cpuCoreNumInfo.cpuCoreNum);
@@ -582,34 +574,42 @@ bool LinuxSystemInterface::GetHostMemInformationStatOnce(MemoryInformation& memi
 
     /* 字符串处理，处理成对应的类型以及值*/
     for (size_t i = 0; i < memInfoStr.size() && count < 5; i++) {
-        std::vector<std::string> words;
-        boost::algorithm::split(words, memInfoStr[i], boost::is_any_of(" "), boost::token_compress_on);
-        // words-> MemTotal: / 12344 / kB
-        if (words.size() < 2) {
+        FastFieldParser parser(memInfoStr[i]);
+
+        if (parser.GetFieldCount() < 2) {
             continue;
         }
+
+        auto field0 = parser.GetField(0); // 字段名 (MemTotal:)
+        auto field1 = parser.GetField(1); // 数值 (12344)
+
         double val = 0.0;
         uint64_t orival;
-        if (words.size() == 2) {
-            if (!StringTo(words[1], val)) {
+
+        if (parser.GetFieldCount() == 2) {
+            if (!StringTo(std::string(field1), val)) {
                 val = 0.0;
             }
-        } else if (words.back().size() > 0 && StringTo(words[1], orival)) {
-            val = GetMemoryValue(words.back()[0], orival);
+        } else {
+            auto lastField = parser.GetField(parser.GetFieldCount() - 1); // 单位 (kB)
+            if (!lastField.empty() && StringTo(std::string(field1), orival)) {
+                val = GetMemoryValue(lastField[0], orival);
+            }
         }
-        if (words[0] == "MemTotal:") {
+
+        if (field0 == "MemTotal:") {
             meminfo.memStat.total = val;
             count++;
-        } else if (words[0] == "MemFree:") {
+        } else if (field0 == "MemFree:") {
             meminfo.memStat.free = val;
             count++;
-        } else if (words[0] == "MemAvailable:") {
+        } else if (field0 == "MemAvailable:") {
             meminfo.memStat.available = val;
             count++;
-        } else if (words[0] == "Buffers:") {
+        } else if (field0 == "Buffers:") {
             meminfo.memStat.buffers = val;
             count++;
-        } else if (words[0] == "Cached:") {
+        } else if (field0 == "Cached:") {
             meminfo.memStat.cached = val;
             count++;
         }
@@ -770,12 +770,8 @@ bool LinuxSystemInterface::GetSystemUptimeInformationOnce(SystemUptimeInformatio
         return false;
     }
 
-    std::vector<std::string> uptimeMetric;
-    boost::split(uptimeMetric,
-                 (uptimeLines.empty() ? "" : uptimeLines.front()),
-                 boost::is_any_of(" "),
-                 boost::token_compress_on);
-    systemUptimeInfo.uptime = std::stod(uptimeMetric.front());
+    const auto& uptimeLine = uptimeLines.empty() ? "" : uptimeLines.front();
+    systemUptimeInfo.uptime = FastParse::GetFieldAs<double>(uptimeLine, 0, 0.0);
 
     return true;
 }
@@ -799,6 +795,10 @@ bool LinuxSystemInterface::GetDiskSerialIdInformationOnce(std::string diskName, 
     return true;
 }
 
+template <typename T>
+T DiffOrZero(const T& a, const T& b) {
+    return a > b ? a - b : T{0};
+}
 bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) {
     std::vector<std::string> diskLines = {};
     std::string errorMessage;
@@ -813,50 +813,50 @@ bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& dis
     } else {
         for (auto const& diskLine : diskLines) {
             DiskState diskStat;
-            std::vector<std::string> diskMetric;
-            boost::split(diskMetric,
-                         boost::algorithm::trim_left_copy(diskLine),
-                         boost::is_any_of(" "),
-                         boost::token_compress_on);
-            if (diskMetric.size() < (size_t)EnumDiskState::count) {
+
+            // 去除前导空格后解析
+            std::string trimmedLine = boost::algorithm::trim_left_copy(diskLine);
+            FastFieldParser parser(trimmedLine);
+
+            size_t fieldCount = parser.GetFieldCount();
+            if (fieldCount < (size_t)EnumDiskState::count) {
                 continue;
             }
             try {
-                auto get_int = [&](EnumDiskState key) -> uint64_t {
-                    const std::string& s = diskMetric[(int)key];
-                    return static_cast<uint64_t>(std::stoull(s));
-                };
-                // int currentIndex = 0;
-                // 1  major number
-                uint64_t majorVal = get_int(EnumDiskState::major);
-                uint64_t minorVal = get_int(EnumDiskState::minor);
-                diskStat.major = static_cast<unsigned int>(majorVal);
-                diskStat.minor = static_cast<unsigned int>(minorVal);
-                // 2  minor number
-                // 3  device name
-                // ++currentIndex;
+                std::vector<uint64_t> diskValues;
+                diskValues.reserve(static_cast<size_t>(EnumDiskState::count));
+
+                auto iter = parser.begin();
+                auto end = parser.end();
+                for (size_t i = 0; i < static_cast<size_t>(EnumDiskState::count) && iter != end; ++i, ++iter) {
+                    uint64_t value;
+                    diskValues.push_back(StringTo(*iter, value) ? value : 0);
+                }
+
+                if (diskValues.size() < static_cast<size_t>(EnumDiskState::count)) {
+                    continue; // 字段数量不足，跳过此行
+                }
+
+                // 直接从数组索引访问，零遍历开销
+                diskStat.major = static_cast<unsigned int>(diskValues[static_cast<size_t>(EnumDiskState::major)]);
+                diskStat.minor = static_cast<unsigned int>(diskValues[static_cast<size_t>(EnumDiskState::minor)]);
+
                 // 4  reads completed successfully
-                diskStat.reads = get_int(EnumDiskState::reads);
-                // 5  reads merged
-                // ++currentIndex;
+                diskStat.reads = diskValues[static_cast<size_t>(EnumDiskState::reads)];
                 // 6  sectors read
-                diskStat.readBytes = get_int(EnumDiskState::readSectors) * 512;
+                diskStat.readBytes = diskValues[static_cast<size_t>(EnumDiskState::readSectors)] * 512;
                 // 7  time spent reading (ms)
-                diskStat.rTime = get_int(EnumDiskState::rMillis);
+                diskStat.rTime = diskValues[static_cast<size_t>(EnumDiskState::rMillis)];
                 // 8  writes completed
-                diskStat.writes = get_int(EnumDiskState::writes);
-                // 9  writes merged
-                // ++currentIndex;
+                diskStat.writes = diskValues[static_cast<size_t>(EnumDiskState::writes)];
                 // 10  sectors written
-                diskStat.writeBytes = get_int(EnumDiskState::writeSectors) * 512;
+                diskStat.writeBytes = diskValues[static_cast<size_t>(EnumDiskState::writeSectors)] * 512;
                 // 11  time spent writing (ms)
-                diskStat.wTime = get_int(EnumDiskState::wMillis);
-                // 12  I/Os currently in progress
-                // ++currentIndex;
+                diskStat.wTime = diskValues[static_cast<size_t>(EnumDiskState::wMillis)];
                 // 13  time spent doing I/Os (ms)
-                diskStat.time = get_int(EnumDiskState::rwMillis);
+                diskStat.time = diskValues[static_cast<size_t>(EnumDiskState::rwMillis)];
                 // 14  weighted time spent doing I/Os (ms)
-                diskStat.qTime = get_int(EnumDiskState::qMillis);
+                diskStat.qTime = diskValues[static_cast<size_t>(EnumDiskState::qMillis)];
 
             } catch (...) {
                 LOG_ERROR(sLogger, ("failed to parse number in diskstats", diskLine));
@@ -868,6 +868,40 @@ bool LinuxSystemInterface::GetDiskStateInformationOnce(DiskStateInformation& dis
 
     return true;
 }
+
+bool LinuxSystemInterface::GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) {
+    struct statvfs buffer {};
+    int status = statvfs(dirName.c_str(), &buffer);
+    if (status != 0) {
+        LOG_ERROR(sLogger, ("get filesystem infomation error", dirName)("error status", status));
+        return false;
+    }
+
+    // 单位是: KB
+    uint64_t bsize = buffer.f_frsize / 512;
+    fileSystemInfo.fileSystemState.total = ((buffer.f_blocks * bsize) >> 1);
+    fileSystemInfo.fileSystemState.free = ((buffer.f_bfree * bsize) >> 1);
+    fileSystemInfo.fileSystemState.avail = ((buffer.f_bavail * bsize) >> 1); // 非超级用户最大可使用的磁盘量
+    fileSystemInfo.fileSystemState.used
+        = DiffOrZero(fileSystemInfo.fileSystemState.total, fileSystemInfo.fileSystemState.free);
+    fileSystemInfo.fileSystemState.files = buffer.f_files;
+    fileSystemInfo.fileSystemState.freeFiles = buffer.f_ffree;
+
+    // 此处为用户可使用的磁盘量，可能会与fileSystemInfo.total有差异。也就是说:
+    // 当total < fileSystemInfo.total时，表明即使磁盘仍有空间，用户也申请不到了
+    // 毕竟OS维护磁盘，会占掉一部分，比如文件分配表，目录文件等。
+    uint64_t total = fileSystemInfo.fileSystemState.used + fileSystemInfo.fileSystemState.avail;
+    uint64_t used = fileSystemInfo.fileSystemState.used;
+    double percent = 0;
+    if (total != 0) {
+        // 磁盘占用率，使用的是用户最大可用磁盘总量来的，而非物理磁盘总量
+        percent = (double)used / (double)total;
+    }
+    fileSystemInfo.fileSystemState.use_percent = percent;
+
+    return true;
+}
+
 bool LinuxSystemInterface::GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) {
     NetState netState;
 
@@ -896,15 +930,19 @@ bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformatio
 
     // netInterfaceInfo.configs
     for (size_t i = 2; i < netDevLines.size(); ++i) {
-        auto pos = netDevLines[i].find_first_of(':');
-        if (pos == std::string::npos) {
+        const auto& line = netDevLines[i];
+
+        NetDevParser parser(line);
+        StringView deviceNameView;
+        std::vector<uint64_t> stats;
+
+        if (!parser.ParseDeviceStats(deviceNameView, stats)) {
             continue;
         }
-        std::string devCounterStr = netDevLines[i].substr(pos + 1);
-        std::string devName = netDevLines[i].substr(0, pos);
+
+        std::string devName(deviceNameView);
 
         // netInterfaceInfo.configs
-        boost::algorithm::trim(devName);
         InterfaceConfig ifConfig;
         ret = GetInterfaceConfig(ifConfig, devName);
         if (ret != true) {
@@ -912,33 +950,26 @@ bool LinuxSystemInterface::GetNetInterfaceInformationOnce(NetInterfaceInformatio
         }
         netInterfaceInfo.configs.push_back(ifConfig);
 
-        // netInterfaceInfo.metrics
-        std::vector<std::string> netDevMetric;
-        boost::algorithm::trim(devCounterStr);
-        boost::split(netDevMetric, devCounterStr, boost::is_any_of(" "), boost::token_compress_on);
-
-        if (netDevMetric.size() >= 16) {
+        // netInterfaceInfo.metrics - 直接从解析的数组访问，避免字符串转换
+        if (stats.size() >= 16) {
             NetInterfaceMetric information;
-            int index = 0;
-            uint64_t value = 0;
             information.name = devName;
-            information.rxBytes = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.rxPackets = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.rxErrors = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.rxDropped = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.rxOverruns = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.rxFrame = StringTo(netDevMetric[index++], value) ? value : 0;
-            // skip compressed multicast
-            index += 2;
-            information.txBytes = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txPackets = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txErrors = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txDropped = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txOverruns = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txCollisions = StringTo(netDevMetric[index++], value) ? value : 0;
-            information.txCarrier = StringTo(netDevMetric[index++], value) ? value : 0;
-
+            information.rxBytes = stats[0];
+            information.rxPackets = stats[1];
+            information.rxErrors = stats[2];
+            information.rxDropped = stats[3];
+            information.rxOverruns = stats[4];
+            information.rxFrame = stats[5];
+            // skip compressed(6) multicast(7)
+            information.txBytes = stats[8];
+            information.txPackets = stats[9];
+            information.txErrors = stats[10];
+            information.txDropped = stats[11];
+            information.txOverruns = stats[12];
+            information.txCollisions = stats[13];
+            information.txCarrier = stats[14];
             information.speed = -1;
+
             netInterfaceInfo.metrics.push_back(information);
         }
     }
@@ -982,31 +1013,36 @@ bool LinuxSystemInterface::GetProcessStatmOnce(pid_t pid, ProcessMemoryInformati
     }
     file.close();
 
-    std::vector<std::string> processMemoryMetric;
     if (!processStatmString.empty()) {
         const std::string& input = processStatmString.front();
-        boost::algorithm::split(processMemoryMetric, input, boost::is_any_of(" "), boost::algorithm::token_compress_on);
-    }
 
-    if (processMemoryMetric.size() < 3) {
+        FastFieldParser parser(input);
+        std::vector<uint64_t> memValues;
+        memValues.reserve(3);
+
+        auto iter = parser.begin();
+        auto end = parser.end();
+        for (size_t i = 0; i < 3 && iter != end; ++i, ++iter) {
+            uint64_t value;
+            memValues.push_back(StringTo(*iter, value) ? value : 0);
+        }
+
+        if (memValues.size() >= 3) {
+            processMemory.size = memValues[0] * PAGE_SIZE;
+            processMemory.resident = memValues[1] * PAGE_SIZE;
+            processMemory.share = memValues[2] * PAGE_SIZE;
+        } else {
+            return false;
+        }
+    } else {
         return false;
     }
-
-    int index = 0;
-    StringTo(processMemoryMetric[index++], processMemory.size);
-    processMemory.size = processMemory.size * PAGE_SIZE;
-    StringTo(processMemoryMetric[index++], processMemory.resident);
-    processMemory.resident = processMemory.resident * PAGE_SIZE;
-    StringTo(processMemoryMetric[index++], processMemory.share);
-    processMemory.share = processMemory.share * PAGE_SIZE;
 
     return true;
 }
 
 bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& processCredName) {
     auto processStatus = PROCESS_DIR / std::to_string(pid) / PROCESS_STATUS;
-
-    std::vector<std::string> metric;
 
     std::ifstream file(static_cast<std::string>(processStatus));
 
@@ -1021,22 +1057,36 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     bool getGID = false;
     bool getName = false;
     while (std::getline(file, line) && !(getUID && getGID && getName)) {
-        boost::algorithm::split(metric, line, boost::algorithm::is_any_of("\t"), boost::algorithm::token_compress_on);
+        FastFieldParser parser(line, '\t');
 
-        if (metric.front() == "Name:") {
-            processCredName.name = metric[1];
-            getName = true;
-        }
-        if (metric.size() >= 3 && metric.front() == "Uid:") {
-            int index = 1;
-            cred.uid = static_cast<uint64_t>(std::stoull(metric[index++]));
-            cred.euid = static_cast<uint64_t>(std::stoull(metric[index]));
-            getUID = true;
-        } else if (metric.size() >= 3 && metric.front() == "Gid:") {
-            int index = 1;
-            cred.gid = static_cast<uint64_t>(std::stoull(metric[index++]));
-            cred.egid = static_cast<uint64_t>(std::stoull(metric[index]));
-            getGID = true;
+        auto firstField = parser.GetField(0);
+        if (firstField.empty())
+            continue;
+
+        if (firstField == "Name:") {
+            auto nameField = parser.GetField(1);
+            if (!nameField.empty()) {
+                processCredName.name = std::string(nameField);
+                getName = true;
+            }
+        } else if (firstField == "Uid:") {
+            // 直接解析数值字段，避免中间字符串转换
+            auto uid = parser.GetFieldAs<uint64_t>(1, 0);
+            auto euid = parser.GetFieldAs<uint64_t>(2, 0);
+            if (uid > 0) { // 基本有效性检查
+                cred.uid = uid;
+                cred.euid = euid;
+                getUID = true;
+            }
+        } else if (firstField == "Gid:") {
+            // 直接解析数值字段，避免中间字符串转换
+            auto gid = parser.GetFieldAs<uint64_t>(1, 0);
+            auto egid = parser.GetFieldAs<uint64_t>(2, 0);
+            if (gid > 0) { // 基本有效性检查
+                cred.gid = gid;
+                cred.egid = egid;
+                getGID = true;
+            }
         }
     }
 
@@ -1044,7 +1094,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     passwd pwbuffer;
     char buffer[2048];
     if (getpwuid_r(cred.uid, &pwbuffer, buffer, sizeof(buffer), &pw) != 0 || pw == nullptr || pw->pw_name == nullptr) {
-        return false;
+        return true;
     }
 
     processCredName.user = pw->pw_name;
@@ -1053,7 +1103,7 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
     group grpbuffer{};
     char groupBuffer[2048];
     if (getgrgid_r(cred.gid, &grpbuffer, groupBuffer, sizeof(groupBuffer), &grp) != 0) {
-        return false;
+        return true;
     }
 
     if (grp != nullptr && grp->gr_name != nullptr) {
@@ -1077,6 +1127,13 @@ bool LinuxSystemInterface::GetExecutablePathOnce(pid_t pid, ProcessExecutePath& 
 
 bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) {
     std::filesystem::path procFdPath = PROCESS_DIR / std::to_string(pid) / PROCESS_FD;
+
+    // 检查目录是否存在，进程可能已经被杀死
+
+    if (!CheckExistance(procFdPath)) {
+        LOG_ERROR(sLogger, ("file does not exist", procFdPath.string()));
+        return false;
+    }
 
     int count = 0;
     for (const auto& dirEntry :
