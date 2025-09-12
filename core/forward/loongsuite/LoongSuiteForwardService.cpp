@@ -63,9 +63,9 @@ bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Va
     }
     mRetryTimeController.InitRetryTimes(configName, INT32_FLAG(grpc_server_forward_max_retry_times));
 
-    LOG_INFO(sLogger,
-             ("LoongSuiteForwardServiceImpl config updated",
-              configName)("queueKey", queueKey)("inputIndex", inputIndex));
+    LOG_INFO(
+        sLogger,
+        ("LoongSuiteForwardServiceImpl config updated", configName)("queueKey", queueKey)("inputIndex", inputIndex));
     return true;
 }
 
