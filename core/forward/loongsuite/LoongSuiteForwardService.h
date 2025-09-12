@@ -30,7 +30,6 @@ namespace logtail {
 
 struct ForwardConfig {
     std::string configName;
-    std::string matchValue;
     QueueKey queueKey;
     size_t inputIndex;
 };
@@ -100,7 +99,7 @@ private:
 
     RetryTimeController mRetryTimeController;
 
-    bool AddToIndex(ForwardConfig&& config, std::string& errorMsg);
+    bool AddToIndex(std::string& configName, ForwardConfig&& config, std::string& errorMsg);
     bool FindMatchingConfig(grpc::CallbackServerContext* context, std::shared_ptr<ForwardConfig>& config) const;
     void ProcessForwardRequest(const LoongSuiteForwardRequest* request,
                                std::shared_ptr<ForwardConfig> config,

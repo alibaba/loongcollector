@@ -20,7 +20,6 @@
 
 #include <memory>
 
-#include "AlarmManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "grpcpp/support/status.h"
@@ -46,17 +45,7 @@ bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Va
     ForwardConfig forwardConfig;
     forwardConfig.configName = configName;
 
-    const char* matchRuleKey = "MatchRule";
-    const Json::Value* matchRule = config.find(matchRuleKey, matchRuleKey + strlen(matchRuleKey));
     std::string errorMsg;
-    std::string value;
-    if (matchRule && matchRule->isObject()) {
-        if (!GetMandatoryStringParam(*matchRule, "Value", value, errorMsg)) {
-            return false;
-        }
-    }
-    forwardConfig.matchValue = value;
-
     int32_t queueKey = -1;
     if (!GetMandatoryIntParam(config, "QueueKey", queueKey, errorMsg)) {
         return false;
@@ -68,7 +57,7 @@ bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Va
         return false;
     }
     forwardConfig.inputIndex = static_cast<size_t>(inputIndex);
-    if (!AddToIndex(std::move(forwardConfig), errorMsg)) {
+    if (!AddToIndex(configName, std::move(forwardConfig), errorMsg)) {
         LOG_ERROR(sLogger, ("Update LoongSuite forward match rule failed", configName)("error", errorMsg));
         return false;
     }
@@ -76,29 +65,21 @@ bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Va
 
     LOG_INFO(sLogger,
              ("LoongSuiteForwardServiceImpl config updated",
-              configName)("matchValue", value)("queueKey", queueKey)("inputIndex", inputIndex));
+              configName)("queueKey", queueKey)("inputIndex", inputIndex));
     return true;
 }
 
 bool LoongSuiteForwardServiceImpl::Remove(std::string configName, const Json::Value& config) {
-    const char* matchRuleKey = "MatchRule";
-    const Json::Value* matchRule = config.find(matchRuleKey, matchRuleKey + strlen(matchRuleKey));
     std::string errorMsg;
-    std::string value;
-    if (matchRule && matchRule->isObject()) {
-        if (!GetMandatoryStringParam(*matchRule, "Value", value, errorMsg)) {
-            return false;
-        }
-    }
 
     std::unique_lock<std::shared_mutex> lock(mMatchIndexMutex);
-    auto it = mMatchIndex.find(value);
+    auto it = mMatchIndex.find(configName);
     if (it != mMatchIndex.end()) {
         mMatchIndex.erase(it);
         mRetryTimeController.ClearRetryTimes(configName);
         LOG_INFO(sLogger, ("LoongSuiteForwardServiceImpl config removed", configName));
     } else {
-        LOG_WARNING(sLogger, ("Config not found for removal", value)("configName", configName));
+        LOG_WARNING(sLogger, ("Config not found for removal", configName));
     }
     return true;
 }
@@ -156,17 +137,17 @@ void LoongSuiteForwardServiceImpl::ProcessForwardRequest(const LoongSuiteForward
     }
 }
 
-bool LoongSuiteForwardServiceImpl::AddToIndex(ForwardConfig&& config, std::string& errorMsg) {
+bool LoongSuiteForwardServiceImpl::AddToIndex(std::string& configName, ForwardConfig&& config, std::string& errorMsg) {
     errorMsg.clear();
     std::unique_lock<std::shared_mutex> lock(mMatchIndexMutex);
-    if (!config.matchValue.empty()) {
+    if (!configName.empty()) {
         // check if config already exists
-        auto it = mMatchIndex.find(config.matchValue);
+        auto it = mMatchIndex.find(configName);
         if (it != mMatchIndex.end()) {
             errorMsg = "The match rule is already exists, conflict with " + it->second->configName;
             return false;
         }
-        mMatchIndex[config.matchValue] = std::make_shared<ForwardConfig>(config);
+        mMatchIndex[configName] = std::make_shared<ForwardConfig>(std::move(config));
         return true;
     }
     errorMsg = "Invalid match rule";

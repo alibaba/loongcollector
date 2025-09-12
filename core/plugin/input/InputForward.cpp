@@ -71,33 +71,7 @@ bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeli
                            mContext->GetRegion());
     }
 
-    const char* key = "MatchRule";
-    const Json::Value* itr = config.find(key, key + strlen(key));
-    std::string value;
-    if (itr && itr->isObject()) {
-        if (!GetMandatoryStringParam(*itr, "Value", value, errorMsg)) {
-            PARAM_ERROR_RETURN(mContext->GetLogger(),
-                               mContext->GetAlarm(),
-                               errorMsg,
-                               sName,
-                               mContext->GetConfigName(),
-                               mContext->GetProjectName(),
-                               mContext->GetLogstoreName(),
-                               mContext->GetRegion());
-        }
-    } else {
-        PARAM_ERROR_RETURN(mContext->GetLogger(),
-                           mContext->GetAlarm(),
-                           "Param MatchRule is required",
-                           sName,
-                           mContext->GetConfigName(),
-                           mContext->GetProjectName(),
-                           mContext->GetLogstoreName(),
-                           mContext->GetRegion());
-    }
-
     mConfigName = mContext->GetConfigName();
-    mForwardConfig["MatchRule"]["Value"] = value;
     mForwardConfig["InputIndex"] = static_cast<int>(mIndex);
     mForwardConfig["Protocol"] = mProtocol;
 

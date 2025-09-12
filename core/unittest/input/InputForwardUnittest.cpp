@@ -83,10 +83,7 @@ void InputForwardUnittest::OnSuccessfulInit() {
         {
             "Type": "input_forward",
             "Protocol": "LoongSuite",
-            "Endpoint": "127.0.0.1:8080",
-            "MatchRule": {
-                "Value": "test-service"
-            }
+            "Endpoint": "127.0.0.1:8080"
         }
     )";
     APSARA_TEST_TRUE_FATAL(ParseJsonTable(configStr, configJson, errorMsg));
@@ -95,8 +92,6 @@ void InputForwardUnittest::OnSuccessfulInit() {
     input->CreateMetricsRecordRef("test", "2");
     APSARA_TEST_TRUE_FATAL(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
-
-    APSARA_TEST_EQUAL_FATAL("test-service", input->mForwardConfig["MatchRule"]["Value"].asString());
 }
 
 void InputForwardUnittest::OnFailedInit() {
@@ -198,37 +193,6 @@ void InputForwardUnittest::TestMissingMandatoryParams() {
     APSARA_TEST_FALSE_FATAL(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL_FATAL("", input->mEndpoint);
-
-    // Test missing MatchRule
-    configStr = R"(
-        {
-            "Type": "input_forward",
-            "Protocol": "LoongSuite",
-            "Endpoint": "0.0.0.0:9999"
-        }
-    )";
-    APSARA_TEST_TRUE_FATAL(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputForward());
-    input->SetContext(ctx);
-    input->CreateMetricsRecordRef("test", "9");
-    APSARA_TEST_FALSE_FATAL(input->Init(configJson, optionalGoPipeline));
-    input->CommitMetricsRecordRef();
-
-    // Test empty MatchRule Value
-    configStr = R"(
-        {
-            "Type": "input_forward",
-            "Protocol": "LoongSuite",
-            "Endpoint": "0.0.0.0:9999",
-            "MatchRule": {}
-        }
-    )";
-    APSARA_TEST_TRUE_FATAL(ParseJsonTable(configStr, configJson, errorMsg));
-    input.reset(new InputForward());
-    input->SetContext(ctx);
-    input->CreateMetricsRecordRef("test", "10");
-    APSARA_TEST_FALSE_FATAL(input->Init(configJson, optionalGoPipeline));
-    input->CommitMetricsRecordRef();
 }
 
 void InputForwardUnittest::TestStartMethod() {
@@ -241,10 +205,7 @@ void InputForwardUnittest::TestStartMethod() {
         {
             "Type": "input_forward",
             "Protocol": "LoongSuite",
-            "Endpoint": "127.0.0.1:18080",
-            "MatchRule": {
-                "Value": "start-test-service"
-            }
+            "Endpoint": "127.0.0.1:18080"
         }
     )";
     APSARA_TEST_TRUE_FATAL(ParseJsonTable(configStr, configJson, errorMsg));
