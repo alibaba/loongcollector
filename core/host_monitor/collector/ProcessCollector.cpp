@@ -78,6 +78,14 @@ static inline void GetProcessCpuSorted(std::vector<ProcessAllStat>& allPidStats)
     });
 }
 
+static inline void GetProcessCpuSorted(std::vector<std::pair<pid_t, ProcessCpuInformation>>& cpuInfos) {
+    std::sort(cpuInfos.begin(),
+              cpuInfos.end(),
+              [](const std::pair<pid_t, ProcessCpuInformation>& a, const std::pair<pid_t, ProcessCpuInformation>& b) {
+                  return a.second.percent > b.second.percent;
+              });
+}
+
 ProcessCollector::ProcessCollector() : mTopN(INT32_FLAG(host_monitor_process_report_top_N)) {
 }
 
@@ -107,18 +115,30 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     }
 
     pids = processListInfo.pids;
-
-    // 获取每一个进程的信息
     std::vector<ProcessAllStat> allPidStats;
+    std::vector<std::pair<pid_t, ProcessCpuInformation>> cpuInfos;
+
+    // 获取所有进程的cpu信息
     for (auto pid : pids) {
+        ProcessCpuInformation info;
+        if (!GetProcessCpuInformation(collectContext.mCollectTime, pid, info)) {
+            continue;
+        }
+        cpuInfos.push_back(std::make_pair(pid, info));
+    }
+
+    // 对所有进程的cpu信息进行排序
+    GetProcessCpuSorted(cpuInfos);
+
+    // 取cpu排名前15的进程，获取每一个进程的信息
+    for (size_t i = 0; i < mTopN; i++) {
         ProcessAllStat stat;
-        if (!GetProcessAllStat(collectContext.mCollectTime, pid, stat)) {
+        stat.processCpu = cpuInfos[i].second;
+        if (!GetProcessAllStat(collectContext.mCollectTime, cpuInfos[i].first, stat)) {
             continue;
         }
         allPidStats.push_back(stat);
     }
-
-    // GetProcessCpuSorted(allPidStats);
 
     int processNum = allPidStats.size();
 
@@ -261,14 +281,9 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     return true;
 }
 
-// 获取某个pid的信息
+// 获取某个pid的信息，除了cpu
 bool ProcessCollector::GetProcessAllStat(const CollectTime& collectTime, pid_t pid, ProcessAllStat& processStat) {
-    // 获取这个pid的cpu信息
     processStat.pid = pid;
-
-    if (!GetProcessCpuInformation(collectTime, pid, processStat.processCpu)) {
-        return false;
-    }
 
     if (!GetProcessState(collectTime.mMetricTime, pid, processStat.processState)) {
         return false;
