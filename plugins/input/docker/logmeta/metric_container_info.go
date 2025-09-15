@@ -32,10 +32,10 @@ func (i *InputDockerFile) Description() string {
 func (i *InputDockerFile) Collect(collector pipeline.Collector) error {
 	return nil
 }
-func (idf *InputDockerFile) Init(context pipeline.Context) (int, error) {
-	idf.context = context
-	logger.Debugf(idf.context.GetRuntimeContext(), "InputDockerFile inited successfully")
-	return idf.FlushIntervalMs, nil
+func (i *InputDockerFile) Init(context pipeline.Context) (int, error) {
+	i.context = context
+	logger.Debugf(i.context.GetRuntimeContext(), "InputDockerFile inited successfully")
+	return i.FlushIntervalMs, nil
 }
 func init() {
 	pipeline.MetricInputs["metric_container_info"] = func() pipeline.MetricInput {
