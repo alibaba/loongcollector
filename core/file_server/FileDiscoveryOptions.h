@@ -46,12 +46,12 @@ public:
     const std::vector<std::string>& GetWildcardPaths() const { return mWildcardPaths; }
     const std::vector<std::string>& GetConstWildcardPaths() const { return mConstWildcardPaths; }
     bool IsContainerDiscoveryEnabled() const { return mEnableContainerDiscovery; }
-    void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = true; }
+    void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = flag; }
     const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
 
     const std::shared_ptr<std::set<std::string>>& GetFullContainerList() const { return mFullContainerList; }
 
-    void SetContainerDiscoveryOptions(ContainerDiscoveryOptions option) { mContainerDiscovery = std::move(option); }
+    void SetContainerDiscoveryOptions(ContainerDiscoveryOptions&& option) { mContainerDiscovery = std::move(option); }
     ContainerDiscoveryOptions GetContainerDiscoveryOptions() const { return mContainerDiscovery; }
 
     void SetContainerInfo(const std::shared_ptr<std::vector<ContainerInfo>>& info) { mContainerInfos = info; }
