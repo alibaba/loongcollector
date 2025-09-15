@@ -116,7 +116,10 @@ void ContainerManager::ApplyContainerDiffs() {
         }
         // Create and store container config result
         ContainerConfigResult configResult = CreateContainerConfigResult(options, ctx, containerIDs);
-        mConfigContainerResultMap[ctx->GetConfigName()] = configResult;
+        LOG_DEBUG(sLogger, ("configResult", configResult.ToString())("configName", ctx->GetConfigName()));
+        if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta) {
+            mConfigContainerResultMap[ctx->GetConfigName()] = configResult;
+        }
     }
     sendConfigContainerInfo();
     mConfigContainerDiffMap.clear();
@@ -163,7 +166,7 @@ void ContainerManager::sendConfigContainerInfo() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    //pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, "__config_container_info__");
+    pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER);
     
     for (const auto& pair : mConfigContainerResultMap) {
         LogEvent* logEventPtr = pipelineEventGroup.AddLogEvent();

@@ -28,6 +28,7 @@
 
 namespace logtail {
 
+class FileDiscoveryOptions;
 
 struct FieldFilter {
     std::unordered_map<std::string, std::string> mFieldsMap;
@@ -89,6 +90,10 @@ struct ContainerDiscoveryOptions {
     void GetCustomExternalTags(const std::unordered_map<std::string, std::string>& containerEnvs,
                                const std::unordered_map<std::string, std::string>& containerK8sLabels,
                                std::vector<std::pair<std::string, std::string>>& tags) const;
+    
+    void GenerateContainerMetaFetchingGoPipeline(Json::Value& res,
+                                const FileDiscoveryOptions* fileDiscovery = nullptr,
+                                const PluginInstance::PluginMeta& pluginMeta = {"0"}) const;                           
 };
 
 using ContainerDiscoveryConfig = std::pair<const ContainerDiscoveryOptions*, const CollectionPipelineContext*>;

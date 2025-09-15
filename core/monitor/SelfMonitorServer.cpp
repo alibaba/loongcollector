@@ -26,6 +26,7 @@ namespace logtail {
 
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER = "__container__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }

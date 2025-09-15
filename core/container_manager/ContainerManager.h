@@ -50,6 +50,22 @@ struct ContainerConfigResult {
     std::string InputIsContainerFile;
     std::string FlusherType;
     std::string FlusherTargetAddress;
+
+    std::string ToString() const {
+        std::stringstream ss;
+        ss << "DataType: " << DataType << std::endl;
+        ss << "Project: " << Project << std::endl;
+        ss << "Logstore: " << Logstore << std::endl;
+        ss << "ConfigName: " << ConfigName << std::endl;
+        ss << "PathNotExistInputContainerIDs: " << PathNotExistInputContainerIDs << std::endl;
+        ss << "PathExistInputContainerIDs: " << PathExistInputContainerIDs << std::endl;
+        ss << "SourceAddress: " << SourceAddress << std::endl;
+        ss << "InputType: " << InputType << std::endl;
+        ss << "InputIsContainerFile: " << InputIsContainerFile << std::endl;
+        ss << "FlusherType: " << FlusherType << std::endl;
+        ss << "FlusherTargetAddress: " << FlusherTargetAddress << std::endl;
+        return ss.str();
+    }
 };
 
 class ContainerManager {

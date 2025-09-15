@@ -16,6 +16,7 @@
 
 #include <boost/regex.hpp>
 
+#include "file_server/FileDiscoveryOptions.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
@@ -332,6 +333,64 @@ void ContainerDiscoveryOptions::GetCustomExternalTags(
             tags.emplace_back(tagKey, labelIt->second);
         }
     }
+}
+
+void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
+    Json::Value& res, const FileDiscoveryOptions* fileDiscovery, const PluginInstance::PluginMeta& pluginMeta) const {
+    Json::Value plugin(Json::objectValue);
+    Json::Value detail(Json::objectValue);
+    Json::Value object(Json::objectValue);
+    auto ConvertMapToJsonObj = [&](const char* key, const unordered_map<string, string>& map) {
+        if (!map.empty()) {
+            object.clear();
+            for (const auto& item : map) {
+                object[item.first] = Json::Value(item.second);
+            }
+            detail[key] = object;
+        }
+    };
+    if (fileDiscovery) {
+        if (!fileDiscovery->GetWildcardPaths().empty()) {
+            detail["LogPath"] = Json::Value(fileDiscovery->GetWildcardPaths()[0]);
+            detail["MaxDepth"] = Json::Value(static_cast<int32_t>(fileDiscovery->GetWildcardPaths().size())
+                                             + fileDiscovery->mMaxDirSearchDepth - 1);
+        } else {
+            detail["LogPath"] = Json::Value(fileDiscovery->GetBasePath());
+            detail["MaxDepth"] = Json::Value(fileDiscovery->mMaxDirSearchDepth);
+        }
+        detail["FilePattern"] = Json::Value(fileDiscovery->GetFilePattern());
+    }
+    // 传递给 metric_container_info 的配置
+    // 容器过滤
+    if (!mContainerFilterConfig.mK8sNamespaceRegex.empty()) {
+        detail["K8sNamespaceRegex"] = Json::Value(mContainerFilterConfig.mK8sNamespaceRegex);
+    }
+    if (!mContainerFilterConfig.mK8sPodRegex.empty()) {
+        detail["K8sPodRegex"] = Json::Value(mContainerFilterConfig.mK8sPodRegex);
+    }
+    if (!mContainerFilterConfig.mK8sContainerRegex.empty()) {
+        detail["K8sContainerRegex"] = Json::Value(mContainerFilterConfig.mK8sContainerRegex);
+    }
+    ConvertMapToJsonObj("IncludeK8sLabel", mContainerFilterConfig.mIncludeK8sLabel);
+    ConvertMapToJsonObj("ExcludeK8sLabel", mContainerFilterConfig.mExcludeK8sLabel);
+    ConvertMapToJsonObj("IncludeEnv", mContainerFilterConfig.mIncludeEnv);
+    ConvertMapToJsonObj("ExcludeEnv", mContainerFilterConfig.mExcludeEnv);
+    ConvertMapToJsonObj("IncludeContainerLabel", mContainerFilterConfig.mIncludeContainerLabel);
+    ConvertMapToJsonObj("ExcludeContainerLabel", mContainerFilterConfig.mExcludeContainerLabel);
+    // 日志标签富化
+    ConvertMapToJsonObj("ExternalK8sLabelTag", mExternalK8sLabelTag);
+    ConvertMapToJsonObj("ExternalEnvTag", mExternalEnvTag);
+    // 启用容器元信息预览
+    if (mCollectingContainersMeta) {
+        detail["CollectingContainersMeta"] = Json::Value(true);
+    }
+    plugin["type"]
+        = Json::Value(CollectionPipeline::GenPluginTypeWithID("metric_container_info", pluginMeta.mPluginID));
+    plugin["detail"] = detail;
+    res["inputs"].append(plugin);
+    // these param will be overriden if the same param appears in the global module of config, which will be parsed
+    // later.
+    res["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
 }
 
 } // namespace logtail
