@@ -17,15 +17,12 @@
 #include <fstream>
 #include <string>
 
-#include "boost/filesystem.hpp"
 #include "boost/format.hpp"
 
 #include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
 #include "unittest/Unittest.h"
-
-namespace bfs = boost::filesystem;
 
 namespace logtail {
 
@@ -134,7 +131,9 @@ TEST_F(FileSystemUtilUnittest, TestDirNormal) {
 
 #ifndef _MSC_VER
 TEST_F(FileSystemUtilUnittest, TestDirSymbolic) {
-    { std::ofstream((mTestRoot / "f1").string()); }
+    {
+        std::ofstream((mTestRoot / "f1").string());
+    }
     bfs::create_directory(mTestRoot / "d1");
     std::map<std::string, std::string> symbolics = {{"s1", "f1"}, {"s2", "d1"}};
     for (auto& s : symbolics) {
@@ -186,7 +185,9 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
 
     {
         auto filePath = ((mTestRoot / "file").string());
-        { std::ofstream(filePath).write("xxx", 3); }
+        {
+            std::ofstream(filePath).write("xxx", 3);
+        }
         fsutil::PathStat stat;
         EXPECT_TRUE(fsutil::PathStat::stat(filePath, stat));
         DevInode devInode = stat.GetDevInode();
@@ -227,7 +228,9 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
 TEST_F(FileSystemUtilUnittest, TestPathStat_fstat) {
     auto currentTime = time(nullptr);
     auto filePath = ((mTestRoot / "file").string());
-    { std::ofstream(filePath).write("xxx", 3); }
+    {
+        std::ofstream(filePath).write("xxx", 3);
+    }
 
     FILE* file = fopen(filePath.c_str(), "r");
     EXPECT_TRUE(file != nullptr);
@@ -269,7 +272,9 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_fstat) {
 
 TEST_F(FileSystemUtilUnittest, TestPathStat_GetLastWriteTime) {
     auto filePath = ((mTestRoot / "file").string());
-    { std::ofstream(filePath).write("xxx", 3); }
+    {
+        std::ofstream(filePath).write("xxx", 3);
+    }
 
     {
         int64_t sec = -1;
@@ -295,7 +300,9 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_GetLastWriteTime) {
 TEST_F(FileSystemUtilUnittest, TestFileReadOnlyOpen) {
     auto filePath = ((mTestRoot / "file").string());
     const std::string fileContent{"xxx"};
-    { std::ofstream(filePath) << fileContent; }
+    {
+        std::ofstream(filePath) << fileContent;
+    }
 
     // Open the file and delete it before closing.
     // File can still be read after deleting.
@@ -362,7 +369,9 @@ TEST_F(FileSystemUtilUnittest, TestFileWriteOnlyOpen) {
 
     // Case #2: File is existing, open will truncate it.
     {
-        { std::ofstream(filePath) << fileContent; }
+        {
+            std::ofstream(filePath) << fileContent;
+        }
 
         auto file = FileWriteOnlyOpen(filePath.c_str(), "w");
         ASSERT_TRUE(file != NULL);
@@ -414,7 +423,9 @@ TEST_F(FileSystemUtilUnittest, TestFileAppendOpen) {
 
     // Case #3: Open existing file, check its cursor position.
     {
-        { std::ofstream(filePath) << fileContent; }
+        {
+            std::ofstream(filePath) << fileContent;
+        }
 
         auto file = FileAppendOpen(filePath.c_str(), "a");
         EXPECT_EQ(ftell(file), static_cast<long>(fileContentLen));

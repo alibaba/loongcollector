@@ -14,28 +14,27 @@
  * limitations under the License.
  */
 
- #include "plugin/input/InputInternalConfigContainerInfo.h"
+#include "plugin/input/InputInternalConfigContainerInfo.h"
 
- 
- namespace logtail {
- 
- const std::string InputInternalConfigContainerInfo::sName = "input_internal_config_container_info";
- 
- bool InputInternalConfigContainerInfo::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-     return true;
- }
- 
- bool InputInternalConfigContainerInfo::Start() {
-     ContainerManager::GetInstance()->UpdateConfigContainerInfoPipeline(mContext, mIndex);
-     return true;
- }
- 
- bool InputInternalConfigContainerInfo::Stop(bool isPipelineRemoving) {
-     if (isPipelineRemoving) {
-         ContainerManager::GetInstance()->RemoveConfigContainerInfoPipeline();
-     }
-     return true;
- }
- 
- } // namespace logtail
- 
+
+namespace logtail {
+
+const std::string InputInternalConfigContainerInfo::sName = "input_internal_config_container_info";
+
+bool InputInternalConfigContainerInfo::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    return true;
+}
+
+bool InputInternalConfigContainerInfo::Start() {
+    ContainerManager::GetInstance()->UpdateConfigContainerInfoPipeline(mContext, mIndex);
+    return true;
+}
+
+bool InputInternalConfigContainerInfo::Stop(bool isPipelineRemoving) {
+    if (isPipelineRemoving) {
+        ContainerManager::GetInstance()->RemoveConfigContainerInfoPipeline();
+    }
+    return true;
+}
+
+} // namespace logtail
