@@ -893,7 +893,6 @@ void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
 }
 
 
-
 void ConfigManager::ClearFilePipelineMatchCache() {
     ScopedSpinLock lock(mCacheFileConfigMapLock);
     mCacheFileConfigMap.clear();
