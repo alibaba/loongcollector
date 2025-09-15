@@ -23,7 +23,6 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
-#include "runner/ProcessorRunner.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
@@ -34,6 +33,7 @@
 #include "models/PipelineEventGroup.h"
 #include "monitor/Monitor.h"
 #include "monitor/SelfMonitorServer.h"
+#include "runner/ProcessorRunner.h"
 
 
 namespace logtail {
@@ -91,10 +91,9 @@ public:
      * @param containerIDs List of container IDs (optional)
      * @return ContainerConfigResult containing config result data
      */
-    ContainerConfigResult CreateContainerConfigResult(
-        const FileDiscoveryOptions* options,
-        const CollectionPipelineContext* ctx,
-        const std::vector<std::string>& containerIDs = {});
+    ContainerConfigResult CreateContainerConfigResult(const FileDiscoveryOptions* options,
+                                                      const CollectionPipelineContext* ctx,
+                                                      const std::vector<std::string>& containerIDs = {});
 
     void UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveConfigContainerInfoPipeline();

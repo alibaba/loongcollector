@@ -66,7 +66,8 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
     if (!containerDiscovery.Init(config, *mContext, sName)) {
         return false;
     }
-    containerDiscovery.GenerateContainerMetaFetchingGoPipeline(optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
+    containerDiscovery.GenerateContainerMetaFetchingGoPipeline(
+        optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
     mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
     mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
     mFileDiscovery.SetContainerDiscoveryOptions(containerDiscovery);

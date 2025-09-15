@@ -16,10 +16,10 @@
 
 #include <boost/regex.hpp>
 
-#include "file_server/FileDiscoveryOptions.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+#include "file_server/FileDiscoveryOptions.h"
 
 
 using namespace std;

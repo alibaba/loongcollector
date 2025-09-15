@@ -166,8 +166,9 @@ void ContainerManager::sendConfigContainerInfo() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER);
-    
+    pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                   SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER);
+
     for (const auto& pair : mConfigContainerResultMap) {
         LogEvent* logEventPtr = pipelineEventGroup.AddLogEvent();
         time_t logtime = time(nullptr);
@@ -198,11 +199,12 @@ void ContainerManager::sendConfigContainerInfo() {
     mConfigContainerResultMap.clear();
 
     if (pipelineEventGroup.GetEvents().size() > 0) {
-        ProcessorRunner::GetInstance()->PushQueue(
-            mConfigContainerInfoPipelineCtx->GetProcessQueueKey(), mConfigContainerInfoInputIndex, std::move(pipelineEventGroup));
+        ProcessorRunner::GetInstance()->PushQueue(mConfigContainerInfoPipelineCtx->GetProcessQueueKey(),
+                                                  mConfigContainerInfoInputIndex,
+                                                  std::move(pipelineEventGroup));
     }
 }
-    
+
 
 bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx) {
@@ -229,7 +231,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
 
     // Update the config's container update time when there are changes
     options->SetLastContainerUpdateTime(time(nullptr));
-    
+
     if (diff.IsEmpty()) {
         return false;
     }
@@ -309,10 +311,9 @@ void ContainerManager::refreshAllContainersSnapshot() {
 }
 
 
-ContainerConfigResult ContainerManager::CreateContainerConfigResult(
-    const FileDiscoveryOptions* options,
-    const CollectionPipelineContext* ctx,
-    const std::vector<std::string>& containerIDs) {
+ContainerConfigResult ContainerManager::CreateContainerConfigResult(const FileDiscoveryOptions* options,
+                                                                    const CollectionPipelineContext* ctx,
+                                                                    const std::vector<std::string>& containerIDs) {
     ContainerConfigResult result;
 
     if (!options || !ctx) {
@@ -346,8 +347,8 @@ ContainerConfigResult ContainerManager::CreateContainerConfigResult(
     }
 
     // Source and type information
-    result.SourceAddress = "stdout";  // Similar to input_docker_stdout
-    result.InputType = "input_docker_stdout";  // Plugin name
+    result.SourceAddress = "stdout"; // Similar to input_docker_stdout
+    result.InputType = "input_docker_stdout"; // Plugin name
     result.FlusherType = "flusher_sls";
     result.FlusherTargetAddress = ctx->GetProjectName() + "/" + ctx->GetLogstoreName();
 
@@ -462,7 +463,6 @@ void ContainerManager::computeMatchedContainersDiff(
     const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
     const ContainerFilters& filters,
     ContainerDiff& diff) {
-    
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
         if (mContainerMap.find(*it) == mContainerMap.end()) {

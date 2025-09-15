@@ -17,7 +17,6 @@
 #include "monitor/SelfMonitorServer.h"
 
 #include "MetricConstants.h"
-#include "Monitor.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
