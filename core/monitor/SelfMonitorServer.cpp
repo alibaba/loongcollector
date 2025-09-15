@@ -18,6 +18,7 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "monitor/TaskStatusManager.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -26,6 +27,7 @@ namespace logtail {
 
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
@@ -199,6 +201,28 @@ void SelfMonitorServer::SendAlarms() {
     // INTERNAL_DATA_TYPE:__alarm__
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
+
+    ReadLock lock(mAlarmPipelineMux);
+    if (mAlarmPipelineCtx == nullptr) {
+        return;
+    }
+
+    for (auto& pipelineEventGroup : pipelineEventGroupList) {
+        if (pipelineEventGroup.GetEvents().size() > 0) {
+            ProcessorRunner::GetInstance()->PushQueue(
+                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
+        }
+    }
+}
+
+void SelfMonitorServer::SendTaskStatus() {
+    // metadata:
+    // INTERNAL_DATA_TARGET_REGION:${region}
+    // INTERNAL_DATA_TYPE:__task_status__
+    // tags:
+    // LOG_RESERVED_KEY_TASK_TYPE:${taskType}
+    vector<PipelineEventGroup> pipelineEventGroupList;
+    TaskStatusManager::GetInstance()->FlushTaskStatus(pipelineEventGroupList);
 
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {

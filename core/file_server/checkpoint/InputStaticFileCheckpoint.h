@@ -46,6 +46,7 @@ public:
 
     bool Serialize(std::string* res) const;
     bool Deserialize(const std::string& str, std::string* errMsg);
+    bool SerializeToLogEvents() const;
 
     const std::string& GetConfigName() const { return mConfigName; }
     size_t GetInputIndex() const { return mInputIdx; }

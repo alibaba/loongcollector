@@ -16,7 +16,12 @@
 
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
+#include "monitor/TaskStatusManager.h"
+#include "monitor/profile_sender/ProfileSender.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
+#include "provider/Provider.h"
 
 using namespace std;
 
@@ -339,6 +344,73 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
                 return false;
         }
         mFileCheckpoints.emplace_back(std::move(cpt));
+    }
+    return true;
+}
+
+bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
+    string project;
+    string region;
+    size_t prefixPos = mConfigName.find("##1.0##");
+    if (prefixPos != string::npos) {
+        size_t dollarPos = mConfigName.find('$', prefixPos + 7);
+        if (dollarPos != string::npos) {
+            project = mConfigName.substr(prefixPos + 7, dollarPos - prefixPos - 7);
+            region = FlusherSLS::GetProjectRegion(project);
+        }
+    }
+    if (region.empty()) {
+        region = ProfileSender::GetInstance()->GetDefaultProfileRegion();
+    }
+
+    auto now = GetCurrentLogtailTime();
+    auto timestamp = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
+    for (const auto& cpt : mFileCheckpoints) {
+        LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(TASK_TYPE_STATIC_FILE, region);
+        if (!logEvent) {
+            continue;
+        }
+        logEvent->SetTimestamp(timestamp);
+        // task info
+        logEvent->SetContent("config_name", mConfigName);
+        logEvent->SetContent("input_idx", ToString(mInputIdx));
+        logEvent->SetContent("file_count", ToString(mFileCheckpoints.size()));
+        logEvent->SetContent("status", StaticFileReadingStatusToString(mStatus));
+        if (mStatus == StaticFileReadingStatus::RUNNING) {
+            logEvent->SetContent("current_file_index", ToString(mCurrentFileIndex));
+        }
+        // file info
+        logEvent->SetContent("filepath", cpt.mFilePath.string());
+        logEvent->SetContent("status", FileStatusToString(cpt.mStatus));
+        switch (cpt.mStatus) {
+            case FileStatus::WAITING:
+                logEvent->SetContent("dev", ToString(cpt.mDevInode.dev));
+                logEvent->SetContent("inode", ToString(cpt.mDevInode.inode));
+                logEvent->SetContent("sig_hash", ToString(cpt.mSignatureHash));
+                logEvent->SetContent("sig_size", ToString(cpt.mSignatureSize));
+                break;
+            case FileStatus::READING:
+                logEvent->SetContent("dev", ToString(cpt.mDevInode.dev));
+                logEvent->SetContent("inode", ToString(cpt.mDevInode.inode));
+                logEvent->SetContent("sig_hash", ToString(cpt.mSignatureHash));
+                logEvent->SetContent("sig_size", ToString(cpt.mSignatureSize));
+                logEvent->SetContent("size", ToString(cpt.mSize));
+                logEvent->SetContent("offset", ToString(cpt.mOffset));
+                logEvent->SetContent("start_time", ToString(cpt.mStartTime));
+                logEvent->SetContent("last_read_time", ToString(cpt.mLastUpdateTime));
+                break;
+            case FileStatus::FINISHED:
+                logEvent->SetContent("size", ToString(cpt.mSize));
+                logEvent->SetContent("start_time", ToString(cpt.mStartTime));
+                logEvent->SetContent("finish_time", ToString(cpt.mLastUpdateTime));
+                break;
+            case FileStatus::ABORT:
+                logEvent->SetContent("abort_time", ToString(cpt.mLastUpdateTime));
+                break;
+            default:
+                // should not happen
+                break;
+        }
     }
     return true;
 }

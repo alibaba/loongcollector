@@ -76,5 +76,6 @@ const string LOG_RESERVED_KEY_SOURCE = "__source__";
 const string LOG_RESERVED_KEY_TOPIC = "__topic__";
 const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
 const string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
+const string LOG_RESERVED_KEY_TASK_TYPE = "__task_type__";
 
 } // namespace logtail

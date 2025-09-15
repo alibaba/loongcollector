@@ -38,8 +38,11 @@ public:
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
+    void SendTaskStatus(); // use Alarm pipeline to send task status immediately in enterprise version
+
     static const std::string INTERNAL_DATA_TYPE_ALARM;
     static const std::string INTERNAL_DATA_TYPE_METRIC;
+    static const std::string INTERNAL_DATA_TYPE_TASK_STATUS;
 
 private:
     SelfMonitorServer();

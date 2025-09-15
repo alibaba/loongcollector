@@ -14,6 +14,7 @@
 
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 
+#include "SelfMonitorServer.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
@@ -234,6 +235,8 @@ void InputStaticFileCheckpointManager::DumpAllCheckpointFiles() const {
             LOG_WARNING(sLogger,
                         ("failed to dump checkpoint file, config",
                          item.second.GetConfigName())("input idx", item.second.GetInputIndex()));
+        } else {
+            SelfMonitorServer::GetInstance()->SendTaskStatus();
         }
     }
 }
@@ -332,6 +335,12 @@ bool InputStaticFileCheckpointManager::DumpCheckpointFile(const InputStaticFileC
         // should not happen
         return false;
     }
+
+    if (!cpt.SerializeToLogEvents()) {
+        // should not happen
+        return false;
+    }
+
     string errMsg;
     return UpdateFileContent(
         mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex()), res, errMsg);
