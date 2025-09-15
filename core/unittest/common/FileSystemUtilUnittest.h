@@ -491,10 +491,10 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     }
 
     std::string content;
-    FileReadResult ret = ReadFileContent((mTestRoot / "not—exist-file").string(), content);
+    FileReadResult ret = ReadFileContent((mTestRoot / "not—exist-file").string(), content, kDefaultMaxFileSize);
     EXPECT_EQ(FileReadResult::kError, ret);
 
-    ret = ReadFileContent(filePath, content);
+    ret = ReadFileContent(filePath, content, kDefaultMaxFileSize);
 
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_EQ(1024 * 1024UL, content.size());
@@ -508,12 +508,12 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
         }
     }
 
-    ret = ReadFileContent(filePath, content);
+    ret = ReadFileContent(filePath, content, kDefaultMaxFileSize);
     EXPECT_EQ(FileReadResult::kTruncated, ret);
     EXPECT_EQ(1024 * 1024UL, content.size());
 
 #if defined(__linux__)
-    ret = ReadFileContent("/proc/self/cgroup", content);
+    ret = ReadFileContent("/proc/self/cgroup", content, kDefaultMaxFileSize);
     EXPECT_EQ(FileReadResult::kOK, ret);
     EXPECT_GT(content.size(), 0UL);
 #endif

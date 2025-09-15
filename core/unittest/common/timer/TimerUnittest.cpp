@@ -34,6 +34,7 @@ class TimerUnittest : public ::testing::Test {
 public:
     void TestPushEvent();
     void TestPeriodicEvent();
+    void TestGetTimeStamp();
 
 private:
     std::vector<int> mVec;
@@ -57,7 +58,6 @@ void TimerUnittest::TestPushEvent() {
 }
 
 UNIT_TEST_CASE(TimerUnittest, TestPushEvent)
-
 
 } // namespace logtail
 

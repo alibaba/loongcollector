@@ -17,6 +17,46 @@ import (
 )
 
 const slsName = "sls"
+
+const SLSFlusherConfigForAPMGateway = `
+flushers:
+  - Type: flusher_sls
+    Aliuid: "{{.Aliuid}}"
+    TelemetryType: "arms_traces"
+    Region: {{.Region}}
+    Endpoint: {{.Endpoint}}
+    Project: {{.APMProject}}
+    Workspace: {{.APMWorkspace}}
+    Logstore: "{{.APMTraceLogstore}}"
+    Match:
+      Type: tag
+      Key: data_type
+      Value: trace
+  - Type: flusher_sls
+    Aliuid: "{{.Aliuid}}"
+    TelemetryType: "arms_metrics"
+    Region: {{.Region}}
+    Endpoint: {{.Endpoint}}
+    Project: {{.APMProject}}
+    Workspace: {{.APMWorkspace}}
+    Logstore: "{{.APMMetricLogstore}}"
+    Match:
+      Type: tag
+      Key: data_type
+      Value: metric
+  - Type: flusher_sls
+    Aliuid: "{{.Aliuid}}"
+    TelemetryType: "logs"
+    Region: {{.Region}}
+    Endpoint: {{.Endpoint}}
+    Project: {{.Project}}
+    Logstore: "{{.Logstore}}"
+    Match:
+      Type: tag
+      Key: data_type
+      Value: log
+`
+
 const SLSFlusherConfigTemplate = `
 flushers:
   - Type: flusher_sls
@@ -28,14 +68,19 @@ flushers:
     Logstore: {{.Logstore}}`
 
 type SLSSubscriber struct {
-	client        *sls.Client
-	TelemetryType string
-	Aliuid        string
-	Region        string
-	Endpoint      string
-	QueryEndpoint string
-	Project       string
-	Logstore      string
+	client            *sls.Client
+	TelemetryType     string
+	Aliuid            string
+	Region            string
+	Endpoint          string
+	QueryEndpoint     string
+	Project           string
+	Logstore          string
+	Scenario          string
+	APMProject        string
+	APMWorkspace      string
+	APMTraceLogstore  string
+	APMMetricLogstore string
 }
 
 func (s *SLSSubscriber) Name() string {
@@ -70,14 +115,21 @@ func (s *SLSSubscriber) GetData(query string, startTime int32) ([]*protocol.LogG
 
 func (s *SLSSubscriber) FlusherConfig() string {
 	tpl := template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigTemplate))
+	if s.Scenario == "apm" {
+		tpl = template.Must(template.New("slsFlusherConfig").Parse(SLSFlusherConfigForAPMGateway))
+	}
 	var builder strings.Builder
 	_ = tpl.Execute(&builder, map[string]interface{}{
-		"Aliuid":        s.Aliuid,
-		"Region":        s.Region,
-		"Endpoint":      s.Endpoint,
-		"Project":       s.Project,
-		"Logstore":      s.Logstore,
-		"TelemetryType": s.TelemetryType,
+		"Aliuid":            s.Aliuid,
+		"Region":            s.Region,
+		"Endpoint":          s.Endpoint,
+		"Project":           s.Project,
+		"Logstore":          s.Logstore,
+		"TelemetryType":     s.TelemetryType,
+		"APMProject":        s.APMProject,
+		"APMTraceLogstore":  s.APMTraceLogstore,
+		"APMMetricLogstore": s.APMMetricLogstore,
+		"APMWorkspace":      s.APMWorkspace,
 	})
 	config := builder.String()
 	return config
@@ -210,6 +262,8 @@ func (s *SLSSubscriber) getCompleteQuery(query string) string {
 	switch s.TelemetryType {
 	case "logs":
 		return query
+	case "arms_metrics":
+		fallthrough
 	case "metrics":
 		return fmt.Sprintf("* | select promql_query_range('%s') from metrics limit 10000", query)
 	case "traces":
@@ -287,6 +341,21 @@ func init() {
 			l.Logstore = v.(string)
 		} else {
 			l.Logstore = config.TestConfig.GetLogstore(l.TelemetryType)
+		}
+		if v, ok := spec["scenario"]; ok {
+			l.Scenario = v.(string)
+		}
+		if v, ok := spec["apm_project"]; ok {
+			l.APMProject = v.(string)
+		}
+		if v, ok := spec["apm_workspace"]; ok {
+			l.APMWorkspace = v.(string)
+		}
+		if v, ok := spec["apm_trace_logstore"]; ok {
+			l.APMTraceLogstore = v.(string)
+		}
+		if v, ok := spec["apm_metric_logstore"]; ok {
+			l.APMMetricLogstore = v.(string)
 		}
 		l.client = createSLSClient(config.TestConfig.AccessKeyID, config.TestConfig.AccessKeySecret, l.QueryEndpoint)
 		return l, nil

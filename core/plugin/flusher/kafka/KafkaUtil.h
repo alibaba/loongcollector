@@ -1,11 +1,11 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,13 +16,27 @@
 
 #pragma once
 
-#include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
+
 namespace logtail {
 
-bool GetHostSystemStatWithPath(std::vector<std::string>& lines,
-                               std::string& errorMessage,
-                               std::filesystem::path PROC_DIR);
+class KafkaUtil {
+public:
+    static std::string BrokersToString(const std::vector<std::string>& brokers);
+
+    struct Version {
+        int major = 0;
+        int minor = 0;
+        int patch = 0;
+        int build = 0;
+    };
+
+    static bool ParseKafkaVersion(const std::string& in, Version& out);
+
+    static void DeriveApiVersionConfigs(const std::string& userKafkaVersion,
+                                        std::map<std::string, std::string>& outConfigs);
+};
 
 } // namespace logtail

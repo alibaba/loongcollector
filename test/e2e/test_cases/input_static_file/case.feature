@@ -3,19 +3,20 @@ Feature: input static file
   Test input static file
 
   @e2e @docker-compose
-  Scenario: TestInputStaticFile
+  Scenario: TestInputStaticFileBasic
     Given {docker-compose} environment
     Given subcribe data from {grpc} with config
     """
     """
-    Given {input-static-file-case} local config as below
+    Given {input-static-file-basic-case} onetime pipeline local config as below
     """
     enable: true
     global:
+      ExcutionTimeout: 600
       UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
-      - Type: input_file
+      - Type: input_static_file_onetime
         FilePaths: 
           - "/root/test/**/a*.log"
         MaxDirSearchDepth: 10

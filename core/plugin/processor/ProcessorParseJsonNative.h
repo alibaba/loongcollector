@@ -33,6 +33,9 @@ public:
     std::string mSourceKey;
     CommonParserOptions mCommonParserOptions;
 
+    // Flag to indicate which JSON parser implementation to use at runtime
+    bool mUseSimdJson = false;
+
 protected:
     bool IsSupportedEvent(const PipelineEventPtr& e) const override;
 
@@ -41,6 +44,14 @@ private:
                            const StringView& logPath,
                            PipelineEventPtr& e,
                            bool& sourceKeyOverwritten);
+    bool JsonLogLineParserSimdJson(LogEvent& sourceEvent,
+                                   const StringView& logPath,
+                                   PipelineEventPtr& e,
+                                   bool& sourceKeyOverwritten);
+    bool JsonLogLineParserRapidJson(LogEvent& sourceEvent,
+                                    const StringView& logPath,
+                                    PipelineEventPtr& e,
+                                    bool& sourceKeyOverwritten);
     void AddLog(const StringView& key, const StringView& value, LogEvent& targetEvent, bool overwritten = true);
     bool ProcessEvent(const StringView& logPath, PipelineEventPtr& e, const GroupMetadata& metadata);
 

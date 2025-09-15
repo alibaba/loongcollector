@@ -36,6 +36,12 @@ target_link_libraries(metric_calculate_unittest ${UT_BASE_TARGET})
 add_executable(system_interface_unittest SystemInterfaceUnittest.cpp)
 target_link_libraries(system_interface_unittest ${UT_BASE_TARGET})
 
+add_executable(fast_field_parser_unittest FastFieldParserUnittest.cpp)
+target_link_libraries(fast_field_parser_unittest ${UT_BASE_TARGET})
+
+# add_executable(fast_field_parser_benchmark FastFieldParserBenchmark.cpp)
+# target_link_libraries(fast_field_parser_benchmark ${UT_BASE_TARGET})
+
 if (LINUX)
     add_executable(linux_system_interface_unittest LinuxSystemInterfaceUnittest.cpp)
     target_link_libraries(linux_system_interface_unittest ${UT_BASE_TARGET})
@@ -62,3 +68,5 @@ gtest_discover_tests(mem_collector_unittest)
 gtest_discover_tests(disk_collector_unittest)
 gtest_discover_tests(process_collector_unittest)
 gtest_discover_tests(net_collector_unittest)
+gtest_discover_tests(fast_field_parser_unittest)
+# gtest_discover_tests(fast_field_parser_benchmark)
