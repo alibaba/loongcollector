@@ -33,12 +33,20 @@ class FileDiscoveryOptions;
 struct FieldFilter {
     std::unordered_map<std::string, std::string> mFieldsMap;
     std::unordered_map<std::string, std::shared_ptr<boost::regex>> mFieldsRegMap;
+
+    bool IsEmpty() const {
+        return mFieldsMap.empty() && mFieldsRegMap.empty();
+    }
 };
 
 struct MatchCriteriaFilter {
     // 包含和排除的标签
     FieldFilter mIncludeFields;
     FieldFilter mExcludeFields;
+
+    bool IsEmpty() const {
+        return mIncludeFields.IsEmpty() && mExcludeFields.IsEmpty();
+    }
 };
 
 struct K8sFilter {
@@ -47,6 +55,10 @@ struct K8sFilter {
     std::shared_ptr<boost::regex> mContainerReg;
 
     MatchCriteriaFilter mK8sLabelFilter;
+
+    bool IsEmpty() const {
+        return mNamespaceReg == nullptr && mPodReg == nullptr && mContainerReg == nullptr && mK8sLabelFilter.IsEmpty();
+    }
 };
 
 struct ContainerFilterConfig {

@@ -41,7 +41,7 @@ struct K8sInfo {
     std::string mPod;
     std::string mContainerName;
     std::unordered_map<std::string, std::string> mLabels;
-    bool mPausedContainer;
+    bool mPausedContainer = false;
 };
 
 struct RawContainerInfo {

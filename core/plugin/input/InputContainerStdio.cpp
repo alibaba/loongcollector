@@ -70,7 +70,7 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
         optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
     mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
     mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
-    mFileDiscovery.SetContainerDiscoveryOptions(containerDiscovery);
+    mFileDiscovery.SetContainerDiscoveryOptions(std::move(containerDiscovery));
 
     if (!mFileReader.Init(config, *mContext, sName)) {
         return false;

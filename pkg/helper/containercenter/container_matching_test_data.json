@@ -1,0 +1,398 @@
+{
+    "containers": [
+        {
+            "id": "container1",
+            "labels": {
+                "app": "nginx",
+                "tier": "frontend",
+                "version": "1.0"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "TIER=frontend",
+                "VERSION=1.0"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-pod-123",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx",
+                    "app.kubernetes.io/version": "1.0"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container2",
+            "labels": {
+                "app": "redis",
+                "tier": "backend",
+                "version": "2.0"
+            },
+            "env": [
+                "APP_NAME=redis",
+                "TIER=backend",
+                "VERSION=2.0"
+            ],
+            "k8s": {
+                "namespace": "production",
+                "pod": "redis-pod-456",
+                "container_name": "redis",
+                "labels": {
+                    "app.kubernetes.io/name": "redis",
+                    "app.kubernetes.io/version": "2.0"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container3",
+            "labels": {
+                "app": "mysql",
+                "tier": "database",
+                "version": "3.0"
+            },
+            "env": [
+                "APP_NAME=mysql",
+                "TIER=database",
+                "VERSION=3.0"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "mysql-pod-789",
+                "container_name": "mysql",
+                "labels": {
+                    "app.kubernetes.io/name": "mysql",
+                    "app.kubernetes.io/version": "3.0"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container4",
+            "labels": {
+                "app": "nginx",
+                "tier": "frontend",
+                "version": "1.1"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "TIER=frontend",
+                "VERSION=1.1"
+            ],
+            "k8s": {
+                "namespace": "staging",
+                "pod": "nginx-pod-staging",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx",
+                    "app.kubernetes.io/version": "1.1"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container5",
+            "labels": {
+                "app": "paused-app",
+                "tier": "frontend"
+            },
+            "env": [
+                "APP_NAME=paused-app",
+                "TIER=frontend"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "paused-pod",
+                "container_name": "paused-container",
+                "labels": {
+                    "app.kubernetes.io/name": "paused-app"
+                },
+                "paused_container": true
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "empty_filters",
+            "description": "Empty filters should match all containers",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container2",
+                "container3",
+                "container4",
+                "container5"
+            ]
+        },
+        {
+            "name": "container_label_include_exact",
+            "description": "Include containers with app=nginx label",
+            "filters": {
+                "container_labels": {
+                    "include": {
+                        "static": {
+                            "app": "nginx"
+                        }
+                    }
+                },
+                "env": {},
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container4"
+            ]
+        },
+        {
+            "name": "container_label_exclude_exact",
+            "description": "Exclude containers with tier=frontend label",
+            "filters": {
+                "container_labels": {
+                    "exclude": {
+                        "static": {
+                            "tier": "frontend"
+                        }
+                    }
+                },
+                "env": {},
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container2",
+                "container3"
+            ]
+        },
+        {
+            "name": "container_label_include_regex",
+            "description": "Include containers with version matching regex ^1\\.",
+            "filters": {
+                "container_labels": {
+                    "include": {
+                        "regex": {
+                            "version": "^1.*$"
+                        }
+                    }
+                },
+                "env": {},
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container4"
+            ]
+        },
+        {
+            "name": "env_include_exact",
+            "description": "Include containers with APP_NAME=redis env",
+            "filters": {
+                "container_labels": {},
+                "env": {
+                    "include": {
+                        "static": {
+                            "APP_NAME": "redis"
+                        }
+                    }
+                },
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container2"
+            ]
+        },
+        {
+            "name": "env_exclude_regex",
+            "description": "Exclude containers with VERSION matching regex ^3\\.",
+            "filters": {
+                "container_labels": {},
+                "env": {
+                    "exclude": {
+                        "regex": {
+                            "VERSION": "^3.*$"
+                        }
+                    }
+                },
+                "k8s": {}
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container2",
+                "container4",
+                "container5"
+            ]
+        },
+        {
+            "name": "k8s_namespace_regex",
+            "description": "Include containers with namespace matching ^def.*",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "namespace_regex": "^def.*"
+                }
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container3"
+            ]
+        },
+        {
+            "name": "k8s_pod_regex",
+            "description": "Include containers with pod matching .*123$",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "pod_regex": ".*123$"
+                }
+            },
+            "expected_matched_ids": [
+                "container1"
+            ]
+        },
+        {
+            "name": "k8s_container_regex",
+            "description": "Include containers with container name matching ^ng.*",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "container_regex": "^ng.*"
+                }
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container4"
+            ]
+        },
+        {
+            "name": "k8s_labels_include",
+            "description": "Include containers with K8S label app.kubernetes.io/version=1.0",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "labels": {
+                        "include": {
+                            "static": {
+                                "app.kubernetes.io/version": "1.0"
+                            }
+                        }
+                    }
+                }
+            },
+            "expected_matched_ids": [
+                "container1"
+            ]
+        },
+        {
+            "name": "k8s_labels_exclude_regex",
+            "description": "Exclude containers with K8S label app.kubernetes.io/version matching ^1\\.",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "labels": {
+                        "exclude": {
+                            "regex": {
+                                "app.kubernetes.io/version": "^1.*"
+                            }
+                        }
+                    }
+                }
+            },
+            "expected_matched_ids": [
+                "container2",
+                "container3"
+            ]
+        },
+        {
+            "name": "paused_container_filter",
+            "description": "Paused containers should not match any K8S filters",
+            "filters": {
+                "container_labels": {},
+                "env": {},
+                "k8s": {
+                    "namespace_regex": ".*"
+                }
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container2",
+                "container3",
+                "container4"
+            ]
+        },
+        {
+            "name": "combined_filters",
+            "description": "Combined filters: container label app=nginx AND env TIER=frontend AND K8S namespace=default",
+            "filters": {
+                "container_labels": {
+                    "include": {
+                        "static": {
+                            "app": "nginx"
+                        }
+                    }
+                },
+                "env": {
+                    "include": {
+                        "static": {
+                            "TIER": "frontend"
+                        }
+                    }
+                },
+                "k8s": {
+                    "namespace_regex": "^default$"
+                }
+            },
+            "expected_matched_ids": [
+                "container1"
+            ]
+        },
+        {
+            "name": "complex_combined_filters",
+            "description": "Complex combined filters with regex and exclude",
+            "filters": {
+                "container_labels": {
+                    "include": {
+                        "regex": {
+                            "version": "^[12].*"
+                        }
+                    },
+                    "exclude": {
+                        "static": {
+                            "tier": "database"
+                        }
+                    }
+                },
+                "env": {
+                    "include": {
+                        "regex": {
+                            "VERSION": "^[12].*"
+                        }
+                    }
+                },
+                "k8s": {
+                    "namespace_regex": ".*",
+                    "labels": {
+                        "include": {
+                            "regex": {
+                                "app.kubernetes.io/version": "^[12].*"
+                            }
+                        }
+                    }
+                }
+            },
+            "expected_matched_ids": [
+                "container1",
+                "container2",
+                "container4"
+            ]
+        }
+    ]
+}

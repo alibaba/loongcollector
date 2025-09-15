@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <boost/regex.hpp>
+#include <fstream>
 #include <memory>
 #include <set>
 #include <string>
@@ -21,7 +22,9 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+#include "json/json.h"
 
+#include "common/JsonUtil.h"
 #include "container_manager/ContainerManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -40,6 +43,10 @@ public:
     void TestLoadContainerInfoFromContainersFormat() const;
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
+    void TestContainerMatchingConsistency() const;
+
+private:
+    void parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const;
 };
 
 void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
@@ -127,7 +134,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        }
     }
 
     {
@@ -142,7 +151,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "1234");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "1234");
+        }
     }
 
     {
@@ -156,7 +167,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "1234");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "1234");
+        }
     }
 
     {
@@ -170,7 +183,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        }
     }
 
     {
@@ -203,7 +218,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "123");
+        }
     }
 
     {
@@ -231,7 +248,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff1);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff1.mAdded.size(), 1);
-        EXPECT_EQ(diff1.mAdded[0]->mID, "k8s1");
+        if (diff1.mAdded.size() > 0) {
+            EXPECT_EQ(diff1.mAdded[0]->mID, "k8s1");
+        }
 
         // exclude label
         matchList.clear();
@@ -242,7 +261,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, diff2);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
-        EXPECT_EQ(diff2.mAdded[0]->mID, "k8s1");
+        if (diff2.mAdded.size() > 0) {
+            EXPECT_EQ(diff2.mAdded[0]->mID, "k8s1");
+        }
 
         // include regex
         matchList.clear();
@@ -253,7 +274,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerDiff diff3;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
-        EXPECT_EQ(diff3.mAdded[0]->mID, "k8s1");
+        if (diff3.mAdded.size() > 0) {
+            EXPECT_EQ(diff3.mAdded[0]->mID, "k8s1");
+        }
     }
 
     {
@@ -280,7 +303,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerDiff diff1;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff1);
         EXPECT_EQ(diff1.mAdded.size(), 1);
-        EXPECT_EQ(diff1.mAdded[0]->mID, "cl1");
+        if (diff1.mAdded.size() > 0) {
+            EXPECT_EQ(diff1.mAdded[0]->mID, "cl1");
+        }
 
         // exclude map
         matchList.clear();
@@ -290,7 +315,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerDiff diff2;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, diff2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
-        EXPECT_EQ(diff2.mAdded[0]->mID, "cl2");
+        if (diff2.mAdded.size() > 0) {
+            EXPECT_EQ(diff2.mAdded[0]->mID, "cl2");
+        }
 
         // include regex
         matchList.clear();
@@ -300,7 +327,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerDiff diff3;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
-        EXPECT_EQ(diff3.mAdded[0]->mID, "cl1");
+        if (diff3.mAdded.size() > 0) {
+            EXPECT_EQ(diff3.mAdded[0]->mID, "cl1");
+        }
 
         // exclude regex
         matchList.clear();
@@ -352,7 +381,9 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
-        EXPECT_EQ(diff.mAdded[0]->mID, "combo1");
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "combo1");
+        }
     }
 }
 
@@ -676,6 +707,206 @@ void ContainerManagerUnittest::TestSaveContainerInfoWithVersion() const {
 }
 
 
+void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
+    // This test loads the shared test data and verifies that the C++ implementation
+    // produces the same results as the Go implementation for container matching logic.
+
+    // Load test data from JSON file
+    std::string filePath = "../../../pkg/helper/containercenter/container_matching_test_data.json";
+    std::cout << "Looking for test data file at: " << filePath << std::endl;
+    std::ifstream file(filePath);
+    if (!file.is_open()) {
+        // If file doesn't exist, skip the test
+        std::cout << "Test data file not found at: " << filePath << ", skipping consistency test" << std::endl;
+        // Try absolute path as fallback
+        std::string absPath = "/workspaces/ilogtail/pkg/helper/containercenter/container_matching_test_data.json";
+        std::cout << "Trying absolute path: " << absPath << std::endl;
+        std::ifstream absFile(absPath);
+        if (absFile.is_open()) {
+            std::cout << "Found file with absolute path, using it" << std::endl;
+            file = std::move(absFile);
+            filePath = absPath;
+        } else {
+            std::cout << "Absolute path also failed, skipping consistency test" << std::endl;
+            return;
+        }
+    }
+
+    Json::Value root;
+    Json::CharReaderBuilder reader;
+    std::string errs;
+    if (!Json::parseFromStream(reader, file, &root, &errs)) {
+        FAIL() << "Failed to parse test data JSON: " << errs;
+    }
+
+    // Parse containers
+    ContainerManager containerManager;
+    const Json::Value& containers = root["containers"];
+    for (const auto& containerJson : containers) {
+        RawContainerInfo containerInfo;
+        containerInfo.mID = containerJson["id"].asString();
+
+        // Parse container labels
+        const Json::Value& labels = containerJson["labels"];
+        for (const auto& labelKey : labels.getMemberNames()) {
+            containerInfo.mContainerLabels[labelKey] = labels[labelKey].asString();
+        }
+
+        // Parse environment variables
+        const Json::Value& envArray = containerJson["env"];
+        for (const auto& envStr : envArray) {
+            std::string env = envStr.asString();
+            size_t equalPos = env.find('=');
+            if (equalPos != std::string::npos) {
+                std::string key = env.substr(0, equalPos);
+                std::string value = env.substr(equalPos + 1);
+                containerInfo.mEnv[key] = value;
+            }
+        }
+
+        // Parse K8S info
+        const Json::Value& k8s = containerJson["k8s"];
+        containerInfo.mK8sInfo.mNamespace = k8s["namespace"].asString();
+        containerInfo.mK8sInfo.mPod = k8s["pod"].asString();
+        containerInfo.mK8sInfo.mContainerName = k8s["container_name"].asString();
+        containerInfo.mK8sInfo.mPausedContainer = k8s["paused_container"].asBool();
+
+        const Json::Value& k8sLabels = k8s["labels"];
+        for (const auto& labelKey : k8sLabels.getMemberNames()) {
+            containerInfo.mK8sInfo.mLabels[labelKey] = k8sLabels[labelKey].asString();
+        }
+
+        containerManager.mContainerMap[containerInfo.mID] = std::make_shared<RawContainerInfo>(containerInfo);
+    }
+
+    // Run test cases
+    const Json::Value& testCases = root["test_cases"];
+    for (const auto& testCase : testCases) {
+        std::string testName = testCase["name"].asString();
+        std::string description = testCase["description"].asString();
+
+        // Parse filters
+        ContainerFilters filters;
+        const Json::Value& filterJson = testCase["filters"];
+
+        // Container labels
+        parseLabelFilters(filterJson["container_labels"], filters.mContainerLabelFilter);
+
+        // Environment variables
+        parseLabelFilters(filterJson["env"], filters.mEnvFilter);
+
+        // K8S filters
+        const Json::Value& k8sFilters = filterJson["k8s"];
+        if (!k8sFilters["namespace_regex"].asString().empty()) {
+            try {
+                filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(k8sFilters["namespace_regex"].asString());
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing regex: " << e.what() << std::endl;
+                FAIL() << "Error parsing regex: " << e.what();
+            }
+        }
+        if (!k8sFilters["pod_regex"].asString().empty()) {
+            try {
+                filters.mK8SFilter.mPodReg = std::make_shared<boost::regex>(k8sFilters["pod_regex"].asString());
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing regex: " << e.what() << std::endl;
+                FAIL() << "Error parsing regex: " << e.what();
+            }
+        }
+        if (!k8sFilters["container_regex"].asString().empty()) {
+            try {
+                filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>(k8sFilters["container_regex"].asString());
+            } catch (const std::exception& e) {
+                std::cout << "Error parsing regex: " << e.what() << std::endl;
+                FAIL() << "Error parsing regex: " << e.what();
+            }
+        }
+        parseLabelFilters(k8sFilters["labels"], filters.mK8SFilter.mK8sLabelFilter);
+
+        // Parse expected results
+        std::set<std::string> expectedMatchedIDs;
+        const Json::Value& expectedArray = testCase["expected_matched_ids"];
+        for (const auto& expectedId : expectedArray) {
+            expectedMatchedIDs.insert(expectedId.asString());
+        }
+
+        // Run the matching logic
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
+
+        // Collect actual matched IDs
+        std::set<std::string> actualMatchedIDs;
+        for (const auto& container : diff.mAdded) {
+            actualMatchedIDs.insert(container->mID);
+        }
+
+        // Verify results
+        std::string errorMsg = "Test case '" + testName + "' (" + description + ") failed. ";
+        errorMsg += "Expected: [";
+        for (const auto& id : expectedMatchedIDs) {
+            errorMsg += id + ",";
+        }
+        errorMsg += "] Got: [";
+        for (const auto& id : actualMatchedIDs) {
+            errorMsg += id + ",";
+        }
+        errorMsg += "]";
+
+        EXPECT_EQ(actualMatchedIDs, expectedMatchedIDs) << errorMsg;
+    }
+}
+
+void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {
+    // Clear existing filters to ensure clean state
+    filter.mIncludeFields.mFieldsMap.clear();
+    filter.mIncludeFields.mFieldsRegMap.clear();
+    filter.mExcludeFields.mFieldsMap.clear();
+    filter.mExcludeFields.mFieldsRegMap.clear();
+
+    // Include filters
+    const Json::Value& includeJson = filtersJson["include"];
+
+    // Static include
+    const Json::Value& staticInclude = includeJson["static"];
+    for (const auto& key : staticInclude.getMemberNames()) {
+        filter.mIncludeFields.mFieldsMap[key] = staticInclude[key].asString();
+    }
+
+    // Regex include
+    const Json::Value& regexInclude = includeJson["regex"];
+    for (const auto& key : regexInclude.getMemberNames()) {
+        try {
+            filter.mIncludeFields.mFieldsRegMap[key] = std::make_shared<boost::regex>(regexInclude[key].asString());
+        } catch (const std::exception& e) {
+            std::cout << "Error parsing regex: " << e.what() << std::endl;
+            FAIL() << "Error parsing regex: " << e.what();
+        }
+    }
+
+    // Exclude filters
+    const Json::Value& excludeJson = filtersJson["exclude"];
+
+    // Static exclude
+    const Json::Value& staticExclude = excludeJson["static"];
+    for (const auto& key : staticExclude.getMemberNames()) {
+        filter.mExcludeFields.mFieldsMap[key] = staticExclude[key].asString();
+    }
+
+    // Regex exclude
+    const Json::Value& regexExclude = excludeJson["regex"];
+    for (const auto& key : regexExclude.getMemberNames()) {
+        try {
+            filter.mExcludeFields.mFieldsRegMap[key] = std::make_shared<boost::regex>(regexExclude[key].asString());
+        } catch (const std::exception& e) {
+            std::cout << "Error parsing regex: " << e.what() << std::endl;
+            FAIL() << "Error parsing regex: " << e.what();
+        }
+    }
+}
+
 UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiff)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestrefreshAllContainersSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestincrementallyUpdateContainersSnapshot)
@@ -684,6 +915,7 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormat)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersFormat)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
 
 } // namespace logtail
 

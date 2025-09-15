@@ -440,6 +440,14 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
 
 
 bool IsK8sFilterMatch(const K8sFilter& filter, const K8sInfo& k8sInfo) {
+    if (filter.IsEmpty()) {
+        return true;
+    }
+
+    if (k8sInfo.mPausedContainer) {
+        return false;
+    }
+
     // 匹配命名空间
     if (filter.mNamespaceReg && !boost::regex_match(k8sInfo.mNamespace, *filter.mNamespaceReg)) {
         return false;
