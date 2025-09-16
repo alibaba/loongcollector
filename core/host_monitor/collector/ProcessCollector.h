@@ -43,7 +43,7 @@ public:
     const std::string& Name() const override { return sName; }
 
 public:
-    bool GetProcessTime(time_t now, pid_t pid, ProcessTime& output, bool includeCTime);
+    bool GetProcessTime(time_t now, pid_t pid, ProcessTime& output);
 
     bool ReadProcessStat(time_t now, pid_t pid, ProcessInformation& processInfo);
 
@@ -66,12 +66,11 @@ public:
     std::string GetExecutablePath(time_t now, pid_t pid);
 
 protected:
-    bool GetProcessCpuInformation(const CollectTime& collectTime,
-                                  pid_t pid,
-                                  ProcessCpuInformation& information,
-                                  bool includeCTime);
+    bool GetProcessCpuInformation(const CollectTime& collectTime, pid_t pid, ProcessCpuInformation& information);
 
-    bool GetProcessCpuInCache(pid_t pid, bool includeCTime);
+    bool GetProcessCpuInCache(pid_t pid);
+
+    void ClearProcessCpuTimeCache();
 
 private:
     std::vector<pid_t> pids;

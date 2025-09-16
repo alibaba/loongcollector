@@ -416,9 +416,8 @@ bool SystemInterface::SystemInformationCache<InfoT>::Set(InfoT& info) {
 
 std::string MacString(const unsigned char* mac) {
     std::string str;
-    if (mac != nullptr && sizeof(mac) >= 6) {
+    if (mac != nullptr) {
         str = fmt::format("{:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        // str = fmt::sprintf("%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
     return str;
 }

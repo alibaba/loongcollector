@@ -25,12 +25,13 @@ const (
 )
 
 var (
-	CaseHome      string
-	CaseName      string
-	EngineLogFile string
-	FlusherFile   string
-	ConfigDir     string
-	LogDir        string
+	CaseHome         string
+	CaseName         string
+	EngineLogFile    string
+	FlusherFile      string
+	ConfigDir        string
+	OnetimeConfigDir string
+	LogDir           string
 )
 
 // Load E2E engine config and define the global variables.

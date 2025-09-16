@@ -29,6 +29,7 @@
 #include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
+#include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
 
@@ -50,6 +51,9 @@ public:
     FileTagOptions mFileTag;
 
 private:
+    PluginMetricManagerPtr mPluginMetricManager;
+    IntGaugePtr mMonitorFileTotal;
+
     void GetValidBaseDirs(const std::filesystem::path& dir,
                           uint32_t depth,
                           std::vector<std::filesystem::path>& filepaths) const;

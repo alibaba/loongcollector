@@ -34,6 +34,7 @@
 #include "monitor/MetricManager.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputStaticFile.h"
 
 namespace logtail {
 

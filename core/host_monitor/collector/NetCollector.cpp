@@ -60,12 +60,14 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
 
+    std::vector<std::string> curDevNames; // 本次采集到的所有设备名
+
     // 更新记录ip
     for (auto& netInterface : netInterfaces.configs) {
         if (netInterface.name.empty()) {
             continue;
         }
-
+        curDevNames.push_back(netInterface.name);
         mDevIp[netInterface.name] = netInterface.address.str();
         if (mDevIp[netInterface.name].empty()) {
             mDevIp[netInterface.name] = netInterface.address6.str();
@@ -314,6 +316,34 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
 
     collectContext.mCount = 0;
     mLastTime = start;
+
+    // 清理掉mLastInterfaceMetrics中，curDevNames中不存在的设备名
+    for (auto it = mLastInterfaceMetrics.begin(); it != mLastInterfaceMetrics.end();) {
+        if (std::find(curDevNames.begin(), curDevNames.end(), it->first) == curDevNames.end()) {
+            it = mLastInterfaceMetrics.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // 清理掉mRatePerSecCalMap中，curDevNames中不存在的设备名
+    for (auto it = mRatePerSecCalMap.begin(); it != mRatePerSecCalMap.end();) {
+        if (std::find(curDevNames.begin(), curDevNames.end(), it->first) == curDevNames.end()) {
+            it = mRatePerSecCalMap.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // 清理掉mDevIp中，curDevNames中不存在的设备名
+    for (auto it = mDevIp.begin(); it != mDevIp.end();) {
+        if (std::find(curDevNames.begin(), curDevNames.end(), it->first) == curDevNames.end()) {
+            it = mDevIp.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
     return true;
 }
 

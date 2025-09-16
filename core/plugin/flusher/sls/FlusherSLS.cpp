@@ -688,6 +688,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 
     switch (mTelemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST:
