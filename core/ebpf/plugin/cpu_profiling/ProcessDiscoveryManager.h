@@ -89,7 +89,7 @@ public:
     void Start(NotifyFn fn);
     void Stop();
 
-    void AddOrUpdateDiscovery(const std::string &configName, UpdateFn updater);
+    void AddDiscovery(const std::string &configName, ProcessDiscoveryConfig config);
 
     bool UpdateDiscovery(const std::string &configName, UpdateFn updater);
 
