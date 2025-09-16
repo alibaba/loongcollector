@@ -17,6 +17,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/TimeUtil.h"
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 #include "ebpf/type/table/ProfileTable.h"
 
@@ -197,6 +198,11 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
         return;
     }
 
+    auto logtime = time(nullptr);
+    if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
+        logtime += GetTimeDelta();
+    }
+
     std::vector<StackCnt> stacks;
     parseStackCnt(stack, stacks);
 
@@ -207,6 +213,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
     auto commSb = sourceBuffer->CopyString(std::string(comm));
     for (auto &[stack, cnt] : stacks) {
         auto* event = eventGroup.AddLogEvent();
+        event->SetTimestamp(logtime);
         auto stackSb = sourceBuffer->CopyString(stack);
         auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
         event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
