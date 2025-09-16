@@ -19,8 +19,19 @@
 | Type | String，无默认值（必填） | 插件类型，固定为`input_forward`。 |
 | Protocol | String，无默认值（必填） | 转发协议类型。目前支持：`LoongSuite`。 |
 | Endpoint | String，无默认值（必填） | 监听地址和端口，格式为`IP:PORT`，例如`0.0.0.0:7899`。或者本地通信socket，例如`/root/loongcollector.sock`。 |
-| MatchRule | Object，无默认值（必填） | 匹配规则配置对象。 |
-| MatchRule.Value | String，无默认值（必填） | 用于匹配请求的标识值，通过请求的metadata中指定字段进行匹配。不同协议规定使用不同字段。`LoongSuite`: `X-Loongsuite-Apm-Configname`。 |
+
+## 转发规则
+### LoongSuite
+
+LoongCollector 根据请求中的采集配置名进行转发，如果没有匹配的路由规则，则返回错误状态码。
+
+#### GRPC
+metadata 中配置 key 为 `X-Loongsuite-Apm-Configname`，value 为采集配置名。
+返回状态码：
+* OK：转发成功
+* NOT_FOUND：没有匹配的采集配置
+* INVALID_ARGUMENT：请求参数错误
+* UNAVAILABLE：转发阻塞，请重试
 
 ## 样例
 
@@ -34,8 +45,6 @@ inputs:
   - Type: input_forward
     Protocol: LoongSuite
     Endpoint: 0.0.0.0:7899
-    MatchRule:
-      Value: test-config
 flushers:
   - Type: flusher_sls
     Project: "your-project"
@@ -46,7 +55,7 @@ flushers:
 
 * 输入
 
-通过gRPC客户端发送LoongSuite协议的转发请求，请求需要在metadata中包含`x-loongsuite-apm-configname: test-config`字段，数据内容在请求的data字段中，为 `PipelineEventGroup` PB 序列化的结果。
+通过gRPC客户端发送LoongSuite协议的转发请求，请求需要在metadata中包含`x-loongsuite-apm-configname: <采集配置名>`字段，数据内容在请求的data字段中，为 `PipelineEventGroup` PB 序列化的结果。
 
 * 输出
 
