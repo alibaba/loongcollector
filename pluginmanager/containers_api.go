@@ -170,9 +170,9 @@ func GetDiffContainers() string {
 			}
 		}
 	}
-
 	// Update cache
 	caCachedFullList = newMap
+	lastUpdateTime = newUpdateTime
 
 	wrapper := map[string]*DiffCmd{"DiffCmd": diff}
 	buf, _ := json.Marshal(wrapper)
