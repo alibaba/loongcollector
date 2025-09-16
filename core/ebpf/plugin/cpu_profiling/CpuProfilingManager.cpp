@@ -161,7 +161,7 @@ static void parseStackCnt(char const *symbol, std::vector<StackCnt> &result) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
         }
-        auto pos2 = line.find(' ');
+        auto pos2 = line.rfind(' ');
         if (pos2 == std::string::npos || pos2 < pos1) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
