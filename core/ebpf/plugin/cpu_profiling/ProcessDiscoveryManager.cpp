@@ -48,12 +48,11 @@ void ProcessDiscoveryManager::Stop() {
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "stop"));
 }
 
-void ProcessDiscoveryManager::AddOrUpdateDiscovery(const std::string &configName, UpdateFn updater) {
+void ProcessDiscoveryManager::AddDiscovery(const std::string &configName, ProcessDiscoveryConfig config) {
     std::lock_guard<std::mutex> guard(mLock);
     auto it = mStates.emplace(configName, InnerState{}).first;
     auto &state = it->second;
-    auto &config = state.mConfig;
-    updater(config);
+    state.mConfig = std::move(config);
 }
 
 bool ProcessDiscoveryManager::UpdateDiscovery(const std::string &configName, UpdateFn updater) {
