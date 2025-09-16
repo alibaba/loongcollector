@@ -205,7 +205,7 @@ void FlusherRunner::Run() {
     }
 }
 
-void FlusherRunner::Dispatch(SenderQueueItem* item) {
+bool FlusherRunner::Dispatch(SenderQueueItem* item) {
     switch (item->mFlusher->GetSinkType()) {
         case SinkType::HTTP:
             // TODO: make it common for all http flushers
