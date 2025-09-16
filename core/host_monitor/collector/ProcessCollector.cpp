@@ -131,7 +131,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     GetProcessCpuSorted(cpuInfos);
 
     // 取cpu排名前mTopN的进程，获取每一个进程的信息
-    for (size_t i = 0; i < mTopN; i++) {
+    for (size_t i = 0; i < std::min(static_cast<size_t>(mTopN), cpuInfos.size()); i++) {
         ProcessAllStat stat;
         stat.processCpu = cpuInfos[i].second;
         if (!GetProcessAllStat(collectContext.mCollectTime, cpuInfos[i].first, stat)) {
