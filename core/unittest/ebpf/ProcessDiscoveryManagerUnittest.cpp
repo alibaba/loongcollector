@@ -59,8 +59,8 @@ void ProcessDiscoveryManagerUnittest::TestSingleConfig() {
     manager.Start(callback);
 
     // watch single config
-    manager.AddOrUpdateDiscovery("test_watch", [&](ProcessDiscoveryConfig& config) {
-        config.mRegexs.push_back(boost::regex("sleep.+"));
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
+        .mRegexs = {boost::regex("sleep.+")}
     });
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 1);
@@ -76,11 +76,11 @@ void ProcessDiscoveryManagerUnittest::TestMultiConfig() {
     manager.Start(callback);
 
     // watch single config
-    manager.AddOrUpdateDiscovery("test_watch", [&](ProcessDiscoveryConfig& config) {
-        config.mRegexs.push_back(boost::regex("sleep.+"));
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
+        .mRegexs = {boost::regex("sleep.+")}
     });
-    manager.AddOrUpdateDiscovery("test_watch2", [&](ProcessDiscoveryConfig& config) {
-        config.mRegexs.push_back(boost::regex("sleep.+"));
+    manager.AddDiscovery("test_watch2", ProcessDiscoveryConfig{
+        .mRegexs = {boost::regex("sleep.+")}
     });
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 2);
@@ -90,7 +90,7 @@ void ProcessDiscoveryManagerUnittest::TestUpdateConfig() {
     ProcessDiscoveryManager manager;
     manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {});
 
-    manager.AddOrUpdateDiscovery("test_watch", [](ProcessDiscoveryConfig& config) {});
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{});
 
     // ok to update "test_watch"
     APSARA_TEST_TRUE(manager.UpdateDiscovery("test_watch", [](ProcessDiscoveryConfig& config) {}));
@@ -108,8 +108,8 @@ void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {
     ProcessDiscoveryManager manager;
     manager.Start(callback);
 
-    manager.AddOrUpdateDiscovery("test_watch", [&](ProcessDiscoveryConfig& config) {
-        config.mRegexs.push_back(boost::regex("sleep.+"));
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
+        .mRegexs = {boost::regex("sleep.+")}
     });
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 1);
@@ -125,7 +125,7 @@ void ProcessDiscoveryManagerUnittest::TestCheckConfigExist() {
     manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {});
 
     APSARA_TEST_FALSE(manager.CheckDiscoveryExist("test_watch"));
-    manager.AddOrUpdateDiscovery("test_watch", [&](ProcessDiscoveryConfig& config) {});
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{});
     APSARA_TEST_TRUE(manager.CheckDiscoveryExist("test_watch"));
 }
 
