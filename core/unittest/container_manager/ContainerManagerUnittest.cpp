@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <dirent.h>
+
 #include <algorithm>
 #include <boost/regex.hpp>
 #include <fstream>
@@ -24,7 +26,10 @@
 #include "gtest/gtest.h"
 #include "json/json.h"
 
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/RuntimeUtil.h"
+#include "container_manager/ContainerDiscoveryOptions.h"
 #include "container_manager/ContainerManager.h"
 #include "unittest/Unittest.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
@@ -44,9 +49,12 @@ public:
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
     void TestContainerMatchingConsistency() const;
+    void runTestFile(const std::string& testFilePath) const;
 
 private:
     void parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const;
+    bool parseContainerFilterConfigFromTestJson(const Json::Value& filterJson, ContainerFilterConfig& config) const;
+    std::string findTestDataDirectory() const;
 };
 
 void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
@@ -706,37 +714,75 @@ void ContainerManagerUnittest::TestSaveContainerInfoWithVersion() const {
     EXPECT_TRUE(foundAnotherKey);
 }
 
+std::string ContainerManagerUnittest::findTestDataDirectory() const {
+    std::string testDataDir = GetProcessExecutionDir();
+    // Remove trailing path separator if present
+    if (!testDataDir.empty() && testDataDir.back() == PATH_SEPARATOR[0]) {
+        testDataDir.pop_back();
+    }
+    // Add path to test data directory
+    testDataDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "ContainerManagerUnittest";
+    return testDataDir;
+}
 
 void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
     // This test loads the shared test data and verifies that the C++ implementation
     // produces the same results as the Go implementation for container matching logic.
 
-    // Load test data from JSON file
-    std::string filePath = "../../../pkg/helper/containercenter/container_matching_test_data.json";
-    std::cout << "Looking for test data file at: " << filePath << std::endl;
-    std::ifstream file(filePath);
-    if (!file.is_open()) {
-        // If file doesn't exist, skip the test
-        std::cout << "Test data file not found at: " << filePath << ", skipping consistency test" << std::endl;
-        // Try absolute path as fallback
-        std::string absPath = "/workspaces/ilogtail/pkg/helper/containercenter/container_matching_test_data.json";
-        std::cout << "Trying absolute path: " << absPath << std::endl;
-        std::ifstream absFile(absPath);
-        if (absFile.is_open()) {
-            std::cout << "Found file with absolute path, using it" << std::endl;
-            file = std::move(absFile);
-            filePath = absPath;
-        } else {
-            std::cout << "Absolute path also failed, skipping consistency test" << std::endl;
-            return;
+    // Get test data directory path using smart path detection
+    std::string testDataDir = findTestDataDirectory();
+    if (testDataDir.empty()) {
+        std::cout << "Test data directory not found, skipping consistency test" << std::endl;
+        return;
+    }
+
+    DIR* dir = opendir(testDataDir.c_str());
+    if (!dir) {
+        std::cout << "Failed to open test data directory: " << testDataDir << std::endl;
+        std::cout << "Test data directory not found, skipping consistency test" << std::endl;
+        return;
+    }
+
+    // Collect all JSON files in the directory
+    std::vector<std::string> testFiles;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string fileName = entry->d_name;
+        if (fileName.size() > 5 && fileName.substr(fileName.size() - 5) == ".json") {
+            testFiles.push_back(testDataDir + "/" + fileName);
         }
+    }
+    closedir(dir);
+
+    if (testFiles.empty()) {
+        std::cout << "No JSON test files found in directory, skipping consistency test" << std::endl;
+        return;
+    }
+
+    // Sort files for consistent test order
+    std::sort(testFiles.begin(), testFiles.end());
+
+    // Run tests for each file
+    for (const auto& testFilePath : testFiles) {
+        std::cout << "Running tests from file: " << testFilePath << std::endl;
+        runTestFile(testFilePath);
+    }
+}
+
+void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) const {
+    // Load test data from JSON file
+    std::ifstream file(testFilePath);
+    if (!file.is_open()) {
+        FAIL() << "Failed to open test file: " << testFilePath;
+        return;
     }
 
     Json::Value root;
     Json::CharReaderBuilder reader;
     std::string errs;
     if (!Json::parseFromStream(reader, file, &root, &errs)) {
-        FAIL() << "Failed to parse test data JSON: " << errs;
+        FAIL() << "Failed to parse test data JSON from file " << testFilePath << ": " << errs;
+        return;
     }
 
     // Parse containers
@@ -785,49 +831,34 @@ void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
         std::string testName = testCase["name"].asString();
         std::string description = testCase["description"].asString();
 
-        // Parse filters
+        LOG_DEBUG(sLogger, ("testCase start", description));
+
+        // Parse filters using ContainerFilters::Init approach
         ContainerFilters filters;
         const Json::Value& filterJson = testCase["filters"];
 
-        // Container labels
-        parseLabelFilters(filterJson["container_labels"], filters.mContainerLabelFilter);
+        // Use the new method to parse ContainerFilterConfig from test JSON
+        ContainerFilterConfig config;
+        if (!parseContainerFilterConfigFromTestJson(filterJson, config)) {
+            FAIL() << "Failed to parse container filter config for test case: " << testName;
+        }
 
-        // Environment variables
-        parseLabelFilters(filterJson["env"], filters.mEnvFilter);
-
-        // K8S filters
-        const Json::Value& k8sFilters = filterJson["k8s"];
-        if (!k8sFilters["namespace_regex"].asString().empty()) {
-            try {
-                filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(k8sFilters["namespace_regex"].asString());
-            } catch (const std::exception& e) {
-                std::cout << "Error parsing regex: " << e.what() << std::endl;
-                FAIL() << "Error parsing regex: " << e.what();
-            }
+        // Initialize ContainerFilters using the standard Init method
+        if (!filters.Init(config)) {
+            FAIL() << "Failed to initialize ContainerFilters for test case: " << testName;
         }
-        if (!k8sFilters["pod_regex"].asString().empty()) {
-            try {
-                filters.mK8SFilter.mPodReg = std::make_shared<boost::regex>(k8sFilters["pod_regex"].asString());
-            } catch (const std::exception& e) {
-                std::cout << "Error parsing regex: " << e.what() << std::endl;
-                FAIL() << "Error parsing regex: " << e.what();
-            }
-        }
-        if (!k8sFilters["container_regex"].asString().empty()) {
-            try {
-                filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>(k8sFilters["container_regex"].asString());
-            } catch (const std::exception& e) {
-                std::cout << "Error parsing regex: " << e.what() << std::endl;
-                FAIL() << "Error parsing regex: " << e.what();
-            }
-        }
-        parseLabelFilters(k8sFilters["labels"], filters.mK8SFilter.mK8sLabelFilter);
 
         // Parse expected results
         std::set<std::string> expectedMatchedIDs;
         const Json::Value& expectedArray = testCase["expected_matched_ids"];
-        for (const auto& expectedId : expectedArray) {
-            expectedMatchedIDs.insert(expectedId.asString());
+        if (expectedArray.isArray()) {
+            for (const auto& expectedId : expectedArray) {
+                expectedMatchedIDs.insert(expectedId.asString());
+            }
+        } else if (expectedArray.isNull()) {
+            // Handle null case - no expected matches
+        } else {
+            FAIL() << "Invalid expected_matched_ids format in test case: " << testName;
         }
 
         // Run the matching logic
@@ -856,7 +887,70 @@ void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
         errorMsg += "]";
 
         EXPECT_EQ(actualMatchedIDs, expectedMatchedIDs) << errorMsg;
+
+        LOG_DEBUG(sLogger, ("testCase end", testCase.toStyledString()));
     }
+}
+
+bool ContainerManagerUnittest::parseContainerFilterConfigFromTestJson(const Json::Value& filterJson,
+                                                                      ContainerFilterConfig& config) const {
+    // Clear existing config
+    config = ContainerFilterConfig();
+
+    // Parse K8s regex filters
+    if (!filterJson["K8sNamespaceRegex"].asString().empty()) {
+        config.mK8sNamespaceRegex = filterJson["K8sNamespaceRegex"].asString();
+    }
+    if (!filterJson["K8sPodRegex"].asString().empty()) {
+        config.mK8sPodRegex = filterJson["K8sPodRegex"].asString();
+    }
+    if (!filterJson["K8sContainerRegex"].asString().empty()) {
+        config.mK8sContainerRegex = filterJson["K8sContainerRegex"].asString();
+    }
+
+    // Parse K8s label filters
+    if (filterJson.isMember("IncludeK8sLabel")) {
+        const Json::Value& includeK8sLabel = filterJson["IncludeK8sLabel"];
+        for (const auto& key : includeK8sLabel.getMemberNames()) {
+            config.mIncludeK8sLabel[key] = includeK8sLabel[key].asString();
+        }
+    }
+    if (filterJson.isMember("ExcludeK8sLabel")) {
+        const Json::Value& excludeK8sLabel = filterJson["ExcludeK8sLabel"];
+        for (const auto& key : excludeK8sLabel.getMemberNames()) {
+            config.mExcludeK8sLabel[key] = excludeK8sLabel[key].asString();
+        }
+    }
+
+    // Parse environment filters
+    if (filterJson.isMember("IncludeEnv")) {
+        const Json::Value& includeEnv = filterJson["IncludeEnv"];
+        for (const auto& key : includeEnv.getMemberNames()) {
+            config.mIncludeEnv[key] = includeEnv[key].asString();
+        }
+    }
+    if (filterJson.isMember("ExcludeEnv")) {
+        const Json::Value& excludeEnv = filterJson["ExcludeEnv"];
+        for (const auto& key : excludeEnv.getMemberNames()) {
+            config.mExcludeEnv[key] = excludeEnv[key].asString();
+        }
+    }
+
+    // Parse container label filters
+    if (filterJson.isMember("IncludeContainerLabel")) {
+        const Json::Value& includeContainerLabel = filterJson["IncludeContainerLabel"];
+        for (const auto& key : includeContainerLabel.getMemberNames()) {
+            config.mIncludeContainerLabel[key] = includeContainerLabel[key].asString();
+        }
+    }
+    if (filterJson.isMember("ExcludeContainerLabel")) {
+        const Json::Value& excludeContainerLabel = filterJson["ExcludeContainerLabel"];
+        for (const auto& key : excludeContainerLabel.getMemberNames()) {
+            config.mExcludeContainerLabel[key] = excludeContainerLabel[key].asString();
+        }
+    }
+
+    return true;
 }
 
 void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {

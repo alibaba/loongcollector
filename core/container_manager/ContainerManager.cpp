@@ -415,6 +415,7 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
 
         // 如果没有匹配，返回 false
         if (!matchedFlag) {
+            LOG_DEBUG(sLogger, ("matchedFlag", "false"));
             return false;
         }
     }
@@ -423,6 +424,7 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
     for (const auto& pair : filter.mExcludeFields.mFieldsMap) {
         auto it = labels.find(pair.first);
         if (it != labels.end() && (pair.second.empty() || it->second == pair.second)) {
+            LOG_DEBUG(sLogger, ("no match by exclude static", ""));
             return false;
         }
     }
@@ -431,6 +433,7 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
     for (const auto& pair : filter.mExcludeFields.mFieldsRegMap) {
         auto it = labels.find(pair.first);
         if (it != labels.end() && boost::regex_match(it->second, *pair.second)) {
+            LOG_DEBUG(sLogger, ("no match by exclude regex", ""));
             return false;
         }
     }
@@ -440,29 +443,34 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
 
 
 bool IsK8sFilterMatch(const K8sFilter& filter, const K8sInfo& k8sInfo) {
-    if (filter.IsEmpty()) {
-        return true;
-    }
-
     if (k8sInfo.mPausedContainer) {
         return false;
     }
-
     // 匹配命名空间
     if (filter.mNamespaceReg && !boost::regex_match(k8sInfo.mNamespace, *filter.mNamespaceReg)) {
+        LOG_DEBUG(sLogger,
+                  ("k8sInfo.mNamespace", k8sInfo.mNamespace)("filter.mNamespaceReg", filter.mNamespaceReg->str()));
         return false;
     }
     // 匹配 Pod 名称
     if (filter.mPodReg && !boost::regex_match(k8sInfo.mPod, *filter.mPodReg)) {
+        LOG_DEBUG(sLogger, ("k8sInfo.mPod", k8sInfo.mPod)("filter.mPodReg", filter.mPodReg->str()));
         return false;
     }
     // 匹配容器名称
     if (filter.mContainerReg && !boost::regex_match(k8sInfo.mContainerName, *filter.mContainerReg)) {
+        LOG_DEBUG(
+            sLogger,
+            ("k8sInfo.mContainerName", k8sInfo.mContainerName)("filter.mContainerReg", filter.mContainerReg->str()));
         return false;
     }
-
+    bool isK8sLabelMatch = IsMapLabelsMatch(filter.mK8sLabelFilter, k8sInfo.mLabels);
+    LOG_DEBUG(sLogger, ("mK8sLabelFilter", filter.mK8sLabelFilter.ToString()));
+    for (const auto& pair : k8sInfo.mLabels) {
+        LOG_DEBUG(sLogger, ("K8sLabel", pair.first + "=" + pair.second));
+    }
     // 确保 Labels 不为 nullptr，使用默认的空映射初始化
-    return IsMapLabelsMatch(filter.mK8sLabelFilter, k8sInfo.mLabels);
+    return isK8sLabelMatch;
 }
 
 
@@ -499,10 +507,26 @@ void ContainerManager::computeMatchedContainersDiff(
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             fullContainerIDList.insert(pair.first); // 加入到 fullContainerIDList
+            bool isContainerLabelMatch = IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels);
+            LOG_DEBUG(sLogger, ("mContainerLabelFilter", filters.mContainerLabelFilter.ToString()));
+            for (const auto& pair : pair.second->mContainerLabels) {
+                LOG_DEBUG(sLogger, ("label", pair.first + "=" + pair.second));
+            }
+
+            bool isEnvMatch = IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv);
+
+            LOG_DEBUG(sLogger, ("mEnvFilter", filters.mEnvFilter.ToString()));
+            for (const auto& pair : pair.second->mEnv) {
+                LOG_DEBUG(sLogger, ("env", pair.first + "=" + pair.second));
+            }
+
+
+            bool isK8sMatch = IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo);
+            LOG_DEBUG(sLogger,
+                      ("isContainerLabelMatch", isContainerLabelMatch)("isEnvMatch", isEnvMatch)(
+                          "isK8sMatch", isK8sMatch)("container name", pair.second->mID));
             // 检查标签和环境匹配
-            if (IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels)
-                && IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv)
-                && IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo)) {
+            if (isContainerLabelMatch && isEnvMatch && isK8sMatch) {
                 diff.mAdded.push_back(pair.second); // 添加到变换列表
             }
         }

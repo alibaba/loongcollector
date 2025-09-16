@@ -151,7 +151,7 @@ bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& input
     for (const auto& input : inputs) {
         // 检查是否是有效的正则表达式：必须以^开头并且以$结尾
         bool isValidRegex = false;
-        if (!input.second.empty() && input.second[0] == '^' && input.second.back() == '$') {
+        if (!input.second.empty() && input.second[0] == '^') {
             isValidRegex = true;
         }
 

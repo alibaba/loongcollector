@@ -34,8 +34,17 @@ struct FieldFilter {
     std::unordered_map<std::string, std::string> mFieldsMap;
     std::unordered_map<std::string, std::shared_ptr<boost::regex>> mFieldsRegMap;
 
-    bool IsEmpty() const {
-        return mFieldsMap.empty() && mFieldsRegMap.empty();
+    bool IsEmpty() const { return mFieldsMap.empty() && mFieldsRegMap.empty(); }
+
+    std::string ToString() const {
+        std::stringstream ss;
+        for (const auto& pair : mFieldsMap) {
+            ss << pair.first << "=" << pair.second << std::endl;
+        }
+        for (const auto& pair : mFieldsRegMap) {
+            ss << pair.first << "=" << pair.second->str() << std::endl;
+        }
+        return ss.str();
     }
 };
 
@@ -44,8 +53,13 @@ struct MatchCriteriaFilter {
     FieldFilter mIncludeFields;
     FieldFilter mExcludeFields;
 
-    bool IsEmpty() const {
-        return mIncludeFields.IsEmpty() && mExcludeFields.IsEmpty();
+    bool IsEmpty() const { return mIncludeFields.IsEmpty() && mExcludeFields.IsEmpty(); }
+
+    std::string ToString() const {
+        std::stringstream ss;
+        ss << "IncludeFields: " << mIncludeFields.ToString() << std::endl;
+        ss << "ExcludeFields: " << mExcludeFields.ToString() << std::endl;
+        return ss.str();
     }
 };
 

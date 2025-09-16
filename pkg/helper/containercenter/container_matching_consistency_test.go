@@ -17,6 +17,7 @@ package containercenter
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"testing"
@@ -44,26 +45,15 @@ type TestK8SInfo struct {
 }
 
 type TestFilters struct {
-	ContainerLabels TestLabelFilters `json:"container_labels"`
-	Env             TestLabelFilters `json:"env"`
-	K8S             TestK8SFilters   `json:"k8s"`
-}
-
-type TestLabelFilters struct {
-	Include TestLabelFilterCriteria `json:"include"`
-	Exclude TestLabelFilterCriteria `json:"exclude"`
-}
-
-type TestLabelFilterCriteria struct {
-	Static map[string]string `json:"static"`
-	Regex  map[string]string `json:"regex"`
-}
-
-type TestK8SFilters struct {
-	NamespaceRegex string           `json:"namespace_regex"`
-	PodRegex       string           `json:"pod_regex"`
-	ContainerRegex string           `json:"container_regex"`
-	Labels         TestLabelFilters `json:"labels"`
+	K8sNamespaceRegex     string            `json:"K8sNamespaceRegex,omitempty"`
+	K8sPodRegex           string            `json:"K8sPodRegex,omitempty"`
+	IncludeK8sLabel       map[string]string `json:"IncludeK8sLabel,omitempty"`
+	ExcludeK8sLabel       map[string]string `json:"ExcludeK8sLabel,omitempty"`
+	K8sContainerRegex     string            `json:"K8sContainerRegex,omitempty"`
+	IncludeEnv            map[string]string `json:"IncludeEnv,omitempty"`
+	ExcludeEnv            map[string]string `json:"ExcludeEnv,omitempty"`
+	IncludeContainerLabel map[string]string `json:"IncludeContainerLabel,omitempty"`
+	ExcludeContainerLabel map[string]string `json:"ExcludeContainerLabel,omitempty"`
 }
 
 type TestCase struct {
@@ -114,93 +104,37 @@ func convertTestContainerToDockerInfoDetail(tc TestContainer) *DockerInfoDetail 
 // convertTestFiltersToGoFilters converts test filters to Go filter structures
 func convertTestFiltersToGoFilters(tf TestFilters) (map[string]string, map[string]string, map[string]*regexp.Regexp, map[string]*regexp.Regexp, map[string]string, map[string]string, map[string]*regexp.Regexp, map[string]*regexp.Regexp, *K8SFilter) {
 	// Container labels
-	includeLabel := make(map[string]string)
-	excludeLabel := make(map[string]string)
-	includeLabelRegex := make(map[string]*regexp.Regexp)
-	excludeLabelRegex := make(map[string]*regexp.Regexp)
-
-	for k, v := range tf.ContainerLabels.Include.Static {
-		includeLabel[k] = v
-	}
-	for k, v := range tf.ContainerLabels.Exclude.Static {
-		excludeLabel[k] = v
-	}
-	for k, v := range tf.ContainerLabels.Include.Regex {
-		includeLabelRegex[k] = regexp.MustCompile(v)
-	}
-	for k, v := range tf.ContainerLabels.Exclude.Regex {
-		excludeLabelRegex[k] = regexp.MustCompile(v)
-	}
+	includeLabel, includeLabelRegex, _ := SplitRegexFromMap(tf.IncludeContainerLabel)
+	excludeLabel, excludeLabelRegex, _ := SplitRegexFromMap(tf.ExcludeContainerLabel)
 
 	// Environment variables
-	includeEnv := make(map[string]string)
-	excludeEnv := make(map[string]string)
-	includeEnvRegex := make(map[string]*regexp.Regexp)
-	excludeEnvRegex := make(map[string]*regexp.Regexp)
-
-	for k, v := range tf.Env.Include.Static {
-		includeEnv[k] = v
-	}
-	for k, v := range tf.Env.Exclude.Static {
-		excludeEnv[k] = v
-	}
-	for k, v := range tf.Env.Include.Regex {
-		includeEnvRegex[k] = regexp.MustCompile(v)
-	}
-	for k, v := range tf.Env.Exclude.Regex {
-		excludeEnvRegex[k] = regexp.MustCompile(v)
-	}
+	includeEnv, includeEnvRegex, _ := SplitRegexFromMap(tf.IncludeEnv)
+	excludeEnv, excludeEnvRegex, _ := SplitRegexFromMap(tf.ExcludeEnv)
 
 	// K8S filters
-	var k8sFilter *K8SFilter
-	if tf.K8S.NamespaceRegex != "" || tf.K8S.PodRegex != "" || tf.K8S.ContainerRegex != "" ||
-		len(tf.K8S.Labels.Include.Static) > 0 || len(tf.K8S.Labels.Exclude.Static) > 0 ||
-		len(tf.K8S.Labels.Include.Regex) > 0 || len(tf.K8S.Labels.Exclude.Regex) > 0 {
-
-		var namespaceReg, podReg, containerReg *regexp.Regexp
-		if tf.K8S.NamespaceRegex != "" {
-			namespaceReg = regexp.MustCompile(tf.K8S.NamespaceRegex)
-		}
-		if tf.K8S.PodRegex != "" {
-			podReg = regexp.MustCompile(tf.K8S.PodRegex)
-		}
-		if tf.K8S.ContainerRegex != "" {
-			containerReg = regexp.MustCompile(tf.K8S.ContainerRegex)
-		}
-
-		includeLabels := make(map[string]string)
-		excludeLabels := make(map[string]string)
-		includeLabelRegs := make(map[string]*regexp.Regexp)
-		excludeLabelRegs := make(map[string]*regexp.Regexp)
-
-		for k, v := range tf.K8S.Labels.Include.Static {
-			includeLabels[k] = v
-		}
-		for k, v := range tf.K8S.Labels.Exclude.Static {
-			excludeLabels[k] = v
-		}
-		for k, v := range tf.K8S.Labels.Include.Regex {
-			includeLabelRegs[k] = regexp.MustCompile(v)
-		}
-		for k, v := range tf.K8S.Labels.Exclude.Regex {
-			excludeLabelRegs[k] = regexp.MustCompile(v)
-		}
-
-		k8sFilter, _ = CreateK8SFilter("", "", "", includeLabels, excludeLabels)
-		k8sFilter.NamespaceReg = namespaceReg
-		k8sFilter.PodReg = podReg
-		k8sFilter.ContainerReg = containerReg
-		k8sFilter.IncludeLabelRegs = includeLabelRegs
-		k8sFilter.ExcludeLabelRegs = excludeLabelRegs
-	}
+	k8sFilter, _ := CreateK8SFilter(tf.K8sNamespaceRegex, tf.K8sPodRegex, tf.K8sContainerRegex, tf.IncludeK8sLabel, tf.ExcludeK8sLabel)
 
 	return includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex,
 		includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter
 }
 
 func TestContainerMatchingConsistency(t *testing.T) {
+	// Get all test files from the container_matching_test_data directory
+	testFiles, err := filepath.Glob("../../../core/unittest/container_manager/testDataSet/ContainerManagerUnittest/*.json")
+	require.NoError(t, err)
+	require.NotEmpty(t, testFiles, "No test files found in container_matching_test_data directory")
+
+	// Run tests for each file
+	for _, testFile := range testFiles {
+		t.Run(filepath.Base(testFile), func(t *testing.T) {
+			runTestFile(t, testFile)
+		})
+	}
+}
+
+func runTestFile(t *testing.T, testFilePath string) {
 	// Load test data
-	data, err := os.ReadFile("./container_matching_test_data.json")
+	data, err := os.ReadFile(testFilePath)
 	require.NoError(t, err)
 
 	var testData TestData
