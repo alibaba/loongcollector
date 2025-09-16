@@ -191,10 +191,6 @@ func runTestFile(t *testing.T, testFilePath string) {
 			fullList := make(map[string]bool)
 			matchList := make(map[string]*DockerInfoDetail)
 
-			// Clear both fullList and matchList to start fresh
-			fullList = make(map[string]bool)
-			matchList = make(map[string]*DockerInfoDetail)
-
 			// Single call - all containers will be treated as "new" since fullList is empty
 			_, _, _, _ = GetContainerByAcceptedInfoV2(fullList, matchList,
 				includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex,
