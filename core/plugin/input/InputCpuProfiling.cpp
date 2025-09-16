@@ -18,6 +18,7 @@
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
+#include "app_config/AppConfig.h"
 
 namespace logtail {
 
@@ -30,7 +31,7 @@ bool InputCpuProfiling::Init(const Json::Value &config,
     if (!ok) {
         return false;
     }
-    if (mCpuProfilingOption.mEnableContainerDiscovery) {
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
         mCpuProfilingOption.mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
             optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
     }

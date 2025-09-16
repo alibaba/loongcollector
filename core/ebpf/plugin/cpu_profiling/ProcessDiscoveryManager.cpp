@@ -92,7 +92,7 @@ void ProcessDiscoveryManager::run() {
                 auto& config = state.mConfig;
                 std::set<uint32_t> matchedPids;
                 for (const auto& proc : procs) {
-                    if (config.IsMatch(proc.mCmdline, proc.mContainerId)) {
+                    if (config.IsMatch(proc.mCmdline, proc.mContainerId, mIsContainerMode)) {
                         matchedPids.insert(proc.mPid);
                     }
                 }
