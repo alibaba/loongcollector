@@ -21,6 +21,7 @@
 | Endpoint | String，无默认值（必填） | 监听地址和端口，格式为`IP:PORT`，例如`0.0.0.0:7899`。或者本地通信socket，例如`/root/loongcollector.sock`。 |
 
 ## 转发规则
+
 ### LoongSuite
 
 LoongCollector 根据请求中的采集配置名进行转发，如果没有匹配的路由规则，则返回错误状态码。
