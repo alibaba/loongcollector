@@ -63,9 +63,7 @@ public:
               const CollectionPipelineContext* mContext,
               const std::string& sName);
     
-    bool mEnableSystemProfiling = false;
     std::vector<std::string> mCmdlines;
-    bool mEnableContainerDiscovery = false;
     ContainerDiscoveryOptions mContainerDiscovery;
 };
 

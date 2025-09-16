@@ -35,19 +35,24 @@ struct ProcessDiscoveryConfig {
     std::unordered_set<std::string> mContainerIds;
     bool mFullDiscovery = false;
 
-    bool IsMatch(const std::string& cmdline, const std::string& containerId) {
-        if (mFullDiscovery) {
-            return true;
-        }
-        for (auto& regex : mRegexs) {
-            if (boost::regex_match(cmdline, regex)) {
+    bool IsMatch(const std::string& cmdline, const std::string& containerId, bool isContainerMode) {
+        auto checkCmdlines = [&] {
+            if (mFullDiscovery) {
                 return true;
             }
+            for (auto& regex : mRegexs) {
+                if (boost::regex_match(cmdline, regex)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (isContainerMode) {
+            return mContainerIds.find(containerId) != mContainerIds.end() && checkCmdlines();
+        } else {
+            return checkCmdlines();
         }
-        if (!containerId.empty() && mContainerIds.find(containerId) != mContainerIds.end()) {
-            return true;
-        }
-        return false;
     }
 };
 
@@ -65,7 +70,9 @@ public:
     using NotifyFn = std::function<void(DiscoverResult)>;
     using UpdateFn = std::function<void(ProcessDiscoveryConfig&)>;
 
-    ProcessDiscoveryManager() : mProcParser(GetContainerHostPath().value_or("/")) {}
+    ProcessDiscoveryManager()
+        : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()),
+          mProcParser(GetContainerHostPath().value_or("/")) {}
 
     ProcessDiscoveryManager(const ProcessDiscoveryManager &) = delete;
     ProcessDiscoveryManager &operator=(const ProcessDiscoveryManager &) = delete;
@@ -104,6 +111,7 @@ private:
     std::unordered_map<std::string, InnerState> mStates;
     NotifyFn mCallback;
     
+    bool mIsContainerMode;
     ProcParser mProcParser;
 };
 
