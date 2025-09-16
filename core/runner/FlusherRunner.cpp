@@ -213,13 +213,13 @@ bool FlusherRunner::Dispatch(SenderQueueItem* item) {
                 && item->mFlusher->Name() == "flusher_sls") {
                 DiskBufferWriter::GetInstance()->PushToDiskBuffer(item, 3);
                 SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+                return true;
             } else {
-                PushToHttpSink(item);
+                return PushToHttpSink(item);
             }
-            break;
         default:
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
-            break;
+            return false;
     }
 }
 
