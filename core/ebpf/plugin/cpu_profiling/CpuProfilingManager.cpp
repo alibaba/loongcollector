@@ -114,9 +114,7 @@ int CpuProfilingManager::AddOrUpdateConfig(
         }
     }
 
-    // TODO: remove this callback
-    ProcessDiscoveryManager::GetInstance()->AddOrUpdateDiscovery(
-        configName, [&](ProcessDiscoveryConfig& c) { c = config; });
+    ProcessDiscoveryManager::GetInstance()->AddDiscovery(configName, std::move(config));
 
     LOG_DEBUG(sLogger, ("CpuProfilingManager", "add or update config")("config", configName));
     
