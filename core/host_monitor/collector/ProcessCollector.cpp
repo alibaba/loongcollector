@@ -130,7 +130,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     // 对所有进程的cpu信息进行排序
     GetProcessCpuSorted(cpuInfos);
 
-    // 取cpu排名前15的进程，获取每一个进程的信息
+    // 取cpu排名前mTopN的进程，获取每一个进程的信息
     for (size_t i = 0; i < mTopN; i++) {
         ProcessAllStat stat;
         stat.processCpu = cpuInfos[i].second;
