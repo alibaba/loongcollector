@@ -127,7 +127,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         cpuInfos.push_back(std::make_pair(pid, info));
     }
 
-    // 对所有进程的cpu信息进行排序
+    // 对所有进程的cpu信息进行排序 
     GetProcessCpuSorted(cpuInfos);
 
     // 取cpu排名前mTopN的进程，获取每一个进程的信息
