@@ -243,7 +243,10 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
 
 void ContainerManager::incrementallyUpdateContainersSnapshot() {
     std::string diffContainersMeta = LogtailPlugin::GetInstance()->GetDiffContainersMeta();
-    LOG_DEBUG(sLogger, ("diffContainersMeta", diffContainersMeta));
+    if (diffContainersMeta.empty()) {
+        return;
+    }
+    LOG_INFO(sLogger, ("diffContainersMeta", diffContainersMeta));
 
     Json::Value jsonParams;
     std::string errorMsg;

@@ -9,6 +9,7 @@ import (
 )
 
 var caCachedFullList map[string]*containercenter.DockerInfoDetail
+var lastUpdateTime int64 = 0
 
 type Mount struct {
 	Source      string
@@ -133,6 +134,13 @@ func GetAllContainers() string {
 }
 
 func GetDiffContainers() string {
+	newUpdateTime := containercenter.GetContainersLastUpdateTime()
+	if lastUpdateTime != 0 {
+		if lastUpdateTime >= newUpdateTime {
+			return ""
+		}
+	}
+
 	if caCachedFullList == nil {
 		caCachedFullList = make(map[string]*containercenter.DockerInfoDetail)
 	}
@@ -162,6 +170,7 @@ func GetDiffContainers() string {
 			}
 		}
 	}
+
 	// Update cache
 	caCachedFullList = newMap
 
