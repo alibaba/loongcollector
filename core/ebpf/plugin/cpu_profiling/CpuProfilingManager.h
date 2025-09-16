@@ -97,6 +97,8 @@ private:
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;
+
+    friend class CpuProfilingManagerUnittest;
 };
 
 } // namespace logtail::ebpf
