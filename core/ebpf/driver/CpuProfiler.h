@@ -18,12 +18,15 @@
 #include <mutex>
 #include <unordered_set>
 #include <vector>
+#include <optional>
 
 extern "C" {
 
 void livetrace_enable_system_profiling(void);
 
 void livetrace_disable_symbolizer(void);
+
+int32_t livetrace_set_host_root_path(const char *path);
 
 struct Profiler;
 
@@ -58,13 +61,16 @@ public:
 
     ~CpuProfiler() { Stop(); }
 
-    void Start(livetrace_profiler_read_cb_ctx_t handler, void *ctx) {
+    void Start(livetrace_profiler_read_cb_ctx_t handler, void *ctx, std::optional<std::string> hostRootPath) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
             mProfiler = livetrace_profiler_create();
             assert(mProfiler != nullptr);
             mHandler = handler;
             mCtx = ctx;
+            if (hostRootPath != std::nullopt) {
+                livetrace_set_host_root_path(hostRootPath.value().c_str());
+            }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
                 "[CpuProfiler][Start] create profiler, handler: %p ctx: %p", handler, ctx);
         }
