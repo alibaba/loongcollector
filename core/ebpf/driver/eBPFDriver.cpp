@@ -405,7 +405,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
             assert(config != nullptr);
             assert(config->mHandler != nullptr);
-            gCpuProfiler->Start(config->mHandler, config->mCtx);
+            gCpuProfiler->Start(config->mHandler, config->mCtx, std::move(config->mHostRootPath));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler started\n");
             break;
         }
