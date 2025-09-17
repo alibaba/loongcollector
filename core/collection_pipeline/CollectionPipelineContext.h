@@ -57,6 +57,7 @@ public:
     const CollectionPipeline& GetPipeline() const { return *mPipeline; }
     CollectionPipeline& GetPipeline() { return *mPipeline; }
     void SetPipeline(CollectionPipeline& pipeline) { mPipeline = &pipeline; }
+    bool HasValidPipeline() const { return mPipeline != nullptr; }
 
     const std::string& GetProjectName() const;
     const std::string& GetLogstoreName() const;
