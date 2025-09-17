@@ -141,16 +141,10 @@ bool LoongSuiteForwardServiceImpl::AddToIndex(std::string& configName, ForwardCo
     errorMsg.clear();
     std::unique_lock<std::shared_mutex> lock(mMatchIndexMutex);
     if (!configName.empty()) {
-        // check if config already exists
-        auto it = mMatchIndex.find(configName);
-        if (it != mMatchIndex.end()) {
-            errorMsg = "The match rule is already exists, conflict with " + it->second->configName;
-            return false;
-        }
         mMatchIndex[configName] = std::make_shared<ForwardConfig>(std::move(config));
         return true;
     }
-    errorMsg = "Invalid match rule";
+    errorMsg = "Empty config name";
     return false;
 }
 

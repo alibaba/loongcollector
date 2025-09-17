@@ -98,12 +98,12 @@ void LoongSuiteForwardServiceUnittest::TestUpdateConfig() {
     APSARA_TEST_EQUAL_FATAL(1, it->second->queueKey);
     APSARA_TEST_EQUAL_FATAL(0, it->second->inputIndex);
 
-    // Test same match rule (should fail due to duplicate matchValue)
     Json::Value configNoMatch;
     configNoMatch["QueueKey"] = 2;
     configNoMatch["InputIndex"] = 1;
     std::string configName2 = "test_config_2";
-    APSARA_TEST_FALSE_FATAL(service->Update(configName2, configNoMatch));
+    APSARA_TEST_TRUE_FATAL(service->Update(configName2, configNoMatch));
+    APSARA_TEST_TRUE_FATAL(service->Update(configName, configNoMatch));
 }
 
 void LoongSuiteForwardServiceUnittest::TestUpdateConfigWithInvalidParams() {
@@ -383,7 +383,7 @@ void LoongSuiteForwardServiceUnittest::TestAddToIndexEdgeCases() {
     std::string configName2 = "duplicate_test_2";
 
     APSARA_TEST_TRUE_FATAL(service->Update(configName1, config));
-    APSARA_TEST_FALSE_FATAL(service->Update(configName2, config)); // Should fail due to duplicate
+    APSARA_TEST_TRUE_FATAL(service->Update(configName2, config));
 
     // Verify only first config exists
     auto it = service->mMatchIndex.find("duplicate_test_1");
@@ -432,18 +432,14 @@ void LoongSuiteForwardServiceUnittest::TestConfigConflicts() {
     // First config should succeed
     APSARA_TEST_TRUE_FATAL(service->Update(configName1, config1));
 
-    // Second config with same match value should fail
-    APSARA_TEST_FALSE_FATAL(service->Update(configName1, config2));
+    // Second config update
+    APSARA_TEST_TRUE_FATAL(service->Update(configName1, config2));
 
     // Verify only first config exists
     auto it = service->mMatchIndex.find("conflict_test_1");
     APSARA_TEST_TRUE_FATAL(it != service->mMatchIndex.end());
     APSARA_TEST_EQUAL_FATAL(configName1, it->second->configName);
-    APSARA_TEST_EQUAL_FATAL(1, it->second->queueKey);
-
-    // Test updating the existing config (should delete first then update)
-    config1["QueueKey"] = 10;
-    APSARA_TEST_FALSE_FATAL(service->Update(configName1, config1));
+    APSARA_TEST_EQUAL_FATAL(2, it->second->queueKey);
 }
 
 UNIT_TEST_CASE(LoongSuiteForwardServiceUnittest, TestServiceName)
