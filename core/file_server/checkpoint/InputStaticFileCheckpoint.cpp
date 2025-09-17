@@ -366,6 +366,14 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
 }
 
 bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
+    // 优化：直接判断是否还有文件需要发送
+    // 如果 mLastSentIndex 已经到达或超过文件总数，说明所有文件都已处理完毕
+    if (mLastSentIndex >= mFileCheckpoints.size()) {
+        return true;
+    }
+    
+    size_t startIndex = mLastSentIndex;
+
     string project;
     string region;
     size_t prefixPos = mConfigName.find("##1.0##");
@@ -382,7 +390,11 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
 
     auto now = GetCurrentLogtailTime();
     auto timestamp = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
-    for (const auto& cpt : mFileCheckpoints) {
+    
+    // 优化：从上次发送位置开始发送，避免重复处理已发送的文件
+    for (size_t i = startIndex; i < mFileCheckpoints.size(); ++i) {
+        const auto& cpt = mFileCheckpoints[i];
+        
         LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(region);
         if (!logEvent) {
             continue;
@@ -433,6 +445,12 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
             default:
                 // should not happen
                 break;
+        }
+        
+        // 更新 mLastSentIndex：如果当前文件已经是终态（FINISHED 或 ABORT），
+        // 则可以将 mLastSentIndex 更新到下一个位置
+        if (cpt.mStatus == FileStatus::FINISHED || cpt.mStatus == FileStatus::ABORT) {
+            mLastSentIndex = i + 1;
         }
     }
     return true;

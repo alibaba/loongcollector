@@ -63,6 +63,7 @@ private:
     StaticFileReadingStatus mStatus = StaticFileReadingStatus::RUNNING;
     uint32_t mStartTime = 0;
     uint32_t mExpireTime = 0;
+    mutable size_t mLastSentIndex = 0; // 跟踪上次发送到的位置
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputStaticFileCheckpointManagerUnittest;
