@@ -127,16 +127,16 @@ bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
             item->mStatus = SendingStatus::IDLE;
-            LOG_TRACE(sLogger,
-                      ("failed to build request", "retry later")("item address", item)(
-                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
-                            "errMsg", errMsg));
+            LOG_TRACE(
+                sLogger,
+                ("failed to build request", "retry later")("item address", item)(
+                    "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         } else {
-            LOG_WARNING(sLogger,
-                        ("failed to build request", "discard item")("item address", item)(
-                            "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
-                                "errMsg", errMsg));
+            LOG_WARNING(
+                sLogger,
+                ("failed to build request", "discard item")("item address", item)(
+                    "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
         }
