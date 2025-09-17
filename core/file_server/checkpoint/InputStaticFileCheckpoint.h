@@ -63,6 +63,8 @@ private:
     StaticFileReadingStatus mStatus = StaticFileReadingStatus::RUNNING;
     uint32_t mStartTime = 0;
     uint32_t mExpireTime = 0;
+    uint32_t mFinishTime = 0; // 记录状态变为 FINISHED 的时间
+    uint32_t mAbortTime = 0; // 记录状态变为 ABORT 的时间
     mutable size_t mLastSentIndex = 0; // 跟踪上次发送到的位置
 
 #ifdef APSARA_UNIT_TEST_MAIN

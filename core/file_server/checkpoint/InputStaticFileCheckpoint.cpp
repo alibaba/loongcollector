@@ -106,6 +106,7 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
                                                                                                                  size));
                 if (++mCurrentFileIndex == mFileCheckpoints.size()) {
                     mStatus = StaticFileReadingStatus::FINISHED;
+                    mFinishTime = time(nullptr);
                     LOG_INFO(sLogger, ("all files read done, config", mConfigName)("input idx", mInputIdx));
                 }
             }
@@ -135,6 +136,7 @@ bool InputStaticFileCheckpoint::InvalidateCurrentFileCheckpoint() {
                     "signature size", fileCpt.mSignatureSize)("read offset", fileCpt.mOffset));
     if (++mCurrentFileIndex == mFileCheckpoints.size()) {
         mStatus = StaticFileReadingStatus::FINISHED;
+        mFinishTime = time(nullptr);
         LOG_INFO(sLogger, ("all files read done, config", mConfigName)("input idx", mInputIdx));
     }
     return true;
@@ -162,6 +164,7 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
 void InputStaticFileCheckpoint::SetAbort() {
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         mStatus = StaticFileReadingStatus::ABORT;
+        mAbortTime = time(nullptr);
         LOG_WARNING(sLogger, ("file read abort, config", mConfigName)("input idx", mInputIdx));
     }
 }
@@ -180,6 +183,12 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
     root["status"] = StaticFileReadingStatusToString(mStatus);
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         root["current_file_index"] = mCurrentFileIndex;
+    }
+    if (mStatus == StaticFileReadingStatus::FINISHED) {
+        root["finish_time"] = mFinishTime;
+    }
+    if (mStatus == StaticFileReadingStatus::ABORT) {
+        root["abort_time"] = mAbortTime;
     }
     root["files"] = Json::arrayValue;
     auto& files = root["files"];
@@ -259,6 +268,12 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         if (!GetMandatoryUInt64Param(res, "current_file_index", mCurrentFileIndex, *errMsg)) {
             return false;
         }
+    }
+    if (mStatus == StaticFileReadingStatus::FINISHED) {
+        GetOptionalUIntParam(res, "finish_time", mFinishTime, *errMsg);
+    }
+    if (mStatus == StaticFileReadingStatus::ABORT) {
+        GetOptionalUIntParam(res, "abort_time", mAbortTime, *errMsg);
     }
 
     uint32_t fileCnt = 0;
@@ -365,6 +380,46 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
     return true;
 }
 
+string buildFileInfoJson(const FileCheckpoint& cpt) {
+    Json::Value fileInfo;
+    fileInfo["filepath"] = cpt.mFilePath.string();
+    fileInfo["status"] = FileStatusToString(cpt.mStatus);
+    
+    switch (cpt.mStatus) {
+        case FileStatus::WAITING:
+            fileInfo["dev"] = cpt.mDevInode.dev;
+            fileInfo["inode"] = cpt.mDevInode.inode;
+            fileInfo["sig_hash"] = cpt.mSignatureHash;
+            fileInfo["sig_size"] = cpt.mSignatureSize;
+            break;
+        case FileStatus::READING:
+            fileInfo["dev"] = cpt.mDevInode.dev;
+            fileInfo["inode"] = cpt.mDevInode.inode;
+            fileInfo["sig_hash"] = cpt.mSignatureHash;
+            fileInfo["sig_size"] = cpt.mSignatureSize;
+            fileInfo["size"] = cpt.mSize;
+            fileInfo["offset"] = cpt.mOffset;
+            fileInfo["start_time"] = cpt.mStartTime;
+            fileInfo["last_read_time"] = cpt.mLastUpdateTime;
+            break;
+        case FileStatus::FINISHED:
+            fileInfo["size"] = cpt.mSize;
+            fileInfo["start_time"] = cpt.mStartTime;
+            fileInfo["finish_time"] = cpt.mLastUpdateTime;
+            break;
+        case FileStatus::ABORT:
+            fileInfo["abort_time"] = cpt.mLastUpdateTime;
+            break;
+        default:
+            // should not happen
+            break;
+    }
+    
+    Json::StreamWriterBuilder builder;
+    builder["indentation"] = "";  // 不缩进，生成紧凑的JSON
+    return Json::writeString(builder, fileInfo);
+}
+
 bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
     // 优化：直接判断是否还有文件需要发送
     // 如果 mLastSentIndex 已经到达或超过文件总数，说明所有文件都已处理完毕
@@ -414,38 +469,13 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
         if (mStatus == StaticFileReadingStatus::RUNNING) {
             logEvent->SetContent("current_file_index", ToString(mCurrentFileIndex));
         }
-        // file info
-        logEvent->SetContent("filepath", cpt.mFilePath.string());
-        logEvent->SetContent("status", FileStatusToString(cpt.mStatus));
-        switch (cpt.mStatus) {
-            case FileStatus::WAITING:
-                logEvent->SetContent("dev", ToString(cpt.mDevInode.dev));
-                logEvent->SetContent("inode", ToString(cpt.mDevInode.inode));
-                logEvent->SetContent("sig_hash", ToString(cpt.mSignatureHash));
-                logEvent->SetContent("sig_size", ToString(cpt.mSignatureSize));
-                break;
-            case FileStatus::READING:
-                logEvent->SetContent("dev", ToString(cpt.mDevInode.dev));
-                logEvent->SetContent("inode", ToString(cpt.mDevInode.inode));
-                logEvent->SetContent("sig_hash", ToString(cpt.mSignatureHash));
-                logEvent->SetContent("sig_size", ToString(cpt.mSignatureSize));
-                logEvent->SetContent("size", ToString(cpt.mSize));
-                logEvent->SetContent("offset", ToString(cpt.mOffset));
-                logEvent->SetContent("start_time", ToString(cpt.mStartTime));
-                logEvent->SetContent("last_read_time", ToString(cpt.mLastUpdateTime));
-                break;
-            case FileStatus::FINISHED:
-                logEvent->SetContent("size", ToString(cpt.mSize));
-                logEvent->SetContent("start_time", ToString(cpt.mStartTime));
-                logEvent->SetContent("finish_time", ToString(cpt.mLastUpdateTime));
-                break;
-            case FileStatus::ABORT:
-                logEvent->SetContent("abort_time", ToString(cpt.mLastUpdateTime));
-                break;
-            default:
-                // should not happen
-                break;
+        if (mStatus == StaticFileReadingStatus::FINISHED) {
+            logEvent->SetContent("finish_time", ToString(mFinishTime));
         }
+        if (mStatus == StaticFileReadingStatus::ABORT) {
+            logEvent->SetContent("abort_time", ToString(mAbortTime));
+        }
+        logEvent->SetContent("file_info", buildFileInfoJson(cpt));
         
         // 更新 mLastSentIndex：如果当前文件已经是终态（FINISHED 或 ABORT），
         // 则可以将 mLastSentIndex 更新到下一个位置
