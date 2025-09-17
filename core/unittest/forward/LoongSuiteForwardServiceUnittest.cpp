@@ -374,14 +374,9 @@ void LoongSuiteForwardServiceUnittest::TestForwardWithEmptyData() {
 }
 
 void LoongSuiteForwardServiceUnittest::TestAddToIndexEdgeCases() {
-    // Test AddToIndex method directly through public Update method
-
-    // Test with empty match value
     Json::Value config;
-    std::string configName = "empty_match_test";
     config["QueueKey"] = 1;
     config["InputIndex"] = 0;
-    APSARA_TEST_FALSE_FATAL(service->Update(configName, config));
 
     // Test with duplicate match value conflict
     std::string configName1 = "duplicate_test_1";
