@@ -187,7 +187,7 @@ void DiskCollectorUnittest::TestCollect() const {
     ofs3.close();
     PROCESS_DIR = ".";
 
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     ofstream ofs4("./diskstats", std::ios::trunc);
     ofs4 << " 253       0 vda 7658551 323100 586387169 319931079 1424590181 625148386 29125354328 1204074948 0 "
@@ -204,7 +204,7 @@ void DiskCollectorUnittest::TestCollect() const {
 
     std::this_thread::sleep_for(std::chrono::seconds(1)); // wait system interface cache stale
     collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     ofstream ofs5("./diskstats", std::ios::trunc);
     ofs5 << " 253       0 vda 7658551 323100 586387169 319931079 1424590181 625148386 29125354328 1204074948 0 "
@@ -221,7 +221,7 @@ void DiskCollectorUnittest::TestCollect() const {
 
     std::this_thread::sleep_for(std::chrono::seconds(1)); // wait system interface cache stale
     collectContext.SetTime(std::chrono::steady_clock::now(), time(nullptr));
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     ofstream ofs8("./diskstats", std::ios::trunc);
     ofs8 << " 253       0 vda 7658551 323100 586387169 319931079 1424590181 625148386 29125354328 1204074948 0 "
