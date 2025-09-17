@@ -17,8 +17,8 @@
 
 #include "common/ParamExtractor.h"
 #include "monitor/SelfMonitorServer.h"
-#include "provider/Provider.h"
 #include "plugin/input/InputStaticFile.h"
+#include "provider/Provider.h"
 
 namespace logtail {
 
