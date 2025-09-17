@@ -16,7 +16,7 @@ cmake_minimum_required(VERSION 3.22)
 project(driver)
 
 if (LINUX)
-    set(ENABLE_PROFILE ON CACHE BOOL "Enable profile" FORCE)
+    set(ENABLE_PROFILE OFF CACHE BOOL "Enable profile" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Build test cases" FORCE)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
     
@@ -39,6 +39,17 @@ if (LINUX)
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
         DEPENDS coolbpf coolbpf_static
     )
+    add_custom_target(
+        build_libprofiler ALL
+        COMMAND CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/profiler cargo build -r
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf/src/profiler
+    )
+    add_library(profiler SHARED IMPORTED)
+    set_target_properties(profiler PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/profiler/release/libprofiler.so
+        IMPORTED_NO_SONAME TRUE
+    )
+    add_dependencies(profiler build_libprofiler)
 
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
@@ -49,7 +60,7 @@ if (LINUX)
 
     add_library(${EBPF_DIRVER_TARGET} SHARED ${LIB_SOURCE_FILES})
     target_link_options(${EBPF_DIRVER_TARGET} PRIVATE "-Wl,-rpath=.:${DEFAULT_DEPS_ROOT}/lib")
-    target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf ${DEFAULT_DEPS_ROOT}/lib/libprofiler.so)
+    target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf profiler)
     add_dependencies(${EBPF_DIRVER_TARGET} install_coolbpf)
     target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC)
 endif ()
