@@ -242,7 +242,9 @@ void InputStaticFileCheckpointManager::DumpAllCheckpointFiles() const {
                         ("failed to dump checkpoint file, config",
                          item.second.GetConfigName())("input idx", item.second.GetInputIndex()));
         } else {
+#ifdef __ENTERPRISE__
             SelfMonitorServer::GetInstance()->SendTaskStatus();
+#endif
         }
     }
 }
@@ -341,11 +343,12 @@ bool InputStaticFileCheckpointManager::DumpCheckpointFile(const InputStaticFileC
         // should not happen
         return false;
     }
-
+#ifdef __ENTERPRISE__
     if (!cpt.SerializeToLogEvents()) {
         // should not happen
         return false;
     }
+#endif
 
     string errMsg;
     return UpdateFileContent(

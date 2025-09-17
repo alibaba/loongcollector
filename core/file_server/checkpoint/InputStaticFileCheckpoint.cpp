@@ -384,7 +384,7 @@ string buildFileInfoJson(const FileCheckpoint& cpt) {
     Json::Value fileInfo;
     fileInfo["filepath"] = cpt.mFilePath.string();
     fileInfo["status"] = FileStatusToString(cpt.mStatus);
-    
+
     switch (cpt.mStatus) {
         case FileStatus::WAITING:
             fileInfo["dev"] = cpt.mDevInode.dev;
@@ -414,19 +414,18 @@ string buildFileInfoJson(const FileCheckpoint& cpt) {
             // should not happen
             break;
     }
-    
+
     Json::StreamWriterBuilder builder;
-    builder["indentation"] = "";  // 不缩进，生成紧凑的JSON
+    builder["indentation"] = ""; // 不缩进，生成紧凑的JSON
     return Json::writeString(builder, fileInfo);
 }
 
 bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
-    // 优化：直接判断是否还有文件需要发送
     // 如果 mLastSentIndex 已经到达或超过文件总数，说明所有文件都已处理完毕
     if (mLastSentIndex >= mFileCheckpoints.size()) {
         return true;
     }
-    
+
     size_t startIndex = mLastSentIndex;
 
     string project;
@@ -445,11 +444,11 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
 
     auto now = GetCurrentLogtailTime();
     auto timestamp = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
-    
-    // 优化：从上次发送位置开始发送，避免重复处理已发送的文件
+
+    // 从上次发送位置开始发送，避免重复处理已发送的文件
     for (size_t i = startIndex; i < mFileCheckpoints.size(); ++i) {
         const auto& cpt = mFileCheckpoints[i];
-        
+
         LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(region);
         if (!logEvent) {
             continue;
@@ -476,9 +475,7 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
             logEvent->SetContent("abort_time", ToString(mAbortTime));
         }
         logEvent->SetContent("file_info", buildFileInfoJson(cpt));
-        
-        // 更新 mLastSentIndex：如果当前文件已经是终态（FINISHED 或 ABORT），
-        // 则可以将 mLastSentIndex 更新到下一个位置
+
         if (cpt.mStatus == FileStatus::FINISHED || cpt.mStatus == FileStatus::ABORT) {
             mLastSentIndex = i + 1;
         }
