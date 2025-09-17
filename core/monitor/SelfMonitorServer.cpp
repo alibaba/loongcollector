@@ -219,8 +219,6 @@ void SelfMonitorServer::SendTaskStatus() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__task_status__
-    // tags:
-    // LOG_RESERVED_KEY_TASK_TYPE:${taskType}
     vector<PipelineEventGroup> pipelineEventGroupList;
     TaskStatusManager::GetInstance()->FlushTaskStatus(pipelineEventGroupList);
 

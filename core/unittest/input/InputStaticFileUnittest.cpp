@@ -440,6 +440,8 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
                     "config_name" : "test_config",
                     "current_file_index" : 0,
                     "file_count" : 1,
+                    "start_time" : 1739349980,
+                    "expire_time" : 1739349981,
                     "files" :
                     [
                         {

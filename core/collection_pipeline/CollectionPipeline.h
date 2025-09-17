@@ -64,6 +64,8 @@ public:
 
     const std::string& Name() const { return mName; }
     bool IsOnetime() const { return mIsOnetime; }
+    const std::optional<uint32_t>& GetOnetimeStartTime() const { return mOnetimeStartTime; }
+    const std::optional<uint32_t>& GetOnetimeExpireTime() const { return mOnetimeExpireTime; }
     CollectionPipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
     const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
@@ -95,6 +97,8 @@ private:
 
     std::string mName;
     bool mIsOnetime = false;
+    std::optional<uint32_t> mOnetimeStartTime;
+    std::optional<uint32_t> mOnetimeExpireTime;
     std::vector<std::unique_ptr<InputInstance>> mInputs;
     std::vector<std::unique_ptr<ProcessorInstance>> mPipelineInnerProcessorLine;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;

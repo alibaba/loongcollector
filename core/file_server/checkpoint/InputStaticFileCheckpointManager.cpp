@@ -41,7 +41,9 @@ InputStaticFileCheckpointManager::InputStaticFileCheckpointManager()
 
 bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName,
                                                         size_t idx,
-                                                        const optional<vector<filesystem::path>>& files) {
+                                                        const optional<vector<filesystem::path>>& files,
+                                                        uint32_t startTime,
+                                                        uint32_t expireTime) {
     if (!files.has_value()) {
         InputStaticFileCheckpoint cpt;
         if (RetrieveCheckpointFromFile(configName, idx, &cpt)) {
@@ -52,7 +54,9 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         } else {
             lock_guard<mutex> lock(mUpdateMux);
             auto it
-                = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, vector<FileCheckpoint>())
+                = mInputCheckpointMap
+                      .try_emplace(
+                          make_pair(configName, idx), configName, idx, vector<FileCheckpoint>(), startTime, expireTime)
                       .first;
             it->second.SetAbort();
             LOG_WARNING(sLogger,
@@ -118,7 +122,9 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
     {
         lock_guard<mutex> lock(mUpdateMux);
         auto it
-            = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts)).first;
+            = mInputCheckpointMap
+                  .try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts), startTime, expireTime)
+                  .first;
         if (!DumpCheckpointFile(it->second)) {
             LOG_WARNING(sLogger, ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
         }

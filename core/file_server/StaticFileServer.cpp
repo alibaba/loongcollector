@@ -88,7 +88,12 @@ void StaticFileServer::AddInput(const string& configName,
         Init();
     }
 
-    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files);
+    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(
+        configName,
+        idx,
+        files,
+        ctx->GetPipeline().GetOnetimeStartTime().value_or(0),
+        ctx->GetPipeline().GetOnetimeExpireTime().value_or(0));
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileDiscoveryOpts, ctx));

@@ -34,7 +34,8 @@ struct PipelineConfig {
     std::filesystem::path mFilePath;
     uint32_t mCreateTime = 0;
     // valid for onetime config
-    std::optional<uint32_t> mExpireTime;
+    std::optional<uint32_t> mOnetimeStartTime;
+    std::optional<uint32_t> mOnetimeExpireTime;
     bool mIsRunningBeforeStart = false;
 
     PipelineConfig(const std::string& name,

@@ -67,6 +67,5 @@ extern const std::string LOG_RESERVED_KEY_SOURCE;
 extern const std::string LOG_RESERVED_KEY_TOPIC;
 extern const std::string LOG_RESERVED_KEY_MACHINE_UUID;
 extern const std::string LOG_RESERVED_KEY_PACKAGE_ID;
-extern const std::string LOG_RESERVED_KEY_TASK_TYPE;
 
 } // namespace logtail

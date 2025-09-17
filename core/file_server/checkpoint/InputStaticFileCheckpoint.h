@@ -37,7 +37,11 @@ enum class StaticFileReadingStatus {
 class InputStaticFileCheckpoint {
 public:
     InputStaticFileCheckpoint() = default;
-    InputStaticFileCheckpoint(const std::string& configName, size_t idx, std::vector<FileCheckpoint>&& fileCpts);
+    InputStaticFileCheckpoint(const std::string& configName,
+                              size_t idx,
+                              std::vector<FileCheckpoint>&& fileCpts,
+                              uint32_t startTime = 0,
+                              uint32_t expireTime = 0);
 
     bool UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump);
     bool InvalidateCurrentFileCheckpoint();
@@ -57,6 +61,8 @@ private:
     std::vector<FileCheckpoint> mFileCheckpoints;
     size_t mCurrentFileIndex = 0;
     StaticFileReadingStatus mStatus = StaticFileReadingStatus::RUNNING;
+    uint32_t mStartTime = 0;
+    uint32_t mExpireTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputStaticFileCheckpointManagerUnittest;

@@ -64,8 +64,14 @@ static StaticFileReadingStatus GetStaticFileReadingStatusFromString(const string
 InputStaticFileCheckpoint::InputStaticFileCheckpoint(const string& configName,
                                                      size_t idx,
                                                      //  uint64_t hash,
-                                                     vector<FileCheckpoint>&& fileCpts)
-    : mConfigName(configName), mInputIdx(idx), mFileCheckpoints(std::move(fileCpts)) {
+                                                     vector<FileCheckpoint>&& fileCpts,
+                                                     uint32_t startTime,
+                                                     uint32_t expireTime)
+    : mConfigName(configName),
+      mInputIdx(idx),
+      mFileCheckpoints(std::move(fileCpts)),
+      mStartTime(startTime),
+      mExpireTime(expireTime) {
 }
 
 bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump) {
@@ -139,6 +145,9 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
         // should not happen
         return false;
     }
+    if (mStatus == StaticFileReadingStatus::FINISHED || mStatus == StaticFileReadingStatus::ABORT) {
+        return false;
+    }
     if (mCurrentFileIndex >= mFileCheckpoints.size()) {
         return false;
     }
@@ -166,6 +175,8 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
     root["config_name"] = mConfigName;
     root["input_index"] = mInputIdx;
     root["file_count"] = mFileCheckpoints.size(); // for integrity check
+    root["start_time"] = mStartTime;
+    root["expire_time"] = mExpireTime;
     root["status"] = StaticFileReadingStatusToString(mStatus);
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         root["current_file_index"] = mCurrentFileIndex;
@@ -227,6 +238,12 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         return false;
     }
     if (!GetMandatoryUInt64Param(res, "input_index", mInputIdx, *errMsg)) {
+        return false;
+    }
+    if (!GetOptionalUIntParam(res, "start_time", mStartTime, *errMsg)) {
+        return false;
+    }
+    if (!GetOptionalUIntParam(res, "expire_time", mExpireTime, *errMsg)) {
         return false;
     }
     string statusStr;
@@ -366,16 +383,22 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
     auto now = GetCurrentLogtailTime();
     auto timestamp = AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta() : now.tv_sec;
     for (const auto& cpt : mFileCheckpoints) {
-        LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(TASK_TYPE_STATIC_FILE, region);
+        LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(region);
         if (!logEvent) {
             continue;
         }
         logEvent->SetTimestamp(timestamp);
         // task info
-        logEvent->SetContent("config_name", mConfigName);
-        logEvent->SetContent("input_idx", ToString(mInputIdx));
+        logEvent->SetContent(TASK_CONTENT_KEY_TASK_TYPE, TASK_TYPE_STATIC_FILE);
+        if (!project.empty()) {
+            logEvent->SetContent(TASK_CONTENT_KEY_PROJECT, project);
+        }
+        logEvent->SetContent(TASK_CONTENT_KEY_CONFIG_NAME, mConfigName);
+        logEvent->SetContent(TASK_CONTENT_KEY_STATUS, StaticFileReadingStatusToString(mStatus));
+        logEvent->SetContent(TASK_CONTENT_KEY_START_TIME, ToString(mStartTime));
+        logEvent->SetContent(TASK_CONTENT_KEY_EXPIRE_TIME, ToString(mExpireTime));
         logEvent->SetContent("file_count", ToString(mFileCheckpoints.size()));
-        logEvent->SetContent("status", StaticFileReadingStatusToString(mStatus));
+        logEvent->SetContent("input_idx", ToString(mInputIdx));
         if (mStatus == StaticFileReadingStatus::RUNNING) {
             logEvent->SetContent("current_file_index", ToString(mCurrentFileIndex));
         }

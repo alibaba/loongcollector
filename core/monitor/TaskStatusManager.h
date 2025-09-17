@@ -22,6 +22,15 @@
 
 namespace logtail {
 
+// task content keys
+extern const std::string TASK_CONTENT_KEY_TASK_TYPE;
+extern const std::string TASK_CONTENT_KEY_PROJECT;
+extern const std::string TASK_CONTENT_KEY_CONFIG_NAME;
+extern const std::string TASK_CONTENT_KEY_STATUS;
+extern const std::string TASK_CONTENT_KEY_START_TIME;
+extern const std::string TASK_CONTENT_KEY_EXPIRE_TIME;
+
+// task types
 extern const std::string& TASK_TYPE_STATIC_FILE;
 
 class TaskStatusManager {
@@ -31,7 +40,7 @@ public:
         return &instance;
     }
 
-    LogEvent* AddTaskStatus(const std::string& taskType, const std::string& region);
+    LogEvent* AddTaskStatus(const std::string& region);
     void FlushTaskStatus(std::vector<PipelineEventGroup>& pipelineEventGroupList);
 
 private:

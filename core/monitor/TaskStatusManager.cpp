@@ -22,22 +22,28 @@
 
 namespace logtail {
 
+// task content keys
+const std::string TASK_CONTENT_KEY_TASK_TYPE = "task_type";
+const std::string TASK_CONTENT_KEY_PROJECT = "project";
+const std::string TASK_CONTENT_KEY_CONFIG_NAME = "config_name";
+const std::string TASK_CONTENT_KEY_STATUS = "status";
+const std::string TASK_CONTENT_KEY_START_TIME = "start_time";
+const std::string TASK_CONTENT_KEY_EXPIRE_TIME = "expire_time";
+
+// task types
 const std::string& TASK_TYPE_STATIC_FILE = InputStaticFile::sName;
 
-LogEvent* TaskStatusManager::AddTaskStatus(const std::string& taskType, const std::string& region) {
-    std::string key = taskType + "_" + region;
+LogEvent* TaskStatusManager::AddTaskStatus(const std::string& region) {
     std::lock_guard<std::mutex> lock(mMutex);
-    if (mTaskStatusMap.find(key) == mTaskStatusMap.end()) {
+    if (mTaskStatusMap.find(region) == mTaskStatusMap.end()) {
         PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
         // metadata for flusher(region, dataType
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
                                        SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS);
-        // tags for query(task_type)
-        pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_TASK_TYPE, taskType);
-        mTaskStatusMap.emplace(key, std::move(pipelineEventGroup));
+        mTaskStatusMap.emplace(region, std::move(pipelineEventGroup));
     }
-    return mTaskStatusMap.at(key).AddLogEvent();
+    return mTaskStatusMap.at(region).AddLogEvent();
 }
 
 void TaskStatusManager::FlushTaskStatus(std::vector<PipelineEventGroup>& pipelineEventGroupList) {
