@@ -250,7 +250,7 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
 
         if (!isSelfCheckCollector) {
             mLatencyTimeMs->Add(
-                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime));
+                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - startTime));
         }
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
