@@ -15,10 +15,11 @@
 #pragma once
 
 #include <archive.h>
-#include <string>
+
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
+#include <string>
 
 namespace logtail {
 
@@ -40,4 +41,4 @@ private:
     ArchivePtr createArchiveReader();
 };
 
-}
+} // namespace logtail
