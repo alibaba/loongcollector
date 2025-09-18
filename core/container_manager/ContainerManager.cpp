@@ -379,7 +379,6 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
     LOG_INFO(sLogger, ("stoppedContainerIDs", ToString(stoppedContainerIDs)));
 
     for (const auto& containerId : stoppedContainerIDs) {
-        Event* pStoppedEvent = new Event(containerId, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
         for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
             const FileDiscoveryOptions* options = itr->second.first;
             if (options->IsContainerDiscoveryEnabled()) {
@@ -388,15 +387,21 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
                     for (auto& info : *containerInfos) {
                         if (info.mRawContainerInfo->mID == containerId) {
                             info.mRawContainerInfo->mStopped = true;
+
+                            Event* pStoppedEvent = new Event(info.mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
+
                             pStoppedEvent->SetConfigName(itr->first);
-                            break;
+                            pStoppedEvent->SetContainerID(containerId);
+                            eventVec.push_back(pStoppedEvent);
+
+                            LOG_INFO(sLogger, ("stop event", containerId)("configName", itr->first));
+
                         }
                     }
                 }
             }
         }
-        pStoppedEvent->SetContainerID(containerId);
-        eventVec.push_back(pStoppedEvent);
+        
     }
 }
 
