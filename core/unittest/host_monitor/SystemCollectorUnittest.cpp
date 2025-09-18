@@ -52,8 +52,8 @@ void SystemCollectorUnittest::TestCollect() const {
                                      CollectorInstance(std::move(systemCollector)));
     collectconfig.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
-    APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, nullptr));
+    APSARA_TEST_TRUE(collector.Collect(collectconfig, nullptr));
     APSARA_TEST_TRUE(collector.Collect(collectconfig, &group));
     APSARA_TEST_EQUAL_FATAL(1UL, group.GetEvents().size());
 

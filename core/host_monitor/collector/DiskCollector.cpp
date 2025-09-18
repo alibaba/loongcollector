@@ -83,12 +83,7 @@ std::string JoinBytesLimit(const T& v, const std::string& splitter, size_t n) {
     return result;
 }
 
-bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
     std::map<std::string, DiskCollectStat> diskCollectStatMap;
     if (GetDiskCollectStatMap(collectContext.mCollectTime, diskCollectStatMap) <= 0) {
@@ -142,7 +137,8 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
     }
     mLastDiskCollectStatMap = mCurrentDiskCollectStatMap;
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
 
@@ -159,7 +155,7 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
             diskSerialId = diskSerialIdInfo.serialId;
         }
 
-        MetricEvent* metricEvent = group->AddMetricEvent(true);
+        MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
         DiskCollectStat diskCollectStat = mCurrentDiskCollectStatMap[devName];
         std::string dirName = JoinBytesLimit(diskCollectStat.deviceMountInfo.mountPaths, ",", kMaxDirSize);
         if (!metricEvent) {
@@ -224,7 +220,6 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
         }
     }
 
-    collectContext.mCount = 0;
     return true;
 }
 

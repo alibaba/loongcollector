@@ -58,7 +58,7 @@ public:
     CPUCollector() = default;
     ~CPUCollector() override = default;
 
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override;
     [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;

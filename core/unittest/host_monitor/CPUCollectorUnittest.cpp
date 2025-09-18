@@ -59,7 +59,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     collectContext.Reset();
     collectContext.mCountPerReport = 3;
 
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -71,7 +71,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     ofs << "cpu2 1 1 1 1 1 1 1 1 1 1";
     ofs.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -83,7 +83,7 @@ void CPUCollectorUnittest::TestCollectNormal() const {
     ofs1 << "cpu2 1 1 1 1 1 1 1 1 1 1";
     ofs1.close();
     PROCESS_DIR = ".";
-    APSARA_TEST_TRUE(collector.Collect(collectContext, &group));
+    APSARA_TEST_TRUE(collector.Collect(collectContext, nullptr));
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     collectContext.mCollectTime.mMetricTime += 1;
@@ -246,7 +246,6 @@ void CPUCollectorUnittest::TestGetCPUInformationInterface() const {
 
 void CPUCollectorUnittest::TestGroupNull() const {
     auto collector = CPUCollector();
-    PipelineEventGroup* group = nullptr;
 
     auto cpuCollector = std::make_unique<CPUCollector>();
     HostMonitorContext collectContext("test",
@@ -256,7 +255,7 @@ void CPUCollectorUnittest::TestGroupNull() const {
                                       std::chrono::seconds(1),
                                       CollectorInstance(std::move(cpuCollector)));
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, group));
+    APSARA_TEST_TRUE_FATAL(collector.Collect(collectContext, nullptr));
 }
 
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectNormal);

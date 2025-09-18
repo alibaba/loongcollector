@@ -29,12 +29,7 @@ namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
 
-bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        LOG_ERROR(sLogger, ("PipelineEventGroup got nullptr", "skip"));
-        return false;
-    }
-    collectContext.mCount++;
+bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     CPUInformation cpuInfo;
     CPUPercent totalCpuPercent{};
     if (!SystemInterface::GetInstance()->GetCPUInformation(collectContext.GetMetricTime(), cpuInfo)) {
@@ -56,7 +51,7 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         if (!CalculateCPUPercent(totalCpuPercent, cpuTotal)) {
             return false;
         }
-        // first time get cpu count and not calculate mCount
+        // first time get cpu count and not calculate
         if (cpuCount == 0) {
             cpuCount = cpuInfo.stats.size() - 1;
             return true;
@@ -65,14 +60,14 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         cpuCount = cpuInfo.stats.size() - 1;
         mCalculate.AddValue(totalCpuPercent);
 
-        if (collectContext.mCount < collectContext.mCountPerReport) {
+        // If group is not provided, just collect data without generating metrics
+        if (!groupPtr) {
             return true;
         }
 
         CPUPercent minCPU, maxCPU, avgCPU, lastCPU;
         mCalculate.Stat(maxCPU, minCPU, avgCPU, &lastCPU);
 
-        collectContext.mCount = 0;
         mCalculate.Reset();
         struct MetricDef {
             const char* name;
@@ -87,7 +82,7 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             {"cpu_cores_value", &cpuCores},
 
         };
-        MetricEvent* metricEvent = group->AddMetricEvent(true);
+        MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
         if (!metricEvent) {
             return false;
         }
