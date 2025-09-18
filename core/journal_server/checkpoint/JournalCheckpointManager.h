@@ -152,8 +152,6 @@ private:
     
     // 持久化相关配置
     std::chrono::steady_clock::time_point mLastFlushTime;
-    static constexpr int DEFAULT_FLUSH_INTERVAL_SECONDS = 30;
-    static constexpr int DEFAULT_MAX_AGE_HOURS = 24;
 };
 
 } // namespace logtail 
