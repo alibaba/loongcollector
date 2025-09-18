@@ -102,6 +102,7 @@ void FileServer::PauseInner() {
 void FileServer::Resume(bool isConfigUpdate) {
     if (isConfigUpdate) {
         ClearContainerInfo();
+        ClearFullList();
         ContainerManager::GetInstance()->ApplyContainerDiffs();
         ContainerManager::GetInstance()->SaveContainerInfo();
     }
@@ -228,6 +229,27 @@ void FileServer::RemoveFileTagConfig(const string& name) {
 void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {
     WriteLock lock(mReadWriteLock);
     mAllContainerInfoMap[pipeline] = info;
+}
+
+void FileServer::SaveFullList(const string& pipeline, const shared_ptr<std::set<std::string>>& fullList) {
+    WriteLock lock(mReadWriteLock);
+    mAllFullListMap[pipeline] = fullList;
+}
+
+shared_ptr<std::set<std::string>> FileServer::GetAndRemoveFullList(const string& pipeline) {
+    WriteLock lock(mReadWriteLock);
+    auto iter = mAllFullListMap.find(pipeline);
+    if (iter == mAllFullListMap.end()) {
+        return make_shared<std::set<std::string>>();
+    }
+    auto res = iter->second;
+    mAllFullListMap.erase(iter);
+    return res;
+}
+
+void FileServer::ClearFullList() {
+    WriteLock lock(mReadWriteLock);
+    mAllFullListMap.clear();
 }
 
 // 获取并移除给定管道的容器信息

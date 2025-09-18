@@ -38,12 +38,23 @@ struct FieldFilter {
 
     std::string ToString() const {
         std::stringstream ss;
+        ss << "{";
+        bool first = true;
         for (const auto& pair : mFieldsMap) {
-            ss << pair.first << "=" << pair.second << std::endl;
+            if (!first) {
+                ss << ", ";
+            }
+            ss << pair.first << "=" << pair.second;
+            first = false;
         }
         for (const auto& pair : mFieldsRegMap) {
-            ss << pair.first << "=" << pair.second->str() << std::endl;
+            if (!first) {
+                ss << ", ";
+            }
+            ss << pair.first << "=" << (pair.second ? pair.second->str() : "null");
+            first = false;
         }
+        ss << "}";
         return ss.str();
     }
 };
@@ -57,8 +68,8 @@ struct MatchCriteriaFilter {
 
     std::string ToString() const {
         std::stringstream ss;
-        ss << "IncludeFields: " << mIncludeFields.ToString() << std::endl;
-        ss << "ExcludeFields: " << mExcludeFields.ToString() << std::endl;
+        ss << "IncludeFields: " << mIncludeFields.ToString()
+           << ", ExcludeFields: " << mExcludeFields.ToString();
         return ss.str();
     }
 };
@@ -72,6 +83,15 @@ struct K8sFilter {
 
     bool IsEmpty() const {
         return mNamespaceReg == nullptr && mPodReg == nullptr && mContainerReg == nullptr && mK8sLabelFilter.IsEmpty();
+    }
+
+    std::string ToString() const {
+        std::stringstream ss;
+        ss << "NamespaceReg: " << (mNamespaceReg ? mNamespaceReg->str() : "null")
+           << ", PodReg: " << (mPodReg ? mPodReg->str() : "null")
+           << ", ContainerReg: " << (mContainerReg ? mContainerReg->str() : "null")
+           << ", K8sLabelFilter: " << mK8sLabelFilter.ToString();
+        return ss.str();
     }
 };
 
@@ -99,6 +119,14 @@ struct ContainerFilters {
     MatchCriteriaFilter mContainerLabelFilter;
 
     bool Init(const ContainerFilterConfig& config);
+
+    std::string ToString() const {
+        std::stringstream ss;
+        ss << "K8SFilter: " << mK8SFilter.ToString()
+           << ", EnvFilter: " << mEnvFilter.ToString()
+           << ", ContainerLabelFilter: " << mContainerLabelFilter.ToString();
+        return ss.str();
+    }
 };
 
 

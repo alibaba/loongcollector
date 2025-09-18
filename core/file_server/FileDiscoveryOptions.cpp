@@ -710,9 +710,12 @@ bool FileDiscoveryOptions::DeleteRawContainerInfo(const std::string& containerID
     if (!mContainerInfos) {
         return false;
     }
-    for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-        if ((*mContainerInfos)[i].mRawContainerInfo->mID == containerID) {
-            mContainerInfos->erase(mContainerInfos->begin() + i);
+
+    // 使用迭代器遍历，更安全和现代的做法
+    for (auto iter = mContainerInfos->begin(); iter != mContainerInfos->end(); ++iter) {
+        if (iter->mRawContainerInfo && iter->mRawContainerInfo->mID == containerID) {
+            LOG_INFO(sLogger, ("delete container", containerID));
+            mContainerInfos->erase(iter);
             return true;
         }
     }

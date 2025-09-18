@@ -50,6 +50,7 @@ public:
     const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
 
     const std::shared_ptr<std::set<std::string>>& GetFullContainerList() const { return mFullContainerList; }
+    void SetFullContainerList(const std::shared_ptr<std::set<std::string>>& fullList) { mFullContainerList = fullList; }
 
     void SetContainerDiscoveryOptions(ContainerDiscoveryOptions&& option) { mContainerDiscovery = std::move(option); }
     ContainerDiscoveryOptions GetContainerDiscoveryOptions() const { return mContainerDiscovery; }

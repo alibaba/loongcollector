@@ -93,9 +93,11 @@ void ContainerManager::ApplyContainerDiffs() {
         }
         const auto& options = itr->second.first;
         const auto& ctx = itr->second.second;
-
-
+        
         const auto& diff = pair.second;
+
+        LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
+
         for (const auto& container : diff->mAdded) {
             options->UpdateRawContainerInfo(container, ctx);
         }
@@ -229,6 +231,9 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                  options->GetContainerDiscoveryOptions().mContainerFilters,
                                  diff);
 
+                            
+    LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName())("containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())("fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size()));
+
     // Update the config's container update time when there are changes
     options->SetLastContainerUpdateTime(time(nullptr));
 
@@ -236,7 +241,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         return false;
     }
 
-    LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
+    //LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
     mConfigContainerDiffMap[ctx->GetConfigName()] = std::make_shared<ContainerDiff>(diff);
     return true;
 }
@@ -301,6 +306,11 @@ void ContainerManager::refreshAllContainersSnapshot() {
     }
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> tmpContainerMap;
     Json::Value allContainers = jsonParams["AllCmd"];
+    if (!allContainers.isArray() || allContainers.size() == 0) {
+        LOG_INFO(sLogger, ("no containers found in AllCmd", ""));
+        return;  // 或者其他适当的处理逻辑
+    }
+
     for (const auto& container : allContainers) {
         auto containerInfo = DeserializeRawContainerInfo(container);
         if (containerInfo && !containerInfo->mID.empty()) {
@@ -510,19 +520,7 @@ void ContainerManager::computeMatchedContainersDiff(
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             fullContainerIDList.insert(pair.first); // 加入到 fullContainerIDList
             bool isContainerLabelMatch = IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels);
-            LOG_DEBUG(sLogger, ("mContainerLabelFilter", filters.mContainerLabelFilter.ToString()));
-            for (const auto& pair : pair.second->mContainerLabels) {
-                LOG_DEBUG(sLogger, ("label", pair.first + "=" + pair.second));
-            }
-
             bool isEnvMatch = IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv);
-
-            LOG_DEBUG(sLogger, ("mEnvFilter", filters.mEnvFilter.ToString()));
-            for (const auto& pair : pair.second->mEnv) {
-                LOG_DEBUG(sLogger, ("env", pair.first + "=" + pair.second));
-            }
-
-
             bool isK8sMatch = IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo);
             LOG_DEBUG(sLogger,
                       ("isContainerLabelMatch", isContainerLabelMatch)("isEnvMatch", isEnvMatch)(
@@ -699,6 +697,7 @@ void ContainerManager::SaveContainerInfo() {
 }
 
 void ContainerManager::LoadContainerInfo() {
+    LOG_INFO(sLogger, ("load container state", "start"));
     std::string configPath = PathJoin(GetAgentDataDir(), "docker_path_config.json");
     std::string content;
 
@@ -859,31 +858,33 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
     }
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> tmp;
-    std::vector<std::shared_ptr<RawContainerInfo>> allContainers;
     const auto& arr = root["Containers"];
 
     for (Json::ArrayIndex i = 0; i < arr.size(); ++i) {
         auto info = DeserializeRawContainerInfo(arr[i]);
         if (!info->mID.empty()) {
             tmp[info->mID] = info;
-            allContainers.push_back(info);
         }
     }
+
+    LOG_INFO(sLogger, ("recover containers", tmp.size()));
 
     if (!tmp.empty()) {
         std::lock_guard<std::mutex> lock(mContainerMapMutex);
         mContainerMap.swap(tmp);
-
         // Apply containers to all existing configs
-        if (!allContainers.empty()) {
-            auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-            for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-                FileDiscoveryOptions* options = itr->second.first;
-                if (options->IsContainerDiscoveryEnabled()) {
-                    checkContainerDiffForOneConfig(options, itr->second.second);
-                }
+        auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+
+        LOG_INFO(sLogger, ("nameConfigMap", nameConfigMap.size()));
+
+        std::vector<std::shared_ptr<RawContainerInfo>> allContainers;
+        for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
+            FileDiscoveryOptions* options = itr->second.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                checkContainerDiffForOneConfig(options, itr->second.second);
             }
         }
+    
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0+)", configPath));
     }
 }
