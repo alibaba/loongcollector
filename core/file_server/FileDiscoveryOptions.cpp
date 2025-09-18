@@ -691,7 +691,7 @@ bool FileDiscoveryOptions::UpdateRawContainerInfo(const std::shared_ptr<RawConta
     containerInfo.mRawContainerInfo = rawContainerInfo;
 
     mContainerDiscovery.GetCustomExternalTags(
-        rawContainerInfo->mEnv, rawContainerInfo->mContainerLabels, containerInfo.mExtraTags);
+        rawContainerInfo->mEnv, rawContainerInfo->mK8sInfo.mLabels, containerInfo.mExtraTags);
 
     if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
         return false;

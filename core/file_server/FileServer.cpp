@@ -105,6 +105,7 @@ void FileServer::Resume(bool isConfigUpdate) {
         ClearFullList();
         ContainerManager::GetInstance()->ApplyContainerDiffs();
         ContainerManager::GetInstance()->SaveContainerInfo();
+        ContainerManager::GetInstance()->LoadContainerInfo();
     }
 
     LOG_INFO(sLogger, ("file server resume", "starts"));
