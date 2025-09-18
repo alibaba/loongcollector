@@ -687,6 +687,7 @@ macro(link_archive target_name)
         target_link_libraries(${target_name} "${archive_${LIBRARY_DIR_SUFFIX}}/libarchive.a")
     elseif (UNIX)
         target_link_libraries(${target_name} archive)
+    endif()
 endmacro()
 
 # grpc
