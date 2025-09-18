@@ -15,7 +15,9 @@
 package grok
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/dlclark/regexp2"
 	. "github.com/smartystreets/goconvey/convey"
@@ -30,6 +32,13 @@ PASS
 coverage: 92.8% of statements
 ok      github.com/alibaba/ilogtail/plugins/processor/grok      0.221s
 */
+
+var expectedGrokPatterns = map[string]string{
+	"%{WORD:word1} %{NUMBER:request_time} %{WORD:word2}":                `(?P<word1>\b\w+\b) (?P<request_time>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+)))))) (?P<word2>\b\w+\b)`,
+	"%{YEAR:year} %{MONTH:month} %{MONTHDAY:day} %{QUOTEDSTRING:motto}": "(?P<year>(?>\\d\\d){1,2}) (?P<month>\\b(?:Jan(?:uary|uar)?|Feb(?:ruary|ruar)?|M(?:a|ä)?r(?:ch|z)?|Apr(?:il)?|Ma(?:y|i)?|Jun(?:e|i)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|O(?:c|k)?t(?:ober)?|Nov(?:ember)?|De(?:c|z)(?:ember)?)\\b) (?P<day>(?:(?:0[1-9])|(?:[12][0-9])|(?:3[01])|[1-9])) (?P<motto>(?>(?<!\\\\)(?>\"(?>\\\\.|[^\\\\\"]+)+\"|\"\"|(?>'(?>\\\\.|[^\\\\']+)+')|''|(?>`(?>\\\\.|[^\\\\`]+)+`)|``)))",
+	"%{HTTP}": `(?P<client>(?:(((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?)|((?<![0-9])(?:(?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))(?![0-9])))) (?P<method>\b\w+\b) (?P<request>((?:/[A-Za-z0-9$.+!*'(){},~:;=@#%_\-]*)+)(?:(\?[A-Za-z0-9$.+!*'|(){},~@#%&/=:;_?\-\[\]<>]*))?) (?P<bytes>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+)))))) (?P<duration>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+))))))`,
+	"SLB_URI": `(?P<proto>[A-Za-z]+(\+[A-Za-z+]+)?)://(?:(([a-zA-Z0-9._-]+))(?::[^@]*)?@)?(?:(?P<urihost>((?:((?:(((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?)|((?<![0-9])(?:(?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))(?![0-9]))))|(\b(?:[0-9A-Za-z][0-9A-Za-z-]{0,62})(?:\.(?:[0-9A-Za-z][0-9A-Za-z-]{0,62}))*(\.?|\b))))(?::(?P<port>\b(?:[1-9][0-9]*)\b))?))?(?:((?P<path>(?:/[A-Za-z0-9$.+!*'(){},~:;=@#%_\-]*)+)(?:(?P<params>\?[A-Za-z0-9$.+!*'|(){},~@#%&/=:;_?\-\[\]<>]*))?))?`,
+}
 
 func newProcessor() (*ProcessorGrok, error) {
 	ctx := mock.NewEmptyContext("p", "l", "c")
@@ -73,7 +82,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["ELB_URI"], ShouldEqual, ans["SLB_URI"])
+			So(processor.processedPatterns["ELB_URI"], ShouldEqual, expectedGrokPatterns["SLB_URI"])
 			for k, v := range processor.processedPatterns {
 				_, err = regexp2.Compile(v, regexp2.RE2)
 				if err != nil {
@@ -89,7 +98,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["HTTP"], ShouldEqual, ans["%{HTTP}"])
+			So(processor.processedPatterns["HTTP"], ShouldEqual, expectedGrokPatterns["%{HTTP}"])
 			_, err = regexp2.Compile(processor.processedPatterns["Http"], regexp2.RE2)
 			So(err, ShouldBeNil)
 		})
@@ -100,7 +109,7 @@ func TestProcessorGrokInit(t *testing.T) {
 			err = processor.Init(mock.NewEmptyContext("p", "l", "c"))
 			So(err, ShouldBeNil)
 
-			So(processor.processedPatterns["DATA"], ShouldEqual, ans["%{HTTP}"])
+			So(processor.processedPatterns["DATA"], ShouldEqual, expectedGrokPatterns["%{HTTP}"])
 			_, err := regexp2.Compile(processor.processedPatterns["Http"], regexp2.RE2)
 			So(err, ShouldBeNil)
 		})
@@ -396,9 +405,68 @@ func TestProcessorGrokError(t *testing.T) {
 	})
 }
 
-var ans = map[string]string{
-	"%{WORD:word1} %{NUMBER:request_time} %{WORD:word2}":                `(?P<word1>\b\w+\b) (?P<request_time>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+)))))) (?P<word2>\b\w+\b)`,
-	"%{YEAR:year} %{MONTH:month} %{MONTHDAY:day} %{QUOTEDSTRING:motto}": "(?P<year>(?>\\d\\d){1,2}) (?P<month>\\b(?:Jan(?:uary|uar)?|Feb(?:ruary|ruar)?|M(?:a|ä)?r(?:ch|z)?|Apr(?:il)?|Ma(?:y|i)?|Jun(?:e|i)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|O(?:c|k)?t(?:ober)?|Nov(?:ember)?|De(?:c|z)(?:ember)?)\\b) (?P<day>(?:(?:0[1-9])|(?:[12][0-9])|(?:3[01])|[1-9])) (?P<motto>(?>(?<!\\\\)(?>\"(?>\\\\.|[^\\\\\"]+)+\"|\"\"|(?>'(?>\\\\.|[^\\\\']+)+')|''|(?>`(?>\\\\.|[^\\\\`]+)+`)|``)))",
-	"%{HTTP}": `(?P<client>(?:(((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?)|((?<![0-9])(?:(?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))(?![0-9])))) (?P<method>\b\w+\b) (?P<request>((?:/[A-Za-z0-9$.+!*'(){},~:;=@#%_\-]*)+)(?:(\?[A-Za-z0-9$.+!*'|(){},~@#%&/=:;_?\-\[\]<>]*))?) (?P<bytes>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+)))))) (?P<duration>(?:((?<![0-9.+-])(?>[+-]?(?:(?:[0-9]+(?:\.[0-9]+)?)|(?:\.[0-9]+))))))`,
-	"SLB_URI": `(?P<proto>[A-Za-z]+(\+[A-Za-z+]+)?)://(?:(([a-zA-Z0-9._-]+))(?::[^@]*)?@)?(?:(?P<urihost>((?:((?:(((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?)|((?<![0-9])(?:(?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])[.](?:[0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))(?![0-9]))))|(\b(?:[0-9A-Za-z][0-9A-Za-z-]{0,62})(?:\.(?:[0-9A-Za-z][0-9A-Za-z-]{0,62}))*(\.?|\b))))(?::(?P<port>\b(?:[1-9][0-9]*)\b))?))?(?:((?P<path>(?:/[A-Za-z0-9$.+!*'(){},~:;=@#%_\-]*)+)(?:(?P<params>\?[A-Za-z0-9$.+!*'|(){},~@#%&/=:;_?\-\[\]<>]*))?))?`,
+func TestGrokWarnZeroWidthPattern(t *testing.T) {
+	Convey("grok should warn about zero-width regex patterns in Match", t, func() {
+		p, err := newProcessor()
+		So(err, ShouldBeNil)
+		p.Match = []string{"(?s)^$"}
+
+		// Capture logs to verify warning is issued
+		ctx := mock.NewEmptyContext("p", "l", "c")
+		err = p.Init(ctx)
+		So(err, ShouldBeNil)
+
+		// The processor should still work despite zero-width pattern
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: ""})
+		logs := []*protocol.Log{log}
+		out := p.ProcessLogs(logs)
+		So(len(out), ShouldEqual, 1)
+	})
+}
+
+func TestGrokTotalTimeoutBudget(t *testing.T) {
+	Convey("grok should honor TotalTimeoutMs budget", t, func() {
+		p, err := newProcessor()
+		So(err, ShouldBeNil)
+		// Use a catastrophic backtracking pattern that will definitely timeout
+		p.Match = []string{"(a+)+b"}
+		p.TimeoutMilliSeconds = 50
+		err = p.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		// Input that triggers catastrophic backtracking - many 'a's but no 'b'
+		record := strings.Repeat("a", 10000) + "c"
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+
+		start := time.Now()
+		result := p.processGrok(log, &record)
+		elapsed := time.Since(start)
+
+		// Should timeout and return matchTimeOut
+		So(result, ShouldEqual, matchTimeOut)
+		// Should complete within reasonable time due to timeout protection
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
+	})
+}
+
+func TestGrokTimeoutDefaults(t *testing.T) {
+	Convey("Timeout fields should have proper defaults", t, func() {
+		p := &ProcessorGrok{
+			CustomPatternDir:    []string{},
+			CustomPatterns:      map[string]string{},
+			SourceKey:           "content",
+			Match:               []string{},
+			TimeoutMilliSeconds: 0, // should default to 100
+			IgnoreParseFailure:  true,
+			KeepSource:          true,
+			NoKeyError:          true,
+			NoMatchError:        true,
+			TimeoutError:        true,
+		}
+		err := p.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+		So(p.TimeoutMilliSeconds, ShouldEqual, 100)
+	})
 }

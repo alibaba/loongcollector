@@ -232,7 +232,7 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     }
 
     auto token = username + ":" + password;
-    auto token64 = Base64Enconde(token);
+    auto token64 = Base64Encode(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
 
     {
@@ -311,7 +311,7 @@ bool ScrapeConfig::UpdateAuthorization() {
             LOG_ERROR(sLogger, ("read password_file failed, password_file", mBasicPasswordPath));
             return false;
         }
-        credentials = prometheus::BASIC_PREFIX + Base64Enconde(username + ":" + password);
+        credentials = prometheus::BASIC_PREFIX + Base64Encode(username + ":" + password);
     } else {
         if (mBearerTokenPath.empty()) {
             return false;

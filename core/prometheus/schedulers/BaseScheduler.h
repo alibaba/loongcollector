@@ -20,8 +20,8 @@ public:
 
     std::chrono::steady_clock::time_point GetNextExecTime();
 
-    void SetFirstExecTime(std::chrono::steady_clock::time_point firstExecTime,
-                          std::chrono::system_clock::time_point firstScrapeTime);
+    void CalculateFirstExecTime(std::chrono::steady_clock::time_point firstExecTime,
+                                std::chrono::system_clock::time_point firstScrapeTime);
 
     void SetScrapeOnceTime(std::chrono::steady_clock::time_point, std::chrono::system_clock::time_point);
     void DelayExecTime(uint64_t delaySeconds);

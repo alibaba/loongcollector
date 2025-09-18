@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/util/Converger.h"
 #include "ebpf/util/sampler/Sampler.h"
 
 namespace logtail::ebpf {
@@ -26,9 +27,10 @@ class AbstractProtocolParser {
 public:
     virtual ~AbstractProtocolParser() = default;
     virtual std::shared_ptr<AbstractProtocolParser> Create() = 0;
-    virtual std::vector<std::shared_ptr<AbstractRecord>> Parse(struct conn_data_event_t* dataEvent,
-                                                               const std::shared_ptr<Connection>& conn,
-                                                               const std::shared_ptr<Sampler>& sampler = nullptr)
+    virtual std::vector<std::shared_ptr<L7Record>> Parse(struct conn_data_event_t* dataEvent,
+                                                         const std::shared_ptr<Connection>& conn,
+                                                         const std::shared_ptr<AppDetail>& appDetail,
+                                                         const std::shared_ptr<AppConvergerManager>& converger)
         = 0;
 };
 

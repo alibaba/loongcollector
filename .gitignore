@@ -11,6 +11,10 @@
 # Dev Container
 .devcontainer/
 
+### visual studio
+.vs/
+core/out/*
+
 ### GoLand
 **/.idea/**
 
@@ -102,3 +106,8 @@ license_coverage.txt
 /generated_files/
 /dist/
 /tags/
+
+### Cursor
+/.cursor/
+/.claude/
+/.gemini/

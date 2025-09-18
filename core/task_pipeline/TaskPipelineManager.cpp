@@ -38,7 +38,7 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             LOG_WARNING(
                 sLogger,
                 ("failed to build task for existing config", "keep current task running")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build task for existing config: keep current task running, config: " + config.mName);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
@@ -49,7 +49,9 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
                  ("task building for existing config succeeded",
                   "stop the old task and start the new one")("config", config.mName));
         auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+        // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one should
+        // be considered as deleted
+        iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
         mPipelineNameEntityMap[config.mName] = std::move(p);
         mPipelineNameEntityMap[config.mName]->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
@@ -60,9 +62,9 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build task for new config", "skip current object")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "failed to build task for new config: skip current object, config: "
-                                                       + config.mName);
+            AlarmManager::GetInstance()->SendAlarmError(
+                CATEGORY_CONFIG_ALARM,
+                "failed to build task for new config: skip current object, config: " + config.mName);
             ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                          ConfigFeedbackStatus::FAILED);
             continue;

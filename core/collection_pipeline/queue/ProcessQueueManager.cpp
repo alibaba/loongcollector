@@ -238,12 +238,6 @@ void ProcessQueueManager::DisablePop(const string& configName, bool isPipelineRe
         auto iter = mQueues.find(key);
         if (iter != mQueues.end()) {
             (*iter->second.first)->DisablePop();
-            if (!isPipelineRemoving) {
-                const auto& p = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
-                if (p) {
-                    (*iter->second.first)->SetPipelineForItems(p);
-                }
-            }
         }
     } else {
         ExactlyOnceQueueManager::GetInstance()->DisablePopProcessQueue(configName, isPipelineRemoving);

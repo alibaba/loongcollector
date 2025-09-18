@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TimeUtil.h"
+#include "common/TimeUtil.h"
 
 #include <cmath>
 #include <memory.h>
@@ -39,17 +39,19 @@ std::string ConvertToTimeStamp(const time_t& t, const std::string& format) {
     return GetTimeStamp(t, format);
 }
 
-std::string GetTimeStamp(time_t t, const std::string& format) {
-    if (0 == strcmp(format.c_str(), "%s")) {
+std::string GetTimeStamp(time_t t, const std::string& format, bool isLocal) {
+    if (format.compare("%s") == 0) {
         return t <= 0 ? "" : std::to_string(t);
     }
 
     struct tm timeInfo;
 #if defined(__linux__)
-    if (NULL == localtime_r(&t, &timeInfo))
+    auto* timeInfoPtr = isLocal ? localtime_r(&t, &timeInfo) : gmtime_r(&t, &timeInfo);
+    if (NULL == timeInfoPtr)
         return "";
 #elif defined(_MSC_VER)
-    if (0 != localtime_s(&timeInfo, &t))
+    auto errorNo = isLocal ? localtime_s(&timeInfo, &t) : gmtime_s(&timeInfo, &t);
+    if (errorNo != 0)
         return "";
 #endif
     char buf[256];
@@ -408,11 +410,6 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
         result = result.substr(result.length() - length, length);
     }
     return result;
-}
-
-long GetTicksPerSecond() {
-    static long sTicksPerSecond = sysconf(_SC_CLK_TCK);
-    return sTicksPerSecond;
 }
 
 std::chrono::nanoseconds GetTimeDiffFromMonotonic() {

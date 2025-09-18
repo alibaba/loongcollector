@@ -14,11 +14,13 @@
 
 #pragma once
 
+#include <sys/epoll.h>
+
 #include <array>
 #include <atomic>
 #include <future>
 #include <memory>
-#include <mutex>
+#include <shared_mutex>
 #include <variant>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
@@ -28,13 +30,11 @@
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "monitor/metric_models/MetricTypes.h"
 #include "runner/InputRunner.h"
 #include "type/CommonDataEvent.h"
 #include "util/FrequencyManager.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 class EnvManager {
 public:
@@ -53,12 +53,29 @@ private:
 #endif
 };
 
+enum class PluginStateOperation {
+    kAddPipeline,
+    kRemovePipeline,
+    kRemoveAll,
+};
+
+struct PluginState {
+    // pipelineName ==> project
+    std::map<std::string, std::string> mPipelines;
+    std::shared_ptr<AbstractManager> mManager;
+    // Shared mutex to coordinate access between plugin management operations
+    // (EnablePlugin/DisablePlugin/SuspendPlugin) and event handling operations
+    // (PollPerfBuffers/HandlerEvents/GetAllProjects), allowing them to safely interleave.
+    mutable std::atomic_bool mValid;
+    mutable std::shared_mutex mMtx;
+};
+
 class EBPFServer : public InputRunner {
 public:
     EBPFServer(const EBPFServer&) = delete;
     EBPFServer& operator=(const EBPFServer&) = delete;
 
-    ~EBPFServer() = default;
+    ~EBPFServer();
 
     void Init() override;
 
@@ -69,9 +86,7 @@ public:
 
     void Stop() override;
 
-    std::string CheckLoadedPipelineName(PluginType type);
-
-    void UpdatePipelineName(PluginType type, const std::string& name, const std::string& project);
+    void EventGC() override;
 
     bool EnablePlugin(const std::string& pipelineName,
                       uint32_t pluginIndex,
@@ -90,13 +105,13 @@ public:
 
     std::string GetAllProjects();
 
-    bool CheckIfNeedStopProcessCacheManager() const;
-
-    void PollPerfBuffers();
-    void HandlerEvents();
-
+    // TODO(qianlu): remove this function when network observer use unified threads
     std::shared_ptr<AbstractManager> GetPluginManager(PluginType type);
-    void UpdatePluginManager(PluginType type, std::shared_ptr<AbstractManager>);
+
+    RetryableEventCache& EventCache() { return mRetryableEventCache; }
+
+    void RegisterPluginPerfBuffers(PluginType type);
+    void UnregisterPluginPerfBuffers(PluginType type);
 
 private:
     bool startPluginInternal(const std::string& pipelineName,
@@ -105,17 +120,33 @@ private:
                              const logtail::CollectionPipelineContext* ctx,
                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                              const PluginMetricManagerPtr& metricManager);
-    EBPFServer() : mEBPFAdapter(std::make_shared<EBPFAdapter>()), mDataEventQueue(4096) {}
+    EBPFServer();
 
+    void pollPerfBuffers();
+    void handlerEvents();
+    // std::string checkLoadedPipelineName(PluginType type);
+    void updatePluginState(PluginType type,
+                           const std::string& name,
+                           const std::string& project,
+                           PluginStateOperation op,
+                           std::shared_ptr<AbstractManager>);
+    PluginState& getPluginState(PluginType type);
+    bool checkIfNeedStopProcessCacheManager() const;
+    void stopProcessCacheManager();
     void
     updateCbContext(PluginType type, const logtail::CollectionPipelineContext* ctx, logtail::QueueKey key, int idx);
+    void handleEvents(std::array<std::shared_ptr<CommonEvent>, 4096>& items, size_t count);
+    void sendEvents();
+    void handleEventCache();
+    void handleEpollEvents();
+
+    // Unified epoll monitoring methods
+    bool initUnifiedEpollMonitoring();
+    void cleanupUnifiedEpollMonitoring();
 
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
 
-    mutable std::mutex mMtx;
-    std::array<std::string, static_cast<size_t>(PluginType::MAX)> mLoadedPipeline = {};
-    std::array<std::string, static_cast<size_t>(PluginType::MAX)> mPluginProject = {};
-    std::array<std::shared_ptr<AbstractManager>, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
+    std::array<PluginState, static_cast<size_t>(PluginType::MAX)> mPlugins = {};
 
     eBPFAdminConfig mAdminConfig;
     std::atomic_bool mInited = false;
@@ -126,27 +157,36 @@ private:
     std::filesystem::path mHostPathPrefix;
 
     EnvManager mEnvMgr;
-    MetricsRecordRef mRef;
-
-    CounterPtr mPollProcessEventsTotal;
-    CounterPtr mLossProcessEventsTotal;
-    CounterPtr mProcessCacheMissTotal;
-    IntGaugePtr mProcessCacheSize;
+    mutable MetricsRecordRef mMetricsRecordRef;
 
     // hold some managers ...
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
-    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mDataEventQueue;
+    moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> mCommonEventQueue;
 
-    std::future<void> mPoller;
-    std::future<void> mHandler;
+    std::future<void> mPoller; // used to poll perf buffers and handle retry events
+    std::future<void> mHandler; // used to handle common events, do aggregate and send events
+    std::future<void> mIterator; // used to iterate bpf maps
 
     FrequencyManager mFrequencyMgr;
 
+    // metrics
+    CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mLossKernelEventsTotal;
+    IntGaugePtr mConnectionCacheSize;
+    CounterPtr mPushLogFailedTotal;
+
+    int mUnifiedEpollFd = -1;
+    std::vector<struct epoll_event> mEpollEvents;
+
+    RetryableEventCache mRetryableEventCache;
+    IntGaugePtr mRetryableEventCacheSize;
+    int64_t mLastEventCacheRetryTime = 0;
+
+    EventPool mEventPool;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

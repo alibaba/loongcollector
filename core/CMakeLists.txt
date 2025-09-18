@@ -34,9 +34,13 @@ cmake_dependent_option(ENABLE_CORP_FEATURE "Enable corp feature" OFF "ENABLE_ENT
 option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
+option(BUILD_LOGTAIL_UT_WITH_BENCHMARK "Build unit test for benchmark" OFF)
 cmake_dependent_option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" ON "CMAKE_BUILD_TYPE STREQUAL Debug;NOT ANDROID" OFF)
 set(PROVIDER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/provider CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
 set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
+
+# Option to enable/disable treating warnings as errors
+option(ENABLE_WERROR "Treat warnings as errors" ON)
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
     message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
@@ -57,12 +61,23 @@ endif ()
 
 if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
+else ()
+    add_definitions(-D__INCLUDE_SSE4_2__)
 endif()
+
+message(STATUS "loongcollector Cpp compile flags: ${CMAKE_CXX_FLAGS}")
+
+add_definitions(-DXXH_DISPATCH_AVX2=0)
+add_definitions(-DXXH_DISPATCH_AVX512=0)
 
 # Default C/CXX flags.
 if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -Wall -fpic -fPIC -D_LARGEFILE64_SOURCE")
+    if (ENABLE_WERROR)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
+    endif()
     if (NOT WITHOUTGDB)
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -ggdb")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -ggdb")
@@ -74,19 +89,28 @@ if (UNIX)
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
     if (BUILD_LOGTAIL_UT)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
-        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+        if (NOT BUILD_LOGTAIL_UT_WITH_BENCHMARK) 
+            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+            SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+        endif ()
     endif ()
 elseif (MSVC)
     add_definitions(-DNOMINMAX)
     add_definitions(-DTARGETLIBS=Psapi.lib)
     add_definitions(-DPSAPI_VERSION=1)
+    # remove WinSock1
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /MP /Zi")
+    # /DEBUG will generate many "pdb not found" warnings.
     set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /DEBUG /OPT:REF /OPT:ICF")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd /MP")
+    add_compile_options("/std:c++17")
+    # for cross-platform, soure file all are utf8
+    add_compile_options("/utf-8")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif ()
 
 # To be compatible with low version Linux.
@@ -118,27 +142,25 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
 
 # Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
-        application app_config checkpoint container_manager metadata logger go_pipeline monitor monitor/metric_constants monitor/metric_models monitor/profile_sender models
-        config config/watcher constants
+        application app_config constants container_manager metadata logger go_pipeline models
+        config config/watcher
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
-        task_pipeline
         runner runner/sink/http
-        protobuf/sls protobuf/models
-        file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling
-        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        apm
-        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+        task_pipeline
+        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
+        protobuf/sls protobuf/models protobuf/forward
+        file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
-        host_monitor host_monitor/collector
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} apm ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+        prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
+        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
+        )
 elseif(MSVC)
-    if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} daemon)
-    endif()
 endif ()
 if (ENABLE_ENTERPRISE)
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} config_sdk)
@@ -208,12 +230,14 @@ if (BUILD_LOGTAIL_SHARED_LIBRARY)
     if (ENABLE_ENTERPRISE)
         if (UNIX)
             add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail.cpp ${SRC_FILES})
+            target_compile_options(${LOGTAIL_TARGET} PRIVATE -fPIC)
         elseif (MSVC)
             add_library(${LOGTAIL_TARGET} SHARED enterprise_logtail_windows.cpp ${SRC_FILES})
         endif ()
     else ()
         if (UNIX)
             add_library(${LOGTAIL_TARGET} SHARED logtail.cpp ${SRC_FILES})
+            target_compile_options(${LOGTAIL_TARGET} PRIVATE -fPIC)
         elseif (MSVC)
             add_library(${LOGTAIL_TARGET} SHARED logtail_windows.cpp ${SRC_FILES})
         endif ()
@@ -226,6 +250,12 @@ add_subdirectory(common)
 # Build eBPF dependencies
 set(EBPF_DIRVER_TARGET "eBPFDriver")
 add_subdirectory(ebpf/driver)
+if(MSVC)
+    if (ENABLE_ENTERPRISE)
+        add_subdirectory(windows/daemon)
+        add_subdirectory(windows/installer)
+    endif()
+endif()
 
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
@@ -235,7 +265,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
-    add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    if (LINUX)
+        add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+    endif()
 endif()
 
 # Logtail UT.
@@ -250,7 +282,8 @@ if (BUILD_LOGTAIL_UT)
             endforeach()
         endif()
     endfunction()
-    delete_gcda_files(".")
+    # clean .gcda files in build directory
+    delete_gcda_files("${CMAKE_BINARY_DIR}")
     include(CTest)
     enable_testing()
     add_subdirectory("${UNITTEST_PATH}" "${CMAKE_BINARY_DIR}/unittest")

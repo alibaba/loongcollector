@@ -75,13 +75,13 @@ bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineConte
                 ctx.GetLogger(),
                 ("problem encountered in config parsing", errorMsg)("action", "ignore param TopicType and TopicFormat")(
                     "module", moduleName)("config", ctx.GetConfigName()));
-            ctx.GetAlarm().SendAlarm(CATEGORY_CONFIG_ALARM,
-                                     errorMsg
-                                         + ": ignore param TopicType and TopicFormat, config: " + ctx.GetConfigName(),
-                                     ctx.GetRegion(),
-                                     ctx.GetProjectName(),
-                                     ctx.GetConfigName(),
-                                     ctx.GetLogstoreName());
+            ctx.GetAlarm().SendAlarmWarning(
+                CATEGORY_CONFIG_ALARM,
+                errorMsg + ": ignore param TopicType and TopicFormat, config: " + ctx.GetConfigName(),
+                ctx.GetRegion(),
+                ctx.GetProjectName(),
+                ctx.GetConfigName(),
+                ctx.GetLogstoreName());
         } else if (mTopicType == TopicType::FILEPATH && !NormalizeTopicRegFormat(mTopicFormat)) {
             mTopicType = TopicType::NONE;
             mTopicFormat.clear();
@@ -89,7 +89,7 @@ bool GlobalConfig::Init(const Json::Value& config, const CollectionPipelineConte
                         ("problem encountered in config parsing",
                          "string param TopicFormat is not valid")("action", "ignore param TopicType and TopicFormat")(
                             "module", moduleName)("config", ctx.GetConfigName()));
-            ctx.GetAlarm().SendAlarm(
+            ctx.GetAlarm().SendAlarmWarning(
                 CATEGORY_CONFIG_ALARM,
                 "string param TopicFormat is not valid: ignore param TopicType and TopicFormat, config: "
                     + ctx.GetConfigName(),

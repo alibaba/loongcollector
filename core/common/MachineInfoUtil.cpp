@@ -16,12 +16,6 @@
 
 #include <cstring>
 
-#include <thread>
-
-#include "curl/curl.h"
-#include "rapidjson/document.h"
-#include "rapidjson/rapidjson.h"
-
 #include "AppConfig.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
@@ -45,13 +39,11 @@
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
+#include <ws2tcpip.h>
 #endif
 
 DEFINE_FLAG_STRING(agent_host_id, "", "");
 
-const std::string sInstanceIdKey = "instance-id";
-const std::string sOwnerAccountIdKey = "owner-account-id";
-const std::string sRegionIdKey = "region-id";
 const std::string sRandomHostIdKey = "random-hostid";
 const std::string sECSAssistMachineIdKey = "ecs-assist-machine-id";
 const std::string sCustomHostIdKey = "custom-hostid";
@@ -182,6 +174,7 @@ std::string GetHostName() {
     return std::string(hostname);
 }
 
+#if defined(__linux__)
 std::unordered_set<std::string> GetNicIpv4IPSet() {
     struct ifaddrs* ifAddrStruct = NULL;
     void* tmpAddrPtr = NULL;
@@ -207,6 +200,7 @@ std::unordered_set<std::string> GetNicIpv4IPSet() {
     freeifaddrs(ifAddrStruct);
     return ipSet;
 }
+#endif
 
 std::string GetHostIpByHostName() {
     std::string hostname = GetHostName();
@@ -452,7 +446,7 @@ bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashP
     bashPath.append("/etc/redhat-release");
     os.clear();
     std::string content, exception;
-    if (FileReadResult::kOK != ReadFileContent(bashPath, content)) {
+    if (FileReadResult::kOK != ReadFileContent(bashPath, content, kDefaultMaxFileSize)) {
         return false;
     }
     boost::match_results<const char*> what;
@@ -479,8 +473,9 @@ bool IsDigitsDotsHostname(const char* hostname) {
         int16_t digits = 32;
         while (*cp != '\0' && digits > 0) {
             char* endp;
-            uint64_t sum = strtoul(cp, &endp, 0);
-            if ((sum == ULONG_MAX && errno == ERANGE) || sum >= (1UL << digits)) {
+            // unsiged long 32 bit in windows, 64bit in linux.
+            uint64_t sum = strtoull(cp, &endp, 0);
+            if ((sum == ULONG_MAX && errno == ERANGE) || sum >= (1ULL << digits)) {
                 break;
             }
             cp = endp;
@@ -497,39 +492,6 @@ bool IsDigitsDotsHostname(const char* hostname) {
         return true;
     }
     return false;
-}
-
-
-size_t FetchECSMetaCallback(char* buffer, size_t size, size_t nmemb, std::string* res) {
-    if (NULL == buffer) {
-        return 0;
-    }
-
-    size_t sizes = size * nmemb;
-    res->append(buffer, sizes);
-    return sizes;
-}
-
-bool ParseECSMeta(const std::string& meta, ECSMeta& metaObj) {
-    Json::Value doc;
-    std::string errMsg;
-    if (!ParseJsonTable(meta, doc, errMsg)) {
-        LOG_WARNING(sLogger, ("parse ecs meta fail, errMsg", errMsg)("meta", meta));
-        return false;
-    }
-
-    if (doc.isMember(sInstanceIdKey) && doc[sInstanceIdKey].isString()) {
-        metaObj.SetInstanceID(doc[sInstanceIdKey].asString());
-    }
-
-    if (doc.isMember(sOwnerAccountIdKey) && doc[sOwnerAccountIdKey].isString()) {
-        metaObj.SetUserID(doc[sOwnerAccountIdKey].asString());
-    }
-
-    if (doc.isMember(sRegionIdKey) && doc[sRegionIdKey].isString()) {
-        metaObj.SetRegionID(doc[sRegionIdKey].asString());
-    }
-    return metaObj.IsValid();
 }
 
 InstanceIdentity::InstanceIdentity() {
@@ -572,7 +534,7 @@ bool InstanceIdentity::InitFromFile() {
     ECSMeta meta;
     if (CheckExistance(mInstanceIdentityFile)) {
         std::string instanceIdentityStr;
-        if (FileReadResult::kOK != ReadFileContent(mInstanceIdentityFile, instanceIdentityStr)) {
+        if (FileReadResult::kOK != ReadFileContent(mInstanceIdentityFile, instanceIdentityStr, kDefaultMaxFileSize)) {
             Json::Value doc;
             std::string errMsg;
             if (!ParseJsonTable(instanceIdentityStr, doc, errMsg)) {
@@ -688,87 +650,13 @@ void InstanceIdentity::updateHostId(const ECSMeta& meta) {
     }
 }
 
-bool FetchECSMeta(ECSMeta& metaObj) {
-    CURL* curl = nullptr;
-    for (size_t retryTimes = 1; retryTimes <= 5; retryTimes++) {
-        curl = curl_easy_init();
-        if (curl) {
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
-    if (curl) {
-        std::string token;
-        auto* tokenHeaders = curl_slist_append(nullptr, "X-aliyun-ecs-metadata-token-ttl-seconds:3600");
-        if (!tokenHeaders) {
-            curl_easy_cleanup(curl);
-            return false;
-        }
-        curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/api/token");
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "PUT");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, tokenHeaders);
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-        // 超时1秒
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
-
-        CURLcode res = curl_easy_perform(curl);
-        curl_slist_free_all(tokenHeaders);
-
-        if (res != CURLE_OK) {
-            LOG_INFO(sLogger, ("fetch ecs token fail", curl_easy_strerror(res)));
-            curl_easy_cleanup(curl);
-            return false;
-        }
-
-        // Get metadata with token
-        std::string meta;
-        auto* metaHeaders = curl_slist_append(nullptr, ("X-aliyun-ecs-metadata-token: " + token).c_str());
-        if (!metaHeaders) {
-            curl_easy_cleanup(curl);
-            return false;
-        }
-
-        curl_easy_reset(curl);
-        curl_easy_setopt(curl, CURLOPT_URL, "http://100.100.100.200/latest/dynamic/instance-identity/document");
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, metaHeaders);
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1);
-        // 超时1秒
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &meta);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, FetchECSMetaCallback);
-
-        res = curl_easy_perform(curl);
-        curl_slist_free_all(metaHeaders);
-
-        if (res != CURLE_OK) {
-            LOG_INFO(sLogger, ("fetch ecs meta fail", curl_easy_strerror(res)));
-            curl_easy_cleanup(curl);
-            return false;
-        }
-        if (!ParseECSMeta(meta, metaObj)) {
-            curl_easy_cleanup(curl);
-            return false;
-        }
-        curl_easy_cleanup(curl);
-        return metaObj.IsValid();
-    }
-    LOG_WARNING(
-        sLogger,
-        ("curl handler cannot be initialized during user environment identification", "ecs meta may be mislabeled"));
-    return false;
-}
-
 // 从云助手获取序列号
 void InstanceIdentity::getSerialNumberFromEcsAssist() {
     if (mHasTriedToGetSerialNumber) {
         return;
     }
     if (CheckExistance(mEcsAssistMachineIdFile)) {
-        if (FileReadResult::kOK != ReadFileContent(mEcsAssistMachineIdFile, mSerialNumber)) {
+        if (FileReadResult::kOK != ReadFileContent(mEcsAssistMachineIdFile, mSerialNumber, kDefaultMaxFileSize)) {
             mSerialNumber = "";
         }
     }

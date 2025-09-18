@@ -16,6 +16,7 @@
 
 #include "json/json.h"
 
+#include "StringView.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
@@ -37,7 +38,6 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", true);
-DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 DECLARE_FLAG_INT32(file_tags_update_interval);
 DECLARE_FLAG_STRING(agent_host_id);
 DECLARE_FLAG_BOOL(ilogtail_disable_core);
@@ -152,8 +152,8 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
         auto stopAllCost = GetCurrentTimeInMilliSeconds() - stopAllStart;
         LOG_INFO(sLogger, ("Go pipelines stop all", "succeeded")("cost", ToString(stopAllCost) + "ms"));
         if (stopAllCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                                   "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
+            AlarmManager::GetInstance()->SendAlarmError(
+                HOLD_ON_TOO_SLOW_ALARM, "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
         }
     }
 #else
@@ -173,7 +173,7 @@ void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
         auto stopCost = GetCurrentTimeInMilliSeconds() - stopStart;
         LOG_INFO(sLogger, ("Go pipelines stop", "succeeded")("config", configName)("cost", ToString(stopCost) + "ms"));
         if (stopCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 HOLD_ON_TOO_SLOW_ALARM, "Stopping Go pipeline " + configName + " took " + ToString(stopCost) + "ms");
         }
     }
@@ -291,7 +291,7 @@ int LogtailPlugin::ExecPluginCmd(
     // cmd 解析json
     Json::Value jsonParams;
     std::string errorMsg;
-    if (paramsStr.size() < 5UL || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
+    if (paramsStr.size() < (size_t)5 || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
         LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
         return -2;
     }
@@ -555,7 +555,7 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
         GoString type;
         type.n = metricType.size();
         type.p = metricType.c_str();
-        auto metrics = mGetGoMetricsFun(type);
+        auto* metrics = mGetGoMetricsFun(type);
         if (metrics != nullptr) {
             for (int i = 0; i < metrics->count; ++i) {
                 std::map<std::string, std::string> item;
@@ -582,11 +582,14 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
 }
 
 K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
+    return GetContainerMeta(StringView(containerID));
+}
+K8sContainerMeta LogtailPlugin::GetContainerMeta(StringView containerID) {
     if (mPluginValid && mGetContainerMetaFun != nullptr) {
         GoString id;
         id.n = containerID.size();
-        id.p = containerID.c_str();
-        auto innerMeta = mGetContainerMetaFun(id);
+        id.p = containerID.data();
+        auto* innerMeta = mGetContainerMetaFun(id);
         if (innerMeta != NULL) {
             K8sContainerMeta meta;
             meta.ContainerName.assign(innerMeta->containerName);
@@ -594,19 +597,22 @@ K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
             meta.K8sNamespace.assign(innerMeta->k8sNamespace);
             meta.PodName.assign(innerMeta->podName);
             for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->containerLabelsKey[i]);
                 value.assign(innerMeta->containerLabelsVal[i]);
                 meta.containerLabels.insert(std::make_pair(std::move(key), std::move(key)));
             }
             for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->k8sLabelsKey[i]);
                 value.assign(innerMeta->k8sLabelsVal[i]);
                 meta.k8sLabels.insert(std::make_pair(std::move(key), std::move(key)));
             }
             for (int i = 0; i < innerMeta->envSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->envsKey[i]);
                 value.assign(innerMeta->envsVal[i]);
                 meta.envs.insert(std::make_pair(std::move(key), std::move(key)));

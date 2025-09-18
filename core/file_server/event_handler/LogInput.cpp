@@ -18,7 +18,6 @@
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -28,6 +27,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event/BlockEventManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "file_server/event_handler/HistoryFileImporter.h"
@@ -280,14 +280,14 @@ bool LogInput::ReadLocalEvents() {
             sLogger,
             ("process local event, dir", source)("file name", object)("config", configName)(
                 "project", readerConfig.second->GetProjectName())("logstore", readerConfig.second->GetLogstoreName()));
-        AlarmManager::GetInstance()->SendAlarm(LOAD_LOCAL_EVENT_ALARM,
-                                               string("process local event, dir:") + source + ", file name:" + object
-                                                   + ", config:" + configName
-                                                   + ", file count:" + ToString(objList.size()),
-                                               readerConfig.second->GetRegion(),
-                                               readerConfig.second->GetProjectName(),
-                                               readerConfig.second->GetConfigName(),
-                                               readerConfig.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOAD_LOCAL_EVENT_ALARM,
+                                                      string("process local event, dir:") + source
+                                                          + ", file name:" + object + ", config:" + configName
+                                                          + ", file count:" + ToString(objList.size()),
+                                                      readerConfig.second->GetRegion(),
+                                                      readerConfig.second->GetProjectName(),
+                                                      readerConfig.second->GetConfigName(),
+                                                      readerConfig.second->GetLogstoreName());
 
         HistoryFileImporter* importer = HistoryFileImporter::GetInstance();
         importer->PushEvent(historyFileEvent);
@@ -304,9 +304,9 @@ bool LogInput::ReadLocalEvents() {
 
 void LogInput::ProcessEvent(EventDispatcher* dispatcher, Event* ev) {
     const string& source = ev->GetSource();
-    const string& object = ev->GetObject();
+    const string& object = ev->GetEventObject();
     LOG_DEBUG(sLogger,
-              ("process event, type", ev->GetTypeString())("dir", ev->GetSource())("filename", ev->GetObject())(
+              ("process event, type", ev->GetTypeString())("dir", ev->GetSource())("filename", ev->GetEventObject())(
                   "config", ev->GetConfigName()));
     if (ev->IsTimeout())
         dispatcher->UnregisterAllDir(source);
@@ -380,9 +380,9 @@ void LogInput::ProcessLoop() {
         Event* ev = PopEventQueue();
         if (ev != NULL) {
             ++mEventProcessCount;
-            if (mIdleFlag)
+            if (mIdleFlag) {
                 delete ev;
-            else
+            } else
                 ProcessEvent(dispatcher, ev);
         } else {
             unique_lock<mutex> lock(mFeedbackMux);
@@ -468,7 +468,7 @@ void LogInput::PushEventQueue(std::vector<Event*>& eventVec) {
         string key;
         key.append((*iter)->GetSource())
             .append(">")
-            .append((*iter)->GetObject())
+            .append((*iter)->GetEventObject())
             .append(">")
             .append(ToString((*iter)->GetDev()))
             .append(">")
@@ -493,7 +493,7 @@ void LogInput::PushEventQueue(Event* ev) {
     string key;
     key.append(ev->GetSource())
         .append(">")
-        .append(ev->GetObject())
+        .append(ev->GetEventObject())
         .append(">")
         .append(ToString(ev->GetDev()))
         .append(">")

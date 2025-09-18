@@ -47,6 +47,15 @@ func (c *BootController) Start(ctx context.Context) error {
 		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
 		return err
 	}
+	if _, err := os.Stat(config.OnetimeConfigDir); os.IsNotExist(err) {
+		if err = os.Mkdir(config.OnetimeConfigDir, 0750); err != nil {
+			logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+			return err
+		}
+	} else if err != nil {
+		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		return err
+	}
 	if err := dockercompose.Start(ctx); err != nil {
 		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
 		return err
@@ -61,5 +70,6 @@ func (c *BootController) Clean() {
 	}
 	_ = os.RemoveAll(config.FlusherFile)
 	_ = os.RemoveAll(config.ConfigDir)
+	_ = os.RemoveAll(config.OnetimeConfigDir)
 	time.Sleep(time.Second * 3)
 }

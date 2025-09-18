@@ -26,7 +26,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceSenderQueue.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -35,6 +34,7 @@
 #include "collection_pipeline/queue/QueueParam.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/FeedbackInterface.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 
 namespace logtail {
 
@@ -96,6 +96,7 @@ private:
     friend class ExactlyOnceQueueManagerUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
+    friend class CreateModifyHandlerUnittest;
 #endif
 };
 

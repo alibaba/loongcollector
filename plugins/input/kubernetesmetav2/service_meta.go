@@ -31,6 +31,9 @@ type ServiceK8sMeta struct {
 	StorageClass          bool
 	Ingress               bool
 	Container             bool
+	// labels and annotations switch
+	EnableLabels      bool
+	EnableAnnotations bool
 	// link switch
 	Node2Pod                  string
 	Deployment2Pod            string
@@ -46,7 +49,7 @@ type ServiceK8sMeta struct {
 	Pod2PersistentVolumeClaim string
 	Pod2ConfigMap             string
 
-	// add link for namesapce
+	// add link for namespace
 	Namespace2Pod                   string
 	Namespace2Service               string
 	Namespace2Deployment            string
@@ -73,7 +76,10 @@ type ServiceK8sMeta struct {
 	metaCollector *metaCollector
 	configName    string
 	clusterID     string
+	clusterName   string
+	clusterRegion string
 	domain        string
+
 	// self metric
 	entityCount selfmonitor.CounterMetric
 	linkCount   selfmonitor.CounterMetric
@@ -117,19 +123,24 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 }
 
 func (s *ServiceK8sMeta) initDomain() {
-	switch *flags.ClusterType {
-	case ackCluster, oneCluster, asiCluster:
-		s.domain = acsDomain
-	default:
-		s.domain = infraDomain
+
+	if flags.ClusterType != nil && *flags.ClusterType != "" {
+		s.domain = *flags.ClusterType
+	} else {
+		s.domain = k8sDomain
 	}
+
 }
 
 func init() {
 	pipeline.ServiceInputs["service_kubernetes_meta"] = func() pipeline.ServiceInput {
 		return &ServiceK8sMeta{
-			Interval:  60,
-			clusterID: *flags.ClusterID,
+			Interval:          60,
+			EnableLabels:      false,
+			EnableAnnotations: false,
+			clusterID:         *flags.ClusterID,
+			clusterName:       *flags.ClusterName,
+			clusterRegion:     *flags.ClusterRegion,
 		}
 	}
 }

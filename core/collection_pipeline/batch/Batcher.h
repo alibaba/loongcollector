@@ -111,7 +111,7 @@ public:
         } else {
             labels.emplace_back(METRIC_LABEL_KEY_GROUP_BATCH_ENABLED, "false");
         }
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_COMPONENT, std::move(labels));
         mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
         mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
@@ -122,6 +122,7 @@ public:
         mBufferedEventsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_EVENTS_TOTAL);
         mBufferedDataSizeByte = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_BATCHER_BUFFERED_SIZE_BYTES);
         mTotalAddTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_COMPONENT_BATCHER_TOTAL_ADD_TIME_MS);
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
         return true;
     }
@@ -153,6 +154,9 @@ public:
                                g.GetSourceBuffer(),
                                g.GetExactlyOnceCheckpoint(),
                                g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
+                    for (const auto& extraSourceBuffer : g.GetExtraSourceBuffers()) {
+                        item.AddSourceBuffer(extraSourceBuffer);
+                    }
                 }
                 item.Add(std::move(e));
                 if (mEventFlushStrategy.SizeReachingUpperLimit(item.GetStatus())) {
@@ -194,6 +198,9 @@ public:
                                g.GetSourceBuffer(),
                                g.GetExactlyOnceCheckpoint(),
                                g.GetMetadata(EventGroupMetaKey::SOURCE_ID));
+                    for (const auto& extraSourceBuffer : g.GetExtraSourceBuffers()) {
+                        item.AddSourceBuffer(extraSourceBuffer);
+                    }
                     TimeoutFlushManager::GetInstance()->UpdateRecord(mFlusher->GetContext().GetConfigName(),
                                                                      mFlusher->GetFlusherIndex(),
                                                                      key,
@@ -203,6 +210,9 @@ public:
                     ADD_GAUGE(mBufferedDataSizeByte, item.DataSize());
                 } else if (i == 0) {
                     item.AddSourceBuffer(g.GetSourceBuffer());
+                    for (const auto& extraSourceBuffer : g.GetExtraSourceBuffers()) {
+                        item.AddSourceBuffer(extraSourceBuffer);
+                    }
                 }
                 ADD_GAUGE(mBufferedEventsTotal, 1);
                 ADD_GAUGE(mBufferedDataSizeByte, e->DataSize());

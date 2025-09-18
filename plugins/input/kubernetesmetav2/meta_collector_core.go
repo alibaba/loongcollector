@@ -22,8 +22,12 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("instance_ip", obj.Status.PodIP)
 		containerInfos := []map[string]string{}
@@ -45,8 +49,8 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Timestamp = log.Timestamp
 
 				containerLog.Contents.Add(entityDomainFieldName, m.serviceK8sMeta.domain)
-				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerTypeName))
-				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerTypeName, obj.Namespace, obj.Name+container.Name))
+				containerLog.Contents.Add(entityTypeFieldName, m.genEntityTypeKey(containerKindName))
+				containerLog.Contents.Add(entityIDFieldName, m.genKey(containerKindName, obj.Namespace, obj.Name+container.Name))
 				containerLog.Contents.Add(entityMethodFieldName, method)
 
 				containerLog.Contents.Add(entityFirstObservedTimeFieldName, strconv.FormatInt(data.FirstObservedTime, 10))
@@ -62,13 +66,31 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				containerLog.Contents.Add("pod_name", obj.Name)
 				containerLog.Contents.Add("pod_namespace", obj.Namespace)
 				containerLog.Contents.Add("image", container.Image)
-				containerLog.Contents.Add("cpu_request", container.Resources.Requests.Cpu().String())
-				containerLog.Contents.Add("cpu_limit", container.Resources.Limits.Cpu().String())
-				containerLog.Contents.Add("memory_request", container.Resources.Requests.Memory().String())
-				containerLog.Contents.Add("memory_limit", container.Resources.Limits.Memory().String())
+				if container.Resources.Requests != nil && container.Resources.Requests.Cpu() != nil {
+					containerLog.Contents.Add("cpu_request", container.Resources.Requests.Cpu().String())
+				} else {
+					containerLog.Contents.Add("cpu_request", "")
+				}
+				if container.Resources.Limits != nil && container.Resources.Limits.Cpu() != nil {
+					containerLog.Contents.Add("cpu_limit", container.Resources.Limits.Cpu().String())
+				} else {
+					containerLog.Contents.Add("cpu_limit", "")
+				}
+				if container.Resources.Requests != nil && container.Resources.Requests.Memory() != nil {
+					containerLog.Contents.Add("memory_request", container.Resources.Requests.Memory().String())
+				} else {
+					containerLog.Contents.Add("memory_request", "")
+				}
+				if container.Resources.Limits != nil && container.Resources.Limits.Memory() != nil {
+					containerLog.Contents.Add("memory_limit", container.Resources.Limits.Memory().String())
+				} else {
+					containerLog.Contents.Add("memory_limit", "")
+				}
 				ports := make([]int32, 0)
-				for _, port := range container.Ports {
-					ports = append(ports, port.ContainerPort)
+				if container.Ports != nil {
+					for _, port := range container.Ports {
+						ports = append(ports, port.ContainerPort)
+					}
 				}
 				portsStr, _ := json.Marshal(ports)
 				if len(ports) == 0 {
@@ -76,12 +98,14 @@ func (m *metaCollector) processPodEntity(data *k8smeta.ObjectWrapper, method str
 				}
 				containerLog.Contents.Add("container_ports", string(portsStr))
 				volumes := make([]map[string]string, 0)
-				for _, volume := range container.VolumeMounts {
-					volumeInfo := map[string]string{
-						"volumeMountName": volume.Name,
-						"volumeMountPath": volume.MountPath,
+				if container.VolumeMounts != nil {
+					for _, volume := range container.VolumeMounts {
+						volumeInfo := map[string]string{
+							"volumeMountName": volume.Name,
+							"volumeMountPath": volume.MountPath,
+						}
+						volumes = append(volumes, volumeInfo)
 					}
-					volumes = append(volumes, volumeInfo)
 				}
 				containerLog.Contents.Add("volumes", m.processEntityJSONArray(volumes))
 				result = append(result, containerLog)
@@ -100,8 +124,12 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		m.processEntityCommonPart(log.Contents, obj.Kind, "", obj.Name, method, data.FirstObservedTime, data.LastObservedTime, obj.CreationTimestamp)
 
 		// custom fields
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		status := []map[string]string{}
 		for _, condition := range obj.Status.Conditions {
 			conditionInfo := map[string]string{
@@ -125,7 +153,12 @@ func (m *metaCollector) processNodeEntity(data *k8smeta.ObjectWrapper, method st
 		addressStr, _ := json.Marshal(obj.Status.Addresses)
 		log.Contents.Add("addresses", string(addressStr))
 		log.Contents.Add("provider_id", obj.Spec.ProviderID)
-		return []models.PipelineEvent{log}
+		log.SetName(m.genEntityTypeKey(obj.Kind)) // used to determine whether a link need to be estabilished with cluster, only k8s.node requires it, infra.server link doest not
+
+		serverID := m.generateInfraServerKeyID(obj)
+		// generate k8s.node -> infra.server link
+		logNodeInfraLink := m.processInfraServerLink(data, obj, method, serverID)
+		return []models.PipelineEvent{log, logNodeInfraLink}
 	}
 	return nil
 }
@@ -140,16 +173,26 @@ func (m *metaCollector) processServiceEntity(data *k8smeta.ObjectWrapper, method
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("selector", m.processEntityJSONObject(obj.Spec.Selector))
 		log.Contents.Add("type", string(obj.Spec.Type))
 		log.Contents.Add("cluster_ip", obj.Spec.ClusterIP)
 		ports := make([]map[string]string, 0)
 		for _, port := range obj.Spec.Ports {
+			targetPort := ""
+			if port.TargetPort.Type == 0 { // IntOrString type, 0 means int
+				targetPort = strconv.FormatInt(int64(port.TargetPort.IntVal), 10)
+			} else {
+				targetPort = port.TargetPort.StrVal
+			}
 			portInfo := map[string]string{
 				"port":       strconv.FormatInt(int64(port.Port), 10),
-				"targetPort": strconv.FormatInt(int64(port.TargetPort.IntVal), 10),
+				"targetPort": targetPort,
 				"protocol":   string(port.Protocol),
 			}
 			ports = append(ports, portInfo)
@@ -170,8 +213,12 @@ func (m *metaCollector) processConfigMapEntity(data *k8smeta.ObjectWrapper, meth
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -188,7 +235,12 @@ func (m *metaCollector) processNamespaceEntity(data *k8smeta.ObjectWrapper, meth
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("kind", obj.Kind)
 		log.Contents.Add("name", obj.Name)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -204,8 +256,12 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storage_class_name", obj.Spec.StorageClassName)
 		log.Contents.Add("persistent_volume_reclaim_policy", string(obj.Spec.PersistentVolumeReclaimPolicy))
@@ -214,8 +270,16 @@ func (m *metaCollector) processPersistentVolumeEntity(data *k8smeta.ObjectWrappe
 		} else {
 			log.Contents.Add("volume_mode", "")
 		}
-		log.Contents.Add("capacity", obj.Spec.Capacity.Storage().String())
-		log.Contents.Add("fsType", obj.Spec.CSI.FSType)
+		if obj.Spec.Capacity != nil && obj.Spec.Capacity.Storage() != nil {
+			log.Contents.Add("capacity", obj.Spec.Capacity.Storage().String())
+		} else {
+			log.Contents.Add("capacity", "")
+		}
+		if obj.Spec.CSI != nil {
+			log.Contents.Add("fsType", obj.Spec.CSI.FSType)
+		} else {
+			log.Contents.Add("fsType", "")
+		}
 		return []models.PipelineEvent{log}
 	}
 	return nil
@@ -231,8 +295,12 @@ func (m *metaCollector) processPersistentVolumeClaimEntity(data *k8smeta.ObjectW
 		// custom fields
 		log.Contents.Add("api_version", obj.APIVersion)
 		log.Contents.Add("namespace", obj.Namespace)
-		log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
-		log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		if m.serviceK8sMeta.EnableLabels {
+			log.Contents.Add("labels", m.processEntityJSONObject(obj.Labels))
+		}
+		if m.serviceK8sMeta.EnableAnnotations {
+			log.Contents.Add("annotations", m.processEntityJSONObject(obj.Annotations))
+		}
 		log.Contents.Add("status", string(obj.Status.Phase))
 		log.Contents.Add("storeage_requests", obj.Spec.Resources.Requests.Storage().String())
 		if obj.Spec.StorageClassName != nil {

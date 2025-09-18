@@ -81,18 +81,22 @@ unique_ptr<Compressor> CompressorFactory::Create(CompressType type) {
 
 const string& CompressTypeToString(CompressType type) {
     switch (type) {
-        case CompressType::LZ4:
+        case CompressType::LZ4: {
             static string lz4 = "lz4";
             return lz4;
-        case CompressType::ZSTD:
+        }
+        case CompressType::ZSTD: {
             static string zstd = "zstd";
             return zstd;
-        case CompressType::NONE:
+        }
+        case CompressType::NONE: {
             static string none = "none";
             return none;
-        default:
+        }
+        default: {
             static string unknown = "unknown";
             return unknown;
+        }
     }
 }
 

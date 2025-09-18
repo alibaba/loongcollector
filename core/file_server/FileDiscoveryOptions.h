@@ -53,7 +53,10 @@ public:
         mDeduceAndSetContainerBaseDirFunc = f;
     }
 
-    bool IsDirectoryInBlacklist(const std::string& dirPath) const;
+    bool IsFilenameMatched(const std::string& filename) const;
+    bool IsFilenameInBlacklist(const std::string& filename) const;
+    bool IsDirectoryInBlacklist(const std::string& dir) const;
+    bool IsFilepathInBlacklist(const std::string& filepath) const;
     bool IsMatch(const std::string& path, const std::string& name) const;
     bool IsTimeout(const std::string& path) const;
     bool WithinMaxDepth(const std::string& path) const;
@@ -78,7 +81,6 @@ private:
     void ParseWildcardPath();
     std::pair<std::string, std::string> GetDirAndFileNameFromPath(const std::string& filePath);
     bool IsObjectInBlacklist(const std::string& path, const std::string& name) const;
-    bool IsFileNameInBlacklist(const std::string& fileName) const;
     bool IsWildcardPathMatch(const std::string& path, const std::string& name = "") const;
 
     std::string mBasePath;
@@ -121,6 +123,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;
+    friend class ModifyHandlerUnittest;
 #endif
 };
 

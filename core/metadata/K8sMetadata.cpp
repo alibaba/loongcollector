@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <future>
+#include <memory>
 #include <thread>
 
 #include "app_config/AppConfig.h"
@@ -31,6 +32,7 @@
 #include "common/http/HttpRequest.h"
 #include "common/http/HttpResponse.h"
 #include "logger/Logger.h"
+#include "metadata/ContainerInfo.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 using namespace std;
@@ -115,7 +117,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
 #endif
 
     // self monitor
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA}});
@@ -125,6 +127,7 @@ K8sMetadata::K8sMetadata(size_t ipCacheSize, size_t cidCacheSize, size_t externa
     mExternalIpCacheSize = mRef.CreateIntGauge(METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE);
     mRequestMetaServerTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL);
     mRequestMetaServerFailedTotal = mRef.CreateCounter(METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mRef);
 
     // batch query metadata ...
     if (mEnable) {
@@ -270,15 +273,14 @@ const std::string kKeysString = "keys";
 std::string KeysToReqBody(const std::vector<std::string>& keys) {
     if (keys.size()) {
         Json::Value jsonObj;
-        for (auto& str : keys) {
+        for (const auto& str : keys) {
             jsonObj[kKeysString].append(str);
         }
         std::vector<std::string> res;
         Json::StreamWriterBuilder writer;
         return Json::writeString(writer, jsonObj);
-    } else {
-        return "";
     }
+    return "";
 }
 
 std::unique_ptr<K8sMetadataHttpRequest>
@@ -414,10 +416,10 @@ void K8sMetadata::SetExternalIpCache(const std::string& ip) {
 void K8sMetadata::UpdateExternalIpCache(const std::vector<std::string>& queryIps,
                                         const std::vector<std::string>& retIps) {
     std::set<std::string> hash;
-    for (auto& ip : retIps) {
+    for (const auto& ip : retIps) {
         hash.insert(ip);
     }
-    for (auto& x : queryIps) {
+    for (const auto& x : queryIps) {
         if (!hash.count(x)) {
             LOG_DEBUG(sLogger, (x, "mark as external ip"));
             SetExternalIpCache(x);
@@ -440,11 +442,12 @@ std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByContainerIdFromCache(const Str
         return nullptr;
     }
     auto cid = std::string(containerId);
-    if (mContainerCache.contains(cid)) {
-        return mContainerCache.get(cid);
-    } else {
-        return nullptr;
+    std::shared_ptr<K8sPodInfo> info;
+    bool isValid = mContainerCache.tryGetCopy(cid, info);
+    if (isValid) {
+        return info;
     }
+    return nullptr;
 }
 
 std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& ipv) {
@@ -452,11 +455,12 @@ std::shared_ptr<K8sPodInfo> K8sMetadata::GetInfoByIpFromCache(const StringView& 
         return nullptr;
     }
     auto ip = std::string(ipv);
-    if (mIpCache.contains(ip)) {
-        return mIpCache.get(ip);
-    } else {
-        return nullptr;
+    std::shared_ptr<K8sPodInfo> info;
+    bool isValid = mIpCache.tryGetCopy(ip, info);
+    if (isValid) {
+        return info;
     }
+    return nullptr;
 }
 
 bool K8sMetadata::IsExternalIp(const StringView& ip) const {

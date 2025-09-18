@@ -153,12 +153,6 @@ void ExactlyOnceQueueManager::DisablePopProcessQueue(const string& configName, b
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {
             iter.second->DisablePop();
-            if (!isPipelineRemoving) {
-                const auto& p = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
-                if (p) {
-                    iter.second->SetPipelineForItems(p);
-                }
-            }
         }
     }
 }

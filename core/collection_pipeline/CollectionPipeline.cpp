@@ -32,7 +32,9 @@
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
+#include "config/OnetimeConfigInfoManager.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "plugin/processor/ProcessorParseApsaraNative.h"
@@ -76,8 +78,10 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
     mSingletonInput = config.mSingletonInput;
+    mIsOnetime = config.mExpireTime.has_value();
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
+    mContext.SetIsOnetimePipelineRunningBeforeStart(config.mIsRunningBeforeStart);
     mContext.SetPipeline(*this);
     mContext.SetIsFirstProcessorJsonFlag(config.mIsFirstProcessorJson);
     mContext.SetHasNativeProcessorsFlag(config.mHasNativeProcessor);
@@ -86,6 +90,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     // for special treatment below
     const InputFile* inputFile = nullptr;
     const InputContainerStdio* inputContainerStdio = nullptr;
+    const InputStaticFile* inputStaticFile = nullptr;
     bool hasFlusherSLS = false;
 
     // to send alarm and init MetricsRecord before flusherSLS is built, a temporary object is made, which will be
@@ -103,7 +108,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         const Json::Value& detail = *config.mInputs[i];
         string pluginType = detail["Type"].asString();
         unique_ptr<InputInstance> input
-            = PluginRegistry::GetInstance()->CreateInput(pluginType, GenNextPluginMeta(false));
+            = PluginRegistry::GetInstance()->CreateInput(pluginType, mIsOnetime, GenNextPluginMeta(false));
         if (input) {
             Json::Value optionalGoPipeline;
             if (!input->Init(detail, mContext, i, optionalGoPipeline)) {
@@ -118,6 +123,8 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                 inputFile = static_cast<const InputFile*>(mInputs[0]->GetPlugin());
             } else if (pluginType == InputContainerStdio::sName) {
                 inputContainerStdio = static_cast<const InputContainerStdio*>(mInputs[0]->GetPlugin());
+            } else if (pluginType == InputStaticFile::sName) {
+                inputStaticFile = static_cast<const InputStaticFile*>(mInputs[0]->GetPlugin());
             }
         } else {
             AddPluginToGoPipeline(pluginType, detail, "inputs", mGoPipelineWithInput);
@@ -247,7 +254,8 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     }
 
     // mandatory override global.DefaultLogQueueSize in Go pipeline when input_file and Go processing coexist.
-    if ((inputFile != nullptr || inputContainerStdio != nullptr) && IsFlushingThroughGoPipeline()) {
+    if ((inputFile != nullptr || inputContainerStdio != nullptr || inputStaticFile != nullptr)
+        && IsFlushingThroughGoPipeline()) {
         mGoPipelineWithoutInput["global"]["DefaultLogQueueSize"]
             = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
     }
@@ -339,11 +347,18 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
         ProcessQueueManager::GetInstance()->SetDownStreamQueues(mContext.GetProcessQueueKey(), std::move(senderQueues));
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(mMetricsRecordRef,
-                                                         MetricCategory::METRIC_CATEGORY_PIPELINE,
-                                                         {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
-                                                          {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
-                                                          {METRIC_LABEL_KEY_LOGSTORE, mContext.GetLogstoreName()}});
+    // for symetry consideration, the following should be done on pipeline start. However, since it relies much on
+    // config, it is more reasonable to do it here.
+    if (mIsOnetime) {
+        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
+            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
+    }
+
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,
+                                                        MetricCategory::METRIC_CATEGORY_PIPELINE,
+                                                        {{METRIC_LABEL_KEY_PROJECT, mContext.GetProjectName()},
+                                                         {METRIC_LABEL_KEY_PIPELINE_NAME, mName},
+                                                         {METRIC_LABEL_KEY_LOGSTORE, mContext.GetLogstoreName()}});
     mStartTime = mMetricsRecordRef.CreateIntGauge(METRIC_PIPELINE_START_TIME);
     mProcessorsInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENTS_TOTAL);
     mProcessorsInGroupsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_PROCESSORS_IN_EVENT_GROUPS_TOTAL);
@@ -354,6 +369,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mFlushersInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_EVENTS_TOTAL);
     mFlushersInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_PIPELINE_FLUSHERS_IN_SIZE_BYTES);
     mFlushersTotalPackageTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_PIPELINE_FLUSHERS_TOTAL_PACKAGE_TIME_MS);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
     return true;
 }
@@ -392,8 +408,22 @@ void CollectionPipeline::Process(vector<PipelineEventGroup>& logGroupList, size_
     ADD_COUNTER(mProcessorsInGroupsTotal, logGroupList.size())
 
     auto before = chrono::system_clock::now();
-    for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
-        p->Process(logGroupList);
+    if (inputIndex < mInputs.size()) {
+        for (auto& p : mInputs[inputIndex]->GetInnerProcessors()) {
+            p->Process(logGroupList);
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                    ("input index out of range", "skip inner processing")(
+                        "reason", "may be caused by input delete but there are still data belong to it")(
+                        "input index", inputIndex)("config", mName));
+        GetContext().GetAlarm().SendAlarmWarning(
+            LOGTAIL_CONFIG_ALARM,
+            "input delete but there are still data belong to it, may cause processing wrong",
+            GetContext().GetRegion(),
+            GetContext().GetProjectName(),
+            GetContext().GetConfigName(),
+            GetContext().GetLogstoreName());
     }
     for (auto& p : mPipelineInnerProcessorLine) {
         p->Process(logGroupList);
@@ -443,9 +473,12 @@ bool CollectionPipeline::FlushBatch() {
 }
 
 void CollectionPipeline::Stop(bool isRemoving) {
+    bool stopSuccess = true;
     // TODO: 应该保证指定时间内返回，如果无法返回，将配置放入stopDisabled里
     for (const auto& input : mInputs) {
-        input->Stop(isRemoving);
+        if (!input->Stop(isRemoving)) {
+            stopSuccess = false;
+        }
     }
 
     if (!mGoPipelineWithInput.isNull()) {
@@ -464,9 +497,22 @@ void CollectionPipeline::Stop(bool isRemoving) {
     }
 
     for (const auto& flusher : mFlushers) {
-        flusher->Stop(isRemoving);
+        if (!flusher->Stop(isRemoving)) {
+            stopSuccess = false;
+        }
     }
-    LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
+
+    // only valid for onetime config
+    // for update, the old expire has been replaced by the new one on init, should not remove here
+    if (mIsOnetime && isRemoving) {
+        OnetimeConfigInfoManager::GetInstance()->RemoveConfig(mName);
+    }
+
+    if (stopSuccess) {
+        LOG_INFO(sLogger, ("pipeline stop", "succeeded")("config", mName));
+    } else {
+        LOG_WARNING(sLogger, ("pipeline stop", "failed")("config", mName));
+    }
 }
 
 void CollectionPipeline::RemoveProcessQueue() const {
@@ -548,12 +594,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "2")("Go pipeline content", content)("config", mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "Go pipeline is invalid, content: " + content + ", config: " + mName,
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmCritical(CATEGORY_CONFIG_ALARM,
+                                                           "Go pipeline is invalid, content: " + content
+                                                               + ", config: " + mName,
+                                                           mContext.GetRegion(),
+                                                           mContext.GetProjectName(),
+                                                           mContext.GetConfigName(),
+                                                           mContext.GetLogstoreName());
             return false;
         }
     }
@@ -568,12 +615,13 @@ bool CollectionPipeline::LoadGoPipelines() const {
             LOG_ERROR(mContext.GetLogger(),
                       ("failed to init pipeline", "Go pipeline is invalid, see " + GetPluginLogName() + " for detail")(
                           "Go pipeline num", "1")("Go pipeline content", content)("config", mName));
-            AlarmManager::GetInstance()->SendAlarm(CATEGORY_CONFIG_ALARM,
-                                                   "Go pipeline is invalid, content: " + content + ", config: " + mName,
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmCritical(CATEGORY_CONFIG_ALARM,
+                                                           "Go pipeline is invalid, content: " + content
+                                                               + ", config: " + mName,
+                                                           mContext.GetRegion(),
+                                                           mContext.GetProjectName(),
+                                                           mContext.GetConfigName(),
+                                                           mContext.GetLogstoreName());
             if (!mGoPipelineWithoutInput.isNull()) {
                 LogtailPlugin::GetInstance()->UnloadPipeline(GetConfigNameOfGoPipelineWithoutInput());
             }
@@ -600,13 +648,13 @@ void CollectionPipeline::WaitAllItemsInProcessFinished() {
         uint64_t duration = GetCurrentTimeInMilliSeconds() - startTime;
         if (!alarmOnce && duration > 10000) { // 10s
             LOG_ERROR(sLogger, ("pipeline stop", "too slow")("config", mName)("cost", duration));
-            AlarmManager::GetInstance()->SendAlarm(CONFIG_UPDATE_ALARM,
-                                                   string("pipeline stop too slow, config: ") + mName
-                                                       + "; cost:" + to_string(duration),
-                                                   mContext.GetRegion(),
-                                                   mContext.GetProjectName(),
-                                                   mContext.GetConfigName(),
-                                                   mContext.GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM,
+                                                        string("pipeline stop too slow, config: ") + mName
+                                                            + "; cost:" + to_string(duration),
+                                                        mContext.GetRegion(),
+                                                        mContext.GetProjectName(),
+                                                        mContext.GetConfigName(),
+                                                        mContext.GetLogstoreName());
             alarmOnce = true;
         }
     }

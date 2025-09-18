@@ -91,10 +91,10 @@ func (m *DeferredDeletionMetaStore) Get(key []string) map[string][]*ObjectWrappe
 				if obj.Raw != nil {
 					result[k] = append(result[k], obj)
 				} else {
-					logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "raw object not found", realKey)
+					logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "raw object not found", realKey)
 				}
 			} else {
-				logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "key not found", realKey)
+				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "key not found", realKey)
 			}
 		}
 	}
@@ -159,6 +159,7 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 
 		m.eventCh <- event
 		ticker := time.NewTicker(time.Duration(interval) * time.Second)
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
@@ -195,7 +196,7 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 			case EventTypeTimer:
 				m.handleTimerEvent(event)
 			default:
-				logger.Error(context.Background(), "unknown event type", event.EventType)
+				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "unknown event type", event.EventType)
 			}
 		case <-m.stopCh:
 			m.registerLock.Lock()
@@ -211,30 +212,49 @@ func (m *DeferredDeletionMetaStore) handleEvent() {
 func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
-	idxKeys := m.getIdxKeys(event.Object)
+	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	// should delete oldIdxKeys in two cases:
 	// 1. update event
 	// 2. add event when the previous object is between deleted and deferred delete
 	if obj, ok := m.Items[key]; ok {
-		var oldIdxKeys []string
+		oldIdxKeys := m.getIdxKeys(obj)
 		event.Object.FirstObservedTime = obj.FirstObservedTime
-		oldIdxKeys = m.getIdxKeys(obj)
-		for _, idxKey := range oldIdxKeys {
-			m.Index[idxKey].Remove(key)
+
+		// Use incremental index update: only modify changed index keys
+		keysToRemove, keysToAdd := m.getIndexKeyDiff(oldIdxKeys, newIdxKeys)
+
+		// Remove only the keys that are no longer needed
+		for _, idxKey := range keysToRemove {
+			if indexItem, ok := m.Index[idxKey]; ok {
+				indexItem.Remove(key)
+				if len(indexItem.Keys) == 0 {
+					delete(m.Index, idxKey)
+				}
+			}
+		}
+
+		// Add only the new keys
+		for _, idxKey := range keysToAdd {
+			if _, ok := m.Index[idxKey]; !ok {
+				m.Index[idxKey] = NewIndexItem()
+			}
+			m.Index[idxKey].Add(key)
+		}
+	} else {
+		// New object: add all index keys
+		for _, idxKey := range newIdxKeys {
+			if _, ok := m.Index[idxKey]; !ok {
+				m.Index[idxKey] = NewIndexItem()
+			}
+			m.Index[idxKey].Add(key)
 		}
 	}
 
 	m.Items[key] = event.Object
-	for _, idxKey := range idxKeys {
-		if _, ok := m.Index[idxKey]; !ok {
-			m.Index[idxKey] = NewIndexItem()
-		}
-		m.Index[idxKey].Add(key)
-	}
 	m.lock.Unlock()
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
@@ -246,7 +266,7 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with keyFunc error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
 	m.lock.Lock()
@@ -273,16 +293,16 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
-		logger.Error(context.Background(), "handleDeferredDeleteEvent keyFunc error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handleDeferredDeleteEvent keyFunc error", err)
 		return
 	}
-	idxKeys := m.getIdxKeys(event.Object)
+	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	defer m.lock.Unlock()
 	if obj, ok := m.Items[key]; ok {
 		if obj.Deleted {
 			delete(m.Items, key)
-			for _, idxKey := range idxKeys {
+			for _, idxKey := range newIdxKeys {
 				if _, ok := m.Index[idxKey]; !ok {
 					continue
 				}
@@ -322,10 +342,44 @@ func (m *DeferredDeletionMetaStore) getIdxKeys(obj *ObjectWrapper) []string {
 	for _, rule := range m.indexRules {
 		idxKeys, err := rule(obj.Raw)
 		if err != nil {
-			logger.Error(context.Background(), "K8S_META_HANDLE_ALARM", "handle k8s meta with idx rules error", err)
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with idx rules error", err)
 			return nil
 		}
 		result = append(result, idxKeys...)
 	}
 	return result
+}
+
+// getIndexKeyDiff returns keys to remove and keys to add for incremental index update
+func (m *DeferredDeletionMetaStore) getIndexKeyDiff(oldKeys, newKeys []string) (toRemove, toAdd []string) {
+
+	if len(oldKeys) == 0 && len(newKeys) == 0 {
+		return nil, nil
+	}
+
+	oldKeySet := make(map[string]struct{})
+	newKeySet := make(map[string]struct{})
+
+	for _, key := range oldKeys {
+		oldKeySet[key] = struct{}{}
+	}
+	for _, key := range newKeys {
+		newKeySet[key] = struct{}{}
+	}
+
+	// Find keys to remove (in old but not in new)
+	for _, key := range oldKeys {
+		if _, exists := newKeySet[key]; !exists {
+			toRemove = append(toRemove, key)
+		}
+	}
+
+	// Find keys to add (in new but not in old)
+	for _, key := range newKeys {
+		if _, exists := oldKeySet[key]; !exists {
+			toAdd = append(toAdd, key)
+		}
+	}
+
+	return toRemove, toAdd
 }

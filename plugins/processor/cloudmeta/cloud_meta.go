@@ -53,13 +53,13 @@ func (c *ProcessorCloudMeta) Init(context pipeline.Context) error {
 	m := platformmeta.GetManager(c.Platform)
 	if m == nil {
 		// don't direct return to support still work on unknown host with auto mode.
-		logger.Error(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "not support platform", c.Platform)
+		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "not support platform", c.Platform)
 	} else {
 		c.manager = m
 		c.manager.StartCollect()
 	}
 	if len(c.Metadata) == 0 {
-		logger.Error(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "metadata is required")
+		logger.Warning(c.context.GetRuntimeContext(), "CLOUD_META_ALARM", "metadata is required")
 		return errors.New("metadata is required")
 	}
 	c.JSONPath = strings.TrimSpace(c.JSONPath)

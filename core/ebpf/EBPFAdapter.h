@@ -19,9 +19,6 @@
 
 #include <array>
 #include <atomic>
-#include <chrono>
-#include <iostream>
-#include <map>
 #include <memory>
 #include <string>
 
@@ -58,9 +55,11 @@ public:
     bool CheckPluginRunning(PluginType pluginType);
 
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
+    int32_t ConsumePerfBufferData(PluginType pluginType);
+    std::vector<int> GetPerfBufferEpollFds(PluginType pluginType);
 
     bool SetNetworkObserverConfig(int32_t key, int32_t value);
-    bool SetNetworkObserverCidFilter(const std::string&, bool update);
+    bool SetNetworkObserverCidFilter(const std::string&, bool update, uint64_t cidKey);
 
     // for bpf object operations ...
     bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
@@ -78,6 +77,7 @@ private:
         EBPF_NETWORK_OBSERVER_UPDATE_CONN_ADDR,
         EBPF_NETWORK_OBSERVER_DISABLE_PROCESS,
         EBPF_NETWORK_OBSERVER_UPDATE_CONN_ROLE,
+        EBPF_NETWORK_OBSERVER_GET_RUNTIME_INFO,
         EBPF_NETWORK_OBSERVER_MAX,
     };
 
@@ -89,14 +89,17 @@ private:
         EBPF_SUSPEND_PLUGIN,
         EBPF_RESUME_PLUGIN,
         EBPF_POLL_PLUGIN_PBS,
+        EBPF_CONSUME_PLUGIN_PB_DATA,
         EBPF_SET_NETWORKOBSERVER_CONFIG,
         EBPF_SET_NETWORKOBSERVER_CID_FILTER,
 
         // operations
         EBPF_MAP_UPDATE_ELEM,
+        EBPF_GET_PLUGIN_PB_EPOLL_FDS,
         EBPF_FUNC_MAX,
     };
 
+    std::atomic_bool mInited = false;
     std::shared_ptr<DynamicLibLoader> mLib;
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};

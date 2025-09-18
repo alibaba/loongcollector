@@ -58,12 +58,13 @@ PrometheusInputRunner::PrometheusInputRunner()
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels), std::move(dynamicLabels));
 
     mPromRegisterState = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CLIENT_REGISTER_STATE);
     mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOBS_TOTAL);
     mPromRegisterRetryTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 /// @brief receive scrape jobs from input plugins and update scrape jobs
@@ -87,7 +88,7 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
                                chrono::duration_cast<chrono::milliseconds>(currSystemTime.time_since_epoch()).count());
     auto firstExecTime = chrono::steady_clock::now() + chrono::milliseconds(randSleepMilliSec);
     auto firstSubscribeTime = currSystemTime + chrono::milliseconds(randSleepMilliSec);
-    targetSubscriber->SetFirstExecTime(firstExecTime, firstSubscribeTime);
+    targetSubscriber->CalculateFirstExecTime(firstExecTime, firstSubscribeTime);
     // 1. add subscriber to mTargetSubscriberSchedulerMap
     {
         WriteLock lock(mSubscriberMapRWLock);

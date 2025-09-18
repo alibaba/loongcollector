@@ -108,7 +108,7 @@ func (r *InputRedis) Collect(collector pipeline.Collector) error {
 			defer wg.Done()
 			err := r.gatherServer(url, collector)
 			if err != nil {
-				logger.Error(r.context.GetRuntimeContext(), "REDIS_COLLECT_ALARM", err)
+				logger.Warning(r.context.GetRuntimeContext(), "REDIS_COLLECT_ALARM", err)
 			}
 		}(u)
 	}

@@ -127,21 +127,6 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
-long GetPageSize() {
-    static long pageSize = sysconf(_SC_PAGESIZE);
-    return (pageSize > 0) ? static_cast<size_t>(pageSize) : 4096;
-}
-
-size_t GetBlockSize(const std::filesystem::path& path) {
-#if defined(__linux__)
-    struct statvfs buf {};
-    if (statvfs(path.c_str(), &buf) == 0) {
-        return buf.f_bsize;
-    }
-#endif
-    return 0UL;
-}
-
 FileReadResult ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize) {
     std::ifstream ifs(fileName, std::ios::binary);
     if (!ifs) {
@@ -250,8 +235,29 @@ bool OverwriteFile(const std::string& fileName, const std::string& content) {
     return true;
 }
 
+bool UpdateFileContent(const std::filesystem::path& filepath, const std::string& content, std::string& errMsg) {
+    filesystem::path tmpFilepath = filepath.string() + ".new";
+    {
+        ofstream fout(tmpFilepath, ios::binary);
+        if (!fout) {
+            errMsg = "failed to open file";
+            return false;
+        }
+        fout << content;
+    }
+
+    error_code ec;
+    filesystem::rename(tmpFilepath, filepath, ec);
+    if (ec) {
+        filesystem::remove(tmpFilepath, ec);
+        errMsg = "failed to rename tmp file to file";
+        return false;
+    }
+    return true;
+}
+
 bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg) {
-    ofstream f(fileName, ios::trunc);
+    ofstream f(fileName, ios::trunc | ios::binary);
     if (!f.is_open()) {
         errMsg = "failed to open file " + fileName;
         return false;

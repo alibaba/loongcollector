@@ -167,6 +167,8 @@ extern const std::string& METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL;
+extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL;
+extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL;
 
 /**********************************************************
  *   all flusher （所有发送插件通用指标）
@@ -335,6 +337,12 @@ extern const std::string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_LOSS_PROCESS_EVENTS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_MISS_TOTAL;
 extern const std::string METRIC_RUNNER_EBPF_PROCESS_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_PROCESS_DATA_MAP_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_POLL_KERNEL_EVENTS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL;
+extern const std::string METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE;
+extern const std::string METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL;
 
 /**********************************************************
  *   k8s metadata

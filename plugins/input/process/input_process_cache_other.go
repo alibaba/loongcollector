@@ -45,7 +45,7 @@ type processCacheOther struct {
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
 	processes, err := process.Processes()
 	if err != nil {
-		logger.Errorf(context.Background(), "PROCESS_LIST_ALARM", "error: %v", err)
+		logger.Warningf(context.Background(), "PROCESS_LIST_ALARM", "error: %v", err)
 		return nil, err
 	}
 	if len(processes) == 0 {

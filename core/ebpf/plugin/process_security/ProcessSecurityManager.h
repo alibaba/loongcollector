@@ -15,6 +15,7 @@
 #pragma once
 
 #include <coolbpf/security/type.h>
+#include <cstdint>
 
 #include <memory>
 
@@ -23,9 +24,9 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/type/ProcessEvent.h"
+#include "ebpf/util/AggregateTree.h"
 
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 class ProcessSecurityManager : public AbstractManager {
 public:
     inline static constexpr StringView kExitTidKey = "exit_tid";
@@ -38,29 +39,38 @@ public:
     ProcessSecurityManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                           const PluginMetricManagerPtr& metricManager);
+                           EventPool* pool);
 
     static std::shared_ptr<ProcessSecurityManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           const PluginMetricManagerPtr& metricMgr) {
-        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, metricMgr);
+           EventPool* pool) {
+        return std::make_shared<ProcessSecurityManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     ~ProcessSecurityManager() = default;
-    int Init(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
+    int Init() override;
     int Destroy() override;
 
-    PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
+    PluginType GetPluginType() override { return PluginType::PROCESS_SECURITY; }
 
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override;
 
-    // process perfbuffer was polled by processCacheManager ...
-    int PollPerfBuffer() override { return 0; }
+    int SendEvents() override;
 
-    bool ScheduleNext(const std::chrono::steady_clock::time_point& execTime,
-                      const std::shared_ptr<ScheduleConfig>& config) override;
+    // process perfbuffer was polled by processCacheManager ...
+    int PollPerfBuffer(int maxWaitTimeMs) override { return 0; }
+    int ConsumePerfBufferData() override { return 0; }
+
+    int RegisteredConfigCount() override { return mRegisteredConfigCount; }
+
+    int AddOrUpdateConfig(const CollectionPipelineContext*,
+                          uint32_t,
+                          const PluginMetricManagerPtr&,
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
+
+    int RemoveConfig(const std::string&) override;
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
@@ -71,16 +81,25 @@ public:
 
     int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
-        LOG_WARNING(sLogger, ("would do nothing", ""));
         return 0;
     }
 
-    bool ConsumeAggregateTree(const std::chrono::steady_clock::time_point& execTime);
+    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
 
 private:
-    ReadWriteLock mLock;
+    int64_t mSendIntervalMs = 400;
+    int64_t mLastSendTimeMs = 0;
     SIZETAggTree<ProcessEventGroup, std::shared_ptr<CommonEvent>> mAggregateTree;
+
+    std::vector<MetricLabels> mRefAndLabels;
+    PluginMetricManagerPtr mMetricMgr;
+    const CollectionPipelineContext* mPipelineCtx{nullptr};
+    logtail::QueueKey mQueueKey = 0;
+    int mRegisteredConfigCount = 0;
+    uint32_t mPluginIndex{0};
+    CounterPtr mPushLogsTotal;
+    CounterPtr mPushLogGroupTotal;
+    CounterPtr mPushLogFailedTotal;
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

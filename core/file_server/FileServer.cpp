@@ -14,13 +14,13 @@
 
 #include "file_server/FileServer.h"
 
-#include "checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileTagOptions.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
@@ -33,7 +33,7 @@ using namespace std;
 namespace logtail {
 
 FileServer::FileServer() {
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER}});
@@ -48,8 +48,8 @@ void FileServer::Start() {
     ConfigManager::GetInstance()->RegisterHandlers();
     auto costMs = GetCurrentTimeInMilliSeconds() - start;
     if (costMs >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(REGISTER_HANDLERS_TOO_SLOW_ALARM,
-                                               "Registering handlers took " + ToString(costMs) + " ms");
+        AlarmManager::GetInstance()->SendAlarmWarning(REGISTER_HANDLERS_TOO_SLOW_ALARM,
+                                                      "Registering handlers took " + ToString(costMs) + " ms");
         LOG_WARNING(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
     } else {
         LOG_INFO(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
@@ -62,6 +62,7 @@ void FileServer::Start() {
         PollingDirFile::GetInstance()->Start();
     }
     LogInput::GetInstance()->Start();
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
     LOG_INFO(sLogger, ("file server", "started"));
 }
 
@@ -89,8 +90,8 @@ void FileServer::PauseInner() {
     LogInput::GetInstance()->HoldOn();
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                               "Pausing file server took " + ToString(holdOnCost) + "ms");
+        AlarmManager::GetInstance()->SendAlarmError(HOLD_ON_TOO_SLOW_ALARM,
+                                                    "Pausing file server took " + ToString(holdOnCost) + "ms");
     }
     LOG_INFO(sLogger, ("file server pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));
 }

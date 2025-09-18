@@ -25,6 +25,9 @@ DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10)
 DEFINE_FLAG_DOUBLE(cpu_usage_up_limit, "cpu usage upper limit, cores", 2.0);
 DEFINE_FLAG_INT64(memory_usage_up_limit, "memory usage upper limit, MB", 2 * 1024);
 
+// checkpoint
+DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
+
 // epoll
 DEFINE_FLAG_INT32(ilogtail_epoll_time_out, "default time out is 1s", 1);
 DEFINE_FLAG_INT32(ilogtail_epoll_wait_events, "epoll_wait event number", 100);
@@ -62,3 +65,8 @@ DEFINE_FLAG_STRING(logs_dir, "loongcollector log dir", "log");
 DEFINE_FLAG_STRING(data_dir, "loongcollector data dir", "data");
 DEFINE_FLAG_STRING(run_dir, "loongcollector run dir", "run");
 DEFINE_FLAG_STRING(third_party_dir, "loongcollector third party dir", "thirdparty");
+
+// ebpf event retry flags
+DEFINE_FLAG_INT32(ebpf_event_retry_interval_sec, "Time in seconds between ebpf event retries", 2);
+DEFINE_FLAG_INT32(ebpf_event_retry_limit, "Number of attempts to retry processing ebpf event", 15);
+DEFINE_FLAG_INT32(ebpf_max_aggregate_events, "Maximum events in aggregate tree before sending", 2000);

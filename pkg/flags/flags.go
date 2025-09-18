@@ -35,10 +35,11 @@ const (
 )
 
 const (
-	DefaultGlobalConfig     = `{"InputIntervalMs":5000,"AggregatIntervalMs":30,"FlushIntervalMs":30,"DefaultLogQueueSize":11,"DefaultLogGroupQueueSize":12}`
-	DefaultPluginConfig     = `{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"Content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}`
-	DefaultFlusherConfig    = `{"type":"flusher_sls","detail":{}}`
-	LoongcollectorEnvPrefix = "LOONG_"
+	DefaultGlobalConfig                 = `{"InputIntervalMs":5000,"AggregatIntervalMs":30,"FlushIntervalMs":30,"DefaultLogQueueSize":11,"DefaultLogGroupQueueSize":12}`
+	DefaultPluginConfig                 = `{"inputs":[{"type":"metric_mock","detail":{"Tags":{"tag1":"aaaa","tag2":"bbb"},"Fields":{"Content":"xxxxx","time":"2017.09.12 20:55:36"}}}],"flushers":[{"type":"flusher_stdout"}]}`
+	DefaultFlusherConfig                = `{"type":"flusher_sls","detail":{}}`
+	LoongcollectorEnvPrefix             = "LOONG_"
+	LoongcollectorContainerLogEnvPrefix = "loong_logs_"
 )
 
 var (
@@ -141,7 +142,9 @@ var (
 	DeployMode           = flag.String("DEPLOY_MODE", DeployDaemonset, "alibaba log deploy mode, daemonset or statefulset or singleton")
 	EnableKubernetesMeta = flag.Bool("ENABLE_KUBERNETES_META", false, "enable kubernetes meta")
 	ClusterID            = flag.String("GLOBAL_CLUSTER_ID", "", "cluster id")
-	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "", "cluster type, supporting ack, one, asi and k8s")
+	ClusterName          = flag.String("GLOBAL_CLUSTER_NAME", "", "cluster name")
+	ClusterRegion        = flag.String("GLOBAL_CLUSTER_REGION", "", "cluster region")
+	ClusterType          = flag.String("GLOBAL_CLUSTER_TYPE", "k8s", "cluster domain, configurable: k8s (default)")
 )
 
 // lookupFlag returns the flag.Flag for the given name, or an error if not found
@@ -343,6 +346,8 @@ func init() {
 	_ = util.InitFromEnvString("DEPLOY_MODE", DeployMode, *DeployMode)
 	_ = util.InitFromEnvBool("ENABLE_KUBERNETES_META", EnableKubernetesMeta, *EnableKubernetesMeta)
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_ID", ClusterID, *ClusterID)
+	_ = util.InitFromEnvString("GLOBAL_CLUSTER_NAME", ClusterName, *ClusterName)
+	_ = util.InitFromEnvString("GLOBAL_CLUSTER_REGION", ClusterRegion, *ClusterRegion)
 	_ = util.InitFromEnvString("GLOBAL_CLUSTER_TYPE", ClusterType, *ClusterType)
 
 	if len(*DefaultRegion) == 0 {

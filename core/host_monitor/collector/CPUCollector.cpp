@@ -16,123 +16,123 @@
 
 #include "host_monitor/collector/CPUCollector.h"
 
+#include <ctime>
+
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
+#include "Flags.h"
+#include "host_monitor/HostMonitorContext.h"
+#include "host_monitor/SystemInterface.h"
 
-#include "MetricValue.h"
-#include "common/StringTools.h"
-#include "host_monitor/Constants.h"
-#include "host_monitor/SystemInformationTools.h"
-#include "logger/Logger.h"
-
+DEFINE_FLAG_INT32(basic_host_monitor_cpu_collect_interval, "basic host monitor cpu collect interval, seconds", 1);
 namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
-const std::string kMetricLabelCPU = "cpu";
-const std::string kMetricLabelMode = "mode";
 
-bool CPUCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
-    if (group == nullptr) {
+bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
+    CPUInformation cpuInfo;
+    CPUPercent totalCpuPercent{};
+    if (!SystemInterface::GetInstance()->GetCPUInformation(collectContext.GetMetricTime(), cpuInfo)) {
         return false;
     }
-    std::vector<CPUStat> cpus;
-    if (!GetHostSystemCPUStat(cpus)) {
+
+    if (cpuInfo.stats.size() <= 1) {
+        LOG_ERROR(sLogger, ("cpu count is negative", cpuInfo.stats.size()));
         return false;
     }
-    const time_t now = time(nullptr);
-    constexpr struct MetricDef {
-        const char* name;
-        const char* mode;
-        double CPUStat::*value;
-    } metrics[] = {
-        {"node_cpu_seconds_total", "user", &CPUStat::user},
-        {"node_cpu_seconds_total", "nice", &CPUStat::nice},
-        {"node_cpu_seconds_total", "system", &CPUStat::system},
-        {"node_cpu_seconds_total", "idle", &CPUStat::idle},
-        {"node_cpu_seconds_total", "iowait", &CPUStat::iowait},
-        {"node_cpu_seconds_total", "irq", &CPUStat::irq},
-        {"node_cpu_seconds_total", "softirq", &CPUStat::softirq},
-        {"node_cpu_seconds_total", "steal", &CPUStat::steal},
-        {"node_cpu_guest_seconds_total", "user", &CPUStat::guest},
-        {"node_cpu_guest_seconds_total", "nice", &CPUStat::guestNice},
-    };
-    for (const auto& cpu : cpus) {
-        if (cpu.index == -1) {
+
+    for (const auto& cpu : cpuInfo.stats) {
+        if (cpu.index != -1) {
             continue;
         }
+
+        CPUStat cpuTotal = cpu;
+        double cpuCores = cpuCount;
+        if (!CalculateCPUPercent(totalCpuPercent, cpuTotal)) {
+            return false;
+        }
+        // first time get cpu count and not calculate
+        if (cpuCount == 0) {
+            cpuCount = cpuInfo.stats.size() - 1;
+            return true;
+        }
+
+        cpuCount = cpuInfo.stats.size() - 1;
+        mCalculate.AddValue(totalCpuPercent);
+
+        // If group is not provided, just collect data without generating metrics
+        if (!groupPtr) {
+            return true;
+        }
+
+        CPUPercent minCPU, maxCPU, avgCPU, lastCPU;
+        mCalculate.Stat(maxCPU, minCPU, avgCPU, &lastCPU);
+
+        mCalculate.Reset();
+        struct MetricDef {
+            const char* name;
+            double* value;
+        } metrics[] = {
+            {"cpu_system_avg", &avgCPU.sys},  {"cpu_system_min", &minCPU.sys},  {"cpu_system_max", &maxCPU.sys},
+            {"cpu_idle_avg", &avgCPU.idle},   {"cpu_idle_min", &minCPU.idle},   {"cpu_idle_max", &maxCPU.idle},
+            {"cpu_user_avg", &avgCPU.user},   {"cpu_user_min", &minCPU.user},   {"cpu_user_max", &maxCPU.user},
+            {"cpu_wait_avg", &avgCPU.wait},   {"cpu_wait_min", &minCPU.wait},   {"cpu_wait_max", &maxCPU.wait},
+            {"cpu_other_avg", &avgCPU.other}, {"cpu_other_min", &minCPU.other}, {"cpu_other_max", &maxCPU.other},
+            {"cpu_total_avg", &avgCPU.total}, {"cpu_total_min", &minCPU.total}, {"cpu_total_max", &maxCPU.total},
+            {"cpu_cores_value", &cpuCores},
+
+        };
+        MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
+        if (!metricEvent) {
+            return false;
+        }
+        metricEvent->SetTimestamp(cpuInfo.collectTime, 0);
+        metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+        metricEvent->SetTag(std::string("m"), std::string("system.cpu"));
+        auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
         for (const auto& def : metrics) {
-            auto* metricEvent = group->AddMetricEvent(true);
-            if (!metricEvent) {
-                continue;
-            }
-            metricEvent->SetName(def.name);
-            metricEvent->SetTimestamp(now, 0);
-            metricEvent->SetValue<UntypedSingleValue>(cpu.*(def.value) / SYSTEM_HERTZ);
-            metricEvent->SetTag(kMetricLabelCPU, std::to_string(cpu.index));
-            metricEvent->SetTagNoCopy(kMetricLabelMode, def.mode);
+            multiDoubleValues->SetValue(std::string(def.name),
+                                        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
         }
     }
     return true;
 }
 
-bool CPUCollector::GetHostSystemCPUStat(std::vector<CPUStat>& cpus) {
-    std::vector<std::string> cpuLines;
-    std::string errorMessage;
-    if (!GetHostSystemStat(cpuLines, errorMessage)) {
-        if (mValidState) {
-            LOG_WARNING(sLogger, ("failed to get system cpu", "invalid CPU collector")("error msg", errorMessage));
-            mValidState = false;
-        }
+bool CPUCollector::CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& currentCpu) {
+    if (cpuCount == 0) {
+        lastCpu = currentCpu;
+        cpuPercent.sys = cpuPercent.user = cpuPercent.wait = cpuPercent.idle = cpuPercent.other = cpuPercent.total
+            = 0.0;
+        LOG_DEBUG(sLogger, ("first time collect Cpu info", "empty"));
+        return true;
+    }
+
+    double currentJiffies, lastJiffies, jiffiesDelta;
+    currentJiffies = currentCpu.user + currentCpu.nice + currentCpu.system + currentCpu.idle + currentCpu.iowait
+        + currentCpu.irq + currentCpu.softirq + currentCpu.steal;
+    lastJiffies = lastCpu.user + lastCpu.nice + lastCpu.system + lastCpu.idle + lastCpu.iowait + lastCpu.irq
+        + lastCpu.softirq + lastCpu.steal;
+    jiffiesDelta = currentJiffies - lastJiffies;
+
+    if (jiffiesDelta <= 0) {
+        LOG_ERROR(sLogger, ("jiffies delta is negative", "skip"));
         return false;
     }
-    mValidState = true;
-    // cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0
-    // cpu0 14708487 14216 4613031 2108180843 57199 0 424744 0 0 0
-    // ...
-    cpus.clear();
-    cpus.reserve(cpuLines.size());
-    for (auto const& line : cpuLines) {
-        std::vector<std::string> cpuMetric;
-        boost::split(cpuMetric, line, boost::is_any_of(" "), boost::token_compress_on);
-        if (cpuMetric.size() > 0 && cpuMetric[0].substr(0, 3) == "cpu") {
-            CPUStat cpuStat{};
-            if (cpuMetric[0] == "cpu") {
-                cpuStat.index = -1;
-            } else {
-                if (!StringTo(cpuMetric[0].substr(3), cpuStat.index)) {
-                    LOG_ERROR(sLogger, ("failed to parse cpu index", "skip")("wrong cpu index", cpuMetric[0]));
-                    continue;
-                }
-            }
-            cpuStat.user = ParseMetric(cpuMetric, EnumCpuKey::user);
-            cpuStat.nice = ParseMetric(cpuMetric, EnumCpuKey::nice);
-            cpuStat.system = ParseMetric(cpuMetric, EnumCpuKey::system);
-            cpuStat.idle = ParseMetric(cpuMetric, EnumCpuKey::idle);
-            cpuStat.iowait = ParseMetric(cpuMetric, EnumCpuKey::iowait);
-            cpuStat.irq = ParseMetric(cpuMetric, EnumCpuKey::irq);
-            cpuStat.softirq = ParseMetric(cpuMetric, EnumCpuKey::softirq);
-            cpuStat.steal = ParseMetric(cpuMetric, EnumCpuKey::steal);
-            cpuStat.guest = ParseMetric(cpuMetric, EnumCpuKey::guest);
-            cpuStat.guestNice = ParseMetric(cpuMetric, EnumCpuKey::guest_nice);
-            cpus.push_back(cpuStat);
-        }
-    }
+
+    cpuPercent.sys = (currentCpu.system - lastCpu.system) / jiffiesDelta * 100;
+    cpuPercent.user = (currentCpu.user - lastCpu.user) / jiffiesDelta * 100;
+    cpuPercent.wait = (currentCpu.iowait - lastCpu.iowait) / jiffiesDelta * 100;
+    cpuPercent.idle = (currentCpu.idle - lastCpu.idle) / jiffiesDelta * 100;
+    cpuPercent.other = (currentCpu.nice + currentCpu.irq + currentCpu.softirq + currentCpu.steal - lastCpu.nice
+                        - lastCpu.irq - lastCpu.softirq - lastCpu.steal)
+        / jiffiesDelta * 100;
+    cpuPercent.total = 100 - cpuPercent.idle;
+    lastCpu = currentCpu;
     return true;
 }
 
-double CPUCollector::ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const {
-    if (cpuMetric.size() <= static_cast<size_t>(key)) {
-        return 0.0;
-    }
-    double value = 0.0;
-    if (!StringTo(cpuMetric[static_cast<size_t>(key)], value)) {
-        LOG_WARNING(
-            sLogger,
-            ("failed to parse cpu metric", static_cast<size_t>(key))("value", cpuMetric[static_cast<size_t>(key)]));
-    }
-    return value;
+const std::chrono::seconds CPUCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_cpu_collect_interval));
 }
 
 } // namespace logtail

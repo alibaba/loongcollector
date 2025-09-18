@@ -53,9 +53,22 @@ func (m *metadataHandler) K8sServerRun(stopCh <-chan struct{}) error {
 	logger.Info(context.Background(), "k8s meta server", "started", "port", port)
 	go func() {
 		defer panicRecover()
-		_ = server.ListenAndServe()
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Critical(context.Background(), "HTTP_SERVER_ERROR", "HTTP server error", err)
+		}
 	}()
 	<-stopCh
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// shutdown server gracefully
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error(context.Background(), "HTTP_SERVER_ERROR", "HTTP server shutdown error", err)
+		return err
+	}
+
+	logger.Info(context.Background(), "k8s meta server", "stopped")
 	return nil
 }
 
@@ -277,7 +290,7 @@ func (m *metadataHandler) handlePodMetaByHostIP(w http.ResponseWriter, r *http.R
 
 	// Get the metadata
 	metadata := make(map[string]*PodMetadata)
-	queryKeys := make([]string, len(rBody.Keys))
+	queryKeys := make([]string, 0, len(rBody.Keys))
 	for _, key := range rBody.Keys {
 		queryKeys = append(queryKeys, addHostIPIndexPrefex(key))
 	}

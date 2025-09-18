@@ -255,7 +255,7 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		logger.Error(h.context.GetRuntimeContext(), "HTTP_PARSE_ALARM", "Read body of HTTP response failed", err)
+		logger.Warning(h.context.GetRuntimeContext(), "HTTP_PARSE_ALARM", "Read body of HTTP response failed", err)
 		fields["_result_"] = "invalid_body"
 		fields["_response_match_"] = "no"
 		return fields, nil
@@ -268,7 +268,7 @@ func (h *Response) httpGather(address string) (map[string]string, error) {
 		if h.compiledStringMatch == nil {
 			h.compiledStringMatch, err = regexp.Compile(h.ResponseStringMatch)
 			if err != nil {
-				logger.Error(h.context.GetRuntimeContext(), "HTTP_INIT_ALARM", "Compile regular expression faild", h.ResponseStringMatch, "error", err)
+				logger.Warning(h.context.GetRuntimeContext(), "HTTP_INIT_ALARM", "Compile regular expression faild", h.ResponseStringMatch, "error", err)
 				fields["_result_"] = "match_regex_invalid"
 				return fields, nil
 			}

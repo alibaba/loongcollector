@@ -2846,5 +2846,6 @@ void ConfigUpdatorUnittest::TestIsWildcardPathMatch() {
 int main(int argc, char** argv) {
     InitUnittestMain();
     ::testing::InitGoogleTest(&argc, argv);
+    ::testing::AddGlobalTestEnvironment(new GlobalEnvironment);
     return RUN_ALL_TESTS();
 }

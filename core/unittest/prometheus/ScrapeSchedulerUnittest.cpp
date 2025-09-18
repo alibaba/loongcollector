@@ -262,7 +262,7 @@ void ScrapeSchedulerUnittest::TestTokenUpdate() {
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     EventPool eventPool{true};
     event.SetComponent(&eventPool);
-    event.SetFirstExecTime(chrono::steady_clock::now(), chrono::system_clock::now());
+    event.CalculateFirstExecTime(chrono::steady_clock::now(), chrono::system_clock::now());
     event.ScheduleNext();
 
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
@@ -306,7 +306,7 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     event.SetComponent(&eventPool);
     auto now = std::chrono::steady_clock::now();
     auto nowScrape = std::chrono::system_clock::now();
-    event.SetFirstExecTime(now, nowScrape);
+    event.CalculateFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.size() == 1);
@@ -334,7 +334,7 @@ void ScrapeSchedulerUnittest::TestExactlyScrape() {
     event.SetComponent(&eventPool);
     auto execTime = std::chrono::steady_clock::now();
     auto scrapeTime = std::chrono::system_clock::now();
-    event.SetFirstExecTime(execTime, scrapeTime);
+    event.CalculateFirstExecTime(execTime, scrapeTime);
 
     auto firstScrapeTime = event.mLatestScrapeTime;
     event.ExecDone();

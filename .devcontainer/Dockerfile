@@ -12,26 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.4
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
 USER root
 
-RUN wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolchain/glibc-2.18.tar.gz && \
-    tar -zxvf glibc-2.18.tar.gz && \
-    cd glibc-2.18 && \
-    mkdir build && \
-    cd build && \
-    ../configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install && \
-    cd ../ && \
-    rm -fr glibc-2.18*
-
+RUN yum -y install openssh-server && \
+    ssh-keygen -A
+    
 # Create the user
 COPY .env /tmp/.env
-RUN source /tmp/.env && rm /tmp/.env; \
+COPY authorized_keys /tmp/authorized_keys
+
+RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
+    cp /opt/logtail/deps/lib/libcrypto.so.1.0.0 /usr/lib64; \
+    source /tmp/.env && rm /tmp/.env; \
     if getent passwd $USERNAME; then userdel -f $USERNAME; fi; \
     if [ $HOST_OS = "Linux" ]; then \
     if getent group $GROUPNAME; then groupdel -f $GROUPNAME; fi; \
@@ -43,10 +39,18 @@ RUN source /tmp/.env && rm /tmp/.env; \
     # the filename should not have the . or ~ symbol.
     USER_SUDOER_FILE=$(echo $USERNAME | sed 's/\./-/g'); \
     echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USER_SUDOER_FILE; \
+    echo "$USERNAME     soft    nproc     unlimited" >> /etc/security/limits.d/20-nproc.conf; \
     chmod 0440 /etc/sudoers.d/$USER_SUDOER_FILE; \
+    chmod -R 755 $(eval echo ~$USERNAME); \
+    mkdir -p /home/$USERNAME/.ssh; \
+    cp /tmp/authorized_keys /home/$USERNAME/.ssh/authorized_keys; \
+    chmod 700 /home/$USERNAME/.ssh; \
+    chmod 600 /home/$USERNAME/.ssh/authorized_keys; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
-    chmod -R 755 $(eval echo ~$USERNAME);
+    rm /tmp/authorized_keys; \
+    echo "export PATH=/usr/local/go/bin:/opt/logtail/deps/bin:$PATH" >> /home/$USERNAME/.bashrc; \
+    su - $USERNAME -c "\
+    go env -w GO111MODULE=on && \
+    go env -w GOPROXY=https://goproxy.cn,direct"
 
 USER $USERNAME
-
-RUN go env -w GO111MODULE=on && go env -w GOPROXY=https://goproxy.cn,direct

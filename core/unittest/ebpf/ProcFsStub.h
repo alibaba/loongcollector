@@ -1,3 +1,19 @@
+// Copyright 2025 LoongCollector Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
 #include <cstddef>
 
 #include <filesystem>
@@ -7,6 +23,7 @@
 #include "ProcParser.h"
 #include "common/ProcParser.h"
 #include "common/TimeUtil.h"
+#include "coolbpf/security/bpf_process_event_type.h"
 
 using namespace logtail;
 
@@ -54,6 +71,36 @@ Proc CreateStubProc() {
     proc.user_ns = 4026531837;
     proc.uts_ns = 4026535740;
     return proc;
+}
+
+void FillKernelThreadProc(Proc& proc) {
+    proc.pid = 10002;
+    proc.ppid = 0;
+    proc.tid = proc.pid;
+    proc.nspid = 0; // no container_id
+    proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID | EVENT_ROOT_CWD);
+    proc.cwd = "/";
+    proc.comm = "ksoftirqd/18";
+    proc.cmdline = ""; // \0 separated binary and args
+    proc.exe = "";
+    proc.container_id.resize(0);
+    proc.effective = 0x000001ffffffffff;
+    proc.inheritable = 0x0000000000000000;
+    proc.permitted = 0x000001ffffffffff;
+}
+
+void FillRootCwdProc(Proc& proc) {
+    proc.pid = 20001;
+    proc.ppid = 99999;
+    proc.tid = proc.pid;
+    proc.nspid = 0; // no container_id
+    proc.flags = static_cast<uint32_t>(EVENT_PROCFS | EVENT_NEEDS_CWD | EVENT_NEEDS_AUID | EVENT_ROOT_CWD);
+    proc.cwd = "/";
+    proc.comm = "cat";
+    constexpr char cmdline[] = "cat\0/etc/host.conf\0/etc/resolv.conf";
+    proc.cmdline.assign(cmdline, sizeof(cmdline) - 1); // \0 separated binary and args
+    proc.exe = "/usr/bin/cat";
+    proc.container_id.resize(0);
 }
 
 class ProcFsStub {

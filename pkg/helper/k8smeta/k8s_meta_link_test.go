@@ -1369,7 +1369,7 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getConfigMapNamesapceLink(configmapList)
+	results := linkGenerator.getConfigMapNamespaceLink(configmapList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*ConfigMapNamespace).Namespace.Name)
 	assert.Equal(t, "configmap1", results[0].Object.Raw.(*ConfigMapNamespace).ConfigMap.Name)
@@ -1429,7 +1429,7 @@ func TestGetJobNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getJobNamesapceLink(jobList)
+	results := linkGenerator.getJobNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*JobNamespace).Namespace.Name)
 	assert.Equal(t, "job1", results[0].Object.Raw.(*JobNamespace).Job.Name)
@@ -1474,7 +1474,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		Object:    cronjob2,
 	})
 
-	jobList := []*K8sMetaEvent{
+	cronjobList := []*K8sMetaEvent{
 		{
 			EventType: "update",
 			Object:    cronjob1,
@@ -1489,7 +1489,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getCronJobNamesapceLink(jobList)
+	results := linkGenerator.getCronJobNamespaceLink(cronjobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*CronJobNamespace).Namespace.Name)
 	assert.Equal(t, "cronjob1", results[0].Object.Raw.(*CronJobNamespace).CronJob.Name)
@@ -1499,7 +1499,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 }
 
 func TestGetPVCNamespaceLink(t *testing.T) {
-	pvcCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUME)
+	pvcCache := newK8sMetaCache(make(chan struct{}), PERSISTENTVOLUMECLAIM)
 	namespaceCache := newK8sMetaCache(make(chan struct{}), NAMESPACE)
 	namespaceCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
 		EventType: "add",
@@ -1549,7 +1549,7 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 		NAMESPACE:             namespaceCache,
 	})
 
-	results := linkGenerator.getPVCNamesapceLink(jobList)
+	results := linkGenerator.getPVCNamespaceLink(jobList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*PersistentVolumeClaimNamespace).Namespace.Name)
 	assert.Equal(t, "pvc1", results[0].Object.Raw.(*PersistentVolumeClaimNamespace).PersistentVolumeClaim.Name)
@@ -1594,7 +1594,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		Object:    ingress2,
 	})
 
-	jobList := []*K8sMetaEvent{
+	ingressList := []*K8sMetaEvent{
 		{
 			EventType: "update",
 			Object:    ingress1,
@@ -1609,7 +1609,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 		NAMESPACE: namespaceCache,
 	})
 
-	results := linkGenerator.getIngressNamesapceLink(jobList)
+	results := linkGenerator.getIngressNamespaceLink(ingressList)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "default", results[0].Object.Raw.(*IngressNamespace).Namespace.Name)
 	assert.Equal(t, "ingress1", results[0].Object.Raw.(*IngressNamespace).Ingress.Name)
@@ -1623,7 +1623,7 @@ func generateMockNamespace(namespaceName string) *ObjectWrapper {
 		Raw: &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      namespaceName,
-				Namespace: "", // namesapce itself without namesapce
+				Namespace: "", // namespace itself without namespace
 			},
 		},
 	}

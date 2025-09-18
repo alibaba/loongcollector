@@ -21,14 +21,52 @@ target_link_libraries(process_entity_collector_unittest ${UT_BASE_TARGET})
 add_executable(host_monitor_input_runner_unittest HostMonitorInputRunnerUnittest.cpp)
 target_link_libraries(host_monitor_input_runner_unittest ${UT_BASE_TARGET})
 
-add_executable(system_information_tools_unittest SystemInformationToolsUnittest.cpp)
-target_link_libraries(system_information_tools_unittest ${UT_BASE_TARGET})
-
 add_executable(cpu_collector_unittest CPUCollectorUnittest.cpp)
 target_link_libraries(cpu_collector_unittest ${UT_BASE_TARGET})
+
+add_executable(system_collector_unittest SystemCollectorUnittest.cpp)
+target_link_libraries(system_collector_unittest ${UT_BASE_TARGET})
+
+add_executable(net_collector_unittest NetCollectorUnittest.cpp)
+target_link_libraries(net_collector_unittest ${UT_BASE_TARGET})
+
+add_executable(metric_calculate_unittest MetricCalculateUnittest.cpp)
+target_link_libraries(metric_calculate_unittest ${UT_BASE_TARGET})
+
+add_executable(system_interface_unittest SystemInterfaceUnittest.cpp)
+target_link_libraries(system_interface_unittest ${UT_BASE_TARGET})
+
+add_executable(fast_field_parser_unittest FastFieldParserUnittest.cpp)
+target_link_libraries(fast_field_parser_unittest ${UT_BASE_TARGET})
+
+# add_executable(fast_field_parser_benchmark FastFieldParserBenchmark.cpp)
+# target_link_libraries(fast_field_parser_benchmark ${UT_BASE_TARGET})
+
+if (LINUX)
+    add_executable(linux_system_interface_unittest LinuxSystemInterfaceUnittest.cpp)
+    target_link_libraries(linux_system_interface_unittest ${UT_BASE_TARGET})
+endif()
+add_executable(mem_collector_unittest MemCollectorUnittest.cpp)
+target_link_libraries(mem_collector_unittest ${UT_BASE_TARGET})
+add_executable(process_collector_unittest ProcessCollectorUnittest.cpp)
+target_link_libraries(process_collector_unittest ${UT_BASE_TARGET})
+
+add_executable(disk_collector_unittest DiskCollectorUnittest.cpp)
+target_link_libraries(disk_collector_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(process_entity_collector_unittest)
 gtest_discover_tests(host_monitor_input_runner_unittest)
-gtest_discover_tests(system_information_tools_unittest)
 gtest_discover_tests(cpu_collector_unittest)
+gtest_discover_tests(metric_calculate_unittest)
+gtest_discover_tests(system_interface_unittest)
+if (LINUX)
+    gtest_discover_tests(linux_system_interface_unittest)
+endif()
+gtest_discover_tests(system_collector_unittest)
+gtest_discover_tests(mem_collector_unittest)
+gtest_discover_tests(disk_collector_unittest)
+gtest_discover_tests(process_collector_unittest)
+gtest_discover_tests(net_collector_unittest)
+gtest_discover_tests(fast_field_parser_unittest)
+# gtest_discover_tests(fast_field_parser_benchmark)

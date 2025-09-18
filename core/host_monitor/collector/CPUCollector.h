@@ -16,53 +16,61 @@
 
 #pragma once
 
-#include <vector>
-
+#include "host_monitor/Constants.h"
+#include "host_monitor/SystemInterface.h"
 #include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/MetricCalculate.h"
+#include "plugin/input/InputHostMonitor.h"
 
 namespace logtail {
 
-// man proc: https://man7.org/linux/man-pages/man5/proc.5.html
-// search key: /proc/stat
-enum class EnumCpuKey : int {
-    user = 1,
-    nice,
-    system,
-    idle,
-    iowait, // since Linux 2.5.41
-    irq, // since Linux 2.6.0
-    softirq, // since Linux 2.6.0
-    steal, // since Linux 2.6.11
-    guest, // since Linux 2.6.24
-    guest_nice, // since Linux 2.6.33
-};
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
 
-struct CPUStat {
-    int32_t index; // -1 means total cpu
+struct CPUPercent {
+    double sys;
     double user;
-    double nice;
-    double system;
+    double wait;
     double idle;
-    double iowait;
-    double irq;
-    double softirq;
-    double steal;
-    double guest;
-    double guestNice;
+    double other;
+    double total;
+
+    // Define the field descriptors
+    static inline const FieldName<CPUPercent> CPUMetricFields[] = {
+        FIELD_ENTRY(CPUPercent, sys),
+        FIELD_ENTRY(CPUPercent, user),
+        FIELD_ENTRY(CPUPercent, wait),
+        FIELD_ENTRY(CPUPercent, idle),
+        FIELD_ENTRY(CPUPercent, other),
+        FIELD_ENTRY(CPUPercent, total),
+    };
+
+    // Define the enumerate function for your metric type
+    static void enumerate(const std::function<void(const FieldName<CPUPercent, double>&)>& callback) {
+        for (const auto& field : CPUMetricFields) {
+            callback(field);
+        }
+    }
 };
 
 class CPUCollector : public BaseCollector {
 public:
+    CPUCollector() = default;
     ~CPUCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
 
 private:
-    bool GetHostSystemCPUStat(std::vector<CPUStat>& cpus);
-    double ParseMetric(const std::vector<std::string>& cpuMetric, EnumCpuKey key) const;
+    bool CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& cpu);
+
+private:
+    int cpuCount = 0;
+    MetricCalculate<CPUPercent> mCalculate;
+    CPUStat lastCpu{};
 };
 
 } // namespace logtail

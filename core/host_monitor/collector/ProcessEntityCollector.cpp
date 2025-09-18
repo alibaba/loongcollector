@@ -18,26 +18,26 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <ctime>
 #include <sched.h>
 #include <unistd.h>
 
-#include <functional>
 #include <memory>
 #include <queue>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include "ProcParser.h"
-#include "common/FileSystemUtil.h"
+#include "HostMonitorTimerEvent.h"
 #include "common/Flags.h"
 #include "common/HashUtil.h"
 #include "common/MachineInfoUtil.h"
-#include "common/StringTools.h"
+#include "common/ProcParser.h"
 #include "common/StringView.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/SystemInformationTools.h"
+#include "host_monitor/HostMonitorContext.h"
+#include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 
@@ -54,25 +54,35 @@ ProcessEntityCollector::ProcessEntityCollector()
 }
 
 system_clock::time_point ProcessEntityCollector::TicksToUnixTime(int64_t startTicks) {
-    return system_clock::time_point{static_cast<milliseconds>(startTicks)
-                                    + milliseconds{GetHostSystemBootTime() * 1000}};
+    SystemInformation systemInfo;
+    if (!SystemInterface::GetInstance()->GetSystemInformation(systemInfo)) {
+        LOG_ERROR(sLogger, ("failed to get system information", "use current time instead"));
+        return system_clock::now();
+    }
+    return system_clock::time_point{static_cast<milliseconds>(startTicks) + milliseconds{systemInfo.bootTime * 1000}};
 }
 
-bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig,
-                                     PipelineEventGroup* group) {
-    if (group == nullptr) {
+bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
+    // ProcessEntityCollector always generates events when called
+    if (!groupPtr) {
+        LOG_ERROR(sLogger, ("ProcessEntityCollector requires a group to generate events", "skip"));
         return false;
     }
+    SystemInformation systemInfo;
+    if (!SystemInterface::GetInstance()->GetSystemInformation(systemInfo)) {
+        LOG_ERROR(sLogger, ("failed to get system information", "use current time instead"));
+        systemInfo.bootTime = 0;
+    }
     std::vector<ExtendedProcessStatPtr> processes;
-    GetSortedProcess(processes, ProcessTopN);
+    GetSortedProcess(processes, ProcessTopN, collectContext.mCollectTime);
     for (const auto& extentedProcess : processes) {
         auto process = extentedProcess->stat;
-        auto* event = group->AddLogEvent();
+        auto* event = groupPtr->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
 
         auto startTime = system_clock::time_point{static_cast<milliseconds>(process.startTicks)
-                                                  + milliseconds{GetHostSystemBootTime() * 1000}};
+                                                  + milliseconds{systemInfo.bootTime * 1000}};
 
         std::string processCreateTime = std::to_string(duration_cast<seconds>(startTime.time_since_epoch()).count());
 
@@ -89,7 +99,7 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
 
         event->SetContent(DEFAULT_CONTENT_KEY_FIRST_OBSERVED_TIME, processCreateTime);
         event->SetContent(DEFAULT_CONTENT_KEY_LAST_OBSERVED_TIME, std::to_string(logtime));
-        int keepAliveSeconds = collectConfig.mInterval.count() * 2;
+        int keepAliveSeconds = collectContext.mReportInterval.count() * 2;
         event->SetContent(DEFAULT_CONTENT_KEY_KEEP_ALIVE_SECONDS, std::to_string(keepAliveSeconds));
 
         // custom fields
@@ -105,7 +115,7 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID, ""); TODO: get container id
 
         // process -> host link
-        auto* linkEvent = group->AddLogEvent();
+        auto* linkEvent = groupPtr->AddLogEvent();
         linkEvent->SetTimestamp(logtime);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_DOMAIN, domain);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_ENTITY_TYPE, entityType);
@@ -122,10 +132,11 @@ bool ProcessEntityCollector::Collect(const HostMonitorTimerEvent::CollectConfig&
     return true;
 }
 
-void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats, size_t topN) {
-    steady_clock::time_point now = steady_clock::now();
+time_t ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats,
+                                                size_t topN,
+                                                const CollectTime& collectTime) {
     auto compare = [](const std::pair<ExtendedProcessStatPtr, double>& a,
-                      const std::pair<ExtendedProcessStatPtr, double>& b) { return a.second > b.second; };
+                      const std::pair<ExtendedProcessStatPtr, double>& b) { return a.second < b.second; };
     std::priority_queue<std::pair<ExtendedProcessStatPtr, double>,
                         std::vector<std::pair<ExtendedProcessStatPtr, double>>,
                         decltype(compare)>
@@ -133,27 +144,35 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
 
     int readCount = 0;
     std::unordered_map<pid_t, ExtendedProcessStatPtr> newProcessStat;
-    WalkAllProcess(PROCESS_DIR, [&](const std::string& dirName) {
+    ProcessListInformation processListInfo;
+    if (!SystemInterface::GetInstance()->GetProcessListInformation(collectTime.mMetricTime, processListInfo)) {
+        LOG_ERROR(sLogger, ("failed to get process list information", "skip collect"));
+        return 0;
+    }
+    CollectTime shiftCollectTime{collectTime.GetShiftSteadyTime(processListInfo.collectTime),
+                                 processListInfo.collectTime};
+
+    for (const auto& pid : processListInfo.pids) {
+        if (pid == 0) {
+            continue;
+        }
         if (++readCount > mProcessSilentCount) {
             readCount = 0;
             std::this_thread::sleep_for(milliseconds{100});
         }
-        pid_t pid{};
-        if (!StringTo(dirName, pid)) {
-            return;
+        bool isFirstCollect = false;
+        auto ptr = GetProcessStat(pid, isFirstCollect, shiftCollectTime);
+        if (ptr == nullptr) {
+            continue;
         }
-        if (pid != 0) {
-            bool isFirstCollect = false;
-            auto ptr = GetProcessStat(pid, isFirstCollect);
-            newProcessStat[pid] = ptr;
-            if (ptr && !isFirstCollect) {
-                queue.emplace(ptr, ptr->cpuInfo.percent);
-            }
-            if (queue.size() > topN) {
-                queue.pop();
-            }
+        newProcessStat[pid] = ptr;
+        if (!isFirstCollect) {
+            queue.emplace(ptr, ptr->cpuInfo.percent);
         }
-    });
+        if (queue.size() > topN) {
+            queue.pop();
+        }
+    }
 
     processStats.clear();
     processStats.reserve(queue.size());
@@ -169,12 +188,12 @@ void ProcessEntityCollector::GetSortedProcess(std::vector<ExtendedProcessStatPtr
     LOG_DEBUG(sLogger, ("collect Process Cpu info, top", processStats.size()));
 
     mPrevProcessStat = std::move(newProcessStat);
-    mProcessSortTime = now;
+    mProcessSortTime = collectTime.GetShiftSteadyTime(processListInfo.collectTime);
+    return processListInfo.collectTime;
 }
 
-ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect) {
-    const auto now = steady_clock::now();
-
+ExtendedProcessStatPtr
+ProcessEntityCollector::GetProcessStat(pid_t pid, bool& isFirstCollect, const CollectTime& collectTime) {
     // TODO: more accurate cache
     auto prev = mPrevProcessStat.find(pid);
     if (prev == mPrevProcessStat.end() || prev->second == nullptr
@@ -184,17 +203,22 @@ ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& i
         isFirstCollect = false;
     }
     // proc/[pid]/stat的统计粒度通常为10ms，两次采样之间需要足够大才能平滑。
-    if (prev != mPrevProcessStat.end() && prev->second && now < prev->second->lastStatTime + seconds{1}) {
+    if (prev != mPrevProcessStat.end() && prev->second
+        && collectTime.mScheduleTime < prev->second->lastStatTime + seconds{1}) {
         return prev->second;
     }
-    auto ptr = ReadNewProcessStat(pid);
-    if (!ptr) {
+    auto ptr = std::make_shared<ExtendedProcessStat>();
+    ProcessInformation processInfo;
+    if (SystemInterface::GetInstance()->GetProcessInformation(collectTime.mMetricTime, pid, processInfo)) {
+        ptr->stat = processInfo.stat;
+    } else {
+        LOG_ERROR(sLogger, ("failed to get process information", pid));
         return nullptr;
     }
 
     // calculate CPU related fields
     {
-        ptr->lastStatTime = now;
+        ptr->lastStatTime = collectTime.mScheduleTime;
         constexpr const uint64_t MILLISECOND = 1000;
         ptr->cpuInfo.user = (ptr->stat.utimeTicks + ptr->stat.cutimeTicks) * MILLISECOND / SYSTEM_HERTZ;
         ptr->cpuInfo.sys = (ptr->stat.stimeTicks + ptr->stat.cstimeTicks) * MILLISECOND / SYSTEM_HERTZ;
@@ -212,42 +236,6 @@ ExtendedProcessStatPtr ProcessEntityCollector::GetProcessStat(pid_t pid, bool& i
         }
     }
     return ptr;
-}
-
-ExtendedProcessStatPtr ProcessEntityCollector::ReadNewProcessStat(pid_t pid) {
-    LOG_DEBUG(sLogger, ("read process stat", pid));
-    auto processStat = PROCESS_DIR / std::to_string(pid) / PROCESS_STAT;
-
-    std::string line;
-    if (FileReadResult::kOK != ReadFileContent(processStat.string(), line)) {
-        LOG_ERROR(sLogger, ("read process stat", "fail")("file", processStat));
-        return nullptr;
-    }
-    auto ptr = std::make_shared<ExtendedProcessStat>();
-    mProcParser.ParseProcessStat(pid, line, ptr->stat);
-    return ptr;
-}
-
-bool ProcessEntityCollector::WalkAllProcess(const std::filesystem::path& root,
-                                            const std::function<void(const std::string&)>& callback) {
-    if (!std::filesystem::exists(root) || !std::filesystem::is_directory(root)) {
-        if (mValidState) {
-            LOG_ERROR(sLogger,
-                      ("root path is not a directory or not exist", "invalid ProcessEntity collector")("root", root));
-            mValidState = false;
-        }
-        return false;
-    }
-    mValidState = true;
-
-    for (const auto& dirEntry :
-         std::filesystem::directory_iterator{root, std::filesystem::directory_options::skip_permission_denied}) {
-        std::string filename = dirEntry.path().filename().string();
-        if (IsInt(filename)) {
-            callback(filename);
-        }
-    }
-    return true;
 }
 
 std::string ProcessEntityCollector::GetProcessEntityID(StringView pid, StringView createTime, StringView hostEntityID) {
@@ -275,37 +263,6 @@ void ProcessEntityCollector::FetchDomainInfo(std::string& domain,
         entityType = DEFAULT_CONTENT_VALUE_ENTITY_TYPE_ECS_PROCESS;
         hostEntityID = entity->GetHostID();
     }
-}
-
-int64_t ProcessEntityCollector::GetHostSystemBootTime() {
-    static int64_t systemBootSeconds = 0;
-    if (systemBootSeconds != 0) {
-        return systemBootSeconds;
-    }
-    int64_t currentSeconds = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
-    std::vector<std::string> lines = {};
-    std::string errorMessage;
-    if (!GetHostSystemStat(lines, errorMessage)) {
-        LOG_WARNING(sLogger, ("failed to get system boot time", "use current time instead")("error msg", errorMessage));
-        return currentSeconds;
-    }
-    for (auto const& line : lines) {
-        auto cpuMetric = SplitString(line);
-        // example: btime 1719922762
-        if (cpuMetric.size() >= 2 && cpuMetric[0] == "btime") {
-            if (!StringTo(cpuMetric[1], systemBootSeconds)) {
-                LOG_WARNING(sLogger,
-                            ("failed to get system boot time",
-                             "use current time instead")("error msg", "parse btime erorr " + cpuMetric[1]));
-                return currentSeconds;
-            }
-            return systemBootSeconds;
-        }
-    }
-
-    LOG_WARNING(sLogger,
-                ("failed to get system boot time", "use current time instead")("error msg", "btime not found in stat"));
-    return currentSeconds;
 }
 
 } // namespace logtail

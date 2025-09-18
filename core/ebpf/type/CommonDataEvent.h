@@ -32,20 +32,23 @@ enum class KernelEventType {
     FILE_PATH_TRUNCATE,
     FILE_MMAP,
     FILE_PERMISSION_EVENT,
+
+    L7_RECORD,
+    CONN_STATS_RECORD,
+
+    FILE_PERMISSION_EVENT_WRITE,
+    FILE_PERMISSION_EVENT_READ,
 };
 
 class CommonEvent {
 public:
-    explicit CommonEvent(uint32_t pid, uint64_t ktime, KernelEventType type, uint64_t timestamp)
-        : mPid(pid), mKtime(ktime), mEventType(type), mTimestamp(timestamp) {}
+    explicit CommonEvent(KernelEventType type) : mEventType(type) {}
     virtual ~CommonEvent() {}
 
     [[nodiscard]] virtual PluginType GetPluginType() const = 0;
     [[nodiscard]] virtual KernelEventType GetKernelEventType() const { return mEventType; }
-    uint32_t mPid;
-    uint64_t mKtime;
     KernelEventType mEventType;
-    uint64_t mTimestamp; // for kernel ts nano
+
 private:
     CommonEvent() = delete;
 };

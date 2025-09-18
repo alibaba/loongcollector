@@ -27,15 +27,17 @@ inline constexpr char kContentLength[] = "Content-Length";
 inline constexpr char kTransferEncoding[] = "Transfer-Encoding";
 inline constexpr char kUpgrade[] = "Upgrade";
 
-std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
-                                                                       const std::shared_ptr<Connection>& conn,
-                                                                       const std::shared_ptr<Sampler>& sampler) {
-    auto record = std::make_shared<HttpRecord>(conn);
+std::vector<std::shared_ptr<L7Record>>
+HTTPProtocolParser::Parse(struct conn_data_event_t* dataEvent,
+                          const std::shared_ptr<Connection>& conn,
+                          const std::shared_ptr<AppDetail>& appDetail,
+                          const std::shared_ptr<AppConvergerManager>& converger) {
+    auto record = std::make_shared<HttpRecord>(conn, appDetail);
     record->SetEndTsNs(dataEvent->end_ts);
     record->SetStartTsNs(dataEvent->start_ts);
     auto spanId = GenerateSpanID();
     // slow request
-    if (record->GetLatencyMs() > 500 || sampler->ShouldSample(spanId)) {
+    if (record->GetLatencyMs() > 500 || appDetail->mSampler->ShouldSample(spanId)) {
         record->MarkSample();
     }
 
@@ -55,6 +57,9 @@ std::vector<std::shared_ptr<AbstractRecord>> HTTPProtocolParser::Parse(struct co
         if (state != ParseState::kSuccess) {
             LOG_DEBUG(sLogger, ("[HTTPProtocolParser]: Parse HTTP request failed", int(state)));
             return {};
+        }
+        if (converger) {
+            converger->DoConverge(appDetail, ConvType::kUrl, record->mPath);
         }
     }
 
@@ -109,6 +114,7 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<HttpRecord>& resu
             result->SetRealPath(kRootPath);
         } else if (pos != std::string::npos) {
             result->SetPath(trimPath.substr(0, pos));
+            result->SetRealPath(trimPath.substr(0, pos));
         } else {
             result->SetPath(trimPath);
             result->SetRealPath(trimPath);

@@ -91,7 +91,7 @@ void BlockedEventManager::UpdateBlockEvent(
         string key;
         key.append(pEvent->GetSource())
             .append(">")
-            .append(pEvent->GetObject())
+            .append(pEvent->GetEventObject())
             .append(">")
             .append(ToString(pEvent->GetDev()))
             .append(">")
@@ -101,7 +101,7 @@ void BlockedEventManager::UpdateBlockEvent(
         hashKey = HashSignatureString(key.c_str(), key.size());
     }
     LOG_DEBUG(sLogger,
-              ("Add block event ", pEvent->GetSource())(pEvent->GetObject(),
+              ("Add block event ", pEvent->GetSource())(pEvent->GetEventObject(),
                                                         pEvent->GetInode())(pEvent->GetConfigName(), hashKey));
     mEventMap[hashKey].Update(logstoreKey, pEvent, curTime);
 }
@@ -131,7 +131,7 @@ void BlockedEventManager::GetFeedbackEvent(vector<Event*>& res) {
     for (auto& key : keys) {
         for (auto iter = mEventMap.begin(); iter != mEventMap.end();) {
             auto& e = iter->second;
-            if (e.mEvent != nullptr && e.mQueueKey == key) {
+            if (e.mEvent != nullptr && e.mQueueKey == key && !e.mEvent->IsReaderFlushTimeout()) {
                 res.push_back(e.mEvent);
                 iter = mEventMap.erase(iter);
             } else {

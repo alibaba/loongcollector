@@ -22,14 +22,15 @@
 #include <unistd.h>
 
 #include <boost/filesystem.hpp>
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
+#include "HostMonitorTimerEvent.h"
 #include "common/ProcParser.h"
 #include "common/StringView.h"
 #include "constants/EntityConstants.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/collector/BaseCollector.h"
 
 using namespace std::chrono;
@@ -58,27 +59,25 @@ public:
     ProcessEntityCollector();
     ~ProcessEntityCollector() override = default;
 
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override { return std::chrono::seconds(0); }
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
 
 private:
     system_clock::time_point TicksToUnixTime(int64_t startTicks);
-    void GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats, size_t topN);
-    ExtendedProcessStatPtr GetProcessStat(pid_t pid, bool& isFirstCollect);
-    ExtendedProcessStatPtr ReadNewProcessStat(pid_t pid);
-    ExtendedProcessStatPtr ParseProcessStat(pid_t pid, std::string& line);
-    bool WalkAllProcess(const std::filesystem::path& root, const std::function<void(const std::string&)>& callback);
+    time_t
+    GetSortedProcess(std::vector<ExtendedProcessStatPtr>& processStats, size_t topN, const CollectTime& collectTime);
+    ExtendedProcessStatPtr GetProcessStat(pid_t pid, bool& isFirstCollect, const CollectTime& collectTime);
 
     std::string GetProcessEntityID(StringView pid, StringView createTime, StringView hostEntityID);
     void FetchDomainInfo(std::string& domain,
                          std::string& entityType,
                          std::string& hostEntityType,
                          StringView& hostEntityID);
-    int64_t GetHostSystemBootTime();
 
-    steady_clock::time_point mProcessSortTime;
+    std::chrono::steady_clock::time_point mProcessSortTime;
     std::unordered_map<pid_t, ExtendedProcessStatPtr> mPrevProcessStat;
     ProcParser mProcParser;
 

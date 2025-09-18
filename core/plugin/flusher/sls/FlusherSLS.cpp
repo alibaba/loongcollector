@@ -135,7 +135,7 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
     auto limiter = iter->second.lock();
     if (!limiter) {
         limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
-                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
     }
     return limiter;
@@ -153,7 +153,7 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     auto limiter = iter->second.lock();
     if (!limiter) {
         limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
-                                                    AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency());
         iter->second = limiter;
     }
     return limiter;
@@ -297,6 +297,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                            mContext->GetRegion());
     }
 
+    // Workspace
+    if (!GetOptionalStringParam(config, "Workspace", mWorkspace, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
     // TelemetryType
     string telemetryType;
     if (!GetOptionalStringParam(config, "TelemetryType", telemetryType, errorMsg)) {
@@ -313,6 +325,10 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         // TelemetryType set to metrics
         mTelemetryType = BOOL_FLAG(enable_metricstore_channel) ? sls_logs::SLS_TELEMETRY_TYPE_METRICS
                                                                : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
+    } else if (telemetryType == "metrics_multivalue") {
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE;
+    } else if (telemetryType == "metrics_host") {
+        mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST;
     } else if (telemetryType == "arms_agentinfo") {
         mSubpath = APM_AGENTINFOS_URL;
         mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS;
@@ -336,7 +352,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     // Logstore
-    if (mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS) {
+    if (IsRawSLSTelemetryType()) {
         // log and metric
         if (!GetMandatoryStringParam(config, "Logstore", mLogstore, errorMsg)) {
             PARAM_ERROR_RETURN(mContext->GetLogger(),
@@ -504,8 +520,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     if (!mBatcher.Init(itr ? *itr : Json::Value(),
                        this,
                        strategy,
-                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty()
-                           && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS)) {
+                       !mContext->IsExactlyOnceEnabled() && mShardHashKeys.empty() && IsMetricsTelemetryType())) {
         // when either exactly once is enabled or ShardHashKeys is not empty or telemetry type is metrics, we don't
         // enable group batch
         return false;
@@ -607,12 +622,15 @@ bool FlusherSLS::FlushAll() {
 bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem, string* errMsg) {
     ADD_COUNTER(mSendCnt, 1);
 
-    SLSClientManager::AuthType type;
-    string accessKeyId, accessKeySecret;
-    if (!SLSClientManager::GetInstance()->GetAccessKey(mAliuid, type, accessKeyId, accessKeySecret)) {
+    AuthType type;
+    string accessKeyId, accessKeySecret, secToken, errorMsg;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(
+            mAliuid, type, accessKeyId, accessKeySecret, secToken, errorMsg)) {
 #ifdef __ENTERPRISE__
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 mProject, type, accessKeyId, accessKeySecret)) {
+            AlarmManager::GetInstance()->SendAlarmError(
+                GLOBAL_CONFIG_ALARM, "failed to get access key: " + errorMsg, mRegion, mProject, "", mLogstore);
             *keepItem = true;
             *errMsg = "failed to get access key";
             return false;
@@ -670,15 +688,19 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 
     switch (mTelemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
-            req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
+            req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
+            break;
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST:
+            req = CreatePostHostMetricsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
-            req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data, mSubpath);
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         default:
             break;
@@ -761,14 +783,14 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
                 ADD_COUNTER(mProjectQuotaErrorCnt, 1);
             }
-            AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
-                                                   "error_code: " + slsResponse.mErrorCode
-                                                       + ", error_message: " + slsResponse.mErrorMsg
-                                                       + ", request_id:" + slsResponse.mRequestId,
-                                                   mRegion,
-                                                   mProject,
-                                                   mContext ? mContext->GetConfigName() : "",
-                                                   data->mLogstore);
+            AlarmManager::GetInstance()->SendAlarmError(SEND_QUOTA_EXCEED_ALARM,
+                                                        "error_code: " + slsResponse.mErrorCode
+                                                            + ", error_message: " + slsResponse.mErrorMsg
+                                                            + ", request_id:" + slsResponse.mRequestId,
+                                                        mRegion,
+                                                        mProject,
+                                                        mContext ? mContext->GetConfigName() : "",
+                                                        data->mLogstore);
             operation = OperationOnFail::RETRY_LATER;
         } else if (sendResult == SEND_UNAUTHORIZED) {
             failDetail << "write unauthorized";
@@ -788,7 +810,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 if (!cpt) {
                     failDetail << ", unexpected result when exactly once checkpoint is not found";
                     suggestion << "report bug";
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmCritical(
                         EXACTLY_ONCE_ALARM,
                         "drop exactly once log group because of invalid sequence ID, request id:"
                             + slsResponse.mRequestId,
@@ -807,7 +829,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 failDetail << ", drop exactly once log group and commit checkpoint"
                            << " checkpointKey:" << cpt->key << " checkpoint:" << cpt->data.DebugString();
                 suggestion << "no suggestion";
-                AlarmManager::GetInstance()->SendAlarm(
+                AlarmManager::GetInstance()->SendAlarmCritical(
                     EXACTLY_ONCE_ALARM,
                     "drop exactly once log group because of invalid sequence ID, cpt:" + cpt->key
                         + ", data:" + cpt->data.DebugString() + "request id:" + slsResponse.mRequestId,
@@ -873,7 +895,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             default:
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmCritical(
                         SEND_DATA_FAIL_ALARM,
                         "failed to send request: " + failDetail.str() + "\toperation: " + GetOperationString(operation)
                             + "\trequestId: " + slsResponse.mRequestId
@@ -912,13 +934,14 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress data",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                           "failed to compress data: " + errorMsg + "\taction: discard data\tplugin: "
-                                               + sName + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                  "failed to compress data: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             return false;
         }
     } else {
@@ -966,20 +989,23 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                     std::move(group.GetExactlyOnceCheckpoint()));
+    for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
+        g.mSourceBuffers.emplace_back(extraSourceBuffer);
+    }
     AddPackId(g);
     string errorMsg;
     if (!mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg)) {
         LOG_WARNING(mContext->GetLogger(),
                     ("failed to serialize event group",
                      errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-        mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                       "failed to serialize event group: " + errorMsg
-                                           + "\taction: discard data\tplugin: " + sName
-                                           + "\tconfig: " + mContext->GetConfigName(),
-                                       mContext->GetRegion(),
-                                       mContext->GetProjectName(),
-                                       mContext->GetConfigName(),
-                                       mContext->GetLogstoreName());
+        mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                              "failed to serialize event group: " + errorMsg
+                                                  + "\taction: discard data\tplugin: " + sName
+                                                  + "\tconfig: " + mContext->GetConfigName(),
+                                              mContext->GetRegion(),
+                                              mContext->GetProjectName(),
+                                              mContext->GetConfigName(),
+                                              mContext->GetLogstoreName());
         return false;
     }
     if (mCompressor) {
@@ -987,14 +1013,14 @@ bool FlusherSLS::SerializeAndPush(PipelineEventGroup&& group) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to compress event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                           "failed to compress event group: " + errorMsg
-                                               + "\taction: discard data\tplugin: " + sName
-                                               + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                  "failed to compress event group: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             return false;
         }
     } else {
@@ -1034,14 +1060,14 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
             LOG_WARNING(mContext->GetLogger(),
                         ("failed to serialize event group",
                          errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-            mContext->GetAlarm().SendAlarm(SERIALIZE_FAIL_ALARM,
-                                           "failed to serialize event group: " + errorMsg
-                                               + "\taction: discard data\tplugin: " + sName
-                                               + "\tconfig: " + mContext->GetConfigName(),
-                                           mContext->GetRegion(),
-                                           mContext->GetProjectName(),
-                                           mContext->GetConfigName(),
-                                           mContext->GetLogstoreName());
+            mContext->GetAlarm().SendAlarmWarning(SERIALIZE_FAIL_ALARM,
+                                                  "failed to serialize event group: " + errorMsg
+                                                      + "\taction: discard data\tplugin: " + sName
+                                                      + "\tconfig: " + mContext->GetConfigName(),
+                                                  mContext->GetRegion(),
+                                                  mContext->GetProjectName(),
+                                                  mContext->GetConfigName(),
+                                                  mContext->GetLogstoreName());
             allSucceeded = false;
             continue;
         }
@@ -1050,14 +1076,14 @@ bool FlusherSLS::SerializeAndPush(BatchedEventsList&& groupList) {
                 LOG_WARNING(mContext->GetLogger(),
                             ("failed to compress event group",
                              errorMsg)("action", "discard data")("plugin", sName)("config", mContext->GetConfigName()));
-                mContext->GetAlarm().SendAlarm(COMPRESS_FAIL_ALARM,
-                                               "failed to compress event group: " + errorMsg
-                                                   + "\taction: discard data\tplugin: " + sName
-                                                   + "\tconfig: " + mContext->GetConfigName(),
-                                               mContext->GetRegion(),
-                                               mContext->GetProjectName(),
-                                               mContext->GetConfigName(),
-                                               mContext->GetLogstoreName());
+                mContext->GetAlarm().SendAlarmWarning(COMPRESS_FAIL_ALARM,
+                                                      "failed to compress event group: " + errorMsg
+                                                          + "\taction: discard data\tplugin: " + sName
+                                                          + "\tconfig: " + mContext->GetConfigName(),
+                                                      mContext->GetRegion(),
+                                                      mContext->GetProjectName(),
+                                                      mContext->GetConfigName(),
+                                                      mContext->GetLogstoreName());
                 allSucceeded = false;
                 continue;
             }
@@ -1126,7 +1152,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 DISCARD_DATA_ALARM,
                 "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
             return false;
@@ -1141,7 +1167,7 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     LOG_WARNING(
         sLogger,
         ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    AlarmManager::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarmCritical(
         DISCARD_DATA_ALARM,
         "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
     return false;
@@ -1175,7 +1201,8 @@ void FlusherSLS::AddPackId(BatchedEvents& g) const {
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const string& accessKeyId,
                                                                       const string& accessKeySecret,
-                                                                      SLSClientManager::AuthType type,
+                                                                      const string& secToken,
+                                                                      AuthType type,
                                                                       SLSSenderQueueItem* item) const {
     optional<uint64_t> seqId;
     if (item->mExactlyOnceCheckpoint) {
@@ -1185,6 +1212,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
     map<string, string> header;
     PreparePostLogStoreLogsRequest(accessKeyId,
                                    accessKeySecret,
+                                   secToken,
                                    type,
                                    item->mCurrentHost,
                                    item->mRealIpFlag,
@@ -1214,14 +1242,48 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                         CurlSocket(INT32_FLAG(sls_request_dscp)));
 }
 
+unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const string& accessKeyId,
+                                                                     const string& accessKeySecret,
+                                                                     const std::string& secToken,
+                                                                     AuthType type,
+                                                                     SLSSenderQueueItem* item) const {
+    string path, query;
+    map<string, string> header;
+    PreparePostHostMetricsRequest(accessKeyId,
+                                  accessKeySecret,
+                                  secToken,
+                                  type,
+                                  CompressTypeToString(mCompressor->GetCompressType()),
+                                  item->mType,
+                                  item->mData,
+                                  item->mRawSize,
+                                  path,
+                                  header);
+    bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    return make_unique<HttpSinkRequest>(HTTP_POST,
+                                        httpsFlag,
+                                        item->mCurrentHost,
+                                        httpsFlag ? 443 : 80,
+                                        path,
+                                        query,
+                                        header,
+                                        item->mData,
+                                        item,
+                                        INT32_FLAG(default_http_request_timeout_sec),
+                                        1,
+                                        CurlSocket(INT32_FLAG(sls_request_dscp)));
+}
+
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
                                                                          const string& accessKeySecret,
-                                                                         SLSClientManager::AuthType type,
+                                                                         const string& secToken,
+                                                                         AuthType type,
                                                                          SLSSenderQueueItem* item) const {
     string path;
     map<string, string> header;
     PreparePostMetricStoreLogsRequest(accessKeyId,
                                       accessKeySecret,
+                                      secToken,
                                       type,
                                       item->mCurrentHost,
                                       item->mRealIpFlag,
@@ -1249,31 +1311,32 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
                                                                     const string& accessKeySecret,
-                                                                    SLSClientManager::AuthType type,
-                                                                    SLSSenderQueueItem* item,
-                                                                    const std::string& subPath) const {
+                                                                    const string& secToken,
+                                                                    AuthType type,
+                                                                    SLSSenderQueueItem* item) const {
     string query;
     map<string, string> header;
+    header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
+    header.insert({APM_HEADER_PROJECT, mProject});
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
+                                 secToken,
                                  type,
                                  item->mCurrentHost,
                                  item->mRealIpFlag,
                                  mProject,
-                                 item->mLogstore,
                                  CompressTypeToString(mCompressor->GetCompressType()),
                                  item->mType,
                                  item->mData,
                                  item->mRawSize,
                                  mSubpath,
-                                 query,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         item->mCurrentHost,
                                         httpsFlag ? 443 : 80,
-                                        subPath,
+                                        mSubpath,
                                         "",
                                         header,
                                         item->mData,
@@ -1281,6 +1344,17 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                         INT32_FLAG(default_http_request_timeout_sec),
                                         1,
                                         CurlSocket(INT32_FLAG(sls_request_dscp)));
+}
+
+bool FlusherSLS::IsRawSLSTelemetryType() const {
+    return mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_LOGS || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS
+        || mTelemetryType == sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE;
+}
+
+bool FlusherSLS::IsMetricsTelemetryType() const {
+    return mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS
+        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE
+        && mTelemetryType != sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST;
 }
 
 sls_logs::SlsCompressType ConvertCompressType(CompressType type) {

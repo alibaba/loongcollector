@@ -58,6 +58,14 @@ inline constexpr DataElement kPodName = {
     "",
 };
 
+inline constexpr DataElement kContainerName = {
+    "k8s_container_name",
+    "k8s_container_name", // metric
+    "k8s.container.name", // span
+    "k8s.container.name", // log, inside pod
+    "",
+};
+
 inline constexpr DataElement kPodIp = {
     "pod_ip",
     "podIp", // metric
@@ -241,6 +249,30 @@ inline constexpr DataElement kAppName = {
     "arms app name",
 };
 
+inline constexpr DataElement kWorkspace = {
+    "workspace",
+    "acs_cms_workspace", // metric
+    "acs.cms.workspace", // span
+    "acs.cms.workspace", // log
+    "cms workspace",
+};
+
+inline constexpr DataElement kArmsServiceId = {
+    "service_id",
+    "acs_arms_service_id", // metric
+    "acs.arms.service.id", // span
+    "acs.arms.serviceid", // log
+    "arms serviceid",
+};
+
+inline constexpr DataElement kLanguage = {
+    "language",
+    "language", // metric
+    "language", // span
+    "language", // log
+    "program language",
+};
+
 inline constexpr DataElement kPeerAppName = {
     "peer_app",
     "arms_peer_app_name", // metric
@@ -292,7 +324,7 @@ inline constexpr DataElement kRpcType = {
 inline constexpr DataElement kCallType = {
     "callType",
     "callType", // metric
-    "callType", // span
+    "call.type", // span
     "arms.call.type", // log
     "arms call type",
 };
@@ -300,7 +332,7 @@ inline constexpr DataElement kCallType = {
 inline constexpr DataElement kCallKind = {
     "callKind",
     "callKind", // metric
-    "callKind", // span
+    "call.kind", // span
     "arms.call.kind", // log
     "arms call kind",
 };
@@ -319,6 +351,22 @@ inline constexpr DataElement kContainerId = {
     "container.id", // span
     "container.id", // log
     "local container id",
+};
+
+inline constexpr DataElement kLocalContainerName = {
+    "container_name",
+    "", // metric
+    "container.name", // span
+    "container.name", // log
+    "local container name",
+};
+
+inline constexpr DataElement kContainerImageName = {
+    "container_image_name",
+    "", // metric
+    "container.image.name", // span
+    "container.image.name", // log
+    "container image name",
 };
 
 // for processes
@@ -512,6 +560,14 @@ inline constexpr DataElement kParentCapEffective = {
     "",
     "parent.cap.effective",
     "",
+};
+
+inline constexpr DataElement kParentContainerId = {
+    "parent_container_id",
+    "", // metric
+    "parent.container.id", // span
+    "parent.container.id", // log
+    "local parent container id",
 };
 
 // for network

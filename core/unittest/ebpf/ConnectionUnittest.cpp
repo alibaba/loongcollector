@@ -57,7 +57,7 @@ private:
 
 void ConnectionUnittest::TestBasicOperations() {
     auto tracker = CreateTestTracker();
-    ValidateTrackerState(tracker, false, support_role_e::IsUnknown, 4);
+    ValidateTrackerState(tracker, false, support_role_e::IsUnknown, kConnectionEpoch);
 
     ConnId expectedId(1, 1000, 123456);
     APSARA_TEST_EQUAL(tracker->GetConnId(), expectedId);
@@ -67,13 +67,13 @@ void ConnectionUnittest::TestBasicOperations() {
     APSARA_TEST_FALSE(tracker->ReadyToDestroy(now));
 
     tracker->CountDown();
-    APSARA_TEST_EQUAL(tracker->GetEpoch(), 3);
+    APSARA_TEST_EQUAL(tracker->GetEpoch(), kConnectionEpoch - 1);
 }
 
 void ConnectionUnittest::TestStateTransitions() {
     auto tracker = CreateTestTracker();
 
-    ValidateTrackerState(tracker, false, support_role_e::IsUnknown, 4);
+    ValidateTrackerState(tracker, false, support_role_e::IsUnknown, kConnectionEpoch);
 
     struct conn_stats_event_t statsEvent = {};
     statsEvent.protocol = support_proto_e::ProtoHTTP;

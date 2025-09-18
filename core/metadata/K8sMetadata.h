@@ -16,22 +16,23 @@
 
 #pragma once
 
+#include <ctime>
+
 #include <atomic>
-#include <future>
+#include <condition_variable>
 #include <iostream>
 #include <mutex>
 #include <string>
+#include <unordered_set>
 
-#include "json/json.h"
+#include "json/value.h"
 
-#include "ContainerInfo.h"
-#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/LRUCache.h"
-#include "common/Lock.h"
 #include "common/NetworkUtil.h"
 #include "common/StringView.h"
 #include "common/http/HttpRequest.h"
+#include "metadata/ContainerInfo.h"
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/MetricTypes.h"
 
@@ -114,8 +115,8 @@ private:
 
 public:
     static K8sMetadata& GetInstance() {
-        static K8sMetadata instance(1024, 1024, 1024);
-        return instance;
+        static K8sMetadata sInstance(1024, 1024, 1024);
+        return sInstance;
     }
     ~K8sMetadata();
 
@@ -159,6 +160,8 @@ public:
     friend class ConnectionUnittest;
     friend class ConnectionManagerUnittest;
     friend class NetworkObserverManagerUnittest;
+    friend class HttpRetryableEventUnittest;
+    friend class NetworkObserverConfigUpdateUnittest;
 #endif
 };
 

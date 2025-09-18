@@ -20,17 +20,17 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "json/json.h"
 
+#include "config/PipelineConfig.h"
+
 namespace logtail {
 
-struct CollectionConfig {
-    std::string mName;
-    std::unique_ptr<Json::Value> mDetail;
-    uint32_t mCreateTime = 0;
+struct CollectionConfig : public PipelineConfig {
     const Json::Value* mGlobal = nullptr;
     std::vector<const Json::Value*> mInputs;
     std::optional<std::string> mSingletonInput;
@@ -51,10 +51,14 @@ struct CollectionConfig {
     std::string mLogstore;
     std::string mRegion;
 
-    CollectionConfig(const std::string& name, std::unique_ptr<Json::Value>&& detail)
-        : mName(name), mDetail(std::move(detail)) {}
+    CollectionConfig(const std::string& name,
+                     std::unique_ptr<Json::Value>&& detail,
+                     const std::filesystem::path& filepath)
+        : PipelineConfig(name, std::move(detail), filepath) {}
+    CollectionConfig(CollectionConfig&& rhs) = default;
+    CollectionConfig& operator=(CollectionConfig&& rhs) noexcept = default;
 
-    bool Parse();
+    bool Parse() override;
 
     bool ShouldNativeFlusherConnectedByGoPipeline() const {
         // 过渡使用，待c++支持分叉后恢复下面的正式版
@@ -78,11 +82,13 @@ struct CollectionConfig {
 
     bool HasGoPlugin() const { return mHasGoFlusher || mHasGoProcessor || mHasGoInput; }
 
+    bool IsOnetime() const { return mExpireTime.has_value(); }
+
     bool ReplaceEnvVar();
 };
 
 inline bool operator==(const CollectionConfig& lhs, const CollectionConfig& rhs) {
-    return (lhs.mName == rhs.mName) && (*lhs.mDetail == *rhs.mDetail);
+    return static_cast<const PipelineConfig&>(lhs) == static_cast<const PipelineConfig&>(rhs);
 }
 
 inline bool operator!=(const CollectionConfig& lhs, const CollectionConfig& rhs) {

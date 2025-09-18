@@ -16,21 +16,29 @@
 
 #pragma once
 
-#include <algorithm>
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
-#include "boost/lexical_cast.hpp"
-#pragma GCC diagnostic pop
 #include <charconv>
 
+#include <algorithm>
+#include <filesystem>
 #include <string>
 #include <vector>
 
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
+#include "boost/lexical_cast.hpp"
 #include "boost/regex.hpp"
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #include "common/StringView.h"
 
 namespace logtail {
+
+// C++11定义的空白符
+extern const std::string kSpaceChars;
 
 inline bool StartWith(const std::string& input, StringView pattern) {
     return input.find(pattern.data(), 0, pattern.size()) == 0;
@@ -87,6 +95,7 @@ inline std::string ToString(bool value) {
     return value ? "true" : "false";
 }
 std::string ToString(const std::vector<std::string>& vec);
+std::string ToString(const std::vector<std::filesystem::path>& vec);
 
 template <typename T>
 std::string ToHexString(const T& value) {
@@ -169,8 +178,8 @@ static inline StringView Rtrim(StringView s, const StringView blank = " \t\n\r\f
 }
 
 // trim from both ends (returns a new string_view)
-static inline StringView Trim(StringView s) {
-    return Ltrim(Rtrim(s));
+static inline StringView Trim(StringView s, const StringView blank = " \t\n\r\f\v") {
+    return Ltrim(Rtrim(s, blank), blank);
 }
 
 static constexpr StringView kNullSv("\0", 1);
@@ -185,7 +194,8 @@ public:
 
     StringViewSplitterIterator() = default;
 
-    StringViewSplitterIterator(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter), mPos(0) {
+    StringViewSplitterIterator(StringView str, StringView delimiter, bool skipConsecutiveDelimiters = false)
+        : mStr(str), mDelimiter(delimiter), mPos(0), mSkipConsecutiveDelimiters(skipConsecutiveDelimiters) {
         findNext();
     }
 
@@ -219,6 +229,15 @@ private:
             return;
         }
 
+        if (mSkipConsecutiveDelimiters && !mDelimiter.empty()) {
+            skipDelimiters();
+            if (mPos >= mStr.size()) {
+                mField = {};
+                mPos = StringView::npos;
+                return;
+            }
+        }
+
         size_t end = 0;
         if (mDelimiter.empty()) {
             end = mPos + 1;
@@ -236,6 +255,25 @@ private:
         } else {
             mField = mStr.substr(mPos, end - mPos);
             mPos = end + mDelimiter.size();
+            if (mSkipConsecutiveDelimiters) {
+                skipDelimiters();
+            }
+        }
+    }
+
+    void skipDelimiters() {
+        if (mDelimiter.size() == 1) {
+            // 优化单字符分隔符的情况
+            char delim = mDelimiter[0];
+            while (mPos < mStr.size() && mStr[mPos] == delim) {
+                mPos++;
+            }
+        } else {
+            // 多字符分隔符的情况
+            while (mPos < mStr.size() && mPos + mDelimiter.size() <= mStr.size()
+                   && mStr.substr(mPos, mDelimiter.size()) == mDelimiter) {
+                mPos += mDelimiter.size();
+            }
         }
     }
 
@@ -243,6 +281,7 @@ private:
     StringView mDelimiter;
     StringView mField;
     size_t mPos = StringView::npos;
+    bool mSkipConsecutiveDelimiters = false;
 };
 
 class StringViewSplitter {
@@ -250,15 +289,17 @@ public:
     using value_type = StringView;
     using iterator = StringViewSplitterIterator;
 
-    StringViewSplitter(StringView str, StringView delimiter) : mStr(str), mDelimiter(delimiter) {}
+    StringViewSplitter(StringView str, StringView delimiter, bool skipConsecutiveDelimiters = false)
+        : mStr(str), mDelimiter(delimiter), mSkipConsecutiveDelimiters(skipConsecutiveDelimiters) {}
 
-    iterator begin() const { return iterator(mStr, mDelimiter); }
+    iterator begin() const { return iterator(mStr, mDelimiter, mSkipConsecutiveDelimiters); }
 
     iterator end() const { return iterator(); }
 
 private:
     StringView mStr;
     StringView mDelimiter;
+    bool mSkipConsecutiveDelimiters = false;
 };
 
 template <class T>
@@ -356,5 +397,35 @@ template <class T>
 bool StringTo(const StringView& str, T& val, int base = 10) {
     return StringTo(str.data(), str.data() + str.size(), val, base);
 }
+
+// 移除前后缀的空白符，
+// std::string Trim(const std::string &str, bool trimLeft = true, bool trimRight = true);
+// 移除前、后缀的trimCharacters中的字符
+std::string Trim(const std::string& str, const std::string& trimChars, bool trimLeft = true, bool trimRight = true);
+
+inline std::string Trim(const std::string& str, const char* trimChars, bool trimLeft = true, bool trimRight = true) {
+    return trimChars ? Trim(str, std::string{trimChars}, trimLeft, trimRight) : str;
+}
+
+inline std::string TrimLeft(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, true, false);
+}
+
+inline std::string TrimRight(const std::string& str, const std::string& trimCharacters) {
+    return Trim(str, trimCharacters, false, true);
+}
+
+inline std::string TrimSpace(const std::string& str) {
+    return Trim(str, kSpaceChars, true, true);
+}
+
+inline std::string TrimLeftSpace(const std::string& str) {
+    return TrimLeft(str, kSpaceChars);
+}
+
+inline std::string TrimRightSpace(const std::string& str) {
+    return TrimRight(str, kSpaceChars);
+}
+
 
 } // namespace logtail

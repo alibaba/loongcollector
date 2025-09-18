@@ -64,7 +64,7 @@ std::map<StringView, UntypedMultiDoubleValue>::const_iterator UntypedMultiDouble
     return mValues.end();
 }
 
-size_t UntypedMultiDoubleValues::ValusSize() const {
+size_t UntypedMultiDoubleValues::ValuesSize() const {
     return mValues.size();
 }
 
@@ -81,7 +81,7 @@ size_t DataSize(const MetricValue& value) {
         [](auto&& arg) {
             using T = decay_t<decltype(arg)>;
             if constexpr (is_same_v<T, monostate>) {
-                return 0UL;
+                return (size_t)0;
             } else {
                 return arg.DataSize();
             }

@@ -364,7 +364,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 			return nil
 		}
 		if len(e.Rows)%2 != 0 {
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid update value count", len(e.Rows))
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid update value count", len(e.Rows))
 			return nil
 		}
 		for i := 0; i < len(e.Rows); i += 2 {
@@ -377,7 +377,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
 							"old columns", len(e.Rows[i]),
 							"new columns", len(e.Rows[i+1]),
 							"table meta columns", len(e.Table.Columns),
@@ -428,7 +428,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
 							"columns", len(rowValues),
 							"table meta columns", len(e.Table.Columns),
 							"error", err)
@@ -589,7 +589,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 				if errConv != nil {
 					latestPos.Name = valueStr
 				} else {
-					logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error")
+					logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error")
 				}
 				offset, conErr := strconv.ParseUint(fmt.Sprint(value[1]), 10, 64)
 				if conErr == nil {
@@ -598,7 +598,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 			}
 		}
 	} else {
-		logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error", err)
+		logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error", err)
 	}
 	logger.Info(sc.context.GetRuntimeContext(), "start from latest binlog position", latestPos)
 	return latestPos
@@ -696,7 +696,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 
 	shouldShutdown, err := sc.newCanal()
 	if err != nil {
-		logger.Error(sc.context.GetRuntimeContext(),
+		logger.Warning(sc.context.GetRuntimeContext(),
 			"CANAL_START_ALARM", "service_canal plugin only supports ROW mode", err)
 		return err
 	}
@@ -748,7 +748,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 	if sc.checkpoint.GTID != "" {
 		gtid, err = mysql.ParseGTIDSet(sc.Flavor, sc.checkpoint.GTID)
 		if err != nil {
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Parse GTID error, clear it",
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Parse GTID error, clear it",
 				sc.checkpoint.GTID, err)
 			gtid = nil
 			sc.checkpoint.GTID = ""
@@ -800,7 +800,7 @@ ForBlock:
 				break ForBlock
 			}
 			errStr := err.Error()
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM", "Restart canal because of error", err)
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM", "Restart canal because of error", err)
 
 			// Get latest position from server and restart.
 			//

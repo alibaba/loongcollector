@@ -37,7 +37,7 @@ public:
     void OnFailedInit();
     void OnSuccessfulStart();
     void OnSuccessfulStop();
-    // void OnPipelineUpdate();
+    void TestSaeConfig();
 
 protected:
     void SetUp() override {
@@ -67,7 +67,7 @@ void InputNetworkObserverUnittest::TestName() {
 void InputNetworkObserverUnittest::TestSupportAck() {
     InputNetworkObserver input;
     bool supportAck = input.SupportAck();
-    APSARA_TEST_FALSE(supportAck);
+    APSARA_TEST_TRUE(supportAck);
 }
 
 void InputNetworkObserverUnittest::OnSuccessfulInit() {
@@ -81,27 +81,60 @@ void InputNetworkObserverUnittest::OnSuccessfulInit() {
             "Type": "input_network_observer",
             "ProbeConfig": 
             {
-                "EnableProtocols": [
-                    "http"
-                ],
-                "DisableProtocolParse": false,
-                "DisableConnStats": false,
-                "EnableConnTrackerDump": false
+                "L7Config": {
+                    "Enable": true,
+                    "SampleRate": 1.0,
+                    "EnableLog": true,
+                    "EnableMetric": true,
+                    "EnableSpan": true,
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "ApmConfig": {
+                    "Workspace": "prod",
+                    "AppName": "prod-app",
+                    "AppId": "xxx@xxx",
+                    "ServiceId": "aaa@xxx",
+                    "Language": "php"
+                },
+                "WorkloadSelectors": [
+                    {
+                        "WorkloadName": "default-workload-name",
+                        "WorkloadKind": "default-Workload-kInd",
+                        "Namespace": "default-ns"
+                    },
+                ]
+                    
             }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
-    APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
-    APSARA_TEST_EQUAL(false, thisObserver.mDisableConnStats);
-    APSARA_TEST_EQUAL(false, thisObserver.mEnableConnTrackerDump);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnable, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableLog, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableMetric, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableSpan, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mSampleRate, 1.0);
+
+    APSARA_TEST_EQUAL(thisObserver.mL4Config.mEnable, true);
+
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppId, "xxx@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
+
+
+    APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 1);
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mNamespace, "default-ns");
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mWorkloadKind, "default-workload-kind");
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mWorkloadName, "default-workload-name");
 }
 
 void InputNetworkObserverUnittest::OnFailedInit() {
@@ -115,44 +148,141 @@ void InputNetworkObserverUnittest::OnFailedInit() {
             "Type": "input_network_observer",
             "ProbeConfig": 
             {
-                "EnableProtocols": [
-                    "http"
-                ],
-                "DisableProtocolParse": 1,
-                "DisableConnStats": false,
-                "EnableConnTrackerDump": false
+                "L7Config": {
+                    "Enable": true,
+                    "SampleRate": 1.0,
+                    "EnableLog": true,
+                    "EnableMetric": 2, // invalid optional param
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "ApmConfig": {
+                    "Workspace": "prod",
+                    "AppName": "prod-app",
+                    "AppId": "xxx@xxx",
+                    "ServiceId": "aaa@xxx",
+                    "Language": "php"
+                },
+                "WorkloadSelectors": [
+                    {
+                        "WorkloadName": "default-workload-name",
+                        "WorkloadKind": "default-workload-kind",
+                        "Namespace": "default-ns"
+                    },
+                ]
+                    
             }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_EQUAL(input->sName, "input_network_observer");
     logtail::ebpf::ObserverNetworkOption thisObserver = input->mNetworkOption;
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols.size(), 1UL);
-    APSARA_TEST_EQUAL(thisObserver.mEnableProtocols[0], "http");
-    APSARA_TEST_EQUAL(false, thisObserver.mDisableProtocolParse);
-    APSARA_TEST_EQUAL(false, thisObserver.mDisableConnStats);
-    APSARA_TEST_EQUAL(false, thisObserver.mEnableConnTrackerDump);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnable, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableLog, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableMetric, false);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableSpan, false);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mSampleRate, 1.0);
 
-    // lag of mandatory param + error param level
+    APSARA_TEST_EQUAL(thisObserver.mL4Config.mEnable, true);
+
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppId, "xxx@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
+
+    APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 1);
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mNamespace, "default-ns");
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mWorkloadKind, "default-workload-kind");
+    APSARA_TEST_EQUAL(thisObserver.mSelectors[0].mWorkloadName, "default-workload-name");
+
+    // lack of optional param
     configStr = R"(
         {
             "Type": "input_network_observer",
-            "EnableProtocols": [
-                "http"
-            ],
-            "DisableProtocolParse": false,
-            "DisableConnStats": false,
-            "EnableConnTrackerDump": false
+            "ProbeConfig": 
+            {
+                "L7Config": {
+                    "Enable": true,
+                    "SampleRate": 1.0,
+                    "EnableLog": true,
+                    "EnableMetric": 2, // invalid optional param
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "ApmConfig": {
+                    "Workspace": "prod",
+                    "AppName": "prod-app",
+                    "AppId": "xxx@xxx",
+                    "ServiceId": "aaa@xxx",
+                    "Language": "php"
+                }  
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_EQUAL(input->sName, "input_network_observer");
+    thisObserver = input->mNetworkOption;
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnable, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableLog, true);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableMetric, false);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mEnableSpan, false);
+    APSARA_TEST_EQUAL(thisObserver.mL7Config.mSampleRate, 1.0);
+
+    APSARA_TEST_EQUAL(thisObserver.mL4Config.mEnable, true);
+
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppId, "xxx@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mServiceId, "aaa@xxx");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mAppName, "prod-app");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mWorkspace, "prod");
+    APSARA_TEST_EQUAL(thisObserver.mApmConfig.mLanguage, "php");
+
+    APSARA_TEST_EQUAL(thisObserver.mSelectors.size(), 0);
+
+    // lag of mandatory param + error param level
+    configStr = R"(
+        {
+            "Type": "input_network_observer",
+            "L7Config": {
+                "Enable": true,
+                "SampleRate": 1.0,
+                "EnableLog": true,
+                "EnableMetric": true,
+                "EnableSpan": true,
+            },
+            "L4Config": {
+                "Enable": true
+            },
+            "ApmConfig": {
+                "Workspace": "prod",
+                "AppName": "prod-app",
+                "AppId": "xxx@xxx",
+                "ServiceId": "aaa@xxx",
+                "Language": "php"
+            },
+            "WorkloadSelectors": [
+                {
+                    "WorkloadName": "default-workload-name",
+                    "WorkloadKind": "default-workload-kind",
+                    "Namespace": "default-ns"
+                },
+            ]      
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputNetworkObserver());
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
 }
 
@@ -166,25 +296,39 @@ void InputNetworkObserverUnittest::OnSuccessfulStart() {
             "Type": "input_network_observer",
             "ProbeConfig": 
             {
-                "EnableProtocols": [
-                    "http"
-                ],
-                "DisableProtocolParse": false,
-                "DisableConnStats": false,
-                "EnableConnTrackerDump": false
+                "L7Config": {
+                    "Enable": true,
+                    "SampleRate": 1.0,
+                    "EnableLog": true,
+                    "EnableMetric": 2, // invalid optional param
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "ApmConfig": {
+                    "Workspace": "prod",
+                    "AppName": "prod-app",
+                    "AppId": "xxx@xxx",
+                    "ServiceId": "aaa@xxx",
+                    "Language": "php"
+                },
+                "WorkloadSelectors": [
+                    {
+                        "WorkloadName": "default-workload-name",
+                        "WorkloadKind": "default-workload-kind",
+                        "Namespace": "default-ns"
+                    },
+                ]
+                    
             }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
     APSARA_TEST_TRUE(input->Stop(true));
 }
 
@@ -198,33 +342,78 @@ void InputNetworkObserverUnittest::OnSuccessfulStop() {
             "Type": "input_network_observer",
             "ProbeConfig": 
             {
-                "EnableProtocols": [
-                    "http"
-                ],
-                "DisableProtocolParse": false,
-                "DisableConnStats": false,
-                "EnableConnTrackerDump": false
+                "L7Config": {
+                    "Enable": true,
+                    "SampleRate": 1.0,
+                    "EnableLog": true,
+                    "EnableMetric": true,
+                    "EnableSpan": true,
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "ApmConfig": {
+                    "Workspace": "prod",
+                    "AppName": "prod-app",
+                    "AppId": "xxx@xxx",
+                    "ServiceId": "aaa@xxx",
+                    "Language": "php"
+                },
+                "WorkloadSelectors": [
+                    {
+                        "WorkloadName": "default-workload-name",
+                        "WorkloadKind": "default-workload-kind",
+                        "Namespace": "default-ns"
+                    },
+                ]
+                    
             }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     input.reset(new InputNetworkObserver());
     input->SetContext(ctx);
-    input->SetMetricsRecordRef("test", "1");
+    input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     APSARA_TEST_TRUE(input->Start());
-    string serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    string pipelineName = input->GetContext().GetConfigName();
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    // APSARA_TEST_TRUE(input->Stop(false));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    APSARA_TEST_TRUE(serverPipelineName.size() && serverPipelineName == pipelineName);
-    APSARA_TEST_TRUE(input->Stop(true));
-    serverPipelineName
-        = ebpf::EBPFServer::GetInstance()->CheckLoadedPipelineName(logtail::ebpf::PluginType::NETWORK_OBSERVE);
-    APSARA_TEST_TRUE(serverPipelineName.empty());
+}
+
+void InputNetworkObserverUnittest::TestSaeConfig() {
+    unique_ptr<InputNetworkObserver> input;
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+
+    configStr = R"(
+        {
+            "ProbeConfig": {
+                "ApmConfig": {
+                    "AppId": "76fe228e-2c2e-4363-9f08-dcc412502062",
+                    "AppName": "zizhao-ebpf-test",
+                    "ServiceId": "hc4fs1hkb3@71ec1c84e2ca4cc069064",
+                    "Workspace": "default-cms-1760720386195983-cn-beijing",
+                    "Language": "php"
+                },
+                "L4Config": {
+                    "Enable": true
+                },
+                "L7Config": {
+                    "Enable": true,
+                    "EnableMetric": true,
+                    "EnableProtocols": [
+                        "http"
+                    ],
+                    "EnableSpan": true,
+                    "SampleRate": 1
+                }
+            },
+            "Type": "input_network_observer"
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputNetworkObserver());
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
 }
 
 UNIT_TEST_CASE(InputNetworkObserverUnittest, TestName)
@@ -233,7 +422,7 @@ UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStart)
 UNIT_TEST_CASE(InputNetworkObserverUnittest, OnSuccessfulStop)
-// UNIT_TEST_CASE(InputNetworkObserverUnittest, OnPipelineUpdate)
+UNIT_TEST_CASE(InputNetworkObserverUnittest, TestSaeConfig)
 
 } // namespace logtail
 

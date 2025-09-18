@@ -23,6 +23,14 @@
 
 namespace logtail {
 
+struct ContainerMeta {
+    std::string mContainerId;
+    std::string mContainerName;
+    // std::string mImageId;
+    std::string mImageName;
+    // std::string mContainerIp;
+};
+
 struct K8sPodInfo {
     std::unordered_map<std::string, std::string> mImages;
     std::unordered_map<std::string, std::string> mLabels;
@@ -35,6 +43,7 @@ struct K8sPodInfo {
     std::string mAppName;
     std::string mPodIp;
     std::string mPodName;
+    // std::string mPodUid;
     int64_t mStartTime;
     std::vector<std::string> mContainerIds;
 };

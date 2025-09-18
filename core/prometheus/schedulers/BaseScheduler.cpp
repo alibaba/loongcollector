@@ -20,8 +20,8 @@ chrono::steady_clock::time_point BaseScheduler::GetNextExecTime() {
     return mLatestExecTime;
 }
 
-void BaseScheduler::SetFirstExecTime(chrono::steady_clock::time_point firstExecTime,
-                                     chrono::system_clock::time_point firstScrapeTime) {
+void BaseScheduler::CalculateFirstExecTime(chrono::steady_clock::time_point firstExecTime,
+                                           chrono::system_clock::time_point firstScrapeTime) {
     mFirstExecTime = firstExecTime;
     mLatestExecTime = mFirstExecTime;
     mFirstScrapeTime = firstScrapeTime;

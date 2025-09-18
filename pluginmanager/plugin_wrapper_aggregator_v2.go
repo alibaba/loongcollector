@@ -57,11 +57,9 @@ func (wrapper *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, c
 
 	err := wrapper.Aggregator.Record(events, context)
 	if err == nil {
-		wrapper.outEventsTotal.Add(int64(len(events.Events)))
+		wrapper.outEventsTotal.Add(events.GetEventCount())
 		wrapper.outEventGroupsTotal.Add(1)
-		for _, event := range events.Events {
-			wrapper.outSizeBytes.Add(event.GetSize())
-		}
+		wrapper.outSizeBytes.Add(events.GetSize())
 	}
 	wrapper.totalDelayTimeMs.Add(time.Since(startTime).Milliseconds())
 	return err

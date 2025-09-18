@@ -29,7 +29,8 @@ logtail_define(DEPS_INCLUDE_ROOT "" "${DEPS_ROOT}/include")
 logtail_define(DEPS_LIBRARY_ROOT "" "${DEPS_ROOT}/lib")
 logtail_define(DEPS_BINARY_ROOT "" "${DEPS_ROOT}/bin")
 include_directories("${DEPS_INCLUDE_ROOT}")
-link_directories("${DEPS_LIBRARY_ROOT}")
+# Set library search path for find_library() - preferred over link_directories()
+list(PREPEND CMAKE_LIBRARY_PATH "${DEPS_LIBRARY_ROOT}")
 
 # Each dependency has three related variables can be set:
 # - {dep_name}_INCLUDE_DIR
@@ -41,27 +42,32 @@ set(LIBRARY_DIR_SUFFIX "LIBRARY_DIR")
 set(LINK_OPTION_SUFFIX "LINK_OPTION")
 # Dependencies list.
 set(DEP_NAME_LIST
-        spdlog                  # header-only
-        rapidjson               # header-only
-        gtest
-        gmock
-        protobuf
-        re2
-        cityhash
-        gflags
-        jsoncpp
-        yamlcpp
         boost
+        cityhash
+        crypto
+        curl
+        gflags
+        gmock
+        gtest
+        jsoncpp
+        leveldb
         lz4
+        protobuf
+        rapidjson               # header-only
+        re2
+        simdjson
+        spdlog                  # header-only
+        ssl                     # openssl
+        unwind                  # google breakpad on Windows
+        uuid
+        yamlcpp
         zlib
         zstd
-        curl
-        unwind                  # google breakpad on Windows
-        ssl                     # openssl
-        crypto
-        leveldb
-        uuid
         )
+
+if (NOT ENABLE_ENTERPRISE AND UNIX)
+    list(APPEND DEP_NAME_LIST "rdkafka")
+endif()
 
 if (NOT NO_TCMALLOC)
     list(APPEND DEP_NAME_LIST "tcmalloc") # (gperftools)
@@ -82,7 +88,8 @@ foreach (DEP_NAME ${DEP_NAME_LIST})
     endif ()
 
     if (${DEP_NAME}_${LIBRARY_DIR_SUFFIX})
-        link_directories("${${DEP_NAME}_${LIBRARY_DIR_SUFFIX}}")
+        # Prefer CMAKE_LIBRARY_PATH for find_library over link_directories
+        list(PREPEND CMAKE_LIBRARY_PATH "${${DEP_NAME}_${LIBRARY_DIR_SUFFIX}}")
     else ()
         set(${DEP_NAME}_${LIBRARY_DIR_SUFFIX} "${DEPS_LIBRARY_ROOT}")
     endif ()
@@ -93,31 +100,37 @@ macro(link_gtest target_name)
     if (gtest_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${gtest_${LINK_OPTION_SUFFIX}}" "${gmock_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${gtest_${LIBRARY_DIR_SUFFIX}}/libgtest.a" "${gmock_${LIBRARY_DIR_SUFFIX}}/libgmock.a")
+        find_library(GTEST_LIB libgtest.a PATHS "${gtest_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GMOCK_LIB libgmock.a PATHS "${gmock_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(GTEST_LIB AND GMOCK_LIB)
+            target_link_libraries(${target_name} "${GTEST_LIB}" "${GMOCK_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find gtest or gmock libraries")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "gtestd"
-                optimized "gtest"
-                debug "gmockd"
-                optimized "gmock")
+        find_library(GTEST_DEBUG_LIB gtestd.lib PATHS "${gtest_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GTEST_RELEASE_LIB gtest.lib PATHS "${gtest_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GMOCK_DEBUG_LIB gmockd.lib PATHS "${gmock_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GMOCK_RELEASE_LIB gmock.lib PATHS "${gmock_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(GTEST_RELEASE_LIB AND GMOCK_RELEASE_LIB)
+            if(GTEST_DEBUG_LIB AND GMOCK_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${GTEST_DEBUG_LIB}" "${GMOCK_DEBUG_LIB}"
+                        optimized "${GTEST_RELEASE_LIB}" "${GMOCK_RELEASE_LIB}")
+            else()
+                # Use release libraries for both debug and release builds when debug libs are missing
+                target_link_libraries(${target_name} "${GTEST_RELEASE_LIB}" "${GMOCK_RELEASE_LIB}")
+            endif()
+        elseif(GTEST_DEBUG_LIB AND GMOCK_DEBUG_LIB)
+            # Fallback to debug libs when only debug is available
+            target_link_libraries(${target_name} "${GTEST_DEBUG_LIB}" "${GMOCK_DEBUG_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find gtest/gmock libraries (GTEST: d=${GTEST_DEBUG_LIB}; r=${GTEST_RELEASE_LIB}, GMOCK: d=${GMOCK_DEBUG_LIB}; r=${GMOCK_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
-# protobuf
-macro(link_protobuf target_name)
-    if (protobuf_${LINK_OPTION_SUFFIX})
-        target_link_libraries(${target_name} "${protobuf_${LINK_OPTION_SUFFIX}}")
-    elseif (UNIX)
-        target_link_libraries(${target_name} "${protobuf_${LIBRARY_DIR_SUFFIX}}/libprotobuf.a")
-    elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "libprotobufd"
-                optimized "libprotobuf")
-    endif ()
-    if (ANDROID)
-        target_link_libraries(${target_name} "log")
-    endif ()
-endmacro()
 logtail_define(protobuf_BIN "Absolute path to protoc" "${DEPS_BINARY_ROOT}/protoc")
 
 function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
@@ -125,6 +138,16 @@ function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
     execute_process(COMMAND ${protobuf_BIN} 
         --proto_path=${PROTO_PATH}
         --cpp_out=${OUTPUT_PATH}
+        ${PROTO_FILES})
+endfunction()
+
+function(compile_proto_grpc PROTO_PATH OUTPUT_PATH PROTO_FILES)
+    file(MAKE_DIRECTORY ${OUTPUT_PATH})
+    execute_process(COMMAND ${protobuf_BIN}  
+        --plugin=protoc-gen-grpc=${DEPS_BINARY_ROOT}/grpc_cpp_plugin
+        -I=${PROTO_PATH}
+        --cpp_out=${OUTPUT_PATH}
+        --grpc_out=${OUTPUT_PATH}
         ${PROTO_FILES})
 endfunction()
 
@@ -139,6 +162,14 @@ compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/models"
     "log_event.proto;metric_event.proto;span_event.proto;pipeline_event_group.proto"
 )
+
+if (UNIX)
+compile_proto_grpc(
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/forward"
+    "loongsuite.proto"
+)
+endif()
 
 compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/../config_server/protocol/v1"
@@ -156,11 +187,27 @@ macro(link_re2 target_name)
     if (re2_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${re2_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${re2_${LIBRARY_DIR_SUFFIX}}/libre2.a")
+        find_library(RE2_LIB libre2.a PATHS "${re2_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(RE2_LIB)
+            target_link_libraries(${target_name} "${RE2_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find re2 library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "re2d"
-                optimized "re2")
+        find_library(RE2_DEBUG_LIB re2d.lib PATHS "${re2_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(RE2_RELEASE_LIB re2.lib PATHS "${re2_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(RE2_RELEASE_LIB)
+            if(RE2_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${RE2_DEBUG_LIB}"
+                        optimized "${RE2_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${RE2_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find re2 library (Debug: ${RE2_DEBUG_LIB}, Release: ${RE2_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -170,12 +217,29 @@ macro(link_tcmalloc target_name)
         if (tcmalloc_${LINK_OPTION_SUFFIX})
             target_link_libraries(${target_name} "${tcmalloc_${LINK_OPTION_SUFFIX}}")
         elseif (UNIX)
-            target_link_libraries(${target_name} "${tcmalloc_${LIBRARY_DIR_SUFFIX}}/libtcmalloc_minimal.a")
-        elseif (MSVC)
-            add_definitions(-DPERFTOOLS_DLL_DECL=)
-            target_link_libraries(${target_name}
-                    debug "libtcmalloc_minimald"
-                    optimized "libtcmalloc_minimal")
+            find_library(TCMALLOC_LIB libtcmalloc_minimal.a PATHS "${tcmalloc_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+            if(TCMALLOC_LIB)
+                target_link_libraries(${target_name} "${TCMALLOC_LIB}")
+            else()
+                message(FATAL_ERROR "Could not find tcmalloc library")
+            endif()
+            # target_link_libraries(${target_name} "${tcmalloc_${LIBRARY_DIR_SUFFIX}}/libtcmalloc_and_profiler.a")
+            elseif (MSVC)
+        add_definitions(-DPERFTOOLS_DLL_DECL=)
+        find_library(TCMALLOC_DEBUG_LIB libtcmalloc_minimald.lib PATHS "${tcmalloc_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(TCMALLOC_RELEASE_LIB libtcmalloc_minimal.lib PATHS "${tcmalloc_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(TCMALLOC_RELEASE_LIB)
+            if(TCMALLOC_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${TCMALLOC_DEBUG_LIB}"
+                        optimized "${TCMALLOC_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${TCMALLOC_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find tcmalloc library (Debug: ${TCMALLOC_DEBUG_LIB}, Release: ${TCMALLOC_RELEASE_LIB})")
+        endif()
         endif ()
     endif ()
 endmacro()
@@ -185,11 +249,27 @@ macro(link_cityhash target_name)
     if (cityhash_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${cityhash_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${cityhash_${LIBRARY_DIR_SUFFIX}}/libcityhash.a")
+        find_library(CITYHASH_LIB libcityhash.a PATHS "${cityhash_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(CITYHASH_LIB)
+            target_link_libraries(${target_name} "${CITYHASH_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find cityhash library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "cityhashd"
-                optimized "cityhash")
+        find_library(CITYHASH_DEBUG_LIB cityhashd.lib PATHS "${cityhash_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(CITYHASH_RELEASE_LIB cityhash.lib PATHS "${cityhash_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(CITYHASH_RELEASE_LIB)
+            if(CITYHASH_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${CITYHASH_DEBUG_LIB}"
+                        optimized "${CITYHASH_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${CITYHASH_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find cityhash library (Debug: ${CITYHASH_DEBUG_LIB}, Release: ${CITYHASH_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -198,11 +278,27 @@ macro(link_gflags target_name)
     if (gflags_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${gflags_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${gflags_${LIBRARY_DIR_SUFFIX}}/libgflags.a")
+        find_library(GFLAGS_LIB libgflags.a PATHS "${gflags_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(GFLAGS_LIB)
+            target_link_libraries(${target_name} "${GFLAGS_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find gflags library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "gflags_staticd"
-                optimized "gflags_static")
+        find_library(GFLAGS_DEBUG_LIB gflags_staticd.lib PATHS "${gflags_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(GFLAGS_RELEASE_LIB gflags_static.lib PATHS "${gflags_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(GFLAGS_RELEASE_LIB)
+            if(GFLAGS_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${GFLAGS_DEBUG_LIB}"
+                        optimized "${GFLAGS_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${GFLAGS_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find gflags library (Debug: ${GFLAGS_DEBUG_LIB}, Release: ${GFLAGS_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -211,11 +307,27 @@ macro(link_jsoncpp target_name)
     if (jsoncpp_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${jsoncpp_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${jsoncpp_${LIBRARY_DIR_SUFFIX}}/libjsoncpp.a")
+        find_library(JSONCPP_LIB libjsoncpp.a PATHS "${jsoncpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(JSONCPP_LIB)
+            target_link_libraries(${target_name} "${JSONCPP_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find jsoncpp library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "jsoncppd"
-                optimized "jsoncpp")
+        find_library(JSONCPP_DEBUG_LIB jsoncppd.lib PATHS "${jsoncpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(JSONCPP_RELEASE_LIB jsoncpp.lib PATHS "${jsoncpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(JSONCPP_RELEASE_LIB)
+            if(JSONCPP_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${JSONCPP_DEBUG_LIB}"
+                        optimized "${JSONCPP_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${JSONCPP_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find jsoncpp library (Debug: ${JSONCPP_DEBUG_LIB}, Release: ${JSONCPP_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -224,11 +336,27 @@ macro(link_yamlcpp target_name)
     if (yamlcpp_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${yamlcpp_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${yamlcpp_${LIBRARY_DIR_SUFFIX}}/libyaml-cpp.a")
+        find_library(YAMLCPP_LIB libyaml-cpp.a PATHS "${yamlcpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(YAMLCPP_LIB)
+            target_link_libraries(${target_name} "${YAMLCPP_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find yaml-cpp library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "yaml-cppd"
-                optimized "yaml-cpp")
+        find_library(YAMLCPP_DEBUG_LIB yaml-cppd.lib PATHS "${yamlcpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(YAMLCPP_RELEASE_LIB yaml-cpp.lib PATHS "${yamlcpp_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(YAMLCPP_RELEASE_LIB)
+            if(YAMLCPP_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${YAMLCPP_DEBUG_LIB}"
+                        optimized "${YAMLCPP_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${YAMLCPP_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find yaml-cpp library (Debug: ${YAMLCPP_DEBUG_LIB}, Release: ${YAMLCPP_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -237,13 +365,22 @@ macro(link_boost target_name)
     if (boost_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${boost_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name}
-                "${boost_${LIBRARY_DIR_SUFFIX}}/libboost_regex.a"
-                "${boost_${LIBRARY_DIR_SUFFIX}}/libboost_thread.a"
-                "${boost_${LIBRARY_DIR_SUFFIX}}/libboost_system.a"
-                "${boost_${LIBRARY_DIR_SUFFIX}}/libboost_filesystem.a"
-                "${boost_${LIBRARY_DIR_SUFFIX}}/libboost_chrono.a"
-                )
+        find_library(BOOST_REGEX_LIB libboost_regex.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BOOST_THREAD_LIB libboost_thread.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BOOST_SYSTEM_LIB libboost_system.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BOOST_FILESYSTEM_LIB libboost_filesystem.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BOOST_CHRONO_LIB libboost_chrono.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(BOOST_REGEX_LIB AND BOOST_THREAD_LIB AND BOOST_SYSTEM_LIB AND BOOST_FILESYSTEM_LIB AND BOOST_CHRONO_LIB)
+            target_link_libraries(${target_name}
+                    "${BOOST_REGEX_LIB}"
+                    "${BOOST_THREAD_LIB}"
+                    "${BOOST_SYSTEM_LIB}"
+                    "${BOOST_FILESYSTEM_LIB}"
+                    "${BOOST_CHRONO_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find one or more boost libraries")
+        endif()
     elseif (MSVC)
         if (NOT DEFINED Boost_FOUND)
             set(Boost_USE_STATIC_LIBS ON)
@@ -264,11 +401,27 @@ macro(link_lz4 target_name)
     if (lz4_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${lz4_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${lz4_${LIBRARY_DIR_SUFFIX}}/liblz4.a")
+        find_library(LZ4_LIB liblz4.a PATHS "${lz4_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LZ4_LIB)
+            target_link_libraries(${target_name} "${LZ4_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find lz4 library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "liblz4_staticd"
-                optimized "liblz4_static")
+        find_library(LZ4_DEBUG_LIB liblz4_staticd.lib PATHS "${lz4_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LZ4_RELEASE_LIB liblz4_static.lib PATHS "${lz4_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LZ4_RELEASE_LIB)
+            if(LZ4_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${LZ4_DEBUG_LIB}"
+                        optimized "${LZ4_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${LZ4_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find lz4 library (Debug: ${LZ4_DEBUG_LIB}, Release: ${LZ4_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -279,11 +432,27 @@ macro(link_zlib target_name)
     elseif(ANDROID)
         target_link_libraries(${target_name} z)
     elseif (UNIX)
-        target_link_libraries(${target_name} "${zlib_${LIBRARY_DIR_SUFFIX}}/libz.a")
+        find_library(ZLIB_LIB libz.a PATHS "${zlib_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZLIB_LIB)
+            target_link_libraries(${target_name} "${ZLIB_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find zlib library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "zlibstaticd"
-                optimized "zlibstatic")
+        find_library(ZLIB_DEBUG_LIB zlibstaticd.lib PATHS "${zlib_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(ZLIB_RELEASE_LIB zlibstatic.lib PATHS "${zlib_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZLIB_RELEASE_LIB)
+            if(ZLIB_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${ZLIB_DEBUG_LIB}"
+                        optimized "${ZLIB_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${ZLIB_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find zlib library (Debug: ${ZLIB_DEBUG_LIB}, Release: ${ZLIB_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -293,11 +462,27 @@ macro(link_zstd target_name)
     if (zstd_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${zstd_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${zstd_${LIBRARY_DIR_SUFFIX}}/libzstd.a")
+        find_library(ZSTD_LIB libzstd.a PATHS "${zstd_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZSTD_LIB)
+            target_link_libraries(${target_name} "${ZSTD_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find zstd library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "zstdstaticd"
-                optimized "zstdstatic")
+        find_library(ZSTD_DEBUG_LIB zstdstaticd.lib PATHS "${zstd_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(ZSTD_RELEASE_LIB zstdstatic.lib PATHS "${zstd_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(ZSTD_RELEASE_LIB)
+            if(ZSTD_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${ZSTD_DEBUG_LIB}"
+                        optimized "${ZSTD_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${ZSTD_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find zstd library (Debug: ${ZSTD_DEBUG_LIB}, Release: ${ZSTD_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -306,20 +491,47 @@ macro(link_curl target_name)
     if (curl_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${curl_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${curl_${LIBRARY_DIR_SUFFIX}}/libcurl.a")
+        find_library(CURL_LIB libcurl.a PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(CURL_LIB)
+            target_link_libraries(${target_name} "${CURL_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find curl library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "libcurl-d"
-                optimized "libcurl")
-        add_definitions(-DCURL_STATICLIB)
-        target_link_libraries(${target_name}
-                debug "libeay32"
-                optimized "libeay32")
-        target_link_libraries(${target_name}
-                debug "ssleay32"
-                optimized "ssleay32")
-        target_link_libraries(${target_name} "Ws2_32.lib")
-        target_link_libraries(${target_name} "Wldap32.lib")
+        find_library(CURL_DEBUG_LIB libcurl-d.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(CURL_RELEASE_LIB libcurl.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LIBEAY32_LIB libeay32.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(SSLEAY32_LIB ssleay32.lib PATHS "${curl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(CURL_RELEASE_LIB)
+            if(CURL_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${CURL_DEBUG_LIB}"
+                        optimized "${CURL_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${CURL_RELEASE_LIB}")
+            endif()
+            
+            add_definitions(-DCURL_STATICLIB)
+            
+            if(LIBEAY32_LIB)
+                target_link_libraries(${target_name} "${LIBEAY32_LIB}")
+            else()
+                target_link_libraries(${target_name} "libeay32")
+            endif()
+            
+            if(SSLEAY32_LIB)
+                target_link_libraries(${target_name} "${SSLEAY32_LIB}")
+            else()
+                target_link_libraries(${target_name} "ssleay32")
+            endif()
+            
+            target_link_libraries(${target_name} "Ws2_32.lib")
+            target_link_libraries(${target_name} "Wldap32.lib")
+        else()
+            message(FATAL_ERROR "Could not find curl library (Debug: ${CURL_DEBUG_LIB}, Release: ${CURL_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -330,17 +542,50 @@ macro(link_unwind target_name)
     elseif (ANDROID)
         # target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwindstack.a")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${unwind_${LIBRARY_DIR_SUFFIX}}/libunwind.a")
+        find_library(UNWIND_LIB libunwind.a PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(UNWIND_LIB)
+            target_link_libraries(${target_name} "${UNWIND_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find unwind library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "breakpad_commond.lib"
-                optimized "breakpad_common.lib")
-        target_link_libraries(${target_name}
-                debug "breakpad_crash_generation_clientd.lib"
-                optimized "breakpad_crash_generation_client.lib")
-        target_link_libraries(${target_name}
-                debug "breakpad_exception_handlerd.lib"
-                optimized "breakpad_exception_handler.lib")
+        find_library(BREAKPAD_COMMON_DEBUG_LIB breakpad_commond.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_COMMON_RELEASE_LIB breakpad_common.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_CLIENT_DEBUG_LIB breakpad_crash_generation_clientd.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_CLIENT_RELEASE_LIB breakpad_crash_generation_client.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_HANDLER_DEBUG_LIB breakpad_exception_handlerd.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(BREAKPAD_HANDLER_RELEASE_LIB breakpad_exception_handler.lib PATHS "${unwind_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        
+        if(BREAKPAD_COMMON_RELEASE_LIB AND BREAKPAD_CLIENT_RELEASE_LIB AND BREAKPAD_HANDLER_RELEASE_LIB)
+            # Link common library
+            if(BREAKPAD_COMMON_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_COMMON_DEBUG_LIB}"
+                        optimized "${BREAKPAD_COMMON_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_COMMON_RELEASE_LIB}")
+            endif()
+            
+            # Link client library
+            if(BREAKPAD_CLIENT_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_CLIENT_DEBUG_LIB}"
+                        optimized "${BREAKPAD_CLIENT_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_CLIENT_RELEASE_LIB}")
+            endif()
+            
+            # Link handler library
+            if(BREAKPAD_HANDLER_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${BREAKPAD_HANDLER_DEBUG_LIB}"
+                        optimized "${BREAKPAD_HANDLER_RELEASE_LIB}")
+            else()
+                target_link_libraries(${target_name} "${BREAKPAD_HANDLER_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find one or more breakpad libraries (missing release versions)")
+        endif()
     endif ()
 endmacro()
 
@@ -349,7 +594,12 @@ macro(link_ssl target_name)
     if (ssl_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${ssl_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${ssl_${LIBRARY_DIR_SUFFIX}}/libssl.a")
+        find_library(SSL_LIB libssl.a PATHS "${ssl_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(SSL_LIB)
+            target_link_libraries(${target_name} "${SSL_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find ssl library")
+        endif()
     elseif (MSVC)
         #target_link_libraries (${target_name}
         #   debug "libcurl-d"
@@ -362,7 +612,12 @@ macro(link_crypto target_name)
     if (crypto_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${crypto_${LINK_OPTION_SUFFIX}}")
     elseif (UNIX)
-        target_link_libraries(${target_name} "${crypto_${LIBRARY_DIR_SUFFIX}}/libcrypto.a")
+        find_library(CRYPTO_LIB libcrypto.a PATHS "${crypto_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(CRYPTO_LIB)
+            target_link_libraries(${target_name} "${CRYPTO_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find crypto library")
+        endif()
     elseif (MSVC)
         #target_link_libraries (${target_name}
         #   debug "libcurl-d"
@@ -373,11 +628,27 @@ endmacro()
 # leveldb
 macro(link_leveldb target_name)
     if (UNIX)
-        target_link_libraries(${target_name} "${leveldb_${LIBRARY_DIR_SUFFIX}}/libleveldb.a")
+        find_library(LEVELDB_LIB libleveldb.a PATHS "${leveldb_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LEVELDB_LIB)
+            target_link_libraries(${target_name} "${LEVELDB_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find leveldb library")
+        endif()
     elseif (MSVC)
-        target_link_libraries(${target_name}
-                debug "leveldbd.lib"
-                optimized "leveldb.lib")
+        find_library(LEVELDB_DEBUG_LIB leveldbd.lib PATHS "${leveldb_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(LEVELDB_RELEASE_LIB leveldb.lib PATHS "${leveldb_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(LEVELDB_RELEASE_LIB)
+            if(LEVELDB_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${LEVELDB_DEBUG_LIB}"
+                        optimized "${LEVELDB_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${LEVELDB_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find leveldb library (Debug: ${LEVELDB_DEBUG_LIB}, Release: ${LEVELDB_RELEASE_LIB})")
+        endif()
     endif ()
 endmacro()
 
@@ -397,7 +668,12 @@ macro(link_uuid target_name)
     if (uuid_${LINK_OPTION_SUFFIX})
         target_link_libraries(${target_name} "${uuid_${LINK_OPTION_SUFFIX}}")
     elseif (ANDROID)
-        target_link_libraries(${target_name} "${uuid_${LIBRARY_DIR_SUFFIX}}/libuuid.a")
+        find_library(UUID_LIB libuuid.a PATHS "${uuid_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(UUID_LIB)
+            target_link_libraries(${target_name} "${UUID_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find uuid library")
+        endif()
     elseif (UNIX)
         target_link_libraries(${target_name} uuid)
     endif ()
@@ -411,18 +687,94 @@ macro(link_archive target_name)
         target_link_libraries(${target_name} "${archive_${LIBRARY_DIR_SUFFIX}}/libarchive.a")
     elseif (UNIX)
         target_link_libraries(${target_name} archive)
+endmacro()
+
+# grpc
+macro(link_grpc target_name)
+    if (UNIX)
+        set(OPENSSL_USE_STATIC_LIBS ON)
+        set(OPENSSL_ROOT_DIR ${DEFAULT_DEPS_ROOT})
+        find_package(re2 QUIET PATHS ${DEPS_ROOT}/lib64/cmake/re2 NO_DEFAULT_PATH)
+        if(NOT re2_FOUND)
+            message(FATAL_ERROR "re2 not found, please upgrade your development image to compile!")
+        endif()
+        find_package(absl QUIET PATHS ${DEPS_ROOT}/lib64/cmake/absl NO_DEFAULT_PATH)
+        if(NOT absl_FOUND)
+            message(FATAL_ERROR "absl not found, please upgrade your development image to compile!")
+        endif()
+        find_package(utf8_range QUIET PATHS ${DEPS_ROOT}/lib64/cmake/utf8_range NO_DEFAULT_PATH)
+        if(NOT utf8_range_FOUND)
+            message(FATAL_ERROR "utf8_range not found, please upgrade your development image to compile!")
+        endif()
+        find_package(protobuf QUIET PATHS ${DEPS_ROOT}/lib64/cmake/protobuf NO_DEFAULT_PATH)
+        if(NOT protobuf_FOUND)
+            message(FATAL_ERROR "protobuf not found, please upgrade your development image to compile!")
+        endif()
+        find_package(gRPC QUIET PATHS ${DEPS_ROOT} NO_DEFAULT_PATH)
+        if(NOT gRPC_FOUND)
+            message(FATAL_ERROR "gRPC not found, please upgrade your development image to compile!")
+        endif()
+        target_link_libraries(${target_name} gRPC::grpc++ protobuf::libprotobuf utf8_range::utf8_range)
+    elseif (MSVC)
+        find_library(PROTOBUF_DEBUG_LIB libprotobufd.lib PATHS "${protobuf_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        find_library(PROTOBUF_RELEASE_LIB libprotobuf.lib PATHS "${protobuf_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(PROTOBUF_RELEASE_LIB)
+            if(PROTOBUF_DEBUG_LIB)
+                target_link_libraries(${target_name}
+                        debug "${PROTOBUF_DEBUG_LIB}"
+                        optimized "${PROTOBUF_RELEASE_LIB}")
+            else()
+                # Use release library for both debug and release builds
+                target_link_libraries(${target_name} "${PROTOBUF_RELEASE_LIB}")
+            endif()
+        else()
+            message(FATAL_ERROR "Could not find protobuf library (Debug: ${PROTOBUF_DEBUG_LIB}, Release: ${PROTOBUF_RELEASE_LIB})")
+        endif()
+    endif()
+endmacro()
+
+
+macro(link_simdjson target_name)
+    if (simdjson_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${simdjson_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        find_library(SIMDJSON_LIB libsimdjson.a PATHS "${simdjson_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+        if(SIMDJSON_LIB)
+            message(STATUS "Found simdjson library: ${SIMDJSON_LIB}")
+            target_link_libraries(${target_name} "${SIMDJSON_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find simdjson library")
+        endif()
+    endif ()
+endmacro()
+
+
+# rdkafka
+macro(link_rdkafka target_name)
+    if (rdkafka_${LINK_OPTION_SUFFIX})
+        target_link_libraries(${target_name} "${rdkafka_${LINK_OPTION_SUFFIX}}")
+    elseif (UNIX)
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka.a")
+        target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka++.a")
+    elseif (MSVC)
+        target_link_libraries(${target_name}
+                debug "rdkafkad"
+                optimized "rdkafka")
+        target_link_libraries(${target_name}
+                debug "rdkafka++d"
+                optimized "rdkafka++")
     endif ()
 endmacro()
 
 macro(link_spl target_name)
     logtail_define(spl_${target_name} "" "")
 
-    find_library(LIB_FOUND "libloongcollector_spl.a")
+    find_library(LIB_FOUND "libloongcollector_spl_2.1.9.a")
     if (NOT LIB_FOUND)
         message(FATAL_ERROR "Please upgrade your development image to compile!")
     endif()
     
-    target_link_libraries(${target_name} "libloongcollector_spl.a")
+    target_link_libraries(${target_name} "libloongcollector_spl_2.1.9.a")
     target_link_libraries(${target_name} "libx.a")
     target_link_libraries(${target_name} "libxx.a")
     target_link_libraries(${target_name} "libpresto_common.a")
@@ -534,7 +886,12 @@ macro(link_spl target_name)
     target_link_libraries(${target_name} "libfolly.a")
     target_link_libraries(${target_name} "libuuid.a")
     target_link_libraries(${target_name} "libfmt.a")
-    target_link_libraries(${target_name} "libboost_context.a")
+    find_library(BOOST_CONTEXT_LIB libboost_context.a PATHS "${boost_${LIBRARY_DIR_SUFFIX}}" NO_DEFAULT_PATH)
+    if(BOOST_CONTEXT_LIB)
+        target_link_libraries(${target_name} "${BOOST_CONTEXT_LIB}")
+    else()
+        message(FATAL_ERROR "Could not find boost_context library")
+    endif()
 
     target_link_libraries(${target_name} "libdouble-conversion.a")
     target_link_libraries(${target_name} "libsodium.a")
@@ -548,7 +905,6 @@ macro(link_spl target_name)
     target_link_libraries(${target_name} "libtransport.a")
     target_link_libraries(${target_name} "libprometheus-cpp-core.a")
     target_link_libraries(${target_name} "libprometheus-cpp-pull.a")
-    target_link_libraries(${target_name} "libsimdjson.a")
     target_link_libraries(${target_name} "libsnappy.a")
     target_link_libraries(${target_name} "libbz2.a")
     target_link_libraries(${target_name} "liblzo2.a")
