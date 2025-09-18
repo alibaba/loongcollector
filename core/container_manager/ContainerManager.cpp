@@ -254,10 +254,9 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
         LOG_ERROR(sLogger, ("invalid docker container params", diffContainersMeta)("errorMsg", errorMsg));
         return;
     }
-    Json::Value diffContainers = jsonParams["DiffCmd"];
-    Json::Value updateContainers = diffContainers["Update"];
-    Json::Value deleteContainers = diffContainers["Delete"];
-    Json::Value stopContainers = diffContainers["Stop"];
+    Json::Value updateContainers = jsonParams["Update"];
+    Json::Value deleteContainers = jsonParams["Delete"];
+    Json::Value stopContainers = jsonParams["Stop"];
 
     bool hasChanges = false;
 
@@ -576,7 +575,7 @@ static Json::Value SerializeRawContainerInfo(const std::shared_ptr<RawContainerI
         k8sLabels[p.first] = Json::Value(p.second);
     }
     k8s["Labels"] = k8sLabels;
-    v["K8s"] = k8s;
+    v["K8sInfo"] = k8s;
 
     // env
     Json::Value env(Json::objectValue);
@@ -640,8 +639,8 @@ static std::shared_ptr<RawContainerInfo> DeserializeRawContainerInfo(const Json:
     }
 
     // k8s
-    if (v.isMember("K8s") && v["K8s"].isObject()) {
-        const auto& k8s = v["K8s"];
+    if (v.isMember("K8sInfo") && v["K8sInfo"].isObject()) {
+        const auto& k8s = v["K8sInfo"];
         if (k8s.isMember("Namespace") && k8s["Namespace"].isString())
             info->mK8sInfo.mNamespace = k8s["Namespace"].asString();
         if (k8s.isMember("Pod") && k8s["Pod"].isString())

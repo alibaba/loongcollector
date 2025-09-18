@@ -8,7 +8,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 )
 
-var caCachedFullList map[string]*containercenter.DockerInfoDetail
+var caCachedFullList map[string]struct{}
 var lastUpdateTime int64 = 0
 
 type Mount struct {
@@ -46,7 +46,7 @@ type DiffCmd struct {
 	Stop   []string
 }
 
-func convertDockerInfos(info *containercenter.DockerInfoDetail, allCmd *DockerFileUpdateCmdAll) {
+func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]DockerFileUpdateCmd) {
 	var cmd DockerFileUpdateCmd
 	cmd.ID = info.ContainerInfo.ID
 
@@ -113,22 +113,19 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, allCmd *DockerFi
 			Destination: filepath.Clean(mount.Destination),
 		})
 	}
-
-	if allCmd != nil {
-		allCmd.AllCmd = append(allCmd.AllCmd, cmd)
-	}
+	*cmds = append(*cmds, cmd)
 }
 
 func GetAllContainers() string {
 	allCmd := new(DockerFileUpdateCmdAll)
+	allCmd.AllCmd = make([]DockerFileUpdateCmd, 0)
 	// Snapshot current containers
 	rawMap := containercenter.GetContainerMap()
-	newMap := make(map[string]*containercenter.DockerInfoDetail, len(rawMap))
-	for id, info := range rawMap {
-		convertDockerInfos(info, allCmd)
-		newMap[id] = info
+	caCachedFullList = make(map[string]struct{})
+	for _, info := range rawMap {
+		convertDockerInfos(info, &allCmd.AllCmd)
+		caCachedFullList[info.ContainerInfo.ID] = struct{}{}
 	}
-	caCachedFullList = newMap
 	cmdBuf, _ := json.Marshal(allCmd)
 	return string(cmdBuf)
 }
@@ -142,39 +139,22 @@ func GetDiffContainers() string {
 	}
 
 	if caCachedFullList == nil {
-		caCachedFullList = make(map[string]*containercenter.DockerInfoDetail)
+		caCachedFullList = make(map[string]struct{})
 	}
-	// Snapshot current containers
-	rawMap := containercenter.GetContainerMap()
-	newMap := make(map[string]*containercenter.DockerInfoDetail, len(rawMap))
-	for id, info := range rawMap {
-		newMap[id] = info
-	}
-
-	diff := new(DiffCmd)
-	// Deleted containers
-	for id := range caCachedFullList {
-		if c, ok := newMap[id]; !ok {
-			diff.Delete = append(diff.Delete, id)
-		} else if c.Status() != containercenter.ContainerStatusRunning {
-			diff.Stop = append(diff.Stop, id)
-		}
-	}
-	// Added containers -> build Update cmds
-	for id, info := range newMap {
-		if _, ok := caCachedFullList[id]; !ok {
-			var tmpAll DockerFileUpdateCmdAll
-			convertDockerInfos(info, &tmpAll)
-			if len(tmpAll.AllCmd) > 0 {
-				diff.Update = append(diff.Update, tmpAll.AllCmd[0])
-			}
-		}
-	}
-	// Update cache
-	caCachedFullList = newMap
 	lastUpdateTime = newUpdateTime
+	update, delete, stop, changed, newFullList := containercenter.GetContainerDiffForPluginManager(caCachedFullList)
+	if !changed {
+		return ""
+	}
+	diff := new(DiffCmd)
+	diff.Update = make([]DockerFileUpdateCmd, 0)
+	for _, info := range update {
+		convertDockerInfos(info, &diff.Update)
+	}
+	diff.Delete = delete
+	diff.Stop = stop
+	caCachedFullList = newFullList
 
-	wrapper := map[string]*DiffCmd{"DiffCmd": diff}
-	buf, _ := json.Marshal(wrapper)
+	buf, _ := json.Marshal(diff)
 	return string(buf)
 }
