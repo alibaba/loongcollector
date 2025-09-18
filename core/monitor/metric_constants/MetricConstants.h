@@ -298,6 +298,7 @@ extern const std::string& METRIC_RUNNER_IN_EVENT_GROUPS_TOTAL;
 extern const std::string& METRIC_RUNNER_IN_SIZE_BYTES;
 extern const std::string& METRIC_RUNNER_IN_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_LAST_RUN_TIME;
+extern const std::string& METRIC_RUNNER_OUT_SIZE_BYTES;
 extern const std::string& METRIC_RUNNER_OUT_ITEMS_TOTAL;
 extern const std::string& METRIC_RUNNER_TOTAL_DELAY_MS;
 extern const std::string METRIC_RUNNER_CLIENT_REGISTER_STATE;
@@ -318,6 +319,7 @@ extern const std::string METRIC_RUNNER_SINK_SEND_CONCURRENCY;
  *   flusher runner
  **********************************************************/
 extern const std::string METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES;
+extern const std::string METRIC_RUNNER_FLUSHER_OUT_RAW_SIZE_BYTES;
 extern const std::string METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL;
 
 /**********************************************************
