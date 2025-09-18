@@ -147,7 +147,7 @@ CURL* CreateCurlHandler(const string& method,
     if (!queryString.empty()) {
         totalUrl.append("?").append(queryString);
     }
-    LOG_INFO(sLogger, ("total url", totalUrl));
+    LOG_DEBUG(sLogger, ("total url", totalUrl));
     curl_easy_setopt(curl, CURLOPT_URL, totalUrl.c_str());
     for (const auto& iter : header) {
         headers = curl_slist_append(headers, (iter.first + ":" + iter.second).c_str());

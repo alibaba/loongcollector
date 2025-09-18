@@ -43,8 +43,8 @@ public:
         // 清理临时测试目录
         std::filesystem::remove_all(mTestDir);
         std::filesystem::remove_all("/opt/.arms");
-        mPackageManager.reset();
         mPackageManager->UninstallExecHook();
+        mPackageManager.reset();
     }
 
     void TestPrepareExecHook() {

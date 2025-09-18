@@ -33,7 +33,6 @@ bool ApmAgentInjectTask::Init(const Json::Value& config) {
 
 void ApmAgentInjectTask::Start() {
     apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, mAttachConfig);
-    apm::ApmInjectRunner::GetInstance()->InjectApmAgent(mContext, mAttachConfig);
     mAttachConfig = nullptr;
 }
 

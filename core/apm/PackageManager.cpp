@@ -426,7 +426,6 @@ bool PackageManager::download(const std::string& url,
             // not found
             lastModified = it->second;
         }
-        lastModified = it->second;
         changed = true;
 
         // remove old file

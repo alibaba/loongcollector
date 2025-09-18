@@ -28,7 +28,7 @@
 
 namespace logtail {
 
-class CollectionPipeline;
+class TaskPipeline;
 
 class TaskPipelineContext {
 public:
