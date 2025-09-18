@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <dirent.h>
 
 #include <algorithm>
 #include <boost/regex.hpp>
@@ -736,8 +735,8 @@ void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
         return;
     }
 
-    DIR* dir = opendir(testDataDir.c_str());
-    if (!dir) {
+    fsutil::Dir dir(testDataDir);
+    if (!dir.Open()) {
         std::cout << "Failed to open test data directory: " << testDataDir << std::endl;
         std::cout << "Test data directory not found, skipping consistency test" << std::endl;
         return;
@@ -745,14 +744,14 @@ void ContainerManagerUnittest::TestContainerMatchingConsistency() const {
 
     // Collect all JSON files in the directory
     std::vector<std::string> testFiles;
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != nullptr) {
-        std::string fileName = entry->d_name;
+    fsutil::Entry entry;
+    while ((entry = dir.ReadNext()).operator bool()) {
+        std::string fileName = entry.Name();
         if (fileName.size() > 5 && fileName.substr(fileName.size() - 5) == ".json") {
-            testFiles.push_back(testDataDir + "/" + fileName);
+            testFiles.push_back(testDataDir + PATH_SEPARATOR + fileName);
         }
     }
-    closedir(dir);
+    dir.Close();
 
     if (testFiles.empty()) {
         std::cout << "No JSON test files found in directory, skipping consistency test" << std::endl;
