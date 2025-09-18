@@ -29,6 +29,7 @@
 #include <limits>
 #include <numeric>
 #include <random>
+#include <sstream>
 
 #include "boost/filesystem.hpp"
 #include "boost/regex.hpp"
@@ -700,14 +701,18 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
         ? 0
         : (endOffset - ((int64_t)mReaderConfig.first->mTailSizeKB * 1024));
 
-    // 如果跳过了文件开头的数据，发送警告和告警
+    // If data at the beginning of the file is skipped, send a warning and an alarm
     if (mLastFilePos > 0) {
-        std::string warningMsg = "File size " + std::to_string(endOffset / 1024) + "KB > "
-            + std::to_string(mReaderConfig.first->mTailSizeKB) + "KB when discovered, skipped "
-            + std::to_string(mLastFilePos) + " bytes from the beginning of file: " + mHostLogPath
-            + ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+        std::ostringstream oss;
+        oss << "File size " << (endOffset / 1024) << "KB > " << mReaderConfig.first->mTailSizeKB
+            << "KB when discovered, skipped " << mLastFilePos << " bytes from the beginning of file: " << mHostLogPath
+            << ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+        std::string warningMsg = oss.str();
 
-        LOG_WARNING(sLogger, ("%s", warningMsg.c_str()));
+        LOG_WARNING(sLogger,
+                    ("project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
+                        "file path", mHostLogPath)("file device", ToString(mDevInode.dev))(
+                        "file inode", ToString(mDevInode.inode))("first open", warningMsg.c_str()));
 
         AlarmManager::GetInstance()->SendAlarmWarning(
             SKIP_READ_LOG_ALARM, warningMsg, GetRegion(), GetProject(), GetConfigName(), GetLogstore());
