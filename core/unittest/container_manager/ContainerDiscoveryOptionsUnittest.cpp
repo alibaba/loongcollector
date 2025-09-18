@@ -260,7 +260,7 @@ void ContainerDiscoveryOptionsUnittest::TestRegexCompilation() const {
         {
             "IncludeK8sLabel": {
                 "valid_regex": "^web.*$",
-                "invalid_regex1": "^web.*",
+                "valid_regex1": "^web.*",
                 "invalid_regex2": "web.*$",
                 "static_match": "exact-match"
             },
@@ -275,9 +275,9 @@ void ContainerDiscoveryOptionsUnittest::TestRegexCompilation() const {
     ContainerFilters filters;
     APSARA_TEST_TRUE(filters.Init(filterConfig));
 
-    // Verify regex compilation - only valid regex (^...$) should be in mFieldsRegMap
+    // Verify regex compilation - only valid regex (^...) should be in mFieldsRegMap
     APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap.count("valid_regex"));
-    APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap.count("invalid_regex1"));
+    APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap.count("valid_regex1"));
     APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap.count("invalid_regex2"));
     APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap.count("static_match"));
     APSARA_TEST_TRUE(filters.mEnvFilter.mExcludeFields.mFieldsMap.count("temp"));

@@ -472,7 +472,6 @@ void ContainerManagerUnittest::TestincrementallyUpdateContainersSnapshot() const
     {
         // test diff containers meta
         LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(R"({
-            "DiffCmd": {
                 "Update": [
                     {
                         "ID": "123",
@@ -488,7 +487,7 @@ void ContainerManagerUnittest::TestincrementallyUpdateContainersSnapshot() const
                 "Delete": [123],
                 "Stop": ["123"]
             }
-        })");
+        )");
         ContainerManager containerManager;
         containerManager.incrementallyUpdateContainersSnapshot();
         EXPECT_EQ(containerManager.mContainerMap.size(), 1);
