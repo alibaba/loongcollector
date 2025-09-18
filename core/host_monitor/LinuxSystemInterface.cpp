@@ -326,7 +326,8 @@ bool LinuxSystemInterface::GetInterfaceConfig(InterfaceConfig& interfaceConfig, 
         if (ret != 0 || netInet6Lines.empty()) {
             // Failure should not be returned without "/proc/net/if_inet6"
             close(sock);
-            return false;
+            LOG_WARNING(sLogger, ("GetInterfaceConfig, failed to get ipv6 config", errorMessage));
+            return true;
         }
     }
 

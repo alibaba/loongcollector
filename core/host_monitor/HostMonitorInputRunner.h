@@ -95,6 +95,7 @@ private:
                                      []() -> CollectorInstance { return CollectorInstance(std::make_unique<T>()); });
     }
 
+    void PushQueue(CollectContextPtr context, PipelineEventGroup&& group);
     void PushNextTimerEvent(CollectContextPtr config);
     void AddHostLabels(PipelineEventGroup& group);
 
