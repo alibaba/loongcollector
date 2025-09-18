@@ -699,6 +699,20 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
     mLastFilePos = endOffset <= ((int64_t)mReaderConfig.first->mTailSizeKB * 1024)
         ? 0
         : (endOffset - ((int64_t)mReaderConfig.first->mTailSizeKB * 1024));
+
+    // 如果跳过了文件开头的数据，发送警告和告警
+    if (mLastFilePos > 0) {
+        std::string warningMsg = "File size " + std::to_string(endOffset / 1024) + "KB > "
+            + std::to_string(mReaderConfig.first->mTailSizeKB) + "KB when discovered, skipped "
+            + std::to_string(mLastFilePos) + " bytes from the beginning of file: " + mHostLogPath
+            + ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+
+        LOG_WARNING(sLogger, ("%s", warningMsg.c_str()));
+
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            SKIP_READ_LOG_ALARM, warningMsg, GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+    }
+
     mCache.clear();
     FixLastFilePos(op, endOffset);
 }
