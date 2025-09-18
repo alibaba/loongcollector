@@ -47,7 +47,6 @@ public:
     AlarmManager& GetAlarm() const { return *mAlarm; };
 
 private:
-
     std::string mConfigName;
     uint32_t mCreateTime;
 
