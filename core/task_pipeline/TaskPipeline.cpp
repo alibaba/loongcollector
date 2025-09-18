@@ -29,7 +29,7 @@ bool TaskPipeline::Init(TaskConfig&& config) {
     mCreateTime = config.mCreateTime;
     mConfig = std::move(config.mDetail);
 
-    mContext.SetConfigName(mConfigName);
+    mContext.SetConfigName(mName);
     mContext.SetCreateTime(mCreateTime);
 
     const auto& detail = (*mConfig)["task"];
