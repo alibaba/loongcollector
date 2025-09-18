@@ -29,6 +29,7 @@
 #include <limits>
 #include <numeric>
 #include <random>
+#include <sstream>
 
 #include "boost/filesystem.hpp"
 #include "boost/regex.hpp"
@@ -699,6 +700,24 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
     mLastFilePos = endOffset <= ((int64_t)mReaderConfig.first->mTailSizeKB * 1024)
         ? 0
         : (endOffset - ((int64_t)mReaderConfig.first->mTailSizeKB * 1024));
+
+    // If data at the beginning of the file is skipped, send a warning and an alarm
+    if (mLastFilePos > 0) {
+        std::ostringstream oss;
+        oss << "File size " << (endOffset / 1024) << "KB > " << mReaderConfig.first->mTailSizeKB
+            << "KB when discovered, skipped " << mLastFilePos << " bytes from the beginning of file: " << mHostLogPath
+            << ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+        std::string warningMsg = oss.str();
+
+        LOG_WARNING(sLogger,
+                    ("project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
+                        "file path", mHostLogPath)("file device", ToString(mDevInode.dev))(
+                        "file inode", ToString(mDevInode.inode))("first open", warningMsg.c_str()));
+
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            SKIP_READ_LOG_ALARM, warningMsg, GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+    }
+
     mCache.clear();
     FixLastFilePos(op, endOffset);
 }
