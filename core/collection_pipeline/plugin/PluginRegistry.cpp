@@ -53,6 +53,7 @@
 #include "plugin/flusher/kafka/FlusherKafka.h"
 #endif
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/input/InputCpuProfiling.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputHostMonitor.h"
@@ -75,6 +76,7 @@ DEFINE_FLAG_BOOL(enable_ebpf_network_observer, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_process_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_file_secure, "", true);
 DEFINE_FLAG_BOOL(enable_ebpf_network_secure, "", false);
+DEFINE_FLAG_BOOL(enable_ebpf_cpu_profiling, "", false);
 
 using namespace std;
 
@@ -169,6 +171,9 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
+    }
+    if (BOOL_FLAG(enable_ebpf_cpu_profiling)) {
+        RegisterContinuousInputCreator(new StaticInputCreator<InputCpuProfiling>(), false);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);

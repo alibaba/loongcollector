@@ -257,7 +257,7 @@ int NetworkSecurityManager::Init() {
 int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
-                                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+                                              const PluginOptions& options) {
     // init metrics ...
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};

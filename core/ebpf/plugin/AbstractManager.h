@@ -43,10 +43,8 @@ public:
 
     virtual int Init() = 0;
 
-    virtual int AddOrUpdateConfig(const CollectionPipelineContext*,
-                                  uint32_t,
-                                  const PluginMetricManagerPtr&,
-                                  const std::variant<SecurityOptions*, ObserverNetworkOption*>&)
+    virtual int
+    AddOrUpdateConfig(const CollectionPipelineContext*, uint32_t, const PluginMetricManagerPtr&, const PluginOptions&)
         = 0;
 
     virtual int RemoveConfig(const std::string&) = 0;
@@ -86,7 +84,7 @@ public:
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    virtual int Resume(const PluginOptions& options) {
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;
@@ -99,10 +97,9 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
+    virtual std::unique_ptr<PluginConfig> GeneratePluginConfig([[maybe_unused]] const PluginOptions& options) = 0;
 
-    virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    virtual int Update([[maybe_unused]] const PluginOptions& options) {
         bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {
             LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));

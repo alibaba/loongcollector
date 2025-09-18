@@ -64,11 +64,10 @@ int ProcessSecurityManager::Init() {
     return 0;
 }
 
-int ProcessSecurityManager::AddOrUpdateConfig(
-    const CollectionPipelineContext* ctx,
-    uint32_t index,
-    const PluginMetricManagerPtr& metricMgr,
-    [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+int ProcessSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
+                                              uint32_t index,
+                                              const PluginMetricManagerPtr& metricMgr,
+                                              [[maybe_unused]] const PluginOptions& opt) {
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
         auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
