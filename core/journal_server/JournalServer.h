@@ -25,10 +25,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include "collection_pipeline/CollectionPipelineContext.h"
-#include "runner/InputRunner.h"
-#include "common/JournalConfig.h"
-
 namespace logtail {
 
 // Forward declarations

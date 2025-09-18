@@ -31,43 +31,37 @@ class CollectionPipelineContext;
 struct JournalConfig {
     // Journal reading configuration
     std::string seekPosition;
-    int cursorFlushPeriodMs;
+    int cursorFlushPeriodMs = 5000;
     std::string cursorSeekFallback;
 
     // Filter configuration
     std::vector<std::string> units;           // Systemd unit filter
     std::vector<std::string> identifiers;    // Syslog identifier filter  
     std::vector<std::string> matchPatterns;  // Custom match patterns
-    bool kernel;                             // Enable kernel log filter
+    bool kernel = true;                             // Enable kernel log filter
 
     // Performance configuration
-    int resetIntervalSecond;                 // Connection reset interval
-    int maxEntriesPerBatch;                  // Max entries per batch
-    int waitTimeoutMs;                       // Wait timeout in milliseconds
+    int resetIntervalSecond = 3600;          // Connection reset interval
+    int maxEntriesPerBatch = 1000;           // Max entries per batch
+    int waitTimeoutMs = 1000;                // Wait timeout in milliseconds
 
     // Field processing configuration
-    bool parsePriority;                      // Parse priority field
-    bool parseSyslogFacility;               // Parse syslog facility field
-    bool useJournalEventTime;               // Use journal event time instead of system time
+    bool parsePriority = false;              // Parse priority field
+    bool parseSyslogFacility = false;       // Parse syslog facility field
+    bool useJournalEventTime = true;        // Use journal event time instead of system time
 
     // Custom journal path (for file-based journals)
     std::vector<std::string> journalPaths;
 
     // Context reference
-    const CollectionPipelineContext* ctx;
+    const CollectionPipelineContext* ctx = nullptr;
     
     // Runtime state (set during validation)
     mutable QueueKey queueKey = -1;  // Cached queue key after validation (-1 = not validated)
     mutable std::string lastSeekCheckpoint;  // Last checkpoint we successfully seeked to
     mutable bool needsSeek = true;  // Whether we need to perform seek on next read
     
-    JournalConfig() : cursorFlushPeriodMs(5000), kernel(false), resetIntervalSecond(3600),
-                     maxEntriesPerBatch(1000), waitTimeoutMs(1000),
-                     parsePriority(false), parseSyslogFacility(false), useJournalEventTime(true), ctx(nullptr) {
-        // Note: kernel默认为false，这样默认采集所有日志而不仅仅是内核日志
-        // 用户可以根据需要手动启用kernel过滤器
-        // maxEntriesPerBatch默认1000，waitTimeoutMs默认1000ms
-    }
+    JournalConfig() = default;
 };
 
 } // namespace logtail 
