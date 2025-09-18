@@ -229,6 +229,13 @@ func GetContainerMap() map[string]*DockerInfoDetail {
 	instance := getContainerCenterInstance()
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+	return instance.containerMap
+}
+
+func GetContainerMapCopy() map[string]*DockerInfoDetail {
+	instance := getContainerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 	copyMap := make(map[string]*DockerInfoDetail)
 	for key, value := range instance.containerMap {
 		copyMap[key] = value
@@ -262,7 +269,7 @@ func GetContainerDiffForPluginManager(fullList map[string]struct{}) (update []*D
 	}
 	if changed {
 		newFullList = make(map[string]struct{})
-		for key, _ := range instance.containerMap {
+		for key := range instance.containerMap {
 			newFullList[key] = struct{}{}
 		}
 		return update, delete, stop, changed, newFullList

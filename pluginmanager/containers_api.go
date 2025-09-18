@@ -9,7 +9,7 @@ import (
 )
 
 var caCachedFullList map[string]struct{}
-var lastUpdateTime int64 = 0
+var lastUpdateTime int64
 
 type Mount struct {
 	Source      string
@@ -120,7 +120,7 @@ func GetAllContainers() string {
 	allCmd := new(DockerFileUpdateCmdAll)
 	allCmd.AllCmd = make([]DockerFileUpdateCmd, 0)
 	// Snapshot current containers
-	rawMap := containercenter.GetContainerMap()
+	rawMap := containercenter.GetContainerMapCopy()
 	caCachedFullList = make(map[string]struct{})
 	for _, info := range rawMap {
 		convertDockerInfos(info, &allCmd.AllCmd)
