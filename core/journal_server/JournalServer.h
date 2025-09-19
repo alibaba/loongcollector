@@ -68,6 +68,7 @@ public:
                         size_t idx,
                         const JournalConfig& config);
     void RemoveJournalInput(const std::string& configName, size_t idx);
+    void RemoveJournalInputWithoutCleanup(const std::string& configName, size_t idx);
 
     // Configuration management
     JournalConfig GetJournalConfig(const std::string& name, size_t idx) const;
@@ -88,6 +89,10 @@ private:
     mutable std::mutex mThreadRunningMux;
     bool mIsThreadRunning = true;
     mutable std::condition_variable mStopCV;
+
+    // Initialization state management
+    bool mIsInitialized = false;
+    mutable std::mutex mInitMux;
 
     time_t mStartTime = 0;
 

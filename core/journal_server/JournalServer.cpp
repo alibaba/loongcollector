@@ -38,13 +38,21 @@ namespace logtail {
 // =============================================================================
 
 void JournalServer::Init() {
+    lock_guard<mutex> lock(mInitMux);
+    if (mIsInitialized) {
+        LOG_INFO(sLogger, ("JournalServer already initialized", "skipping duplicate Init() call"));
+        return;
+    }
+    
     mThreadRes = async(launch::async, &JournalServer::run, this);
     mStartTime = time(nullptr);
+    mIsInitialized = true;
     LOG_INFO(sLogger, ("JournalServer initialized", ""));
 }
 
 void JournalServer::Stop() {
-    if (!mThreadRes.valid()) {
+    lock_guard<mutex> initLock(mInitMux);
+    if (!mIsInitialized || !mThreadRes.valid()) {
         return;
     }
     {
@@ -54,6 +62,7 @@ void JournalServer::Stop() {
     if (mThreadRes.valid()) {
         mThreadRes.get();
     }
+    mIsInitialized = false;
     LOG_INFO(sLogger, ("JournalServer stopped", ""));
 }
 
@@ -68,6 +77,12 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
     if (!impl::ValidateJournalConfig(configName, idx, config, queueKey)) {
         LOG_ERROR(sLogger, ("journal input validation failed", "config not added")("config", configName)("idx", idx));
         return;
+    }
+    
+    // 尝试从磁盘加载现有检查点（用于配置更新场景）
+    bool hasExistingCheckpoint = JournalCheckpointManager::GetInstance().LoadCheckpointFromDisk(configName, idx);
+    if (hasExistingCheckpoint) {
+        LOG_INFO(sLogger, ("existing checkpoint loaded for config update", "")("config", configName)("idx", idx));
     }
     
     // 验证成功后，缓存queueKey并添加配置
@@ -107,6 +122,29 @@ void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
     }
     
     LOG_INFO(sLogger, ("journal input removed with automatic connection and checkpoint cleanup", "")("config", configName)("idx", idx));
+}
+
+void JournalServer::RemoveJournalInputWithoutCleanup(const string& configName, size_t idx) {
+    {
+        lock_guard<mutex> lock(mUpdateMux);
+        auto configItr = mPipelineNameJournalConfigsMap.find(configName);
+        // 如果配置存在，则移除
+        if (configItr != mPipelineNameJournalConfigsMap.end()) {
+            configItr->second.erase(idx);
+            // 如果配置为空，则移除整个配置
+            if (configItr->second.empty()) {
+                // 移除整个配置
+                mPipelineNameJournalConfigsMap.erase(configItr);
+            }
+        }
+    }
+    
+    // 移除config对应的连接
+    JournalConnectionManager::GetInstance()->RemoveConnection(configName, idx);
+    
+    // 注意：不清理检查点，保留给配置更新后的新实例使用
+    
+    LOG_INFO(sLogger, ("journal input removed without checkpoint cleanup", "checkpoints preserved for config update")("config", configName)("idx", idx));
 }
 
 JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) const {
