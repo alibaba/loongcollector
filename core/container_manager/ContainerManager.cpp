@@ -692,14 +692,23 @@ void ContainerManager::SaveContainerInfo() {
     }
     root["Containers"] = arr;
     root["version"] = "1.0.0";
+#ifdef APSARA_UNIT_TEST_MAIN
+    std::string configPath = PathJoin(GetAgentDataDir(), "docker_path_config.json");
+#else
     std::string configPath = AppConfig::GetInstance()->GetDockerFilePathConfig();
+#endif
     OverwriteFile(configPath, root.toStyledString());
     LOG_INFO(sLogger, ("save container state", configPath));
 }
 
 void ContainerManager::LoadContainerInfo() {
     LOG_INFO(sLogger, ("load container state", "start"));
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    std::string configPath = PathJoin(GetAgentDataDir(), "docker_path_config.json");
+#else
     std::string configPath = AppConfig::GetInstance()->GetDockerFilePathConfig();
+#endif
     std::string content;
 
     // Load from docker_path_config.json and determine logic based on version
