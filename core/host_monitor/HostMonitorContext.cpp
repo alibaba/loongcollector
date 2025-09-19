@@ -81,4 +81,15 @@ bool HostMonitorContext::CheckClockRolling() {
     return false;
 }
 
+bool HostMonitorContext::ShouldGenerateMetric() {
+    if (mCollectType == HostMonitorCollectType::kMultiValue) {
+        ++mCount;
+        if (mCount < mCountPerReport) {
+            return false;
+        }
+        mCount = 0;
+    }
+    return true;
+}
+
 } // namespace logtail

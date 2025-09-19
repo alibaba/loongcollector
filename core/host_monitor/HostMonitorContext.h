@@ -83,6 +83,7 @@ struct HostMonitorContext {
 
     std::chrono::steady_clock::time_point GetScheduleTime() const { return mCollectTime.mScheduleTime; }
     time_t GetMetricTime() const { return mCollectTime.mMetricTime; }
+    bool ShouldGenerateMetric();
 
     void Reset();
     void CalculateFirstCollectTime(time_t metricTimeNow, std::chrono::steady_clock::time_point steadyClockNow);

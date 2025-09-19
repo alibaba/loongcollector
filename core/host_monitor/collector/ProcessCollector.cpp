@@ -78,6 +78,14 @@ static inline void GetProcessCpuSorted(std::vector<ProcessAllStat>& allPidStats)
     });
 }
 
+static inline void GetProcessCpuSorted(std::vector<std::pair<pid_t, ProcessCpuInformation>>& cpuInfos) {
+    std::sort(cpuInfos.begin(),
+              cpuInfos.end(),
+              [](const std::pair<pid_t, ProcessCpuInformation>& a, const std::pair<pid_t, ProcessCpuInformation>& b) {
+                  return a.second.percent > b.second.percent;
+              });
+}
+
 ProcessCollector::ProcessCollector() : mTopN(INT32_FLAG(host_monitor_process_report_top_N)) {
 }
 
@@ -94,12 +102,7 @@ bool ProcessCollector::Init(HostMonitorContext& collectContext) {
     return true;
 }
 
-bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     ProcessListInformation processListInfo;
 
     if (!SystemInterface::GetInstance()->GetProcessListInformation(collectContext.GetMetricTime(), processListInfo)) {
@@ -107,18 +110,30 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     }
 
     pids = processListInfo.pids;
-
-    // 获取每一个进程的信息
     std::vector<ProcessAllStat> allPidStats;
+    std::vector<std::pair<pid_t, ProcessCpuInformation>> cpuInfos;
+
+    // 获取所有进程的cpu信息
     for (auto pid : pids) {
+        ProcessCpuInformation info;
+        if (!GetProcessCpuInformation(collectContext.mCollectTime, pid, info)) {
+            continue;
+        }
+        cpuInfos.push_back(std::make_pair(pid, info));
+    }
+
+    // 对所有进程的cpu信息进行排序
+    GetProcessCpuSorted(cpuInfos);
+
+    // 取cpu排名前mTopN的进程，获取每一个进程的信息
+    for (size_t i = 0; i < std::min(static_cast<size_t>(mTopN), cpuInfos.size()); i++) {
         ProcessAllStat stat;
-        if (!GetProcessAllStat(collectContext.mCollectTime, pid, stat)) {
+        stat.processCpu = cpuInfos[i].second;
+        if (!GetProcessAllStat(collectContext.mCollectTime, cpuInfos[i].first, stat)) {
             continue;
         }
         allPidStats.push_back(stat);
     }
-
-    // GetProcessCpuSorted(allPidStats);
 
     int processNum = allPidStats.size();
 
@@ -159,7 +174,8 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         }
     }
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
 
@@ -170,7 +186,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     mVMProcessNumStat.Stat(minVMProcessNum, maxVMProcessNum, avgVMProcessNum, &lastVMProcessNum);
 
     // 指标推送
-    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }
@@ -196,7 +212,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
-        MetricEvent* metricEventEachPid = group->AddMetricEvent(true);
+        MetricEvent* metricEventEachPid = groupPtr->AddMetricEvent(true);
         metricEventEachPid->SetTimestamp(processListInfo.collectTime, 0);
         metricEventEachPid->SetValue<UntypedMultiDoubleValues>(metricEventEachPid);
         auto* multiDoubleValuesEachPid = metricEventEachPid->MutableValue<UntypedMultiDoubleValues>();
@@ -246,7 +262,6 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失
-    collectContext.mCount = 0;
     mVMProcessNumStat.Reset();
     mProcessPushMertic.clear();
     mAvgProcessCpuPercent.clear();
@@ -261,14 +276,9 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     return true;
 }
 
-// 获取某个pid的信息
+// 获取某个pid的信息，除了cpu
 bool ProcessCollector::GetProcessAllStat(const CollectTime& collectTime, pid_t pid, ProcessAllStat& processStat) {
-    // 获取这个pid的cpu信息
     processStat.pid = pid;
-
-    if (!GetProcessCpuInformation(collectTime, pid, processStat.processCpu)) {
-        return false;
-    }
 
     if (!GetProcessState(collectTime.mMetricTime, pid, processStat.processState)) {
         return false;

@@ -36,30 +36,24 @@ namespace logtail {
 
 const std::string MemCollector::sName = "memory";
 
-bool MemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool MemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     MemoryInformation meminfo;
     if (!SystemInterface::GetInstance()->GetHostMemInformationStat(collectContext.GetMetricTime(), meminfo)) {
         return false;
     }
 
-
     mCalculateMeminfo.AddValue(meminfo.memStat);
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
+
     MemoryStat minMem, maxMem, avgMem, lastMem;
-
     mCalculateMeminfo.Stat(maxMem, minMem, avgMem, &lastMem);
-
-    collectContext.mCount = 0;
     mCalculateMeminfo.Reset();
 
-    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }

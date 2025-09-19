@@ -27,8 +27,12 @@ public:
 
     bool Init(HostMonitorContext& collectContext) override { return true; }
 
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override {
-        auto event = group->AddLogEvent();
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override {
+        // MockCollector always generates events when called
+        if (!groupPtr) {
+            return false;
+        }
+        auto event = groupPtr->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
         std::string key = "mock_key";
@@ -38,7 +42,7 @@ public:
     }
     [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override { return mCollectInterval; }
     static const std::string sName;
-    const std::string& Name() const { return sName; }
+    const std::string& Name() const override { return sName; }
 
     static std::chrono::seconds mCollectInterval;
 };

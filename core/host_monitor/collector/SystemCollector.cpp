@@ -36,12 +36,7 @@ namespace logtail {
 const std::string SystemCollector::sName = "system";
 const std::string kMetricLabelMode = "valueTag";
 
-bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     SystemLoadInformation load;
     if (!SystemInterface::GetInstance()->GetSystemLoadInformation(collectContext.GetMetricTime(), load)) {
         return false;
@@ -49,14 +44,13 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
 
     mCalculate.AddValue(load.systemStat);
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
 
     SystemStat minSys, maxSys, avgSys;
     mCalculate.Stat(maxSys, minSys, avgSys);
-
-    collectContext.mCount = 0;
     mCalculate.Reset();
 
     // 数据整理
@@ -98,7 +92,7 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
                                       "load_per_core_15m_avg"};
 
 
-    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }

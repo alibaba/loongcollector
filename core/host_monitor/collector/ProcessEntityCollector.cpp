@@ -62,8 +62,10 @@ system_clock::time_point ProcessEntityCollector::TicksToUnixTime(int64_t startTi
     return system_clock::time_point{static_cast<milliseconds>(startTicks) + milliseconds{systemInfo.bootTime * 1000}};
 }
 
-bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
+bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
+    // ProcessEntityCollector always generates events when called
+    if (!groupPtr) {
+        LOG_ERROR(sLogger, ("ProcessEntityCollector requires a group to generate events", "skip"));
         return false;
     }
     SystemInformation systemInfo;
@@ -75,7 +77,7 @@ bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, Pipelin
     GetSortedProcess(processes, ProcessTopN, collectContext.mCollectTime);
     for (const auto& extentedProcess : processes) {
         auto process = extentedProcess->stat;
-        auto* event = group->AddLogEvent();
+        auto* event = groupPtr->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
 
@@ -113,7 +115,7 @@ bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, Pipelin
         // event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID, ""); TODO: get container id
 
         // process -> host link
-        auto* linkEvent = group->AddLogEvent();
+        auto* linkEvent = groupPtr->AddLogEvent();
         linkEvent->SetTimestamp(logtime);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_DOMAIN, domain);
         linkEvent->SetContent(DEFAULT_CONTENT_KEY_SRC_ENTITY_TYPE, entityType);
