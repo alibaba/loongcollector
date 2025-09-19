@@ -25,7 +25,7 @@ namespace logtail {
 
 bool TaskPipeline::Init(TaskConfig&& config) {
     mName = config.mName;
-    mIsOnetime = config.mExpireTime.has_value();
+    mIsOnetime = config.mOnetimeExpireTime.has_value();
     mCreateTime = config.mCreateTime;
     mConfig = std::move(config.mDetail);
 
@@ -36,7 +36,7 @@ bool TaskPipeline::Init(TaskConfig&& config) {
     }
     if (mIsOnetime) {
         OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
-            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
+            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mOnetimeExpireTime.value());
     }
     return true;
 }
