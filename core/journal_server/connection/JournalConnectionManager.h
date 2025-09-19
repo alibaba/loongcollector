@@ -21,12 +21,10 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <vector>
 #include <atomic>
 
 #include "../reader/JournalReader.h"
 #include "../common/JournalConfig.h"
-#include "../filter/JournalFilter.h"
 #include "JournalConnectionGuard.h"
 
 namespace logtail {

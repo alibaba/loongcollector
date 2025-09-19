@@ -24,6 +24,7 @@
 #include "connection/JournalConnectionManager.h"
 #include "connection/JournalConnectionGuard.h"
 #include "checkpoint/JournalCheckpointManager.h"
+#include "common/JournalConstants.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "models/PipelineEventGroup.h"
 #include "common/memory/SourceBuffer.h"
@@ -32,7 +33,6 @@
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 #include "reader/JournalEntry.h"
-#include "common/JournalConstants.h"
 
 using namespace std;
 
@@ -67,9 +67,9 @@ bool JournalServer::HasRegisteredPlugins() const {
     return !mPipelineNameJournalConfigsMap.empty();
 }
 
-void JournalServer::addJournalInput(const string& configName, size_t idx, const JournalConfig& config) {
+void JournalServer::AddJournalInput(const string& configName, size_t idx, const JournalConfig& config) {
     // 首先验证配置
-    QueueKey queueKey;
+    QueueKey queueKey = 0;
     if (!validateJournalConfig(configName, idx, config, queueKey)) {
         LOG_ERROR(sLogger, ("journal input validation failed", "config not added")("config", configName)("idx", idx));
         return;
@@ -89,7 +89,7 @@ void JournalServer::addJournalInput(const string& configName, size_t idx, const 
     // Note: Checkpoint management is now handled automatically by JournalConnectionManager
 }
 
-void JournalServer::removeJournalInput(const string& configName, size_t idx) {
+void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
     {
         lock_guard<mutex> lock(mUpdateMux);
         auto configItr = mPipelineNameJournalConfigsMap.find(configName);
@@ -113,7 +113,7 @@ void JournalServer::removeJournalInput(const string& configName, size_t idx) {
     LOG_INFO(sLogger, ("journal input removed with automatic connection and checkpoint cleanup", "")("config", configName)("idx", idx));
 }
 
-JournalConfig JournalServer::getJournalConfig(const string& name, size_t idx) const {
+JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) const {
     lock_guard<mutex> lock(mUpdateMux);
     auto configItr = mPipelineNameJournalConfigsMap.find(name);
     if (configItr != mPipelineNameJournalConfigsMap.end()) {
@@ -147,16 +147,16 @@ void JournalServer::run() {
         this_thread::sleep_for(chrono::milliseconds(100));
         
         // 定期清理过期的checkpoints（每小时一次）
-        static time_t lastCleanup = time(nullptr);
+        static time_t sLastCleanup = time(nullptr);
         time_t currentTime = time(nullptr);
-        if (currentTime - lastCleanup >= 3600) {
+        if (currentTime - sLastCleanup >= 3600) {
             // 清理过期的checkpoints（默认24小时）
             LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", ""));
             size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(24);
             if (cleanedCheckpoints > 0) {
                 LOG_INFO(sLogger, ("expired checkpoints cleaned", "")("count", cleanedCheckpoints));
             }
-            lastCleanup = currentTime;
+            sLastCleanup = currentTime;
         }
     }
     
@@ -187,12 +187,12 @@ void JournalServer::processJournalEntries() {
     LOG_INFO(sLogger, ("processing journal entries", "")("configs_count", currentConfigs.size()));
     
     // Process each configuration
-    for (const auto& pipelineConfig : currentConfigs) {
+    for (auto& pipelineConfig : currentConfigs) {
         const string& configName = pipelineConfig.first;
         
-        for (const auto& idxConfig : pipelineConfig.second) {
+        for (auto& idxConfig : pipelineConfig.second) {
             size_t idx = idxConfig.first;
-            const JournalConfig& config = idxConfig.second;
+            JournalConfig& config = idxConfig.second;
             
             LOG_DEBUG(sLogger, ("processing config", "")("config", configName)("idx", idx));
             
@@ -207,7 +207,7 @@ void JournalServer::processJournalEntries() {
 // =============================================================================
 
 // 处理单个journal配置的主流程控制
-void JournalServer::processJournalConfig(const string& configName, size_t idx, const JournalConfig& config) {
+void JournalServer::processJournalConfig(const string& configName, size_t idx, JournalConfig& config) {
     LOG_INFO(sLogger, ("processJournalConfig", "started")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr));
 
     // 使用已验证的queueKey（在addJournalInput时已验证并缓存）
@@ -230,9 +230,9 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, c
     // Step 2: Perform seek operation (only when necessary)
     // 强制seek的条件：新连接
     bool forceSeek = isNewConnection;
-    if (!performJournalSeek(configName, idx, const_cast<JournalConfig&>(config), journalReader, forceSeek)) {
+    if (!performJournalSeek(configName, idx, config, journalReader, forceSeek)) {
         // Seek失败，标记需要重新seek以便下次尝试
-        const_cast<JournalConfig&>(config).needsSeek = true;
+        config.needsSeek = true;
         return;
     }
     
@@ -371,8 +371,8 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
     if (config.parsePriority) {
         auto it = entry.fields.find("PRIORITY");
         if (it != entry.fields.end()) {
-            auto priorityIt = JournalConstants::PriorityConversionMap.find(it->second);
-            if (priorityIt != JournalConstants::PriorityConversionMap.end()) {
+            auto priorityIt = JournalConstants::kPriorityConversionMap.find(it->second);
+            if (priorityIt != JournalConstants::kPriorityConversionMap.end()) {
                 it->second = priorityIt->second;
             }
         }
@@ -381,8 +381,8 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
     if (config.parseSyslogFacility) {
         auto it = entry.fields.find("SYSLOG_FACILITY");
         if (it != entry.fields.end()) {
-            auto facilityIt = JournalConstants::SyslogFacilityString.find(it->second);
-            if (facilityIt != JournalConstants::SyslogFacilityString.end()) {
+            auto facilityIt = JournalConstants::kSyslogFacilityString.find(it->second);
+            if (facilityIt != JournalConstants::kSyslogFacilityString.end()) {
                 it->second = facilityIt->second;
             }
         }
@@ -391,7 +391,7 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
 
 // 批量读取和处理journal条目的主循环
 void JournalServer::readJournalEntriesForConfig(const string& configName, size_t idx, const JournalConfig& config, 
-                                        std::shared_ptr<SystemdJournalReader> journalReader, QueueKey queueKey) {
+                                        const std::shared_ptr<SystemdJournalReader>& journalReader, QueueKey queueKey) {
     int entryCount = 0;
     const int maxEntriesPerBatch = config.maxEntriesPerBatch;
     bool isFirstEntry = true;
@@ -440,7 +440,7 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
 
 // 处理移动到下一个journal条目的逻辑
 bool JournalServer::moveToNextJournalEntry(const string& configName, size_t idx, const JournalConfig& config, 
-                                          std::shared_ptr<SystemdJournalReader> journalReader, bool isFirstEntry, int entryCount) {
+                                          const std::shared_ptr<SystemdJournalReader>& journalReader, bool isFirstEntry, int entryCount) {
     // 对于head模式或者非首次读取，需要调用Next()移动到下一条
     if (config.seekPosition == "head" || !isFirstEntry) {
         bool nextSuccess = journalReader->Next();
@@ -525,7 +525,7 @@ bool JournalServer::createAndPushEventGroup(const string& configName, size_t idx
 
 // 处理journal等待逻辑，支持动态超时调整
 bool JournalServer::handleJournalWait(const string& configName, size_t idx, const JournalConfig& config, 
-                                    std::shared_ptr<SystemdJournalReader> journalReader, int entryCount) {
+                                    const std::shared_ptr<SystemdJournalReader>& journalReader, int entryCount) {
     // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
     int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
     
@@ -551,7 +551,8 @@ bool JournalServer::handleJournalWait(const string& configName, size_t idx, cons
             return false;
         }
         return true;
-    } else if (waitResult == 0) {
+    }
+    if (waitResult == 0) {
         // 超时，没有新数据
         if (entryCount == 0) {
             LOG_DEBUG(sLogger, ("wait timeout, no new entries found", "")("config", configName)("idx", idx));
@@ -559,15 +560,14 @@ bool JournalServer::handleJournalWait(const string& configName, size_t idx, cons
             LOG_DEBUG(sLogger, ("wait timeout, batch completed with entries", "")("config", configName)("idx", idx)("entries_processed", entryCount));
         }
         return false;
-    } else {
-        // 错误，可能是连接被重置或其他问题
-        LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
-        
-        if (!journalReader->IsOpen()) {
-            LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
-        }
-        return false;
     }
+    // 错误，可能是连接被重置或其他问题
+    LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
+    
+    if (!journalReader->IsOpen()) {
+        LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
+    }
+    return false;
 }
 
 // 从JournalEntry创建LogEvent，包含时间戳处理

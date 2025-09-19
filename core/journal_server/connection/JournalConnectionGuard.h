@@ -75,7 +75,7 @@ public:
      * @brief 检查受保护的连接是否有效
      * @return true如果连接有效且打开
      */
-    bool IsValid() const;
+    [[nodiscard]] bool IsValid() const;
     
     /**
      * @brief 获取受保护的连接对象

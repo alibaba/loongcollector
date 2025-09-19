@@ -17,14 +17,10 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
-#include <memory>
 #include <string>
 #include <vector>
-#include <functional>
 
 #include "collection_pipeline/plugin/interface/Input.h"
-#include "json/json.h"
 
 namespace logtail {
 
@@ -38,6 +34,12 @@ public:
     InputJournal();
     ~InputJournal();
 
+    // Delete copy and move operations
+    InputJournal(const InputJournal&) = delete;
+    InputJournal& operator=(const InputJournal&) = delete;
+    InputJournal(InputJournal&&) = delete;
+    InputJournal& operator=(InputJournal&&) = delete;
+
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
@@ -45,6 +47,11 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
+    // Helper methods for configuration parsing
+    void parseBasicParams(const Json::Value& config);
+    void parseArrayParams(const Json::Value& config);
+    void parseStringArray(const Json::Value& config, const std::string& key, std::vector<std::string>& target);
+    
     // Configuration options
     std::string mSeekPosition;
     int mCursorFlushPeriodMs;
@@ -67,16 +74,16 @@ private:
     // 不再需要线程管理，JournalServer 会处理所有数据
 
     // Constants
-    static constexpr int DEFAULT_RESET_INTERVAL = 3600; // 1 hour
-    static constexpr int DEFAULT_CURSOR_FLUSH_PERIOD_MS = 5000; // 5 seconds
+    static constexpr int kDefaultResetInterval = 3600; // 1 hour
+    static constexpr int kDefaultCursorFlushPeriodMs = 5000; // 5 seconds
 
     // 不再需要这些辅助方法，JournalServer 会处理所有 journal 操作
     
     // Seek position constants
-    static const std::string SEEK_POSITION_CURSOR;
-    static const std::string SEEK_POSITION_HEAD;
-    static const std::string SEEK_POSITION_TAIL;
-    static const std::string SEEK_POSITION_DEFAULT;
+    static const std::string kSeekPositionCursor;
+    static const std::string kSeekPositionHead;
+    static const std::string kSeekPositionTail;
+    static const std::string kSeekPositionDefault;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputJournalUnittest;

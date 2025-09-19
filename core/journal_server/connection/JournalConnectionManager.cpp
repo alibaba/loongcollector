@@ -15,6 +15,7 @@
  */
 
 #include "JournalConnectionManager.h"
+#include "../filter/JournalFilter.h"
 #include "logger/Logger.h"
 #include <sstream>
 
@@ -194,10 +195,10 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
             mConnections[key] = connInfo;
             LOG_INFO(sLogger, ("new journal connection created", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
             return connInfo->GetReader();
-        } else {
-            LOG_ERROR(sLogger, ("failed to create valid journal connection", "")("config", configName)("idx", idx));
-            return nullptr;
-        }
+        }             
+        LOG_ERROR(sLogger, ("failed to create valid journal connection", "")("config", configName)("idx", idx));
+        return nullptr;
+       
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger, ("exception creating journal connection", e.what())("config", configName)("idx", idx));
         return nullptr;

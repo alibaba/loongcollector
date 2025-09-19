@@ -22,8 +22,11 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <unordered_map>
+
+#include "runner/InputRunner.h"
+#include "common/JournalConfig.h"
+#include "models/LogEvent.h"
 
 namespace logtail {
 
@@ -47,11 +50,15 @@ class JournalServer : public InputRunner {
 public:
     JournalServer(const JournalServer&) = delete;
     JournalServer& operator=(const JournalServer&) = delete;
+    JournalServer(JournalServer&&) = delete;
+    JournalServer& operator=(JournalServer&&) = delete;
 
     static JournalServer* GetInstance() {
         static JournalServer sInstance;
         return &sInstance;
     }
+
+    ~JournalServer() = default;
 
     // InputRunner interface implementation
     void Init() override;
@@ -59,44 +66,43 @@ public:
     bool HasRegisteredPlugins() const override;
     
     // Plugin registration interface
-    void addJournalInput(const std::string& configName,
+    void AddJournalInput(const std::string& configName,
                         size_t idx,
                         const JournalConfig& config);
-    void removeJournalInput(const std::string& configName, size_t idx);
+    void RemoveJournalInput(const std::string& configName, size_t idx);
 
     // Configuration management
-    JournalConfig getJournalConfig(const std::string& name, size_t idx) const;
-    const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& getAllJournalConfigs() const {
+    JournalConfig GetJournalConfig(const std::string& name, size_t idx) const;
+    const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& GetAllJournalConfigs() const {
         return mPipelineNameJournalConfigsMap;
     }
 
     // Checkpoint management moved to JournalConnectionManager
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    void clear();
+    void Clear();
 #endif
 
 private:
     JournalServer() = default;
-    ~JournalServer() = default;
 
     void run();
     void processJournalEntries();
-    void processJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config);
+    void processJournalConfig(const std::string& configName, size_t idx, JournalConfig& config);
     
     // Helper functions for processJournalConfig to reduce cognitive complexity
     bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
     std::shared_ptr<SystemdJournalReader> setupJournalConnection(const std::string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection);
     bool performJournalSeek(const std::string& configName, size_t idx, JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek = false);
-    void readJournalEntriesForConfig(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, QueueKey queueKey);
+    void readJournalEntriesForConfig(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, QueueKey queueKey);
     
     // Helper functions for readJournalEntriesForConfig to reduce cognitive complexity
-    bool moveToNextJournalEntry(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool isFirstEntry, int entryCount);
+    bool moveToNextJournalEntry(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, bool isFirstEntry, int entryCount);
     bool readAndValidateEntry(const std::string& configName, size_t idx, std::shared_ptr<SystemdJournalReader> journalReader, JournalEntry& entry);
     bool createAndPushEventGroup(const std::string& configName, size_t idx, const JournalConfig& config, const JournalEntry& entry, QueueKey queueKey);
     
     // Low-level helper functions
-    bool handleJournalWait(const std::string& configName, size_t idx, const JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, int entryCount);
+    bool handleJournalWait(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, int entryCount);
     LogEvent* createLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, PipelineEventGroup& eventGroup);
 
     std::future<void> mThreadRes;

@@ -26,8 +26,8 @@
 namespace logtail {
 
 JournalCheckpointManager& JournalCheckpointManager::GetInstance() {
-    static JournalCheckpointManager instance;
-    return instance;
+    static JournalCheckpointManager sInstance;
+    return sInstance;
 }
 
 void JournalCheckpointManager::SaveCheckpoint(const std::string& configName, size_t configIndex, const std::string& cursor) {

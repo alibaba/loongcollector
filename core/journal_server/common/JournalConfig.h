@@ -35,10 +35,10 @@ struct JournalConfig {
     std::string cursorSeekFallback;
 
     // Filter configuration
-    std::vector<std::string> units;           // Systemd unit filter
+    std::vector<std::string> units;          // Systemd unit filter
     std::vector<std::string> identifiers;    // Syslog identifier filter  
     std::vector<std::string> matchPatterns;  // Custom match patterns
-    bool kernel = true;                             // Enable kernel log filter
+    bool kernel = true;                      // Enable kernel log filter
 
     // Performance configuration
     int resetIntervalSecond = 3600;          // Connection reset interval
@@ -47,8 +47,8 @@ struct JournalConfig {
 
     // Field processing configuration
     bool parsePriority = false;              // Parse priority field
-    bool parseSyslogFacility = false;       // Parse syslog facility field
-    bool useJournalEventTime = true;        // Use journal event time instead of system time
+    bool parseSyslogFacility = false;        // Parse syslog facility field
+    bool useJournalEventTime = true;         // Use journal event time instead of system time
 
     // Custom journal path (for file-based journals)
     std::vector<std::string> journalPaths;

@@ -6,13 +6,10 @@
  */
 
  #include "JournalReader.h"
- #include "logger/Logger.h"
  
  #include <chrono>
- #include <thread>
- #include <cstring>
- #include <filesystem>
- #include <iostream>
+#include <cstring>
+#include <filesystem>
  
  #ifdef __linux__
  #  include <systemd/sd-journal.h>
@@ -25,33 +22,37 @@
   *========================================================*/
  class SystemdJournalReader::Impl {
  public:
-     Impl()
- #ifdef __linux__
-         : mJournal(nullptr)
- #endif
-         , mIsOpen(false), mDataThreshold(64 * 1024), mTimeoutMs(1000) {}
+         Impl() = default;
  
      ~Impl() { Close(); }
+    
+    // Delete copy and move operations
+    Impl(const Impl&) = delete;
+    Impl& operator=(const Impl&) = delete;
+    Impl(Impl&&) = delete;
+    Impl& operator=(Impl&&) = delete;
  
      /*---------------  打开 / 关闭  ----------------*/
      bool Open() {
  #ifdef __linux__
-         if (mIsOpen) return true;
+         if (mIsOpen) {
+            return true;
+        }
  
          int ret = 0;
  
-         if (mJournalPaths.empty()) {
-             ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
-         } else {
-             const std::string& p = mJournalPaths[0];
-             ret = std::filesystem::is_directory(p) ? openDir(p) : openFile(p);
-         }
-                 if (ret < 0) {
+                 if (mJournalPaths.empty()) {
+            ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
+        } else {
+            const std::string& path = mJournalPaths[0];
+            ret = std::filesystem::is_directory(path) ? openDir(path) : openFile(path);
+        }
+        if (ret < 0) {
             return false;
         }
-         (void)sd_journal_set_data_threshold(mJournal, mDataThreshold);
-         mIsOpen = true;
-         return true;
+        (void)sd_journal_set_data_threshold(mJournal, mDataThreshold);
+        mIsOpen = true;
+        return true;
  #else
          mIsOpen = true;
          return true;
@@ -60,7 +61,7 @@
  
      void Close() {
  #ifdef __linux__
-         if (mJournal) {
+         if (mJournal != nullptr) {
              sd_journal_close(mJournal);
              mJournal = nullptr;
          }
@@ -68,7 +69,7 @@
          mIsOpen = false;
      }
  
-     bool IsOpen() const {
+     [[nodiscard]] bool IsOpen() const {
  #ifdef __linux__
          return mIsOpen && mJournal != nullptr;
  #else
@@ -76,13 +77,14 @@
  #endif
      }
  
-     /*---------------  遍历  ----------------*/
-     bool SeekHead()  { return call([](auto j){ return sd_journal_seek_head(j); }); }
-     bool SeekTail()  { return call([](auto j){ return sd_journal_seek_tail(j); }); }
-     bool SeekCursor(const std::string& c) {
-         return call([&](auto j){ return sd_journal_seek_cursor(j, c.c_str()); });
-     }
-         bool Next() { 
+         /*---------------  遍历  ----------------*/
+    bool SeekHead()  { return call([](auto journal){ return sd_journal_seek_head(journal); }); }
+    bool SeekTail()  { return call([](auto journal){ return sd_journal_seek_tail(journal); }); }
+    bool SeekCursor(const std::string& cursor) {
+        return call([&](auto journal){ return sd_journal_seek_cursor(journal, cursor.c_str()); });
+    }
+    
+    bool Next() {  
 #ifdef __linux__
         if (!IsOpen()) {
             return false;
@@ -90,13 +92,10 @@
         
         int ret = sd_journal_next(mJournal);
         
-        if (ret < 0) {
+        if (ret <= 0) {
             return false;
-        } else if (ret == 0) {
-            return false;
-        } else {
-            return true;
         }
+        return true;
 #else
         return mIsOpen;
 #endif
@@ -110,47 +109,50 @@
         
         int ret = sd_journal_previous(mJournal);
         
-        if (ret < 0) {
+        if (ret <= 0) {
             return false;
-        } else if (ret == 0) {
-            return false;
-        } else {
-            return true;
         }
+        return true;
 #else
         return mIsOpen;
 #endif
     }
  
      /*---------------  读取单条  ----------------*/
-     bool GetEntry(JournalEntry& entry) {
- #ifdef __linux__
-         if (!IsOpen()) return false;
+         bool GetEntry(JournalEntry& entry) {
+#ifdef __linux__
+        if (!IsOpen()) {
+            return false;
+        }
          entry = {};
  
-         char* cursor = nullptr;
-         if (sd_journal_get_cursor(mJournal, &cursor) < 0) return false;
+                 char* cursor = nullptr;
+        if (sd_journal_get_cursor(mJournal, &cursor) < 0) {
+            return false;
+        }
          entry.cursor = cursor;
-         free(cursor);
- 
-                 uint64_t ts = 0;
-        sd_journal_get_realtime_usec(mJournal, &ts);
-        entry.realtimeTimestamp = ts;
+                 free(cursor);
+
+        uint64_t timestamp = 0;
+        sd_journal_get_realtime_usec(mJournal, &timestamp);
+        entry.realtimeTimestamp = timestamp;
         
-        uint64_t monotonic_ts = 0;
-        sd_id128_t boot_id;
-        sd_journal_get_monotonic_usec(mJournal, &monotonic_ts, &boot_id);
-        entry.monotonicTimestamp = monotonic_ts;
+        uint64_t monotonicTimestamp = 0;
+        sd_id128_t bootId;
+        sd_journal_get_monotonic_usec(mJournal, &monotonicTimestamp, &bootId);
+        entry.monotonicTimestamp = monotonicTimestamp;
  
          const void* data = nullptr;
          size_t len = 0;
          sd_journal_restart_data(mJournal);
-         while (sd_journal_enumerate_data(mJournal, &data, &len) > 0) {
-             const char* p = static_cast<const char*>(data);
-             const char* eq = static_cast<const char*>(memchr(p, '=', len));
-             if (!eq) continue;
-             entry.fields.emplace(std::string(p, eq),
-                                  std::string(eq + 1, p + len));
+                 while (sd_journal_enumerate_data(mJournal, &data, &len) > 0) {
+            const char* dataPtr = static_cast<const char*>(data);
+                        const char* equalSign = static_cast<const char*>(memchr(dataPtr, '=', len));
+            if (equalSign == nullptr) {
+                continue;
+            }
+            entry.fields.emplace(std::string(dataPtr, equalSign),
+                                 std::string(equalSign + 1, dataPtr + len));
          }
          return true;
  #else
@@ -163,11 +165,15 @@
  
      std::string GetCursor() {
  #ifdef __linux__
-         if (!IsOpen()) return "";
-         char* c = nullptr;
-         if (sd_journal_get_cursor(mJournal, &c) < 0) return "";
-         std::string res(c);
-         free(c);
+                 if (!IsOpen()) {
+            return "";
+        }
+                char* cursorPtr = nullptr;
+        if (sd_journal_get_cursor(mJournal, &cursorPtr) < 0) {
+            return "";
+        }
+        std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
+        std::string res(cursor.get());
          return res;
  #else
          return mIsOpen ? "simulated_cursor" : "";
@@ -175,11 +181,13 @@
      }
  
      /*---------------  过滤 / 等待  ----------------*/
-     bool AddMatch(const std::string& f, const std::string& v) {
+     bool AddMatch(const std::string& field, const std::string& value) {
  #ifdef __linux__
-         if (!IsOpen()) return false;
-         std::string kv = f + "=" + v;
-         return sd_journal_add_match(mJournal, kv.c_str(), kv.size()) == 0;
+         if (!IsOpen()) {
+            return false;
+        }
+                 std::string keyValue = field + "=" + value;
+        return sd_journal_add_match(mJournal, keyValue.c_str(), keyValue.size()) == 0;
  #else
          return mIsOpen;
  #endif
@@ -193,13 +201,14 @@
  #endif
      }
  
-     int Wait(std::chrono::milliseconds ms) {
+     int Wait(std::chrono::milliseconds timeout) {
  #ifdef __linux__
-         if (!IsOpen()) return -1;
-         return sd_journal_wait(mJournal,
-                std::chrono::duration_cast<std::chrono::microseconds>(ms).count());
- #else
-         std::this_thread::sleep_for(ms);
+         if (!IsOpen()) { return -1;
+}
+                 return sd_journal_wait(mJournal,
+               std::chrono::duration_cast<std::chrono::microseconds>(timeout).count());
+#else
+        std::this_thread::sleep_for(timeout);
          return 1; // 模拟有数据
  #endif
      }
@@ -208,11 +217,13 @@
      bool SetDataThreshold(size_t t) {
          mDataThreshold = t;
  #ifdef __linux__
-         if (IsOpen()) sd_journal_set_data_threshold(mJournal, t);
+         if (IsOpen()) {
+            sd_journal_set_data_threshold(mJournal, t);
+        }
  #endif
          return true;
      }
-     bool SetTimeout(std::chrono::milliseconds ms)  { mTimeoutMs = (int)ms.count(); return true; }
+     bool SetTimeout(std::chrono::milliseconds timeout)  { mTimeoutMs = (int)timeout.count(); return true; }
      bool SetJournalPaths(const std::vector<std::string>& p) { mJournalPaths = p; return true; }
  
  private:
@@ -226,27 +237,36 @@
  
      int openDir(const std::string& dir) {
          std::vector<std::string> fs;
-         for (auto& e : std::filesystem::recursive_directory_iterator(dir))
-             if (e.is_regular_file() && e.path().extension() == ".journal")
+         for (const auto& e : std::filesystem::recursive_directory_iterator(dir)) {
+             if (e.is_regular_file() && e.path().extension() == ".journal") {
                  fs.emplace_back(e.path().string());
-         if (fs.empty()) return -ENOENT;
+}
+}
+         if (fs.empty()) { return -ENOENT;
+}
  
-         std::vector<const char*> ptrs;
-         for (auto& s : fs) ptrs.push_back(s.c_str());
+        std::vector<const char*> ptrs;
+        ptrs.reserve(fs.size() + 1);
+        for (auto& s : fs) {
+            ptrs.push_back(s.c_str());
+        }
          ptrs.push_back(nullptr);
          return sd_journal_open_files(&mJournal, ptrs.data(), 0);
      }
  
      int openFile(const std::string& file) {
-         const char* arr[] = { file.c_str(), nullptr };
-         return sd_journal_open_files(&mJournal, arr, 0);
+                 const char* arr[] = { file.c_str(), nullptr };
+        return sd_journal_open_files(&mJournal, static_cast<const char**>(arr), 0);
      }
  #endif
  
-     bool mIsOpen{false};
-     size_t mDataThreshold{64 * 1024};
-     int mTimeoutMs{1000};
-     std::vector<std::string> mJournalPaths;
+         static constexpr size_t kDefaultDataThreshold = 64 * 1024;
+    static constexpr int kDefaultTimeoutMs = 1000;
+    
+    bool mIsOpen{false};
+    size_t mDataThreshold{kDefaultDataThreshold};
+    int mTimeoutMs{kDefaultTimeoutMs};
+    std::vector<std::string> mJournalPaths;
  };
  
  /*========================================================
@@ -270,9 +290,9 @@
  bool  SystemdJournalReader::AddMatch(const std::string& f,
                                       const std::string& v)  { FWD(AddMatch(f,v)); }
  bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
- int   SystemdJournalReader::Wait(std::chrono::milliseconds ms){ FWD(Wait(ms)); }
+ int   SystemdJournalReader::Wait(std::chrono::milliseconds timeout){ FWD(Wait(timeout)); }
  bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
- bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds ms){ FWD(SetTimeout(ms)); }
+ bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }
  bool  SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p){ FWD(SetJournalPaths(p)); }
  #undef FWD
  

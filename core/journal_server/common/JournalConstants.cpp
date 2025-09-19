@@ -3,7 +3,7 @@
 namespace logtail {
 
 // Syslog facility conversion map (from Go version)
-const std::map<std::string, std::string> JournalConstants::SyslogFacilityString = {
+const std::map<std::string, std::string> JournalConstants::kSyslogFacilityString = {
     {"0",  "kernel"},
     {"1",  "user"},
     {"2",  "mail"},
@@ -31,7 +31,7 @@ const std::map<std::string, std::string> JournalConstants::SyslogFacilityString 
 };
 
 // Priority conversion map (from Go version) 
-const std::map<std::string, std::string> JournalConstants::PriorityConversionMap = {
+const std::map<std::string, std::string> JournalConstants::kPriorityConversionMap = {
     {"0", "emergency"},
     {"1", "alert"},
     {"2", "critical"},

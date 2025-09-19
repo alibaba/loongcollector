@@ -39,7 +39,7 @@ struct JournalCheckpoint {
         : createTime(std::chrono::steady_clock::now())
         , updateTime(std::chrono::steady_clock::now()) {}
         
-    JournalCheckpoint(const std::string& cursor_)
+    explicit JournalCheckpoint(const std::string& cursor_)
         : cursor(cursor_)
         , createTime(std::chrono::steady_clock::now()) 
         , updateTime(std::chrono::steady_clock::now()) {}
@@ -59,6 +59,12 @@ public:
     static JournalCheckpointManager& GetInstance();
     
     ~JournalCheckpointManager() = default;
+    
+    // Delete copy and move operations (singleton pattern)
+    JournalCheckpointManager(const JournalCheckpointManager&) = delete;
+    JournalCheckpointManager& operator=(const JournalCheckpointManager&) = delete;
+    JournalCheckpointManager(JournalCheckpointManager&&) = delete;
+    JournalCheckpointManager& operator=(JournalCheckpointManager&&) = delete;
     
     /**
      * @brief 保存checkpoint
@@ -132,8 +138,6 @@ public:
 
 private:
     JournalCheckpointManager() : mLastFlushTime(std::chrono::steady_clock::now()) {}
-    JournalCheckpointManager(const JournalCheckpointManager&) = delete;
-    JournalCheckpointManager& operator=(const JournalCheckpointManager&) = delete;
     
     // 生成checkpoint key
     std::string makeCheckpointKey(const std::string& configName, size_t configIndex) const;
