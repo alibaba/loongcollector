@@ -320,8 +320,10 @@ bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache
         LOG_ERROR(sLogger, ("failed to get system information", errorType));
     }
     auto cacheSizeAfter = cache.GetCacheSize();
-    if (mCacheItemsSize) {
-        mCacheItemsSize->Add(mCacheItemsSize->GetValue() + cacheSizeAfter - cacheSizeBefore);
+    if (cacheSizeAfter > cacheSizeBefore) {
+        ADD_GAUGE(mCacheItemsSize, cacheSizeAfter - cacheSizeBefore);
+    } else {
+        SUB_GAUGE(mCacheItemsSize, cacheSizeBefore - cacheSizeAfter);
     }
     return status;
 }
@@ -540,21 +542,19 @@ void SystemInterface::InitMetrics() {
 }
 
 void SystemInterface::UpdateSystemOpMetrics(bool success) {
-    if (mSystemOpTotal) {
-        mSystemOpTotal->Add(1);
-    }
-    if (!success && mSystemOpFailTotal) {
-        mSystemOpFailTotal->Add(1);
+    ADD_COUNTER(mSystemOpTotal, 1);
+    if (!success) {
+        ADD_COUNTER(mSystemOpFailTotal, 1);
     }
 }
 
 void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter) {
-    if (mCacheItemsSize) {
-        mCacheItemsSize->Set(mCacheItemsSize->GetValue() + cacheSizeAfter - cacheSizeBefore);
+    if (cacheSizeAfter > cacheSizeBefore) {
+        ADD_GAUGE(mCacheItemsSize, cacheSizeAfter - cacheSizeBefore);
+    } else {
+        SUB_GAUGE(mCacheItemsSize, cacheSizeBefore - cacheSizeAfter);
     }
-    if (mUseCacheTotal) {
-        mUseCacheTotal->Add(1);
-    }
+    ADD_COUNTER(mUseCacheTotal, 1);
 }
 
 } // namespace logtail
