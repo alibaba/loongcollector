@@ -181,7 +181,7 @@ void JournalServer::run() {
 // 遍历所有配置并处理journal条目
 void JournalServer::processJournalEntries() {
     LOG_INFO(sLogger, ("processJournalEntries", "called"));
-    // Get current configurations snapshot to avoid long lock holding
+    // 获取当前配置的快照，避免长时间持有锁
     unordered_map<string, map<size_t, JournalConfig>> currentConfigs;
     {
         lock_guard<mutex> lock(mUpdateMux);
@@ -189,7 +189,7 @@ void JournalServer::processJournalEntries() {
         LOG_INFO(sLogger, ("configurations loaded from map", "")("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
     
-    // Add debug logging
+    // 如果当前配置为空，则返回
     if (currentConfigs.empty()) {
         LOG_WARNING(sLogger, ("no journal configurations to process", "server may not have any registered journal inputs"));
         return;
@@ -197,7 +197,7 @@ void JournalServer::processJournalEntries() {
     
     LOG_INFO(sLogger, ("processing journal entries", "")("configs_count", currentConfigs.size()));
     
-    // Process each configuration
+    // 处理每个配置
     for (auto& pipelineConfig : currentConfigs) {
         const string& configName = pipelineConfig.first;
         
@@ -226,7 +226,7 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, J
         return;
     }
     
-    // Step 1: Setup journal connection
+    // Step 1: 创建journal连接
     std::unique_ptr<JournalConnectionGuard> connectionGuard;
     bool isNewConnection = false;
     auto journalReader = setupJournalConnection(configName, idx, config, connectionGuard, isNewConnection);
@@ -236,7 +236,7 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, J
         return;
     }
     
-    // Step 2: Perform seek operation (only when necessary)
+    // Step 2: 执行seek操作（仅在必要时）
     // 强制seek的条件：新连接
     bool forceSeek = isNewConnection;
     if (!performJournalSeek(configName, idx, config, journalReader, forceSeek)) {
@@ -245,7 +245,7 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, J
         return;
     }
     
-    // Step 3: Read and process entries
+    // Step 3: 读取和处理journal条目
     readJournalEntriesForConfig(configName, idx, config, journalReader, queueKey);
 }
 
@@ -255,20 +255,20 @@ void JournalServer::processJournalConfig(const string& configName, size_t idx, J
 
 // 验证journal配置的有效性和获取队列Key
 bool JournalServer::validateJournalConfig(const string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey) {
-    // Basic validation
+    // 基本验证
     if (!config.ctx) {
         LOG_ERROR(sLogger, ("CRITICAL: no context available for journal config", "this indicates initialization problem")("config", configName)("idx", idx));
         return false;
     }
     
-    // Get queue key from pipeline context
+    // 从pipeline context获取queue key
     queueKey = config.ctx->GetProcessQueueKey();
     if (queueKey == -1) {
         LOG_WARNING(sLogger, ("no queue key available for journal config", "skip")("config", configName)("idx", idx));
         return false;
     }
     
-    // Check if queue is valid
+    // 检查队列是否有效
     if (!ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
         // 队列无效，跳过该journal配置的处理
         return false;
@@ -291,22 +291,21 @@ std::shared_ptr<SystemdJournalReader> JournalServer::setupJournalConnection(cons
         isNewConnection = false;
         return nullptr;
     }
-    
+    // 获取journal reader
     auto journalReader = connectionGuard->GetReader();
     if (!journalReader) {
         LOG_ERROR(sLogger, ("failed to get journal reader from guard", "skip processing")("config", configName)("idx", idx));
         isNewConnection = false;
         return nullptr;
     }
-    
+    // 检查journal reader是否打开
     if (!journalReader->IsOpen()) {
         LOG_ERROR(sLogger, ("journal reader not open", "skip processing")("config", configName)("idx", idx));
         isNewConnection = false;
         return nullptr;
     }
     
-    // 检查是否创建了新连接（简化的启发式方法）
-    // 更准确的方法可能需要JournalConnectionManager提供额外的API
+    // 检查是否创建了新连接
     size_t connectionCountAfter = JournalConnectionManager::GetInstance()->GetConnectionCount();
     isNewConnection = (connectionCountAfter > connectionCountBefore);
     
@@ -325,14 +324,14 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
     
     if (!shouldSeek) {
         // 跳过seek操作，位置未改变，无需重新定位
-        return true; // 位置没有变化，无需seek
+        return true; 
     }
     
     LOG_INFO(sLogger, ("performing journal seek", "")("config", configName)("idx", idx)("reason", forceSeek ? "forced" : (config.needsSeek ? "required" : "checkpoint_changed"))("current_checkpoint", currentCheckpoint.substr(0, 50)));
     
     bool seekSuccess = false;
     
-    // 首先尝试使用checkpoint
+    // 首先尝试使用cursor
     if (!currentCheckpoint.empty() && config.seekPosition == "cursor") {
         LOG_INFO(sLogger, ("seeking to checkpoint cursor", currentCheckpoint.substr(0, 50))("config", configName)("idx", idx));
         seekSuccess = journalReader->SeekCursor(currentCheckpoint);
@@ -341,7 +340,7 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
         }
     }
     
-    // 如果checkpoint失败或者不使用cursor，按seekPosition处理
+    // 如果cursor失败或者不使用cursor，按seekPosition处理
     if (!seekSuccess) {
         if (config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head")) {
             LOG_INFO(sLogger, ("seeking to journal head", "")("config", configName)("idx", idx));
@@ -361,7 +360,7 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
             }
         }
     }
-    
+    // 如果seek失败，则返回false
     if (!seekSuccess) {
         LOG_ERROR(sLogger, ("failed to seek to position", config.seekPosition)("config", configName)("idx", idx));
         return false;
@@ -378,20 +377,26 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
 // 应用字段转换规则（重命名、过滤等）
 void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
     if (config.parsePriority) {
+        // 查找PRIORITY字段
         auto it = entry.fields.find("PRIORITY");
         if (it != entry.fields.end()) {
+            // 查找PRIORITY字段对应的值
             auto priorityIt = JournalConstants::kPriorityConversionMap.find(it->second);
             if (priorityIt != JournalConstants::kPriorityConversionMap.end()) {
+                // 如果找到对应的值，则更新PRIORITY字段
                 it->second = priorityIt->second;
             }
         }
     }
     
     if (config.parseSyslogFacility) {
+        // 查找SYSLOG_FACILITY字段
         auto it = entry.fields.find("SYSLOG_FACILITY");
         if (it != entry.fields.end()) {
+            // 查找SYSLOG_FACILITY字段对应的值
             auto facilityIt = JournalConstants::kSyslogFacilityString.find(it->second);
             if (facilityIt != JournalConstants::kSyslogFacilityString.end()) {
+                // 如果找到对应的值，则更新SYSLOG_FACILITY字段
                 it->second = facilityIt->second;
             }
         }
@@ -409,23 +414,27 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
     
     while (entryCount < maxEntriesPerBatch) {
         // Step 1: 移动到下一个entry，如果需要的话
+        // 如果需要的话，则移动到下一个entry
         if (!moveToNextJournalEntry(configName, idx, config, journalReader, isFirstEntry, entryCount)) {
             break;
         }
         
         // Step 2: 读取和验证entry
+        // 读取和验证entry
         JournalEntry entry;
         if (!readAndValidateEntry(configName, idx, journalReader, entry)) {
+            // 如果entry为空，则跳过
             if (entry.fields.empty() && !entry.cursor.empty()) {
-                // Empty entry but valid cursor, count it and continue
+                // 如果entry为空，但cursor有效，则计数并继续
                 isFirstEntry = false;
                 entryCount++;
                 continue;
             }
-            break;  // Connection error or read failure
+            break;  // 连接错误或读取失败
         }
         
         // Step 3: 处理enrty (transform, create event, push)
+        // 处理enrty (transform, create event, push)
         if (!createAndPushEventGroup(configName, idx, config, entry, queueKey)) {
             LOG_ERROR(sLogger, ("failed to process journal entry", "continue")("config", configName)("idx", idx));
         }
@@ -433,10 +442,11 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
         entryCount++;
         isFirstEntry = false;
         
-        // 处理完一条entry后更新checkpoint
+        // 处理完一条entry后更新cursor
         JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, entry.cursor);
     }
     
+    // 如果处理了entry，则记录日志
     if (entryCount > 0) {
         LOG_INFO(sLogger, ("journal processing completed", "")("config", configName)("idx", idx)("entries_processed", entryCount));
     } else {
@@ -470,7 +480,7 @@ bool JournalServer::moveToNextJournalEntry(const string& configName, size_t idx,
 }
 
 // 读取和验证journal条目
-bool JournalServer::readAndValidateEntry(const string& configName, size_t idx, std::shared_ptr<SystemdJournalReader> journalReader, JournalEntry& entry) {
+bool JournalServer::readAndValidateEntry(const string& configName, size_t idx, const std::shared_ptr<SystemdJournalReader>& journalReader, JournalEntry& entry) {
     // 在读取entry之前验证连接状态
     if (!journalReader->IsOpen()) {
         LOG_WARNING(sLogger, ("journal connection closed before GetEntry", "aborting batch")("config", configName)("idx", idx));
@@ -581,7 +591,7 @@ LogEvent* JournalServer::createLogEventFromJournal(const JournalEntry& entry, co
         logEvent->SetContent(field.first, field.second);
     }
     
-    // 添加时间戳字段（始终透出）
+    // 添加时间戳字段（始终透出），保持和go版本一致
     logEvent->SetContent("_realtime_timestamp_", std::to_string(entry.realtimeTimestamp));
     logEvent->SetContent("_monotonic_timestamp_", std::to_string(entry.monotonicTimestamp));
     

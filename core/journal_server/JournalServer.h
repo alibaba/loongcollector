@@ -98,7 +98,7 @@ private:
     
     // Helper functions for readJournalEntriesForConfig to reduce cognitive complexity
     bool moveToNextJournalEntry(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, bool isFirstEntry, int entryCount);
-    bool readAndValidateEntry(const std::string& configName, size_t idx, std::shared_ptr<SystemdJournalReader> journalReader, JournalEntry& entry);
+    bool readAndValidateEntry(const std::string& configName, size_t idx, const std::shared_ptr<SystemdJournalReader>& journalReader, JournalEntry& entry);
     bool createAndPushEventGroup(const std::string& configName, size_t idx, const JournalConfig& config, const JournalEntry& entry, QueueKey queueKey);
     
     // Low-level helper functions
