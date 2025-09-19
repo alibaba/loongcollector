@@ -290,6 +290,20 @@ bool SystemInterface::GetNetInterfaceInformation(time_t now, NetInterfaceInforma
         errorType);
 }
 
+bool SystemInterface::InitGPUCollector(const FieldMap& fieldMap) {
+    return InitGPUCollectorOnce(fieldMap);
+}
+
+bool SystemInterface::GetGPUInformation(time_t now, GPUInformation& gpuInfo) {
+    const std::string errorType = "gpu";
+    return MemoizedCall(
+        mGPUInformationCache,
+        now,
+        [this](BaseInformation& info) { return this->GetGPUInformationOnce(static_cast<GPUInformation&>(info)); },
+        gpuInfo,
+        errorType);
+}
+
 template <typename F, typename InfoT, typename... Args>
 bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache,
                                    time_t now,

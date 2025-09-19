@@ -45,5 +45,8 @@ const int EXECUTE_FAIL = -1;
 const std::filesystem::path PROCESS_NET_IF_INET6 = "net/if_inet6";
 const int64_t SYSTEM_HERTZ = sysconf(_SC_CLK_TCK);
 const long PAGE_SIZE = sysconf(_SC_PAGESIZE);
+const std::string NVSMI = "nvidia-smi";
+const std::string LIB_DCGM = "dcgm";
+const std::filesystem::path NVIDIACTL = "/dev/nvidiactl";
 
 } // namespace logtail
