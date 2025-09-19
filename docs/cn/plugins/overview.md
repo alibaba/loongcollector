@@ -12,6 +12,7 @@
 | `input_ebpf_network_observer`<br>[eBPF 网络可观测数据](input/native/input-network-observer.md) | SLS 官方 | eBPF 网络可观测数据采集。             |
 | `input_ebpf_network_security`<br>[eBPF 网络安全数据](input/native/input-network-security.md)   | SLS 官方 | eBPF 网络安全数据采集。               |
 | `input_ebpf_process_security`<br>[eBPF 进程安全数据](input/native/input-process-security.md)   | SLS 官方 | eBPF 进程安全数据采集。               |
+| `input_forward`<br>[转发输入插件](input/native/input-forward.md)                               | SLS 官方 | 接收来自其他系统的数据转发请求。       |
 | `input_internal_metrics`<br>[自监控指标数据](input/native/input-internal-metrics.md)           | SLS 官方 | 导出自监控指标数据。                  |
 | `input_internal_alarms`<br>[自监控告警数据](input/native/input-internal-alarms.md)             | SLS 官方 | 导出自监控告警数据。                  |
 
