@@ -12,10 +12,10 @@ namespace logtail {
  */
 class JournalConstants {
 public:
-    // Syslog facility conversion map (from Go version)
+    // Syslog设施转换映射表
     static const std::map<std::string, std::string> kSyslogFacilityString;
     
-    // Priority conversion map (from Go version) 
+    // 优先级转换映射表
     static const std::map<std::string, std::string> kPriorityConversionMap;
 };
 

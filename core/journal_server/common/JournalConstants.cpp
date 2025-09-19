@@ -2,7 +2,7 @@
 
 namespace logtail {
 
-// Syslog facility conversion map (from Go version)
+// Syslog设施转换映射表（来自Go版本）
 const std::map<std::string, std::string> JournalConstants::kSyslogFacilityString = {
     {"0",  "kernel"},
     {"1",  "user"},
@@ -30,7 +30,7 @@ const std::map<std::string, std::string> JournalConstants::kSyslogFacilityString
     {"23", "local7"}
 };
 
-// Priority conversion map (from Go version) 
+// 优先级转换映射表（来自Go版本）
 const std::map<std::string, std::string> JournalConstants::kPriorityConversionMap = {
     {"0", "emergency"},
     {"1", "alert"},

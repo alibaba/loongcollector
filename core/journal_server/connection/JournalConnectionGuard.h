@@ -17,11 +17,11 @@
 #pragma once
 
 #include <memory>
+#include "JournalConnectionInstance.h"
 
 namespace logtail {
 
-// Forward declarations
-class JournalConnectionInfo;
+// Forward declarations  
 class SystemdJournalReader;
 
 /**
@@ -52,7 +52,7 @@ public:
      * @brief 构造守护对象并增加使用计数
      * @param connection 要保护的连接对象
      */
-    explicit JournalConnectionGuard(std::shared_ptr<JournalConnectionInfo> connection);
+    explicit JournalConnectionGuard(std::shared_ptr<JournalConnectionInstance> connection);
     
     /**
      * @brief 析构守护对象并减少使用计数
@@ -81,12 +81,12 @@ public:
      * @brief 获取受保护的连接对象
      * @return 连接对象指针
      */
-    std::shared_ptr<JournalConnectionInfo> GetConnection() const {
+    std::shared_ptr<JournalConnectionInstance> GetConnection() const {
         return mConnection;
     }
     
 private:
-    std::shared_ptr<JournalConnectionInfo> mConnection;
+    std::shared_ptr<JournalConnectionInstance> mConnection;
 };
 
 } // namespace logtail 

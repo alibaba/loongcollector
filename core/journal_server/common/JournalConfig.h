@@ -22,44 +22,44 @@
 
 namespace logtail {
 
-// Forward declaration
+// 前向声明
 class CollectionPipelineContext;
 
 /**
- * @brief Configuration for journal input plugin
+ * @brief journal输入插件的配置
  */
 struct JournalConfig {
-    // Journal reading configuration
+    // Journal读取配置
     std::string seekPosition;
     int cursorFlushPeriodMs = 5000;
     std::string cursorSeekFallback;
 
-    // Filter configuration
-    std::vector<std::string> units;          // Systemd unit filter
-    std::vector<std::string> identifiers;    // Syslog identifier filter  
-    std::vector<std::string> matchPatterns;  // Custom match patterns
-    bool kernel = true;                      // Enable kernel log filter
+    // 过滤配置
+    std::vector<std::string> units;          // Systemd服务单元过滤器
+    std::vector<std::string> identifiers;    // Syslog标识符过滤器  
+    std::vector<std::string> matchPatterns;  // 自定义匹配模式
+    bool kernel = true;                      // 启用内核日志过滤器
 
-    // Performance configuration
-    int resetIntervalSecond = 3600;          // Connection reset interval
-    int maxEntriesPerBatch = 1000;           // Max entries per batch
-    int waitTimeoutMs = 1000;                // Wait timeout in milliseconds
+    // 性能配置
+    int resetIntervalSecond = 3600;          // 连接重置间隔
+    int maxEntriesPerBatch = 1000;           // 每批最大条目数
+    int waitTimeoutMs = 1000;                // 等待超时时间（毫秒）
 
-    // Field processing configuration
-    bool parsePriority = false;              // Parse priority field
-    bool parseSyslogFacility = false;        // Parse syslog facility field
-    bool useJournalEventTime = true;         // Use journal event time instead of system time
+    // 字段处理配置
+    bool parsePriority = false;              // 解析优先级字段
+    bool parseSyslogFacility = false;        // 解析syslog设施字段
+    bool useJournalEventTime = true;         // 使用journal事件时间而非系统时间
 
-    // Custom journal path (for file-based journals)
+    // 自定义journal路径（用于文件形式的journal）
     std::vector<std::string> journalPaths;
 
-    // Context reference
+    // 上下文引用
     const CollectionPipelineContext* ctx = nullptr;
     
-    // Runtime state (set during validation)
-    mutable QueueKey queueKey = -1;  // Cached queue key after validation (-1 = not validated)
-    mutable std::string lastSeekCheckpoint;  // Last checkpoint we successfully seeked to
-    mutable bool needsSeek = true;  // Whether we need to perform seek on next read
+    // 运行时状态（在验证期间设置）
+    mutable QueueKey queueKey = -1;  // 验证后缓存的队列键值（-1 = 未验证）
+    mutable std::string lastSeekCheckpoint;  // 我们成功定位到的最后一个检查点
+    mutable bool needsSeek = true;  // 下次读取时是否需要执行定位
     
     JournalConfig() = default;
 };

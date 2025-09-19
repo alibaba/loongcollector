@@ -15,12 +15,11 @@
  */
 
 #include "JournalConnectionGuard.h"
-#include "JournalConnectionManager.h"
 #include "../reader/JournalReader.h"
 
 namespace logtail {
 
-JournalConnectionGuard::JournalConnectionGuard(std::shared_ptr<JournalConnectionInfo> connection)
+JournalConnectionGuard::JournalConnectionGuard(std::shared_ptr<JournalConnectionInstance> connection)
     : mConnection(std::move(connection)) {
     if (mConnection) {
         mConnection->IncrementUsageCount();

@@ -23,71 +23,15 @@
 #include <unordered_map>
 #include <atomic>
 
-#include "../reader/JournalReader.h"
 #include "../common/JournalConfig.h"
+#include "JournalConnectionInstance.h"
 #include "JournalConnectionGuard.h"
 
 namespace logtail {
 
 // Forward declarations
-class JournalConnectionInfo;
 class JournalConnectionGuard;
 
-/**
- * @brief 管理单个config的journal连接信息
- * 
- * 参考Go版本的ServiceJournal设计，每个连接包含：
- * - 独立的journal reader实例
- * - 创建时间（用于重置周期判断）
- * - 配置信息的缓存
- * - 连接使用状态管理
- */
-class JournalConnectionInfo {
-public:
-    JournalConnectionInfo(const std::string& configName, 
-                         size_t idx, 
-                         const JournalConfig& config);
-    ~JournalConnectionInfo();
-
-    // 获取journal reader，如果连接断开会尝试重连
-    std::shared_ptr<SystemdJournalReader> GetReader();
-    
-    // 检查连接是否需要重置（基于时间）
-    bool ShouldReset(int resetIntervalSec) const;
-    
-    // 强制重置连接
-    bool ResetConnection();
-    
-    // 检查连接是否有效
-    bool IsValid() const;
-    
-    // 连接使用状态管理 - 防止在使用中的连接被重置
-    void IncrementUsageCount();
-    void DecrementUsageCount();
-    bool IsInUse() const;
-    
-    // 获取连接信息
-    const std::string& GetConfigName() const { return mConfigName; }
-    size_t GetIndex() const { return mIndex; }
-    std::chrono::steady_clock::time_point GetCreateTime() const { return mCreateTime; }
-
-private:
-    bool initializeConnection();
-    
-    std::string mConfigName;
-    size_t mIndex;
-    JournalConfig mConfig;
-    
-    std::shared_ptr<SystemdJournalReader> mReader;
-    std::chrono::steady_clock::time_point mCreateTime;
-    std::chrono::steady_clock::time_point mLastResetTime;
-    
-    // 连接使用计数 - 防止重置正在使用的连接
-    std::atomic<int> mUsageCount{0};
-    
-    mutable std::mutex mMutex;
-    bool mIsValid;
-};
 
 /**
  * @brief Journal连接管理器
@@ -100,12 +44,14 @@ private:
 class JournalConnectionManager {
 public:
     static JournalConnectionManager* GetInstance() {
-        static JournalConnectionManager instance;
-        return &instance;
+        static JournalConnectionManager sInstance;
+        return &sInstance;
     }
 
     JournalConnectionManager(const JournalConnectionManager&) = delete;
     JournalConnectionManager& operator=(const JournalConnectionManager&) = delete;
+    JournalConnectionManager(JournalConnectionManager&&) = delete;
+    JournalConnectionManager& operator=(JournalConnectionManager&&) = delete;
 
     /**
      * @brief 获取或创建journal连接
@@ -171,7 +117,7 @@ private:
     ~JournalConnectionManager() = default;
 
     using ConnectionKey = std::pair<std::string, size_t>;
-    using ConnectionPtr = std::shared_ptr<JournalConnectionInfo>;
+    using ConnectionPtr = std::shared_ptr<JournalConnectionInstance>;
     
     mutable std::mutex mConnectionsMutex;
     std::unordered_map<std::string, ConnectionPtr> mConnections; // key: configName_idx

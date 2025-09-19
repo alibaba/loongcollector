@@ -16,13 +16,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <chrono>
 #include <memory>
 #include <string>
 #include <vector>
-#include <functional>
-#include <map>
 
 #include "JournalEntry.h"
 
@@ -34,7 +31,15 @@ namespace logtail {
  */
 class JournalReader {
 public:
+    // Add default constructor
+    JournalReader() = default;
     virtual ~JournalReader() = default;
+    
+    // Default copy and move operations for interface
+    JournalReader(const JournalReader&) = default;
+    JournalReader& operator=(const JournalReader&) = default;
+    JournalReader(JournalReader&&) = default;
+    JournalReader& operator=(JournalReader&&) = default;
 
     // Core journal operations
     virtual bool Open() = 0;
@@ -74,6 +79,12 @@ class SystemdJournalReader : public JournalReader {
 public:
     SystemdJournalReader();
     ~SystemdJournalReader() override;
+    
+    // Delete copy and move operations
+    SystemdJournalReader(const SystemdJournalReader&) = delete;
+    SystemdJournalReader& operator=(const SystemdJournalReader&) = delete;
+    SystemdJournalReader(SystemdJournalReader&&) = delete;
+    SystemdJournalReader& operator=(SystemdJournalReader&&) = delete;
 
     // JournalReader interface implementation
     bool Open() override;

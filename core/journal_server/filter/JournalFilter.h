@@ -143,6 +143,12 @@ public:
      */
     static std::string GetConfigDescription(const FilterConfig& config);
 
+    // Delete copy/move operations for utility class
+    JournalFilter(const JournalFilter&) = delete;
+    JournalFilter& operator=(const JournalFilter&) = delete;
+    JournalFilter(JournalFilter&&) = delete;
+    JournalFilter& operator=(JournalFilter&&) = delete;
+
 private:
     JournalFilter() = default;
     ~JournalFilter() = default;
