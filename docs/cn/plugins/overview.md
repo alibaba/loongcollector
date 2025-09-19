@@ -61,6 +61,15 @@
 | `processor_parse_timestamp_native`<br>[时间解析原生处理插件](processor/native/processor-parse-timestamp-native.md)   | SLS 官方 | 解析事件中记录时间的字段，并将结果置为事件的 \_\_time\_\_ 字段。 |
 | `processor_filter_regex_native`<br>[过滤原生处理插件](processor/native/processor-filter-regex-native.md)             | SLS 官方 | 根据事件字段内容来过滤事件。                                     |
 | `processor_desensitize_native`<br>[脱敏原生处理插件](processor/native/processor-desensitize-native.md)               | SLS 官方 | 对事件指定字段内容进行脱敏。                                     |
+| `processor_parse_apsara_native`<br>[Apsara 解析](processor/native/processor-parse-apsara-native.md)                  | SLS 官方 | 按飞天格式解析时间与基础字段，并抽取 key:value 字段。         |
+| `processor_merge_multiline_log_native`<br>[多行合并](processor/native/processor-merge-multiline-log-native.md)       | SLS 官方 | **特殊插件不可随意组合！**基于容器标记或正则配置合并多行日志。                             |
+| `processor_parse_container_log_native`<br>[容器日志解析](processor/native/processor-parse-container-log-native.md)   | SLS 官方 | **特殊插件不可随意组合！**解析 containerd/docker 输出，提取时间/流/正文。                   |
+| `processor_split_string_native`<br>[单行切分](processor/native/processor-split-string-native.md)                     | SLS 官方 | 按分隔字符将一条多行内容拆分为多条事件。                         |
+| `processor_split_multiline_log_string_native`<br>[多行切分](processor/native/processor-split-multiline-log-string-native.md) | SLS 官方 | 按多行正则将内容拆分为多条事件。                           |
+| `processor_tag_native`<br>[元标签添加](processor/native/processor-tag-native.md)                                      | SLS 官方 | 为事件组添加主机/环境等元标签。                                   |
+| `processor_prom_parse_metric_native`<br>[Prom 文本解析](processor/native/processor-prom-parse-metric-native.md)      | SLS 官方 | 将 Prom 文本转为指标事件。                                       |
+| `processor_prom_relabel_metric_native`<br>[Prom 重标记](processor/native/processor-prom-relabel-metric-native.md)    | SLS 官方 | 按配置进行指标重标记与自动指标输出。                             |
+| `processor_parse_from_pb_native`<br>[PB 事件解析](processor/native/processor-parse-from-pb-native.md)                | SLS 官方 | 反序列化 PB `PipelineEventGroup` 为内部事件。                    |
 
 ### 扩展插件
 
