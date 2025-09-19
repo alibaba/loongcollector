@@ -88,9 +88,8 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
         containerDiscovery.GenerateContainerMetaFetchingGoPipeline(
             optionalGoPipeline, &mFileDiscovery, mContext->GetPipeline().GenNextPluginMeta(false));
-        
-        mFileDiscovery.SetContainerDiscoveryOptions(std::move(containerDiscovery));
 
+        mFileDiscovery.SetContainerDiscoveryOptions(std::move(containerDiscovery));
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {
