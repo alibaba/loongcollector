@@ -33,6 +33,11 @@
 #include "logger/Logger.h"
 #include "runner/ProcessorRunner.h"
 #include "reader/JournalEntry.h"
+#include "common/Flags.h"
+
+// Journal checkpoint 清理配置
+DEFINE_FLAG_INT32(journal_checkpoint_cleanup_interval_sec, "cleanup interval for journal checkpoints in seconds, default 1 hour", 3600); // 默认1小时清理一次
+DEFINE_FLAG_INT32(journal_checkpoint_expired_threshold_hours, "expired threshold for journal checkpoints in hours, default 24 hours", 24); // 默认24小时即过期
 
 using namespace std;
 
@@ -85,26 +90,27 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
         
         LOG_INFO(sLogger, ("journal input added after validation", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
-    
-    // Note: Checkpoint management is now handled automatically by JournalConnectionManager
 }
 
 void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
     {
         lock_guard<mutex> lock(mUpdateMux);
         auto configItr = mPipelineNameJournalConfigsMap.find(configName);
+        // 如果配置存在，则移除
         if (configItr != mPipelineNameJournalConfigsMap.end()) {
             configItr->second.erase(idx);
+            // 如果配置为空，则移除整个配置
             if (configItr->second.empty()) {
+                // 移除整个配置
                 mPipelineNameJournalConfigsMap.erase(configItr);
             }
         }
     }
     
-    // 移除对应的连接（会自动清理checkpoint）
+    // 移除config对应的连接
     JournalConnectionManager::GetInstance()->RemoveConnection(configName, idx);
     
-    // 清理该配置的所有checkpoints
+    // 清理configName对应的所有checkpoints
     size_t clearedCheckpoints = JournalCheckpointManager::GetInstance().ClearConfigCheckpoints(configName);
     if (clearedCheckpoints > 0) {
         LOG_INFO(sLogger, ("config checkpoints cleared", "")("config", configName)("count", clearedCheckpoints));
@@ -117,11 +123,13 @@ JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) co
     lock_guard<mutex> lock(mUpdateMux);
     auto configItr = mPipelineNameJournalConfigsMap.find(name);
     if (configItr != mPipelineNameJournalConfigsMap.end()) {
+        // 如果配置存在，则获取idx对应的配置
         auto idxItr = configItr->second.find(idx);
         if (idxItr != configItr->second.end()) {
             return idxItr->second;
         }
     }
+    // 如果配置不存在，则返回空配置
     return JournalConfig();
 }
 
@@ -146,13 +154,16 @@ void JournalServer::run() {
         // 每次循环后短暂休眠，避免CPU占用过高
         this_thread::sleep_for(chrono::milliseconds(100));
         
-        // 定期清理过期的checkpoints（每小时一次）
+        // 定期清理过期的checkpoints（使用配置的间隔时间）
         static time_t sLastCleanup = time(nullptr);
         time_t currentTime = time(nullptr);
-        if (currentTime - sLastCleanup >= 3600) {
-            // 清理过期的checkpoints（默认24小时）
-            LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", ""));
-            size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(24);
+        if (currentTime - sLastCleanup >= INT32_FLAG(journal_checkpoint_cleanup_interval_sec)) {
+            // 清理过期的checkpoints（使用配置的过期时间）
+            LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", "")
+                     ("cleanup_interval_sec", INT32_FLAG(journal_checkpoint_cleanup_interval_sec))
+                     ("expired_threshold_hours", INT32_FLAG(journal_checkpoint_expired_threshold_hours)));
+            size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(
+                INT32_FLAG(journal_checkpoint_expired_threshold_hours));
             if (cleanedCheckpoints > 0) {
                 LOG_INFO(sLogger, ("expired checkpoints cleaned", "")("count", cleanedCheckpoints));
             }

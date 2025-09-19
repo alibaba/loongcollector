@@ -65,25 +65,22 @@ bool InputJournal::Start() {
     
     LOG_INFO(sLogger, ("starting InputJournal", "")("config", mContext->GetConfigName())("idx", mIndex));
     
-    // Initialize JournalServer if not already initialized
+    // 初始化JournalServer
     JournalServer::GetInstance()->Init();
     
-    // Create journal configuration for JournalServer
+    // 创建journal配置对象
     JournalConfig config;
-    config.seekPosition = mSeekPosition;
-    config.cursorFlushPeriodMs = mCursorFlushPeriodMs;
-    config.cursorSeekFallback = mCursorSeekFallback;
-    config.units = mUnits;
-    config.kernel = mKernel;
-    config.identifiers = mIdentifiers;
-    config.journalPaths = mJournalPaths;
-    config.resetIntervalSecond = mResetIntervalSecond;
-    config.ctx = mContext;
+    config.seekPosition = mSeekPosition; // 设置seek位置
+    config.cursorFlushPeriodMs = mCursorFlushPeriodMs; // 设置cursor刷新周期
+    config.cursorSeekFallback = mCursorSeekFallback; // 设置cursor回退位置
+    config.units = mUnits; // 设置units
+    config.kernel = mKernel; // 设置kernel
+    config.identifiers = mIdentifiers; // 设置identifiers
+    config.journalPaths = mJournalPaths; // 设置journal路径
+    config.resetIntervalSecond = mResetIntervalSecond; // 设置重置间隔
+    config.ctx = mContext; // 设置context
     
-    // 已创建journal配置对象，包含所有配置参数
-    // 配置详情：seek位置、units数量、identifiers数量、journal路径数量等
-    
-    // Register with JournalServer
+    // 注册到JournalServer
     JournalServer::GetInstance()->AddJournalInput(
         mContext->GetConfigName(), 
         mIndex, 
@@ -95,62 +92,63 @@ bool InputJournal::Start() {
 }
 
 bool InputJournal::Stop(bool isPipelineRemoving) {
-    (void)isPipelineRemoving; // Suppress unused parameter warning
+    (void)isPipelineRemoving;
     if (mShutdown) {
         return true;
     }
     
-    // Unregister from JournalServer
+    // 从JournalServer注销
     JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName(), mIndex);
     
     mShutdown = true;
-    
-    // 不再需要等待线程结束，JournalServer 会处理清理工作
-    // 不再需要 JournalReader，JournalServer 会处理所有数据
     
     return true;
 }
 
 void InputJournal::parseBasicParams(const Json::Value& config) {
     std::string errorMsg;
-    
+    // 获取seek位置
     if (!GetOptionalStringParam(config, "SeekPosition", mSeekPosition, errorMsg)) {
         mSeekPosition = kSeekPositionTail;
     }
-    
+    // 获取cursor刷新周期
     if (!GetOptionalIntParam(config, "CursorFlushPeriodMs", mCursorFlushPeriodMs, errorMsg)) {
         mCursorFlushPeriodMs = kDefaultCursorFlushPeriodMs;
     }
-    
+    // 获取cursor回退位置
     if (!GetOptionalStringParam(config, "CursorSeekFallback", mCursorSeekFallback, errorMsg)) {
         mCursorSeekFallback = kSeekPositionTail;
     }
-    
+    // 获取kernel
     if (!GetOptionalBoolParam(config, "Kernel", mKernel, errorMsg)) {
         mKernel = true;
     }
-    
+    // 获取parse syslog facility
     if (!GetOptionalBoolParam(config, "ParseSyslogFacility", mParseSyslogFacility, errorMsg)) {
         mParseSyslogFacility = false;
     }
-    
+    // 获取parse priority
     if (!GetOptionalBoolParam(config, "ParsePriority", mParsePriority, errorMsg)) {
         mParsePriority = false;
     }
-    
+    // 获取use journal event time
     if (!GetOptionalBoolParam(config, "UseJournalEventTime", mUseJournalEventTime, errorMsg)) {
         mUseJournalEventTime = false;
     }
-    
+    // 获取reset interval second
     if (!GetOptionalIntParam(config, "ResetIntervalSecond", mResetIntervalSecond, errorMsg)) {
         mResetIntervalSecond = kDefaultResetInterval;
     }
 }
 
 void InputJournal::parseArrayParams(const Json::Value& config) {
+    // 获取units    
     parseStringArray(config, "Units", mUnits);
+    // 获取identifiers
     parseStringArray(config, "Identifiers", mIdentifiers);
+    // 获取journal路径
     parseStringArray(config, "JournalPaths", mJournalPaths);
+    // 获取match patterns
     parseStringArray(config, "MatchPatterns", mMatchPatterns);
 }
 
