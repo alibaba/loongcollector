@@ -16,34 +16,33 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-#include "common/DynamicStringFormatter.h"
-#include "models/PipelineEvent.h"
-#include "models/PipelineEventGroup.h"
-#include "models/PipelineEventPtr.h"
-
 namespace logtail {
 
-class TopicFormatParser {
+class FormattedString {
 public:
-    TopicFormatParser();
-    ~TopicFormatParser();
+    FormattedString() = default;
+    ~FormattedString() = default;
 
     bool Init(const std::string& formatString);
-    bool FormatTopic(const PipelineEventPtr& event, std::string& result, const GroupTags& groupTags) const;
 
-    bool IsDynamic() const { return mFormatter.IsDynamic(); }
+    bool IsDynamic() const { return !mPlaceholderNames.empty(); }
+    const std::string& GetTemplate() const { return mTemplate; }
+    const std::vector<std::string>& GetRequiredKeys() const { return mRequiredKeys; }
+
+    bool Format(const std::unordered_map<std::string, std::string>& values, std::string& result) const;
 
 private:
-    DynamicStringFormatter mFormatter;
+    bool ParseFormatString(const std::string& formatString);
 
-    std::string CreateValueProvider(const PipelineEventPtr& event,
-                                    const GroupTags& groupTags,
-                                    const std::string& placeholder) const;
+private:
+    std::string mTemplate;
+    std::vector<std::string> mStaticParts;
+    std::vector<std::string> mPlaceholderNames;
+    std::vector<std::string> mRequiredKeys;
 };
 
 } // namespace logtail
