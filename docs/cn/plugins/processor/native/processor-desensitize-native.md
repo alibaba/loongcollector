@@ -2,7 +2,7 @@
 
 ## 简介
 
-`processor_desensitize_native`插件对事件指定字段内容进行脱敏。
+`processor_desensitize_native` 插件对事件指定字段内容进行脱敏。
 
 ## 版本
 
