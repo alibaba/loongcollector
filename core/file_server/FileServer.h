@@ -77,10 +77,6 @@ public:
     void AddFileTagConfig(const std::string& name, const FileTagOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileTagConfig(const std::string& name);
 
-    void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<ContainerInfo>>& info);
-    std::shared_ptr<std::vector<ContainerInfo>> GetAndRemoveContainerInfo(const std::string& pipeline);
-    void ClearContainerInfo();
-
     PluginMetricManagerPtr GetPluginMetricManager(const std::string& name) const;
     const std::unordered_map<std::string, PluginMetricManagerPtr>& GetAllMetricRecordSetDefinitions() const {
         return mPipelineNamePluginMetricManagersMap;
@@ -115,6 +111,10 @@ private:
     std::unordered_map<std::string, FileTagConfig> mPipelineNameFileTagConfigsMap;
     std::unordered_map<std::string, std::shared_ptr<std::vector<ContainerInfo>>> mAllContainerInfoMap;
     std::unordered_map<std::string, PluginMetricManagerPtr> mPipelineNamePluginMetricManagersMap;
+
+
+    std::unordered_map<std::string, std::shared_ptr<std::set<std::string>>> mAllFullListMap;
+
     // 过渡使用
     std::unordered_map<std::string, uint32_t> mPipelineNameEOConcurrencyMap;
 

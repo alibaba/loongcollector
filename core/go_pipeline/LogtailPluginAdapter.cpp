@@ -19,24 +19,18 @@
 IsValidToSendFun gAdapterIsValidToSendFun = NULL;
 SendPbFun gAdapterSendPbFun = NULL;
 SendPbV2Fun gAdapterSendPbV2Fun = NULL;
-PluginCtlCmdFun gPluginCtlCmdFun = NULL;
 
-void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun, PluginCtlCmdFun cmdFun) {
-    fprintf(stderr, "[GoPluginAdapter] register fun %p %p %p\n", checkFun, sendFun, cmdFun);
+void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun) {
+    fprintf(stderr, "[GoPluginAdapter] register fun %p %p\n", checkFun, sendFun);
     gAdapterIsValidToSendFun = checkFun;
     gAdapterSendPbFun = sendFun;
-    gPluginCtlCmdFun = cmdFun;
 }
 
-void RegisterLogtailCallBackV2(IsValidToSendFun checkFun,
-                               SendPbFun sendV1Fun,
-                               SendPbV2Fun sendV2Fun,
-                               PluginCtlCmdFun cmdFun) {
-    fprintf(stderr, "register fun v2 %p %p %p %p\n", checkFun, sendV1Fun, sendV2Fun, cmdFun);
+void RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, SendPbV2Fun sendV2Fun) {
+    fprintf(stderr, "register fun v2 %p %p %p \n", checkFun, sendV1Fun, sendV2Fun);
     gAdapterIsValidToSendFun = checkFun;
     gAdapterSendPbFun = sendV1Fun;
     gAdapterSendPbV2Fun = sendV2Fun;
-    gPluginCtlCmdFun = cmdFun;
 }
 
 int LogtailIsValidToSend(long long logstoreKey) {
@@ -73,13 +67,6 @@ int LogtailSendPbV2(const char* configName,
     }
     return gAdapterSendPbV2Fun(
         configName, configNameSize, logstore, logstoreSize, pbBuffer, pbSize, lines, shardHash, shardHashSize);
-}
-
-int LogtailCtlCmd(const char* configName, int configNameSize, int optId, const char* params, int paramsLen) {
-    if (gPluginCtlCmdFun == NULL) {
-        return -1;
-    }
-    return gPluginCtlCmdFun(configName, configNameSize, optId, params, paramsLen);
 }
 
 // # 300

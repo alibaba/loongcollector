@@ -29,6 +29,8 @@
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
+#include "constants/TagConstants.h"
+#include "file_server/ContainerInfo.h"
 #include "file_server/FileServer.h"
 #include "file_server/event/Event.h"
 #include "file_server/event_handler/EventHandler.h"
@@ -124,7 +126,7 @@ protected:
         discoveryOpts.SetEnableContainerDiscoveryFlag(true);
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
             [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
-                containerInfo.mRealBaseDir = containerInfo.mUpperDir;
+                containerInfo.mRealBaseDir = containerInfo.mRawContainerInfo->mUpperDir;
                 return true;
             });
         mConfig = std::make_pair(&discoveryOpts, &ctx);
@@ -184,40 +186,31 @@ private:
     }
 
     void addContainerInfo(const std::string containerID) {
-        std::string errorMsg;
-        std::string containerStr = R"(
-            {
-                "ID": ")"
-            + containerID + R"(",
-                "Mounts": [
-                    {
-                        "Source": ")"
-            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
-                        "Destination" : ")"
-            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
-                    }
-                ],
-                "UpperDir": ")"
-            + UnitTestHelper::JsonEscapeDirPath(gRootDir) + R"(",
-                "LogPath": ")"
-            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"(",
-                "MetaDatas": [
-                    "_container_name_",
-                    "test-container"
-                ],
-                "Path": ")"
-            + UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName) + R"("
-            }
-        )";
-        Json::Value containerJson;
-        APSARA_TEST_TRUE_FATAL(ParseJsonTable(containerStr, containerJson, errorMsg));
-        APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateContainerInfo(containerJson, &ctx));
+        // Create RawContainerInfo object directly
+        auto rawContainerInfo = std::make_shared<RawContainerInfo>();
+        rawContainerInfo->mID = containerID;
+        rawContainerInfo->mUpperDir = gRootDir;
+        rawContainerInfo->mLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+
+        // Add mount information
+        Mount mount;
+        mount.mSource = gRootDir + PATH_SEPARATOR + gLogName;
+        mount.mDestination = gRootDir + PATH_SEPARATOR + gLogName;
+        rawContainerInfo->mMounts.push_back(mount);
+
+        // Add metadata
+        rawContainerInfo->mMetadatas.push_back(std::make_pair(TagKey::CONTAINER_NAME_TAG_KEY, "test-container"));
+
+        // Set K8s info
+        rawContainerInfo->mK8sInfo.mContainerName = "test-container";
+
+        APSARA_TEST_TRUE_FATAL(discoveryOpts.UpdateRawContainerInfo(rawContainerInfo, &ctx));
     }
 
     void stopContainer(const std::string containerID) {
         for (auto& containerInfo : *(discoveryOpts.mContainerInfos)) {
-            if (containerInfo.mID == containerID) {
-                containerInfo.mStopped = true;
+            if (containerInfo.mRawContainerInfo->mID == containerID) {
+                containerInfo.mRawContainerInfo->mStopped = true;
                 break;
             }
         }

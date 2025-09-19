@@ -518,5 +518,4 @@ TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     EXPECT_GT(content.size(), 0UL);
 #endif
 }
-
 } // namespace logtail

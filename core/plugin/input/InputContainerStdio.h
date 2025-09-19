@@ -43,7 +43,6 @@ public:
     bool Stop(bool isPipelineRemoving) override;
     bool SupportAck() const override { return true; }
 
-    ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
     FileTagOptions mFileTag;

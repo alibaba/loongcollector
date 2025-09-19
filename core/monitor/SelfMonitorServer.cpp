@@ -17,7 +17,6 @@
 #include "monitor/SelfMonitorServer.h"
 
 #include "MetricConstants.h"
-#include "Monitor.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -26,6 +25,7 @@ namespace logtail {
 
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER = "__container__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }

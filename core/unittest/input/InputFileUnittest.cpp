@@ -23,6 +23,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
+#include "file_server/ContainerInfo.h"
 #include "file_server/FileServer.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -499,12 +500,17 @@ void InputFileUnittest::OnPipelineUpdate() {
 void InputFileUnittest::TestSetContainerBaseDir() {
     InputFile inputFile;
     ContainerInfo containerInfo;
-    containerInfo.mID = "testContainer";
-    containerInfo.mUpperDir = "/UpperDir";
-    containerInfo.mMounts.push_back(Mount("/source1", "/data1"));
-    containerInfo.mMounts.push_back(Mount("/source2", "/data1/data2"));
-    containerInfo.mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
-    containerInfo.mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
+
+    // Create RawContainerInfo object
+    auto rawContainerInfo = std::make_shared<RawContainerInfo>();
+    rawContainerInfo->mID = "testContainer";
+    rawContainerInfo->mUpperDir = "/UpperDir";
+    rawContainerInfo->mMounts.push_back(Mount("/source1", "/data1"));
+    rawContainerInfo->mMounts.push_back(Mount("/source2", "/data1/data2"));
+    rawContainerInfo->mMounts.push_back(Mount("/source3", "/data1/data2/data3"));
+    rawContainerInfo->mMounts.push_back(Mount("/source4", "/data1/data2/data3/data4"));
+
+    containerInfo.mRawContainerInfo = rawContainerInfo;
 
     containerInfo.mRealBaseDir = "";
     ASSERT_TRUE(inputFile.SetContainerBaseDir(containerInfo, "/data2/log"));

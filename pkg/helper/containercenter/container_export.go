@@ -232,6 +232,51 @@ func GetContainerMap() map[string]*DockerInfoDetail {
 	return instance.containerMap
 }
 
+func GetContainerMapCopy() map[string]*DockerInfoDetail {
+	instance := getContainerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+	copyMap := make(map[string]*DockerInfoDetail)
+	for key, value := range instance.containerMap {
+		copyMap[key] = value
+	}
+	return copyMap
+}
+
+func GetContainerDiffForPluginManager(fullList map[string]struct{}) (update []*DockerInfoDetail, delete []string, stop []string, changed bool, newFullList map[string]struct{}) {
+	instance := getContainerCenterInstance()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+	delete = make([]string, 0)
+	stop = make([]string, 0)
+	update = make([]*DockerInfoDetail, 0)
+	changed = false
+	for key := range fullList {
+		if c, ok := instance.containerMap[key]; !ok {
+			delete = append(delete, key)
+		} else if c.Status() != ContainerStatusRunning {
+			stop = append(stop, key)
+		}
+	}
+	for key, value := range instance.containerMap {
+		_, ok := fullList[key]
+		if !ok {
+			update = append(update, value)
+		}
+	}
+	if len(delete) > 0 || len(stop) > 0 || len(update) > 0 {
+		changed = true
+	}
+	if changed {
+		newFullList = make(map[string]struct{})
+		for key := range instance.containerMap {
+			newFullList[key] = struct{}{}
+		}
+		return update, delete, stop, changed, newFullList
+	}
+	return update, delete, stop, false, nil
+}
+
 func GetAllContainerToRecord(envSet, labelSet, k8sLabelSet map[string]struct{}, containerIds map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {
 	instance := getContainerCenterInstance()
 	instance.lock.RLock()
