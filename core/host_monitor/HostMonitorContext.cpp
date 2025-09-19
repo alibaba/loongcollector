@@ -56,7 +56,7 @@ bool HostMonitorContext::CheckClockRolling() {
     // if the difference between the schedule time and the steady clock is more than 60 seconds, it means the system
     // clock is rolling
     if (std::abs(std::chrono::duration_cast<std::chrono::seconds>(mCollectTime.mScheduleTime - steadyClockNow).count()
-                 - std::abs(mCollectTime.mMetricTime - systemTimeT))
+                 - (mCollectTime.mMetricTime - systemTimeT))
         > 60) {
         LOG_ERROR(
             sLogger,

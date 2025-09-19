@@ -50,7 +50,7 @@ bool SelfCheckCollector::Collect(HostMonitorContext&, PipelineEventGroup*) {
                 continue;
             }
 
-            if (ShouldRestartCollector(runInfo.lastRunTime, runInfo.interval)) {
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime) > runInfo.interval * 5) {
                 collectorsToRestart.emplace_back(key.configName, key.collectorName);
 
                 LOG_WARNING(sLogger,
@@ -82,16 +82,8 @@ const std::chrono::seconds SelfCheckCollector::GetCollectInterval() const {
     return std::chrono::seconds(INT32_FLAG(self_check_collector_interval));
 }
 
-bool SelfCheckCollector::ShouldRestartCollector(const std::chrono::steady_clock::time_point& lastRunTime,
-                                                const std::chrono::seconds& interval) const {
-    auto now = std::chrono::steady_clock::now();
-    auto timeSinceLastRun = std::chrono::duration_cast<std::chrono::seconds>(now - lastRunTime);
-
-    // Restart if more than 5 intervals have passed since last run
-    return timeSinceLastRun > (interval * 5);
-}
-
 void SelfCheckCollector::RestartAgent() {
+    // refer to LoongCollectorMonitor::Suicide
     Application::GetInstance()->SetSigTermSignalFlag(true);
     sleep(60);
     _exit(1);

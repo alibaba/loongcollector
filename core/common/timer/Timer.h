@@ -49,7 +49,6 @@ public:
     void Stop();
     void PushEvent(std::unique_ptr<TimerEvent>&& e);
     void InitMetrics();
-    void UpdateMetrics();
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif
