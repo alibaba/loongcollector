@@ -164,6 +164,7 @@ private:
     CounterPtr mSendCnt;
     CounterPtr mSendDoneCnt;
     CounterPtr mSuccessCnt;
+    CounterPtr mRetryCnt;
     CounterPtr mDiscardCnt;
     CounterPtr mNetworkErrorCnt;
     CounterPtr mServerErrorCnt;

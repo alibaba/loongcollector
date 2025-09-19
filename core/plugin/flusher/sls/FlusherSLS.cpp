@@ -566,6 +566,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     mSendDoneCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL);
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);
+    mRetryCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_RETRY_TOTAL);
     mDiscardCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL);
     mNetworkErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL);
     mServerErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL);
@@ -879,6 +880,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
                 ++item->mTryCnt;
+                ADD_COUNTER(mRetryCnt, 1);
                 FlusherRunner::GetInstance()->PushToHttpSink(item, false);
                 break;
             case OperationOnFail::RETRY_LATER:
@@ -887,12 +889,13 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                     LOG_WARNING(sLogger, LOG_PATTERN);
                     data->mLastLogWarningTime = curTime;
                 }
+                ADD_COUNTER(mRetryCnt, 1);
                 SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
                 DealSenderQueueItemAfterSend(item, true);
                 break;
             case OperationOnFail::DISCARD:
-                ADD_COUNTER(mDiscardCnt, 1);
             default:
+                ADD_COUNTER(mDiscardCnt, 1);
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
                     AlarmManager::GetInstance()->SendAlarmCritical(
