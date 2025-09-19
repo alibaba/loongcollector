@@ -80,8 +80,8 @@ bool InputJournal::Start() {
     config.resetIntervalSecond = mResetIntervalSecond;
     config.ctx = mContext;
     
-    LOG_DEBUG(sLogger, ("journal config created", "")("config", mContext->GetConfigName())("idx", mIndex));
-    LOG_DEBUG(sLogger, ("journal config details", "")("seek_position", mSeekPosition)("units_count", mUnits.size())("identifiers_count", mIdentifiers.size())("journal_paths_count", mJournalPaths.size()));
+    // 已创建journal配置对象，包含所有配置参数
+    // 配置详情：seek位置、units数量、identifiers数量、journal路径数量等
     
     // Register with JournalServer
     JournalServer::GetInstance()->AddJournalInput(

@@ -193,9 +193,7 @@ void JournalServer::processJournalEntries() {
         for (auto& idxConfig : pipelineConfig.second) {
             size_t idx = idxConfig.first;
             JournalConfig& config = idxConfig.second;
-            
-            LOG_DEBUG(sLogger, ("processing config", "")("config", configName)("idx", idx));
-            
+                        
             // 处理单个journal配置的主流程控制
             processJournalConfig(configName, idx, config);
         }
@@ -261,7 +259,7 @@ bool JournalServer::validateJournalConfig(const string& configName, size_t idx, 
     
     // Check if queue is valid
     if (!ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
-        LOG_DEBUG(sLogger, ("queue not valid for journal config", "skip")("config", configName)("idx", idx)("queue", queueKey));
+        // 队列无效，跳过该journal配置的处理
         return false;
     }
     
@@ -315,7 +313,7 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
                       (config.lastSeekCheckpoint != currentCheckpoint);
     
     if (!shouldSeek) {
-        LOG_DEBUG(sLogger, ("skipping seek operation", "position unchanged")("config", configName)("idx", idx)("last_checkpoint", config.lastSeekCheckpoint.substr(0, 20)));
+        // 跳过seek操作，位置未改变，无需重新定位
         return true; // 位置没有变化，无需seek
     }
     
@@ -362,7 +360,7 @@ bool JournalServer::performJournalSeek(const string& configName, size_t idx, Jou
     config.lastSeekCheckpoint = currentCheckpoint;
     config.needsSeek = false;
     
-    LOG_DEBUG(sLogger, ("seek operation completed", "")("config", configName)("idx", idx)("checkpoint", currentCheckpoint.substr(0, 20)));
+    // 完成Seek返回
     return true;
 }
 
@@ -399,12 +397,12 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
     LOG_INFO(sLogger, ("starting to read journal entries", "")("config", configName)("idx", idx)("seek_position", config.seekPosition)("max_batch_size", maxEntriesPerBatch));
     
     while (entryCount < maxEntriesPerBatch) {
-        // Step 1: Move to next entry if needed
+        // Step 1: 移动到下一个entry，如果需要的话
         if (!moveToNextJournalEntry(configName, idx, config, journalReader, isFirstEntry, entryCount)) {
             break;
         }
         
-        // Step 2: Read and validate entry
+        // Step 2: 读取和验证entry
         JournalEntry entry;
         if (!readAndValidateEntry(configName, idx, journalReader, entry)) {
             if (entry.fields.empty() && !entry.cursor.empty()) {
@@ -416,7 +414,7 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
             break;  // Connection error or read failure
         }
         
-        // Step 3: Process the entry (transform, create event, push)
+        // Step 3: 处理enrty (transform, create event, push)
         if (!createAndPushEventGroup(configName, idx, config, entry, queueKey)) {
             LOG_ERROR(sLogger, ("failed to process journal entry", "continue")("config", configName)("idx", idx));
         }
@@ -424,9 +422,8 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
         entryCount++;
         isFirstEntry = false;
         
-        // Update checkpoint
+        // 处理完一条entry后更新checkpoint
         JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, entry.cursor);
-        LOG_DEBUG(sLogger, ("journal entry processed", "")("config", configName)("idx", idx)("entry", entryCount)("cursor", entry.cursor.substr(0, 50)));
     }
     
     if (entryCount > 0) {
@@ -435,7 +432,7 @@ void JournalServer::readJournalEntriesForConfig(const string& configName, size_t
         LOG_WARNING(sLogger, ("no journal entries processed", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
     }
     
-    LOG_DEBUG(sLogger, ("journal processing completed, connection remains open", "")("config", configName)("idx", idx));
+    // journal处理完成，连接保持打开状态以供后续使用
 }
 
 // 处理移动到下一个journal条目的逻辑
@@ -456,7 +453,7 @@ bool JournalServer::moveToNextJournalEntry(const string& configName, size_t idx,
                 return false;
             }
         }
-        LOG_DEBUG(sLogger, ("moved to next entry", "")("config", configName)("idx", idx)("entry_count", entryCount));
+        // 已移动到下一个条目，继续处理
     }
     return true;
 }
@@ -503,20 +500,19 @@ bool JournalServer::createAndPushEventGroup(const string& configName, size_t idx
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
     
-    LogEvent* logEvent = createLogEventFromJournal(mutableEntry, config, eventGroup);
+    createLogEventFromJournal(mutableEntry, config, eventGroup);
     
-    LOG_DEBUG(sLogger, ("created LogEvent", "")("config", configName)("idx", idx)("fields", mutableEntry.fields.size())("timestamp", logEvent->GetTimestamp()));
+    // 已创建LogEvent对象，包含所有字段和时间戳信息
     
     // 推送到处理队列
     if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, idx, std::move(eventGroup))) {
         LOG_ERROR(sLogger, ("failed to push journal data to process queue", "discard data")
                   ("config", configName)("input idx", idx)("queue", queueKey));
         return false;
-    } else {
-        LOG_DEBUG(sLogger, ("successfully pushed journal event to process queue", "")
-                  ("config", configName)("input idx", idx)("queue", queueKey));
-        return true;
-    }
+    }          
+    // 成功推送到处理队列
+    return true;
+   
 }
 
 // =============================================================================
@@ -529,12 +525,12 @@ bool JournalServer::handleJournalWait(const string& configName, size_t idx, cons
     // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
     int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
     
-    LOG_DEBUG(sLogger, ("no entries available, waiting for new entries", "")("config", configName)("idx", idx)("wait_timeout_ms", waitTimeout)("entries_processed", entryCount));
+    // 当前无可用条目，等待新条目到达（使用动态超时时间）
     
     int waitResult = journalReader->Wait(std::chrono::milliseconds(waitTimeout));
     if (waitResult > 0) {
         // 有新的数据可用，继续尝试读取
-        LOG_DEBUG(sLogger, ("new entries detected after wait", "")("config", configName)("idx", idx)("entries_processed", entryCount));
+        // 等待后检测到新条目，继续处理
         
         // 在wait之后重新检查连接状态
         if (!journalReader->IsOpen()) {
@@ -544,7 +540,7 @@ bool JournalServer::handleJournalWait(const string& configName, size_t idx, cons
         
         bool nextSuccess = journalReader->Next();
         if (!nextSuccess) {
-            LOG_DEBUG(sLogger, ("wait indicated new data but Next() failed", "")("config", configName)("idx", idx));
+            // 等待显示有新数据，但Next()失败，可能连接有问题
             if (!journalReader->IsOpen()) {
                 LOG_WARNING(sLogger, ("connection lost after wait", "")("config", configName)("idx", idx));
             }
@@ -553,12 +549,7 @@ bool JournalServer::handleJournalWait(const string& configName, size_t idx, cons
         return true;
     }
     if (waitResult == 0) {
-        // 超时，没有新数据
-        if (entryCount == 0) {
-            LOG_DEBUG(sLogger, ("wait timeout, no new entries found", "")("config", configName)("idx", idx));
-        } else {
-            LOG_DEBUG(sLogger, ("wait timeout, batch completed with entries", "")("config", configName)("idx", idx)("entries_processed", entryCount));
-        }
+        // 等待超时，没有新数据（可能未发现新条目，或批次已完成）
         return false;
     }
     // 错误，可能是连接被重置或其他问题
@@ -598,7 +589,7 @@ LogEvent* JournalServer::createLogEventFromJournal(const JournalEntry& entry, co
         if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
             adjustedSeconds += GetTimeDelta();
             adjustedNanoSeconds += GetTimeDelta()*1000000;
-            LOG_DEBUG(sLogger, ("new timestamp", "adjustedSeconds")("new nanoSeconds", adjustedNanoSeconds));
+            // 时间已调整，应用了时间偏移量
         }
         logEvent->SetTimestamp(adjustedSeconds, adjustedNanoSeconds);
     }
