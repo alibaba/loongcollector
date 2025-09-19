@@ -8,12 +8,15 @@
 | ---------------------------------------------------------------------------------------------- | -------- | ------------------------------------- |
 | `input_file`<br>[文本日志](input/native/input-file.md)                                         | SLS 官方 | 文本采集。                            |
 | `input_container_stdio`<br>[容器标准输出](input/native/input-container-stdio.md)               | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
-| `input_ebpf_file_security`<br>[eBPF 文件安全数据](input/native/input-file-security.md)         | SLS 官方 | eBPF 文件安全数据采集。               |
-| `input_ebpf_network_observer`<br>[eBPF 网络可观测数据](input/native/input-network-observer.md) | SLS 官方 | eBPF 网络可观测数据采集。             |
-| `input_ebpf_network_security`<br>[eBPF 网络安全数据](input/native/input-network-security.md)   | SLS 官方 | eBPF 网络安全数据采集。               |
-| `input_ebpf_process_security`<br>[eBPF 进程安全数据](input/native/input-process-security.md)   | SLS 官方 | eBPF 进程安全数据采集。               |
+| `input_file_security`<br>[eBPF 文件安全数据](input/native/input-file-security.md)              | SLS 官方 | eBPF 文件安全数据采集。               |
+| `input_network_observer`<br>[eBPF 网络可观测数据](input/native/input-network-observer.md)      | SLS 官方 | eBPF 网络可观测数据采集。             |
+| `input_network_security`<br>[eBPF 网络安全数据](input/native/input-network-security.md)        | SLS 官方 | eBPF 网络安全数据采集。               |
+| `input_process_security`<br>[eBPF 进程安全数据](input/native/input-process-security.md)        | SLS 官方 | eBPF 进程安全数据采集。               |
 | `input_internal_metrics`<br>[自监控指标数据](input/native/input-internal-metrics.md)           | SLS 官方 | 导出自监控指标数据。                  |
 | `input_internal_alarms`<br>[自监控告警数据](input/native/input-internal-alarms.md)             | SLS 官方 | 导出自监控告警数据。                  |
+| `input_host_monitor`<br>[主机监控数据](input/native/input-host-monitor.md)                     | SLS 官方 | 采集主机 CPU/内存/磁盘/网络等指标。   |
+| `input_prometheus`<br>[Prometheus 抓取](input/native/input-prometheus.md)                       | SLS 官方 | 按 ScrapeConfig 抓取指标。            |
+| `input_static_file_onetime`<br>[一次性文件采集](input/native/input-static-file-onetime.md)     | SLS 官方 | 对匹配文件进行一次性读取采集。        |
 
 ### 扩展插件
 
