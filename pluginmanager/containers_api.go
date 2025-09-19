@@ -24,7 +24,7 @@ type K8sInfo struct {
 	PausedContainer bool
 }
 
-type DockerFileUpdateCmd struct {
+type ContainerInfoCmd struct {
 	ID              string
 	Mounts          []Mount // 容器挂载路径
 	UpperDir        string  // 容器默认路径
@@ -36,18 +36,18 @@ type DockerFileUpdateCmd struct {
 	Stopped         bool              // 容器是否已停止
 }
 
-type DockerFileUpdateCmdAll struct {
-	AllCmd []DockerFileUpdateCmd
+type AllCmd struct {
+	All []ContainerInfoCmd
 }
 
 type DiffCmd struct {
-	Update []DockerFileUpdateCmd
+	Update []ContainerInfoCmd
 	Delete []string
 	Stop   []string
 }
 
-func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]DockerFileUpdateCmd) {
-	var cmd DockerFileUpdateCmd
+func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]ContainerInfoCmd) {
+	var cmd ContainerInfoCmd
 	cmd.ID = info.ContainerInfo.ID
 
 	cmd.UpperDir = filepath.Clean(info.DefaultRootPath)
@@ -117,13 +117,16 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]DockerFi
 }
 
 func GetAllContainers() string {
-	allCmd := new(DockerFileUpdateCmdAll)
-	allCmd.AllCmd = make([]DockerFileUpdateCmd, 0)
+	allCmd := new(AllCmd)
+	allCmd.All = make([]ContainerInfoCmd, 0)
 	// Snapshot current containers
 	rawMap := containercenter.GetContainerMapCopy()
+	if len(rawMap) == 0 {
+		return ""
+	}
 	caCachedFullList = make(map[string]struct{})
 	for _, info := range rawMap {
-		convertDockerInfos(info, &allCmd.AllCmd)
+		convertDockerInfos(info, &allCmd.All)
 		caCachedFullList[info.ContainerInfo.ID] = struct{}{}
 	}
 	cmdBuf, _ := json.Marshal(allCmd)
@@ -147,7 +150,7 @@ func GetDiffContainers() string {
 		return ""
 	}
 	diff := new(DiffCmd)
-	diff.Update = make([]DockerFileUpdateCmd, 0)
+	diff.Update = make([]ContainerInfoCmd, 0)
 	for _, info := range update {
 		convertDockerInfos(info, &diff.Update)
 	}

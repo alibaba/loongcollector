@@ -93,7 +93,7 @@ void ContainerManager::ApplyContainerDiffs() {
         }
         const auto& options = itr->second.first;
         const auto& ctx = itr->second.second;
-        
+
         const auto& diff = pair.second;
 
         LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
@@ -231,8 +231,12 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                  options->GetContainerDiscoveryOptions().mContainerFilters,
                                  diff);
 
-                            
-    LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName())("containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())("fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size()));
+
+    LOG_INFO(
+        sLogger,
+        ("diff", diff.ToString())("configName", ctx->GetConfigName())(
+            "containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())(
+            "fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size()));
 
     // Update the config's container update time when there are changes
     options->SetLastContainerUpdateTime(time(nullptr));
@@ -241,7 +245,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         return false;
     }
 
-    //LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
+    // LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
     mConfigContainerDiffMap[ctx->GetConfigName()] = std::make_shared<ContainerDiff>(diff);
     return true;
 }
@@ -251,12 +255,12 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
     if (diffContainersMeta.empty()) {
         return;
     }
-    LOG_INFO(sLogger, ("diffContainersMeta", diffContainersMeta));
+    LOG_DEBUG(sLogger, ("diffContainersMeta", diffContainersMeta));
 
     Json::Value jsonParams;
     std::string errorMsg;
     if (!ParseJsonTable(diffContainersMeta, jsonParams, errorMsg)) {
-        LOG_ERROR(sLogger, ("invalid docker container params", diffContainersMeta)("errorMsg", errorMsg));
+        LOG_WARNING(sLogger, ("invalid docker container params", diffContainersMeta)("errorMsg", errorMsg));
         return;
     }
     Json::Value updateContainers = jsonParams["Update"];
@@ -268,24 +272,31 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
     for (const auto& container : updateContainers) {
         auto containerInfo = DeserializeRawContainerInfo(container);
         if (containerInfo && !containerInfo->mID.empty()) {
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
-            mContainerMap[containerInfo->mID] = containerInfo;
+            {
+                std::lock_guard<std::mutex> lock(mContainerMapMutex);
+                if (mContainerMap.find(containerInfo->mID) == mContainerMap.end()) {
+                    mContainerMap[containerInfo->mID] = containerInfo;
+                }
+            }
             hasChanges = true;
         }
     }
 
     for (const auto& container : deleteContainers) {
         std::string containerId = container.asString();
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        if (mContainerMap.erase(containerId) > 0) {
-            hasChanges = true;
+        {
+            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            if (mContainerMap.erase(containerId) > 0) {
+                hasChanges = true;
+            }
         }
     }
     for (const auto& container : stopContainers) {
         std::string containerId = container.asString();
-        mStoppedContainerIDsMutex.lock();
-        mStoppedContainerIDs.push_back(containerId);
-        mStoppedContainerIDsMutex.unlock();
+        {
+            std::lock_guard<std::mutex> lock(mStoppedContainerIDsMutex);
+            mStoppedContainerIDs.push_back(containerId);
+        }
         hasChanges = true;
     }
 
@@ -296,6 +307,10 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
 
 void ContainerManager::refreshAllContainersSnapshot() {
     std::string allContainersMeta = LogtailPlugin::GetInstance()->GetAllContainersMeta();
+    // 如果 allContainersMeta 为空，则返回
+    if (allContainersMeta.empty()) {
+        return;
+    }
     LOG_DEBUG(sLogger, ("allContainersMeta", allContainersMeta));
     // cmd 解析json
     Json::Value jsonParams;
@@ -305,10 +320,9 @@ void ContainerManager::refreshAllContainersSnapshot() {
         return;
     }
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> tmpContainerMap;
-    Json::Value allContainers = jsonParams["AllCmd"];
+    Json::Value allContainers = jsonParams["All"];
     if (!allContainers.isArray() || allContainers.size() == 0) {
-        LOG_INFO(sLogger, ("no containers found in AllCmd", ""));
-        return;  // 或者其他适当的处理逻辑
+        return;
     }
 
     for (const auto& container : allContainers) {
@@ -317,8 +331,10 @@ void ContainerManager::refreshAllContainersSnapshot() {
             tmpContainerMap[containerInfo->mID] = containerInfo;
         }
     }
-    std::lock_guard<std::mutex> lock(mContainerMapMutex);
-    mContainerMap = tmpContainerMap;
+    {
+        std::lock_guard<std::mutex> lock(mContainerMapMutex);
+        mContainerMap = tmpContainerMap;
+    }
     mLastUpdateTime = time(nullptr);
 }
 
@@ -369,10 +385,11 @@ ContainerConfigResult ContainerManager::CreateContainerConfigResult(const FileDi
 
 void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    mStoppedContainerIDsMutex.lock();
     std::vector<std::string> stoppedContainerIDs;
-    stoppedContainerIDs.swap(mStoppedContainerIDs);
-    mStoppedContainerIDsMutex.unlock();
+    {
+        std::lock_guard<std::mutex> lock(mStoppedContainerIDsMutex);
+        stoppedContainerIDs.swap(mStoppedContainerIDs);
+    }
     if (stoppedContainerIDs.empty()) {
         return;
     }
@@ -381,27 +398,25 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
     for (const auto& containerId : stoppedContainerIDs) {
         for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
             const FileDiscoveryOptions* options = itr->second.first;
-            if (options->IsContainerDiscoveryEnabled()) {
-                const auto& containerInfos = options->GetContainerInfo();
-                if (containerInfos) {
-                    for (auto& info : *containerInfos) {
-                        if (info.mRawContainerInfo->mID == containerId) {
-                            info.mRawContainerInfo->mStopped = true;
-
-                            Event* pStoppedEvent = new Event(info.mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
-
-                            pStoppedEvent->SetConfigName(itr->first);
-                            pStoppedEvent->SetContainerID(containerId);
-                            eventVec.push_back(pStoppedEvent);
-
-                            LOG_INFO(sLogger, ("stop event", containerId)("configName", itr->first));
-
-                        }
-                    }
+            if (!options->IsContainerDiscoveryEnabled()) {
+                continue;
+            }
+            const auto& containerInfos = options->GetContainerInfo();
+            if (!containerInfos) {
+                continue;
+            }
+            for (auto& info : *containerInfos) {
+                if (info.mRawContainerInfo->mID == containerId) {
+                    Event* pStoppedEvent
+                        = new Event(info.mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
+                    pStoppedEvent->SetConfigName(itr->first);
+                    pStoppedEvent->SetContainerID(containerId);
+                    eventVec.push_back(pStoppedEvent);
+                    info.mRawContainerInfo->mStopped = true;
+                    LOG_DEBUG(sLogger, ("generate stop event, containerId", containerId)("configName", itr->first));
                 }
             }
         }
-        
     }
 }
 
@@ -409,7 +424,6 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
 bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_map<std::string, std::string>& labels) {
     if (!filter.mIncludeFields.mFieldsMap.empty() || !filter.mIncludeFields.mFieldsRegMap.empty()) {
         bool matchedFlag = false;
-
         // 检查静态 include 标签
         for (const auto& pair : filter.mIncludeFields.mFieldsMap) {
             auto it = labels.find(pair.first);
@@ -418,7 +432,6 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
                 break;
             }
         }
-
         // 如果匹配，则不需要检查正则表达式
         if (!matchedFlag) {
             for (const auto& pair : filter.mIncludeFields.mFieldsRegMap) {
@@ -429,10 +442,8 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
                 }
             }
         }
-
         // 如果没有匹配，返回 false
         if (!matchedFlag) {
-            LOG_DEBUG(sLogger, ("matchedFlag", "false"));
             return false;
         }
     }
@@ -441,7 +452,6 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
     for (const auto& pair : filter.mExcludeFields.mFieldsMap) {
         auto it = labels.find(pair.first);
         if (it != labels.end() && (pair.second.empty() || it->second == pair.second)) {
-            LOG_DEBUG(sLogger, ("no match by exclude static", ""));
             return false;
         }
     }
@@ -450,11 +460,9 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
     for (const auto& pair : filter.mExcludeFields.mFieldsRegMap) {
         auto it = labels.find(pair.first);
         if (it != labels.end() && boost::regex_match(it->second, *pair.second)) {
-            LOG_DEBUG(sLogger, ("no match by exclude regex", ""));
             return false;
         }
     }
-
     return true;
 }
 
@@ -465,29 +473,18 @@ bool IsK8sFilterMatch(const K8sFilter& filter, const K8sInfo& k8sInfo) {
     }
     // 匹配命名空间
     if (filter.mNamespaceReg && !boost::regex_match(k8sInfo.mNamespace, *filter.mNamespaceReg)) {
-        LOG_DEBUG(sLogger,
-                  ("k8sInfo.mNamespace", k8sInfo.mNamespace)("filter.mNamespaceReg", filter.mNamespaceReg->str()));
         return false;
     }
     // 匹配 Pod 名称
     if (filter.mPodReg && !boost::regex_match(k8sInfo.mPod, *filter.mPodReg)) {
-        LOG_DEBUG(sLogger, ("k8sInfo.mPod", k8sInfo.mPod)("filter.mPodReg", filter.mPodReg->str()));
         return false;
     }
     // 匹配容器名称
     if (filter.mContainerReg && !boost::regex_match(k8sInfo.mContainerName, *filter.mContainerReg)) {
-        LOG_DEBUG(
-            sLogger,
-            ("k8sInfo.mContainerName", k8sInfo.mContainerName)("filter.mContainerReg", filter.mContainerReg->str()));
         return false;
     }
-    bool isK8sLabelMatch = IsMapLabelsMatch(filter.mK8sLabelFilter, k8sInfo.mLabels);
-    LOG_DEBUG(sLogger, ("mK8sLabelFilter", filter.mK8sLabelFilter.ToString()));
-    for (const auto& pair : k8sInfo.mLabels) {
-        LOG_DEBUG(sLogger, ("K8sLabel", pair.first + "=" + pair.second));
-    }
     // 确保 Labels 不为 nullptr，使用默认的空映射初始化
-    return isK8sLabelMatch;
+    return IsMapLabelsMatch(filter.mK8sLabelFilter, k8sInfo.mLabels);
 }
 
 
@@ -681,7 +678,6 @@ static std::shared_ptr<RawContainerInfo> DeserializeRawContainerInfo(const Json:
                 info->mContainerLabels[key] = cl[key].asString();
         }
     }
-
     return info;
 }
 
@@ -696,19 +692,19 @@ void ContainerManager::SaveContainerInfo() {
     }
     root["Containers"] = arr;
     root["version"] = "1.0.0";
-    std::string configPath = PathJoin(GetAgentDataDir(), "docker_path_config.json");
+    std::string configPath = AppConfig::GetInstance()->GetDockerFilePathConfig();
     OverwriteFile(configPath, root.toStyledString());
     LOG_INFO(sLogger, ("save container state", configPath));
 }
 
 void ContainerManager::LoadContainerInfo() {
     LOG_INFO(sLogger, ("load container state", "start"));
-    std::string configPath = PathJoin(GetAgentDataDir(), "docker_path_config.json");
+    std::string configPath = AppConfig::GetInstance()->GetDockerFilePathConfig();
     std::string content;
 
     // Load from docker_path_config.json and determine logic based on version
     if (FileReadResult::kOK != ReadFileContent(configPath, content)) {
-        LOG_INFO(sLogger, ("docker_path_config.json not found", configPath));
+        LOG_WARNING(sLogger, ("docker_path_config.json not found", configPath));
         return;
     }
 
@@ -834,8 +830,10 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
     }
 
     if (!tmpContainerMap.empty()) {
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        mContainerMap.swap(tmpContainerMap);
+        {
+            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            mContainerMap.swap(tmpContainerMap);
+        }
 
         // Update config container diffs for each config
         for (const auto& configPair : configContainerMap) {
@@ -864,23 +862,23 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> tmp;
     const auto& arr = root["Containers"];
-
     for (Json::ArrayIndex i = 0; i < arr.size(); ++i) {
         auto info = DeserializeRawContainerInfo(arr[i]);
         if (!info->mID.empty()) {
             tmp[info->mID] = info;
         }
     }
-
-    LOG_INFO(sLogger, ("recover containers", tmp.size()));
+    LOG_DEBUG(sLogger, ("recover containers from docker_path_config.json (v1.0.0)", tmp.size()));
 
     if (!tmp.empty()) {
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        mContainerMap.swap(tmp);
+        {
+            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            mContainerMap.swap(tmp);
+        }
         // Apply containers to all existing configs
         auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
 
-        LOG_INFO(sLogger, ("nameConfigMap", nameConfigMap.size()));
+        LOG_DEBUG(sLogger, ("recover containers to nameConfigMap", nameConfigMap.size()));
 
         std::vector<std::shared_ptr<RawContainerInfo>> allContainers;
         for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
@@ -889,8 +887,7 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
                 checkContainerDiffForOneConfig(options, itr->second.second);
             }
         }
-    
-        LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0+)", configPath));
+        LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));
     }
 }
 

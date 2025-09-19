@@ -280,8 +280,7 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
 
 bool InputContainerStdio::Start() {
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
-    mFileDiscovery.SetContainerInfo(
-        FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
+    mFileDiscovery.SetContainerInfo(std::make_shared<vector<ContainerInfo>>());
     FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
     FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
     FileServer::GetInstance()->AddMultilineConfig(mContext->GetConfigName(), &mMultiline, mContext);
@@ -291,9 +290,6 @@ bool InputContainerStdio::Start() {
 }
 
 bool InputContainerStdio::Stop(bool isPipelineRemoving) {
-    if (!isPipelineRemoving) {
-        FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
-    }
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());

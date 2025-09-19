@@ -52,9 +52,6 @@ InputFile::InputFile()
 
 bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     string errorMsg;
-
-    LOG_INFO(sLogger, ("diff", "init")("config", mContext->GetPipeline().Name()));
-
     if (!mFileDiscovery.Init(config, *mContext, sName)) {
         return false;
     }
@@ -183,14 +180,9 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
 }
 
 bool InputFile::Start() {
-    LOG_INFO(sLogger, ("diff", "start")("config", mContext->GetPipeline().Name()));
-
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
     if (mEnableContainerDiscovery) {
         mFileDiscovery.SetContainerInfo(std::make_shared<vector<ContainerInfo>>());
-        //    FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
-        //mFileDiscovery.SetFullContainerList(
-        //    FileServer::GetInstance()->GetAndRemoveFullList(mContext->GetPipeline().Name()));
     }
     FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
     FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
@@ -201,12 +193,6 @@ bool InputFile::Start() {
 }
 
 bool InputFile::Stop(bool isPipelineRemoving) {
-    LOG_INFO(sLogger, ("diff", "stop")("config", mContext->GetPipeline().Name())("isPipelineRemoving", isPipelineRemoving));
-
-    if (!isPipelineRemoving && mEnableContainerDiscovery) {
-        // FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
-        // FileServer::GetInstance()->SaveFullList(mContext->GetPipeline().Name(), mFileDiscovery.GetFullContainerList());
-    }
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());

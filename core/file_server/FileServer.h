@@ -77,14 +77,6 @@ public:
     void AddFileTagConfig(const std::string& name, const FileTagOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileTagConfig(const std::string& name);
 
-    void SaveContainerInfo(const std::string& pipeline, const std::shared_ptr<std::vector<ContainerInfo>>& info);
-    std::shared_ptr<std::vector<ContainerInfo>> GetAndRemoveContainerInfo(const std::string& pipeline);
-    void ClearContainerInfo();
-
-    void SaveFullList(const std::string& pipeline, const std::shared_ptr<std::set<std::string>>& fullList);
-    std::shared_ptr<std::set<std::string>> GetAndRemoveFullList(const std::string& pipeline);
-    void ClearFullList();
-
     PluginMetricManagerPtr GetPluginMetricManager(const std::string& name) const;
     const std::unordered_map<std::string, PluginMetricManagerPtr>& GetAllMetricRecordSetDefinitions() const {
         return mPipelineNamePluginMetricManagersMap;

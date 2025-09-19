@@ -101,13 +101,9 @@ void FileServer::PauseInner() {
 // 恢复文件服务，重新注册事件处理程序和恢复日志输入
 void FileServer::Resume(bool isConfigUpdate) {
     if (isConfigUpdate) {
-        ClearContainerInfo();
-        ClearFullList();
-        ContainerManager::GetInstance()->ApplyContainerDiffs();
         ContainerManager::GetInstance()->SaveContainerInfo();
         ContainerManager::GetInstance()->LoadContainerInfo();
     }
-
     LOG_INFO(sLogger, ("file server resume", "starts"));
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
@@ -223,52 +219,6 @@ void FileServer::AddFileTagConfig(const std::string& name,
 void FileServer::RemoveFileTagConfig(const string& name) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileTagConfigsMap.erase(name);
-}
-
-
-// 保存容器信息
-void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap[pipeline] = info;
-}
-
-void FileServer::SaveFullList(const string& pipeline, const shared_ptr<std::set<std::string>>& fullList) {
-    WriteLock lock(mReadWriteLock);
-    mAllFullListMap[pipeline] = fullList;
-}
-
-shared_ptr<std::set<std::string>> FileServer::GetAndRemoveFullList(const string& pipeline) {
-    WriteLock lock(mReadWriteLock);
-    auto iter = mAllFullListMap.find(pipeline);
-    if (iter == mAllFullListMap.end()) {
-        return make_shared<std::set<std::string>>();
-    }
-    auto res = iter->second;
-    mAllFullListMap.erase(iter);
-    return res;
-}
-
-void FileServer::ClearFullList() {
-    WriteLock lock(mReadWriteLock);
-    mAllFullListMap.clear();
-}
-
-// 获取并移除给定管道的容器信息
-shared_ptr<vector<ContainerInfo>> FileServer::GetAndRemoveContainerInfo(const string& pipeline) {
-    WriteLock lock(mReadWriteLock);
-    auto iter = mAllContainerInfoMap.find(pipeline);
-    if (iter == mAllContainerInfoMap.end()) {
-        return make_shared<vector<ContainerInfo>>();
-    }
-    auto res = iter->second;
-    mAllContainerInfoMap.erase(iter);
-    return res;
-}
-
-// 清除所有容器信息
-void FileServer::ClearContainerInfo() {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap.clear();
 }
 
 // 获取插件的指标管理器

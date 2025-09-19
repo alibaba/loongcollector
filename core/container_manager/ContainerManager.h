@@ -84,13 +84,6 @@ public:
     void SaveContainerInfo();
     void LoadContainerInfo();
 
-    /**
-     * @brief Create a container config result similar to input_docker_stdout plugin
-     * @param options FileDiscoveryOptions pointer
-     * @param ctx CollectionPipelineContext pointer
-     * @param containerIDs List of container IDs (optional)
-     * @return ContainerConfigResult containing config result data
-     */
     ContainerConfigResult CreateContainerConfigResult(const FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx,
                                                       const std::vector<std::string>& containerIDs = {});
