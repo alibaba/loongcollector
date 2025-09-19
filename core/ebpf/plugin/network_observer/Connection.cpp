@@ -281,6 +281,7 @@ void Connection::TryAttachPeerMeta(int family, uint32_t ip) {
     }
     if (!K8sMetadata::GetInstance().Enable()) {
         // k8smetadata not enable, mark attached ...
+        updatePeerPodMetaForExternal();
         MarkPeerMetaAttached();
         return;
     }
