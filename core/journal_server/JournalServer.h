@@ -19,14 +19,12 @@
 #include <condition_variable>
 #include <future>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
 #include "runner/InputRunner.h"
 #include "common/JournalConfig.h"
-#include "models/LogEvent.h"
 
 namespace logtail {
 
@@ -77,8 +75,6 @@ public:
         return mPipelineNameJournalConfigsMap;
     }
 
-    // Checkpoint management moved to JournalConnectionManager
-
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif
@@ -87,23 +83,6 @@ private:
     JournalServer() = default;
 
     void run();
-    void processJournalEntries();
-    void processJournalConfig(const std::string& configName, size_t idx, JournalConfig& config);
-    
-    // Helper functions for processJournalConfig to reduce cognitive complexity
-    bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
-    std::shared_ptr<SystemdJournalReader> setupJournalConnection(const std::string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection);
-    bool performJournalSeek(const std::string& configName, size_t idx, JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek = false);
-    void readJournalEntriesForConfig(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, QueueKey queueKey);
-    
-    // Helper functions for readJournalEntriesForConfig to reduce cognitive complexity
-    bool moveToNextJournalEntry(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, bool isFirstEntry, int entryCount);
-    bool readAndValidateEntry(const std::string& configName, size_t idx, const std::shared_ptr<SystemdJournalReader>& journalReader, JournalEntry& entry);
-    bool createAndPushEventGroup(const std::string& configName, size_t idx, const JournalConfig& config, const JournalEntry& entry, QueueKey queueKey);
-    
-    // Low-level helper functions
-    bool handleJournalWait(const std::string& configName, size_t idx, const JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, int entryCount);
-    LogEvent* createLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, PipelineEventGroup& eventGroup);
 
     std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;

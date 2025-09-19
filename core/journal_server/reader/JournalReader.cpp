@@ -126,12 +126,12 @@
         }
          entry = {};
  
-                 char* cursor = nullptr;
-        if (sd_journal_get_cursor(mJournal, &cursor) < 0) {
+                 char* cursorPtr = nullptr;
+        if (sd_journal_get_cursor(mJournal, &cursorPtr) < 0) {
             return false;
         }
-         entry.cursor = cursor;
-                 free(cursor);
+        std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
+        entry.cursor = cursor.get();
 
         uint64_t timestamp = 0;
         sd_journal_get_realtime_usec(mJournal, &timestamp);
@@ -270,31 +270,36 @@
  };
  
  /*========================================================
-  *  公共接口空壳转发
-  *========================================================*/
- SystemdJournalReader::SystemdJournalReader()
-     : mImpl(std::make_unique<Impl>()) {}
- SystemdJournalReader::~SystemdJournalReader() = default;
- 
- #define FWD(Method) return mImpl->Method
- bool  SystemdJournalReader::Open()                          { FWD(Open()); }
- void  SystemdJournalReader::Close()                         { FWD(Close()); }
- bool  SystemdJournalReader::IsOpen() const                  { FWD(IsOpen()); }
- bool  SystemdJournalReader::SeekHead()                      { FWD(SeekHead()); }
- bool  SystemdJournalReader::SeekTail()                      { FWD(SeekTail()); }
- bool  SystemdJournalReader::SeekCursor(const std::string& c){ FWD(SeekCursor(c)); }
- bool  SystemdJournalReader::Next()                          { FWD(Next()); }
- bool  SystemdJournalReader::Previous()                      { FWD(Previous()); }
- bool  SystemdJournalReader::GetEntry(JournalEntry& e)       { FWD(GetEntry(e)); }
- std::string SystemdJournalReader::GetCursor()               { FWD(GetCursor()); }
- bool  SystemdJournalReader::AddMatch(const std::string& f,
-                                      const std::string& v)  { FWD(AddMatch(f,v)); }
- bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
- int   SystemdJournalReader::Wait(std::chrono::milliseconds timeout){ FWD(Wait(timeout)); }
- bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
- bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }
- bool  SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p){ FWD(SetJournalPaths(p)); }
- #undef FWD
+ *  公共接口转发 - Pimpl 模式实现
+ *  
+ *  设计意图：
+ *  1. 编译隔离：避免头文件暴露 systemd 依赖
+ *  2. 跨平台兼容：Linux/非Linux 统一接口
+ *  3. 扩展性：支持抽象接口和多实现
+ *========================================================*/
+SystemdJournalReader::SystemdJournalReader()
+    : mImpl(std::make_unique<Impl>()) {}
+SystemdJournalReader::~SystemdJournalReader() = default;
+
+#define FWD(Method) return mImpl->Method
+bool  SystemdJournalReader::Open()                          { FWD(Open()); }
+void  SystemdJournalReader::Close()                         { FWD(Close()); }
+bool  SystemdJournalReader::IsOpen() const                  { FWD(IsOpen()); }
+bool  SystemdJournalReader::SeekHead()                      { FWD(SeekHead()); }
+bool  SystemdJournalReader::SeekTail()                      { FWD(SeekTail()); }
+bool  SystemdJournalReader::SeekCursor(const std::string& c){ FWD(SeekCursor(c)); }
+bool  SystemdJournalReader::Next()                          { FWD(Next()); }
+bool  SystemdJournalReader::Previous()                      { FWD(Previous()); }
+bool  SystemdJournalReader::GetEntry(JournalEntry& e)       { FWD(GetEntry(e)); }
+std::string SystemdJournalReader::GetCursor()               { FWD(GetCursor()); }
+bool  SystemdJournalReader::AddMatch(const std::string& f,
+                                     const std::string& v)  { FWD(AddMatch(f,v)); }
+bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
+int   SystemdJournalReader::Wait(std::chrono::milliseconds timeout){ FWD(Wait(timeout)); }
+bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
+bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }
+bool  SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p){ FWD(SetJournalPaths(p)); }
+#undef FWD
  
  } // namespace logtail
  
