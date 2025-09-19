@@ -1,0 +1,31 @@
+{
+  "inputs": [
+    {
+      "type": "metric_mock",
+      "detail": {
+        "Fields": {
+          "1111": "2222"
+        }
+      }
+    }
+  ],
+  "processors": [
+    {
+      "type": "processor_add_fields_v2",
+      "detail": {
+        "Fields": {
+          "key1": ["value1", "value2"],
+          "key2": "${uuid()}"
+        }
+      }
+    }
+  ],
+  "flushers": [
+    {
+      "type": "flusher_stdout",
+      "detail": {
+        "OnlyStdout": true
+      }
+    }
+  ]
+}
