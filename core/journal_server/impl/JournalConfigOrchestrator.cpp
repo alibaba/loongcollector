@@ -56,13 +56,13 @@ bool ValidateJournalConfig(const string& configName, size_t idx, const JournalCo
 }
 
 void ProcessJournalEntries(JournalServer* server) {
-    LOG_INFO(sLogger, ("processJournalEntries", "called"));
+    // Process journal entries for all registered configurations
     // 获取当前配置的快照，避免长时间持有锁
     unordered_map<string, map<size_t, JournalConfig>> currentConfigs;
     {
         const auto& allConfigs = server->GetAllJournalConfigs();
         currentConfigs = allConfigs;
-        LOG_INFO(sLogger, ("configurations loaded from map", "")("total_pipelines", allConfigs.size()));
+        // Loaded configurations from map, total pipelines: allConfigs.size()
     }
     
     // 如果当前配置为空，则返回
@@ -71,7 +71,7 @@ void ProcessJournalEntries(JournalServer* server) {
         return;
     }
     
-    LOG_INFO(sLogger, ("processing journal entries", "")("configs_count", currentConfigs.size()));
+    // Processing journal entries for configs_count: currentConfigs.size()
     
     // 处理每个配置
     for (auto& pipelineConfig : currentConfigs) {
@@ -88,7 +88,7 @@ void ProcessJournalEntries(JournalServer* server) {
 }
 
 void ProcessJournalConfig(const string& configName, size_t idx, JournalConfig& config) {
-    LOG_INFO(sLogger, ("processJournalConfig", "started")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr));
+    // Processing journal config: configName, idx: idx, ctx_valid: config.ctx != nullptr
 
     // 使用已验证的queueKey（在addJournalInput时已验证并缓存）
     QueueKey queueKey = config.queueKey;

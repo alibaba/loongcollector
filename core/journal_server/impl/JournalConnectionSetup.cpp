@@ -33,7 +33,7 @@ namespace logtail::impl {
 // =============================================================================
 
 std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection) {
-    LOG_INFO(sLogger, ("getting guarded journal connection from manager", "")("config", configName)("idx", idx));
+    // Getting guarded journal connection from manager for config: configName, idx: idx
     
     // 记录连接获取前的连接数，用于判断是否创建了新连接
     size_t connectionCountBefore = JournalConnectionManager::GetInstance()->GetConnectionCount();
@@ -63,7 +63,7 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     size_t connectionCountAfter = JournalConnectionManager::GetInstance()->GetConnectionCount();
     isNewConnection = (connectionCountAfter > connectionCountBefore);
     
-    LOG_INFO(sLogger, ("guarded journal connection obtained successfully", "")("config", configName)("idx", idx)("is_new_connection", isNewConnection));
+    // Guarded journal connection obtained successfully for config: configName, idx: idx, is_new_connection: isNewConnection
     return journalReader;
 }
 
@@ -80,13 +80,13 @@ bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& con
         return true; 
     }
     
-    LOG_INFO(sLogger, ("performing journal seek", "")("config", configName)("idx", idx)("reason", forceSeek ? "forced" : (config.needsSeek ? "required" : "checkpoint_changed"))("current_checkpoint", currentCheckpoint.substr(0, 50)));
+    // Performing journal seek for config: configName, idx: idx, reason: (forceSeek ? "forced" : (config.needsSeek ? "required" : "checkpoint_changed")), current_checkpoint truncated
     
     bool seekSuccess = false;
     
     // 首先尝试使用cursor
     if (!currentCheckpoint.empty() && config.seekPosition == "cursor") {
-        LOG_INFO(sLogger, ("seeking to checkpoint cursor", currentCheckpoint.substr(0, 50))("config", configName)("idx", idx));
+        // Seeking to checkpoint cursor for config: configName, idx: idx
         seekSuccess = journalReader->SeekCursor(currentCheckpoint);
         if (!seekSuccess) {
             LOG_WARNING(sLogger, ("failed to seek to checkpoint, using fallback position", config.cursorSeekFallback)("config", configName)("idx", idx));
@@ -96,18 +96,18 @@ bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& con
     // 如果cursor失败或者不使用cursor，按seekPosition处理
     if (!seekSuccess) {
         if (config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head")) {
-            LOG_INFO(sLogger, ("seeking to journal head", "")("config", configName)("idx", idx));
+            // Seeking to journal head for config: configName, idx: idx
             seekSuccess = journalReader->SeekHead();
         } else {
-            LOG_INFO(sLogger, ("seeking to journal tail", "")("config", configName)("idx", idx));
+            // Seeking to journal tail for config: configName, idx: idx
             seekSuccess = journalReader->SeekTail();
             
             // tail定位后需要回退到最后一条实际记录
             if (seekSuccess) {
                 if (journalReader->Previous()) {
-                    LOG_INFO(sLogger, ("moved to last actual entry after tail seek", "")("config", configName)("idx", idx));
+                    // Moved to last actual entry after tail seek for config: configName, idx: idx
                 } else {
-                    LOG_INFO(sLogger, ("no entries found after tail seek", "")("config", configName)("idx", idx));
+                    // No entries found after tail seek for config: configName, idx: idx
                     return false;
                 }
             }
