@@ -68,8 +68,7 @@ struct MatchCriteriaFilter {
 
     std::string ToString() const {
         std::stringstream ss;
-        ss << "IncludeFields: " << mIncludeFields.ToString()
-           << ", ExcludeFields: " << mExcludeFields.ToString();
+        ss << "IncludeFields: " << mIncludeFields.ToString() << ", ExcludeFields: " << mExcludeFields.ToString();
         return ss.str();
     }
 };
@@ -122,8 +121,7 @@ struct ContainerFilters {
 
     std::string ToString() const {
         std::stringstream ss;
-        ss << "K8SFilter: " << mK8SFilter.ToString()
-           << ", EnvFilter: " << mEnvFilter.ToString()
+        ss << "K8SFilter: " << mK8SFilter.ToString() << ", EnvFilter: " << mEnvFilter.ToString()
            << ", ContainerLabelFilter: " << mContainerLabelFilter.ToString();
         return ss.str();
     }
