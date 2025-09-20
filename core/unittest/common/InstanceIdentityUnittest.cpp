@@ -18,8 +18,8 @@
 
 #include "Flags.h"
 #include "MachineInfoUtil.h"
-#include "unittest/Unittest.h"
 #include "common/FileSystemUtil.h"
+#include "unittest/Unittest.h"
 
 DECLARE_FLAG_STRING(agent_host_id);
 
@@ -137,7 +137,8 @@ void InstanceIdentityUnittest::TestInitFromFileRandomHostId() {
     const std::string content = (boost::format(R"({
 	"random-hostid" : "%1%"
 }
-)" ) % expectHostId).str();
+)") % expectHostId)
+                                    .str();
 
     std::string errMsg;
     APSARA_TEST_TRUE(WriteFile(filePath, content, errMsg));
@@ -163,7 +164,9 @@ void InstanceIdentityUnittest::TestInitFromFileEcsMeta() {
 	"owner-account-id" : "%2%",
 	"region-id" : "%3%"
 }
-)" ) % expectInstanceId % expectUserId % expectRegion).str();
+)") % expectInstanceId % expectUserId
+                                 % expectRegion)
+                                    .str();
 
     std::string errMsg;
     APSARA_TEST_TRUE(WriteFile(filePath, content, errMsg));
