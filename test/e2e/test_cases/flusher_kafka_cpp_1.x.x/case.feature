@@ -24,7 +24,7 @@ Feature: flusher kafka cpp 1.x.x
         MaxDirSearchDepth: 10
         TailingAllMatchedFiles: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "test-topic-1x"
         Version: "1.1.0"
@@ -32,7 +32,7 @@ Feature: flusher kafka cpp 1.x.x
     """
     Given loongcollector container mount {./flusher_test_1.x.x.log} to {/root/test/1/2/3/flusher_testxxxx.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_1.x.x}
+    When start docker-compose {flusher_kafka_native_1.x.x}
     Then there is at least {1000} logs
     Then the log fields match kv
     """

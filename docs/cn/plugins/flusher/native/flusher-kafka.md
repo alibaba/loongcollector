@@ -2,7 +2,7 @@
 
 ## 简介
 
-`flusher_kafka_cpp` 将事件序列化为 JSON 文本后异步投递到 Kafka，底层基于 librdkafka。
+`flusher_kafka_native` 将事件序列化为 JSON 文本后异步投递到 Kafka，底层基于 librdkafka。
 
 ## 版本
 
@@ -12,7 +12,7 @@
 
 | 参数 | 类型 | 是否必选 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
-| `Type` | string | 是 | / | 固定为 `flusher_kafka_cpp` |
+| `Type` | string | 是 | / | 固定为 `flusher_kafka_native` |
 | `Brokers` | string[] | 是 | / | Kafka 集群地址列表，如 `["host1:9092", "host2:9092"]` |
 | `Topic` | string | 是 | / | 发送的目标 Topic 名称。支持动态 Topic 同 kafka_flusher_v2 扩展插件（仅字符串替换）。 |
 | `Version` | string | 否 | `"1.0.0"` | Kafka 协议版本，格式 `x.y.z[.n]`，用于推导底层 librdkafka 兼容参数。 |
@@ -37,7 +37,7 @@ inputs:
     FilePaths:
       - "/root/test/**/flusher_test*.log"
 flushers:
-  - Type: flusher_kafka_cpp
+  - Type: flusher_kafka_native
     Brokers: ["kafka:29092"]
     Topic: "test-topic"
     Version: "3.6.0"

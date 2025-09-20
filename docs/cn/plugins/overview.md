@@ -116,9 +116,9 @@
 | 名称                                                                            | 提供方   | 简介                                                 |
 | ------------------------------------------------------------------------------- | -------- | ---------------------------------------------------- |
 | `flusher_sls`<br>[SLS](flusher/native/flusher-sls.md)                           | SLS 官方 | 将采集到的数据输出到 SLS。                           |
-| `flusher_file`<br>[本地文件](flusher/native/flusher-file.md)                    | SLS 官方 | 将采集到的数据写到本地文件。                         |
-| `flusher_blackhole`<br>[原生 Flusher 测试](flusher/native/flusher-blackhole.md) | SLS 官方 | 直接丢弃采集的事件，属于原生输出插件，主要用于测试。 |
-| `flusher_kafka_cpp`<br>[Kafka](flusher/native/flusher-kafka.md)                 | <br>[ChaoEcho](https://github.com/ChaoEcho) | 将采集到的数据输出到 Kafka（C++ 实现）。            |
+| `flusher_file`<br>[本地文件](flusher/native/flusher-file.md)                     | SLS 官方 | 将采集到的数据写到本地文件。                         |
+| `flusher_blackhole`<br>[黑洞](flusher/native/flusher-blackhole.md)              | SLS 官方 | 直接丢弃采集的事件，属于原生输出插件，主要用于测试。 |
+| `flusher_kafka_native`<br>[Kafka](flusher/native/flusher-kafka.md)                 | <br>[ChaoEcho](https://github.com/ChaoEcho) | 将采集到的数据输出到 Kafka（C++ 实现）。 |
 
 ### 扩展插件
 
