@@ -20,6 +20,7 @@
 |  SourceKey  |  string  |  是  |  /  |  源字段名。  |
 |  SourceFormat  |  string  |  是  |  /  |  日志时间格式。更多信息，请参见表1。  |
 |  SourceTimezone  |  string  |  否  |  空  |  日志时间所属时区。格式为GMT+HH:MM（东区）或GMT-HH:MM（西区）。  |
+|  SourceYear  |  int  |  否  |  -1  |  当时间字符串不包含年份时，指定解析所用的年份。  |
 
 * 表1：时间格式
 

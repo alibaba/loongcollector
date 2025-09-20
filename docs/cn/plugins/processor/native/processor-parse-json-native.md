@@ -21,6 +21,7 @@
 |  KeepingSourceWhenParseFail  |  bool  |  否  |  false  |  当解析失败时，是否保留源字段。  |
 |  KeepingSourceWhenParseSucceed  |  bool  |  否  |  false  |  当解析成功时，是否保留源字段。  |
 |  RenamedSourceKey  |  string  |  否  |  空  |  当源字段被保留时，用于存储源字段的字段名。若不填，默认不改名。  |
+|  CopingRawLog  |  bool  |  否  |  false  |  当解析失败且开启保留源字段时，是否额外复制一份原始日志到 `__raw_log__` 字段。  |
 
 ## 样例
 

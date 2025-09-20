@@ -19,6 +19,8 @@
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_container\_stdio。  |
 |  IgnoringStdout  |  Boolean  |  否  |  false  |  是否忽略标准输出stdout。  |
 |  IgnoringStderr  |  Boolean  |  否  |  false  |  是否忽略标准出错信息stderr。 |
+|  IgnoreParseWarning  |  Boolean  |  否  |  false  |  解析容器日志时，是否忽略解析告警。  |
+|  KeepingSourceWhenParseFail  |  Boolean  |  否  |  true  |  当解析失败时是否保留原始内容。  |
 |  TailSizeKB  |  uint  |  否  |  1024  |  配置首次生效时，标准输出文件的起始采集位置距离文件结尾的大小。如果文件大小小于该值，则从头开始采集，取值范围为0～10485760KB。  |
 |  Multiline  |  object  |  否  |  空  |  多行聚合选项，详见表1。  |
 |  ContainerFilters  |  object  |  否  |  空  |  容器过滤选项。多个选项之间为“且”的关系，详见表2。  |
@@ -32,7 +34,7 @@
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Mode  |  string  |  否  |  custom  |  多行聚合模式。仅支持custom。  |
+|  Mode  |  string  |  否  |  custom  |  多行聚合模式。可选值包括custom和JSON。  |
 |  StartPattern  |  string  |  当Multiline.Mode取值为custom时，至少1个必填  |  空  |  行首正则表达式。  |
 |  ContinuePattern  |  string  |  |  空  |  行继续正则表达式。  |
 |  EndPattern  |  string  |  |  空  |  行尾正则表达式。  |

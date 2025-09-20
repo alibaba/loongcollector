@@ -30,6 +30,7 @@
 | --- | --- | --- | --- | --- |
 |  Key  |  string  |  是  |  /  |  tag的键。  |
 |  Value  |  string  |  是  |  /  |  tag的值。  |
+|  DiscardingTag  |  bool  |  否  |  false  |  命中后是否从事件上删除该标签。 |
 
 ## 样例
 

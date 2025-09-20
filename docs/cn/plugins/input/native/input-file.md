@@ -19,6 +19,7 @@
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_file。  |
 |  FilePaths  |  \[string\]  |  是  |  /  |  待采集的日志文件路径列表（目前仅限1个路径）。路径中支持使用\*和\*\*通配符，其中\*\*通配符仅能出现一次且仅限用于文件名前。  |
 |  MaxDirSearchDepth  |  int  |  否  |  0  |  文件路径中\*\*通配符匹配的最大目录深度。仅当日志路径中存在\*\*通配符时有效，取值范围为0～1000。  |
+|  MaxCheckpointDirSearchDepth  |  uint  |  否  |  0  |  还原检查点时如果文件已被移动，找回文件的最大目录搜索深度。  |
 |  ExcludeFilePaths  |  \[string\]  |  否  |  空  |  文件路径黑名单。路径必须为绝对路径，支持使用\*通配符。  |
 |  ExcludeFiles  |  \[string\]  |  否  |  空  |  文件名黑名单。支持使用\*通配符。  |
 |  ExcludeDirs  |  \[string\]  |  否  |  空  |  目录黑名单。路径必须为绝对路径，支持使用\*通配符  |
@@ -31,6 +32,7 @@
 |  ExternalEnvTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
 |  AppendingLogPositionMeta  |  bool  |  否  |  false  |  是否在日志中添加该条日志所属文件的元信息，包括\_\_tag\_\_:\_\_inode\_\_字段和\_\_file\_offset\_\_字段。  |
 |  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
+|  EnableExactlyOnce  |  uint  |  否  |  0  |  **实验功能！**Exactly Once 并发度（>0 启用 Exactly Once 处理与提交保障）。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的文件。  |
 |  FileOffsetKey | string | 否 | log.file.offset | 用于指定日志文件偏移量的字段名。 |
 |  Tags | map | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
