@@ -19,12 +19,16 @@
 #include <cstring>
 
 #include <sstream>
+#include <unordered_map>
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/ParamExtractor.h"
+#include "common/StringView.h"
 #include "logger/Logger.h"
+#include "models/LogEvent.h"
+#include "models/PipelineEvent.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
@@ -60,6 +64,32 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
 
     if (!mSerializer) {
         mSerializer = make_unique<JsonEventGroupSerializer>(this);
+    }
+
+    if (!mTopicFormatter.Init(mKafkaConfig.Topic)) {
+        LOG_ERROR(mContext->GetLogger(), ("invalid topic format string", mKafkaConfig.Topic));
+        return false;
+    }
+
+    if (mTopicFormatter.IsDynamic()) {
+        mTopicDescriptors.clear();
+        const auto& keys = mTopicFormatter.GetRequiredKeys();
+        mTopicDescriptors.reserve(keys.size());
+        for (const auto& key : keys) {
+            TopicPlaceholderDescriptor descriptor;
+            descriptor.placeholder = key;
+            if (key.rfind("content.", 0) == 0) {
+                descriptor.source = TopicValueSource::Content;
+                descriptor.key = key.substr(8);
+            } else if (key.rfind("tag.", 0) == 0) {
+                descriptor.source = TopicValueSource::TagWithPrefix;
+                descriptor.key = key.substr(4);
+            } else {
+                descriptor.source = TopicValueSource::GroupTag;
+                descriptor.key = key;
+            }
+            mTopicDescriptors.emplace_back(std::move(descriptor));
+        }
     }
 
     GenerateQueueKey(mKafkaConfig.Topic);
@@ -115,37 +145,124 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         return false;
     }
 
-    BatchedEvents batchedEvents(std::move(group.MutableEvents()),
-                                std::move(group.GetSizedTags()),
-                                std::move(group.GetSourceBuffer()),
-                                group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
-                                std::move(group.GetExactlyOnceCheckpoint()));
+    auto events = std::move(group.MutableEvents());
 
-    string serializedData;
-    string errorMsg;
-    if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
-        LOG_ERROR(mContext->GetLogger(), ("failed to serialize events", errorMsg)("action", "discard data"));
-        mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
-                                               "failed to serialize events: " + errorMsg + "\taction: discard data",
-                                               mContext->GetRegion(),
-                                               mContext->GetProjectName(),
-                                               mContext->GetConfigName(),
-                                               mContext->GetLogstoreName());
-        mDiscardCnt->Add(1);
-        return false;
+    const bool isDynamicTopic = mTopicFormatter.IsDynamic();
+    const GroupTags* groupTags = isDynamicTopic ? &group.GetTags() : nullptr;
+    const auto& sizedTags = group.GetSizedTags();
+    auto& sourceBuffer = group.GetSourceBuffer();
+    auto& checkpoint = group.GetExactlyOnceCheckpoint();
+
+    std::unordered_map<std::string, std::string> topicValues;
+    if (isDynamicTopic) {
+        topicValues.reserve(mTopicDescriptors.size());
     }
 
-    mSendCnt->Add(1);
+    bool allSuccess = true;
+    std::string serializedData;
+    std::string errorMsg;
 
-    size_t bytes = serializedData.size();
-    mProducer->ProduceAsync(mKafkaConfig.Topic,
-                            std::move(serializedData),
-                            [this, bytes](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
-                                if (success) {
-                                    LOG_DEBUG(mContext->GetLogger(), ("kafka message queued", bytes));
-                                }
-                                HandleDeliveryResult(success, errorInfo);
-                            });
+    for (auto& event : events) {
+        errorMsg.clear();
+        serializedData.clear();
+
+        std::string topic = mKafkaConfig.Topic;
+        if (isDynamicTopic) {
+            if (!(PopulateTopicValues(event, *groupTags, topicValues) && mTopicFormatter.Format(topicValues, topic))) {
+                topic = mKafkaConfig.Topic;
+                LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mKafkaConfig.Topic));
+            }
+        }
+        mTopicSet.insert(topic);
+
+        BatchedEvents batchedEvents;
+        batchedEvents.mEvents.reserve(1);
+        batchedEvents.mEvents.emplace_back(std::move(event));
+        batchedEvents.mTags = sizedTags;
+        batchedEvents.mSourceBuffers.emplace_back(sourceBuffer);
+        batchedEvents.mExactlyOnceCheckpoint = checkpoint;
+
+        if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
+            LOG_ERROR(mContext->GetLogger(),
+                      ("failed to serialize events", errorMsg)("topic", topic)("action", "discard data"));
+            mContext->GetAlarm().SendAlarmCritical(SERIALIZE_FAIL_ALARM,
+                                                   "failed to serialize events: " + errorMsg + "\taction: discard data",
+                                                   mContext->GetRegion(),
+                                                   mContext->GetProjectName(),
+                                                   mContext->GetConfigName(),
+                                                   mContext->GetLogstoreName());
+            mDiscardCnt->Add(1);
+            allSuccess = false;
+            continue;
+        }
+
+        mSendCnt->Add(1);
+
+        size_t bytes = serializedData.size();
+        mProducer->ProduceAsync(
+            topic, std::move(serializedData), [this, bytes](bool success, const KafkaProducer::ErrorInfo& errorInfo) {
+                if (success) {
+                    LOG_DEBUG(mContext->GetLogger(), ("kafka message queued", bytes));
+                }
+                HandleDeliveryResult(success, errorInfo);
+            });
+    }
+
+    return allSuccess;
+}
+
+bool FlusherKafka::PopulateTopicValues(const PipelineEventPtr& event,
+                                       const GroupTags& groupTags,
+                                       std::unordered_map<std::string, std::string>& values) const {
+    values.clear();
+
+    if (mTopicDescriptors.empty()) {
+        return true;
+    }
+
+    values.reserve(mTopicDescriptors.size());
+
+    for (const auto& descriptor : mTopicDescriptors) {
+        switch (descriptor.source) {
+            case TopicValueSource::Content: {
+                if (event->GetType() != PipelineEvent::Type::LOG) {
+                    return false;
+                }
+                const auto& logEvent = event.Cast<LogEvent>();
+                StringView key(descriptor.key);
+                StringView value = logEvent.GetContent(key);
+                if (value.empty()) {
+                    return false;
+                }
+                values[descriptor.placeholder] = value.to_string();
+                break;
+            }
+            case TopicValueSource::TagWithPrefix: {
+                if (groupTags.empty()) {
+                    return false;
+                }
+                StringView key(descriptor.key);
+                auto it = groupTags.find(key);
+                if (it == groupTags.end() || it->second.empty()) {
+                    return false;
+                }
+                values[descriptor.placeholder] = it->second.to_string();
+                break;
+            }
+            case TopicValueSource::GroupTag: {
+                if (groupTags.empty()) {
+                    return false;
+                }
+                StringView key(descriptor.key);
+                auto it = groupTags.find(key);
+                if (it == groupTags.end() || it->second.empty()) {
+                    return false;
+                }
+                values[descriptor.placeholder] = it->second.to_string();
+                break;
+            }
+        }
+    }
 
     return true;
 }

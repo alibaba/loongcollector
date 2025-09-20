@@ -43,3 +43,34 @@ flushers:
     MaxMessageBytes: 5242880
     MaxRetries: 2
 ```
+
+
+## 动态 Topic
+
+`Topic` 支持动态格式化，按事件内容或分组标签动态路由到不同的 Kafka Topic。支持的占位符：
+
+- `%{content.key}`: 取日志内容中的字段值（仅对 `LOG` 类型事件生效）。
+- `%{tag.key}`: 取分组标签（`GroupTags`）中的键值。
+- `${ENV_NAME}`: 取分组标签中名为 `ENV_NAME` 的值（通常由上游处理器/输入端注入）。
+
+示例：根据日志中的 `service` 字段动态路由到不同 Topic：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_cpp
+    Brokers: ["kafka:29092"]
+    Topic: "app-%{content.service}"
+    KafkaVersion: "3.6.0"
+```
+
+示例：根据标签 `env` 和日志字段 `service` 组合路由：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_cpp
+    Brokers: ["kafka:29092"]
+    Topic: "${env}-%{content.service}"
+    KafkaVersion: "3.6.0"
+```
+
+当动态格式化失败（字段缺失等）时，将回退到原始 `Topic` 模板字符串对应的静态值，并记录错误日志。
