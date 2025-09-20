@@ -272,7 +272,7 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         bool res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
         if (!res) {
             LOG_WARNING(sLogger, ("start file security plugin", "failed"));
-            return -1;
+            return 1;
         }
         LOG_INFO(sLogger, ("start file security plugin", "success"));
     }

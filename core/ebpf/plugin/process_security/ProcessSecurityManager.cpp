@@ -98,8 +98,6 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     mQueueKey = ctx->GetProcessQueueKey();
 
     mRegisteredConfigCount = 1;
-    LOG_ERROR(sLogger, ("ProcessSecurity AddOrUpdateConfig count", mRegisteredConfigCount));
-
     return 0;
 }
 
@@ -116,7 +114,6 @@ int ProcessSecurityManager::RemoveConfig(const std::string&) {
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
     mRegisteredConfigCount = 0;
-    LOG_ERROR(sLogger, ("ProcessSecurity RemoveConfig count", mRegisteredConfigCount));
     return 0;
 }
 

@@ -306,7 +306,7 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         bool res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
         if (!res) {
             LOG_WARNING(sLogger, ("start network security plugin", "failed"));
-            return -1;
+            return 1;
         }
         LOG_INFO(sLogger, ("start network security plugin", "success"));
     }
