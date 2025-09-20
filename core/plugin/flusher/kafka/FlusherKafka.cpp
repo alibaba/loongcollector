@@ -19,6 +19,7 @@
 #include <cstring>
 
 #include <sstream>
+#include <unordered_map>
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
@@ -144,39 +145,43 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         return false;
     }
 
-    GroupTags groupTags = group.GetTags();
-
     auto events = std::move(group.MutableEvents());
 
+    const bool isDynamicTopic = mTopicFormatter.IsDynamic();
+    const GroupTags* groupTags = isDynamicTopic ? &group.GetTags() : nullptr;
+    const auto& sizedTags = group.GetSizedTags();
+    auto& sourceBuffer = group.GetSourceBuffer();
+    auto& checkpoint = group.GetExactlyOnceCheckpoint();
+
     std::unordered_map<std::string, std::string> topicValues;
-    if (mTopicFormatter.IsDynamic()) {
+    if (isDynamicTopic) {
         topicValues.reserve(mTopicDescriptors.size());
     }
 
     bool allSuccess = true;
+    std::string serializedData;
+    std::string errorMsg;
 
     for (auto& event : events) {
+        errorMsg.clear();
+        serializedData.clear();
+
         std::string topic = mKafkaConfig.Topic;
-        if (mTopicFormatter.IsDynamic()) {
-            if (!(PopulateTopicValues(event, groupTags, topicValues) && mTopicFormatter.Format(topicValues, topic))) {
+        if (isDynamicTopic) {
+            if (!(PopulateTopicValues(event, *groupTags, topicValues) && mTopicFormatter.Format(topicValues, topic))) {
                 topic = mKafkaConfig.Topic;
                 LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mKafkaConfig.Topic));
             }
         }
         mTopicSet.insert(topic);
 
-        EventsContainer singleEvent;
-        singleEvent.reserve(1);
-        singleEvent.emplace_back(std::move(event));
-
         BatchedEvents batchedEvents;
-        batchedEvents.mEvents = std::move(singleEvent);
-        batchedEvents.mTags = group.GetSizedTags();
-        batchedEvents.mSourceBuffers.emplace_back(group.GetSourceBuffer());
-        batchedEvents.mExactlyOnceCheckpoint = group.GetExactlyOnceCheckpoint();
+        batchedEvents.mEvents.reserve(1);
+        batchedEvents.mEvents.emplace_back(std::move(event));
+        batchedEvents.mTags = sizedTags;
+        batchedEvents.mSourceBuffers.emplace_back(sourceBuffer);
+        batchedEvents.mExactlyOnceCheckpoint = checkpoint;
 
-        string serializedData;
-        string errorMsg;
         if (!mSerializer->DoSerialize(std::move(batchedEvents), serializedData, errorMsg)) {
             LOG_ERROR(mContext->GetLogger(),
                       ("failed to serialize events", errorMsg)("topic", topic)("action", "discard data"));

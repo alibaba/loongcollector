@@ -74,7 +74,12 @@ void FormattedStringUnittest::TestMissingKey() {
 
 void FormattedStringUnittest::TestEnvironmentPlaceholder() {
     const char* envKey = "FORMATTED_STRING_ENV";
+
+#if defined(_WIN32) || defined(_WIN64)
+    _putenv_s(envKey, "prod");
+#else
     setenv(envKey, "prod", 1);
+#endif
 
     FormattedString formatter;
     APSARA_TEST_TRUE(formatter.Init("service_${FORMATTED_STRING_ENV}_%{tag.env}"));
