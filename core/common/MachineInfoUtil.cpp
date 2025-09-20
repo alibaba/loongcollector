@@ -534,7 +534,7 @@ bool InstanceIdentity::InitFromFile() {
     ECSMeta meta;
     if (CheckExistance(mInstanceIdentityFile)) {
         std::string instanceIdentityStr;
-        if (FileReadResult::kOK != ReadFileContent(mInstanceIdentityFile, instanceIdentityStr, kDefaultMaxFileSize)) {
+        if (FileReadResult::kOK == ReadFileContent(mInstanceIdentityFile, instanceIdentityStr, kDefaultMaxFileSize)) {
             Json::Value doc;
             std::string errMsg;
             if (!ParseJsonTable(instanceIdentityStr, doc, errMsg)) {
