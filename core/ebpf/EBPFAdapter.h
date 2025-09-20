@@ -52,7 +52,6 @@ public:
     // re-attach bpf progs ...
     bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
-    bool CheckPluginRunning(PluginType pluginType);
 
     int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
     int32_t ConsumePerfBufferData(PluginType pluginType);
@@ -104,7 +103,6 @@ private:
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
     std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
-    std::array<std::atomic_bool, (int)PluginType::MAX> mRunning = {};
     std::string mBinaryPath;
     std::string mFullLibName;
 

@@ -79,7 +79,7 @@ public:
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
         return 0;
     }

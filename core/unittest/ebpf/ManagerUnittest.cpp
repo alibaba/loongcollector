@@ -112,7 +112,7 @@ void ManagerUnittest::TestProcessSecurityManagerBasic() {
     APSARA_TEST_EQUAL(manager->Suspend(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 
-    APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(manager->resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
     APSARA_TEST_EQUAL(manager->Destroy(), 0);
@@ -156,7 +156,7 @@ void ManagerUnittest::TestFileSecurityManagerBasic() {
     APSARA_TEST_EQUAL(manager->Suspend(), 0);
     APSARA_TEST_FALSE(manager->IsRunning());
 
-    APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(manager->resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
     APSARA_TEST_EQUAL(manager->Destroy(), 0);
@@ -280,7 +280,7 @@ void ManagerUnittest::TestNetworkSecurityManagerBasic() {
     APSARA_TEST_FALSE(manager->IsRunning());
 
     // 测试恢复
-    APSARA_TEST_EQUAL(manager->Resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
+    APSARA_TEST_EQUAL(manager->resume(std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)), 0);
     APSARA_TEST_TRUE(manager->IsRunning());
 
     APSARA_TEST_EQUAL(manager->Destroy(), 0);

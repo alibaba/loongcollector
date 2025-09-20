@@ -140,18 +140,8 @@ bool ProcessCloneRetryableEvent::attachK8sPodMeta(bool isRetry) {
 }
 
 bool ProcessCloneRetryableEvent::flushEvent() {
-    if (!mFlushProcessEvent) {
-        return true;
-    }
-    if (!mCommonEventQueue.try_enqueue(mProcessEvent)) {
-        // don't use move as it will set mProcessEvent to nullptr even
-        // if enqueue failed, this is unexpected but don't know why
-        LOG_WARNING(
-            sLogger,
-            ("event", "Failed to enqueue process clone event")("pid", mRawEvent->tgid)("ktime", mRawEvent->ktime));
-        // TODO: Alarm discard event if it is called by OnDrop
-        return false;
-    }
+    // don't enqueue process clone event
+    // the method is preserved in case of debugging
     return true;
 }
 

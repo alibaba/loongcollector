@@ -1225,8 +1225,10 @@ int NetworkObserverManager::Init() {
     pc->mConfig = config;
     auto ret = mEBPFAdapter->StartPlugin(PluginType::NETWORK_OBSERVE, std::move(pc));
     if (!ret) {
+        LOG_WARNING(sLogger, ("start network observer plugin", "failed"));
         return -1;
     }
+    LOG_INFO(sLogger, ("start network observer plugin", "success"));
     mInited = true;
 
     return 0;
@@ -1366,7 +1368,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     }
 
     updateConfigVersionAndWhitelist({}, std::move(expiredCids));
-    Resume(opt);
+    resume(opt);
     return 0;
 }
 
@@ -1910,8 +1912,12 @@ int NetworkObserverManager::Destroy() {
         return 0;
     }
     LOG_INFO(sLogger, ("prepare to destroy", ""));
-    mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
-    LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
+    auto ret = mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
+    if (ret) {
+        LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog success"));
+    } else {
+        LOG_WARNING(sLogger, ("destroy stage", "shutdown ebpf prog failed"));
+    }
     this->mInited = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
