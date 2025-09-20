@@ -150,9 +150,6 @@ int FileSecurityManager::SendEvents() {
             // set process tag
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
-            if (!hit) {
-                LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
-            }
 
             for (const auto& commonEvent : group->mInnerEvents) {
                 auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());
@@ -198,6 +195,9 @@ int FileSecurityManager::SendEvents() {
                     default:
                         break;
                 }
+                if (!hit) {
+                    LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime)("path", innerEvent->mPath)("eventType", magic_enum::enum_name(innerEvent->mEventType)));
+                }
             }
         });
     }
@@ -222,6 +222,9 @@ int FileSecurityManager::SendEvents() {
 }
 
 int FileSecurityManager::Init() {
+    if (mInited) {
+        return 0;
+    }
     mInited = true;
     return 0;
 }
@@ -239,16 +242,16 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     }
 
-    if (mConfigName.size()) {
+    if (RegisteredConfigCount() != 0) {
         // update
         LOG_DEBUG(sLogger, ("FileSecurity Update", ""));
         // update config (BPF tailcall, filter map etc.)
-        if (Update(options)) {
+        if (update(options)) {
             LOG_WARNING(sLogger, ("FileSecurity Update failed", ""));
             return 1;
         }
         // resume
-        if (Resume(options)) {
+        if (resume(options)) {
             LOG_WARNING(sLogger, ("FileSecurity Resume failed", ""));
             return 1;
         }
@@ -266,12 +269,12 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                 [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
         pc->mConfig = std::move(config);
 
-        auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
-        LOG_INFO(sLogger, ("start file probe, status", res));
+        bool res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
         if (!res) {
-            LOG_WARNING(sLogger, ("failed to start file probe", ""));
-            return 1;
+            LOG_WARNING(sLogger, ("start file security plugin", "failed"));
+            return -1;
         }
+        LOG_INFO(sLogger, ("start file security plugin", "success"));
     }
 
     mConfigName = ctx->GetConfigName();
@@ -291,8 +294,13 @@ int FileSecurityManager::RemoveConfig(const std::string&) {
         }
     }
     mRegisteredConfigCount = 0;
+    mConfigName.clear();
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
-    LOG_INFO(sLogger, ("stop file plugin, status", res)("configCount", mRegisteredConfigCount));
+    if (res) {
+        LOG_INFO(sLogger, ("stop file security plugin", "success"));
+    } else {
+        LOG_WARNING(sLogger, ("stop file security plugin", "failed"));
+    }
     mRetryableEventCache.Clear();
     return res ? 0 : 1;
 }

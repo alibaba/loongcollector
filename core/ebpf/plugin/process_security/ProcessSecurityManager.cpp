@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "Lock.h"
+#include "Logger.h"
 #include "TimeKeeper.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -59,8 +60,10 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
 }
 
 int ProcessSecurityManager::Init() {
+    if (mInited) {
+        return 0;
+    }
     mInited = true;
-    mSuspendFlag = false;
     return 0;
 }
 
@@ -84,7 +87,7 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
-    if (Resume(opt)) {
+    if (resume(opt)) {
         LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
         return 1;
     }
@@ -94,7 +97,8 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
 
-    mRegisteredConfigCount++;
+    mRegisteredConfigCount = 1;
+    LOG_ERROR(sLogger, ("ProcessSecurity AddOrUpdateConfig count", mRegisteredConfigCount));
 
     return 0;
 }
@@ -111,7 +115,8 @@ int ProcessSecurityManager::RemoveConfig(const std::string&) {
         return 1;
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
-    mRegisteredConfigCount--;
+    mRegisteredConfigCount = 0;
+    LOG_ERROR(sLogger, ("ProcessSecurity RemoveConfig count", mRegisteredConfigCount));
     return 0;
 }
 

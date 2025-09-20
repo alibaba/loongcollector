@@ -108,17 +108,8 @@ public:
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
-        return 0;
-    }
-
     int Suspend() override {
         mSuspendFlag = true;
-        return 0;
-    }
-
-    int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
-        mSuspendFlag = false;
         return 0;
     }
 
@@ -141,6 +132,16 @@ public:
     void ReportAgentInfo();
 
     void HandleHostMetadataUpdate(const std::vector<std::string>& podCidVec);
+
+protected:
+    int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+        return 0;
+    }
+
+    int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override {
+        mSuspendFlag = false;
+        return 0;
+    }
 
 private:
     // the following 3 methods are not thread safe ...

@@ -250,6 +250,9 @@ int NetworkSecurityManager::SendEvents() {
 }
 
 int NetworkSecurityManager::Init() {
+    if (mInited) {
+        return 0;
+    }
     mInited = true;
     return 0;
 }
@@ -267,16 +270,16 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     }
 
-    if (mConfigName.size()) {
+    if (RegisteredConfigCount() != 0) {
         // update
         LOG_DEBUG(sLogger, ("NetworkSecurity Update", ""));
         // update config (BPF tailcall, filter map etc.)
-        if (Update(options)) {
+        if (update(options)) {
             LOG_WARNING(sLogger, ("NetworkSecurity Update failed", ""));
             return 1;
         }
         // resume
-        if (Resume(options)) {
+        if (resume(options)) {
             LOG_WARNING(sLogger, ("NetworkSecurity Resume failed", ""));
             return 1;
         }
@@ -300,10 +303,12 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
                 [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
         pc->mConfig = std::move(config);
 
-        if (!mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc))) {
-            LOG_WARNING(sLogger, ("NetworkSecurity Start failed", ""));
-            return 1;
+        bool res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
+        if (!res) {
+            LOG_WARNING(sLogger, ("start network security plugin", "failed"));
+            return -1;
         }
+        LOG_INFO(sLogger, ("start network security plugin", "success"));
     }
 
     mConfigName = ctx->GetConfigName();
@@ -322,8 +327,15 @@ int NetworkSecurityManager::RemoveConfig(const std::string&) {
             mMetricMgr->ReleaseReentrantMetricsRecordRef(item);
         }
     }
+    mConfigName.clear();
     mRegisteredConfigCount = 0;
-    return mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY) ? 0 : 1;
+    bool ret = mEBPFAdapter->StopPlugin(PluginType::NETWORK_SECURITY);
+    if (ret) {
+        LOG_INFO(sLogger, ("stop network security plugin", "success"));
+    } else {
+        LOG_WARNING(sLogger, ("stop network security plugin", "failed"));
+    }
+    return ret ? 0 : 1;
 }
 
 int NetworkSecurityManager::Destroy() {

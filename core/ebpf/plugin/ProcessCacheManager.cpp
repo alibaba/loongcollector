@@ -159,10 +159,10 @@ bool ProcessCacheManager::Init() {
     ebpfConfig->mConfig = pconfig;
     bool status = mEBPFAdapter->StartPlugin(PluginType::PROCESS_SECURITY, std::move(ebpfConfig));
     if (!status) {
-        LOG_ERROR(sLogger, ("start process probes", "failed"));
+        LOG_ERROR(sLogger, ("start process security plugin", "failed"));
         return false;
     }
-    LOG_INFO(sLogger, ("start process probes, status", status));
+    LOG_INFO(sLogger, ("start process security plugin", "success"));
     ebpf::EBPFServer::GetInstance()->RegisterPluginPerfBuffers(PluginType::PROCESS_SECURITY);
     mInited = true;
     auto ret = syncAllProc(); // write process cache contention with pollPerfBuffers
@@ -180,7 +180,11 @@ void ProcessCacheManager::Stop() {
     mInited = false;
     waitForConsumeFinished();
     auto res = mEBPFAdapter->StopPlugin(PluginType::PROCESS_SECURITY);
-    LOG_INFO(sLogger, ("stop process probes, status", res));
+    if (res) {
+        LOG_INFO(sLogger, ("stop process security plugin", "success"));
+    } else {
+        LOG_WARNING(sLogger, ("stop process security plugin", "failed"));
+    }
     mProcessCache.Clear();
     mProcessDataMap.Clear();
 }
@@ -248,7 +252,6 @@ bool ProcessCacheManager::AttachProcessData(uint32_t pid,
     auto procPtr = mProcessCache.Lookup({pid, ktime});
     if (!procPtr) {
         ADD_COUNTER(mProcessCacheMissTotal, 1);
-        LOG_WARNING(sLogger, ("cannot find proc in cache, pid", pid)("ktime", ktime)("size", mProcessCache.Size()));
         return false;
     }
 
