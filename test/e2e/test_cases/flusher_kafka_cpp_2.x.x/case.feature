@@ -1,9 +1,9 @@
 @flusher
-Feature: flusher kafka cpp 2.x.x
-  Test flusher kafka cpp with native input_file on Kafka 2.x.x
+Feature: flusher kafka native 2.x.x
+  Test flusher kafka native with native input_file on Kafka 2.x.x
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_2.x.x
+  Scenario: TestFlusherKafkaNative_2.x.x
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -11,7 +11,7 @@ Feature: flusher kafka cpp 2.x.x
       - "localhost:9092"
     topic: "test-topic-2x"
     """
-    Given {flusher-kafka-cpp-2.x.x-case} local config as below
+    Given {flusher-kafka-native-2.x.x-case} local config as below
     """
     enable: true
     global:
