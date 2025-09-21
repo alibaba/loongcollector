@@ -140,8 +140,19 @@ bool ProcessCloneRetryableEvent::attachK8sPodMeta(bool isRetry) {
 }
 
 bool ProcessCloneRetryableEvent::flushEvent() {
-    // don't enqueue process clone event
-    // the method is preserved in case of debugging
+    if (!mFlushProcessEvent) {
+        return true;
+    }
+#if defined(APSARA_UNIT_TEST_MAIN)
+    if (!mCommonEventQueue.try_enqueue(mProcessEvent)) {
+        // don't use move as it will set mProcessEvent to nullptr even
+        // if enqueue failed, this is unexpected but don't know why
+        LOG_WARNING(
+            sLogger,
+            ("event", "Failed to enqueue process clone event")("pid", mRawEvent->tgid)("ktime", mRawEvent->ktime));
+        return false;
+    }
+#endif // defined(APSARA_UNIT_TEST_MAIN)
     return true;
 }
 

@@ -196,7 +196,10 @@ int FileSecurityManager::SendEvents() {
                         break;
                 }
                 if (!hit) {
-                    LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime)("path", innerEvent->mPath)("eventType", magic_enum::enum_name(innerEvent->mEventType)));
+                    LOG_WARNING(
+                        sLogger,
+                        ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime)(
+                            "path", innerEvent->mPath)("eventType", magic_enum::enum_name(innerEvent->mEventType)));
                 }
             }
         });

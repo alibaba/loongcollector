@@ -701,8 +701,9 @@ void EBPFServer::RegisterPluginPerfBuffers(PluginType type) {
                           ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else if (errno == EEXIST) {
                 // fd already registered, this is normal in some scenarios
-                LOG_WARNING(sLogger,
-                          ("Perf buffer epoll fd already registered", epollFd)("plugin type", magic_enum::enum_name(type)));
+                LOG_WARNING(
+                    sLogger,
+                    ("Perf buffer epoll fd already registered", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
                 LOG_ERROR(sLogger,
                           ("Failed to register perf buffer epoll fd",
@@ -727,8 +728,9 @@ void EBPFServer::UnregisterPluginPerfBuffers(PluginType type) {
                           ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else if (errno == ENOENT) {
                 // fd not registered, this is normal in some scenarios
-                LOG_WARNING(sLogger,
-                          ("Perf buffer epoll fd not registered", epollFd)("plugin type", magic_enum::enum_name(type)));
+                LOG_WARNING(
+                    sLogger,
+                    ("Perf buffer epoll fd not registered", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
                 LOG_ERROR(sLogger,
                           ("Failed to unregister perf buffer epoll fd",

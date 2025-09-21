@@ -83,7 +83,7 @@ namespace logtail::ebpf {
 EBPFAdapter::EBPFAdapter() = default;
 
 EBPFAdapter::~EBPFAdapter() {
-    // Plugin cleanup is handled by EBPFServer::Stop() to avoid 
+    // Plugin cleanup is handled by EBPFServer::Stop() to avoid
     // accessing potentially freed resources during global destruction
 }
 
