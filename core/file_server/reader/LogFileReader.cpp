@@ -78,7 +78,11 @@ DEFINE_FLAG_INT32(max_fix_pos_bytes, "", 128 * 1024);
 DEFINE_FLAG_INT32(force_release_deleted_file_fd_timeout,
                   "force release fd if file is deleted after specified seconds, no matter read to end or not",
                   -1);
-DEFINE_FLAG_BOOL(enable_timeout_force_read, "enable timeoutforce read", true);
+#ifdef __CORP__
+DEFINE_FLAG_BOOL(enable_timeout_force_read, "enable timeout force read", false);
+#else
+DEFINE_FLAG_BOOL(enable_timeout_force_read, "enable timeout force read", true);
+#endif
 #if defined(_MSC_VER)
 // On Windows, if Chinese config base path is used, the log path will be converted to GBK,
 // so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
@@ -964,7 +968,6 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
 
     size_t lastFilePos = mLastFilePos;
     bool tryRollback = true;
-#ifndef __CORP__
     if (BOOL_FLAG(enable_timeout_force_read) && event != nullptr && event->IsReaderFlushTimeout()) {
         // If flush timeout event, we should filter whether the event is legacy.
         if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
@@ -974,7 +977,6 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
             return false;
         }
     }
-#endif
     bool moreData = GetRawData(logBuffer, mLastFileSize, tryRollback);
     if (!logBuffer.rawBuffer.empty()) {
         if (mEOOption) {
