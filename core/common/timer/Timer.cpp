@@ -26,20 +26,18 @@ Timer::~Timer() {
 
 void Timer::Init() {
     {
-        if (mIsThreadRunning) {
+        if (mIsThreadRunning.exchange(true)) {
             return;
         }
-        mIsThreadRunning = true;
     }
     mThreadRes = async(launch::async, &Timer::Run, this);
 }
 
 void Timer::Stop() {
     {
-        if (!mIsThreadRunning) {
+        if (!mIsThreadRunning.exchange(false)) {
             return;
         }
-        mIsThreadRunning = false;
     }
     mCV.notify_one();
     if (!mThreadRes.valid()) {
@@ -65,10 +63,10 @@ void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
 
 void Timer::Run() {
     LOG_INFO(sLogger, ("timer", "started"));
-    while (mIsThreadRunning) {
+    while (mIsThreadRunning.load()) {
         unique_lock<mutex> queueLock(mQueueMux);
         if (mQueue.empty()) {
-            mCV.wait(queueLock, [this]() { return !mIsThreadRunning || !mQueue.empty(); });
+            mCV.wait(queueLock, [this]() { return !mIsThreadRunning.load() || !mQueue.empty(); });
         } else {
             auto now = chrono::steady_clock::now();
             while (!mQueue.empty()) {
