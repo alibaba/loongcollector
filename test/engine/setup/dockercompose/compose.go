@@ -51,6 +51,7 @@ services:
     volumes:
       - %s:/usr/local/loongcollector/conf/default_flusher.json
       - %s:/usr/local/loongcollector/conf/continuous_pipeline_config/local
+      - %s:/usr/local/loongcollector/conf/onetime_pipeline_config/local
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
       - /sys/:/sys/
@@ -279,7 +280,7 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 // getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
-	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir)
+	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir, config.OnetimeConfigDir)
 	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
 		panic(err)
 	}

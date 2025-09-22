@@ -25,45 +25,33 @@
 
 #include "MetricValue.h"
 #include "common/StringTools.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
+
+DEFINE_FLAG_INT32(basic_host_monitor_system_collect_interval, "basic host monitor system collect interval, seconds", 1);
 
 namespace logtail {
 
 const std::string SystemCollector::sName = "system";
 const std::string kMetricLabelMode = "valueTag";
 
-SystemCollector::SystemCollector() {
-    Init();
-}
-int SystemCollector::Init(int totalCount) {
-    mCountPerReport = totalCount;
-    mCount = 0;
-    return 0;
-}
-bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
+bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     SystemLoadInformation load;
-    if (!SystemInterface::GetInstance()->GetSystemLoadInformation(load)) {
+    if (!SystemInterface::GetInstance()->GetSystemLoadInformation(collectContext.GetMetricTime(), load)) {
         return false;
     }
 
     mCalculate.AddValue(load.systemStat);
 
-    mCount++;
-    if (mCount < mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
 
     SystemStat minSys, maxSys, avgSys;
     mCalculate.Stat(maxSys, minSys, avgSys);
-
-    mCount = 0;
     mCalculate.Reset();
-
-    const time_t now = time(nullptr);
 
     // 数据整理
     std::vector<double> values = {minSys.load1,
@@ -104,11 +92,11 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
                                       "load_per_core_15m_avg"};
 
 
-    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
     if (!metricEvent) {
         return false;
     }
-    metricEvent->SetTimestamp(now, 0);
+    metricEvent->SetTimestamp(load.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     metricEvent->SetTag(std::string("m"), std::string("system.load"));
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
@@ -120,5 +108,8 @@ bool SystemCollector::Collect(const HostMonitorTimerEvent::CollectConfig& collec
     return true;
 }
 
+const std::chrono::seconds SystemCollector::GetCollectInterval() const {
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_system_collect_interval));
+}
 
 } // namespace logtail
