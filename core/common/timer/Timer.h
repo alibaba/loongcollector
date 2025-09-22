@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <chrono>
 #include <condition_variable>
 #include <future>
 #include <memory>
@@ -24,7 +23,6 @@
 #include <queue>
 
 #include "common/timer/TimerEvent.h"
-#include "monitor/metric_models/MetricRecord.h"
 
 namespace logtail {
 
