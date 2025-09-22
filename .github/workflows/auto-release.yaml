@@ -341,7 +341,7 @@ jobs:
           cp temp-arm64/* dist/ || true
           cp temp-windows/* dist/ || true
           
-          # Generate SHA256 files for OSS upload
+          # Generate SHA256 files for GitHub release
           cd dist
           for file in *.tar.gz *.zip; do
             if [ -f "$file" ]; then
@@ -359,62 +359,7 @@ jobs:
           path: dist/
           retention-days: 1
 
-  # 第三步：上传到 OSS
-  upload-to-oss:
-    needs: [create-release-branch, prepare-upload]
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: |
-      always() &&
-      (needs.create-release-branch.result == 'success') &&
-      (needs.prepare-upload.result == 'success' || needs.prepare-upload.result == 'skipped')
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ needs.create-release-branch.outputs.branch_name }}
-
-      - name: Download dist artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-packages
-          path: dist/
-
-      - name: Install ossutil
-        run: |
-          sudo -v ; curl https://gosspublic.alicdn.com/ossutil/install.sh | sudo bash
-
-      - name: Upload packages to OSS
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          OSSUTIL="ossutil -e oss-cn-shanghai.aliyuncs.com --region cn-shanghai -i ${{ secrets.OSS_ACCESS_KEY_ID }} -k ${{ secrets.OSS_ACCESS_KEY_SECRET }}"
-          
-          echo "Uploading packages to OSS for version $VERSION..."
-          
-          # Upload Linux packages
-          for arch in amd64 arm64; do
-            if [ -f "dist/loongcollector-$VERSION.linux-$arch.tar.gz" ]; then
-              echo "Uploading Linux $arch package..."
-              $OSSUTIL cp dist/loongcollector-$VERSION.linux-$arch.tar.gz oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-$arch.tar.gz
-              if [ -f "dist/loongcollector-$VERSION.linux-$arch.tar.gz.sha256" ]; then
-                $OSSUTIL cp dist/loongcollector-$VERSION.linux-$arch.tar.gz.sha256 oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.linux-$arch.tar.gz.sha256
-              fi
-            fi
-          done
-          
-          # Upload Windows package
-          if [ -f "dist/loongcollector-$VERSION.windows-amd64.zip" ]; then
-            echo "Uploading Windows package..."
-            $OSSUTIL cp dist/loongcollector-$VERSION.windows-amd64.zip oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.windows-amd64.zip
-            if [ -f "dist/loongcollector-$VERSION.windows-amd64.zip.sha256" ]; then
-              $OSSUTIL cp dist/loongcollector-$VERSION.windows-amd64.zip.sha256 oss://loongcollector-community-edition/$VERSION/loongcollector-$VERSION.windows-amd64.zip.sha256
-            fi
-          fi
-          
-          echo "All packages uploaded to OSS successfully!"
-
-  # 第四步：构建和上传 Docker 镜像
+  # 第三步：构建和上传 Docker 镜像
   upload-images:
     needs: [create-release-branch, prepare-upload]
     runs-on: ubuntu-latest
@@ -432,13 +377,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Login to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: sls-opensource-registry.cn-shanghai.cr.aliyuncs.com
-          username: ${{ secrets.CONTAINER_REGISTRY_USERNAME }}
-          password: ${{ secrets.CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -458,12 +396,12 @@ jobs:
           echo "Artifacts available for Docker build:"
           ls -la dist/ || echo "No artifacts found"
 
-      - name: Build and push Docker images to both registries
+      - name: Build and push Docker images to GitHub Container Registry
         run: |
           VERSION="${{ github.event.inputs.version }}"
           REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           
-          echo "Building and pushing Docker images for version $VERSION to both registries"
+          echo "Building and pushing Docker images for version $VERSION to GitHub Container Registry"
           
           # 检查是否有Linux构建产物
           LINUX_AMD64_FILE="dist/loongcollector-$VERSION.linux-amd64.tar.gz"
@@ -495,28 +433,25 @@ jobs:
           
           echo "Building Docker images for platforms: $PLATFORMS"
           
-          # 构建并推送多架构镜像到两个仓库
+          # 构建并推送多架构镜像到 GitHub Container Registry
           docker buildx build --platform "$PLATFORMS" \
             --file docker/Dockerfile_release \
             --build-arg VERSION=$VERSION \
             --build-arg HOST_OS=Linux \
-            --tag sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:$VERSION \
             --tag ghcr.io/$REPO_OWNER/loongcollector:$VERSION \
             --tag ghcr.io/$REPO_OWNER/loongcollector:latest \
             --push .
           
           echo "Docker images pushed successfully:"
-          echo "- sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:$VERSION"
           echo "- ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
           echo "- ghcr.io/$REPO_OWNER/loongcollector:latest"
 
-  # 第五步：测试链接和产物
+  # 第四步：测试链接和产物
   test-release:
-    needs: [create-release-branch, upload-to-oss, upload-images]
+    needs: [create-release-branch, upload-images]
     if: |
       always() &&
       (needs.create-release-branch.result == 'success') &&
-      (needs.upload-to-oss.result == 'success' || needs.upload-to-oss.result == 'skipped') &&
       (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -557,56 +492,37 @@ jobs:
             fi
           done
           
-          # 测试下载链接
-          echo "Testing download URLs..."
+          # 测试 GitHub Container Registry 镜像
+          echo "Testing GitHub Container Registry images..."
           
-          # 测试 Linux AMD64
-          if [[ "${{ github.event.inputs.build_linux_amd64 }}" == "true" ]]; then
-            LINUX_AMD64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-amd64.tar.gz"
-            echo "Testing Linux AMD64 download URL: $LINUX_AMD64_URL"
-            if curl -f -s -I "$LINUX_AMD64_URL" | grep -q "200 OK"; then
-              echo "✓ Linux AMD64 download URL accessible"
-            else
-              echo "✗ Linux AMD64 download URL failed"
-              exit 1
-            fi
+          # 测试 Docker 镜像是否可访问
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          # 测试镜像标签
+          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/$VERSION" | grep -q "200 OK"; then
+            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION accessible"
+          else
+            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION failed"
+            exit 1
           fi
           
-          # 测试 Linux ARM64
-          if [[ "${{ github.event.inputs.build_linux_arm64 }}" == "true" ]]; then
-            LINUX_ARM64_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.linux-arm64.tar.gz"
-            echo "Testing Linux ARM64 download URL: $LINUX_ARM64_URL"
-            if curl -f -s -I "$LINUX_ARM64_URL" | grep -q "200 OK"; then
-              echo "✓ Linux ARM64 download URL accessible"
-            else
-              echo "✗ Linux ARM64 download URL failed"
-              exit 1
-            fi
-          fi
-          
-          # 测试 Windows
-          if [[ "${{ github.event.inputs.build_windows }}" == "true" ]]; then
-            WINDOWS_URL="https://loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com/${VERSION}/loongcollector-${VERSION}.windows-amd64.zip"
-            echo "Testing Windows download URL: $WINDOWS_URL"
-            if curl -f -s -I "$WINDOWS_URL" | grep -q "200 OK"; then
-              echo "✓ Windows download URL accessible"
-            else
-              echo "✗ Windows download URL failed"
-              exit 1
-            fi
+          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/latest" | grep -q "200 OK"; then
+            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest accessible"
+          else
+            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest failed"
+            exit 1
           fi
           
           echo "All tests passed!" 
 
-  # 第六步：创建 GitHub Release
+  # 第五步：创建 GitHub Release
   create-release:
-    needs: [create-release-branch, upload-to-oss, upload-images, test-release]
+    needs: [create-release-branch, upload-images, test-release]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     if: |
       always() &&
       (needs.create-release-branch.result == 'success') &&
-      (needs.upload-to-oss.result == 'success' || needs.upload-to-oss.result == 'skipped') &&
       (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped') &&
       (needs.test-release.result == 'success' || needs.test-release.result == 'skipped') &&
       github.event.inputs.create_release == 'true'
