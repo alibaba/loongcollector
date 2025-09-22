@@ -261,6 +261,11 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
                                               uint32_t index,
                                               const PluginMetricManagerPtr& metricMgr,
                                               const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return -1;
+    }
+
     // init metrics ...
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
@@ -294,6 +299,10 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        if (!opts) {
+            LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+            return -1;
+        }
         config.mOptions = opts->mOptionList;
         config.mPerfBufferSpec
             = {{"sock_secure_output",

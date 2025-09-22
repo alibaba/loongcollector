@@ -72,6 +72,11 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     uint32_t index,
     const PluginMetricManagerPtr& metricMgr,
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return -1;
+    }
+
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
         auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);

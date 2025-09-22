@@ -236,6 +236,11 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                            uint32_t index,
                                            const PluginMetricManagerPtr& metricMgr,
                                            const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return -1;
+    }
+
     // init metrics ...
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
@@ -263,6 +268,10 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;
         SecurityOptions* opts = std::get<SecurityOptions*>(options);
+        if (!opts) {
+            LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+            return -1;
+        }
         config.mOptions = opts->mOptionList;
         config.mPerfBufferSpec
             = {{"file_secure_output",
