@@ -28,6 +28,7 @@
 #include "common/queue/blockingconcurrentqueue.h"
 #include "models/EventPool.h"
 #include "unittest/ebpf/MockEBPFAdapter.h"
+#include "unittest/Unittest.h"
 
 namespace logtail::ebpf {
 
@@ -55,25 +56,25 @@ public:
         CollectionPipelineContext ctx1;
         ctx1.SetConfigName("config1");
         auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Remove first config
         result = manager->RemoveConfig("config1");
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 0);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 0);
 
         // Add second config
         CollectionPipelineContext ctx2;
         ctx2.SetConfigName("config2");
         result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Remove second config
         result = manager->RemoveConfig("config2");
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 0);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 0);
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
@@ -95,22 +96,22 @@ public:
 
         // Add config
         auto result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Suspend
         result = manager->Suspend();
-        EXPECT_EQ(result, 0);
+        APSARA_TEST_EQUAL(result, 0);
 
         // Update same config (which will resume)
         result = manager->AddOrUpdateConfig(&ctx, 1, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Remove config
         result = manager->RemoveConfig(configName);
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 0);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 0);
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
@@ -134,32 +135,32 @@ public:
 
         // Add first config
         auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Add second config
         result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 2);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 2);
 
         // Suspend
         result = manager->Suspend();
-        EXPECT_EQ(result, 0);
+        APSARA_TEST_EQUAL(result, 0);
 
         // Update config2 (which will resume)
         result = manager->AddOrUpdateConfig(&ctx2, 1, nullptr, createTestOptions());
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 2);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 2);
 
         // Remove config2 (and resume)
         result = manager->RemoveConfig("config2");
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 1);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 1);
 
         // Remove config1
         result = manager->RemoveConfig("config1");
-        EXPECT_EQ(result, 0);
-        EXPECT_EQ(manager->RegisteredConfigCount(), 0);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_EQUAL(manager->RegisteredConfigCount(), 0);
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
@@ -174,12 +175,12 @@ public:
 protected:
     std::shared_ptr<AbstractManager> createAndInitManagerInstance() {
         auto manager = createManagerInstance();
-        EXPECT_NE(manager, nullptr);
-        
+        APSARA_TEST_TRUE(manager != nullptr);
+
         // Initialize the NetworkObserverManager after creation
         auto result = manager->Init();
-        EXPECT_EQ(result, 0);
-        
+        APSARA_TEST_EQUAL(result, 0);
+
         return manager;
     }
 
@@ -201,8 +202,8 @@ protected:
     // Verify plugin lifecycle pairing
     void verifyPluginPairing(PluginType pluginType) {
         // For most managers, we expect start/stop to be paired
-        EXPECT_TRUE(mMockEBPFAdapter->IsStartStopPaired(pluginType));
-        EXPECT_TRUE(mMockEBPFAdapter->IsSuspendResumePaired(pluginType));
+        APSARA_TEST_TRUE(mMockEBPFAdapter->IsStartStopPaired(pluginType));
+        APSARA_TEST_TRUE(mMockEBPFAdapter->IsSuspendResumePaired(pluginType));
     }
 
     // Get EBPFAdapter reference for ProcessCacheManager constructor

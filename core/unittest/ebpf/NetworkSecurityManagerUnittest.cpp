@@ -16,35 +16,27 @@
 #include <memory>
 
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/plugin/network_observer/NetworkObserverManager.h"
-#include "ebpf/type/NetworkObserverEvent.h"
+#include "ebpf/plugin/network_security/NetworkSecurityManager.h"
+#include "ebpf/type/NetworkEvent.h"
 #include "unittest/ebpf/ManagerConfigPairTestFramework.h"
 #include "unittest/Unittest.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
 
-class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerConfigPairTest {
+class NetworkSecurityManagerConfigPairUnittest : public SecurityManagerConfigPairTest {
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
-        return NetworkObserverManager::Create(
+        return std::make_shared<NetworkSecurityManager>(
             mProcessCacheManager,
             mMockEBPFAdapter,
             *mEventQueue,
             mEventPool.get());
     }
+
 };
 
-TEST_F(NetworkObserverManagerConfigPairUnittest, TestDifferentConfigNamesReplacement) {
-    TestDifferentConfigNamesReplacement();
-}
-
-TEST_F(NetworkObserverManagerConfigPairUnittest, TestSameConfigNameUpdate) {
-    TestSameConfigNameUpdate();
-}
-
-TEST_F(NetworkObserverManagerConfigPairUnittest, TestMultipleConfigsComplexScenario) {
-    TestMultipleConfigsComplexScenario();
-}
+UNIT_TEST_CASE(NetworkSecurityManagerConfigPairUnittest, TestDifferentConfigNamesReplacement);
+UNIT_TEST_CASE(NetworkSecurityManagerConfigPairUnittest, TestSameConfigNameUpdate);
 
 UNIT_TEST_MAIN

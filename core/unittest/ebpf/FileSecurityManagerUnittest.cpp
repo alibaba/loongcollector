@@ -27,6 +27,7 @@
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "unittest/Unittest.h"
+#include "unittest/ebpf/ManagerConfigPairTestFramework.h"
 #include "unittest/ebpf/ProcessCacheManagerWrapper.h"
 
 using namespace logtail;
@@ -244,5 +245,16 @@ UNIT_TEST_CASE(FileSecurityManagerUnittest, TestCreateFileRetryableEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestRecordFileEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestHandleEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestSendEvents);
+
+class FileSecurityManagerConfigPairUnittest : public SecurityManagerConfigPairTest {
+protected:
+    std::shared_ptr<AbstractManager> createManagerInstance() override {
+        return std::make_shared<FileSecurityManager>(
+            mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get(), *mRetryableEventCache);
+    }
+};
+
+UNIT_TEST_CASE(FileSecurityManagerConfigPairUnittest, TestDifferentConfigNamesReplacement);
+UNIT_TEST_CASE(FileSecurityManagerConfigPairUnittest, TestSameConfigNameUpdate);
 
 UNIT_TEST_MAIN

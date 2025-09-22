@@ -16,7 +16,7 @@
 #include <memory>
 
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "ebpf/plugin/network_security/NetworkSecurityManager.h"
+#include "ebpf/plugin/process_security/ProcessSecurityManager.h"
 #include "ebpf/type/NetworkEvent.h"
 #include "unittest/ebpf/ManagerConfigPairTestFramework.h"
 #include "unittest/Unittest.h"
@@ -24,10 +24,10 @@
 using namespace logtail;
 using namespace logtail::ebpf;
 
-class NetworkSecurityManagerConfigPairUnittest : public SecurityManagerConfigPairTest {
+class ProcessSecurityManagerConfigPairUnittest : public SecurityManagerConfigPairTest {
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
-        return std::make_shared<NetworkSecurityManager>(
+        return std::make_shared<ProcessSecurityManager>(
             mProcessCacheManager,
             mMockEBPFAdapter,
             *mEventQueue,
@@ -36,12 +36,7 @@ protected:
 
 };
 
-TEST_F(NetworkSecurityManagerConfigPairUnittest, TestDifferentConfigNamesReplacement) {
-    TestDifferentConfigNamesReplacement();
-}
-
-TEST_F(NetworkSecurityManagerConfigPairUnittest, TestSameConfigNameUpdate) {
-    TestSameConfigNameUpdate();
-}
+UNIT_TEST_CASE(ProcessSecurityManagerConfigPairUnittest, TestDifferentConfigNamesReplacement);
+UNIT_TEST_CASE(ProcessSecurityManagerConfigPairUnittest, TestSameConfigNameUpdate);
 
 UNIT_TEST_MAIN
