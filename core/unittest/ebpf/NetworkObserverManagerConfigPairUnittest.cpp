@@ -26,7 +26,7 @@ using namespace logtail::ebpf;
 
 class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerConfigPairTest {
 protected:
-    std::shared_ptr<AbstractManager> CreateManagerInstance() override {
+    std::shared_ptr<AbstractManager> createManagerInstance() override {
         return NetworkObserverManager::Create(
             mProcessCacheManager,
             mMockEBPFAdapter,

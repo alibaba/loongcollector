@@ -40,17 +40,7 @@ public:
         mEventPool = std::make_unique<EventPool>(true);
         mRetryableEventCache = std::make_unique<RetryableEventCache>();
 
-        // Setup mock expectations for successful operations
-        ON_CALL(*mMockEBPFAdapter, StartPlugin(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*mMockEBPFAdapter, StopPlugin(testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*mMockEBPFAdapter, SuspendPlugin(testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*mMockEBPFAdapter, ResumePlugin(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
-        ON_CALL(*mMockEBPFAdapter, UpdatePlugin(testing::_, testing::_))
-            .WillByDefault(testing::Return(true));
+        // Mock methods are directly implemented to track plugin lifecycle
     }
 
     void TearDown() override {
@@ -59,12 +49,12 @@ public:
 
     // Test different config names replacement scenario: add config1 -> remove config1 -> add config2 -> remove config2
     void TestDifferentConfigNamesReplacement() {
-        auto manager = CreateAndInitManagerInstance();
+        auto manager = createAndInitManagerInstance();
 
         // Add first config
         CollectionPipelineContext ctx1;
         ctx1.SetConfigName("config1");
-        auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, CreateTestOptions());
+        auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 1);
 
@@ -76,7 +66,7 @@ public:
         // Add second config
         CollectionPipelineContext ctx2;
         ctx2.SetConfigName("config2");
-        result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, CreateTestOptions());
+        result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 1);
 
@@ -85,20 +75,26 @@ public:
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 0);
 
+        // Get plugin type before destroying manager
+        auto pluginType = manager->GetPluginType();
+        
+        // Destroy manager to ensure complete lifecycle
+        destroyManagerInstance(manager);
+        
         // Verify plugin lifecycle
-        VerifyPluginPairing(manager->GetPluginType());
+        verifyPluginPairing(pluginType);
     }
 
     // Test same config name update scenario: add config -> suspend -> update config and resume -> remove config
     void TestSameConfigNameUpdate() {
-        auto manager = CreateAndInitManagerInstance();
+        auto manager = createAndInitManagerInstance();
         const std::string configName = "test-config";
 
         CollectionPipelineContext ctx;
         ctx.SetConfigName(configName);
 
         // Add config
-        auto result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, CreateTestOptions());
+        auto result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 1);
 
@@ -107,7 +103,7 @@ public:
         EXPECT_EQ(result, 0);
 
         // Update same config (which will resume)
-        result = manager->AddOrUpdateConfig(&ctx, 1, nullptr, CreateTestOptions());
+        result = manager->AddOrUpdateConfig(&ctx, 1, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 1);
 
@@ -116,14 +112,20 @@ public:
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 0);
 
+        // Get plugin type before destroying manager
+        auto pluginType = manager->GetPluginType();
+        
+        // Destroy manager to ensure complete lifecycle
+        destroyManagerInstance(manager);
+        
         // Verify plugin lifecycle
-        VerifyPluginPairing(manager->GetPluginType());
+        verifyPluginPairing(pluginType);
     }
 
     // Test multiple configs complex scenario (only for NetworkObserverManager):
     // add config1 -> add config2 -> suspend -> update config2 and resume -> remove config2 and resume -> remove config1
     void TestMultipleConfigsComplexScenario() {
-        auto manager = CreateAndInitManagerInstance();
+        auto manager = createAndInitManagerInstance();
 
         CollectionPipelineContext ctx1;
         CollectionPipelineContext ctx2;
@@ -131,12 +133,12 @@ public:
         ctx2.SetConfigName("config2");
 
         // Add first config
-        auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, CreateTestOptions());
+        auto result = manager->AddOrUpdateConfig(&ctx1, 0, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 1);
 
         // Add second config
-        result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, CreateTestOptions());
+        result = manager->AddOrUpdateConfig(&ctx2, 0, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 2);
 
@@ -145,7 +147,7 @@ public:
         EXPECT_EQ(result, 0);
 
         // Update config2 (which will resume)
-        result = manager->AddOrUpdateConfig(&ctx2, 1, nullptr, CreateTestOptions());
+        result = manager->AddOrUpdateConfig(&ctx2, 1, nullptr, createTestOptions());
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 2);
 
@@ -159,13 +161,19 @@ public:
         EXPECT_EQ(result, 0);
         EXPECT_EQ(manager->RegisteredConfigCount(), 0);
 
+        // Get plugin type before destroying manager
+        auto pluginType = manager->GetPluginType();
+        
+        // Destroy manager to ensure complete lifecycle
+        destroyManagerInstance(manager);
+        
         // Verify plugin lifecycle
-        VerifyPluginPairing(manager->GetPluginType());
+        verifyPluginPairing(pluginType);
     }
 
 protected:
-    std::shared_ptr<AbstractManager> CreateAndInitManagerInstance() {
-        auto manager = CreateManagerInstance();
+    std::shared_ptr<AbstractManager> createAndInitManagerInstance() {
+        auto manager = createManagerInstance();
         EXPECT_NE(manager, nullptr);
         
         // Initialize the NetworkObserverManager after creation
@@ -175,22 +183,30 @@ protected:
         return manager;
     }
 
+    void destroyManagerInstance(std::shared_ptr<AbstractManager>& manager) {
+        if (manager) {
+            // Destroy the manager to trigger plugin cleanup
+            manager->Destroy();
+            manager.reset();
+        }
+    }
+
     // Factory method to create manager instances - override in derived classes
-    virtual std::shared_ptr<AbstractManager> CreateManagerInstance() = 0;
+    virtual std::shared_ptr<AbstractManager> createManagerInstance() = 0;
 
     // Factory method to create test options - override in derived classes
     virtual std::variant<SecurityOptions*, ObserverNetworkOption*>
-    CreateTestOptions() = 0;
+    createTestOptions() = 0;
 
     // Verify plugin lifecycle pairing
-    void VerifyPluginPairing(PluginType pluginType) {
+    void verifyPluginPairing(PluginType pluginType) {
         // For most managers, we expect start/stop to be paired
         EXPECT_TRUE(mMockEBPFAdapter->IsStartStopPaired(pluginType));
         EXPECT_TRUE(mMockEBPFAdapter->IsSuspendResumePaired(pluginType));
     }
 
     // Get EBPFAdapter reference for ProcessCacheManager constructor
-    std::shared_ptr<EBPFAdapter>& GetEBPFAdapterRef() {
+    std::shared_ptr<EBPFAdapter>& getEbpfAdapterRef() {
         mEBPFAdapterForProcessCache = std::static_pointer_cast<EBPFAdapter>(mMockEBPFAdapter);
         return mEBPFAdapterForProcessCache;
     }
@@ -225,7 +241,7 @@ protected:
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mProcessCacheRef);
 
         mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            GetEBPFAdapterRef(),
+            getEbpfAdapterRef(),
             "test_host",
             "/",
             *mEventQueue,
@@ -250,7 +266,7 @@ protected:
 class SecurityManagerConfigPairTest : public ProcessCacheManagerConfigPairTest {
 protected:
     std::variant<SecurityOptions*, ObserverNetworkOption*>
-    CreateTestOptions() override {
+    createTestOptions() override {
         static SecurityOptions options;
         options.mOptionList.push_back(SecurityOption{{"test_option"}, std::monostate{}});
         return &options;
@@ -261,7 +277,7 @@ protected:
 class NetworkObserverManagerConfigPairTest : public ProcessCacheManagerConfigPairTest {
 protected:
     std::variant<SecurityOptions*, ObserverNetworkOption*>
-    CreateTestOptions() override {
+    createTestOptions() override {
         static ObserverNetworkOption options;
         options.mApmConfig = {.mWorkspace = "test-ws", .mAppName = "test-app", .mAppId = "test-app-id", .mLanguage = "", .mServiceId = "test-service-id"};
         options.mL4Config.mEnable = true;

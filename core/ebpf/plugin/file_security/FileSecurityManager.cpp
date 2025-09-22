@@ -263,31 +263,32 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
             LOG_WARNING(sLogger, ("FileSecurity Resume failed", ""));
             return 1;
         }
-    } else {
-        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
-        pc->mPluginType = PluginType::FILE_SECURITY;
-        FileSecurityConfig config;
-        SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        if (!opts) {
-            LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
-            return -1;
-        }
-        config.mOptions = opts->mOptionList;
-        config.mPerfBufferSpec
-            = {{"file_secure_output",
-                128,
-                this,
-                [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
-                [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
-        pc->mConfig = std::move(config);
-
-        bool res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
-        if (!res) {
-            LOG_WARNING(sLogger, ("start file security plugin", "failed"));
-            return 1;
-        }
-        LOG_INFO(sLogger, ("start file security plugin", "success"));
+        return 0;
     }
+
+    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::FILE_SECURITY;
+    FileSecurityConfig config;
+    SecurityOptions* opts = std::get<SecurityOptions*>(options);
+    if (!opts) {
+        LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+        return -1;
+    }
+    config.mOptions = opts->mOptionList;
+    config.mPerfBufferSpec
+        = {{"file_secure_output",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
+    pc->mConfig = std::move(config);
+
+    bool res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
+    if (!res) {
+        LOG_WARNING(sLogger, ("start file security plugin", "failed"));
+        return 1;
+    }
+    LOG_INFO(sLogger, ("start file security plugin", "success"));
 
     mConfigName = ctx->GetConfigName();
     mMetricMgr = metricMgr;

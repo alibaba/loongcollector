@@ -288,37 +288,37 @@ int NetworkSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* c
             LOG_WARNING(sLogger, ("NetworkSecurity Resume failed", ""));
             return 1;
         }
-    } else {
-        const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
-        if (!securityOpts) {
-            LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
-            return -1;
-        }
-
-        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
-        pc->mPluginType = PluginType::NETWORK_SECURITY;
-        NetworkSecurityConfig config;
-        SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        if (!opts) {
-            LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
-            return -1;
-        }
-        config.mOptions = opts->mOptionList;
-        config.mPerfBufferSpec
-            = {{"sock_secure_output",
-                128,
-                this,
-                [](void* ctx, int cpu, void* data, uint32_t size) { HandleNetworkKernelEvent(ctx, cpu, data, size); },
-                [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
-        pc->mConfig = std::move(config);
-
-        bool res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
-        if (!res) {
-            LOG_WARNING(sLogger, ("start network security plugin", "failed"));
-            return 1;
-        }
-        LOG_INFO(sLogger, ("start network security plugin", "success"));
+        return 0;
     }
+    const auto* securityOpts = std::get_if<SecurityOptions*>(&options);
+    if (!securityOpts) {
+        LOG_ERROR(sLogger, ("Invalid options type for NetworkSecurityManager", ""));
+        return -1;
+    }
+
+    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::NETWORK_SECURITY;
+    NetworkSecurityConfig config;
+    SecurityOptions* opts = std::get<SecurityOptions*>(options);
+    if (!opts) {
+        LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+        return -1;
+    }
+    config.mOptions = opts->mOptionList;
+    config.mPerfBufferSpec
+        = {{"sock_secure_output",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleNetworkKernelEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleNetworkKernelEventLoss(ctx, cpu, cnt); }}};
+    pc->mConfig = std::move(config);
+
+    bool res = mEBPFAdapter->StartPlugin(PluginType::NETWORK_SECURITY, std::move(pc));
+    if (!res) {
+        LOG_WARNING(sLogger, ("start network security plugin", "failed"));
+        return 1;
+    }
+    LOG_INFO(sLogger, ("start network security plugin", "success"));
 
     mConfigName = ctx->GetConfigName();
     mMetricMgr = metricMgr;

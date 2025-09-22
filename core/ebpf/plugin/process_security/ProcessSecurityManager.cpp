@@ -92,9 +92,19 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
-    if (resume(opt)) {
-        LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
-        return 1;
+    if (RegisteredConfigCount() != 0) {
+        // update
+        LOG_DEBUG(sLogger, ("ProcessSecurity Update", ""));
+        // update config (BPF tailcall, filter map etc.)
+        if (update(opt)) {
+            LOG_WARNING(sLogger, ("ProcessSecurity Update failed", ""));
+            return 1;
+        }
+        if (resume(opt)) {
+            LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
+            return 1;
+        }
+        return 0;
     }
 
     mMetricMgr = metricMgr;

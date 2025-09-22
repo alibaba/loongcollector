@@ -31,15 +31,30 @@ public:
 
     MOCK_METHOD0(Init, void());
 
-    MOCK_METHOD2(StartPlugin, bool(PluginType pluginType, std::unique_ptr<PluginConfig> conf));
+    bool StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+        mStartedPlugins.push_back(pluginType);
+        return true;
+    }
 
-    MOCK_METHOD1(StopPlugin, bool(PluginType pluginType));
+    bool StopPlugin(PluginType pluginType) override {
+        mStoppedPlugins.push_back(pluginType);
+        return true;
+    }
 
-    MOCK_METHOD1(SuspendPlugin, bool(PluginType pluginType));
+    bool SuspendPlugin(PluginType pluginType) override {
+        mSuspendedPlugins.push_back(pluginType);
+        return true;
+    }
 
-    MOCK_METHOD2(UpdatePlugin, bool(PluginType pluginType, std::unique_ptr<PluginConfig> conf));
+    bool UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+        mUpdatedPlugins.push_back(pluginType);
+        return true;
+    }
 
-    MOCK_METHOD2(ResumePlugin, bool(PluginType pluginType, std::unique_ptr<PluginConfig> conf));
+    bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+        mResumedPlugins.push_back(pluginType);
+        return true;
+    }
 
     MOCK_METHOD4(PollPerfBuffers, int32_t(PluginType, int32_t, int32_t*, int));
 
@@ -60,26 +75,6 @@ public:
     std::vector<PluginType> GetResumedPlugins() const { return mResumedPlugins; }
     std::vector<PluginType> GetUpdatedPlugins() const { return mUpdatedPlugins; }
 
-    // Helper methods to simulate plugin lifecycle
-    void SimulateStartPlugin(PluginType pluginType) {
-        mStartedPlugins.push_back(pluginType);
-    }
-
-    void SimulateStopPlugin(PluginType pluginType) {
-        mStoppedPlugins.push_back(pluginType);
-    }
-
-    void SimulateSuspendPlugin(PluginType pluginType) {
-        mSuspendedPlugins.push_back(pluginType);
-    }
-
-    void SimulateResumePlugin(PluginType pluginType) {
-        mResumedPlugins.push_back(pluginType);
-    }
-
-    void SimulateUpdatePlugin(PluginType pluginType) {
-        mUpdatedPlugins.push_back(pluginType);
-    }
 
     void ClearTracking() {
         mStartedPlugins.clear();
