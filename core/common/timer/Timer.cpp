@@ -26,7 +26,6 @@ Timer::~Timer() {
 
 void Timer::Init() {
     {
-        lock_guard<mutex> lock(mThreadRunningMux);
         if (mIsThreadRunning) {
             return;
         }
@@ -37,7 +36,6 @@ void Timer::Init() {
 
 void Timer::Stop() {
     {
-        lock_guard<mutex> lock(mThreadRunningMux);
         if (!mIsThreadRunning) {
             return;
         }
@@ -67,20 +65,17 @@ void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
 
 void Timer::Run() {
     LOG_INFO(sLogger, ("timer", "started"));
-    unique_lock<mutex> threadLock(mThreadRunningMux);
     while (mIsThreadRunning) {
         unique_lock<mutex> queueLock(mQueueMux);
         if (mQueue.empty()) {
-            queueLock.unlock();
-            mCV.wait(threadLock, [this]() { return !mIsThreadRunning || !mQueue.empty(); });
+            mCV.wait(queueLock, [this]() { return !mIsThreadRunning || !mQueue.empty(); });
         } else {
             auto now = chrono::steady_clock::now();
             while (!mQueue.empty()) {
                 auto& e = mQueue.top();
                 if (now < e->GetExecTime()) {
                     auto timeout = e->GetExecTime() - now + chrono::milliseconds(1);
-                    queueLock.unlock();
-                    mCV.wait_for(threadLock, timeout);
+                    mCV.wait_for(queueLock, timeout);
                     break;
                 } else {
                     auto e = std::move(const_cast<unique_ptr<TimerEvent>&>(mQueue.top()));
