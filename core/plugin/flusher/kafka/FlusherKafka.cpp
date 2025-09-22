@@ -19,7 +19,6 @@
 #include <cstring>
 
 #include <sstream>
-#include <unordered_map>
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
@@ -69,27 +68,6 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     if (!mTopicFormatter.Init(mKafkaConfig.Topic)) {
         LOG_ERROR(mContext->GetLogger(), ("invalid topic format string", mKafkaConfig.Topic));
         return false;
-    }
-
-    if (mTopicFormatter.IsDynamic()) {
-        mTopicDescriptors.clear();
-        const auto& keys = mTopicFormatter.GetRequiredKeys();
-        mTopicDescriptors.reserve(keys.size());
-        for (const auto& key : keys) {
-            TopicPlaceholderDescriptor descriptor;
-            descriptor.placeholder = key;
-            if (key.rfind("content.", 0) == 0) {
-                descriptor.source = TopicValueSource::Content;
-                descriptor.key = key.substr(8);
-            } else if (key.rfind("tag.", 0) == 0) {
-                descriptor.source = TopicValueSource::TagWithPrefix;
-                descriptor.key = key.substr(4);
-            } else {
-                descriptor.source = TopicValueSource::GroupTag;
-                descriptor.key = key;
-            }
-            mTopicDescriptors.emplace_back(std::move(descriptor));
-        }
     }
 
     GenerateQueueKey(mKafkaConfig.Topic);
@@ -153,11 +131,6 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     auto& sourceBuffer = group.GetSourceBuffer();
     auto& checkpoint = group.GetExactlyOnceCheckpoint();
 
-    std::unordered_map<std::string, std::string> topicValues;
-    if (isDynamicTopic) {
-        topicValues.reserve(mTopicDescriptors.size());
-    }
-
     bool allSuccess = true;
     std::string serializedData;
     std::string errorMsg;
@@ -168,12 +141,11 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
 
         std::string topic = mKafkaConfig.Topic;
         if (isDynamicTopic) {
-            if (!(PopulateTopicValues(event, *groupTags, topicValues) && mTopicFormatter.Format(topicValues, topic))) {
+            if (!mTopicFormatter.Format(event, group.GetTags(), topic)) {
                 topic = mKafkaConfig.Topic;
                 LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mKafkaConfig.Topic));
             }
         }
-        mTopicSet.insert(topic);
 
         BatchedEvents batchedEvents;
         batchedEvents.mEvents.reserve(1);
@@ -211,61 +183,6 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     return allSuccess;
 }
 
-bool FlusherKafka::PopulateTopicValues(const PipelineEventPtr& event,
-                                       const GroupTags& groupTags,
-                                       std::unordered_map<std::string, std::string>& values) const {
-    values.clear();
-
-    if (mTopicDescriptors.empty()) {
-        return true;
-    }
-
-    values.reserve(mTopicDescriptors.size());
-
-    for (const auto& descriptor : mTopicDescriptors) {
-        switch (descriptor.source) {
-            case TopicValueSource::Content: {
-                if (event->GetType() != PipelineEvent::Type::LOG) {
-                    return false;
-                }
-                const auto& logEvent = event.Cast<LogEvent>();
-                StringView key(descriptor.key);
-                StringView value = logEvent.GetContent(key);
-                if (value.empty()) {
-                    return false;
-                }
-                values[descriptor.placeholder] = value.to_string();
-                break;
-            }
-            case TopicValueSource::TagWithPrefix: {
-                if (groupTags.empty()) {
-                    return false;
-                }
-                StringView key(descriptor.key);
-                auto it = groupTags.find(key);
-                if (it == groupTags.end() || it->second.empty()) {
-                    return false;
-                }
-                values[descriptor.placeholder] = it->second.to_string();
-                break;
-            }
-            case TopicValueSource::GroupTag: {
-                if (groupTags.empty()) {
-                    return false;
-                }
-                StringView key(descriptor.key);
-                auto it = groupTags.find(key);
-                if (it == groupTags.end() || it->second.empty()) {
-                    return false;
-                }
-                values[descriptor.placeholder] = it->second.to_string();
-                break;
-            }
-        }
-    }
-
-    return true;
-}
 
 void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo) {
     mSendDoneCnt->Add(1);

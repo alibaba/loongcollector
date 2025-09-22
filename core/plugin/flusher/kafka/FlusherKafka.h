@@ -19,15 +19,14 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
-#include <set>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/FormattedString.h"
+#include "common/StringView.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "monitor/MetricManager.h"
@@ -57,27 +56,14 @@ public:
 #endif
 
 private:
-    enum class TopicValueSource { GroupTag, TagWithPrefix, Content };
-
-    struct TopicPlaceholderDescriptor {
-        std::string placeholder;
-        std::string key;
-        TopicValueSource source;
-    };
-
     bool SerializeAndSend(PipelineEventGroup&& group);
     void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
-    bool PopulateTopicValues(const PipelineEventPtr& event,
-                             const GroupTags& groupTags,
-                             std::unordered_map<std::string, std::string>& values) const;
 
     KafkaConfig mKafkaConfig;
     std::unique_ptr<KafkaProducer> mProducer;
     std::unique_ptr<EventGroupSerializer> mSerializer;
 
     FormattedString mTopicFormatter;
-    std::vector<TopicPlaceholderDescriptor> mTopicDescriptors;
-    std::set<std::string> mTopicSet;
 
     CounterPtr mSendCnt;
     CounterPtr mSuccessCnt;

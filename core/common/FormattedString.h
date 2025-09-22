@@ -17,8 +17,11 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
+
+#include "common/StringView.h"
+#include "models/PipelineEventGroup.h"
+#include "models/PipelineEventPtr.h"
 
 namespace logtail {
 
@@ -33,7 +36,7 @@ public:
     const std::string& GetTemplate() const { return mTemplate; }
     const std::vector<std::string>& GetRequiredKeys() const { return mRequiredKeys; }
 
-    bool Format(const std::unordered_map<std::string, std::string>& values, std::string& result) const;
+    bool Format(const PipelineEventPtr& event, const GroupTags& groupTags, std::string& result) const;
 
 private:
     bool ParseFormatString(const std::string& formatString);

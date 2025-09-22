@@ -24,6 +24,9 @@
 #include <unordered_map>
 
 #include "common/FormattedString.h"
+#include "common/memory/SourceBuffer.h"
+#include "models/LogEvent.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -43,9 +46,11 @@ void FormattedStringUnittest::TestStaticTemplate() {
     APSARA_TEST_TRUE(formatter.Init("plain_topic"));
     APSARA_TEST_FALSE(formatter.IsDynamic());
 
-    std::unordered_map<std::string, std::string> values;
     std::string result;
-    APSARA_TEST_TRUE(formatter.Format(values, result));
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    (void)event;
+    APSARA_TEST_TRUE(formatter.Format(group.GetEvents().back(), group.GetTags(), result));
     APSARA_TEST_EQUAL(std::string("plain_topic"), result);
 }
 
@@ -54,12 +59,13 @@ void FormattedStringUnittest::TestDynamicTemplate() {
     APSARA_TEST_TRUE(formatter.Init("logs_%{tag.namespace}_%{content.app}"));
     APSARA_TEST_TRUE(formatter.IsDynamic());
 
-    std::unordered_map<std::string, std::string> values;
-    values["tag.namespace"] = "access";
-    values["content.app"] = "frontend";
-
     std::string result;
-    APSARA_TEST_TRUE(formatter.Format(values, result));
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("app"), StringView("frontend"));
+    group.SetTag(StringView("namespace"), StringView("access"));
+    APSARA_TEST_TRUE(formatter.Format(group.GetEvents().back(), group.GetTags(), result));
     APSARA_TEST_EQUAL(std::string("logs_access_frontend"), result);
 }
 
@@ -67,9 +73,11 @@ void FormattedStringUnittest::TestMissingKey() {
     FormattedString formatter;
     APSARA_TEST_TRUE(formatter.Init("logs_%{tag.namespace}"));
 
-    std::unordered_map<std::string, std::string> values;
     std::string result;
-    APSARA_TEST_FALSE(formatter.Format(values, result));
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    (void)event;
+    APSARA_TEST_FALSE(formatter.Format(group.GetEvents().back(), group.GetTags(), result));
 }
 
 void FormattedStringUnittest::TestEnvironmentPlaceholder() {
@@ -84,11 +92,12 @@ void FormattedStringUnittest::TestEnvironmentPlaceholder() {
     FormattedString formatter;
     APSARA_TEST_TRUE(formatter.Init("service_${FORMATTED_STRING_ENV}_%{tag.env}"));
 
-    std::unordered_map<std::string, std::string> values;
-    values["tag.env"] = "blue";
-
     std::string result;
-    APSARA_TEST_TRUE(formatter.Format(values, result));
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    (void)event;
+    group.SetTag(StringView("env"), StringView("blue"));
+    APSARA_TEST_TRUE(formatter.Format(group.GetEvents().back(), group.GetTags(), result));
     APSARA_TEST_EQUAL(std::string("service_prod_blue"), result);
 }
 

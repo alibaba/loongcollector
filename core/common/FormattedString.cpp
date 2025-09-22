@@ -20,6 +20,8 @@
 
 #include <unordered_set>
 
+#include "models/LogEvent.h"
+
 namespace logtail {
 
 bool FormattedString::Init(const std::string& formatString) {
@@ -31,7 +33,7 @@ bool FormattedString::Init(const std::string& formatString) {
     return ParseFormatString(formatString);
 }
 
-bool FormattedString::Format(const std::unordered_map<std::string, std::string>& values, std::string& result) const {
+bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& groupTags, std::string& result) const {
     if (!IsDynamic()) {
         result = mTemplate;
         return true;
@@ -47,11 +49,32 @@ bool FormattedString::Format(const std::unordered_map<std::string, std::string>&
     for (size_t idx = 0; idx < mPlaceholderNames.size(); ++idx) {
         result += mStaticParts[idx];
         const auto& key = mPlaceholderNames[idx];
-        auto it = values.find(key);
-        if (it == values.end()) {
-            return false;
+        if (key.rfind("content.", 0) == 0) {
+            if (event->GetType() != PipelineEvent::Type::LOG) {
+                return false;
+            }
+            const auto& logEvent = event.Cast<LogEvent>();
+            StringView fieldKey(key.data() + 8, key.size() - 8);
+            StringView value = logEvent.GetContent(fieldKey);
+            if (value.empty()) {
+                return false;
+            }
+            result.append(value.data(), value.size());
+            continue;
         }
-        result += it->second;
+        if (key.rfind("tag.", 0) == 0) {
+            if (groupTags.empty()) {
+                return false;
+            }
+            StringView fieldKey(key.data() + 4, key.size() - 4);
+            auto it = groupTags.find(fieldKey);
+            if (it == groupTags.end() || it->second.empty()) {
+                return false;
+            }
+            const auto& value = it->second;
+            result.append(value.data(), value.size());
+            continue;
+        }
     }
 
     result += mStaticParts.back();

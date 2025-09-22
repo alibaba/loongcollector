@@ -385,7 +385,9 @@ void FlusherKafkaUnittest::TestDynamicTopic_Success() {
     event->SetContent(StringView("application"), StringView("user_behavior_log"));
 
     APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
-    APSARA_TEST_TRUE(mFlusher->mTopicSet.find("test_user_behavior_log") != mFlusher->mTopicSet.end());
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("test_user_behavior_log"), completed.back().Topic);
     APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
@@ -402,7 +404,9 @@ void FlusherKafkaUnittest::TestDynamicTopic_FallbackToStatic() {
     event->SetContent(StringView("key"), StringView("value"));
 
     APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
-    APSARA_TEST_TRUE(mFlusher->mTopicSet.find("test_%{content.application}") != mFlusher->mTopicSet.end());
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("test_%{content.application}"), completed.back().Topic);
     APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
@@ -420,7 +424,9 @@ void FlusherKafkaUnittest::TestDynamicTopic_FromTags() {
     group.SetTag(StringView("namespace"), StringView("nginx_access_log"));
 
     APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
-    APSARA_TEST_TRUE(mFlusher->mTopicSet.find("logs_nginx_access_log") != mFlusher->mTopicSet.end());
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("logs_nginx_access_log"), completed.back().Topic);
     APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
     APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
