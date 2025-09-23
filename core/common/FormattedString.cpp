@@ -20,17 +20,60 @@
 
 #include <unordered_set>
 
+#include "logger/Logger.h"
 #include "models/LogEvent.h"
 
 namespace logtail {
 
+namespace {
+static std::string ExpandEnvPlaceholders(const std::string& input) {
+    std::string out;
+    out.reserve(input.size());
+    size_t pos = 0;
+    while (pos < input.size()) {
+        size_t start = input.find("${", pos);
+        if (start == std::string::npos) {
+            out.append(input, pos, std::string::npos);
+            break;
+        }
+        // copy preceding static part
+        out.append(input, pos, start - pos);
+
+        size_t end = input.find('}', start + 2);
+        if (end == std::string::npos) {
+            // No closing brace; append the rest verbatim
+            out.append(input, start, std::string::npos);
+            break;
+        }
+        const size_t nameStart = start + 2;
+        if (nameStart >= end) {
+            // Empty var name, keep literal
+            out.append(input, start, end - start + 1);
+            pos = end + 1;
+            continue;
+        }
+        std::string varName = input.substr(nameStart, end - nameStart);
+        const char* envVal = std::getenv(varName.c_str());
+        if (envVal == nullptr) {
+            LOG_WARNING(sLogger,
+                        ("FormattedString env placeholder missing", varName)("action", "use empty string as default"));
+            // replace by empty string
+        } else {
+            out.append(envVal);
+        }
+        pos = end + 1;
+    }
+    return out;
+}
+} // namespace
+
 bool FormattedString::Init(const std::string& formatString) {
-    mTemplate = formatString;
+    mTemplate = ExpandEnvPlaceholders(formatString);
     mStaticParts.clear();
     mPlaceholderNames.clear();
     mRequiredKeys.clear();
 
-    return ParseFormatString(formatString);
+    return ParseFormatString(mTemplate);
 }
 
 bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& groupTags, std::string& result) const {
@@ -51,12 +94,18 @@ bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& gro
         const auto& key = mPlaceholderNames[idx];
         if (key.rfind("content.", 0) == 0) {
             if (event->GetType() != PipelineEvent::Type::LOG) {
+                LOG_WARNING(sLogger,
+                            ("FormattedString dynamic placeholder requires LOG event",
+                             key)("actual_type", static_cast<int>(event->GetType())));
                 return false;
             }
             const auto& logEvent = event.Cast<LogEvent>();
             StringView fieldKey(key.data() + 8, key.size() - 8);
             StringView value = logEvent.GetContent(fieldKey);
             if (value.empty()) {
+                LOG_WARNING(sLogger,
+                            ("FormattedString missing or empty content field",
+                             std::string(fieldKey.data(), fieldKey.size()))("placeholder", key));
                 return false;
             }
             result.append(value.data(), value.size());
@@ -64,11 +113,15 @@ bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& gro
         }
         if (key.rfind("tag.", 0) == 0) {
             if (groupTags.empty()) {
+                LOG_WARNING(sLogger, ("FormattedString no group tags available for placeholder", key));
                 return false;
             }
             StringView fieldKey(key.data() + 4, key.size() - 4);
             auto it = groupTags.find(fieldKey);
             if (it == groupTags.end() || it->second.empty()) {
+                LOG_WARNING(sLogger,
+                            ("FormattedString missing or empty tag key",
+                             std::string(fieldKey.data(), fieldKey.size()))("placeholder", key));
                 return false;
             }
             const auto& value = it->second;
@@ -89,19 +142,7 @@ bool FormattedString::ParseFormatString(const std::string& formatString) {
     std::string currentStatic;
 
     while (position < length) {
-        size_t percentPos = formatString.find("%{", position);
-        size_t dollarPos = formatString.find("${", position);
-
-        size_t nextPos = std::string::npos;
-        bool isDynamicPlaceholder = false;
-
-        if (percentPos != std::string::npos && (dollarPos == std::string::npos || percentPos < dollarPos)) {
-            nextPos = percentPos;
-            isDynamicPlaceholder = true;
-        } else if (dollarPos != std::string::npos) {
-            nextPos = dollarPos;
-        }
-
+        size_t nextPos = formatString.find("%{", position);
         if (nextPos == std::string::npos) {
             break;
         }
@@ -119,19 +160,12 @@ bool FormattedString::ParseFormatString(const std::string& formatString) {
         }
         const std::string placeholderName = formatString.substr(nameStart, closingBrace - nameStart);
 
-        if (isDynamicPlaceholder) {
-            mStaticParts.emplace_back(std::move(currentStatic));
-            currentStatic.clear();
+        mStaticParts.emplace_back(std::move(currentStatic));
+        currentStatic.clear();
 
-            mPlaceholderNames.emplace_back(placeholderName);
-            if (requiredKeySet.insert(placeholderName).second) {
-                mRequiredKeys.emplace_back(placeholderName);
-            }
-        } else {
-            const char* envValue = std::getenv(placeholderName.c_str());
-            if (envValue != nullptr) {
-                currentStatic.append(envValue);
-            }
+        mPlaceholderNames.emplace_back(placeholderName);
+        if (requiredKeySet.insert(placeholderName).second) {
+            mRequiredKeys.emplace_back(placeholderName);
         }
 
         position = closingBrace + 1;

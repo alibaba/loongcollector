@@ -70,7 +70,8 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         return false;
     }
 
-    GenerateQueueKey(mKafkaConfig.Topic);
+    mExpandedTopic = mTopicFormatter.GetTemplate();
+    GenerateQueueKey(mExpandedTopic);
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
 
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
@@ -84,8 +85,8 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
     mOtherErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OTHER_ERROR_TOTAL);
 
     LOG_INFO(mContext->GetLogger(),
-             ("FlusherKafka initialized successfully", "")("topic", mKafkaConfig.Topic)("brokers",
-                                                                                        mKafkaConfig.Brokers.size())(
+             ("FlusherKafka initialized successfully", "")("configured_topic", mKafkaConfig.Topic)(
+                 "expanded_topic", mExpandedTopic)("brokers", mKafkaConfig.Brokers.size())(
                  "Version", mKafkaConfig.Version.empty() ? std::string("<unset>") : mKafkaConfig.Version));
 
     return true;
@@ -139,11 +140,11 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
         errorMsg.clear();
         serializedData.clear();
 
-        std::string topic = mKafkaConfig.Topic;
+        std::string topic = mExpandedTopic;
         if (isDynamicTopic) {
             if (!mTopicFormatter.Format(event, group.GetTags(), topic)) {
-                topic = mKafkaConfig.Topic;
-                LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mKafkaConfig.Topic));
+                topic = mExpandedTopic;
+                LOG_ERROR(mContext->GetLogger(), ("Failed to format dynamic topic from template", mExpandedTopic));
             }
         }
 

@@ -64,6 +64,7 @@ private:
     std::unique_ptr<EventGroupSerializer> mSerializer;
 
     FormattedString mTopicFormatter;
+    std::string mExpandedTopic;
 
     CounterPtr mSendCnt;
     CounterPtr mSuccessCnt;
