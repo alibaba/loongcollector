@@ -125,12 +125,14 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerInfo1.mID = "123";
         containerInfo1.mLogPath = "/var/lib/docker/containers/123/logs";
         containerInfo1.mEnv["test"] = "test";
+        containerInfo1.mStatus = "running";
         containerManager.mContainerMap["123"] = std::make_shared<RawContainerInfo>(containerInfo1);
 
         RawContainerInfo containerInfo2;
         containerInfo2.mID = "1234";
         containerInfo2.mLogPath = "/var/lib/docker/containers/1234/logs";
         containerInfo2.mEnv["test"] = "test2";
+        containerInfo2.mStatus = "running";
         containerManager.mContainerMap["1234"] = std::make_shared<RawContainerInfo>(containerInfo2);
 
         matchList.clear();
@@ -205,6 +207,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerInfo1.mK8sInfo.mPod = "pod1";
         containerInfo1.mK8sInfo.mNamespace = "namespace1";
         containerInfo1.mK8sInfo.mContainerName = "container1";
+        containerInfo1.mStatus = "running";
         containerManager.mContainerMap["123"] = std::make_shared<RawContainerInfo>(containerInfo1);
 
         RawContainerInfo containerInfo2;
@@ -213,6 +216,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerInfo2.mK8sInfo.mPod = "pod2";
         containerInfo2.mK8sInfo.mNamespace = "namespace2";
         containerInfo2.mK8sInfo.mContainerName = "container2";
+        containerInfo2.mStatus = "running";
         containerManager.mContainerMap["1234"] = std::make_shared<RawContainerInfo>(containerInfo2);
 
         matchList.clear();
@@ -252,7 +256,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include label
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
@@ -265,7 +269,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mK8SFilter.mK8sLabelFilter.mExcludeFields.mFieldsMap["tier"] = "backend";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, false, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
@@ -279,7 +283,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters3.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap["tier"]
             = std::make_shared<boost::regex>("^front.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, false, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "k8s1");
@@ -308,7 +312,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include map
         filters.mContainerLabelFilter.mIncludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
             EXPECT_EQ(diff1.mAdded[0]->mID, "cl1");
@@ -320,7 +324,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mContainerLabelFilter.mExcludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, false, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
             EXPECT_EQ(diff2.mAdded[0]->mID, "cl2");
@@ -332,7 +336,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters3;
         filters3.mContainerLabelFilter.mIncludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^ng.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, false, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "cl1");
@@ -344,9 +348,11 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters4;
         filters4.mContainerLabelFilter.mExcludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^re.*$");
         ContainerDiff diff4;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, false, diff4);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, true, diff4);
         EXPECT_EQ(diff4.mAdded.size(), 1);
-        EXPECT_EQ(diff4.mAdded[0]->mID, "cl1");
+        if (diff4.mAdded.size() > 0) {
+            EXPECT_EQ(diff4.mAdded[0]->mID, "cl1");
+        }
     }
 
     {
@@ -386,7 +392,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
             EXPECT_EQ(diff.mAdded[0]->mID, "combo1");
@@ -864,7 +870,7 @@ void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) cons
         std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
 
         // Collect actual matched IDs
         std::set<std::string> actualMatchedIDs;
