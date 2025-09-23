@@ -2,10 +2,11 @@ package pluginmanager
 
 import (
 	"encoding/json"
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 )
 
 var caCachedFullList map[string]struct{}
