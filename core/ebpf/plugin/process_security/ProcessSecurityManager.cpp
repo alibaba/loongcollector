@@ -23,6 +23,7 @@
 #include <utility>
 
 #include "Lock.h"
+#include "Logger.h"
 #include "TimeKeeper.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
@@ -59,8 +60,10 @@ ProcessSecurityManager::ProcessSecurityManager(const std::shared_ptr<ProcessCach
 }
 
 int ProcessSecurityManager::Init() {
+    if (mInited) {
+        return 0;
+    }
     mInited = true;
-    mSuspendFlag = false;
     return 0;
 }
 
@@ -69,6 +72,11 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     uint32_t index,
     const PluginMetricManagerPtr& metricMgr,
     [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return -1;
+    }
+
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
         auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
@@ -84,9 +92,19 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     }
 
     processCacheMgr->MarkProcessEventFlushStatus(true);
-    if (Resume(opt)) {
-        LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
-        return 1;
+    if (RegisteredConfigCount() != 0) {
+        // update
+        LOG_DEBUG(sLogger, ("ProcessSecurity Update", ""));
+        // update config (BPF tailcall, filter map etc.)
+        if (update(opt)) {
+            LOG_WARNING(sLogger, ("ProcessSecurity Update failed", ""));
+            return 1;
+        }
+        if (resume(opt)) {
+            LOG_WARNING(sLogger, ("ProcessSecurity Resume Failed", ""));
+            return 1;
+        }
+        return 0;
     }
 
     mMetricMgr = metricMgr;
@@ -94,8 +112,7 @@ int ProcessSecurityManager::AddOrUpdateConfig(
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
 
-    mRegisteredConfigCount++;
-
+    mRegisteredConfigCount = 1;
     return 0;
 }
 
@@ -111,7 +128,7 @@ int ProcessSecurityManager::RemoveConfig(const std::string&) {
         return 1;
     }
     processCacheMgr->MarkProcessEventFlushStatus(false);
-    mRegisteredConfigCount--;
+    mRegisteredConfigCount = 0;
     return 0;
 }
 
@@ -134,6 +151,7 @@ std::array<size_t, 1> GenerateAggKeyForProcessEvent(ProcessEvent* event) {
 
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (!event) {
+        LOG_ERROR(sLogger, ("cannot handle", "event is null"));
         return 1;
     }
     auto* processEvent = static_cast<ProcessEvent*>(event.get());

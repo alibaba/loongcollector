@@ -86,7 +86,26 @@ public:
         return 0;
     }
 
-    virtual int Resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    virtual std::unique_ptr<PluginConfig>
+    GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
+
+    std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
+
+private:
+    mutable ReadWriteLock mMtx; // lock
+    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
+
+protected:
+    virtual int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+        bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
+        if (!ret) {
+            LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));
+            return 1;
+        }
+        return 0;
+    }
+
+    virtual int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         {
             WriteLock lock(mMtx);
             mSuspendFlag = false;
@@ -99,25 +118,6 @@ public:
         return 0;
     }
 
-    virtual std::unique_ptr<PluginConfig>
-    GeneratePluginConfig([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) = 0;
-
-    virtual int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
-        bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
-        if (!ret) {
-            LOG_ERROR(sLogger, ("failed to update plugin", magic_enum::enum_name(GetPluginType())));
-            return 1;
-        }
-        return 0;
-    }
-
-    std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
-
-private:
-    mutable ReadWriteLock mMtx; // lock
-    std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
-
-protected:
     std::atomic<bool> mInited = false;
     std::atomic<bool> mSuspendFlag = false;
     std::shared_ptr<EBPFAdapter> mEBPFAdapter;
