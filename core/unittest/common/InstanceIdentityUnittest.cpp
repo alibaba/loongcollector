@@ -14,9 +14,11 @@
 
 
 #include <array>
+#include <boost/format.hpp>
 
 #include "Flags.h"
 #include "MachineInfoUtil.h"
+#include "common/FileSystemUtil.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_STRING(agent_host_id);
@@ -27,10 +29,15 @@ class InstanceIdentityUnittest : public ::testing::Test {
 public:
     void TestECSMeta();
     void TestUpdateECSMeta();
+    void TestInitFromFileRandomHostId();
+    void TestInitFromFileEcsMeta();
 };
 
 UNIT_TEST_CASE(InstanceIdentityUnittest, TestECSMeta);
 UNIT_TEST_CASE(InstanceIdentityUnittest, TestUpdateECSMeta);
+UNIT_TEST_CASE(InstanceIdentityUnittest, TestInitFromFileRandomHostId);
+UNIT_TEST_CASE(InstanceIdentityUnittest, TestInitFromFileEcsMeta);
+
 void InstanceIdentityUnittest::TestECSMeta() {
     {
         ECSMeta meta;
@@ -117,7 +124,64 @@ void InstanceIdentityUnittest::TestUpdateECSMeta() {
         APSARA_TEST_EQUAL(InstanceIdentity::Instance()->GetEntity()->GetEcsRegionID().to_string(), "cn-hangzhou");
         APSARA_TEST_EQUAL(InstanceIdentity::Instance()->GetEntity()->IsECSValid(), true);
     }
-} // namespace logtail
+}
+
+void InstanceIdentityUnittest::TestInitFromFileRandomHostId() {
+    // 确保不会被自定义 host id 覆盖
+    STRING_FLAG(agent_host_id) = "";
+
+    const std::string dataDir = GetAgentDataDir();
+    const std::string filePath = dataDir + "instance_identity";
+
+    const std::string expectHostId = "68E47992-9600-11F0-8F6E-6D1B08DFD9DB";
+    const std::string content = (boost::format(R"({
+	"random-hostid" : "%1%"
+}
+)") % expectHostId)
+                                    .str();
+
+    std::string errMsg;
+    APSARA_TEST_TRUE(WriteFile(filePath, content, errMsg));
+
+    bool ok = InstanceIdentity::Instance()->InitFromFile();
+    APSARA_TEST_TRUE(ok);
+    APSARA_TEST_EQUAL(expectHostId, InstanceIdentity::Instance()->GetEntity()->GetHostID().to_string());
+    APSARA_TEST_EQUAL(Hostid::Type::LOCAL, InstanceIdentity::Instance()->GetEntity()->GetHostIdType());
+}
+
+void InstanceIdentityUnittest::TestInitFromFileEcsMeta() {
+    // 确保不会被自定义 host id 覆盖
+    STRING_FLAG(agent_host_id) = "";
+
+    const std::string dataDir = GetAgentDataDir();
+    const std::string filePath = dataDir + "instance_identity";
+
+    const std::string expectInstanceId = "i-abcdefghijklmnopqrst";
+    const std::string expectUserId = "1234567890123456";
+    const std::string expectRegion = "cn-hangzhou";
+    const std::string content = (boost::format(R"({
+	"instance-id" : "%1%",
+	"owner-account-id" : "%2%",
+	"region-id" : "%3%"
+}
+)") % expectInstanceId % expectUserId
+                                 % expectRegion)
+                                    .str();
+
+    std::string errMsg;
+    APSARA_TEST_TRUE(WriteFile(filePath, content, errMsg));
+
+    bool ok = InstanceIdentity::Instance()->InitFromFile();
+    APSARA_TEST_TRUE(ok);
+    // HostId 应为 ECS，且为 instance-id
+    APSARA_TEST_EQUAL(expectInstanceId, InstanceIdentity::Instance()->GetEntity()->GetHostID().to_string());
+    APSARA_TEST_EQUAL(Hostid::Type::ECS, InstanceIdentity::Instance()->GetEntity()->GetHostIdType());
+    // ECS 元数据应被填充
+    APSARA_TEST_TRUE(InstanceIdentity::Instance()->GetEntity()->IsECSValid());
+    APSARA_TEST_EQUAL(expectInstanceId, InstanceIdentity::Instance()->GetEntity()->GetEcsInstanceID().to_string());
+    APSARA_TEST_EQUAL(expectUserId, InstanceIdentity::Instance()->GetEntity()->GetEcsUserID().to_string());
+    APSARA_TEST_EQUAL(expectRegion, InstanceIdentity::Instance()->GetEntity()->GetEcsRegionID().to_string());
+}
 
 } // namespace logtail
 
