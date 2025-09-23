@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     http:
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@
 #include "common/FormattedString.h"
 
 #include <cstdlib>
+#include <cstring>
 
 #include <unordered_set>
 
@@ -36,18 +37,15 @@ static std::string ExpandEnvPlaceholders(const std::string& input) {
             out.append(input, pos, std::string::npos);
             break;
         }
-        // copy preceding static part
         out.append(input, pos, start - pos);
 
         size_t end = input.find('}', start + 2);
         if (end == std::string::npos) {
-            // No closing brace; append the rest verbatim
             out.append(input, start, std::string::npos);
             break;
         }
         const size_t nameStart = start + 2;
         if (nameStart >= end) {
-            // Empty var name, keep literal
             out.append(input, start, end - start + 1);
             pos = end + 1;
             continue;
@@ -57,7 +55,6 @@ static std::string ExpandEnvPlaceholders(const std::string& input) {
         if (envVal == nullptr) {
             LOG_WARNING(sLogger,
                         ("FormattedString env placeholder missing", varName)("action", "use empty string as default"));
-            // replace by empty string
         } else {
             out.append(envVal);
         }
@@ -90,9 +87,10 @@ bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& gro
     result.reserve(mTemplate.size());
 
     for (size_t idx = 0; idx < mPlaceholderNames.size(); ++idx) {
-        result += mStaticParts[idx];
+        const auto& staticSeg = mStaticParts[idx];
+        result.append(staticSeg.data(), staticSeg.size());
         const auto& key = mPlaceholderNames[idx];
-        if (key.rfind("content.", 0) == 0) {
+        if (key.size() >= 8 && std::memcmp(key.data(), "content.", 8) == 0) {
             if (event->GetType() != PipelineEvent::Type::LOG) {
                 LOG_WARNING(sLogger,
                             ("FormattedString dynamic placeholder requires LOG event",
@@ -105,23 +103,26 @@ bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& gro
             if (value.empty()) {
                 LOG_WARNING(sLogger,
                             ("FormattedString missing or empty content field",
-                             std::string(fieldKey.data(), fieldKey.size()))("placeholder", key));
+                             std::string(fieldKey.data(), fieldKey.size()))("placeholder",
+                                                                            std::string(key.data(), key.size())));
                 return false;
             }
             result.append(value.data(), value.size());
             continue;
         }
-        if (key.rfind("tag.", 0) == 0) {
+        if (key.size() >= 4 && std::memcmp(key.data(), "tag.", 4) == 0) {
             if (groupTags.empty()) {
-                LOG_WARNING(sLogger, ("FormattedString no group tags available for placeholder", key));
+                LOG_WARNING(
+                    sLogger,
+                    ("FormattedString no group tags available for placeholder", std::string(key.data(), key.size())));
                 return false;
             }
             StringView fieldKey(key.data() + 4, key.size() - 4);
             auto it = groupTags.find(fieldKey);
             if (it == groupTags.end() || it->second.empty()) {
                 LOG_WARNING(sLogger,
-                            ("FormattedString missing or empty tag key",
-                             std::string(fieldKey.data(), fieldKey.size()))("placeholder", key));
+                            ("FormattedString missing or empty tag key", std::string(fieldKey.data(), fieldKey.size()))(
+                                "placeholder", std::string(key.data(), key.size())));
                 return false;
             }
             const auto& value = it->second;
@@ -130,7 +131,8 @@ bool FormattedString::Format(const PipelineEventPtr& event, const GroupTags& gro
         }
     }
 
-    result += mStaticParts.back();
+    const auto& tail = mStaticParts.back();
+    result.append(tail.data(), tail.size());
     return true;
 }
 
@@ -139,7 +141,6 @@ bool FormattedString::ParseFormatString(const std::string& formatString) {
 
     const size_t length = formatString.size();
     size_t position = 0;
-    std::string currentStatic;
 
     while (position < length) {
         size_t nextPos = formatString.find("%{", position);
@@ -147,7 +148,7 @@ bool FormattedString::ParseFormatString(const std::string& formatString) {
             break;
         }
 
-        currentStatic.append(formatString, position, nextPos - position);
+        mStaticParts.emplace_back(StringView(formatString.data() + position, nextPos - position));
 
         size_t closingBrace = formatString.find('}', nextPos);
         if (closingBrace == std::string::npos) {
@@ -158,24 +159,21 @@ bool FormattedString::ParseFormatString(const std::string& formatString) {
         if (nameStart >= closingBrace) {
             return false;
         }
-        const std::string placeholderName = formatString.substr(nameStart, closingBrace - nameStart);
 
-        mStaticParts.emplace_back(std::move(currentStatic));
-        currentStatic.clear();
+        mPlaceholderNames.emplace_back(StringView(formatString.data() + nameStart, closingBrace - nameStart));
 
-        mPlaceholderNames.emplace_back(placeholderName);
+        std::string placeholderName(formatString.data() + nameStart, closingBrace - nameStart);
         if (requiredKeySet.insert(placeholderName).second) {
-            mRequiredKeys.emplace_back(placeholderName);
+            mRequiredKeys.emplace_back(std::move(placeholderName));
         }
 
         position = closingBrace + 1;
     }
 
-    if (position < length) {
-        currentStatic.append(formatString, position, length - position);
+    if (position <= length) {
+        mStaticParts.emplace_back(StringView(formatString.data() + position, length - position));
     }
 
-    mStaticParts.emplace_back(std::move(currentStatic));
     return true;
 }
 

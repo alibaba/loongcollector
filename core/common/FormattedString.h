@@ -43,8 +43,8 @@ private:
 
 private:
     std::string mTemplate;
-    std::vector<std::string> mStaticParts;
-    std::vector<std::string> mPlaceholderNames;
+    std::vector<StringView> mStaticParts;
+    std::vector<StringView> mPlaceholderNames;
     std::vector<std::string> mRequiredKeys;
 };
 
