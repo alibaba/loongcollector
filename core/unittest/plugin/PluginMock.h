@@ -274,7 +274,7 @@ public:
         return true;
     }
     void Start() override { mIsRunning = true; }
-    void Stop([[maybe_unused]] bool isRemoving) override{ mIsRunning = false; }
+    void Stop([[maybe_unused]] bool isRemoving) override { mIsRunning = false; }
 
     bool mIsRunning = false;
 };

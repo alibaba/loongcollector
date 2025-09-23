@@ -27,12 +27,13 @@ public:
 
     bool Init([[maybe_unused]] HostMonitorContext& collectContext) override { return true; }
 
-    bool Collect([[maybe_unused]] HostMonitorContext& collectContext, [[maybe_unused]] PipelineEventGroup* groupPtr) override {
+    bool Collect([[maybe_unused]] HostMonitorContext& collectContext,
+                 [[maybe_unused]] PipelineEventGroup* groupPtr) override {
         // MockCollector always generates events when called
         if (!groupPtr) {
             return false;
         }
-        auto event = groupPtr->AddLogEvent();
+        auto* event = groupPtr->AddLogEvent();
         time_t logtime = time(nullptr);
         event->SetTimestamp(logtime);
         std::string key = "mock_key";

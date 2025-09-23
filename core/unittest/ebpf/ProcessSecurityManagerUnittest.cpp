@@ -13,12 +13,13 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+
 #include <memory>
 
 #include "ebpf/plugin/process_security/ProcessSecurityManager.h"
 #include "ebpf/type/ProcessEvent.h"
-#include "unittest/ebpf/ManagerUnittestBase.h"
 #include "unittest/Unittest.h"
+#include "unittest/ebpf/ManagerUnittestBase.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
@@ -28,13 +29,11 @@ public:
     void TestProcessSecurityManagerEventHandling();
     void TestProcessSecurityManagerAggregation();
     void TestProcessSecurityManagerErrorHandling();
+
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
         return std::make_shared<ProcessSecurityManager>(
-            mProcessCacheManager,
-            mMockEBPFAdapter,
-            *mEventQueue,
-            mEventPool.get());
+            mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get());
     }
 };
 

@@ -13,13 +13,14 @@
 // limitations under the License.
 
 #include <gtest/gtest.h>
+
 #include <memory>
 
 #include "ebpf/plugin/ProcessCacheManager.h"
 #include "ebpf/plugin/network_security/NetworkSecurityManager.h"
 #include "ebpf/type/NetworkEvent.h"
-#include "unittest/ebpf/ManagerUnittestBase.h"
 #include "unittest/Unittest.h"
+#include "unittest/ebpf/ManagerUnittestBase.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
@@ -29,13 +30,11 @@ public:
     void TestNetworkSecurityManagerEventHandling();
     void TestNetworkSecurityManagerAggregation();
     void TestNetworkSecurityManagerErrorHandling();
+
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
         return std::make_shared<NetworkSecurityManager>(
-            mProcessCacheManager,
-            mMockEBPFAdapter,
-            *mEventQueue,
-            mEventPool.get());
+            mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get());
     }
 };
 
@@ -106,18 +105,19 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
     // 测试 null 事件处理
     APSARA_TEST_NOT_EQUAL(manager->HandleEvent(nullptr), 0);
 
-    auto validEvent = std::make_shared<NetworkEvent>(1234, // pid
-                                                     5678, // ktime
-                                                     KernelEventType::TCP_CONNECT_EVENT, // type
-                                                     std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
-                                                     6, // protocol (TCP)
-                                                     2, // family (AF_INET)
-                                                     0x0100007F, // saddr (127.0.0.1)
-                                                     0x0101A8C0, // daddr (192.168.1.1)
-                                                     12345, // sport
-                                                     80, // dport
-                                                     4026531992 // net_ns
-    );
+    auto validEvent
+        = std::make_shared<NetworkEvent>(1234, // pid
+                                         5678, // ktime
+                                         KernelEventType::TCP_CONNECT_EVENT, // type
+                                         std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
+                                         6, // protocol (TCP)
+                                         2, // family (AF_INET)
+                                         0x0100007F, // saddr (127.0.0.1)
+                                         0x0101A8C0, // daddr (192.168.1.1)
+                                         12345, // sport
+                                         80, // dport
+                                         4026531992 // net_ns
+        );
 
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
@@ -129,33 +129,35 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
     APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
 
     // 测试无效的网络地址
-    auto invalidAddrEvent = std::make_shared<NetworkEvent>(1234, // pid
-                                                          5678, // ktime
-                                                          KernelEventType::TCP_CONNECT_EVENT, // type
-                                                          std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
-                                                          6, // protocol (TCP)
-                                                          0, // family (invalid)
-                                                          0, // saddr
-                                                          0, // daddr
-                                                          0, // sport
-                                                          0, // dport
-                                                          0 // net_ns
-    );
+    auto invalidAddrEvent
+        = std::make_shared<NetworkEvent>(1234, // pid
+                                         5678, // ktime
+                                         KernelEventType::TCP_CONNECT_EVENT, // type
+                                         std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
+                                         6, // protocol (TCP)
+                                         0, // family (invalid)
+                                         0, // saddr
+                                         0, // daddr
+                                         0, // sport
+                                         0, // dport
+                                         0 // net_ns
+        );
     APSARA_TEST_EQUAL(manager->HandleEvent(invalidAddrEvent), 0);
 
     // 测试不同协议类型
-    auto udpEvent = std::make_shared<NetworkEvent>(1234, // pid
-                                                   5678, // ktime
-                                                   KernelEventType::TCP_SENDMSG_EVENT, // type
-                                                   std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
-                                                   17, // protocol (UDP)
-                                                   2, // family (AF_INET)
-                                                   0x0100007F, // saddr (127.0.0.1)
-                                                   0x0101A8C0, // daddr (192.168.1.1)
-                                                   12345, // sport
-                                                   80, // dport
-                                                   4026531992 // net_ns
-    );
+    auto udpEvent
+        = std::make_shared<NetworkEvent>(1234, // pid
+                                         5678, // ktime
+                                         KernelEventType::TCP_SENDMSG_EVENT, // type
+                                         std::chrono::system_clock::now().time_since_epoch().count(), // timestamp
+                                         17, // protocol (UDP)
+                                         2, // family (AF_INET)
+                                         0x0100007F, // saddr (127.0.0.1)
+                                         0x0101A8C0, // daddr (192.168.1.1)
+                                         12345, // sport
+                                         80, // dport
+                                         4026531992 // net_ns
+        );
     APSARA_TEST_EQUAL(manager->HandleEvent(udpEvent), 0);
 
     manager->Destroy();

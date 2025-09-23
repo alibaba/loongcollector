@@ -15,6 +15,7 @@
 #pragma once
 
 #include <gmock/gmock.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -67,7 +68,8 @@ public:
 
     MOCK_METHOD3(SetNetworkObserverCidFilter, bool(const std::string&, bool update, uint64_t cidKey));
 
-    MOCK_METHOD5(BPFMapUpdateElem, bool(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag));
+    MOCK_METHOD5(BPFMapUpdateElem,
+                 bool(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag));
 
     // Add tracking methods for testing
     std::vector<PluginType> GetStartedPlugins() const { return mStartedPlugins; }

@@ -96,6 +96,7 @@ protected:
         mSuspendFlag = false;
         return 0;
     }
+
 private:
     int64_t mSendIntervalMs = 400;
     int64_t mLastSendTimeMs = 0;

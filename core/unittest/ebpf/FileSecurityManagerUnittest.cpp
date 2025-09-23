@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <chrono>
 #include <cstring>
 #include <gtest/gtest.h>
+
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -91,10 +92,10 @@ void FileSecurityManagerUnittest::TestRecordFileEvent() {
 
     // ProcessCacheManager is null
     auto nullManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                            mMockEBPFAdapter,
-                                                            *mEventQueue,
-                                                            mEventPool.get(),
-                                                            *mRetryableEventCache);
+                                                             mMockEBPFAdapter,
+                                                             *mEventQueue,
+                                                             mEventPool.get(),
+                                                             *mRetryableEventCache);
     file_data_t event = CreateMockFileEvent();
     nullManager->RecordFileEvent(&event);
     APSARA_TEST_EQUAL(0UL, nullManager->EventCache().Size());
@@ -138,12 +139,14 @@ void FileSecurityManagerUnittest::TestSendEvents() {
 
     // time interval is too short
     static_cast<FileSecurityManager*>(manager.get())->mInited = true;
-    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs + 10;
+    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs
+        = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs + 10;
     result = manager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // empty node
-    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs - 10;
+    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs
+        = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs - 10;
     result = manager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
@@ -152,10 +155,10 @@ void FileSecurityManagerUnittest::TestSendEvents() {
 
     // ProcessCacheManager is null
     auto nullManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                            mMockEBPFAdapter,
-                                                            *mEventQueue,
-                                                            mEventPool.get(),
-                                                            *mRetryableEventCache);
+                                                             mMockEBPFAdapter,
+                                                             *mEventQueue,
+                                                             mEventPool.get(),
+                                                             *mRetryableEventCache);
     nullManager->mInited = true;
     nullManager->HandleEvent(fileEvent);
     result = nullManager->SendEvents();
@@ -196,8 +199,9 @@ void FileSecurityManagerUnittest::TestSendEvents() {
                                                KernelEventType::FILE_PERMISSION_EVENT_READ,
                                                KernelEventType::PROCESS_EXECVE_EVENT};
     for (auto eventType : eventTypes) {
-        static_cast<FileSecurityManager*>(cacheManager.get())->HandleEvent(
-            std::make_shared<FileEvent>(1234, 123456789, eventType, 1234567890123ULL, StringView("/etc/passwd")));
+        static_cast<FileSecurityManager*>(cacheManager.get())
+            ->HandleEvent(
+                std::make_shared<FileEvent>(1234, 123456789, eventType, 1234567890123ULL, StringView("/etc/passwd")));
     }
 
     QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("test_config");
@@ -253,10 +257,10 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerErrorHandling() {
     APSARA_TEST_NOT_EQUAL(manager->HandleEvent(nullptr), 0);
 
     auto validEvent = std::make_shared<FileEvent>(1234,
-                                                 5678,
-                                                 KernelEventType::FILE_PERMISSION_EVENT,
-                                                 std::chrono::system_clock::now().time_since_epoch().count(),
-                                                 "/test/file.txt");
+                                                  5678,
+                                                  KernelEventType::FILE_PERMISSION_EVENT,
+                                                  std::chrono::system_clock::now().time_since_epoch().count(),
+                                                  "/test/file.txt");
 
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
@@ -269,18 +273,18 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerErrorHandling() {
 
     // 测试无效的文件路径
     auto invalidPathEvent = std::make_shared<FileEvent>(1234,
-                                                       5678,
-                                                       KernelEventType::FILE_PERMISSION_EVENT,
-                                                       std::chrono::system_clock::now().time_since_epoch().count(),
-                                                       "");
+                                                        5678,
+                                                        KernelEventType::FILE_PERMISSION_EVENT,
+                                                        std::chrono::system_clock::now().time_since_epoch().count(),
+                                                        "");
     APSARA_TEST_EQUAL(manager->HandleEvent(invalidPathEvent), 0);
 
     // 测试不同类型的事件
     auto mmapEvent = std::make_shared<FileEvent>(1234,
-                                                5678,
-                                                KernelEventType::FILE_MMAP,
-                                                std::chrono::system_clock::now().time_since_epoch().count(),
-                                                "/test/mmap.txt");
+                                                 5678,
+                                                 KernelEventType::FILE_MMAP,
+                                                 std::chrono::system_clock::now().time_since_epoch().count(),
+                                                 "/test/mmap.txt");
     APSARA_TEST_EQUAL(manager->HandleEvent(mmapEvent), 0);
 
     manager->Destroy();

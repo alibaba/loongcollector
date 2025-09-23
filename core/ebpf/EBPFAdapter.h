@@ -60,7 +60,8 @@ public:
     virtual bool SetNetworkObserverCidFilter(const std::string&, bool update, uint64_t cidKey);
 
     // for bpf object operations ...
-    virtual bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
+    virtual bool
+    BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
 
     EBPFAdapter();
     virtual ~EBPFAdapter();

@@ -367,4 +367,3 @@ int FileSecurityManager::Destroy() {
 }
 
 } // namespace logtail::ebpf
-
