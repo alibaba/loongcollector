@@ -26,8 +26,8 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class EBPFServer;
 
@@ -335,6 +335,7 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (!event) {
+        LOG_ERROR(sLogger, ("cannot handle", "event is null"));
         return 1;
     }
     auto* fileEvent = static_cast<FileEvent*>(event.get());
@@ -365,5 +366,5 @@ int FileSecurityManager::Destroy() {
     return 0;
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf
+

@@ -27,7 +27,7 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "metadata/K8sMetadata.h"
 #include "unittest/Unittest.h"
-#include "unittest/ebpf/ManagerConfigPairTestFramework.h"
+#include "unittest/ebpf/ManagerUnittestBase.h"
 
 
 namespace logtail::ebpf {
@@ -994,7 +994,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConverge);
 
-class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerConfigPairTest {
+class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerUnittestBase {
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
         return NetworkObserverManager::Create(mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get());
@@ -1004,6 +1004,7 @@ protected:
 UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestDifferentConfigNamesReplacement);
 UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestSameConfigNameUpdate);
 UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestMultipleConfigsComplexScenario);
+UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestBasicConfigUpdate);
 } // namespace logtail::ebpf
 
 

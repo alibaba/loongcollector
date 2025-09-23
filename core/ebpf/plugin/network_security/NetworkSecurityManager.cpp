@@ -376,6 +376,10 @@ std::array<size_t, 2> GenerateAggKeyForNetworkEvent(const std::shared_ptr<Common
 }
 
 int NetworkSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
+    if (!event) {
+        LOG_ERROR(sLogger, ("cannot handle", "event is null"));
+        return 1;
+    }
     auto* networkEvent = static_cast<NetworkEvent*>(event.get());
     LOG_DEBUG(sLogger,
               ("receive event, pid", networkEvent->mPid)("ktime", networkEvent->mKtime)("saddr", networkEvent->mSaddr)(

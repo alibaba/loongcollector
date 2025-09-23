@@ -52,7 +52,7 @@ DEFINE_FLAG_INT32(ebpf_process_cache_gc_interval_sec,
 namespace logtail::ebpf {
 
 /////////// ================= for perfbuffer handlers ================= ///////////
-void HandleKernelProcessEvent(void* ctx, int cpu, void* data, uint32_t data_sz) {
+void HandleKernelProcessEvent(void* ctx, [[maybe_unused]] int cpu, void* data, [[maybe_unused]] uint32_t data_sz) {
     auto* processCacheMgr = static_cast<ProcessCacheManager*>(ctx);
     if (!processCacheMgr) {
         LOG_ERROR(sLogger, ("ProcessCacheManager is null!", ""));

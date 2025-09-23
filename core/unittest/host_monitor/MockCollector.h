@@ -25,9 +25,9 @@ public:
     MockCollector() = default;
     ~MockCollector() = default;
 
-    bool Init(HostMonitorContext& collectContext) override { return true; }
+    bool Init([[maybe_unused]] HostMonitorContext& collectContext) override { return true; }
 
-    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override {
+    bool Collect([[maybe_unused]] HostMonitorContext& collectContext, [[maybe_unused]] PipelineEventGroup* groupPtr) override {
         // MockCollector always generates events when called
         if (!groupPtr) {
             return false;

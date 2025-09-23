@@ -14,26 +14,28 @@
 
 #pragma once
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "absl/memory/memory.h"
+#include "common/queue/blockingconcurrentqueue.h"
+#include "coolbpf/security/type.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
-#include "coolbpf/security/type.h"
-#include "common/queue/blockingconcurrentqueue.h"
 #include "models/EventPool.h"
-#include "unittest/ebpf/MockEBPFAdapter.h"
 #include "unittest/Unittest.h"
+#include "unittest/ebpf/MockEBPFAdapter.h"
 
 namespace logtail::ebpf {
 
 // Base test fixture for testing manager config pair operations
-class ManagerConfigPairTest : public ::testing::Test {
+class ManagerUnittestBase : public ::testing::Test {
 public:
     void SetUp() override {
         mMockEBPFAdapter = std::make_shared<MockEBPFAdapter>();
@@ -46,6 +48,9 @@ public:
 
     void TearDown() override {
         mMockEBPFAdapter->ClearTracking();
+        mEventQueue = std::make_unique<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>>();
+        mEventPool->Clear();
+        mRetryableEventCache->Clear();
     }
 
     // Test different config names replacement scenario: add config1 -> remove config1 -> add config2 -> remove config2
@@ -78,10 +83,10 @@ public:
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
-        
+
         // Destroy manager to ensure complete lifecycle
         destroyManagerInstance(manager);
-        
+
         // Verify plugin lifecycle
         verifyPluginPairing(pluginType);
     }
@@ -115,10 +120,9 @@ public:
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
-        
         // Destroy manager to ensure complete lifecycle
         destroyManagerInstance(manager);
-        
+
         // Verify plugin lifecycle
         verifyPluginPairing(pluginType);
     }
@@ -164,11 +168,47 @@ public:
 
         // Get plugin type before destroying manager
         auto pluginType = manager->GetPluginType();
-        
+
         // Destroy manager to ensure complete lifecycle
         destroyManagerInstance(manager);
-        
+
         // Verify plugin lifecycle
+        verifyPluginPairing(pluginType);
+    }
+
+    // Test basic manager lifecycle: init -> add config -> suspend -> resume -> destroy
+    void TestBasicConfigUpdate() {
+        auto manager = createAndInitManagerInstance();
+
+        // Test add config
+        CollectionPipelineContext ctx;
+        ctx.SetConfigName("test_config");
+        std::variant<SecurityOptions*, ObserverNetworkOption*> options = createTestOptions();
+
+        auto result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, options);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_TRUE(manager->IsRunning());
+
+        // Test suspend
+        result = manager->Suspend();
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_FALSE(manager->IsRunning());
+
+        // Test update (this will automatically resume after suspend)
+        result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, options);
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_TRUE(manager->IsRunning());
+
+        // Test remove config
+        result = manager->RemoveConfig("test_config");
+        APSARA_TEST_EQUAL(result, 0);
+        APSARA_TEST_TRUE(manager->IsRunning()); // the flag is untouched
+
+        // Test destroy
+        // Get plugin type before destroying manager
+        auto pluginType = manager->GetPluginType();
+        destroyManagerInstance(manager);
+
         verifyPluginPairing(pluginType);
     }
 
@@ -196,14 +236,13 @@ protected:
     virtual std::shared_ptr<AbstractManager> createManagerInstance() = 0;
 
     // Factory method to create test options - override in derived classes
-    virtual std::variant<SecurityOptions*, ObserverNetworkOption*>
-    createTestOptions() = 0;
+    virtual std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() = 0;
 
     // Verify plugin lifecycle pairing
     void verifyPluginPairing(PluginType pluginType) {
         // For most managers, we expect start/stop to be paired
-        APSARA_TEST_TRUE(mMockEBPFAdapter->IsStartStopPaired(pluginType));
-        APSARA_TEST_TRUE(mMockEBPFAdapter->IsSuspendResumePaired(pluginType));
+        mMockEBPFAdapter->AssertStartStopPaired(pluginType);
+        mMockEBPFAdapter->AssertSuspendResumePaired(pluginType);
     }
 
     // Get EBPFAdapter reference for ProcessCacheManager constructor
@@ -221,11 +260,11 @@ protected:
 };
 
 // Test fixture for managers that need ProcessCacheManager
-class ProcessCacheManagerConfigPairTest : public ManagerConfigPairTest {
+class ManagerUnittestWithProcessCacheManager : public ManagerUnittestBase {
 protected:
     void SetUp() override {
-        ManagerConfigPairTest::SetUp();
-        
+        ManagerUnittestBase::SetUp();
+
         // Create ProcessCacheManager for managers that need it
         DynamicMetricLabels dynamicLabels;
         WriteMetrics::GetInstance()->CreateMetricsRecordRef(
@@ -241,22 +280,19 @@ protected:
         auto retryableEventCacheSize = mProcessCacheRef.CreateIntGauge(METRIC_RUNNER_EBPF_RETRYABLE_EVENT_CACHE_SIZE);
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mProcessCacheRef);
 
-        mProcessCacheManager = std::make_shared<ProcessCacheManager>(
-            getEbpfAdapterRef(),
-            "test_host",
-            "/",
-            *mEventQueue,
-            pollProcessEventsTotal,
-            lossProcessEventsTotal,
-            processCacheMissTotal,
-            processCacheSize,
-            processDataMapSize,
-            *mRetryableEventCache);
+        mProcessCacheManager = std::make_shared<ProcessCacheManager>(getEbpfAdapterRef(),
+                                                                     "test_host",
+                                                                     "/",
+                                                                     *mEventQueue,
+                                                                     pollProcessEventsTotal,
+                                                                     lossProcessEventsTotal,
+                                                                     processCacheMissTotal,
+                                                                     processCacheSize,
+                                                                     processDataMapSize,
+                                                                     *mRetryableEventCache);
     }
 
-    void TearDown() override {
-        ManagerConfigPairTest::TearDown();
-    }
+    void TearDown() override { ManagerUnittestBase::TearDown(); }
 
 protected:
     MetricsRecordRef mProcessCacheRef;
@@ -264,10 +300,9 @@ protected:
 };
 
 // Test fixture specifically for security managers
-class SecurityManagerConfigPairTest : public ProcessCacheManagerConfigPairTest {
+class SecurityManagerUnittestBase : public ManagerUnittestWithProcessCacheManager {
 protected:
-    std::variant<SecurityOptions*, ObserverNetworkOption*>
-    createTestOptions() override {
+    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override {
         static SecurityOptions options;
         options.mOptionList.push_back(SecurityOption{{"test_option"}, std::monostate{}});
         return &options;
@@ -275,12 +310,15 @@ protected:
 };
 
 // Test fixture specifically for network observer managers
-class NetworkObserverManagerConfigPairTest : public ProcessCacheManagerConfigPairTest {
+class NetworkObserverManagerUnittestBase : public ManagerUnittestWithProcessCacheManager {
 protected:
-    std::variant<SecurityOptions*, ObserverNetworkOption*>
-    createTestOptions() override {
+    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override {
         static ObserverNetworkOption options;
-        options.mApmConfig = {.mWorkspace = "test-ws", .mAppName = "test-app", .mAppId = "test-app-id", .mLanguage = "", .mServiceId = "test-service-id"};
+        options.mApmConfig = {.mWorkspace = "test-ws",
+                              .mAppName = "test-app",
+                              .mAppId = "test-app-id",
+                              .mLanguage = "",
+                              .mServiceId = "test-service-id"};
         options.mL4Config.mEnable = true;
         options.mL7Config.mEnable = true;
         options.mSelectors = {{"ns", "kind", "name"}};

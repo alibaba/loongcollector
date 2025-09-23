@@ -151,6 +151,7 @@ std::array<size_t, 1> GenerateAggKeyForProcessEvent(ProcessEvent* event) {
 
 int ProcessSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (!event) {
+        LOG_ERROR(sLogger, ("cannot handle", "event is null"));
         return 1;
     }
     auto* processEvent = static_cast<ProcessEvent*>(event.get());

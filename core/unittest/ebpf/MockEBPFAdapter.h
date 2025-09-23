@@ -21,6 +21,7 @@
 
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/include/export.h"
+#include "unittest/Unittest.h"
 
 namespace logtail::ebpf {
 
@@ -31,7 +32,7 @@ public:
 
     MOCK_METHOD0(Init, void());
 
-    bool StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+    bool StartPlugin(PluginType pluginType, [[maybe_unused]] std::unique_ptr<PluginConfig> conf) override {
         mStartedPlugins.push_back(pluginType);
         return true;
     }
@@ -46,12 +47,12 @@ public:
         return true;
     }
 
-    bool UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+    bool UpdatePlugin(PluginType pluginType, [[maybe_unused]] std::unique_ptr<PluginConfig> conf) override {
         mUpdatedPlugins.push_back(pluginType);
         return true;
     }
 
-    bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) override {
+    bool ResumePlugin(PluginType pluginType, [[maybe_unused]] std::unique_ptr<PluginConfig> conf) override {
         mResumedPlugins.push_back(pluginType);
         return true;
     }
@@ -85,16 +86,16 @@ public:
     }
 
     // Check if plugins are properly paired
-    bool IsStartStopPaired(PluginType pluginType) const {
+    void AssertStartStopPaired(PluginType pluginType) const {
         size_t startCount = std::count(mStartedPlugins.begin(), mStartedPlugins.end(), pluginType);
         size_t stopCount = std::count(mStoppedPlugins.begin(), mStoppedPlugins.end(), pluginType);
-        return startCount == stopCount;
+        APSARA_TEST_EQUAL_FATAL(startCount, stopCount);
     }
 
-    bool IsSuspendResumePaired(PluginType pluginType) const {
+    void AssertSuspendResumePaired(PluginType pluginType) const {
         size_t suspendCount = std::count(mSuspendedPlugins.begin(), mSuspendedPlugins.end(), pluginType);
         size_t resumeCount = std::count(mResumedPlugins.begin(), mResumedPlugins.end(), pluginType);
-        return suspendCount == resumeCount;
+        APSARA_TEST_EQUAL_FATAL(suspendCount, resumeCount);
     }
 
     // Get counts for specific plugin type
