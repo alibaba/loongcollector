@@ -37,35 +37,34 @@ public:
     EBPFAdapter(const EBPFAdapter&) = delete;
     EBPFAdapter& operator=(const EBPFAdapter&) = delete;
 
-    void Init();
+    virtual void Init();
 
-    bool StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
+    virtual bool StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
-    bool StopPlugin(PluginType pluginType);
+    virtual bool StopPlugin(PluginType pluginType);
 
     // detach bpf progs ...
-    bool SuspendPlugin(PluginType pluginType);
+    virtual bool SuspendPlugin(PluginType pluginType);
 
     // just update configs ...
-    bool UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
+    virtual bool UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
     // re-attach bpf progs ...
-    bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
+    virtual bool ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf);
 
-    bool CheckPluginRunning(PluginType pluginType);
+    virtual int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
+    virtual int32_t ConsumePerfBufferData(PluginType pluginType);
+    virtual std::vector<int> GetPerfBufferEpollFds(PluginType pluginType);
 
-    int32_t PollPerfBuffers(PluginType, int32_t, int32_t*, int);
-    int32_t ConsumePerfBufferData(PluginType pluginType);
-    std::vector<int> GetPerfBufferEpollFds(PluginType pluginType);
-
-    bool SetNetworkObserverConfig(int32_t key, int32_t value);
-    bool SetNetworkObserverCidFilter(const std::string&, bool update, uint64_t cidKey);
+    virtual bool SetNetworkObserverConfig(int32_t key, int32_t value);
+    virtual bool SetNetworkObserverCidFilter(const std::string&, bool update, uint64_t cidKey);
 
     // for bpf object operations ...
-    bool BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
+    virtual bool
+    BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
 
     EBPFAdapter();
-    ~EBPFAdapter();
+    virtual ~EBPFAdapter();
 
 private:
     bool loadDynamicLib(const std::string& libName);
@@ -104,7 +103,6 @@ private:
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
     std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
-    std::array<std::atomic_bool, (int)PluginType::MAX> mRunning = {};
     std::string mBinaryPath;
     std::string mFullLibName;
 

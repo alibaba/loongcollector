@@ -15,19 +15,20 @@
 #include <cstring>
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <memory>
+#include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
-#include "common/queue/blockingconcurrentqueue.h"
 #include "coolbpf/security/type.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/file_security/FileSecurityManager.h"
 #include "ebpf/type/FileEvent.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "unittest/Unittest.h"
-#include "unittest/ebpf/ProcessCacheManagerWrapper.h"
+#include "unittest/ebpf/ManagerUnittestBase.h"
 
 using namespace logtail;
 using namespace logtail::ebpf;
@@ -44,179 +45,150 @@ file_data_t CreateMockFileEvent(uint32_t pid = 1234,
     event.func = func;
     event.timestamp = 1234567890123ULL;
     event.size = strlen(path);
-    strcpy(event.path, "abcd");
-    strcat(event.path, path);
+    memcpy(event.path, "abcd", 4);
+    strncat(event.path, path, sizeof(event.path) - 5);
     return event;
 }
 
-class FileSecurityManagerUnittest : public ::testing::Test {
+class FileSecurityManagerUnittest : public SecurityManagerUnittestBase {
 public:
     void TestConstructor();
     void TestCreateFileRetryableEvent();
     void TestRecordFileEvent();
     void TestHandleEvent();
     void TestSendEvents();
+    void TestFileSecurityManagerEventHandling();
+    void TestFileSecurityManagerAggregation();
+    void TestFileSecurityManagerErrorHandling();
 
 protected:
-    void SetUp() override {
-        mEBPFAdapter = std::make_shared<EBPFAdapter>();
-        mEventQueue = std::make_unique<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>>();
-
-        WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricRef,
-                                                            MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE,
-                                                            {{METRIC_LABEL_KEY_PLUGIN_ID, "test_plugin"}},
-                                                            DynamicMetricLabels{});
-        mPluginMetricPtr = std::make_shared<PluginMetricManager>(
-            mMetricRef.GetLabels(),
-            std::unordered_map<std::string, MetricType>{
-                {METRIC_PLUGIN_IN_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER},
-                {METRIC_PLUGIN_OUT_EVENTS_TOTAL, MetricType::METRIC_TYPE_COUNTER}},
-            MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
-        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricRef);
-
-        mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager,
-                                                         mEBPFAdapter, // EBPFAdapter
-                                                         *mEventQueue,
-                                                         &mEventPool,
-                                                         mRetryableEventCache);
+    std::shared_ptr<AbstractManager> createManagerInstance() override {
+        return std::make_shared<FileSecurityManager>(
+            mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get(), *mRetryableEventCache);
     }
-
-    void TearDown() override {
-        mWrapper.Clear();
-        mRetryableEventCache.Clear();
-    }
-
-private:
-    std::shared_ptr<EBPFAdapter> mEBPFAdapter;
-    ProcessCacheManagerWrapper mWrapper;
-    std::unique_ptr<moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>> mEventQueue;
-    EventPool mEventPool = EventPool(true);
-    std::shared_ptr<FileSecurityManager> mManager;
-    MetricsRecordRef mMetricRef;
-    PluginMetricManagerPtr mPluginMetricPtr;
-    RetryableEventCache mRetryableEventCache;
 };
 
 void FileSecurityManagerUnittest::TestConstructor() {
-    APSARA_TEST_TRUE(mManager != nullptr);
-    APSARA_TEST_EQUAL(mManager->GetPluginType(), PluginType::FILE_SECURITY);
+    auto manager = createAndInitManagerInstance();
+    APSARA_TEST_TRUE(manager != nullptr);
+    APSARA_TEST_EQUAL(manager->GetPluginType(), PluginType::FILE_SECURITY);
 }
 
 void FileSecurityManagerUnittest::TestCreateFileRetryableEvent() {
+    auto manager = createAndInitManagerInstance();
     file_data_t event = CreateMockFileEvent();
-    auto* retryEvent = mManager->CreateFileRetryableEvent(&event);
+    auto* retryEvent = static_cast<FileSecurityManager*>(manager.get())->CreateFileRetryableEvent(&event);
     APSARA_TEST_TRUE(retryEvent != nullptr);
 
     delete retryEvent;
 }
 
 void FileSecurityManagerUnittest::TestRecordFileEvent() {
-    // event is null
-    mManager->RecordFileEvent(nullptr);
-    APSARA_TEST_EQUAL(0UL, mManager->EventCache().Size());
+    auto manager = createAndInitManagerInstance();
 
+    // event is null
+    static_cast<FileSecurityManager*>(manager.get())->RecordFileEvent(nullptr);
+    APSARA_TEST_EQUAL(0UL, static_cast<FileSecurityManager*>(manager.get())->EventCache().Size());
 
     // ProcessCacheManager is null
+    auto nullManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
+                                                             mMockEBPFAdapter,
+                                                             *mEventQueue,
+                                                             mEventPool.get(),
+                                                             *mRetryableEventCache);
     file_data_t event = CreateMockFileEvent();
-    mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                     mEBPFAdapter, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     &mEventPool,
-                                                     mRetryableEventCache);
-    mManager->RecordFileEvent(&event);
-    APSARA_TEST_EQUAL(0UL, mManager->EventCache().Size());
+    nullManager->RecordFileEvent(&event);
+    APSARA_TEST_EQUAL(0UL, nullManager->EventCache().Size());
 
     // success
-    mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
-                                                     mEBPFAdapter, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     &mEventPool,
-                                                     mRetryableEventCache);
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
-    mWrapper.mProcessCacheManager->mProcessCache.AddCache({event.key.pid, event.key.ktime}, cacheValue);
+    mProcessCacheManager->mProcessCache.AddCache({event.key.pid, event.key.ktime}, cacheValue);
 
-    mManager->RecordFileEvent(&event);
-    APSARA_TEST_EQUAL(0UL, mManager->EventCache().Size());
+    static_cast<FileSecurityManager*>(manager.get())->RecordFileEvent(&event);
+    APSARA_TEST_EQUAL(0UL, static_cast<FileSecurityManager*>(manager.get())->EventCache().Size());
 
     // no cache
-    mWrapper.mProcessCacheManager->mProcessCache.removeCache({event.key.pid, event.key.ktime});
-    mManager->RecordFileEvent(&event);
-    APSARA_TEST_EQUAL(1UL, mManager->EventCache().Size());
+    mProcessCacheManager->mProcessCache.removeCache({event.key.pid, event.key.ktime});
+    static_cast<FileSecurityManager*>(manager.get())->RecordFileEvent(&event);
+    APSARA_TEST_EQUAL(1UL, static_cast<FileSecurityManager*>(manager.get())->EventCache().Size());
 }
 
 void FileSecurityManagerUnittest::TestHandleEvent() {
+    auto manager = createAndInitManagerInstance();
+
     // test normal event
     auto fileEvent = std::make_shared<FileEvent>(
         1234, 123456789, KernelEventType::FILE_PERMISSION_EVENT, 1234567890123ULL, StringView("/etc/passwd"));
-    int result = mManager->HandleEvent(fileEvent);
+    int result = manager->HandleEvent(fileEvent);
     APSARA_TEST_EQUAL(0, result);
 
     // test null event
     auto nullEvent = std::shared_ptr<CommonEvent>(nullptr);
-    result = mManager->HandleEvent(nullEvent);
+    result = manager->HandleEvent(nullEvent);
     APSARA_TEST_EQUAL(1, result);
 }
 
 void FileSecurityManagerUnittest::TestSendEvents() {
+    auto manager = createAndInitManagerInstance();
+
     // not running
-    int result = mManager->SendEvents();
+    int result = manager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // time interval is too short
-    mManager->mInited = true;
-    mManager->mLastSendTimeMs = TimeKeeper::GetInstance()->NowMs() - mManager->mSendIntervalMs + 10;
-    result = mManager->SendEvents();
+    static_cast<FileSecurityManager*>(manager.get())->mInited = true;
+    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs
+        = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs + 10;
+    result = manager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // empty node
-    mManager->mLastSendTimeMs = TimeKeeper::GetInstance()->NowMs() - mManager->mSendIntervalMs - 10;
-    result = mManager->SendEvents();
+    static_cast<FileSecurityManager*>(manager.get())->mLastSendTimeMs
+        = TimeKeeper::GetInstance()->NowMs() - static_cast<FileSecurityManager*>(manager.get())->mSendIntervalMs - 10;
+    result = manager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     auto fileEvent = std::make_shared<FileEvent>(
         1234, 123456789, KernelEventType::FILE_PERMISSION_EVENT, 1234567890123ULL, StringView("/etc/passwd"));
+
     // ProcessCacheManager is null
-    mManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
-                                                     mEBPFAdapter, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     &mEventPool,
-                                                     mRetryableEventCache);
-    mManager->mInited = true;
-    mManager->HandleEvent(fileEvent);
-    result = mManager->SendEvents();
+    auto nullManager = std::make_shared<FileSecurityManager>(nullptr, // ProcessCacheManager
+                                                             mMockEBPFAdapter,
+                                                             *mEventQueue,
+                                                             mEventPool.get(),
+                                                             *mRetryableEventCache);
+    nullManager->mInited = true;
+    nullManager->HandleEvent(fileEvent);
+    result = nullManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // failed to finalize process tags
-    mManager = std::make_shared<FileSecurityManager>(mWrapper.mProcessCacheManager, // ProcessCacheManager
-                                                     mEBPFAdapter, // EBPFAdapter
-                                                     *mEventQueue,
-                                                     &mEventPool,
-                                                     mRetryableEventCache);
-    mManager->mInited = true;
-    mManager->HandleEvent(fileEvent);
-    result = mManager->SendEvents();
+    auto cacheManager = createAndInitManagerInstance();
+    static_cast<FileSecurityManager*>(cacheManager.get())->mInited = true;
+    static_cast<FileSecurityManager*>(cacheManager.get())->HandleEvent(fileEvent);
+    result = cacheManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // mPipelineCtx is nullptr
-    mManager->HandleEvent(fileEvent);
+    static_cast<FileSecurityManager*>(cacheManager.get())->HandleEvent(fileEvent);
 
     auto cacheValue = std::make_shared<ProcessCacheValue>();
     cacheValue->SetContent<kProcessId>(StringView("1234"));
     cacheValue->SetContent<kKtime>(StringView("123456789"));
     cacheValue->SetContent<kBinary>(StringView("/usr/bin/test"));
-    mWrapper.mProcessCacheManager->mProcessCache.AddCache({1234, 123456789}, cacheValue);
+    mProcessCacheManager->mProcessCache.AddCache({1234, 123456789}, cacheValue);
 
-    result = mManager->SendEvents();
+    result = cacheManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // push queue failed
-    mManager->HandleEvent(fileEvent);
+    static_cast<FileSecurityManager*>(cacheManager.get())->HandleEvent(fileEvent);
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     // mManager->UpdateContext(&ctx, 123, 1);
-    result = mManager->SendEvents();
+    result = cacheManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 
     // success
@@ -227,16 +199,142 @@ void FileSecurityManagerUnittest::TestSendEvents() {
                                                KernelEventType::FILE_PERMISSION_EVENT_READ,
                                                KernelEventType::PROCESS_EXECVE_EVENT};
     for (auto eventType : eventTypes) {
-        mManager->HandleEvent(
-            std::make_shared<FileEvent>(1234, 123456789, eventType, 1234567890123ULL, StringView("/etc/passwd")));
+        static_cast<FileSecurityManager*>(cacheManager.get())
+            ->HandleEvent(
+                std::make_shared<FileEvent>(1234, 123456789, eventType, 1234567890123ULL, StringView("/etc/passwd")));
     }
 
     QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("test_config");
     ctx.SetProcessQueueKey(queueKey);
     // mManager->UpdateContext(&ctx, queueKey, 1);
     ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
-    result = mManager->SendEvents();
+    result = cacheManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
+}
+
+
+void FileSecurityManagerUnittest::TestFileSecurityManagerEventHandling() {
+    auto manager = createAndInitManagerInstance();
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    SecurityOptions options;
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
+
+    // 测试文件权限事件
+    auto permissionEvent = std::make_shared<FileEvent>(1234,
+                                                       5678,
+                                                       KernelEventType::FILE_PERMISSION_EVENT,
+                                                       std::chrono::system_clock::now().time_since_epoch().count(),
+                                                       "/test/file.txt");
+    APSARA_TEST_EQUAL(manager->HandleEvent(permissionEvent), 0);
+
+    // 测试文件内存映射事件
+    auto mmapEvent = std::make_shared<FileEvent>(1234,
+                                                 5678,
+                                                 KernelEventType::FILE_MMAP,
+                                                 std::chrono::system_clock::now().time_since_epoch().count(),
+                                                 "/test/mmap.txt");
+    APSARA_TEST_EQUAL(manager->HandleEvent(mmapEvent), 0);
+
+    // 测试文件截断事件
+    auto truncateEvent = std::make_shared<FileEvent>(1234,
+                                                     5678,
+                                                     KernelEventType::FILE_PATH_TRUNCATE,
+                                                     std::chrono::system_clock::now().time_since_epoch().count(),
+                                                     "/test/truncate.txt");
+    APSARA_TEST_EQUAL(manager->HandleEvent(truncateEvent), 0);
+
+    manager->Destroy();
+}
+
+void FileSecurityManagerUnittest::TestFileSecurityManagerErrorHandling() {
+    auto manager = createAndInitManagerInstance();
+
+    // 测试 null 事件处理
+    APSARA_TEST_NOT_EQUAL(manager->HandleEvent(nullptr), 0);
+
+    auto validEvent = std::make_shared<FileEvent>(1234,
+                                                  5678,
+                                                  KernelEventType::FILE_PERMISSION_EVENT,
+                                                  std::chrono::system_clock::now().time_since_epoch().count(),
+                                                  "/test/file.txt");
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    SecurityOptions options;
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
+
+    APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
+
+    // 测试无效的文件路径
+    auto invalidPathEvent = std::make_shared<FileEvent>(1234,
+                                                        5678,
+                                                        KernelEventType::FILE_PERMISSION_EVENT,
+                                                        std::chrono::system_clock::now().time_since_epoch().count(),
+                                                        "");
+    APSARA_TEST_EQUAL(manager->HandleEvent(invalidPathEvent), 0);
+
+    // 测试不同类型的事件
+    auto mmapEvent = std::make_shared<FileEvent>(1234,
+                                                 5678,
+                                                 KernelEventType::FILE_MMAP,
+                                                 std::chrono::system_clock::now().time_since_epoch().count(),
+                                                 "/test/mmap.txt");
+    APSARA_TEST_EQUAL(manager->HandleEvent(mmapEvent), 0);
+
+    manager->Destroy();
+}
+
+void FileSecurityManagerUnittest::TestFileSecurityManagerAggregation() {
+    auto manager = createAndInitManagerInstance();
+
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    SecurityOptions options;
+    APSARA_TEST_EQUAL(
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        0);
+
+    // 创建多个相关的文件事件
+    std::vector<std::shared_ptr<FileEvent>> events;
+
+    // 同一连接的多个事件
+    for (int i = 0; i < 3; ++i) {
+        events.push_back(
+            std::make_shared<FileEvent>(1234, // pid
+                                        5678, // ktime
+                                        KernelEventType::FILE_PATH_TRUNCATE, // type
+                                        std::chrono::system_clock::now().time_since_epoch().count() + i, // timestamp
+                                        "/test/" + std::to_string(i) // path
+                                        ));
+    }
+
+    // 处理所有事件
+    for (const auto& event : events) {
+        APSARA_TEST_EQUAL(manager->HandleEvent(event), 0);
+    }
+
+    // add cache
+    auto execveEvent = std::make_shared<ProcessCacheValue>();
+    data_event_id key{1234, 5678};
+    execveEvent->mPPid = 2345;
+    execveEvent->mPKtime = 6789;
+
+    // 测试缓存更新
+    mProcessCacheManager->mProcessCache.AddCache(key, execveEvent);
+    auto pExecveEvent = std::make_shared<ProcessCacheValue>();
+    data_event_id pkey{2345, 6789};
+    mProcessCacheManager->mProcessCache.AddCache(pkey, pExecveEvent);
+
+    // 触发聚合
+    APSARA_TEST_EQUAL(0, manager->SendEvents());
+
+    manager->Destroy();
 }
 
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestConstructor);
@@ -244,5 +342,11 @@ UNIT_TEST_CASE(FileSecurityManagerUnittest, TestCreateFileRetryableEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestRecordFileEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestHandleEvent);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestSendEvents);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerEventHandling);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerAggregation);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerErrorHandling);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestDifferentConfigNamesReplacement);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestSameConfigNameUpdate);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestBasicConfigUpdate);
 
 UNIT_TEST_MAIN

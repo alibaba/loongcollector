@@ -83,18 +83,8 @@ namespace logtail::ebpf {
 EBPFAdapter::EBPFAdapter() = default;
 
 EBPFAdapter::~EBPFAdapter() {
-    if (!dynamicLibSuccess()) {
-        return;
-    }
-
-    for (size_t i = 0; i < mRunning.size(); i++) {
-        auto& x = mRunning[i];
-        if (!x) {
-            continue;
-        }
-        // stop plugin
-        StopPlugin(static_cast<PluginType>(i));
-    }
+    // Plugin cleanup is handled by EBPFServer::Stop() to avoid
+    // accessing potentially freed resources during global destruction
 }
 
 void EBPFAdapter::Init() {
@@ -104,9 +94,6 @@ void EBPFAdapter::Init() {
     mInited = true;
     mBinaryPath = GetProcessExecutionDir();
     setenv("SYSAK_WORK_PATH", mBinaryPath.c_str(), 1);
-    for (auto& x : mRunning) {
-        x = false;
-    }
 
     mLogPrinter = [](int16_t level, const char* format, va_list args) -> int {
         auto printLevel = (eBPFLogType)level;
@@ -254,14 +241,6 @@ bool EBPFAdapter::dynamicLibSuccess() {
     return true;
 }
 
-bool EBPFAdapter::CheckPluginRunning(PluginType pluginType) {
-    if (!loadDynamicLib(mDriverLibName)) {
-        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
-        return false;
-    }
-
-    return mRunning[int(pluginType)];
-}
 
 bool EBPFAdapter::SetNetworkObserverConfig(int32_t key, int32_t value) {
     if (!dynamicLibSuccess()) {
@@ -318,12 +297,12 @@ int32_t EBPFAdapter::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, i
 }
 
 bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
-    if (CheckPluginRunning(pluginType)) {
-        // plugin update ...
-        return UpdatePlugin(pluginType, std::move(conf));
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
+        return false;
     }
 
-    // plugin not started ...
+    // Plugin state is managed by upper layer, directly execute start logic
     LOG_INFO(sLogger, ("begin to start plugin, type", magic_enum::enum_name(pluginType)));
     if (conf->mPluginType == PluginType::NETWORK_OBSERVE) {
         auto* nconf = std::get_if<NetworkObserveConfig>(&conf->mConfig);
@@ -349,20 +328,17 @@ bool EBPFAdapter::StartPlugin(PluginType pluginType, std::unique_ptr<PluginConfi
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
-    mRunning[int(pluginType)] = true;
     return true;
 #else
     auto startF = (start_plugin_func)f;
     int res = startF(conf.get());
-    if (!res)
-        mRunning[int(pluginType)] = true;
     return !res;
 #endif
 }
 
 bool EBPFAdapter::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
-    if (!CheckPluginRunning(pluginType)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", magic_enum::enum_name(pluginType)));
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
         return false;
     }
 
@@ -382,8 +358,8 @@ bool EBPFAdapter::ResumePlugin(PluginType pluginType, std::unique_ptr<PluginConf
 }
 
 bool EBPFAdapter::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConfig> conf) {
-    if (!CheckPluginRunning(pluginType)) {
-        LOG_ERROR(sLogger, ("plugin not started, type", magic_enum::enum_name(pluginType)));
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
         return false;
     }
 
@@ -403,10 +379,11 @@ bool EBPFAdapter::UpdatePlugin(PluginType pluginType, std::unique_ptr<PluginConf
 }
 
 bool EBPFAdapter::SuspendPlugin(PluginType pluginType) {
-    if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, cannot suspend. type", magic_enum::enum_name(pluginType)));
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
         return false;
     }
+
     void* f = mFuncs[(int)ebpf_func::EBPF_SUSPEND_PLUGIN];
     if (!f) {
         LOG_ERROR(sLogger, ("failed to load dynamic lib, suspend func ptr is null", magic_enum::enum_name(pluginType)));
@@ -423,9 +400,9 @@ bool EBPFAdapter::SuspendPlugin(PluginType pluginType) {
 }
 
 bool EBPFAdapter::StopPlugin(PluginType pluginType) {
-    if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", magic_enum::enum_name(pluginType)));
-        return true;
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
+        return false;
     }
 
     auto config = std::make_unique<PluginConfig>();
@@ -436,22 +413,19 @@ bool EBPFAdapter::StopPlugin(PluginType pluginType) {
         return false;
     }
 #ifdef APSARA_UNIT_TEST_MAIN
-    mRunning[int(pluginType)] = false;
     return true;
 #else
     auto stopF = (stop_plugin_func)f;
     int res = stopF(pluginType);
-    if (!res)
-        mRunning[int(pluginType)] = false;
     return !res;
 #endif
 }
 
 bool EBPFAdapter::BPFMapUpdateElem(
     PluginType pluginType, const std::string& map_name, void* key, void* value, uint64_t flag) {
-    if (!CheckPluginRunning(pluginType)) {
-        LOG_WARNING(sLogger, ("plugin not started, do nothing. type", magic_enum::enum_name(pluginType)));
-        return true;
+    if (!loadDynamicLib(mDriverLibName)) {
+        LOG_ERROR(sLogger, ("dynamic lib not load, plugin type", magic_enum::enum_name(pluginType)));
+        return false;
     }
 
     void* f = mFuncs[(int)ebpf_func::EBPF_MAP_UPDATE_ELEM];

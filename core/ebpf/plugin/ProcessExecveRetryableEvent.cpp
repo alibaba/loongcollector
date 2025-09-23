@@ -66,44 +66,44 @@ bool ProcessExecveRetryableEvent::HandleMessage() {
 }
 
 void ProcessExecveRetryableEvent::fillProcessPlainFields(const msg_execve_event& event, ProcessCacheValue& cacheValue) {
-    if (mRawEvent->cleanup_key.ktime == 0 || (mRawEvent->process.flags & EVENT_CLONE) != 0) {
-        cacheValue.mPPid = mRawEvent->parent.pid;
-        cacheValue.mPKtime = mRawEvent->parent.ktime;
+    if (event.cleanup_key.ktime == 0 || (event.process.flags & EVENT_CLONE) != 0) {
+        cacheValue.mPPid = event.parent.pid;
+        cacheValue.mPKtime = event.parent.ktime;
     } else { // process created from execve only
-        cacheValue.mPPid = mRawEvent->cleanup_key.pid;
-        cacheValue.mPKtime = mRawEvent->cleanup_key.ktime;
+        cacheValue.mPPid = event.cleanup_key.pid;
+        cacheValue.mPKtime = event.cleanup_key.ktime;
     }
 
-    auto execId = GenerateExecId(mHostname, mRawEvent->process.pid, mRawEvent->process.ktime);
-    auto userName = mProcParser.GetUserNameByUid(mRawEvent->process.uid);
-    auto permitted = GetCapabilities(mRawEvent->creds.caps.permitted, *cacheValue.GetSourceBuffer());
-    auto effective = GetCapabilities(mRawEvent->creds.caps.effective, *cacheValue.GetSourceBuffer());
-    auto inheritable = GetCapabilities(mRawEvent->creds.caps.inheritable, *cacheValue.GetSourceBuffer());
+    auto execId = GenerateExecId(mHostname, event.process.pid, event.process.ktime);
+    auto userName = mProcParser.GetUserNameByUid(event.process.uid);
+    auto permitted = GetCapabilities(event.creds.caps.permitted, *cacheValue.GetSourceBuffer());
+    auto effective = GetCapabilities(event.creds.caps.effective, *cacheValue.GetSourceBuffer());
+    auto inheritable = GetCapabilities(event.creds.caps.inheritable, *cacheValue.GetSourceBuffer());
 
-    fillProcessDataFields(*mRawEvent, cacheValue);
+    fillProcessDataFields(event, cacheValue);
     cacheValue.SetContent<kExecId>(execId);
-    cacheValue.SetContent<kProcessId>(mRawEvent->process.pid);
-    cacheValue.SetContent<kUid>(mRawEvent->process.uid);
+    cacheValue.SetContent<kProcessId>(event.process.pid);
+    cacheValue.SetContent<kUid>(event.process.uid);
     cacheValue.SetContent<kUser>(userName);
-    cacheValue.SetContent<kKtime>(mRawEvent->process.ktime);
+    cacheValue.SetContent<kKtime>(event.process.ktime);
     cacheValue.SetContentNoCopy<kCapPermitted>(permitted);
     cacheValue.SetContentNoCopy<kCapEffective>(effective);
     cacheValue.SetContentNoCopy<kCapInheritable>(inheritable);
     // parse exec
-    // event->process.tid = eventPtr->process.tid;
-    // event->process.nspid = eventPtr->process.nspid;
-    // event->process.auid = eventPtr->process.auid;
-    // event->process.secure_exec = eventPtr->process.secureexec;
-    // event->process.nlink = eventPtr->process.i_nlink;
-    // event->process.ino = eventPtr->process.i_ino;
+    // event.process.tid;
+    // event.process.nspid;
+    // event.process.auid;
+    // event.process.secureexec;
+    // event.process.i_nlink;
+    // event.process.i_ino;
 
     // dockerid
-    StringView ebpfDockerId(mRawEvent->kube.docker_id);
+    StringView ebpfDockerId(event.kube.docker_id);
     if (!ebpfDockerId.empty()) {
         StringView containerId;
         int offset = ProcParser::LookupContainerId(ebpfDockerId, true, containerId);
         if (offset >= 0) {
-            // Must use SetContent because containerId points to temporary memory mRawEvent->kube.docker_id
+            // Must use SetContent because containerId points to temporary memory event.kube.docker_id
             cacheValue.SetContent<kContainerId>(containerId);
         }
     }

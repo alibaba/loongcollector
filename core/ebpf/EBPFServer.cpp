@@ -437,7 +437,9 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         }
 
         // do real destroy ...
-        UnregisterPluginPerfBuffers(type);
+        if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+            UnregisterPluginPerfBuffers(type);
+        }
         ret = pluginManager->Destroy();
         if (ret != 0) {
             LOG_ERROR(sLogger, ("failed to stop plugin for", magic_enum::enum_name(type))("pipeline", pipelineName));
@@ -693,9 +695,15 @@ void EBPFServer::RegisterPluginPerfBuffers(PluginType type) {
             event.events = EPOLLIN;
             event.data.u32 = static_cast<uint32_t>(type);
 
-            if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event) == 0) {
+            int ret = epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, epollFd, &event);
+            if (ret == 0) {
                 LOG_DEBUG(sLogger,
                           ("Registered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            } else if (errno == EEXIST) {
+                // fd already registered, this is normal in some scenarios
+                LOG_WARNING(
+                    sLogger,
+                    ("Perf buffer epoll fd already registered", epollFd)("plugin type", magic_enum::enum_name(type)));
             } else {
                 LOG_ERROR(sLogger,
                           ("Failed to register perf buffer epoll fd",
@@ -714,9 +722,20 @@ void EBPFServer::UnregisterPluginPerfBuffers(PluginType type) {
 
     for (int epollFd : epollFds) {
         if (epollFd >= 0) {
-            epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, epollFd, nullptr);
-            LOG_DEBUG(sLogger,
-                      ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            int ret = epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, epollFd, nullptr);
+            if (ret == 0) {
+                LOG_DEBUG(sLogger,
+                          ("Unregistered perf buffer epoll fd", epollFd)("plugin type", magic_enum::enum_name(type)));
+            } else if (errno == ENOENT) {
+                // fd not registered, this is normal in some scenarios
+                LOG_WARNING(
+                    sLogger,
+                    ("Perf buffer epoll fd not registered", epollFd)("plugin type", magic_enum::enum_name(type)));
+            } else {
+                LOG_ERROR(sLogger,
+                          ("Failed to unregister perf buffer epoll fd",
+                           epollFd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
+            }
         }
     }
 }

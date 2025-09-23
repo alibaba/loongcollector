@@ -27,9 +27,10 @@
 #include "ebpf/type/NetworkObserverEvent.h"
 #include "metadata/K8sMetadata.h"
 #include "unittest/Unittest.h"
+#include "unittest/ebpf/ManagerUnittestBase.h"
 
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class NetworkObserverManagerUnittest : public ::testing::Test {
 public:
@@ -120,7 +121,7 @@ private:
 
 void NetworkObserverManagerUnittest::TestInitialization() {
     // auto mManager = CreateManager();
-    EXPECT_NE(mManager, nullptr);
+    APSARA_TEST_TRUE_FATAL(mManager != nullptr);
 
     ObserverNetworkOption options;
     // options.mEnableProtocols = {"HTTP", "MySQL", "Redis"};
@@ -128,13 +129,13 @@ void NetworkObserverManagerUnittest::TestInitialization() {
     // options.mDisableCids = {"container3"};
 
     int result = mManager->Init();
-    EXPECT_EQ(result, 0);
-    EXPECT_EQ(mManager->GetPluginType(), PluginType::NETWORK_OBSERVE);
+    APSARA_TEST_EQUAL(result, 0);
+    APSARA_TEST_EQUAL(mManager->GetPluginType(), PluginType::NETWORK_OBSERVE);
 }
 
 void NetworkObserverManagerUnittest::TestEventHandling() {
     // auto mManager = NetworkObserverManager::Create(mProcessCacheManager, mEBPFAdapter, mEventQueue, nullptr);
-    EXPECT_NE(mManager, nullptr);
+    APSARA_TEST_TRUE_FATAL(mManager != nullptr);
     ObserverNetworkOption options;
     // options.mEnableProtocols = {"HTTP"};
     mManager->Init();
@@ -266,11 +267,11 @@ void NetworkObserverManagerUnittest::TestPerfBufferOperations() {
     mManager->Init();
 
     int result = mManager->PollPerfBuffer(kDefaultMaxWaitTimeMS);
-    EXPECT_EQ(result, 0);
+    APSARA_TEST_EQUAL(result, 0);
 
     for (int i = 0; i < 5; i++) {
         result = mManager->PollPerfBuffer(kDefaultMaxWaitTimeMS);
-        EXPECT_EQ(result, 0);
+        APSARA_TEST_EQUAL(result, 0);
     }
 }
 
@@ -408,6 +409,7 @@ size_t GenerateContainerIdHash(const std::string& cid) {
 
 void NetworkObserverManagerUnittest::TestConfigUpdate() {
     auto mManager = CreateManager();
+    APSARA_TEST_TRUE_FATAL(mManager != nullptr);
     mManager->Init();
     CollectionPipelineContext context;
     context.SetConfigName("test-config-1");
@@ -418,6 +420,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
     options.mApmConfig = {.mWorkspace = "test-workspace-1",
                           .mAppName = "test-app-name-1",
                           .mAppId = "test-app-id-1",
+                          .mLanguage = "go",
                           .mServiceId = "test-service-id-1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
@@ -503,6 +506,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         APSARA_TEST_EQUAL(appConfig->mAppId, "test-app-id-1");
         APSARA_TEST_EQUAL(appConfig->mAppName, "test-app-name-1");
         APSARA_TEST_EQUAL(appConfig->mWorkspace, "test-workspace-1");
+        APSARA_TEST_EQUAL(appConfig->mLanguage, "go");
         APSARA_TEST_EQUAL(appConfig->mServiceId, "test-service-id-1");
         APSARA_TEST_EQUAL(appConfig->mEnableL4, true);
         APSARA_TEST_EQUAL(appConfig->mEnableL7, true);
@@ -586,6 +590,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
 
     // 验证workload3配置
     const auto& wlConfig3 = mManager->mWorkloadConfigs[keys[3]];
+    APSARA_TEST_EQUAL(wlConfig3.config->mLanguage, "go");
     APSARA_TEST_EQUAL(wlConfig3.config->mServiceId, "test-service-id-1");
 
     // 验证旧容器配置已被清除
@@ -603,6 +608,7 @@ void NetworkObserverManagerUnittest::TestConfigUpdate() {
         .mWorkspace = "test-workspace-2",
         .mAppName = "test-app-name-2",
         .mAppId = "test-app-id-2",
+        .mLanguage = "go",
         .mServiceId = "test-service-id-2",
     };
     options2.mL4Config.mEnable = true;
@@ -782,6 +788,7 @@ void NetworkObserverManagerUnittest::TestReportAgentInfo() {
     options.mApmConfig = {.mWorkspace = "test-workspace",
                           .mAppName = "test-app",
                           .mAppId = "test-app-id",
+                          .mLanguage = "go",
                           .mServiceId = "test-service-id"};
     options.mL4Config.mEnable = true;
     options.mL7Config
@@ -793,7 +800,7 @@ void NetworkObserverManagerUnittest::TestReportAgentInfo() {
     APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups.size(), 1UL);
     APSARA_TEST_EQUAL(mManager->mAgentInfoEventGroups[0].GetEvents().size(), 1UL);
     APSARA_TEST_TRUE(mManager->mAgentInfoEventGroups[0].GetEvents()[0].Is<LogEvent>());
-    auto* logEvent = mManager->mAgentInfoEventGroups[0].GetEvents()[0].Get<LogEvent>();
+    const auto* logEvent = mManager->mAgentInfoEventGroups[0].GetEvents()[0].Get<LogEvent>();
     APSARA_TEST_EQUAL(logEvent->GetContent("pid"), "test-app-id");
     APSARA_TEST_EQUAL(logEvent->GetContent("acs_cms_workspace"), "test-workspace");
     APSARA_TEST_EQUAL(logEvent->GetContent("acs_arms_service_id"), "test-service-id");
@@ -832,10 +839,12 @@ void NetworkObserverManagerUnittest::TestReportAgentInfo() {
     APSARA_TEST_EQUAL(workloadConfig.config->mAppName, "test-app");
     APSARA_TEST_EQUAL(workloadConfig.config->mWorkspace, "test-workspace");
     APSARA_TEST_EQUAL(workloadConfig.config->mServiceId, "test-service-id");
+    APSARA_TEST_EQUAL(workloadConfig.config->mLanguage, "go");
 }
 
 void NetworkObserverManagerUnittest::TestConverge() {
     // auto mManager = CreateManager();
+    APSARA_TEST_TRUE_FATAL(mManager != nullptr);
     ObserverNetworkOption options;
     options.mL7Config.mEnable = true;
     options.mL7Config.mEnableLog = true;
@@ -985,7 +994,18 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConverge);
 
-} // namespace ebpf
-} // namespace logtail
+class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerUnittestBase {
+protected:
+    std::shared_ptr<AbstractManager> createManagerInstance() override {
+        return NetworkObserverManager::Create(mProcessCacheManager, mMockEBPFAdapter, *mEventQueue, mEventPool.get());
+    }
+};
+
+UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestDifferentConfigNamesReplacement);
+UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestSameConfigNameUpdate);
+UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestMultipleConfigsComplexScenario);
+UNIT_TEST_CASE(NetworkObserverManagerConfigPairUnittest, TestBasicConfigUpdate);
+} // namespace logtail::ebpf
+
 
 UNIT_TEST_MAIN
