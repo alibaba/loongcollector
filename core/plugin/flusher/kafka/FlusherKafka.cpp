@@ -127,7 +127,6 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
     auto events = std::move(group.MutableEvents());
 
     const bool isDynamicTopic = mTopicFormatter.IsDynamic();
-    const GroupTags* groupTags = isDynamicTopic ? &group.GetTags() : nullptr;
     const auto& sizedTags = group.GetSizedTags();
     auto& sourceBuffer = group.GetSourceBuffer();
     auto& checkpoint = group.GetExactlyOnceCheckpoint();
