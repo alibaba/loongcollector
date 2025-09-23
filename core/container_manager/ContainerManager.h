@@ -97,10 +97,13 @@ private:
     void incrementallyUpdateContainersSnapshot();
 
     bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
+    void updateContainerInfoPointersInAllConfigs();
+    void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
     computeMatchedContainersDiff(std::set<std::string>& fullContainerIDList,
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
                                  const ContainerFilters& filters,
+                                 bool isStdio,
                                  ContainerDiff& diff);
 
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);

@@ -2,6 +2,7 @@
 
 #include <ctime>
 
+#include <algorithm>
 #include <boost/regex.hpp>
 #include <chrono>
 
@@ -76,7 +77,7 @@ void ContainerManager::pollingLoop() {
         if (now - lastUpdateAllTime >= 3600) {
             refreshAllContainersSnapshot();
             lastUpdateAllTime = now;
-        } else if (now - lastUpdateDiffTime >= 1) {
+        } else if (now - lastUpdateDiffTime >= 3) {
             incrementallyUpdateContainersSnapshot();
             lastUpdateDiffTime = now;
         }
@@ -229,6 +230,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     computeMatchedContainersDiff(*(options->GetFullContainerList()),
                                  containerInfoMap,
                                  options->GetContainerDiscoveryOptions().mContainerFilters,
+                                 options->GetContainerDiscoveryOptions().mIsStdio,
                                  diff);
 
 
@@ -236,7 +238,9 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         sLogger,
         ("diff", diff.ToString())("configName", ctx->GetConfigName())(
             "containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())(
-            "fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size()));
+            "fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size())(
+            "lastConfigContainerUpdateTime", options->GetLastContainerUpdateTime())("mLastUpdateTime",
+                                                                                    mLastUpdateTime));
 
     // Update the config's container update time when there are changes
     options->SetLastContainerUpdateTime(time(nullptr));
@@ -268,16 +272,16 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
     Json::Value stopContainers = jsonParams["Stop"];
 
     bool hasChanges = false;
+    std::vector<std::string> updatedContainerIDs;
 
     for (const auto& container : updateContainers) {
         auto containerInfo = DeserializeRawContainerInfo(container);
         if (containerInfo && !containerInfo->mID.empty()) {
             {
                 std::lock_guard<std::mutex> lock(mContainerMapMutex);
-                if (mContainerMap.find(containerInfo->mID) == mContainerMap.end()) {
-                    mContainerMap[containerInfo->mID] = containerInfo;
-                }
+                mContainerMap[containerInfo->mID] = containerInfo;
             }
+            updatedContainerIDs.push_back(containerInfo->mID);
             hasChanges = true;
         }
     }
@@ -302,6 +306,10 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
 
     if (hasChanges) {
         mLastUpdateTime = time(nullptr);
+        // Update container info pointers only for the updated containers
+        if (!updatedContainerIDs.empty()) {
+            updateContainerInfoPointersForContainers(updatedContainerIDs);
+        }
     }
 }
 
@@ -333,9 +341,13 @@ void ContainerManager::refreshAllContainersSnapshot() {
     }
     {
         std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        mContainerMap = tmpContainerMap;
+        mContainerMap.swap(tmpContainerMap);
     }
     mLastUpdateTime = time(nullptr);
+
+    // Update container info pointers in all configs to point to the new RawContainerInfo objects
+    updateContainerInfoPointersInAllConfigs();
+    tmpContainerMap.clear();
 }
 
 
@@ -492,6 +504,7 @@ void ContainerManager::computeMatchedContainersDiff(
     std::set<std::string>& fullContainerIDList,
     const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
     const ContainerFilters& filters,
+    bool isStdio,
     ContainerDiff& diff) {
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
@@ -521,6 +534,11 @@ void ContainerManager::computeMatchedContainersDiff(
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             fullContainerIDList.insert(pair.first); // 加入到 fullContainerIDList
+
+            if (!isStdio && pair.second->mStatus != "running") {
+                continue;
+            }
+
             bool isContainerLabelMatch = IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels);
             bool isEnvMatch = IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv);
             bool isK8sMatch = IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo);
@@ -543,6 +561,7 @@ static Json::Value SerializeRawContainerInfo(const std::shared_ptr<RawContainerI
     v["UpperDir"] = Json::Value(info->mUpperDir);
     v["LogPath"] = Json::Value(info->mLogPath);
     v["Stopped"] = Json::Value(info->mStopped);
+    v["Status"] = Json::Value(info->mStatus);
 
     // mounts
     Json::Value mounts(Json::arrayValue);
@@ -609,6 +628,9 @@ static std::shared_ptr<RawContainerInfo> DeserializeRawContainerInfo(const Json:
     }
     if (v.isMember("Stopped") && v["Stopped"].isBool()) {
         info->mStopped = v["Stopped"].asBool();
+    }
+    if (v.isMember("Status") && v["Status"].isString()) {
+        info->mStatus = v["Status"].asString();
     }
 
     // mounts
@@ -897,6 +919,69 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             }
         }
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));
+    }
+}
+
+void ContainerManager::updateContainerInfoPointersInAllConfigs() {
+    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    for (const auto& configPair : nameConfigMap) {
+        FileDiscoveryOptions* options = configPair.second.first;
+        if (!options->IsContainerDiscoveryEnabled()) {
+            continue;
+        }
+
+        const auto& containerInfos = options->GetContainerInfo();
+        if (!containerInfos) {
+            continue;
+        }
+
+        // Update RawContainerInfo pointers for each container in this config
+        for (auto& containerInfo : *containerInfos) {
+            const std::string& containerId = containerInfo.mRawContainerInfo->mID;
+            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            auto it = mContainerMap.find(containerId);
+            if (it != mContainerMap.end()) {
+                // Update the pointer to point to the new RawContainerInfo object
+                containerInfo.mRawContainerInfo = it->second;
+            } else {
+                // Container no longer exists in the global map, this should not happen
+                // but log a warning if it does
+                LOG_WARNING(sLogger, ("container not found in global map during pointer update", containerId));
+            }
+        }
+    }
+}
+
+void ContainerManager::updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs) {
+    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    for (const auto& configPair : nameConfigMap) {
+        FileDiscoveryOptions* options = configPair.second.first;
+        if (!options->IsContainerDiscoveryEnabled()) {
+            continue;
+        }
+
+        const auto& containerInfos = options->GetContainerInfo();
+        if (!containerInfos) {
+            continue;
+        }
+
+        // Update RawContainerInfo pointers only for the specified container IDs
+        for (auto& containerInfo : *containerInfos) {
+            const std::string& containerId = containerInfo.mRawContainerInfo->mID;
+            // Check if this container ID is in the list of updated containers
+            if (std::find(containerIDs.begin(), containerIDs.end(), containerId) != containerIDs.end()) {
+                std::lock_guard<std::mutex> lock(mContainerMapMutex);
+                auto it = mContainerMap.find(containerId);
+                if (it != mContainerMap.end()) {
+                    // Update the pointer to point to the new RawContainerInfo object
+                    containerInfo.mRawContainerInfo = it->second;
+                } else {
+                    // Container no longer exists in the global map, this should not happen
+                    // but log a warning if it does
+                    LOG_WARNING(sLogger, ("container not found in global map during pointer update", containerId));
+                }
+            }
+        }
     }
 }
 

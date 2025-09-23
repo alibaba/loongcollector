@@ -2,14 +2,15 @@ package pluginmanager
 
 import (
 	"encoding/json"
-	"path/filepath"
-	"strings"
-
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 var caCachedFullList map[string]struct{}
 var lastUpdateTime int64
+var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
 type Mount struct {
 	Source      string
@@ -34,6 +35,7 @@ type ContainerInfoCmd struct {
 	Env             map[string]string // 环境变量信息
 	ContainerLabels map[string]string // 容器标签信息
 	Stopped         bool              // 容器是否已停止
+	Status          string            // 容器状态
 }
 
 type AllCmd struct {
@@ -58,6 +60,7 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	for key, val := range info.ContainerNameTag {
 		cmd.MetaDatas[key] = val
 	}
+	cmd.Status = info.ContainerInfo.State.Status
 
 	// K8s info
 	if info.K8SInfo != nil {
@@ -85,6 +88,10 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 		for _, env := range info.ContainerInfo.Config.Env {
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) == 2 {
+				key := parts[0]
+				if envRegex.MatchString(key) {
+					continue
+				}
 				cmd.Env[parts[0]] = parts[1]
 			}
 		}

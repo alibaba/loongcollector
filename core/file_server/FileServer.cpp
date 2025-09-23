@@ -99,12 +99,21 @@ void FileServer::PauseInner() {
 }
 
 // 恢复文件服务，重新注册事件处理程序和恢复日志输入
-void FileServer::Resume(bool isConfigUpdate) {
+void FileServer::Resume(bool isConfigUpdate, bool isContainerUpdate) {
     if (isConfigUpdate) {
-        ContainerManager::GetInstance()->SaveContainerInfo();
-        ContainerManager::GetInstance()->LoadContainerInfo();
+        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
+    } else {
+        if (isContainerUpdate) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
     }
-    LOG_INFO(sLogger, ("file server resume", "starts"));
+    LOG_INFO(
+        sLogger,
+        ("file server resume", "starts")("isConfigUpdate", isConfigUpdate)("isContainerUpdate", isContainerUpdate));
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
     if (isConfigUpdate) {

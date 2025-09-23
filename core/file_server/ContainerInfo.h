@@ -65,6 +65,8 @@ struct RawContainerInfo {
 
     bool mStopped = false;
 
+    std::string mStatus;
+
     bool operator==(const RawContainerInfo& rhs) const {
         if (mID != rhs.mID) {
             return false;
@@ -115,6 +117,9 @@ struct RawContainerInfo {
             if (rhsLabel == rhs.mContainerLabels.end() || rhsLabel->second != label.second) {
                 return false;
             }
+        }
+        if (mStatus != rhs.mStatus) {
+            return false;
         }
         return true;
     }

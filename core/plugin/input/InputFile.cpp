@@ -84,6 +84,7 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         if (!containerDiscovery.Init(config, *mContext, sName)) {
             return false;
         }
+        containerDiscovery.mIsStdio = false;
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
         mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
         containerDiscovery.GenerateContainerMetaFetchingGoPipeline(

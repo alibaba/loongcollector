@@ -135,6 +135,7 @@ struct ContainerDiscoveryOptions {
     std::unordered_map<std::string, std::string> mExternalEnvTag;
     // 启用容器元信息预览
     bool mCollectingContainersMeta = false;
+    bool mIsStdio = false;
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
 

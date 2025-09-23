@@ -291,7 +291,7 @@ void Application::Start() { // GCOVR_EXCL_START
     OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0, lastContainerCheckTime = 0;
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -352,9 +352,12 @@ void Application::Start() { // GCOVR_EXCL_START
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
-        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
-            FileServer::GetInstance()->Pause();
-            FileServer::GetInstance()->Resume();
+        if (curTime - lastContainerCheckTime >= 3) {
+            if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+                FileServer::GetInstance()->Pause();
+                FileServer::GetInstance()->Resume(false, true);
+            }
+            lastContainerCheckTime = curTime;
         }
 
         // destruct event handlers here so that it will not block file reading task

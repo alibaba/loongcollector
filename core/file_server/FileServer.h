@@ -90,7 +90,7 @@ public:
     MetricsRecordRef& GetMetricsRecordRef() { return mMetricsRecordRef; }
 
     // 过渡使用
-    void Resume(bool isConfigUpdate = true);
+    void Resume(bool isConfigUpdate = true, bool isContainerUpdate = false);
     void Stop();
     uint32_t GetExactlyOnceConcurrency(const std::string& name) const;
     std::vector<std::string> GetExactlyOnceConfigs() const;
