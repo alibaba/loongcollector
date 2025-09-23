@@ -864,7 +864,7 @@ void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) cons
         std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
 
         // Collect actual matched IDs
         std::set<std::string> actualMatchedIDs;
