@@ -42,6 +42,9 @@ if (LINUX)
 	
     add_executable(input_host_meta_unittest InputHostMetaUnittest.cpp)
     target_link_libraries(input_host_meta_unittest unittest_base)
+
+    add_executable(input_forward_unittest InputForwardUnittest.cpp)
+    target_link_libraries(input_forward_unittest ${UT_BASE_TARGET})
 endif()
 
 add_executable(input_internal_alarms_unittest InputInternalAlarmsUnittest.cpp)
@@ -86,4 +89,5 @@ if (LINUX)
     gtest_discover_tests(input_ebpf_network_observer_unittest)
     gtest_discover_tests(input_host_meta_unittest)
     gtest_discover_tests(input_host_monitor_unittest)
+    gtest_discover_tests(input_forward_unittest)
 endif()

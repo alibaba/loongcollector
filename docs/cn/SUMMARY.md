@@ -46,6 +46,7 @@
     * [eBPF进程安全数据](plugins/input/native/input-process-security.md)
     * [eBPF网络安全数据](plugins/input/native/input-network-security.md)
     * [eBPF文件安全数据](plugins/input/native/input-file-security.md)
+    * [转发输入插件](plugins/input/native/input-forward.md)
     * [自监控指标数据](plugins/input/native/input-internal-metrics.md)
     * [自监控告警数据](plugins/input/native/input-internal-alarms.md)
   * 扩展输入插件
