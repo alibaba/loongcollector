@@ -82,7 +82,14 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
     if (mEnableContainerDiscovery) {
         ContainerDiscoveryOptions containerDiscovery;
         if (!containerDiscovery.Init(config, *mContext, sName)) {
-            return false;
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "container discovery config is invalid",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
         containerDiscovery.mIsStdio = false;
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);

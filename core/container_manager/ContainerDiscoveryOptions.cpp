@@ -19,6 +19,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
+#include "common/StringTools.h"
 #include "file_server/FileDiscoveryOptions.h"
 
 
@@ -144,7 +145,9 @@ bool ContainerFilterConfig::Init(const Json::Value& config,
 }
 
 
-bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& inputs, FieldFilter& fieldFilter) {
+bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& inputs,
+                       FieldFilter& fieldFilter,
+                       std::string& errorMsg) {
     std::unordered_map<std::string, std::string> staticResult;
     std::unordered_map<std::string, std::shared_ptr<boost::regex>> regexResult;
 
@@ -161,6 +164,8 @@ bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& input
                 auto reg = std::make_shared<boost::regex>(input.second);
                 regexResult[input.first] = reg;
             } catch (const std::exception& e) {
+                errorMsg.append("regex_error: ");
+                errorMsg.append(ToString(e.what()));
                 return false;
             }
         } else {
@@ -172,8 +177,9 @@ bool SplitRegexFromMap(const std::unordered_map<std::string, std::string>& input
     return true;
 }
 
-bool ContainerFilters::Init(const ContainerFilterConfig& config) {
+bool ContainerFilters::Init(const ContainerFilterConfig& config, std::string& exception) {
     /// 为 K8sFilter 设置正则表达式
+    exception.clear();
     try {
         if (!config.mK8sNamespaceRegex.empty()) {
             mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>(config.mK8sNamespaceRegex);
@@ -188,45 +194,60 @@ bool ContainerFilters::Init(const ContainerFilterConfig& config) {
         }
     } catch (const boost::regex_error& e) {
         // Handle regex compilation errors gracefully
+        exception.append("regex_error: ");
+        exception.append(logtail::ToString(e.what()));
+        exception.append("; there may be invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
+                         "K8sContainerRegex");
+        // exception.append(buffer);
         return false;
     } catch (const std::exception& e) {
         // Handle other exceptions gracefully
+        exception.append("exception message: ");
+        exception.append(e.what());
+        exception.append("; there may be invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
+                         "K8sContainerRegex ");
         return false;
     }
     bool success = false;
     if (!config.mIncludeK8sLabel.empty()) {
-        success = SplitRegexFromMap(config.mIncludeK8sLabel, mK8SFilter.mK8sLabelFilter.mIncludeFields);
+        success = SplitRegexFromMap(config.mIncludeK8sLabel, mK8SFilter.mK8sLabelFilter.mIncludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for IncludeK8sLabel");
             return success;
         }
     }
     if (!config.mExcludeK8sLabel.empty()) {
-        success = SplitRegexFromMap(config.mExcludeK8sLabel, mK8SFilter.mK8sLabelFilter.mExcludeFields);
+        success = SplitRegexFromMap(config.mExcludeK8sLabel, mK8SFilter.mK8sLabelFilter.mExcludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for ExcludeK8sLabel");
             return success;
         }
     }
     if (!config.mIncludeContainerLabel.empty()) {
-        success = SplitRegexFromMap(config.mIncludeContainerLabel, mContainerLabelFilter.mIncludeFields);
+        success = SplitRegexFromMap(config.mIncludeContainerLabel, mContainerLabelFilter.mIncludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for IncludeContainerLabel");
             return success;
         }
     }
     if (!config.mExcludeContainerLabel.empty()) {
-        success = SplitRegexFromMap(config.mExcludeContainerLabel, mContainerLabelFilter.mExcludeFields);
+        success = SplitRegexFromMap(config.mExcludeContainerLabel, mContainerLabelFilter.mExcludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for ExcludeContainerLabel");
             return success;
         }
     }
     if (!config.mIncludeEnv.empty()) {
-        success = SplitRegexFromMap(config.mIncludeEnv, mEnvFilter.mIncludeFields);
+        success = SplitRegexFromMap(config.mIncludeEnv, mEnvFilter.mIncludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for IncludeEnv");
             return success;
         }
     }
     if (!config.mExcludeEnv.empty()) {
-        success = SplitRegexFromMap(config.mExcludeEnv, mEnvFilter.mExcludeFields);
+        success = SplitRegexFromMap(config.mExcludeEnv, mEnvFilter.mExcludeFields, exception);
         if (!success) {
+            exception.append("; there may be invalid regex patterns in the config for ExcludeEnv");
             return success;
         }
     }
@@ -256,8 +277,16 @@ bool ContainerDiscoveryOptions::Init(const Json::Value& config,
             if (!success) {
                 return false;
             }
-            success = mContainerFilters.Init(mContainerFilterConfig);
+            success = mContainerFilters.Init(mContainerFilterConfig, errorMsg);
             if (!success) {
+                PARAM_WARNING_IGNORE(ctx.GetLogger(),
+                                     ctx.GetAlarm(),
+                                     errorMsg,
+                                     pluginType,
+                                     ctx.GetConfigName(),
+                                     ctx.GetProjectName(),
+                                     ctx.GetLogstoreName(),
+                                     ctx.GetRegion());
                 return false;
             }
         }

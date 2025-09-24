@@ -77,22 +77,23 @@ void ContainerManager::pollingLoop() {
             break;
         }
         time_t now = time(nullptr);
+        // 每1小时更新一次所有容器信息
         if (now - lastUpdateAllTime >= 3600) {
             refreshAllContainersSnapshot();
             lastUpdateAllTime = now;
-        } else if (now - lastUpdateDiffTime >= 3) {
+        } else if (now - lastUpdateDiffTime >= 1) {
             incrementallyUpdateContainersSnapshot();
             lastUpdateDiffTime = now;
         }
         if (first) {
             lastSendAllConfigContainerInfoTime = now;
         } else {
+            // 每12小时发送一次所有配置的容器信息
             if (now - lastSendAllConfigContainerInfoTime >= 43200) {
                 sendAllConfigContainerInfo();
                 lastSendAllConfigContainerInfoTime = now;
             }
         }
-
         std::this_thread::sleep_for(std::chrono::seconds(3));
         first = false;
     }
@@ -277,8 +278,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                  options->GetContainerDiscoveryOptions().mIsStdio,
                                  diff);
 
-
-    LOG_INFO(
+    LOG_DEBUG(
         sLogger,
         ("diff", diff.ToString())("configName", ctx->GetConfigName())(
             "containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())(
@@ -603,11 +603,17 @@ void ContainerManager::computeMatchedContainersDiff(
             }
 
             bool isContainerLabelMatch = IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels);
+            if (!isContainerLabelMatch) {
+                continue;
+            }
             bool isEnvMatch = IsMapLabelsMatch(filters.mEnvFilter, pair.second->mEnv);
+            if (!isEnvMatch) {
+                continue;
+            }
             bool isK8sMatch = IsK8sFilterMatch(filters.mK8SFilter, pair.second->mK8sInfo);
-            LOG_DEBUG(sLogger,
-                      ("isContainerLabelMatch", isContainerLabelMatch)("isEnvMatch", isEnvMatch)(
-                          "isK8sMatch", isK8sMatch)("container name", pair.second->mID));
+            if (!isK8sMatch) {
+                continue;
+            }
             // 检查标签和环境匹配
             if (isContainerLabelMatch && isEnvMatch && isK8sMatch) {
                 diff.mAdded.push_back(pair.second); // 添加到变换列表

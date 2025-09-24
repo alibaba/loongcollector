@@ -27,7 +27,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
-#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"

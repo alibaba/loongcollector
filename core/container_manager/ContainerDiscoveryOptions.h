@@ -117,7 +117,7 @@ struct ContainerFilters {
     MatchCriteriaFilter mEnvFilter;
     MatchCriteriaFilter mContainerLabelFilter;
 
-    bool Init(const ContainerFilterConfig& config);
+    bool Init(const ContainerFilterConfig& config, std::string& exception);
 
     std::string ToString() const {
         std::stringstream ss;

@@ -848,7 +848,8 @@ void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) cons
         }
 
         // Initialize ContainerFilters using the standard Init method
-        if (!filters.Init(config)) {
+        std::string exception;
+        if (!filters.Init(config, exception)) {
             FAIL() << "Failed to initialize ContainerFilters for test case: " << testName;
         }
 

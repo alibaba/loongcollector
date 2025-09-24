@@ -244,7 +244,8 @@ void ContainerDiscoveryOptionsUnittest::TestContainerFilterConfigInit() const {
 
     // Test GetContainerFilters
     ContainerFilters filters;
-    APSARA_TEST_TRUE(filters.Init(filterConfig));
+    std::string exception;
+    APSARA_TEST_TRUE(filters.Init(filterConfig, exception));
     APSARA_TEST_TRUE(filters.mK8SFilter.mNamespaceReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mPodReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mContainerReg != nullptr);
@@ -273,7 +274,8 @@ void ContainerDiscoveryOptionsUnittest::TestRegexCompilation() const {
     APSARA_TEST_TRUE(filterConfig.Init(configJson, ctx, pluginType));
 
     ContainerFilters filters;
-    APSARA_TEST_TRUE(filters.Init(filterConfig));
+    std::string exception;
+    APSARA_TEST_TRUE(filters.Init(filterConfig, exception));
 
     // Verify regex compilation - only valid regex (^...) should be in mFieldsRegMap
     APSARA_TEST_TRUE(filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap.count("valid_regex"));
@@ -367,7 +369,8 @@ void ContainerDiscoveryOptionsUnittest::TestComplexFilterCombination() const {
 
     // Verify regex compilation
     ContainerFilters filters;
-    APSARA_TEST_TRUE(filters.Init(config->mContainerFilterConfig));
+    std::string exception;
+    APSARA_TEST_TRUE(filters.Init(config->mContainerFilterConfig, exception));
     APSARA_TEST_TRUE(filters.mK8SFilter.mNamespaceReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mPodReg != nullptr);
     APSARA_TEST_TRUE(filters.mK8SFilter.mContainerReg != nullptr);
