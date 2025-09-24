@@ -128,6 +128,36 @@ struct ContainerFilters {
 };
 
 
+struct ContainerConfigResult {
+    std::string DataType;
+    std::string Project;
+    std::string Logstore;
+    std::string ConfigName;
+    std::string PathNotExistInputContainerIDs;
+    std::string PathExistInputContainerIDs;
+    std::string SourceAddress;
+    std::string InputType;
+    std::string InputIsContainerFile;
+    std::string FlusherType;
+    std::string FlusherTargetAddress;
+
+    std::string ToString() const {
+        std::stringstream ss;
+        ss << "DataType: " << DataType << std::endl;
+        ss << "Project: " << Project << std::endl;
+        ss << "Logstore: " << Logstore << std::endl;
+        ss << "ConfigName: " << ConfigName << std::endl;
+        ss << "PathNotExistInputContainerIDs: " << PathNotExistInputContainerIDs << std::endl;
+        ss << "PathExistInputContainerIDs: " << PathExistInputContainerIDs << std::endl;
+        ss << "SourceAddress: " << SourceAddress << std::endl;
+        ss << "InputType: " << InputType << std::endl;
+        ss << "InputIsContainerFile: " << InputIsContainerFile << std::endl;
+        ss << "FlusherType: " << FlusherType << std::endl;
+        ss << "FlusherTargetAddress: " << FlusherTargetAddress << std::endl;
+        return ss.str();
+    }
+};
+
 struct ContainerDiscoveryOptions {
     ContainerFilterConfig mContainerFilterConfig;
     ContainerFilters mContainerFilters;
@@ -136,6 +166,9 @@ struct ContainerDiscoveryOptions {
     // 启用容器元信息预览
     bool mCollectingContainersMeta = false;
     bool mIsStdio = false;
+
+    std::shared_ptr<ContainerConfigResult> mContainerConfigResult;
+
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
 

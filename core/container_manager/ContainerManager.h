@@ -37,37 +37,6 @@
 
 
 namespace logtail {
-
-struct ContainerConfigResult {
-    std::string DataType;
-    std::string Project;
-    std::string Logstore;
-    std::string ConfigName;
-    std::string PathNotExistInputContainerIDs;
-    std::string PathExistInputContainerIDs;
-    std::string SourceAddress;
-    std::string InputType;
-    std::string InputIsContainerFile;
-    std::string FlusherType;
-    std::string FlusherTargetAddress;
-
-    std::string ToString() const {
-        std::stringstream ss;
-        ss << "DataType: " << DataType << std::endl;
-        ss << "Project: " << Project << std::endl;
-        ss << "Logstore: " << Logstore << std::endl;
-        ss << "ConfigName: " << ConfigName << std::endl;
-        ss << "PathNotExistInputContainerIDs: " << PathNotExistInputContainerIDs << std::endl;
-        ss << "PathExistInputContainerIDs: " << PathExistInputContainerIDs << std::endl;
-        ss << "SourceAddress: " << SourceAddress << std::endl;
-        ss << "InputType: " << InputType << std::endl;
-        ss << "InputIsContainerFile: " << InputIsContainerFile << std::endl;
-        ss << "FlusherType: " << FlusherType << std::endl;
-        ss << "FlusherTargetAddress: " << FlusherTargetAddress << std::endl;
-        return ss.str();
-    }
-};
-
 class ContainerManager {
 public:
     ContainerManager();
@@ -86,7 +55,8 @@ public:
 
     ContainerConfigResult CreateContainerConfigResult(const FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx,
-                                                      const std::vector<std::string>& containerIDs = {});
+                                                      const std::vector<std::string>& pathExistContainerIDs,
+                                                      const std::vector<std::string>& pathNotExistContainerIDs);
 
     void UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveConfigContainerInfoPipeline();
@@ -109,11 +79,15 @@ private:
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
     void loadContainerInfoFromContainersFormat(const Json::Value& root, const std::string& configPath);
 
-    void sendConfigContainerInfo();
+    void sendConfigContainerInfo(std::vector<std::shared_ptr<ContainerConfigResult>> configResults);
+    void sendAllConfigContainerInfo();
+
+    // Helper method for joining container IDs
+    std::string joinContainerIDs(const std::vector<std::string>& containerIDs);
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
-    std::unordered_map<std::string, ContainerConfigResult> mConfigContainerResultMap;
+    std::unordered_map<std::string, std::shared_ptr<ContainerConfigResult>> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;

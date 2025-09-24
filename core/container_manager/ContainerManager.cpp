@@ -69,6 +69,9 @@ void ContainerManager::Stop() {
 void ContainerManager::pollingLoop() {
     time_t lastUpdateAllTime = 0;
     time_t lastUpdateDiffTime = 0;
+    time_t lastSendAllConfigContainerInfoTime = 0;
+    bool first = true;
+
     while (true) {
         if (!mIsRunning) {
             break;
@@ -81,12 +84,23 @@ void ContainerManager::pollingLoop() {
             incrementallyUpdateContainersSnapshot();
             lastUpdateDiffTime = now;
         }
+        if (first) {
+            lastSendAllConfigContainerInfoTime = now;
+        } else {
+            if (now - lastSendAllConfigContainerInfoTime >= 43200) {
+                sendAllConfigContainerInfo();
+                lastSendAllConfigContainerInfoTime = now;
+            }
+        }
+
         std::this_thread::sleep_for(std::chrono::seconds(3));
+        first = false;
     }
 }
 
 void ContainerManager::ApplyContainerDiffs() {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    std::vector<std::shared_ptr<ContainerConfigResult>> configResults;
     for (auto& pair : mConfigContainerDiffMap) {
         const auto& itr = nameConfigMap.find(pair.first);
         if (itr == nameConfigMap.end()) {
@@ -109,25 +123,53 @@ void ContainerManager::ApplyContainerDiffs() {
             options->DeleteRawContainerInfo(container);
         }
 
-        // Collect all container IDs from the diff for creating config result
-        std::vector<std::string> containerIDs;
-        const auto& containerInfos = options->GetContainerInfo();
-        if (containerInfos) {
-            for (const auto& info : *containerInfos) {
-                containerIDs.push_back(info.mRawContainerInfo->mID);
-            }
-        }
-        // Create and store container config result
-        ContainerConfigResult configResult = CreateContainerConfigResult(options, ctx, containerIDs);
-        LOG_DEBUG(sLogger, ("configResult", configResult.ToString())("configName", ctx->GetConfigName()));
         if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta) {
-            mConfigContainerResultMap[ctx->GetConfigName()] = configResult;
+            // Collect all container IDs from the diff for creating config result
+            std::vector<std::string> pathExistContainerIDs;
+            std::vector<std::string> pathNotExistContainerIDs;
+            const auto& containerInfos = options->GetContainerInfo();
+            if (containerInfos) {
+                if (options->GetContainerDiscoveryOptions().mIsStdio) {
+                    for (const auto& info : *containerInfos) {
+                        pathExistContainerIDs.push_back(info.mRawContainerInfo->mID);
+                    }
+                } else {
+                    for (const auto& info : *containerInfos) {
+                        if (CheckExistance(info.mRealBaseDir)) {
+                            pathExistContainerIDs.push_back(info.mRawContainerInfo->mID);
+                        } else {
+                            pathNotExistContainerIDs.push_back(info.mRawContainerInfo->mID);
+                        }
+                    }
+                }
+            }
+            // Create and store container config result
+            auto configResult = std::make_shared<ContainerConfigResult>(
+                CreateContainerConfigResult(options, ctx, pathExistContainerIDs, pathNotExistContainerIDs));
+            options->GetContainerDiscoveryOptions().mContainerConfigResult = configResult;
+            configResults.push_back(configResult);
+            LOG_DEBUG(sLogger, ("configResult", configResult->ToString())("configName", ctx->GetConfigName()));
         }
     }
-    sendConfigContainerInfo();
+    sendConfigContainerInfo(configResults);
     mConfigContainerDiffMap.clear();
 }
 
+void ContainerManager::sendAllConfigContainerInfo() {
+    std::vector<std::shared_ptr<ContainerConfigResult>> configResults;
+    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+
+    for (auto& pair : nameConfigMap) {
+        FileDiscoveryOptions* options = pair.second.first;
+        if (options->IsContainerDiscoveryEnabled()) {
+            if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
+                && options->GetContainerDiscoveryOptions().mContainerConfigResult) {
+                configResults.push_back(options->GetContainerDiscoveryOptions().mContainerConfigResult);
+            }
+        }
+    }
+    sendConfigContainerInfo(configResults);
+}
 
 bool ContainerManager::CheckContainerDiffForAllConfig() {
     if (!mIsRunning) {
@@ -161,9 +203,13 @@ void ContainerManager::RemoveConfigContainerInfoPipeline() {
     LOG_INFO(sLogger, ("config container info pipeline", "removed"));
 }
 
-void ContainerManager::sendConfigContainerInfo() {
+void ContainerManager::sendConfigContainerInfo(std::vector<std::shared_ptr<ContainerConfigResult>> configResults) {
     ReadLock lock(mConfigContainerInfoPipelineMux);
     if (mConfigContainerInfoPipelineCtx == nullptr) {
+        return;
+    }
+
+    if (configResults.empty()) {
         return;
     }
 
@@ -172,35 +218,33 @@ void ContainerManager::sendConfigContainerInfo() {
     pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
                                    SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER);
 
-    for (const auto& pair : mConfigContainerResultMap) {
+    for (const auto& itr : configResults) {
         LogEvent* logEventPtr = pipelineEventGroup.AddLogEvent();
         time_t logtime = time(nullptr);
 
         logEventPtr->SetTimestamp(logtime);
 
         // Set all fields according to Go implementation
-        logEventPtr->SetContent("type", pair.second.DataType);
-        logEventPtr->SetContent("project", pair.second.Project);
-        logEventPtr->SetContent("logstore", pair.second.Logstore);
+        logEventPtr->SetContent("type", itr->DataType);
+        logEventPtr->SetContent("project", itr->Project);
+        logEventPtr->SetContent("logstore", itr->Logstore);
 
         // Handle config_name with $ separator logic like Go version
-        std::string configName = pair.second.ConfigName;
+        std::string configName = itr->ConfigName;
         size_t dollarPos = configName.find('$');
         if (dollarPos != std::string::npos && dollarPos + 1 < configName.length()) {
             configName = configName.substr(dollarPos + 1);
         }
         logEventPtr->SetContent("config_name", configName);
 
-        logEventPtr->SetContent("input.source_addresses", pair.second.SourceAddress);
-        logEventPtr->SetContent("input.path_exist_container_ids", pair.second.PathExistInputContainerIDs);
-        logEventPtr->SetContent("input.path_not_exist_container_ids", pair.second.PathNotExistInputContainerIDs);
-        logEventPtr->SetContent("input.type", pair.second.InputType);
-        logEventPtr->SetContent("input.container_file", pair.second.InputIsContainerFile);
-        logEventPtr->SetContent("flusher.type", pair.second.FlusherType);
-        logEventPtr->SetContent("flusher.target_addresses", pair.second.FlusherTargetAddress);
+        logEventPtr->SetContent("input.source_addresses", itr->SourceAddress);
+        logEventPtr->SetContent("input.path_exist_container_ids", itr->PathExistInputContainerIDs);
+        logEventPtr->SetContent("input.path_not_exist_container_ids", itr->PathNotExistInputContainerIDs);
+        logEventPtr->SetContent("input.type", itr->InputType);
+        logEventPtr->SetContent("input.container_file", itr->InputIsContainerFile);
+        logEventPtr->SetContent("flusher.type", itr->FlusherType);
+        logEventPtr->SetContent("flusher.target_addresses", itr->FlusherTargetAddress);
     }
-    mConfigContainerResultMap.clear();
-
     if (pipelineEventGroup.GetEvents().size() > 0) {
         ProcessorRunner::GetInstance()->PushQueue(mConfigContainerInfoPipelineCtx->GetProcessQueueKey(),
                                                   mConfigContainerInfoInputIndex,
@@ -351,9 +395,11 @@ void ContainerManager::refreshAllContainersSnapshot() {
 }
 
 
-ContainerConfigResult ContainerManager::CreateContainerConfigResult(const FileDiscoveryOptions* options,
-                                                                    const CollectionPipelineContext* ctx,
-                                                                    const std::vector<std::string>& containerIDs) {
+ContainerConfigResult
+ContainerManager::CreateContainerConfigResult(const FileDiscoveryOptions* options,
+                                              const CollectionPipelineContext* ctx,
+                                              const std::vector<std::string>& pathExistContainerIDs,
+                                              const std::vector<std::string>& pathNotExistContainerIDs) {
     ContainerConfigResult result;
 
     if (!options || !ctx) {
@@ -368,29 +414,46 @@ ContainerConfigResult ContainerManager::CreateContainerConfigResult(const FileDi
     result.ConfigName = ctx->GetConfigName();
 
     // Container IDs - join with semicolon like in Go version
-    if (!containerIDs.empty()) {
-        std::string containerIDStr;
-        for (size_t i = 0; i < containerIDs.size(); ++i) {
-            if (i > 0) {
-                containerIDStr += ";";
-            }
-            // Get short container ID (first 12 characters)
-            if (containerIDs[i].length() >= 12) {
-                containerIDStr += containerIDs[i].substr(0, 12);
-            } else {
-                containerIDStr += containerIDs[i];
-            }
-        }
-        result.PathExistInputContainerIDs = containerIDStr;
-    } else {
-        result.PathExistInputContainerIDs = "";
-    }
+    result.PathExistInputContainerIDs = joinContainerIDs(pathExistContainerIDs);
+    result.PathNotExistInputContainerIDs = joinContainerIDs(pathNotExistContainerIDs);
 
     // Source and type information
     result.SourceAddress = "stdout"; // Similar to input_docker_stdout
     result.InputType = "input_docker_stdout"; // Plugin name
     result.FlusherType = "flusher_sls";
     result.FlusherTargetAddress = ctx->GetProjectName() + "/" + ctx->GetLogstoreName();
+
+    return result;
+}
+
+std::string ContainerManager::joinContainerIDs(const std::vector<std::string>& containerIDs) {
+    if (containerIDs.empty()) {
+        return "";
+    }
+
+    // Pre-calculate the required capacity to avoid reallocations
+    size_t totalLength = 0;
+    for (const auto& id : containerIDs) {
+        totalLength += (id.length() >= 12 ? 12 : id.length()) + 1; // +1 for semicolon
+    }
+    if (totalLength > 0) {
+        totalLength--; // Remove the extra semicolon at the end
+    }
+
+    std::string result;
+    result.reserve(totalLength);
+
+    for (size_t i = 0; i < containerIDs.size(); ++i) {
+        if (i > 0) {
+            result.append(";", 1);
+        }
+        // Get short container ID (first 12 characters)
+        if (containerIDs[i].length() >= 12) {
+            result.append(containerIDs[i].data(), 12);
+        } else {
+            result.append(containerIDs[i]);
+        }
+    }
 
     return result;
 }
