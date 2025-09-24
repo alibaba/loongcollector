@@ -80,10 +80,10 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
                                mContext->GetRegion());
         }
         for (const auto& key : mKafkaConfig.HashKeys) {
-            if (key.rfind(PARTITIONER_PERFIX, 0) != 0) {
+            if (key.rfind(PARTITIONER_PREFIX, 0) != 0) {
                 PARAM_ERROR_RETURN(mContext->GetLogger(),
                                    mContext->GetAlarm(),
-                                   std::string("HashKeys must start with ") + PARTITIONER_PERFIX,
+                                   std::string("HashKeys must start with ") + PARTITIONER_PREFIX,
                                    sName,
                                    mContext->GetConfigName(),
                                    mContext->GetProjectName(),
@@ -280,10 +280,10 @@ std::string FlusherKafka::GeneratePartitionKey(const PipelineEventPtr& event) co
     result.reserve(64);
 
     for (const auto& key : mKafkaConfig.HashKeys) {
-        if (key.size() <= PARTITIONER_PERFIX.size()) {
+        if (key.size() <= PARTITIONER_PREFIX.size()) {
             continue;
         }
-        StringView fieldName(key.data() + PARTITIONER_PERFIX.size(), key.size() - PARTITIONER_PERFIX.size());
+        StringView fieldName(key.data() + PARTITIONER_PREFIX.size(), key.size() - PARTITIONER_PREFIX.size());
 
         if (event->GetType() == PipelineEvent::Type::LOG) {
             const LogEvent& logEvent = event.Cast<LogEvent>();

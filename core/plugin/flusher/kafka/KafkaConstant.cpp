@@ -44,7 +44,7 @@ const int KAFKA_FLUSH_TIMEOUT_MS = 5000;
 
 const std::string PARTITIONER_RANDOM = "random";
 const std::string PARTITIONER_HASH = "hash";
-const std::string PARTITIONER_PERFIX = "content.";
+const std::string PARTITIONER_PREFIX = "content.";
 
 const std::string LIBRDKAFKA_PARTITIONER_RANDOM = "random";
 const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM = "murmur2_random";

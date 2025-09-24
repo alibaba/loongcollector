@@ -44,7 +44,7 @@ extern const int KAFKA_FLUSH_TIMEOUT_MS;
 
 extern const std::string PARTITIONER_RANDOM;
 extern const std::string PARTITIONER_HASH;
-extern const std::string PARTITIONER_PERFIX;
+extern const std::string PARTITIONER_PREFIX;
 
 extern const std::string LIBRDKAFKA_PARTITIONER_RANDOM;
 extern const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM;

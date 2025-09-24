@@ -112,11 +112,12 @@ func KafkaPartitionsConsistentByField(ctx context.Context, field string) (contex
 			var partition string
 			var keyField string
 			for _, c := range lg.Contents {
-				if c.Key == "content" {
+				switch c.Key {
+				case "content":
 					content = c.Value
-				} else if c.Key == "partition" {
+				case "partition":
 					partition = c.Value
-				} else if c.Key == field { // prefer direct field if subscriber extracted it
+				case field: // prefer direct field if subscriber extracted it
 					keyField = c.Value
 				}
 			}
@@ -160,9 +161,10 @@ func KafkaPrintPartitionMappingByField(ctx context.Context, field string) (conte
 			var content string
 			var partition string
 			for _, c := range lg.Contents {
-				if c.Key == "content" {
+				switch c.Key {
+				case "content":
 					content = c.Value
-				} else if c.Key == "partition" {
+				case "partition":
 					partition = c.Value
 				}
 			}
