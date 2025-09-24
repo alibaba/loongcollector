@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -94,6 +95,8 @@ public:
     void TestDynamicTopic_Success();
     void TestDynamicTopic_FallbackToStatic();
     void TestDynamicTopic_FromTags();
+    void TestPartitionerHashConfigValidation();
+    void TestPartitionerHashKeySend();
 
 protected:
     void SetUp();
@@ -432,6 +435,48 @@ void FlusherKafkaUnittest::TestDynamicTopic_FromTags() {
     APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
 }
 
+void FlusherKafkaUnittest::TestPartitionerHashConfigValidation() {
+    Json::Value optionalGoPipeline;
+    Json::Value config;
+    config["Brokers"] = Json::Value(Json::arrayValue);
+    config["Brokers"].append("dummy:9092");
+    config["Topic"] = mTopic;
+    config["Version"] = "2.6.0";
+    config["PartitionerType"] = "hash";
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["PartitionerType"] = "hash";
+    Json::Value hashKeys(Json::arrayValue);
+    hashKeys.append("content.application");
+    config["HashKeys"] = hashKeys;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    auto* e1 = group.AddLogEvent();
+    e1->SetContent(StringView("application"), StringView("serviceA"));
+    auto* e2 = group.AddLogEvent();
+    e2->SetContent(StringView("application"), StringView("serviceB"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    APSARA_TEST_EQUAL(2, mFlusher->mSendCnt->GetValue());
+
+    const auto& reqs = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(2U, reqs.size());
+    std::set<std::string> keys;
+    for (const auto& r : reqs) {
+        keys.insert(r.Key);
+    }
+    APSARA_TEST_TRUE(keys.find("serviceA") != keys.end());
+    APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -452,6 +497,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendSerializationFailure)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_Success)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 
 } // namespace logtail
 

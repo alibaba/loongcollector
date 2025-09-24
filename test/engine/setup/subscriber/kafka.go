@@ -16,9 +16,12 @@ package subscriber
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -99,8 +102,10 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	defer consumer.Close()
 
 	deadline := time.Now().Add(30 * time.Second)
+	var parts []int32
 	for {
-		parts, err2 := consumer.Partitions(k.Topic)
+		var err2 error
+		parts, err2 = consumer.Partitions(k.Topic)
 		if err2 == nil && len(parts) > 0 {
 			break
 		}
@@ -113,18 +118,15 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 		time.Sleep(1 * time.Second)
 	}
 
-	var partitionConsumer sarama.PartitionConsumer
-	for {
-		partitionConsumer, err = consumer.ConsumePartition(k.Topic, 0, sarama.OffsetOldest)
-		if err == nil {
-			break
+	var partitionConsumers []sarama.PartitionConsumer
+	for _, p := range parts {
+		pc, err := consumer.ConsumePartition(k.Topic, p, sarama.OffsetOldest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create partition consumer for p=%d: %w", p, err)
 		}
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("failed to create partition consumer: %w", err)
-		}
-		time.Sleep(1 * time.Second)
+		partitionConsumers = append(partitionConsumers, pc)
+		defer pc.Close()
 	}
-	defer partitionConsumer.Close()
 
 	logGroup := &protocol.LogGroup{Logs: []*protocol.Log{}}
 
@@ -136,10 +138,19 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 
 	logger.Infof(context.Background(), "Starting to consume messages from topic: %s", k.Topic)
 
+	out := make(chan *sarama.ConsumerMessage, 1024)
+	for _, pc := range partitionConsumers {
+		go func(c sarama.PartitionConsumer) {
+			for msg := range c.Messages() {
+				out <- msg
+			}
+		}(pc)
+	}
+
 	for messageCount < maxMessages {
 		select {
-		case msg := <-partitionConsumer.Messages():
-			if len(msg.Value) == 0 {
+		case msg := <-out:
+			if msg == nil || len(msg.Value) == 0 {
 				continue
 			}
 			raw := string(msg.Value)
@@ -180,10 +191,16 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 					}
 				}
 
-				log := &protocol.Log{Contents: []*protocol.Log_Content{
+				msgVal := extractMsgFromRaw(raw)
+				contents := []*protocol.Log_Content{
 					{Key: "content", Value: expectedContent},
 					{Key: "topic", Value: k.Topic},
-				}}
+					{Key: "partition", Value: fmt.Sprintf("%d", msg.Partition)},
+				}
+				if msgVal != "" {
+					contents = append(contents, &protocol.Log_Content{Key: "msg", Value: msgVal})
+				}
+				log := &protocol.Log{Contents: contents}
 				logGroup.Logs = append(logGroup.Logs, log)
 				messageCount++
 				if messageCount >= maxMessages {
@@ -254,4 +271,33 @@ func init() {
 		return k, nil
 	})
 	doc.Register("subscriber", kafkaName, new(KafkaSubscriber))
+}
+
+func extractMsgFromRaw(raw string) string {
+	// match content:"<escaped json string>"
+	reContent := regexp.MustCompile(`"content"\s*:\s*"((?:\\.|[^"\\])*)"`)
+	m := reContent.FindStringSubmatch(raw)
+	if len(m) < 2 {
+		return ""
+	}
+	innerEscaped := m[1]
+	unescaped, err := strconv.Unquote("\"" + innerEscaped + "\"")
+	if err != nil {
+		return ""
+	}
+	// try strict json
+	var mm map[string]interface{}
+	if err := json.Unmarshal([]byte(unescaped), &mm); err == nil {
+		if v, ok := mm["msg"]; ok {
+			if s, ok2 := v.(string); ok2 {
+				return s
+			}
+		}
+	}
+	reMsg := regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
+	mm2 := reMsg.FindStringSubmatch(unescaped)
+	if len(mm2) >= 2 {
+		return mm2[1]
+	}
+	return ""
 }

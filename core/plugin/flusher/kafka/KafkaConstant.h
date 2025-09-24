@@ -21,6 +21,7 @@
 namespace logtail {
 
 extern const std::string KAFKA_CONFIG_BOOTSTRAP_SERVERS;
+extern const std::string KAFKA_CONFIG_PARTITIONER;
 
 extern const std::string KAFKA_CONFIG_BATCH_NUM_MESSAGES;
 extern const std::string KAFKA_CONFIG_LINGER_MS;
@@ -40,5 +41,12 @@ extern const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS;
 
 extern const int KAFKA_POLL_INTERVAL_MS;
 extern const int KAFKA_FLUSH_TIMEOUT_MS;
+
+extern const std::string PARTITIONER_RANDOM;
+extern const std::string PARTITIONER_HASH;
+extern const std::string PARTITIONER_PERFIX;
+
+extern const std::string LIBRDKAFKA_PARTITIONER_RANDOM;
+extern const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM;
 
 } // namespace logtail
