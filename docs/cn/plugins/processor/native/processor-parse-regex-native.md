@@ -19,7 +19,7 @@
 |  Type  |  string  |  是  |  /  |  插件类型。固定为processor\_parse\_regex\_native。  |
 |  SourceKey  |  string  |  是  |  /  |  源字段名。  |
 |  Regex  |  string  |  是  |  /  |  正则表达式。  |
-|  Keys  |  \[string\]  |  是  |  /  |  提取的字段列表。  |
+|  Keys  |  []string  |  是  |  /  |  提取的字段列表。  |
 |  KeepingSourceWhenParseFail  |  bool  |  否  |  false  |  当解析失败时，是否保留源字段。  |
 |  KeepingSourceWhenParseSucceed  |  bool  |  否  |  false  |  当解析成功时，是否保留源字段。  |
 |  RenamedSourceKey  |  string  |  否  |  空  |  当源字段被保留时，用于存储源字段的字段名。若不填，默认不改名。  |

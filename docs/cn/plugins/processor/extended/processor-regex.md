@@ -18,15 +18,15 @@
 
 | 参数           | 类型       | 是否必选 | 说明                                                                        |
 | ------------ | -------- | ---- | ------------------------------------------------------------------------- |
-| Type         | String   | 是    | 插件类型                                                                      |
-| SourceKey    | String   | 是    | 原始字段名                                                                     |
-| Regex        | String   | 是    | 正则表达式，使用()标注待提取的字段。                                                       |
+| Type         | string   | 是    | 插件类型                                                                      |
+| SourceKey    | string   | 是    | 原始字段名                                                                     |
+| Regex        | string   | 是    | 正则表达式，使用()标注待提取的字段。                                                       |
 | Keys         | String数组 | 是    | 提取的字段名，例如\["ip", "time", "method"]。                                       |
-| NoKeyError   | Boolean  | 否    | 无匹配的原始字段时是否报错。如果未添加该参数，则默认使用false，表示不报错。                                  |
-| NoMatchError | Boolean  | 否    | 正则表达式与原始字段的值不匹配时是否报错。如果未添加该参数，则默认使用false，表示不报错。                           |
-| KeepSource   | Boolean  | 否    | 是否保留原始字段。如果未添加该参数，则默认使用false，表示不保留。                                       |
-| FullMatch    | Boolean  | 否    | 如果未添加该参数，则默认使用true，表示只有字段完全匹配Regex参数中的正则表达式时才被提取。配置为false，表示部分字段匹配也会进行提取。 |
-| KeepSourceIfParseError | Boolean | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
+| NoKeyError   | bool  | 否    | 无匹配的原始字段时是否报错。如果未添加该参数，则默认使用false，表示不报错。                                  |
+| NoMatchError | bool  | 否    | 正则表达式与原始字段的值不匹配时是否报错。如果未添加该参数，则默认使用false，表示不报错。                           |
+| KeepSource   | bool  | 否    | 是否保留原始字段。如果未添加该参数，则默认使用false，表示不保留。                                       |
+| FullMatch    | bool  | 否    | 如果未添加该参数，则默认使用true，表示只有字段完全匹配Regex参数中的正则表达式时才被提取。配置为false，表示部分字段匹配也会进行提取。 |
+| KeepSourceIfParseError | bool | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
 
 ## 样例
 

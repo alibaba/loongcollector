@@ -21,7 +21,7 @@
 | FileEncoding | string | 否 | utf8 | 文件编码，支持 utf8、gbk |
 | TailSizeKB | uint | 否 | 1024 | 初次生效时相对文件结尾的起始偏移（KB），小于文件大小时从尾部回溯 |
 | Multiline | object | 否 | 空 | 多行聚合选项，支持 custom 与 JSON，见下表 |
-| Tags | map | 否 | 空 | Tag 重命名/删除配置，含 `__default__` 语义 |
+| Tags | map[string]string | 否 | 空 | Tag 重命名/删除配置，含 `__default__` 语义 |
 
 多行聚合选项：
 

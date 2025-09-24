@@ -16,13 +16,13 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type                  | String，无默认值(必填) | 插件类型，固定为`processor_desensitize` |
-| SourceKey             | String，无默认值(必填) | 日志字段名称。 |
-| Method         | String，无默认值(必填) | 脱敏方式。可选值如下：<br>const：将敏感内容替换成 ReplaceString 参数处配置等字符串。<br>md5：将敏感内容替换为其对应的MD5值。 |
-| Match           | String，无默认值(必填) | 指定敏感数据。可选值如下：<br>full：字段全文。<br>regex：使用正则提取敏感数据。 |
-| ReplaceString         | String，无默认值      | 用于替换敏感内容等字符串，当 Method 设置为 const 时必选。 |
-| RegexBegin            | String，无默认值      | 用于指定敏感内容前缀的正则表达式，当 Match 配置为 regex 时必选。 |
-| RegexContent          | String，无默认值      | 用于指定敏感内容的正则表达式，当 Match 配置为 regex 时必选。|
+| Type                  | string，无默认值(必填) | 插件类型，固定为`processor_desensitize` |
+| SourceKey             | string，无默认值(必填) | 日志字段名称。 |
+| Method         | string，无默认值(必填) | 脱敏方式。可选值如下：<br>const：将敏感内容替换成 ReplaceString 参数处配置等字符串。<br>md5：将敏感内容替换为其对应的MD5值。 |
+| Match           | string，无默认值(必填) | 指定敏感数据。可选值如下：<br>full：字段全文。<br>regex：使用正则提取敏感数据。 |
+| ReplaceString         | string，无默认值      | 用于替换敏感内容等字符串，当 Method 设置为 const 时必选。 |
+| RegexBegin            | string，无默认值      | 用于指定敏感内容前缀的正则表达式，当 Match 配置为 regex 时必选。 |
+| RegexContent          | string，无默认值      | 用于指定敏感内容的正则表达式，当 Match 配置为 regex 时必选。|
 
 ## 样例
 

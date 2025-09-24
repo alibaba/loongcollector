@@ -22,13 +22,13 @@
 
 | 参数            | 类型      | 是否必选 | 说明                                |
 | ------------- | ------- | ---- | --------------------------------- |
-| Type          | String  | 是    | 插件类型                              |
-| OnlyStdout    | Boolean | 否    | 是否打印打印到标准输出。true表示标准输出；false表示文件。 |
-| FileName      | String  | 否    | 打印到文件时，需指定文件名。                    |
-| MaxSize       | Int     | 否    | 打印到文件时，需指定单个文件大小。默认1M。            |
-| MaxRolls      | Int     | 否    | 打印到文件时，需指定文件的轮转个数。默认为1。           |
-| KeyValuePairs | Boolean | 否    |                                   |
-| Tags          | Boolean | 否    | 打印 `__tag__`，默认false。如果将flusher-stdout用于调试，建议设置为true。 |
+| Type          | string  | 是    | 插件类型                              |
+| OnlyStdout    | bool | 否    | 是否打印打印到标准输出。true表示标准输出；false表示文件。 |
+| FileName      | string  | 否    | 打印到文件时，需指定文件名。                    |
+| MaxSize       | int     | 否    | 打印到文件时，需指定单个文件大小。默认1M。            |
+| MaxRolls      | int     | 否    | 打印到文件时，需指定文件的轮转个数。默认为1。           |
+| KeyValuePairs | bool | 否    |                                   |
+| Tags          | bool | 否    | 打印 `__tag__`，默认false。如果将flusher-stdout用于调试，建议设置为true。 |
 
 ## 样例
 

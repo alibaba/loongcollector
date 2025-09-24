@@ -20,13 +20,13 @@
 
 | 参数                  | 类型       | 是否必选 | 说明                                                                                                                                                                             |
 |---------------------|----------|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Type                | String   | 是    | 插件类型，指定为`input_command`                                                                                                                                                        |
-| ScriptType          | String   | 是    | 指定脚本内容的类型，目前支持:bash、shell、python2、python3                                                                                                                                      |
-| User                | String   | 是    | 运行命令使用的用户名，只支持非Root用户(建议配置最小权限，只给需要关注的目录/文件rwx权限)                                                                                                                              |
-| ScriptContent       | String   | 是    | 脚本内容, 支持PlainText和base64加密的内容, 跟ContentEncoding的字段对应, ScriptContent长度不能超过512*1024                                                                                              |
-| ContentEncoding     | String   | 否    | 脚本内容的文本格式 <br/> 支持PlainText(纯文本，不编码)\|Base64编码 默认:PlainText                                                                                                                    |
-| LineSplitSep        | String   | 否    | 脚本输出内容的分隔符，为空时不进行分割，全部作为一条数据返回                                                                                                                                                 |
-| CmdPath             | String   | 否    | 执行脚本命令的路径，如果为空，则使用默认路径。bash、shell、python2、python3对应的默认路径如下：<br/>- bash: /usr/bin/bash<br/>- shell: /usr/bin/sh<br/>- python2: /usr/bin/python2<br/>- python3: /usr/bin/python3 |
+| Type                | string   | 是    | 插件类型，指定为`input_command`                                                                                                                                                        |
+| ScriptType          | string   | 是    | 指定脚本内容的类型，目前支持:bash、shell、python2、python3                                                                                                                                      |
+| User                | string   | 是    | 运行命令使用的用户名，只支持非Root用户(建议配置最小权限，只给需要关注的目录/文件rwx权限)                                                                                                                              |
+| ScriptContent       | string   | 是    | 脚本内容, 支持PlainText和base64加密的内容, 跟ContentEncoding的字段对应, ScriptContent长度不能超过512*1024                                                                                              |
+| ContentEncoding     | string   | 否    | 脚本内容的文本格式 <br/> 支持PlainText(纯文本，不编码)\|Base64编码 默认:PlainText                                                                                                                    |
+| LineSplitSep        | string   | 否    | 脚本输出内容的分隔符，为空时不进行分割，全部作为一条数据返回                                                                                                                                                 |
+| CmdPath             | string   | 否    | 执行脚本命令的路径，如果为空，则使用默认路径。bash、shell、python2、python3对应的默认路径如下：<br/>- bash: /usr/bin/bash<br/>- shell: /usr/bin/sh<br/>- python2: /usr/bin/python2<br/>- python3: /usr/bin/python3 |
 | TimeoutMilliSeconds | int      | 否    | 执行脚本的超时时间，单位为毫秒，默认为3000ms                                                                                                                                                      |
 | IntervalMs          | int      | 否    | 采集触发频率，也是脚本执行的频率，单位为毫秒，默认为5000ms                                                                                                                                               |
 | Environments        | []string | 否    | 环境变量，默认为os.Environ()的值，如果设置了Environments，则在os.Environ()的基础上追加设置的环境变量                                                                                                           |
@@ -36,8 +36,8 @@
 
 | 参数         | 类型     | 说明                                             |
 |------------|--------|------------------------------------------------|
-| content    | String | 表示脚本的输出内容                                      |
-| script_md5 | String | 用于表示 ScriptContent（脚本内容）的 MD5，有助于确定生成日志的脚本内容来源 |
+| content    | string | 表示脚本的输出内容                                      |
+| script_md5 | string | 用于表示 ScriptContent（脚本内容）的 MD5，有助于确定生成日志的脚本内容来源 |
 
 * 采集配置1
 

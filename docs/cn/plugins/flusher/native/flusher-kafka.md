@@ -13,7 +13,7 @@
 | 参数 | 类型 | 是否必选 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- | :--- |
 | `Type` | string | 是 | / | 固定为 `flusher_kafka_native` |
-| `Brokers` | string[] | 是 | / | Kafka 集群地址列表，如 `["host1:9092", "host2:9092"]` |
+| `Brokers` | []string | 是 | / | Kafka 集群地址列表，如 `["host1:9092", "host2:9092"]` |
 | `Topic` | string | 是 | / | 发送的目标 Topic 名称。支持动态 Topic 同 kafka_flusher_v2 扩展插件（仅字符串替换）。 |
 | `Version` | string | 否 | `"1.0.0"` | Kafka 协议版本，格式 `x.y.z[.n]`，用于推导底层 librdkafka 兼容参数。 |
 | `BulkFlushFrequency` | uint | 否 | `0` | 批量发送等待时长（毫秒），映射 `linger.ms` |
@@ -26,7 +26,7 @@
 | `MessageTimeoutMs` | uint | 否 | `300000` | 消息发送（含重试）超时（毫秒），映射 `message.timeout.ms` |
 | `MaxRetries` | uint | 否 | `3` | 失败重试次数，映射 `message.send.max.retries` |
 | `RetryBackoffMs` | uint | 否 | `100` | 重试退避（毫秒），映射 `retry.backoff.ms` |
-| `Kafka` | map<string,string> | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
+| `Kafka` | map[string]string | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
 
 ## 样例
 

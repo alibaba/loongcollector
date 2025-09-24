@@ -25,7 +25,7 @@
 |  Endpoint  |  string  |  社区版必填  |  /  |  [SLS 接入点地址](https://help.aliyun.com/document_detail/29008.html)。企业版可由配置中心下发。 |
 |  TelemetryType  |  enum  |  否  |  `logs` | 可选：`logs`、`metrics`、`metrics_multivalue`、`metrics_host`、`arms_agentinfo`、`arms_metrics`、`arms_traces`。不同取值对应不同上报通道。 |
 |  Workspace  |  string  |  否  |  /  |  APM/ARMS 模式下需要提供的工作空间。 |
-|  ShardHashKeys  |  string[]  |  否  |  /  |  分片哈希字段列表，仅 `logs` 且未开启 Exactly Once 时生效。 |
+|  ShardHashKeys  |  []string  |  否  |  /  |  分片哈希字段列表，仅 `logs` 且未开启 Exactly Once 时生效。 |
 |  Batch  |  object  |  否  |  /  |  批处理选项（包含历史的 `Batch.ShardHashKeys` 已废弃）。 |
 |  CompressType  |  enum  |  否  |  `lz4`  |  是否开启压缩及压缩算法。 |
 |  MaxSendRate  |  uint  |  否  |  不限速  |  单队列最大发送速率（字节/秒），仅开启 Exactly Once 时生效。 |
