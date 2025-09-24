@@ -539,13 +539,13 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
             }
             default:
                 PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                    mContext->GetAlarm(),
-                                    "Unknown security eBPF probe type",
-                                    sName,
-                                    mContext->GetConfigName(),
-                                    mContext->GetProjectName(),
-                                    mContext->GetLogstoreName(),
-                                    mContext->GetRegion());
+                                     mContext->GetAlarm(),
+                                     "Unknown security eBPF probe type",
+                                     sName,
+                                     mContext->GetConfigName(),
+                                     mContext->GetProjectName(),
+                                     mContext->GetLogstoreName(),
+                                     mContext->GetRegion());
         }
         thisSecurityOption.mFilter = thisFilter;
     }
