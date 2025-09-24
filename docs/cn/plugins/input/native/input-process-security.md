@@ -44,6 +44,25 @@
 | exit\_tid | string | 退出线程id（仅在exit事件中出现） |
 | \_\_time\_\_ | int64 | 事件发生时间戳 |
 
+### K8s
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| k8s.namespace | string | K8s命名空间 |
+| k8s.pod.name | string | K8s Pod名称 |
+| k8s.container.name | string | K8s资源配置中的容器名称 |
+| k8s.workload.name | string | K8s 负载名称 |
+| k8s.workload.kind | string | K8s 负载类型 |
+
+### Container
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| container.id | string | 容器id |
+| container.name | string | 本地容器名 |
+| container.image.id | string | 镜像id |
+| container.image.name | string | 镜像name |
+
 ## 样例
 
 ### 采集进程安全数据
