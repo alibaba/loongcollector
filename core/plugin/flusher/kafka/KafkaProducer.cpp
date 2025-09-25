@@ -187,11 +187,23 @@ public:
             rd_kafka_conf_set_default_topic_conf(mConf, tconf);
         }
 
-        if (mConfig.EnableTLS) {
-            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, "ssl")) {
+        const bool useTLS = mConfig.EnableTLS;
+        const bool useKrb = mConfig.EnableKerberos;
+        if (useTLS || useKrb) {
+            std::string secProto;
+            if (useTLS && useKrb) {
+                secProto = "sasl_ssl";
+            } else if (useTLS) {
+                secProto = "ssl";
+            } else {
+                secProto = "sasl_plaintext";
+            }
+            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, secProto)) {
                 return false;
             }
+        }
 
+        if (useTLS) {
             if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.TLSCaFile)) {
                 return false;
             }
@@ -217,6 +229,35 @@ public:
                     if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.TLSKeyPassword)) {
                         return false;
                     }
+                }
+            }
+        }
+
+        if (useKrb) {
+            const std::string mech = mConfig.SaslMechanisms.empty() ? std::string("GSSAPI") : mConfig.SaslMechanisms;
+            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mech)) {
+                return false;
+            }
+
+            if (!mConfig.KerberosServiceName.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.KerberosServiceName)) {
+                    return false;
+                }
+            }
+
+            if (!mConfig.KerberosPrincipal.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.KerberosPrincipal)) {
+                    return false;
+                }
+            }
+            if (!mConfig.KerberosKeytab.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.KerberosKeytab)) {
+                    return false;
+                }
+            }
+            if (!mConfig.KerberosKinitCmd.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.KerberosKinitCmd)) {
+                    return false;
                 }
             }
         }
