@@ -104,6 +104,9 @@ public:
     void TestGeneratePartitionKey_NotHash();
     void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
     void TestInitTLSCertKeyMismatch();
+    void TestInitWithKerberosMinimal();
+    void TestInitWithKerberosAndTLS();
+    void TestInitWithKerberosFull();
 
 protected:
     void SetUp();
@@ -504,6 +507,37 @@ void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
     APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
 
+void FlusherKafkaUnittest::TestInitWithKerberosMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosAndTLS() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/ca.pem";
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosFull() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["Kerberos"]["Mechanism"] = "GSSAPI";
+    config["Authentication"]["Kerberos"]["ServiceName"] = "kafka";
+    config["Authentication"]["Kerberos"]["Principal"] = "kafka/test@EXAMPLE.COM";
+    config["Authentication"]["Kerberos"]["Keytab"] = "/tmp/test.keytab";
+    config["Authentication"]["Kerberos"]["KinitCmd"] = "kinit -k -t %{sasl.kerberos.keytab} %{sasl.kerberos.principal}";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
 void FlusherKafkaUnittest::TestPartitionerHashKeyInvalidPrefix() {
     Json::Value optionalGoPipeline;
     Json::Value config;
@@ -605,6 +639,9 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitTLSCertKeyMismatch)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosAndTLS)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosFull)
 
 } // namespace logtail
 

@@ -65,6 +65,15 @@ services:
       - ALICLOUD_LOG_DOCKER_ENV_CONFIG=true
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
+      - KRB5CCNAME=FILE:/var/kerberos/krb5cc
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        ( command -v yum >/dev/null 2>&1 && yum -y install -q cyrus-sasl-gssapi krb5-workstation ) ||
+        ( command -v microdnf >/dev/null 2>&1 && microdnf -y install cyrus-sasl-gssapi krb5-workstation ) ||
+        ( command -v apt-get >/dev/null 2>&1 && export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get install -y -q libsasl2-modules-gssapi-mit krb5-user ) || true;
+        exec /usr/local/loongcollector/loongcollector_control.sh start_and_block
     healthcheck:
       test: "cat /usr/local/loongcollector/log/loongcollector.LOG"
       interval: 15s
@@ -125,17 +134,34 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	}
 	c.cli = cli
 
+	// Prefer robust discovery by docker compose labels to avoid name pattern ambiguity across compose v1/v2.
 	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+		All: true,
 		Filters: filters.NewArgs(
-			filters.Arg("name", fmt.Sprintf("%s_loongcollectorC*", projectName)),
-			filters.Arg("name", fmt.Sprintf("%s-loongcollectorC*", projectName)),
+			filters.Arg("label", fmt.Sprintf("com.docker.compose.project=%s", projectName)),
+			filters.Arg("label", "com.docker.compose.service=loongcollectorC"),
 		),
 	})
-	if len(list) != 1 {
-		logger.Errorf(context.Background(), "LOONGCOLLECTOR_COMPOSE_ALARM", "loongcollector container size is not equal 1, got %d count", len(list))
+	if err != nil {
+		logger.Error(context.Background(), "DOCKER_LIST_ALARM", "err", err)
 		return err
 	}
-	c.logtailID = list[0].ID
+	if len(list) == 0 {
+		logger.Errorf(context.Background(), "LOONGCOLLECTOR_COMPOSE_ALARM", "loongcollector container not found by labels, project %s", projectName)
+		return fmt.Errorf("loongcollector container not found")
+	}
+	// Prefer a running container if multiple are returned.
+	var picked string
+	for _, ctr := range list {
+		if ctr.State == "running" {
+			picked = ctr.ID
+			break
+		}
+	}
+	if picked == "" {
+		picked = list[0].ID
+	}
+	c.logtailID = picked
 
 	// the docker engine cannot access host on the linux platform, more details please see: https://github.com/docker/for-linux/issues/264
 	cmd := []string{
@@ -336,7 +362,7 @@ func withExposedService(compose testcontainers.DockerCompose) (wrappers []*Strat
 				portNum, _ = strconv.Atoi(port)
 			}
 			wrapper = StrategyWrapper{
-				original:    wait.ForListeningPort(np),
+				original:    wait.ForListeningPort(np).WithStartupTimeout(5 * time.Minute),
 				service:     serv,
 				virtualPort: np,
 			}

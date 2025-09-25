@@ -1,7 +1,7 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10 AS builder
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3 AS builder
 
 # Build arguments
 ARG VERSION=edge
@@ -14,6 +14,8 @@ ARG MAKE_JOBS=16
 USER root
 WORKDIR /src
 COPY . .
+
+RUN yum install -y cyrus-sasl-devel krb5-devel
 
 # build and make dist
 RUN sh ./scripts/build_edge_linux.sh && \
