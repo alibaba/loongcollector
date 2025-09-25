@@ -17,13 +17,11 @@
 #include "JournalFilter.h"
 
 #include <sstream>
-#include <algorithm>
-#include <regex>
-#include <filesystem>
 
 #include "absl/strings/match.h"
 #include "logger/Logger.h"
 #include "../common/JournalConstants.h"
+#include "../common/JournalUtils.h"
 
 namespace logtail {
 
@@ -131,18 +129,18 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
 
     std::vector<std::string> patterns;
     
-    // Process each unit - add specific units or collect glob patterns  
+    // 处理每个单元 - 直接添加具体单元或收集glob模式  
     for (const auto& unit : units) {
         try {
-            // Mangle unit name (convert paths, add suffix, etc.)
-            std::string mangledUnit = unitNameMangle(unit, ".service");
+            // 将任意字符串转换为有效的systemd单元名称（转换路径、添加后缀等）
+            std::string mangledUnit = JournalUtils::UnitNameMangle(unit, ".service");
             
-            if (stringIsGlob(mangledUnit)) {
-                // Collect glob patterns for later processing
+            if (JournalUtils::StringIsGlob(mangledUnit)) {
+                // 收集glob模式以备后续处理
                 patterns.push_back(mangledUnit);
                 LOG_DEBUG(sLogger, ("glob pattern collected", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
             } else {
-                // Add specific unit matches immediately
+                // 立即添加具体单元匹配
                 if (!addSingleUnitMatches(reader, mangledUnit, configName, configIndex)) {
                     LOG_ERROR(sLogger, ("failed to add unit filter", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
                     return false;
@@ -155,7 +153,7 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
         }
     }
 
-    // Now process glob patterns if any
+    // 现在处理glob模式（如果有的话）
     if (!patterns.empty()) {
         LOG_INFO(sLogger, ("processing glob patterns", "")("config", configName)("idx", configIndex)("patterns_count", patterns.size()));
         
@@ -191,6 +189,8 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
         }
 
         // 2. 查找服务的coredump
+        // MESSAGE_ID "fc2e22bc6ee647b6b90729ab34a250b1" 是systemd预定义的coredump消息标识符
+        // systemd-coredump服务在记录进程崩溃信息时使用这个标准ID
         if (!reader->AddDisjunction() || !reader->AddMatch("MESSAGE_ID", "fc2e22bc6ee647b6b90729ab34a250b1")
             || !reader->AddMatch("_UID", "0") || !reader->AddMatch("COREDUMP_UNIT", unit)) {
             LOG_WARNING(sLogger, ("failed to add coredump match", unit)("config", configName)("idx", configIndex));
@@ -299,14 +299,14 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
              ("adding match patterns filter", "")("config", configName)("idx", configIndex)("patterns_count",
                                                                                             patterns.size()));
 
-    // Process patterns same as Go version - directly pass complete pattern to AddMatch
+    // 与Go版本相同的方式处理模式 - 直接传递完整模式给AddMatch
     for (const auto& pattern : patterns) {
         if (pattern.empty()) {
             LOG_WARNING(sLogger, ("empty pattern skipped", "")("config", configName)("idx", configIndex));
             continue;
         }
 
-        // Parse pattern in FIELD=VALUE format to match Go version behavior
+        // 解析FIELD=VALUE格式的模式以匹配Go版本行为
         size_t equalPos = pattern.find('=');
         if (equalPos == std::string::npos) {
             LOG_WARNING(sLogger, ("pattern missing '=' separator", pattern)("config", configName)("idx", configIndex));
@@ -371,179 +371,8 @@ bool JournalFilter::ValidateConfig(const FilterConfig& config) {
 }
 
 // ============================================================================
-// Helper Functions Implementation (based on Go version)
+// 辅助函数实现（基于Go版本）
 // ============================================================================
-
-bool JournalFilter::stringIsGlob(const std::string& name) {
-    return name.find_first_of(JournalConstants::kGlobChars) != std::string::npos;
-}
-
-bool JournalFilter::inCharset(const std::string& s, const std::string& charset) {
-    for (char c : s) {
-        if (charset.find(c) == std::string::npos) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool JournalFilter::isDevicePath(const std::string& path) {
-    return path.length() >= 5 && (path.substr(0, 5) == "/dev/" || path.substr(0, 5) == "/sys/");
-}
-
-bool JournalFilter::pathIsAbsolute(const std::string& path) {
-    return !path.empty() && path[0] == '/';
-}
-
-bool JournalFilter::unitSuffixIsValid(const std::string& suffix) {
-    if (suffix.empty() || suffix[0] != '.') {
-        return false;
-    }
-    
-    for (const auto& validSuffix : JournalConstants::kUnitTypes) {
-        if (suffix == validSuffix) {
-            return true;
-        }
-    }
-    return false;
-}
-
-bool JournalFilter::unitNameIsValid(const std::string& name) {
-    if (name.length() >= JournalConstants::kUnitNameMax) {
-        return false;
-    }
-    
-    size_t dot = name.find('.');
-    if (dot == std::string::npos) {
-        return false; // Must have a dot (i.e. suffix)
-    }
-    
-    std::string suffix = name.substr(dot);
-    if (!unitSuffixIsValid(suffix)) {
-        return false;
-    }
-    
-    if (!inCharset(name, JournalConstants::kValidCharsWithAt)) {
-        return false;
-    }
-    
-    size_t at = name.find('@');
-    if (at == 0) {
-        return false; // Can't start with '@'
-    }
-    
-    // Plain unit (not a template or instance) or a template or instance  
-    if (at == std::string::npos || (at > 0 && dot >= at + 1)) {
-        return true;
-    }
-    
-    return false;
-}
-
-std::string JournalFilter::doEscapeMangle(const std::string& name) {
-    std::string mangled;
-    for (char c : name) {
-        if (c == '/') {
-            mangled += '-';
-        } else if (JournalConstants::kValidChars.find(c) == std::string::npos) {
-            // Convert to hex escape sequence
-            std::ostringstream oss;
-            oss << "\\x" << std::hex << static_cast<unsigned char>(c);
-            mangled += oss.str();
-        } else {
-            mangled += c;
-        }
-    }
-    return mangled;
-}
-
-std::string JournalFilter::unitNameMangle(const std::string& name, const std::string& suffix) {
-    // Can't be empty or begin with a dot
-    if (name.empty() || name[0] == '.') {
-        throw std::invalid_argument("unit name can't be empty or begin with a dot");
-    }
-    
-    if (!unitSuffixIsValid(suffix)) {
-        throw std::invalid_argument("unit name has an invalid suffix");
-    }
-    
-    // Already a fully valid unit name?
-    if (unitNameIsValid(name)) {
-        return name;
-    }
-    
-    // Already a fully valid globbing expression? If so, no mangling is necessary either...
-    if (stringIsGlob(name) && inCharset(name, JournalConstants::kValidCharsGlob)) {
-        return name;
-    }
-    
-    if (isDevicePath(name)) {
-        // chop off path and put .device on the end
-        std::filesystem::path p(name);
-        return p.filename().string() + ".device";
-    }
-    
-    if (pathIsAbsolute(name)) {
-        // chop path and put .mount on the end  
-        std::filesystem::path p(name);
-        return p.filename().string() + ".mount";
-    }
-    
-    std::string escaped = doEscapeMangle(name);
-    
-    // Append a suffix if it doesn't have any, but only if this is not a glob,
-    // so that we can allow "foo.*" as a valid glob.
-    if (!stringIsGlob(escaped) && escaped.find('.') == std::string::npos) {
-        return escaped + suffix;
-    }
-    
-    return escaped;
-}
-
-bool JournalFilter::matchPattern(const std::string& pattern, const std::string& string) {
-    // Simple glob matching using regex 
-    // Convert glob pattern to regex pattern
-    std::string regexPattern;
-    regexPattern.reserve(pattern.length() * 2);
-    
-    for (char c : pattern) {
-        switch (c) {
-            case '*':
-                regexPattern += ".*";
-                break;
-            case '?':
-                regexPattern += ".";
-                break;
-            case '[':
-            case ']':
-                regexPattern += c;
-                break;
-            case '.':
-            case '^':
-            case '$':
-            case '+':
-            case '{':
-            case '}':
-            case '|':
-            case '(':
-            case ')':
-            case '\\':
-                regexPattern += '\\';
-                regexPattern += c;
-                break;
-            default:
-                regexPattern += c;
-                break;
-        }
-    }
-    
-    try {
-        std::regex regex(regexPattern);
-        return std::regex_match(string, regex);
-    } catch (const std::regex_error&) {
-        return false;
-    }
-}
 
 std::vector<std::string> JournalFilter::getPossibleUnits(JournalReader* reader,
                                                          const std::vector<std::string>& fields,
@@ -551,18 +380,18 @@ std::vector<std::string> JournalFilter::getPossibleUnits(JournalReader* reader,
     std::vector<std::string> found;
     std::vector<std::string> possibles;
     
-    // Get unique values from all fields
+    // 从所有字段获取唯一值
     for (const auto& field : fields) {
         std::vector<std::string> vals = reader->GetUniqueValues(field);
         possibles.insert(possibles.end(), vals.begin(), vals.end());
     }
     
-    // Filter possibles list against patterns
+    // 根据模式过滤可能的列表
     for (const auto& possible : possibles) {
         for (const auto& pattern : patterns) {
-            if (matchPattern(pattern, possible)) {
+            if (JournalUtils::MatchPattern(pattern, possible)) {
                 found.push_back(possible);
-                break; // Found match for this possible, no need to check other patterns
+                break; // 找到此可能项的匹配，无需检查其他模式
             }
         }
     }
