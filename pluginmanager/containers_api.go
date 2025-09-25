@@ -3,7 +3,6 @@ package pluginmanager
 import (
 	"encoding/json"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
@@ -11,7 +10,6 @@ import (
 
 var caCachedFullList map[string]struct{}
 var lastUpdateTime int64
-var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
 type Mount struct {
 	Source      string
@@ -89,10 +87,6 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 		for _, env := range info.ContainerInfo.Config.Env {
 			parts := strings.SplitN(env, "=", 2)
 			if len(parts) == 2 {
-				key := parts[0]
-				if envRegex.MatchString(key) {
-					continue
-				}
 				cmd.Env[parts[0]] = parts[1]
 			}
 		}
