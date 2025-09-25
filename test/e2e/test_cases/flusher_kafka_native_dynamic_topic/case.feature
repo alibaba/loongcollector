@@ -1,9 +1,9 @@
 @flusher
-Feature: flusher kafka cpp dynamic topic
-  Test flusher kafka cpp with dynamic Topic formatting using input_file + processors on Kafka 2.x.x
+Feature: flusher kafka native dynamic topic
+  Test flusher kafka native with dynamic Topic formatting using input_file + processors on Kafka 2.x.x
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_DynamicTopic
+  Scenario: TestFlusherKafkaNative_DynamicTopic
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -11,7 +11,7 @@ Feature: flusher kafka cpp dynamic topic
       - "localhost:9092"
     topic: "app-serviceA"
     """
-    Given {flusher-kafka-cpp-dynamic-topic-case} local config as below
+    Given {flusher-kafka-native-dynamic-topic-case} local config as below
     """
     enable: true
     inputs:
@@ -25,7 +25,7 @@ Feature: flusher kafka cpp dynamic topic
         SourceKey: content
         KeepingSourceWhenParseSucceed: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "app-%{content.service}"
         Version: "2.8.0"
@@ -42,7 +42,7 @@ Feature: flusher kafka cpp dynamic topic
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_dynamic_topic}
+    When start docker-compose {flusher_kafka_native_dynamic_topic}
     Then there is at least {10} logs
     Then the log fields match kv
     """
@@ -51,7 +51,7 @@ Feature: flusher kafka cpp dynamic topic
     """
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_DynamicTopic_Tag
+  Scenario: TestFlusherKafkaNative_DynamicTopic_Tag
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -59,7 +59,7 @@ Feature: flusher kafka cpp dynamic topic
       - "localhost:9092"
     topic: "app-loongcollector"
     """
-    Given {flusher-kafka-cpp-dynamic-topic-case} local config as below
+    Given {flusher-kafka-native-dynamic-topic-case} local config as below
     """
     enable: true
     inputs:
@@ -73,7 +73,7 @@ Feature: flusher kafka cpp dynamic topic
         SourceKey: content
         KeepingSourceWhenParseSucceed: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "app-%{tag.__hostname__}"
         Version: "2.8.0"
@@ -90,7 +90,7 @@ Feature: flusher kafka cpp dynamic topic
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_dynamic_topic}
+    When start docker-compose {flusher_kafka_native_dynamic_topic}
     Then there is at least {10} logs
     Then the log fields match kv
     """
@@ -99,7 +99,7 @@ Feature: flusher kafka cpp dynamic topic
     """
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_DynamicTopic_EnvVar
+  Scenario: TestFlusherKafkaNative_DynamicTopic_EnvVar
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -107,7 +107,7 @@ Feature: flusher kafka cpp dynamic topic
       - "localhost:9092"
     topic: "app-prod"
     """
-    Given {flusher-kafka-cpp-dynamic-topic-case} local config as below
+    Given {flusher-kafka-native-dynamic-topic-case} local config as below
     """
     enable: true
     inputs:
@@ -121,7 +121,7 @@ Feature: flusher kafka cpp dynamic topic
         SourceKey: content
         KeepingSourceWhenParseSucceed: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "app-${MY_ENV}"
         Version: "2.8.0"
@@ -138,7 +138,7 @@ Feature: flusher kafka cpp dynamic topic
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_dynamic_topic}
+    When start docker-compose {flusher_kafka_native_dynamic_topic}
     Then there is at least {10} logs
     Then the log fields match kv
     """
