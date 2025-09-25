@@ -53,7 +53,7 @@ struct KafkaConfig {
 
     std::map<std::string, std::string> CustomConfig;
 
-    // General Authentication (TLS for now)
+    // General Authentication (TLS/SASL/Kerberos)
     AuthConfig Authentication;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
