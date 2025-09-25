@@ -30,6 +30,7 @@ if(UNIX AND NOT ENABLE_ENTERPRISE)
 
     add_executable(kafka_producer_unittest KafkaProducerUnittest.cpp)
     target_link_libraries(kafka_producer_unittest ${UT_BASE_TARGET})
+
 endif()
 
 add_executable(pack_id_manager_unittest PackIdManagerUnittest.cpp)

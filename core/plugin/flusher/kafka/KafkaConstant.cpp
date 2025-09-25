@@ -49,4 +49,10 @@ const std::string PARTITIONER_PREFIX = "content.";
 const std::string LIBRDKAFKA_PARTITIONER_RANDOM = "random";
 const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM = "murmur2_random";
 
+const std::string KAFKA_CONFIG_SECURITY_PROTOCOL = "security.protocol";
+const std::string KAFKA_CONFIG_SSL_CA_LOCATION = "ssl.ca.location";
+const std::string KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION = "ssl.certificate.location";
+const std::string KAFKA_CONFIG_SSL_KEY_LOCATION = "ssl.key.location";
+const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD = "ssl.key.password";
+
 } // namespace logtail

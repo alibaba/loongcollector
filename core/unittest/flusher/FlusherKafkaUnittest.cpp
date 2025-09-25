@@ -97,10 +97,13 @@ public:
     void TestDynamicTopic_FromTags();
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
+    void TestInitWithTLSMinimal();
+    void TestInitWithTLSFullPaths();
     void TestPartitionerHashKeyInvalidPrefix();
     void TestUnknownPartitionerType();
     void TestGeneratePartitionKey_NotHash();
     void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
+    void TestInitTLSCertKeyMismatch();
 
 protected:
     void SetUp();
@@ -481,6 +484,26 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
 
+void FlusherKafkaUnittest::TestInitWithTLSMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/does-not-need-to-exist.ca";
+    config["Authentication"]["TLS"]["CertFile"] = "/tmp/does-not-need-to-exist.crt";
+    config["Authentication"]["TLS"]["KeyFile"] = "/tmp/does-not-need-to-exist.key";
+    config["Authentication"]["TLS"]["KeyPassword"] = "secret";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
 void FlusherKafkaUnittest::TestPartitionerHashKeyInvalidPrefix() {
     Json::Value optionalGoPipeline;
     Json::Value config;
@@ -515,6 +538,15 @@ void FlusherKafkaUnittest::TestGeneratePartitionKey_NotHash() {
     const auto& ev = group.GetEvents()[0];
 
     APSARA_TEST_EQUAL(std::string(), mFlusher->GeneratePartitionKey(ev));
+}
+
+void FlusherKafkaUnittest::TestInitTLSCertKeyMismatch() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CertFile"] = "/tmp/dummy.crt";
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
 }
 
 void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
@@ -567,6 +599,9 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitTLSCertKeyMismatch)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)

@@ -29,6 +29,11 @@
 | `Kafka` | map[string]string | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
 | `PartitionerType` | String | 否 | 分区策略：`random` 或 `hash`。默认 `random`。当为 `hash` 时，会基于指定的 `HashKeys` 生成消息键（Key），并使用 `murmur2_random` 作为底层分区器。 |
 | `HashKeys` | String数组 | 否 | 参与分区键生成的字段（仅对 `LOG` 事件生效）。每项必须以 `content.` 前缀开头，如：`["content.service", "content.user"]`。当 `PartitionerType` = `hash` 时必填。 |
+| `Authentication.TLS.Enabled` | bool | 否 | false | 启用 SSL 连接，对应 `security.protocol=ssl` |
+| `Authentication.TLS.CAFile` | string | 否 | / | CA 证书路径，映射 `ssl.ca.location` |
+| `Authentication.TLS.CertFile` | string | 否 | / | 客户端证书路径，映射 `ssl.certificate.location`（与 KeyFile 必须成对配置，否则将视为配置错误） |
+| `Authentication.TLS.KeyFile` | string | 否 | / | 客户端私钥路径，映射 `ssl.key.location`（与 CertFile 必须成对配置，否则将视为配置错误） |
+| `Authentication.TLS.KeyPassword` | string | 否 | / | 私钥口令，映射 `ssl.key.password`（可选） |
 
 ## 样例
 
@@ -49,7 +54,6 @@ flushers:
       compression.type: lz4
 ```
 
-
 ## 动态 Topic
 
 `Topic` 支持动态格式化，按事件内容或分组标签动态路由到不同的 Kafka Topic。支持的占位符：
@@ -62,7 +66,7 @@ flushers:
 
 ```yaml
 flushers:
-  - Type: flusher_kafka_cpp
+  - Type: flusher_kafka_native
     Brokers: ["kafka:29092"]
     Topic: "app-%{content.service}"
     KafkaVersion: "3.6.0"
@@ -72,7 +76,7 @@ flushers:
 
 ```yaml
 flushers:
-  - Type: flusher_kafka_cpp
+  - Type: flusher_kafka_native
     Brokers: ["kafka:29092"]
     Topic: "${env}-%{content.service}"
     KafkaVersion: "3.6.0"
@@ -89,10 +93,32 @@ flushers:
 
 ```yaml
 flushers:
-  - Type: flusher_kafka_cpp
+  - Type: flusher_kafka_native
     Brokers: ["kafka:29092"]
     Topic: "hash-topic"
     Version: "2.8.0"
     PartitionerType: "hash"
     HashKeys: ["content.service", "content.user"]
+```
+
+说明：
+- 仅支持从 `content.*` 中取值生成 Key；若键值缺失则不设置消息 Key（按空 Key 发送，随机分区）。
+- 当前实现按事件逐条发送，Key 不同的事件由客户端路由至对应分区。
+
+## TLS配置
+
+支持通过 TLS/SSL 安全连接到 Kafka 集群。TLS 配置支持两种方式：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29093"]
+    Topic: "tls-topic"
+    Version: "2.8.0"
+    Authentication:
+      TLS:
+        Enabled: true
+        CAFile: "/etc/kafka/ssl/ca.crt"
+        CertFile: "/etc/kafka/ssl/client.crt"
+        KeyFile: "/etc/kafka/ssl/client.key"
 ```
