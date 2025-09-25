@@ -42,4 +42,33 @@ const std::map<std::string, std::string> JournalConstants::kPriorityConversionMa
     {"7", "debug"}
 };
 
+// Unit name processing constants (from Go implementation)
+const std::string JournalConstants::kLetters = std::string(kLowercaseLetters) + std::string(kUppercaseLetters);
+const std::string JournalConstants::kValidChars = std::string(kDigits) + kLetters + ":-_.\\";
+const std::string JournalConstants::kValidCharsWithAt = "@" + kValidChars;
+const std::string JournalConstants::kValidCharsGlob = kValidCharsWithAt + "[]!-*?";
+
+const std::vector<std::string> JournalConstants::kSystemUnits = {
+    "_SYSTEMD_UNIT",
+    "COREDUMP_UNIT",
+    "UNIT", 
+    "OBJECT_SYSTEMD_UNIT",
+    "_SYSTEMD_SLICE"
+};
+
+const std::vector<std::string> JournalConstants::kUnitTypes = {
+    ".service",
+    ".socket",
+    ".target",
+    ".device",
+    ".mount",
+    ".automount", 
+    ".swap",
+    ".path",
+    ".timer",
+    ".snapshot",
+    ".slice",
+    ".scope"
+};
+
 } // namespace logtail 

@@ -61,6 +61,9 @@ public:
     virtual bool AddMatch(const std::string& field, const std::string& value) = 0;
     virtual bool AddDisjunction() = 0;
     
+    // Get unique values for a field (for glob pattern matching)
+    virtual std::vector<std::string> GetUniqueValues(const std::string& field) = 0;
+    
     // Event waiting
     virtual int Wait(std::chrono::milliseconds timeout) = 0;
     
@@ -102,6 +105,8 @@ public:
     
     bool AddMatch(const std::string& field, const std::string& value) override;
     bool AddDisjunction() override;
+    
+    std::vector<std::string> GetUniqueValues(const std::string& field) override;
     
     int Wait(std::chrono::milliseconds timeout) override;
     

@@ -120,7 +120,7 @@ bool JournalConnectionInstance::initializeConnection() {
             mReader.reset();
             return false;
         }
-        
+        // 验证连接是否打开
         if (!mReader->IsOpen()) {
             LOG_ERROR(sLogger, ("journal reader not open after Open() call", "")("config", mConfigName)("idx", mIndex));
             mReader.reset();

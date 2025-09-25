@@ -193,13 +193,43 @@
  #endif
      }
  
-     bool AddDisjunction() {
- #ifdef __linux__
-         return IsOpen() && sd_journal_add_disjunction(mJournal) == 0;
- #else
-         return mIsOpen;
- #endif
-     }
+         bool AddDisjunction() {
+#ifdef __linux__
+        return IsOpen() && sd_journal_add_disjunction(mJournal) == 0;
+#else
+        return mIsOpen;
+#endif
+    }
+    
+    std::vector<std::string> GetUniqueValues(const std::string& field) {
+        std::vector<std::string> values;
+#ifdef __linux__
+        if (!IsOpen()) {
+            return values;
+        }
+        
+        const void* data = nullptr;
+        size_t length = 0;
+        int r = 0;
+        
+        // Use sd_journal_query_unique to get unique values for a field
+        r = sd_journal_query_unique(mJournal, field.c_str());
+        if (r < 0) {
+            return values;
+        }
+        
+        SD_JOURNAL_FOREACH_UNIQUE(mJournal, data, length) {
+            std::string entry(static_cast<const char*>(data), length);
+            
+            // Split at '=' to get just the value part
+            size_t equalPos = entry.find('=');
+            if (equalPos != std::string::npos && equalPos + 1 < entry.length()) {
+                values.push_back(entry.substr(equalPos + 1));
+            }
+        }
+#endif
+        return values;
+    }
  
      int Wait(std::chrono::milliseconds timeout) {
  #ifdef __linux__
@@ -295,6 +325,7 @@ std::string SystemdJournalReader::GetCursor()               { FWD(GetCursor()); 
 bool  SystemdJournalReader::AddMatch(const std::string& f,
                                      const std::string& v)  { FWD(AddMatch(f,v)); }
 bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
+std::vector<std::string> SystemdJournalReader::GetUniqueValues(const std::string& field) { FWD(GetUniqueValues(field)); }
 int   SystemdJournalReader::Wait(std::chrono::milliseconds timeout){ FWD(Wait(timeout)); }
 bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
 bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }

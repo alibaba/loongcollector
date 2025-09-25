@@ -158,6 +158,26 @@ private:
                                      const std::string& unit,
                                      const std::string& configName,
                                      size_t configIndex);
+    
+    // Unit name processing functions (based on Go implementation)
+    static std::string unitNameMangle(const std::string& name, const std::string& suffix);
+    static bool unitNameIsValid(const std::string& name);
+    static bool unitSuffixIsValid(const std::string& suffix);
+    static std::string doEscapeMangle(const std::string& name);
+    
+    // Glob pattern support functions
+    static bool stringIsGlob(const std::string& name);
+    static std::vector<std::string> getPossibleUnits(JournalReader* reader, 
+                                                     const std::vector<std::string>& fields,
+                                                     const std::vector<std::string>& patterns);
+    static bool matchPattern(const std::string& pattern, const std::string& string);
+    
+    // Utility functions
+    static bool inCharset(const std::string& s, const std::string& charset);
+    static bool isDevicePath(const std::string& path);
+    static bool pathIsAbsolute(const std::string& path);
+    
+
 };
 
 } // namespace logtail 
