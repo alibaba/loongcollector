@@ -1,0 +1,215 @@
+{
+    "containers": [
+        {
+            "id": "nginx-normal",
+            "labels": {
+                "app": "nginx",
+                "version": "1.20"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "VERSION=1.20"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-pod-1",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container-empty-labels",
+            "labels": {},
+            "env": [],
+            "k8s": {
+                "namespace": "default",
+                "pod": "empty-pod",
+                "container_name": "empty",
+                "labels": {},
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container-special-chars",
+            "labels": {
+                "app.name": "test-app",
+                "version_with_underscores": "v1_2_3",
+                "path": "/usr/local/bin"
+            },
+            "env": [
+                "SPECIAL_VAR=test@#$%^&*()",
+                "PATH=/usr/local/bin:/usr/bin",
+                "URL=https://example.com/path?query=value"
+            ],
+            "k8s": {
+                "namespace": "test-namespace",
+                "pod": "special-pod-123_456",
+                "container_name": "special-container",
+                "labels": {
+                    "app.kubernetes.io/name": "special-app",
+                    "app.kubernetes.io/component": "test_component"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container-uppercase",
+            "labels": {
+                "APP": "NGINX",
+                "TIER": "FRONTEND"
+            },
+            "env": [
+                "APP_NAME=NGINX",
+                "ENVIRONMENT=PRODUCTION"
+            ],
+            "k8s": {
+                "namespace": "PRODUCTION",
+                "pod": "NGINX-POD-1",
+                "container_name": "NGINX",
+                "labels": {
+                    "APP.KUBERNETES.IO/NAME": "NGINX"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "container-many-conditions",
+            "labels": {
+                "app": "test",
+                "tier": "backend",
+                "version": "1.0",
+                "component": "api",
+                "region": "us-east-1",
+                "zone": "a",
+                "cluster": "prod-cluster-01",
+                "owner": "team-platform",
+                "cost-center": "engineering",
+                "environment": "production"
+            },
+            "env": [
+                "APP_NAME=test",
+                "TIER=backend",
+                "VERSION=1.0",
+                "COMPONENT=api",
+                "REGION=us-east-1",
+                "ZONE=a",
+                "CLUSTER=prod-cluster-01",
+                "OWNER=team-platform",
+                "COST_CENTER=engineering",
+                "ENVIRONMENT=production"
+            ],
+            "k8s": {
+                "namespace": "production",
+                "pod": "test-backend-deployment-1234567890-abcdefghijklmnopqrstuvwx",
+                "container_name": "test-api",
+                "labels": {
+                    "app.kubernetes.io/name": "test",
+                    "app.kubernetes.io/version": "1.0",
+                    "app.kubernetes.io/component": "api",
+                    "app.kubernetes.io/part-of": "platform",
+                    "app.kubernetes.io/managed-by": "helm",
+                    "topology.kubernetes.io/region": "us-east-1",
+                    "topology.kubernetes.io/zone": "us-east-1a"
+                },
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "empty_value_matching",
+            "description": "测试空值匹配的各种情况",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "nonexistent_key": ""
+                }
+            },
+            "expected_matched_ids": []
+        },
+        {
+            "name": "regex_patterns_edge_cases",
+            "description": "测试正则表达式边界情况",
+            "filters": {
+                "K8sPodRegex": "^nginx-.*$"
+            },
+            "expected_matched_ids": [
+                "nginx-normal"
+            ]
+        },
+        {
+            "name": "case_sensitivity_tests",
+            "description": "测试大小写敏感性",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "nginx"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-normal"
+            ]
+        },
+        {
+            "name": "special_characters_in_filters",
+            "description": "测试过滤器中的特殊字符处理",
+            "filters": {
+                "IncludeEnv": {
+                    "SPECIAL_VAR": "^test.*"
+                }
+            },
+            "expected_matched_ids": [
+                "container-special-chars"
+            ]
+        },
+        {
+            "name": "maximum_conditions_test",
+            "description": "测试大量过滤条件的性能和正确性",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "app": "test",
+                    "tier": "backend",
+                    "version": "1.0",
+                    "component": "api",
+                    "region": "us-east-1",
+                    "zone": "a",
+                    "cluster": "prod-cluster-01",
+                    "owner": "team-platform",
+                    "cost-center": "engineering",
+                    "environment": "production"
+                }
+            },
+            "expected_matched_ids": [
+                "container-many-conditions"
+            ]
+        },
+        {
+            "name": "conflicting_filters_test",
+            "description": "测试相互冲突的过滤条件",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "app": "nginx"
+                },
+                "ExcludeContainerLabel": {
+                    "app": "nginx"
+                }
+            },
+            "expected_matched_ids": []
+        },
+        {
+            "name": "null_undefined_values",
+            "description": "测试 null 和 undefined 值的情况",
+            "filters": {
+                "IncludeContainerLabel": {}
+            },
+            "expected_matched_ids": [
+                "nginx-normal",
+                "container-empty-labels",
+                "container-special-chars",
+                "container-uppercase",
+                "container-many-conditions"
+            ]
+        }
+    ]
+}

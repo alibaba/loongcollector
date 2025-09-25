@@ -1,0 +1,202 @@
+{
+    "containers": [
+        {
+            "id": "nginx-prod-frontend",
+            "labels": {
+                "app": "nginx",
+                "tier": "frontend",
+                "version": "1.20"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "ENVIRONMENT=production",
+                "TIER=frontend"
+            ],
+            "k8s": {
+                "namespace": "production",
+                "pod": "nginx-frontend-deployment-12345-abcde",
+                "container_name": "nginx-main",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx",
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/version": "1.20"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "nginx-dev-frontend",
+            "labels": {
+                "app": "nginx",
+                "tier": "frontend",
+                "version": "1.21"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "ENVIRONMENT=development",
+                "TIER=frontend"
+            ],
+            "k8s": {
+                "namespace": "development",
+                "pod": "nginx-frontend-deployment-67890-fghij",
+                "container_name": "nginx-main",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx",
+                    "app.kubernetes.io/component": "web",
+                    "app.kubernetes.io/version": "1.21"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "redis-prod-cache",
+            "labels": {
+                "app": "redis",
+                "tier": "backend",
+                "component": "cache"
+            },
+            "env": [
+                "APP_NAME=redis",
+                "ENVIRONMENT=production",
+                "ROLE=cache"
+            ],
+            "k8s": {
+                "namespace": "production",
+                "pod": "redis-cache-statefulset-0",
+                "container_name": "redis-main",
+                "labels": {
+                    "app.kubernetes.io/name": "redis",
+                    "app.kubernetes.io/component": "cache",
+                    "app.kubernetes.io/version": "6.2"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "mysql-prod-db",
+            "labels": {
+                "app": "mysql",
+                "tier": "database"
+            },
+            "env": [
+                "APP_NAME=mysql",
+                "ENVIRONMENT=production",
+                "DATABASE_URL=mysql://localhost:3306"
+            ],
+            "k8s": {
+                "namespace": "production",
+                "pod": "mysql-db-statefulset-0",
+                "container_name": "mysql-main",
+                "labels": {
+                    "app.kubernetes.io/name": "mysql",
+                    "app.kubernetes.io/component": "database",
+                    "app.kubernetes.io/version": "8.0"
+                },
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "combined_k8s_filters",
+            "description": "测试 K8s 命名空间、Pod、容器名称的组合过滤",
+            "filters": {
+                "K8sNamespaceRegex": "production",
+                "K8sPodRegex": ".*-deployment-.*",
+                "K8sContainerRegex": "nginx-.*"
+            },
+            "expected_matched_ids": [
+                "nginx-prod-frontend"
+            ]
+        },
+        {
+            "name": "combined_label_filters",
+            "description": "测试 K8s 标签和容器标签的组合过滤",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/component": "web"
+                },
+                "IncludeContainerLabel": {
+                    "tier": "frontend"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod-frontend",
+                "nginx-dev-frontend"
+            ]
+        },
+        {
+            "name": "combined_env_and_label_filters",
+            "description": "测试环境变量和标签的组合过滤",
+            "filters": {
+                "IncludeEnv": {
+                    "ENVIRONMENT": "production"
+                },
+                "IncludeContainerLabel": {
+                    "app": "redis"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-prod-cache"
+            ]
+        },
+        {
+            "name": "all_filters_combined",
+            "description": "测试所有类型过滤参数的完整组合",
+            "filters": {
+                "K8sNamespaceRegex": "production",
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "^mysql$"
+                },
+                "IncludeContainerLabel": {
+                    "tier": "database"
+                },
+                "IncludeEnv": {
+                    "APP_NAME": "mysql"
+                },
+                "ExcludeContainerLabel": {
+                    "component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "mysql-prod-db"
+            ]
+        },
+        {
+            "name": "complex_regex_filters",
+            "description": "测试多个正则表达式的复杂组合",
+            "filters": {
+                "K8sPodRegex": ".*-(deployment|statefulset)-.*",
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/version": "^[0-9]+\\.[0-9]+$"
+                },
+                "IncludeEnv": {
+                    "ENVIRONMENT": "^prod.*"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod-frontend",
+                "redis-prod-cache",
+                "mysql-prod-db"
+            ]
+        },
+        {
+            "name": "mixed_include_exclude_filters",
+            "description": "测试包含和排除过滤器的混合使用",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "^(nginx|redis)$"
+                },
+                "ExcludeEnv": {
+                    "ENVIRONMENT": "development"
+                },
+                "ExcludeContainerLabel": {
+                    "component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod-frontend"
+            ]
+        }
+    ]
+}
