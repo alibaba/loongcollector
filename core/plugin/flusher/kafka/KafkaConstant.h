@@ -49,4 +49,10 @@ extern const std::string PARTITIONER_PREFIX;
 extern const std::string LIBRDKAFKA_PARTITIONER_RANDOM;
 extern const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM;
 
+extern const std::string KAFKA_CONFIG_SECURITY_PROTOCOL;
+extern const std::string KAFKA_CONFIG_SSL_CA_LOCATION;
+extern const std::string KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION;
+extern const std::string KAFKA_CONFIG_SSL_KEY_LOCATION;
+extern const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD;
+
 } // namespace logtail
