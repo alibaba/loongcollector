@@ -1,8 +1,8 @@
-# JournalServer - 高性能Systemd日志收集器
+# InputJournal - 高性能Systemd日志收集器
 
-![JournalServer](https://img.shields.io/badge/Component-JournalServer-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-green) ![Language](https://img.shields.io/badge/Language-C%2B%2B-red)
+![InputJournal](https://img.shields.io/badge/Component-JournalServer-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-green) ![Language](https://img.shields.io/badge/Language-C%2B%2B-red)
 
-JournalServer是一个高性能的systemd日志收集组件，专为高效可靠的日志数据提取而设计。它提供全面的过滤功能，并与Golang实现保持兼容性。
+InputJournal是一个高性能的systemd日志收集组件，专为高效可靠的日志数据提取而设计。它提供全面的过滤功能，并与Golang实现保持兼容性。
 
 ---
 
@@ -52,7 +52,7 @@ graph TB
 
 ## 🎯 过滤系统
 
-JournalServer提供一个复杂的过滤系统，允许精确控制收集哪些日志条目。**所有过滤器使用或逻辑**，意味着匹配任何配置过滤器的条目都将被收集。
+InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些日志条目。**所有过滤器使用或逻辑**，意味着匹配任何配置过滤器的条目都将被收集。
 
 ### 过滤器类型
 
@@ -185,7 +185,7 @@ JournalServer提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "JournalPaths": ["/var/log/journal"],
   "SeekPosition": "tail",
   "CursorFlushPeriodMs": 1000,
@@ -227,7 +227,7 @@ JournalServer提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "Units": ["nginx.service", "mysql.service"],
   "Kernel": true,
   "SeekPosition": "tail"
@@ -239,7 +239,7 @@ JournalServer提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "Units": ["systemd-networkd.service"],
   "Identifiers": ["kernel", "systemd", "NetworkManager"],
   "Kernel": true,
@@ -280,22 +280,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make journal_server
 ```
 
-### 项目结构
-```
-core/journal_server/
-├── README.md                 # 本文档
-├── JournalServer.cpp/.h      # 主服务器实现  
-├── common/                   # 通用工具
-│   └── JournalConfig.h       # 配置结构
-├── connection/               # 连接管理
-│   └── JournalConnectionManager.cpp/.h
-├── reader/                   # 日志读取
-│   └── JournalReader.cpp/.h
-├── filter/                   # 过滤系统
-│   └── JournalFilter.cpp/.h
-└── checkpoint/               # 状态管理
-    └── JournalCheckpoint.cpp/.h
-```
+
 
 ## 🐛 故障排除
 
@@ -367,13 +352,6 @@ core/journal_server/
 3. **内核日志**: 仅在必要时启用，因为量大
 4. **日志大小**: 监控日志磁盘使用和轮转策略
 
-### 资源使用
-
-| 场景 | CPU使用 | 内存使用 | 磁盘I/O |
-|----------|-----------|--------------|----------|
-| 10个单元监控 | ~2-5% | ~50MB | 低 |
-| 内核 + 5个单元 | ~5-10% | ~80MB | 中 |
-| 广泛模式匹配 | ~10-20% | ~100MB | 高 |
 
 ## 🤝 贡献
 

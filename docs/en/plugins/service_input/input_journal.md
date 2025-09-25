@@ -185,7 +185,7 @@ OR
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "JournalPaths": ["/var/log/journal"],
   "SeekPosition": "tail",
   "CursorFlushPeriodMs": 1000,
@@ -227,7 +227,7 @@ Monitor specific services and collect kernel logs:
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "Units": ["nginx.service", "mysql.service"],
   "Kernel": true,
   "SeekPosition": "tail"
@@ -239,7 +239,7 @@ Collect logs from multiple sources:
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "Units": ["systemd-networkd.service"],
   "Identifiers": ["kernel", "systemd", "NetworkManager"],
   "Kernel": true,
@@ -253,7 +253,7 @@ High-priority messages across the system:
 
 ```json
 {
-  "Type": "service_journal_server",
+  "Type": "input_journal",
   "MatchPatterns": [
     "PRIORITY=0",
     "PRIORITY=1",
@@ -367,13 +367,6 @@ Or use match patterns:
 3. **Kernel Logs**: Only enable when necessary due to high volume
 4. **Journal Size**: Monitor journal disk usage and rotation policies
 
-### Resource Usage
-
-| Scenario | CPU Usage | Memory Usage | Disk I/O |
-|----------|-----------|--------------|----------|
-| 10 units monitoring | ~2-5% | ~50MB | Low |
-| Kernel + 5 units | ~5-10% | ~80MB | Medium |
-| Broad pattern matching | ~10-20% | ~100MB | High |
 
 ## 🤝 Contributing
 
