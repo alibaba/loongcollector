@@ -187,6 +187,40 @@ public:
             rd_kafka_conf_set_default_topic_conf(mConf, tconf);
         }
 
+        if (mConfig.EnableTLS) {
+            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, "ssl")) {
+                return false;
+            }
+
+            if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.TLSCaFile)) {
+                return false;
+            }
+
+            const bool hasCert = !mConfig.TLSCertFile.empty();
+            const bool hasKey = !mConfig.TLSKeyFile.empty();
+
+            if (hasCert != hasKey) {
+                LOG_ERROR(sLogger,
+                          ("Kafka TLS client auth config error",
+                           "both TLS.CertFile and TLS.KeyFile must be set together, or both unset"));
+                return false;
+            }
+
+            if (hasCert && hasKey) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.TLSCertFile)) {
+                    return false;
+                }
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.TLSKeyFile)) {
+                    return false;
+                }
+                if (!mConfig.TLSKeyPassword.empty()) {
+                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.TLSKeyPassword)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
         for (const auto& kv : mConfig.CustomConfig) {
             if (!SetConfig(kv.first, kv.second)) {
                 return false;
