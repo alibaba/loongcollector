@@ -56,6 +56,13 @@ struct KafkaConfig {
     // General Authentication (TLS for now)
     AuthConfig Authentication;
 
+    bool EnableKerberos = false;
+    std::string SaslMechanisms = "GSSAPI";
+    std::string KerberosPrincipal;
+    std::string KerberosServiceName = "kafka";
+    std::string KerberosKeytab;
+    std::string KerberosKinitCmd;
+
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
             return false;
@@ -104,6 +111,20 @@ struct KafkaConfig {
             }
             if (!Authentication.Validate(errorMsg)) {
                 return false;
+            }
+
+            if (auth.isMember("Kerberos") && auth["Kerberos"].isObject()) {
+                const Json::Value& krb = auth["Kerberos"];
+                if (!GetOptionalBoolParam(krb, "Enabled", EnableKerberos, errorMsg)) {
+                    return false;
+                }
+                if (EnableKerberos) {
+                    GetOptionalStringParam(krb, "Mechanisms", SaslMechanisms, errorMsg);
+                    GetOptionalStringParam(krb, "ServiceName", KerberosServiceName, errorMsg);
+                    GetOptionalStringParam(krb, "Principal", KerberosPrincipal, errorMsg);
+                    GetOptionalStringParam(krb, "Keytab", KerberosKeytab, errorMsg);
+                    GetOptionalStringParam(krb, "KinitCmd", KerberosKinitCmd, errorMsg);
+                }
             }
         }
 

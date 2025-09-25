@@ -34,6 +34,12 @@
 | `Authentication.TLS.CertFile` | string | 否 | / | 客户端证书路径，映射 `ssl.certificate.location`（与 KeyFile 必须成对配置，否则将视为配置错误） |
 | `Authentication.TLS.KeyFile` | string | 否 | / | 客户端私钥路径，映射 `ssl.key.location`（与 CertFile 必须成对配置，否则将视为配置错误） |
 | `Authentication.TLS.KeyPassword` | string | 否 | / | 私钥口令，映射 `ssl.key.password`（可选） |
+| `Authentication.Kerberos.Enabled` | bool | 否 | false | 启用 Kerberos（SASL/GSSAPI） |
+| `Authentication.Kerberos.Mechanisms` | string | 否 | `"GSSAPI"` | 映射 `sasl.mechanisms` |
+| `Authentication.Kerberos.ServiceName` | string | 否 | `"kafka"` | 映射 `sasl.kerberos.service.name` |
+| `Authentication.Kerberos.Principal` | string | 否 | / | 映射 `sasl.kerberos.principal` |
+| `Authentication.Kerberos.Keytab` | string | 否 | / | 映射 `sasl.kerberos.keytab` |
+| `Authentication.Kerberos.KinitCmd` | string | 否 | / | 映射 `sasl.kerberos.kinit.cmd` |
 
 ## 样例
 
