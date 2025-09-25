@@ -147,7 +147,7 @@ Feature: flusher kafka native dynamic topic
     """
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_HashPartition_Basic
+  Scenario: TestFlusherKafkaNative_HashPartition_Basic
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -155,7 +155,7 @@ Feature: flusher kafka native dynamic topic
       - "localhost:9092"
     topic: "app-hash"
     """
-    Given {flusher-kafka-cpp-dynamic-topic-case} local config as below
+    Given {flusher-kafka-native-dynamic-topic-case} local config as below
     """
     enable: true
     inputs:
@@ -169,7 +169,7 @@ Feature: flusher kafka native dynamic topic
         SourceKey: content
         KeepingSourceWhenParseSucceed: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "app-hash"
         Version: "2.8.0"
@@ -188,7 +188,7 @@ Feature: flusher kafka native dynamic topic
     """
     Given loongcollector container mount {./flusher_dynamic.log} to {/root/test/1/2/3/dynamic_input.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_dynamic_topic}
+    When start docker-compose {flusher_kafka_native_dynamic_topic}
     Then there is at least {10} logs
     Then the log fields match kv
     """
