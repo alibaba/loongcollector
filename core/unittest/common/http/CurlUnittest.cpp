@@ -34,13 +34,17 @@ void CurlUnittest::TestSendHttpRequest() {
     std::unique_ptr<HttpRequest> request;
     HttpResponse res;
 
+    // OSS 使用 Host 头来识别要访问的存储桶（bucket）。如果 Host 头缺失或不正确，OSS 会返回 403 Forbidden。
+    map<string, string> headers;
+    headers["Host"] = "loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com";
+
     request = std::make_unique<HttpRequest>("GET",
                                             false,
                                             "loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com",
                                             80,
                                             "/status/404",
                                             "",
-                                            map<string, string>(),
+                                            headers,
                                             "",
                                             10,
                                             1);
@@ -75,13 +79,17 @@ void CurlUnittest::TestFollowRedirect() {
     tls.mCertFile = "client.crt";
     tls.mKeyFile = "client.key";
 
+    // OSS 使用 Host 头来识别要访问的存储桶（bucket）。如果 Host 头缺失或不正确，OSS 会返回 403 Forbidden。
+    map<string, string> headers;
+    headers["Host"] = "loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com";
+
     request = std::make_unique<HttpRequest>("GET",
                                             false,
                                             "loongcollector-community-edition.oss-cn-shanghai.aliyuncs.com",
                                             80,
                                             "/status/404",
                                             "",
-                                            map<string, string>(),
+                                            headers,
                                             "",
                                             10,
                                             1,
