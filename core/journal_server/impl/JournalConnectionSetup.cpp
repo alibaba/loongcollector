@@ -29,7 +29,7 @@ using namespace std;
 namespace logtail::impl {
 
 // =============================================================================
-// Connection 函数实现
+// 建立连接
 // =============================================================================
 
 std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection) {
@@ -67,64 +67,61 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     return journalReader;
 }
 
-bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& config, std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek) {
-    // 获取当前checkpoint
-    string currentCheckpoint = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
-    
-    // 判断是否需要执行seek操作
-    bool shouldSeek = forceSeek || config.needsSeek || 
-                      (config.lastSeekCheckpoint != currentCheckpoint);
-    
-    if (!shouldSeek) {
-        // 跳过seek操作，位置未改变，无需重新定位
-        return true; 
-    }
-    
-    // Performing journal seek for config: configName, idx: idx, reason: (forceSeek ? "forced" : (config.needsSeek ? "required" : "checkpoint_changed")), current_checkpoint truncated
-    
-    bool seekSuccess = false;
-    
-    // 首先尝试使用cursor
-    if (!currentCheckpoint.empty() && config.seekPosition == "cursor") {
-        // Seeking to checkpoint cursor for config: configName, idx: idx
-        seekSuccess = journalReader->SeekCursor(currentCheckpoint);
-        if (!seekSuccess) {
-            LOG_WARNING(sLogger, ("failed to seek to checkpoint, using fallback position", config.cursorSeekFallback)("config", configName)("idx", idx));
+bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& config, const std::shared_ptr<SystemdJournalReader>& journalReader, bool forceSeek) {
+    try {
+        // 检查是否需要执行seek操作
+        bool shouldSeek = forceSeek || config.needsSeek;
+        if (!shouldSeek) {
+            // 如果不需要seek，直接返回成功
+            return true;
         }
-    }
-    
-    // 如果cursor失败或者不使用cursor，按seekPosition处理
-    if (!seekSuccess) {
-        if (config.seekPosition == "head" || (config.seekPosition == "cursor" && config.cursorSeekFallback == "head")) {
-            // Seeking to journal head for config: configName, idx: idx
-            seekSuccess = journalReader->SeekHead();
-        } else {
-            // Seeking to journal tail for config: configName, idx: idx
+        
+        bool seekSuccess = false;
+        
+        if (config.seekPosition == "tail") {
+            // seek到末尾
             seekSuccess = journalReader->SeekTail();
-            
-            // tail定位后需要回退到最后一条实际记录
-            if (seekSuccess) {
-                if (journalReader->Previous()) {
-                    // Moved to last actual entry after tail seek for config: configName, idx: idx
-                } else {
-                    // No entries found after tail seek for config: configName, idx: idx
-                    return false;
+            LOG_INFO(sLogger, ("seek to tail", "")("config", configName)("idx", idx)("success", seekSuccess));
+        } else if (config.seekPosition == "head") {
+            // seek到开头
+            seekSuccess = journalReader->SeekHead();
+            LOG_INFO(sLogger, ("seek to head", "")("config", configName)("idx", idx)("success", seekSuccess));
+        } else {
+            // 尝试从checkpoint加载cursor并seek
+            string checkpointCursor = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
+            if (!checkpointCursor.empty()) {
+                // 有checkpoint，seek到指定位置
+                seekSuccess = journalReader->SeekCursor(checkpointCursor);
+                LOG_INFO(sLogger, ("seek to checkpoint cursor", "")("config", configName)("idx", idx)("cursor", checkpointCursor)("success", seekSuccess));
+                
+                if (!seekSuccess) {
+                    // 如果cursor seek失败，fallback到head
+                    LOG_WARNING(sLogger, ("checkpoint cursor seek failed, falling back to head", "")("config", configName)("idx", idx)("cursor", checkpointCursor));
+                    seekSuccess = journalReader->SeekHead();
                 }
+            } else {
+                // 没有checkpoint，默认从head开始
+                seekSuccess = journalReader->SeekHead();
+                LOG_INFO(sLogger, ("no checkpoint found, seek to head", "")("config", configName)("idx", idx)("success", seekSuccess));
             }
         }
-    }
-    // 如果seek失败，则返回false
-    if (!seekSuccess) {
-        LOG_ERROR(sLogger, ("failed to seek to position", config.seekPosition)("config", configName)("idx", idx));
+        
+        if (!seekSuccess) {
+            LOG_ERROR(sLogger, ("journal seek failed", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
+            return false;
+        }
+        
+        // Seek成功，清除needsSeek标记
+        config.needsSeek = false;
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("exception during journal seek operation", e.what())("config", configName)("idx", idx)("seek_position", config.seekPosition));
+        return false;
+    } catch (...) {
+        LOG_ERROR(sLogger, ("unknown exception during journal seek operation", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
         return false;
     }
-    
-    // 更新seek状态
-    config.lastSeekCheckpoint = currentCheckpoint;
-    config.needsSeek = false;
-    
-    // 完成Seek返回
-    return true;
 }
 
 } // namespace logtail::impl 

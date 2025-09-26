@@ -29,7 +29,7 @@ using namespace std;
 namespace logtail::impl {
 
 // =============================================================================
-// 配置处理函数实现
+// 配置处理函数
 // =============================================================================
 
 bool ValidateJournalConfig(const string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey) {
@@ -54,6 +54,9 @@ bool ValidateJournalConfig(const string& configName, size_t idx, const JournalCo
     
     return true;
 }
+// =============================================================================
+// 核心逻辑： 处理所有配置
+// =============================================================================
 
 void ProcessJournalEntries(JournalServer* server) {
     // Process journal entries for all registered configurations
@@ -86,6 +89,10 @@ void ProcessJournalEntries(JournalServer* server) {
         }
     }
 }
+
+// =============================================================================
+// 核心逻辑：对于每个配置，处理其journal条目
+// =============================================================================
 
 void ProcessJournalConfig(const string& configName, size_t idx, JournalConfig& config) {
     // Processing journal config: configName, idx: idx, ctx_valid: config.ctx != nullptr

@@ -43,139 +43,177 @@ void ReadJournalEntries(const string& configName, size_t idx, const JournalConfi
     int entryCount = 0;
     const int maxEntriesPerBatch = config.maxEntriesPerBatch;
     bool isFirstEntry = true;
-        
-    while (entryCount < maxEntriesPerBatch) {
-        // Step 1: 移动到下一个entry，如果需要的话
-        if (!MoveToNextJournalEntry(configName, idx, config, journalReader, isFirstEntry, entryCount)) {
-            break;
-        }
-        
-        // Step 2: 读取和验证entry
-        JournalEntry entry;
-        if (!ReadAndValidateEntry(configName, idx, journalReader, entry)) {
-            // 如果entry为空，则跳过
-            if (entry.fields.empty() && !entry.cursor.empty()) {
-                isFirstEntry = false;
-                entryCount++;
-                continue;
+    
+    try {
+        while (entryCount < maxEntriesPerBatch) {
+            // Step 1: 移动到下一个entry，如果需要的话
+            if (!MoveToNextJournalEntry(configName, idx, config, journalReader, isFirstEntry, entryCount)) {
+                break;
             }
-            // 连接错误或读取失败
-            break;
+            
+            // Step 2: 读取和验证entry
+            JournalEntry entry;
+            if (!ReadAndValidateEntry(configName, idx, journalReader, entry)) {
+                // 如果entry为空，则跳过
+                if (entry.fields.empty() && !entry.cursor.empty()) {
+                    isFirstEntry = false;
+                    entryCount++;
+                    continue;
+                }
+                // 连接错误或读取失败
+                break;
+            }
+            
+            // Step 3: 处理enrty (transform, create event, push)
+            if (!CreateAndPushEventGroup(configName, idx, config, entry, queueKey)) {
+                LOG_ERROR(sLogger, ("failed to process journal entry", "continue")("config", configName)("idx", idx));
+            }
+            
+            entryCount++;
+            isFirstEntry = false;
+            
+            JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, entry.cursor);
         }
         
-        // Step 3: 处理enrty (transform, create event, push)
-        if (!CreateAndPushEventGroup(configName, idx, config, entry, queueKey)) {
-            LOG_ERROR(sLogger, ("failed to process journal entry", "continue")("config", configName)("idx", idx));
+        // 只在没有处理任何条目且可能存在问题时记录警告
+        if (entryCount == 0 && config.seekPosition != "tail") {
+            LOG_WARNING(sLogger, ("no journal entries processed", "may indicate configuration issue")("config", configName)("idx", idx)("seek_position", config.seekPosition));
         }
         
-        entryCount++;
-        isFirstEntry = false;
+        // journal处理完成，连接保持打开状态以供后续使用
         
-        JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, entry.cursor);
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("exception during journal entries processing", e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
+    } catch (...) {
+        LOG_ERROR(sLogger, ("unknown exception during journal entries processing", "")("config", configName)("idx", idx)("entries_processed", entryCount));
     }
-    
-    // 只在没有处理任何条目且可能存在问题时记录警告
-    if (entryCount == 0 && config.seekPosition != "tail") {
-        LOG_WARNING(sLogger, ("no journal entries processed", "may indicate configuration issue")("config", configName)("idx", idx)("seek_position", config.seekPosition));
-    }
-    
-    // journal处理完成，连接保持打开状态以供后续使用
 }
 
 bool MoveToNextJournalEntry(const string& configName, size_t idx, const JournalConfig& config,
                            const std::shared_ptr<SystemdJournalReader>& journalReader, 
                            bool isFirstEntry, int entryCount) {
-    // 对于head模式或者非首次读取，需要调用Next()移动到下一条
-    if (config.seekPosition == "head" || !isFirstEntry) {
-        bool nextSuccess = journalReader->Next();
-        if (!nextSuccess) {
-            // 检查连接是否仍然有效
-            if (!journalReader->IsOpen()) {
-                LOG_WARNING(sLogger, ("journal connection closed during processing", "aborting batch")("config", configName)("idx", idx)("entries_processed", entryCount));
-                return false;
+    try {
+        // 对于head模式或者非首次读取，需要调用Next()移动到下一条
+        if (config.seekPosition == "head" || !isFirstEntry) {
+            bool nextSuccess = journalReader->Next();
+            if (!nextSuccess) {
+                // 检查连接是否仍然有效
+                if (!journalReader->IsOpen()) {
+                    LOG_WARNING(sLogger, ("journal connection closed during processing", "aborting batch")("config", configName)("idx", idx)("entries_processed", entryCount));
+                    return false;
+                }
+                
+                // 使用wait功能等待新的entries
+                if (!HandleJournalWait(configName, idx, config, journalReader, entryCount)) {
+                    return false;
+                }
             }
-            
-            // 使用wait功能等待新的entries
-            if (!HandleJournalWait(configName, idx, config, journalReader, entryCount)) {
-                return false;
-            }
+            // 已移动到下一个条目，继续处理
         }
-        // 已移动到下一个条目，继续处理
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("exception during journal entry navigation", e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
+        return false;
+    } catch (...) {
+        LOG_ERROR(sLogger, ("unknown exception during journal entry navigation", "")("config", configName)("idx", idx)("entries_processed", entryCount));
+        return false;
     }
-    return true;
 }
 
 bool ReadAndValidateEntry(const string& configName, size_t idx,
                          const std::shared_ptr<SystemdJournalReader>& journalReader, JournalEntry& entry) {
-    // 在读取entry之前验证连接状态
-    if (!journalReader->IsOpen()) {
-        LOG_WARNING(sLogger, ("journal connection closed before GetEntry", "aborting batch")("config", configName)("idx", idx));
-        return false;
-    }
-    
-    // 读取当前entry
-    bool getEntrySuccess = journalReader->GetEntry(entry);
-    
-    if (!getEntrySuccess) {
-        LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx));
-        
-        // 检查是否是连接问题导致的失败
+    try {
+        // 在读取entry之前验证连接状态
         if (!journalReader->IsOpen()) {
-            LOG_WARNING(sLogger, ("GetEntry failed due to closed connection", "aborting batch")("config", configName)("idx", idx));
+            LOG_WARNING(sLogger, ("journal connection closed before GetEntry", "aborting batch")("config", configName)("idx", idx));
             return false;
         }
-        return false;  // Read failed but connection ok, caller should continue
-    }
-    
-    // 检查entry是否为空
-    if (entry.fields.empty()) {
-        LOG_WARNING(sLogger, ("journal entry is empty", "no fields found")("config", configName)("idx", idx)("cursor", entry.cursor));
-        return false;  // Empty entry, special handling needed by caller
-    }
-    
+        
+        // 读取当前entry
+        bool getEntrySuccess = journalReader->GetEntry(entry);
+        
+        if (!getEntrySuccess) {
+            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx));
+            
+            // 检查是否是连接问题导致的失败
+            if (!journalReader->IsOpen()) {
+                LOG_WARNING(sLogger, ("GetEntry failed due to closed connection", "aborting batch")("config", configName)("idx", idx));
+                return false;
+            }
+            return false;  // Read failed but connection ok, caller should continue
+        }
+        
+        // 检查entry是否为空
+        if (entry.fields.empty()) {
+            LOG_WARNING(sLogger, ("journal entry is empty", "no fields found")("config", configName)("idx", idx)("cursor", entry.cursor));
+            return false;  // Empty entry, special handling needed by caller
+        }
+        
 
-    return true;
+        return true;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("exception during journal entry reading", e.what())("config", configName)("idx", idx));
+        // 清空entry以确保不会使用部分读取的数据
+        entry = JournalEntry();
+        return false;
+    } catch (...) {
+        LOG_ERROR(sLogger, ("unknown exception during journal entry reading", "")("config", configName)("idx", idx));
+        // 清空entry以确保不会使用部分读取的数据
+        entry = JournalEntry();
+        return false;
+    }
 }
 
 bool HandleJournalWait(const string& configName, size_t idx, const JournalConfig& config,
                       const std::shared_ptr<SystemdJournalReader>& journalReader, int entryCount) {
-    // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
-    int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
-    
-    // 当前无可用条目，等待新条目到达（使用动态超时时间）
-    
-    int waitResult = journalReader->Wait(std::chrono::milliseconds(waitTimeout));
-    if (waitResult > 0) {
-        // 有新的数据可用，继续尝试读取
-        // 等待后检测到新条目，继续处理
+    try {
+        // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
+        int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
         
-        // 在wait之后重新检查连接状态
-        if (!journalReader->IsOpen()) {
-            LOG_WARNING(sLogger, ("journal connection closed during wait", "aborting batch")("config", configName)("idx", idx));
-            return false;
-        }
+        // 当前无可用条目，等待新条目到达（使用动态超时时间）
         
-        bool nextSuccess = journalReader->Next();
-        if (!nextSuccess) {
-            // 等待显示有新数据，但Next()失败，可能连接有问题
+        int waitResult = journalReader->Wait(std::chrono::milliseconds(waitTimeout));
+        if (waitResult > 0) {
+            // 有新的数据可用，继续尝试读取
+            // 等待后检测到新条目，继续处理
+            
+            // 在wait之后重新检查连接状态
             if (!journalReader->IsOpen()) {
-                LOG_WARNING(sLogger, ("connection lost after wait", "")("config", configName)("idx", idx));
+                LOG_WARNING(sLogger, ("journal connection closed during wait", "aborting batch")("config", configName)("idx", idx));
+                return false;
             }
+            
+            bool nextSuccess = journalReader->Next();
+            if (!nextSuccess) {
+                // 等待显示有新数据，但Next()失败，可能连接有问题
+                if (!journalReader->IsOpen()) {
+                    LOG_WARNING(sLogger, ("connection lost after wait", "")("config", configName)("idx", idx));
+                }
+                return false;
+            }
+            return true;
+        }
+        if (waitResult == 0) {
+            // 等待超时，没有新数据（可能未发现新条目，或批次已完成）
             return false;
         }
-        return true;
-    }
-    if (waitResult == 0) {
-        // 等待超时，没有新数据（可能未发现新条目，或批次已完成）
+        // 错误，可能是连接被重置或其他问题
+        LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
+        
+        if (!journalReader->IsOpen()) {
+            LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
+        }
+        return false;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR(sLogger, ("exception during journal wait operation", e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
+        return false;
+    } catch (...) {
+        LOG_ERROR(sLogger, ("unknown exception during journal wait operation", "")("config", configName)("idx", idx)("entries_processed", entryCount));
         return false;
     }
-    // 错误，可能是连接被重置或其他问题
-    LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
-    
-    if (!journalReader->IsOpen()) {
-        LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
-    }
-    return false;
 }
 
 LogEvent* CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, 

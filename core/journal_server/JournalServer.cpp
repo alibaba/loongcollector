@@ -169,32 +169,44 @@ void JournalServer::run() {
     LOG_INFO(sLogger, ("JournalServer thread", "started"));
     
     while (true) {
-        {
-            lock_guard<mutex> lock(mThreadRunningMux);
-            if (!mIsThreadRunning) {
-                break;
+        try {
+            {
+                lock_guard<mutex> lock(mThreadRunningMux);
+                if (!mIsThreadRunning) {
+                    break;
+                }
             }
-        }
-        // 【核心处理逻辑】：遍历所有配置并处理journal条目
-        impl::ProcessJournalEntries(this);
-        
-        // 每次循环后短暂休眠，避免CPU占用过高
-        this_thread::sleep_for(chrono::milliseconds(100));
-        
-        // 定期清理过期的checkpoints（使用配置的间隔时间）
-        static time_t sLastCleanup = time(nullptr);
-        time_t currentTime = time(nullptr);
-        if (currentTime - sLastCleanup >= INT32_FLAG(journal_checkpoint_cleanup_interval_sec)) {
-            // 清理过期的checkpoints（使用配置的过期时间）
-            LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", "")
-                     ("cleanup_interval_sec", INT32_FLAG(journal_checkpoint_cleanup_interval_sec))
-                     ("expired_threshold_hours", INT32_FLAG(journal_checkpoint_expired_threshold_hours)));
-            size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(
-                INT32_FLAG(journal_checkpoint_expired_threshold_hours));
-            if (cleanedCheckpoints > 0) {
-                LOG_INFO(sLogger, ("expired checkpoints cleaned", "")("count", cleanedCheckpoints));
+            
+            // 【核心处理逻辑】：遍历所有配置并处理journal条目
+            impl::ProcessJournalEntries(this);
+            
+            // 每次循环后短暂休眠，避免CPU占用过高
+            this_thread::sleep_for(chrono::milliseconds(100));
+            
+            // 定期清理过期的checkpoints（使用配置的间隔时间）
+            static time_t sLastCleanup = time(nullptr);
+            time_t currentTime = time(nullptr);
+            if (currentTime - sLastCleanup >= INT32_FLAG(journal_checkpoint_cleanup_interval_sec)) {
+                // 清理过期的checkpoints（使用配置的过期时间）
+                LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", "")
+                         ("cleanup_interval_sec", INT32_FLAG(journal_checkpoint_cleanup_interval_sec))
+                         ("expired_threshold_hours", INT32_FLAG(journal_checkpoint_expired_threshold_hours)));
+                size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(
+                    INT32_FLAG(journal_checkpoint_expired_threshold_hours));
+                if (cleanedCheckpoints > 0) {
+                    LOG_INFO(sLogger, ("expired checkpoints cleaned", "")("count", cleanedCheckpoints));
+                }
+                sLastCleanup = currentTime;
             }
-            sLastCleanup = currentTime;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR(sLogger, ("exception in main journal server loop", e.what()));
+            // 短暂暂停后继续运行，避免异常导致的忙循环
+            this_thread::sleep_for(chrono::seconds(1));
+        } catch (...) {
+            LOG_ERROR(sLogger, ("unknown exception in main journal server loop", ""));
+            // 短暂暂停后继续运行
+            this_thread::sleep_for(chrono::seconds(1));
         }
     }
     
