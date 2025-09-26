@@ -97,6 +97,7 @@ public:
     void TestDynamicTopic_FromTags();
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
+    void TestHeadersConfigured_SendWithHeaders();
 
 protected:
     void SetUp();
@@ -477,6 +478,43 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
 
+void FlusherKafkaUnittest::TestHeadersConfigured_SendWithHeaders() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    Json::Value headers(Json::arrayValue);
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "hk1";
+        h["value"] = "hv1";
+        headers.append(h);
+    }
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "hk2";
+        h["value"] = "hv2";
+        headers.append(h);
+    }
+    config["Headers"] = headers;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("k"), StringView("v"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1U, completed.size());
+    const auto& hdrs = completed.back().Headers;
+    APSARA_TEST_EQUAL(2U, hdrs.size());
+    APSARA_TEST_EQUAL(std::string("hk1"), hdrs[0].first);
+    APSARA_TEST_EQUAL(std::string("hv1"), hdrs[0].second);
+    APSARA_TEST_EQUAL(std::string("hk2"), hdrs[1].first);
+    APSARA_TEST_EQUAL(std::string("hv2"), hdrs[1].second);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -499,6 +537,7 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestHeadersConfigured_SendWithHeaders)
 
 } // namespace logtail
 

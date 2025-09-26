@@ -197,6 +197,14 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 					{Key: "topic", Value: k.Topic},
 					{Key: "partition", Value: fmt.Sprintf("%d", msg.Partition)},
 				}
+				if len(msg.Headers) > 0 {
+					for _, h := range msg.Headers {
+						if h == nil || len(h.Key) == 0 {
+							continue
+						}
+						contents = append(contents, &protocol.Log_Content{Key: fmt.Sprintf("header.%s", string(h.Key)), Value: string(h.Value)})
+					}
+				}
 				if msgVal != "" {
 					contents = append(contents, &protocol.Log_Content{Key: "msg", Value: msgVal})
 				}

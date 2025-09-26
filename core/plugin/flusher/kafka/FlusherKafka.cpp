@@ -108,6 +108,23 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         return false;
     }
 
+    mRecordHeaders.clear();
+    if (mHeadersTemplate) {
+        mProducer->DestroyHeadersTemplate(mHeadersTemplate);
+        mHeadersTemplate = nullptr;
+    }
+    if (!mKafkaConfig.Headers.empty()) {
+        mRecordHeaders.reserve(mKafkaConfig.Headers.size());
+        for (auto& h : mKafkaConfig.Headers) {
+            if (!h.first.empty()) {
+                mRecordHeaders.emplace_back(std::move(h.first), std::move(h.second));
+            }
+        }
+        if (!mRecordHeaders.empty()) {
+            mHeadersTemplate = mProducer->CreateHeadersTemplate(mRecordHeaders);
+        }
+    }
+
     mExpandedTopic = mTopicFormatter.GetTemplate();
     GenerateQueueKey(mExpandedTopic);
     SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
@@ -137,6 +154,10 @@ bool FlusherKafka::Start() {
 bool FlusherKafka::Stop(bool isPipelineRemoving) {
     if (mProducer) {
         mProducer->Close();
+    }
+    if (mHeadersTemplate) {
+        mProducer->DestroyHeadersTemplate(mHeadersTemplate);
+        mHeadersTemplate = nullptr;
     }
     return Flusher::Stop(isPipelineRemoving);
 }
@@ -223,7 +244,8 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
                 }
                 HandleDeliveryResult(success, errorInfo);
             },
-            partitionKey);
+            partitionKey,
+            mHeadersTemplate);
     }
 
     return allSuccess;
