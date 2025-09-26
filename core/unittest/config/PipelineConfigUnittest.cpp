@@ -64,7 +64,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(nullopt, config.mExpireTime);
+        APSARA_TEST_EQUAL(nullopt, config.mOnetimeExpireTime);
     }
     {
         // invalid ExcutionTimeout
@@ -73,7 +73,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mExpireTime);
+        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -83,7 +83,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 600U, config.mExpireTime);
+        APSARA_TEST_EQUAL(time(nullptr) + 600U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -93,7 +93,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mExpireTime);
+        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
 
@@ -144,7 +144,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("new_config", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 3600U, config.mExpireTime);
+        APSARA_TEST_EQUAL(time(nullptr) + 3600U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
         APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
                           sConfigManager->mConfigExpireTimeCheckpoint.find("new_config"));
@@ -157,7 +157,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("old_config", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(2500000000U, config.mExpireTime.value());
+        APSARA_TEST_EQUAL(2500000000U, config.mOnetimeExpireTime.value());
         APSARA_TEST_TRUE(config.mIsRunningBeforeStart);
         APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
                           sConfigManager->mConfigExpireTimeCheckpoint.find("old_config"));

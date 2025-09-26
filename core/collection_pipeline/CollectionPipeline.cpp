@@ -78,7 +78,9 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     mName = config.mName;
     mConfig = std::move(config.mDetail);
     mSingletonInput = config.mSingletonInput;
-    mIsOnetime = config.mExpireTime.has_value();
+    mIsOnetime = config.mOnetimeExpireTime.has_value();
+    mOnetimeStartTime = config.mOnetimeStartTime;
+    mOnetimeExpireTime = config.mOnetimeExpireTime;
     mContext.SetConfigName(mName);
     mContext.SetCreateTime(config.mCreateTime);
     mContext.SetIsOnetimePipelineRunningBeforeStart(config.mIsRunningBeforeStart);
@@ -351,7 +353,7 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     // config, it is more reasonable to do it here.
     if (mIsOnetime) {
         OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
-            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mExpireTime.value());
+            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mOnetimeExpireTime.value());
     }
 
     WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,
