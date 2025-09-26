@@ -80,6 +80,18 @@ bool InputJournal::Start() {
     config.resetIntervalSecond = mResetIntervalSecond; // 设置重置间隔
     config.ctx = mContext; // 设置context
     
+    // 验证和修正配置值
+    int fixedCount = config.ValidateAndFixConfig();
+    if (fixedCount > 0) {
+        LOG_WARNING(sLogger, ("journal config fixed", "some values were corrected")("config", mContext->GetConfigName())("idx", mIndex)("fixed_count", fixedCount));
+    }
+    
+    // 最终验证配置有效性
+    if (!config.IsValid()) {
+        LOG_ERROR(sLogger, ("invalid journal config", "cannot start")("config", mContext->GetConfigName())("idx", mIndex));
+        return false;
+    }
+    
     // 注册到JournalServer
     JournalServer::GetInstance()->AddJournalInput(
         mContext->GetConfigName(), 
@@ -117,33 +129,96 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
     if (!GetOptionalStringParam(config, "SeekPosition", mSeekPosition, errorMsg)) {
         mSeekPosition = kSeekPositionTail;
     }
+    // 验证seek位置的有效性
+    if (mSeekPosition != "head" && mSeekPosition != "tail" && 
+        mSeekPosition != "cursor" && mSeekPosition != "none") {
+        LOG_WARNING(sLogger, ("invalid SeekPosition value, using default", mSeekPosition)("default", kSeekPositionTail));
+        mSeekPosition = kSeekPositionTail;
+    }
+    
     // 获取cursor刷新周期
     if (!GetOptionalIntParam(config, "CursorFlushPeriodMs", mCursorFlushPeriodMs, errorMsg)) {
         mCursorFlushPeriodMs = kDefaultCursorFlushPeriodMs;
     }
+    // 验证cursor刷新周期范围 (1秒到5分钟)
+    if (mCursorFlushPeriodMs <= 0) {
+        LOG_WARNING(sLogger, ("invalid CursorFlushPeriodMs, using default", mCursorFlushPeriodMs)("default", kDefaultCursorFlushPeriodMs));
+        mCursorFlushPeriodMs = kDefaultCursorFlushPeriodMs;
+    } else if (mCursorFlushPeriodMs > 300000) {
+        LOG_WARNING(sLogger, ("CursorFlushPeriodMs too large, capping", mCursorFlushPeriodMs)("max", 300000));
+        mCursorFlushPeriodMs = 300000;
+    }
+    
     // 获取cursor回退位置
     if (!GetOptionalStringParam(config, "CursorSeekFallback", mCursorSeekFallback, errorMsg)) {
         mCursorSeekFallback = kSeekPositionTail;
     }
+    // 验证cursor回退位置的有效性
+    if (mCursorSeekFallback != "head" && mCursorSeekFallback != "tail") {
+        LOG_WARNING(sLogger, ("invalid CursorSeekFallback value, using default", mCursorSeekFallback)("default", kSeekPositionTail));
+        mCursorSeekFallback = kSeekPositionTail;
+    }
+    
     // 获取kernel
     if (!GetOptionalBoolParam(config, "Kernel", mKernel, errorMsg)) {
         mKernel = true;
     }
+    
     // 获取parse syslog facility
     if (!GetOptionalBoolParam(config, "ParseSyslogFacility", mParseSyslogFacility, errorMsg)) {
         mParseSyslogFacility = false;
     }
+    
     // 获取parse priority
     if (!GetOptionalBoolParam(config, "ParsePriority", mParsePriority, errorMsg)) {
         mParsePriority = false;
     }
+    
     // 获取use journal event time
     if (!GetOptionalBoolParam(config, "UseJournalEventTime", mUseJournalEventTime, errorMsg)) {
         mUseJournalEventTime = false;
     }
+    
     // 获取reset interval second
     if (!GetOptionalIntParam(config, "ResetIntervalSecond", mResetIntervalSecond, errorMsg)) {
         mResetIntervalSecond = kDefaultResetInterval;
+    }
+    // 验证重置间隔范围 (1分钟到24小时)
+    if (mResetIntervalSecond <= 0) {
+        LOG_WARNING(sLogger, ("invalid ResetIntervalSecond, using default", mResetIntervalSecond)("default", kDefaultResetInterval));
+        mResetIntervalSecond = kDefaultResetInterval;
+    } else if (mResetIntervalSecond < 60) {
+        LOG_WARNING(sLogger, ("ResetIntervalSecond too small, setting to minimum", mResetIntervalSecond)("min", 60));
+        mResetIntervalSecond = 60;  // 最小1分钟
+    } else if (mResetIntervalSecond > 86400) {
+        LOG_WARNING(sLogger, ("ResetIntervalSecond too large, capping", mResetIntervalSecond)("max", 86400));
+        mResetIntervalSecond = 86400;  // 最大24小时
+    }
+    
+    // 获取max entries per batch (如果有这个配置)
+    int maxEntriesPerBatch = 1000;  // 默认值
+    if (GetOptionalIntParam(config, "MaxEntriesPerBatch", maxEntriesPerBatch, errorMsg)) {
+        if (maxEntriesPerBatch <= 0) {
+            LOG_WARNING(sLogger, ("invalid MaxEntriesPerBatch, using default", maxEntriesPerBatch)("default", 1000));
+            maxEntriesPerBatch = 1000;
+        } else if (maxEntriesPerBatch > 10000) {
+            LOG_WARNING(sLogger, ("MaxEntriesPerBatch too large, capping", maxEntriesPerBatch)("max", 10000));
+            maxEntriesPerBatch = 10000;
+        }
+        // 这里可以将值存储到成员变量中，如果需要的话
+    }
+    
+    // 获取wait timeout (如果有这个配置)
+    int waitTimeoutMs = 1000;  // 默认值
+    if (GetOptionalIntParam(config, "WaitTimeoutMs", waitTimeoutMs, errorMsg)) {
+        if (waitTimeoutMs < 0) {
+            LOG_WARNING(sLogger, ("invalid WaitTimeoutMs, using default", waitTimeoutMs)("default", 1000));
+            waitTimeoutMs = 1000;
+        } else if (waitTimeoutMs > 60000) {
+            LOG_WARNING(sLogger, ("WaitTimeoutMs too large, capping", waitTimeoutMs)("max", 60000));
+            waitTimeoutMs = 60000;  // 最大1分钟
+        }
+        // 这里可以将值存储到成员变量中，如果需要的话
     }
 }
 

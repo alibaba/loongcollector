@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <string>
 #include <vector>
 #include "collection_pipeline/queue/QueueKey.h"
@@ -62,6 +63,107 @@ struct JournalConfig {
     mutable bool needsSeek = true;  // 下次读取时是否需要执行定位
     
     JournalConfig() = default;
+    
+    /**
+     * @brief 验证和修正配置值，确保所有字段都在有效范围内
+     * @return 修正的配置项数量
+     */
+    int ValidateAndFixConfig() {
+        int fixedCount = 0;
+        
+        // 验证数值字段的范围
+        if (resetIntervalSecond <= 0) {
+            resetIntervalSecond = 3600;  // 默认1小时
+            fixedCount++;
+        } else if (resetIntervalSecond > 86400) {  // 最大24小时
+            resetIntervalSecond = 86400;
+            fixedCount++;
+        }
+        
+        if (cursorFlushPeriodMs <= 0) {
+            cursorFlushPeriodMs = 5000;  // 默认5秒
+            fixedCount++;
+        } else if (cursorFlushPeriodMs > 300000) {  // 最大5分钟
+            cursorFlushPeriodMs = 300000;
+            fixedCount++;
+        }
+        
+        if (maxEntriesPerBatch <= 0) {
+            maxEntriesPerBatch = 1000;  // 默认1000条
+            fixedCount++;
+        } else if (maxEntriesPerBatch > 10000) {  // 最大10000条，防止内存爆炸
+            maxEntriesPerBatch = 10000;
+            fixedCount++;
+        }
+        
+        if (waitTimeoutMs < 0) {
+            waitTimeoutMs = 1000;  // 默认1秒
+            fixedCount++;
+        } else if (waitTimeoutMs > 60000) {  // 最大1分钟
+            waitTimeoutMs = 60000;
+            fixedCount++;
+        }
+        
+        // 验证seek位置
+        if (seekPosition != "head" && seekPosition != "tail" && 
+            seekPosition != "cursor" && seekPosition != "none") {
+            seekPosition = "tail";  // 默认tail
+            fixedCount++;
+        }
+        
+        // 验证seek fallback
+        if (cursorSeekFallback != "head" && cursorSeekFallback != "tail") {
+            cursorSeekFallback = "tail";  // 默认tail
+            fixedCount++;
+        }
+        
+        // 验证字符串数组 - 移除空字符串
+        auto removeEmpty = [&fixedCount](std::vector<std::string>& vec) {
+            auto original_size = vec.size();
+            vec.erase(std::remove_if(vec.begin(), vec.end(), 
+                                   [](const std::string& s) { return s.empty(); }), 
+                     vec.end());
+            if (vec.size() != original_size) {
+                fixedCount++;
+            }
+        };
+        
+        removeEmpty(units);
+        removeEmpty(identifiers);
+        removeEmpty(matchPatterns);
+        removeEmpty(journalPaths);
+        
+        // 验证journal路径的有效性（如果指定了路径）
+        if (!journalPaths.empty()) {
+            std::vector<std::string> validPaths;
+            for (const auto& path : journalPaths) {
+                // 检查路径长度合理性
+                if (path.length() > 0 && path.length() < 4096) {
+                    validPaths.push_back(path);
+                } else {
+                    fixedCount++;
+                }
+            }
+            if (validPaths.size() != journalPaths.size()) {
+                journalPaths = std::move(validPaths);
+            }
+        }
+        
+        return fixedCount;
+    }
+    
+    /**
+     * @brief 检查配置是否有效
+     * @return true 如果配置有效
+     */
+    bool IsValid() const {
+        return resetIntervalSecond > 0 && 
+               cursorFlushPeriodMs > 0 && 
+               maxEntriesPerBatch > 0 && 
+               waitTimeoutMs >= 0 &&
+               !seekPosition.empty() &&
+               !cursorSeekFallback.empty();
+    }
 };
 
 } // namespace logtail 
