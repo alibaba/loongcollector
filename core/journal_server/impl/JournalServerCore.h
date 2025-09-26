@@ -68,7 +68,7 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(
  * @brief 智能journal定位操作（仅在必要时执行seek）
  */
 bool PerformJournalSeek(const std::string& configName, size_t idx, JournalConfig& config,
-                       std::shared_ptr<SystemdJournalReader> journalReader, bool forceSeek = false);
+                       const std::shared_ptr<SystemdJournalReader>& journalReader, bool forceSeek = false);
 
 // =============================================================================
 // Reader 读取条目
