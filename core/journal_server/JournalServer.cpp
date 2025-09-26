@@ -55,10 +55,7 @@ void JournalServer::Stop() {
     if (!mIsInitialized || !mThreadRes.valid()) {
         return;
     }
-    {
-        lock_guard<mutex> lock(mThreadRunningMux);
-        mIsThreadRunning = false;
-    }
+    mIsThreadRunning.store(false);
     if (mThreadRes.valid()) {
         mThreadRes.get();
     }
@@ -170,11 +167,8 @@ void JournalServer::run() {
     
     while (true) {
         try {
-            {
-                lock_guard<mutex> lock(mThreadRunningMux);
-                if (!mIsThreadRunning) {
-                    break;
-                }
+            if (!mIsThreadRunning.load()) {
+                break;
             }
             
             // 【核心处理逻辑】：遍历所有配置并处理journal条目

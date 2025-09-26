@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <condition_variable>
 #include <future>
 #include <map>
@@ -86,8 +87,7 @@ private:
     void run();
 
     std::future<void> mThreadRes;
-    mutable std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = true;
+    std::atomic<bool> mIsThreadRunning{true};
     mutable std::condition_variable mStopCV;
 
     // Initialization state management
