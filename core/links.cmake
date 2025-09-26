@@ -36,19 +36,6 @@ macro(all_link target_name)
     endif ()
 endmacro()
 
-# # Add systemd journal library linking
-# macro(link_systemd_journal target_name)
-#     if (LINUX)
-#         find_library(SYSTEMD_JOURNAL_LIB systemd-journal)
-#         if (SYSTEMD_JOURNAL_LIB)
-#             target_link_libraries(${target_name} ${SYSTEMD_JOURNAL_LIB})
-#             message(STATUS "Found systemd-journal library: ${SYSTEMD_JOURNAL_LIB}")
-#         else()
-#             message(WARNING "systemd-journal library not found, journal input plugin may not work")
-#         endif()
-#     endif()
-# endmacro()
-
 macro(link_systemd_journal target_name)
     if (LINUX)
         # 使用 pkg-config 查找 libsystemd

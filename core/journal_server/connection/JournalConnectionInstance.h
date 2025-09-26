@@ -67,7 +67,7 @@ public:
     bool IsInUse() const;
     
     // 强制重置管理
-    void MarkForReset();
+    void MarkForReset() const;
     bool IsPendingReset() const;
     void ClearResetFlag();
     
@@ -91,7 +91,7 @@ private:
     std::atomic<int> mUsageCount{0};
     
     // 强制重置标记 - 当resetInterval到达时标记，阻止新的使用
-    std::atomic<bool> mPendingReset{false};
+    mutable std::atomic<bool> mPendingReset{false};
     
     mutable std::mutex mMutex;
     bool mIsValid;

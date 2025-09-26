@@ -181,10 +181,7 @@ public:
 
         const void* data = nullptr;
         size_t len = 0;
-        int restartRet = sd_journal_restart_data(mJournal);
-        if (restartRet < 0) {
-            return false;
-        }
+        sd_journal_restart_data(mJournal);
         
         int fieldCount = 0;
         constexpr int kMaxFieldsPerEntry = 1000; // 防止内存爆炸

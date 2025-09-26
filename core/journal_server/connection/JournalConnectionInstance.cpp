@@ -71,7 +71,7 @@ bool JournalConnectionInstance::ShouldReset(int resetIntervalSec) const {
     
     // 如果到达重置时间，立即标记为待重置
     if (shouldReset) {
-        const_cast<JournalConnectionInstance*>(this)->MarkForReset();
+        MarkForReset();
         LOG_INFO(sLogger, ("connection marked for reset", "resetInterval reached")("config", mConfigName)("idx", mIndex)("elapsed_sec", elapsed.count()));
     }
     
@@ -188,7 +188,7 @@ bool JournalConnectionInstance::IsInUse() const {
 // 强制重置管理
 //==============================================================================
 
-void JournalConnectionInstance::MarkForReset() {
+void JournalConnectionInstance::MarkForReset() const {
     mPendingReset.store(true);
 }
 

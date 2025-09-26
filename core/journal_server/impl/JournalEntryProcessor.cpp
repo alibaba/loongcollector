@@ -17,6 +17,7 @@
 #include "JournalServerCore.h"
 
 #include <chrono>
+#include <algorithm>
 #include <memory>
 
 #include "checkpoint/JournalCheckpointManager.h"
@@ -41,7 +42,13 @@ namespace logtail::impl {
 void ReadJournalEntries(const string& configName, size_t idx, const JournalConfig& config,
                        const std::shared_ptr<SystemdJournalReader>& journalReader, QueueKey queueKey) {
     int entryCount = 0;
-    const int maxEntriesPerBatch = config.maxEntriesPerBatch;
+    // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
+    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000));
+    
+    // 如果配置值被修正，记录警告
+    if (config.maxEntriesPerBatch != maxEntriesPerBatch) {
+        LOG_WARNING(sLogger, ("maxEntriesPerBatch clamped to safe range", "")("config", configName)("idx", idx)("original", config.maxEntriesPerBatch)("clamped", maxEntriesPerBatch));
+    }
     bool isFirstEntry = true;
     
     try {
