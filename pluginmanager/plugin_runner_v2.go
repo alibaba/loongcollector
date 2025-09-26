@@ -157,6 +157,7 @@ func (p *pluginv2Runner) addMetricInput(pluginMeta *pipeline.PluginMeta, input p
 	p.MetricPlugins = append(p.MetricPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
+		rerunIfPanic:    true,
 		interval:        wrapper.Interval,
 		state:           input,
 		context:         p.LogstoreConfig.Context,
@@ -193,6 +194,7 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
 	p.TimerRunner = append(p.TimerRunner, &timerRunner{
 		state:           aggregator,
+		rerunIfPanic:    true,
 		initialMaxDelay: wrapper.Interval,
 		interval:        wrapper.Interval,
 		context:         p.LogstoreConfig.Context,
@@ -241,7 +243,10 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 				}, cc)
 			})
 		} else {
-			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "METRIC_INPUT_V2_START_FAILURE", "type assertion", "failure")
+			// Aggregator also wrapped by timerRunner
+			if _, ok := t.state.(pipeline.AggregatorV2); !ok {
+				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), "METRIC_INPUT_V2_START_FAILURE", "type assertion", "failure")
+			}
 		}
 	}
 }
