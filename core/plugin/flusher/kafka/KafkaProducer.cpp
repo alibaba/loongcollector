@@ -173,20 +173,52 @@ public:
             }
         }
 
-        if (!mConfig.Partitioner.empty()) {
+        if (!mConfig.Partitioner.empty() || !mConfig.Compression.empty() || mConfig.CompressionLevel != -1) {
             rd_kafka_topic_conf_t* tconf = rd_kafka_topic_conf_new();
             if (!tconf) {
                 return false;
             }
             char errstr2[512];
-            if (rd_kafka_topic_conf_set(
-                    tconf, KAFKA_CONFIG_PARTITIONER.c_str(), mConfig.Partitioner.c_str(), errstr2, sizeof(errstr2))
-                != RD_KAFKA_CONF_OK) {
-                LOG_ERROR(sLogger,
-                          ("Failed to set Kafka topic config",
-                           KAFKA_CONFIG_PARTITIONER)("value", mConfig.Partitioner)("error", errstr2));
-                rd_kafka_topic_conf_destroy(tconf);
-                return false;
+            if (!mConfig.Partitioner.empty()) {
+                if (rd_kafka_topic_conf_set(
+                        tconf, KAFKA_CONFIG_PARTITIONER.c_str(), mConfig.Partitioner.c_str(), errstr2, sizeof(errstr2))
+                    != RD_KAFKA_CONF_OK) {
+                    LOG_ERROR(sLogger,
+                              ("Failed to set Kafka topic config",
+                               KAFKA_CONFIG_PARTITIONER)("value", mConfig.Partitioner)("error", errstr2));
+                    rd_kafka_topic_conf_destroy(tconf);
+                    return false;
+                }
+            }
+
+            if (!mConfig.Compression.empty()) {
+                if (rd_kafka_topic_conf_set(tconf,
+                                            KAFKA_CONFIG_COMPRESSION_CODEC.c_str(),
+                                            mConfig.Compression.c_str(),
+                                            errstr2,
+                                            sizeof(errstr2))
+                    != RD_KAFKA_CONF_OK) {
+                    LOG_ERROR(sLogger,
+                              ("Failed to set Kafka topic config",
+                               KAFKA_CONFIG_COMPRESSION_CODEC)("value", mConfig.Compression)("error", errstr2));
+                    rd_kafka_topic_conf_destroy(tconf);
+                    return false;
+                }
+            }
+
+            if (mConfig.CompressionLevel != -1) {
+                if (rd_kafka_topic_conf_set(tconf,
+                                            KAFKA_CONFIG_COMPRESSION_LEVEL.c_str(),
+                                            std::to_string(mConfig.CompressionLevel).c_str(),
+                                            errstr2,
+                                            sizeof(errstr2))
+                    != RD_KAFKA_CONF_OK) {
+                    LOG_ERROR(sLogger,
+                              ("Failed to set Kafka topic config",
+                               KAFKA_CONFIG_COMPRESSION_LEVEL)("value", mConfig.CompressionLevel)("error", errstr2));
+                    rd_kafka_topic_conf_destroy(tconf);
+                    return false;
+                }
             }
             rd_kafka_conf_set_default_topic_conf(mConf, tconf);
         }

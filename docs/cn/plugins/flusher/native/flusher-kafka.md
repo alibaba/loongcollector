@@ -21,6 +21,8 @@
 | `MaxMessageBytes` | uint | 否 | `1000000` | 单条消息最大字节数，映射 `message.max.bytes` |
 | `QueueBufferingMaxKbytes` | uint | 否 | `1048576` | 本地队列总容量（KB），映射 `queue.buffering.max.kbytes` |
 | `QueueBufferingMaxMessages` | uint | 否 | `100000` | 本地队列最大消息数，映射 `queue.buffering.max.messages` |
+| `Compression` | string | 否 | `none` | 压缩算法：`none`/`gzip`/`snappy`/`lz4`，映射 `compression.codec`（默认 Topic 级） |
+| `CompressionLevel` | int | 否 | `-1` | 压缩级别，映射 `compression.level`（Topic 级，仅部分算法有效；`snappy` 无效） |
 | `RequiredAcks` | int | 否 | `1` | 确认级别：`0`/`1`/`-1(all)`，映射 `acks` |
 | `Timeout` | uint | 否 | `30000` | 请求超时（毫秒），映射 `request.timeout.ms` |
 | `MessageTimeoutMs` | uint | 否 | `300000` | 消息发送（含重试）超时（毫秒），映射 `message.timeout.ms` |
@@ -62,8 +64,8 @@ flushers:
         value: "v1"
       - key: "h2"
         value: "v2"
-    Kafka:
-      compression.type: lz4
+    Compression: lz4
+    CompressionLevel: -1
 ```
 
 ## 动态 Topic

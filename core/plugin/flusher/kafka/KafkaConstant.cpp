@@ -39,6 +39,9 @@ const std::string KAFKA_CONFIG_API_VERSION_REQUEST = "api.version.request";
 const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK = "broker.version.fallback";
 const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS = "api.version.fallback.ms";
 
+const std::string KAFKA_CONFIG_COMPRESSION_CODEC = "compression.codec";
+const std::string KAFKA_CONFIG_COMPRESSION_LEVEL = "compression.level";
+
 const int KAFKA_POLL_INTERVAL_MS = 100;
 const int KAFKA_FLUSH_TIMEOUT_MS = 5000;
 

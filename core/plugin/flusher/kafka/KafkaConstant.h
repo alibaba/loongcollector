@@ -39,6 +39,9 @@ extern const std::string KAFKA_CONFIG_API_VERSION_REQUEST;
 extern const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK;
 extern const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS;
 
+extern const std::string KAFKA_CONFIG_COMPRESSION_CODEC;
+extern const std::string KAFKA_CONFIG_COMPRESSION_LEVEL;
+
 extern const int KAFKA_POLL_INTERVAL_MS;
 extern const int KAFKA_FLUSH_TIMEOUT_MS;
 

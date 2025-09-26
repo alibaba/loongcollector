@@ -44,6 +44,9 @@ struct KafkaConfig {
     uint32_t BulkMaxSize = 2048;
     uint32_t MaxMessageBytes = 1000000;
 
+    std::string Compression;
+    int32_t CompressionLevel = -1;
+
     int32_t RequiredAcks = 1;
     uint32_t Timeout = 30000;
     uint32_t MessageTimeoutMs = 300000;
@@ -108,6 +111,9 @@ struct KafkaConfig {
 
         GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
         GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
+
+        GetOptionalStringParam(config, "Compression", Compression, errorMsg);
+        GetOptionalIntParam(config, "CompressionLevel", CompressionLevel, errorMsg);
 
         if (config.isMember("Authentication") && config["Authentication"].isObject()) {
             const Json::Value& auth = config["Authentication"];

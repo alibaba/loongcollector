@@ -98,6 +98,7 @@ public:
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
     void TestHeadersConfigured_SendWithHeaders();
+    void TestInitWithCompression();
 
 protected:
     void SetUp();
@@ -515,6 +516,17 @@ void FlusherKafkaUnittest::TestHeadersConfigured_SendWithHeaders() {
     APSARA_TEST_EQUAL(std::string("hv2"), hdrs[1].second);
 }
 
+void FlusherKafkaUnittest::TestInitWithCompression() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Compression"] = "gzip";
+    config["CompressionLevel"] = -1;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(std::string("gzip"), mFlusher->mKafkaConfig.Compression);
+    APSARA_TEST_EQUAL(-1, mFlusher->mKafkaConfig.CompressionLevel);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -538,7 +550,7 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestHeadersConfigured_SendWithHeaders)
-
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithCompression)
 } // namespace logtail
 
 UNIT_TEST_MAIN
