@@ -37,21 +37,16 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
     
     auto it = mConnections.find(key);
     if (it != mConnections.end()) {
-        // 连接存在，检查是否需要重置
         auto& connInfo = it->second;
         
-        // 检查是否超过重置周期（使用配置的重置间隔）
-        if (connInfo->ShouldReset(config.resetIntervalSecond)) {
-            if (!connInfo->ResetConnection()) {
-                LOG_WARNING(sLogger, ("failed to reset connection, removing", "")("config", configName)("idx", idx));
-                mConnections.erase(it);
-                // 继续下面的逻辑创建新连接
-            } else {
-                return connInfo->GetReader();
-            }
-        } else {
-            // 连接未到重置时间，直接返回
+        // 检查连接状态：有效且未待重置的连接可以使用
+        if (connInfo->IsValid() && !connInfo->IsPendingReset()) {
             return connInfo->GetReader();
+        } else {
+            // 连接无效或待重置，移除并创建新连接
+            std::string reason = !connInfo->IsValid() ? "invalid" : "pending reset";
+            LOG_WARNING(sLogger, ("existing connection unusable, creating new one", "")("config", configName)("idx", idx)("reason", reason));
+            mConnections.erase(it);
         }
     }
     
@@ -88,17 +83,19 @@ std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConn
     if (it != mConnections.end()) {
         connInfo = it->second;
         
-        // 检查是否需要重置，但不强制重置正在使用的连接
-        if (connInfo->ShouldReset(config.resetIntervalSecond) && !connInfo->IsInUse()) {
-            if (!connInfo->ResetConnection()) {
-                LOG_WARNING(sLogger, ("failed to reset connection, creating new one", "")("config", configName)("idx", idx));
-                mConnections.erase(it);
-                connInfo = nullptr;
-            }
+        // 检查连接状态：无效或待重置的连接都需要重新创建
+        if (!connInfo->IsValid()) {
+            LOG_WARNING(sLogger, ("existing connection invalid, creating new one", "")("config", configName)("idx", idx));
+            mConnections.erase(it);
+            connInfo = nullptr;
+        } else if (connInfo->IsPendingReset()) {
+            LOG_INFO(sLogger, ("connection pending reset, creating new one", "resetInterval reached")("config", configName)("idx", idx));
+            mConnections.erase(it);
+            connInfo = nullptr;
         }
     }
     
-    // 如果连接不存在或重置失败，创建新连接
+    // 如果连接不存在、已无效或待重置，创建新连接
     if (!connInfo) {
         try {
             connInfo = std::make_shared<JournalConnectionInstance>(configName, idx, config);
@@ -164,6 +161,67 @@ size_t JournalConnectionManager::CleanupExpiredConnections(int resetIntervalSec)
     }
     
     return removedCount;
+}
+
+size_t JournalConnectionManager::ResetExpiredConnections() {
+    std::lock_guard<std::mutex> lock(mConnectionsMutex);
+    
+    size_t resetCount = 0;
+    auto it = mConnections.begin();
+    
+    while (it != mConnections.end()) {
+        auto& connInfo = it->second;
+        
+        // 检查是否需要重置
+        if (connInfo->ShouldReset(3600)) {
+            if (connInfo->IsPendingReset()) {
+                // 连接已标记为待重置，强制重置策略
+                if (!connInfo->IsInUse()) {
+                    // 连接空闲，立即重置
+                    if (connInfo->ResetConnection()) {
+                        LOG_INFO(sLogger, ("pending connection reset completed", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                        resetCount++;
+                    } else {
+                        // 重置失败，移除连接，下次使用时会创建新连接
+                        LOG_WARNING(sLogger, ("pending connection reset failed, removing", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                        it = mConnections.erase(it);
+                        resetCount++;
+                        continue;
+                    }
+                } else {
+                    // 连接仍在使用中，但已标记为待重置，移除它让其自然过期
+                    // 新的请求会创建新连接，旧连接会在Guard析构后自动回收
+                    LOG_INFO(sLogger, ("removing pending reset connection in use", "new connection will be created")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                    it = mConnections.erase(it);
+                    resetCount++;
+                    continue;
+                }
+            } else {
+                // 未标记但需要重置的连接（正常重置流程）
+                if (!connInfo->IsInUse()) {
+                    if (connInfo->ResetConnection()) {
+                        LOG_INFO(sLogger, ("connection reset during periodic maintenance", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                        resetCount++;
+                    } else {
+                        // 重置失败，移除连接
+                        LOG_WARNING(sLogger, ("connection reset failed during maintenance, removing", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+                        it = mConnections.erase(it);
+                        resetCount++;
+                        continue;
+                    }
+                }
+                // 正在使用的连接保持等待下次检查
+            }
+        }
+        
+        ++it;
+    }
+    
+    if (resetCount > 0) {
+        LOG_INFO(sLogger, ("periodic connection maintenance completed", "")("reset_count", resetCount)("remaining_connections", mConnections.size()));
+    }
+    
+    return resetCount;
 }
 
 size_t JournalConnectionManager::GetConnectionCount() const {

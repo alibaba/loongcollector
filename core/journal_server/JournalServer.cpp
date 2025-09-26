@@ -183,9 +183,20 @@ void JournalServer::run() {
             // 每次循环后短暂休眠，避免CPU占用过高
             this_thread::sleep_for(chrono::milliseconds(100));
             
+            // 定期清理连接（清理已标记的连接，兜底处理）
+            static time_t sLastConnectionReset = time(nullptr);
+            time_t currentTime = time(nullptr);
+            if (currentTime - sLastConnectionReset >= 300) {
+                size_t cleanedConnections = JournalConnectionManager::GetInstance()->ResetExpiredConnections();
+                if (cleanedConnections > 0) {
+                    LOG_INFO(sLogger, ("periodic connection cleanup completed", "")("cleaned_count", cleanedConnections));
+                }
+                sLastConnectionReset = currentTime;
+            }
+            
             // 定期清理过期的checkpoints（使用配置的间隔时间）
             static time_t sLastCleanup = time(nullptr);
-            time_t currentTime = time(nullptr);
+            currentTime = time(nullptr);
             if (currentTime - sLastCleanup >= INT32_FLAG(journal_checkpoint_cleanup_interval_sec)) {
                 // 清理过期的checkpoints（使用配置的过期时间）
                 LOG_INFO(sLogger, ("cleaning up expired journal checkpoints", "")

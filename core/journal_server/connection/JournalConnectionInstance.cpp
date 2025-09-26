@@ -60,9 +60,22 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionInstance::GetReader() {
 }
 
 bool JournalConnectionInstance::ShouldReset(int resetIntervalSec) const {
+    // 如果已经标记为待重置，返回true
+    if (mPendingReset.load()) {
+        return true;
+    }
+    
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - mLastResetTime);
-    return elapsed.count() >= resetIntervalSec;
+    bool shouldReset = elapsed.count() >= resetIntervalSec;
+    
+    // 如果到达重置时间，立即标记为待重置
+    if (shouldReset) {
+        const_cast<JournalConnectionInstance*>(this)->MarkForReset();
+        LOG_INFO(sLogger, ("connection marked for reset", "resetInterval reached")("config", mConfigName)("idx", mIndex)("elapsed_sec", elapsed.count()));
+    }
+    
+    return shouldReset;
 }
 
 bool JournalConnectionInstance::ResetConnection() {
@@ -83,7 +96,9 @@ bool JournalConnectionInstance::ResetConnection() {
     bool success = initializeConnection();
     mLastResetTime = std::chrono::steady_clock::now();
     
+    // 重置完成后清除标记
     if (success) {
+        ClearResetFlag();
         LOG_INFO(sLogger, ("journal connection reset successfully", "")("config", mConfigName)("idx", mIndex));
     } else {
         LOG_ERROR(sLogger, ("journal connection reset failed", "")("config", mConfigName)("idx", mIndex));
@@ -167,6 +182,22 @@ void JournalConnectionInstance::DecrementUsageCount() {
 
 bool JournalConnectionInstance::IsInUse() const {
     return mUsageCount.load() > 0;
+}
+
+//==============================================================================
+// 强制重置管理
+//==============================================================================
+
+void JournalConnectionInstance::MarkForReset() {
+    mPendingReset.store(true);
+}
+
+bool JournalConnectionInstance::IsPendingReset() const {
+    return mPendingReset.load();
+}
+
+void JournalConnectionInstance::ClearResetFlag() {
+    mPendingReset.store(false);
 }
 
 } // namespace logtail 

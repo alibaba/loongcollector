@@ -90,6 +90,16 @@ public:
      * @return 清理的连接数量
      */
     size_t CleanupExpiredConnections(int resetIntervalSec = 3600);
+    
+    /**
+     * @brief 强制重置过期连接（独立于使用状态检查）
+     * 
+     * 这是连接重置的唯一机制，定期检查并重置空闲的过期连接。
+     * 正在使用的过期连接会继续运行，直到空闲时才会被重置。
+     * 
+     * @return 重置的连接数量
+     */
+    size_t ResetExpiredConnections();
 
     /**
      * @brief 智能清理策略：根据重置周期自动调整清理频率

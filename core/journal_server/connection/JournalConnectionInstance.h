@@ -66,6 +66,11 @@ public:
     void DecrementUsageCount();
     bool IsInUse() const;
     
+    // 强制重置管理
+    void MarkForReset();
+    bool IsPendingReset() const;
+    void ClearResetFlag();
+    
     // 获取连接信息
     const std::string& GetConfigName() const { return mConfigName; }
     size_t GetIndex() const { return mIndex; }
@@ -84,6 +89,9 @@ private:
     
     // 连接使用计数 - 防止重置正在使用的连接
     std::atomic<int> mUsageCount{0};
+    
+    // 强制重置标记 - 当resetInterval到达时标记，阻止新的使用
+    std::atomic<bool> mPendingReset{false};
     
     mutable std::mutex mMutex;
     bool mIsValid;
