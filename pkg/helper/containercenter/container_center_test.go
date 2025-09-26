@@ -728,7 +728,6 @@ func TestFindAllEnvConfig(t *testing.T) {
 	}
 }
 
-
 func TestEnvRegex(t *testing.T) {
 	tests := []struct {
 		name     string

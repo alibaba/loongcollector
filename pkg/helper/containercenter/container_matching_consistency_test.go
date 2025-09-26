@@ -198,7 +198,7 @@ func runTestFile(t *testing.T, testFilePath string) {
 				k8sFilter)
 
 			// Extract matched container IDs
-			var actualMatchedIDs []string = make([]string, 0)
+			actualMatchedIDs := make([]string, 0)
 			for id := range matchList {
 				actualMatchedIDs = append(actualMatchedIDs, id)
 			}
