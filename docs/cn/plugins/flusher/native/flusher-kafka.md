@@ -27,6 +27,7 @@
 | `MaxRetries` | uint | 否 | `3` | 失败重试次数，映射 `message.send.max.retries` |
 | `RetryBackoffMs` | uint | 否 | `100` | 重试退避（毫秒），映射 `retry.backoff.ms` |
 | `Kafka` | map[string]string | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
+| `Headers` | header数组 | 否 | / | Kafka 消息头，静态键值对数组，`value` 仅支持字符串 |
 | `PartitionerType` | String | 否 | 分区策略：`random` 或 `hash`。默认 `random`。当为 `hash` 时，会基于指定的 `HashKeys` 生成消息键（Key），并使用 `murmur2_random` 作为底层分区器。 |
 | `HashKeys` | String数组 | 否 | 参与分区键生成的字段（仅对 `LOG` 事件生效）。每项必须以 `content.` 前缀开头，如：`["content.service", "content.user"]`。当 `PartitionerType` = `hash` 时必填。 |
 | `Authentication.TLS.Enabled` | bool | 否 | false | 启用 SSL 连接，对应 `security.protocol=ssl` |
@@ -59,6 +60,11 @@ flushers:
     Version: "3.6.0"
     MaxMessageBytes: 5242880
     MaxRetries: 2
+    Headers:
+      - key: "h1"
+        value: "v1"
+      - key: "h2"
+        value: "v2"
     Kafka:
       compression.type: lz4
 ```
@@ -120,6 +126,9 @@ flushers:
     Brokers: ["kafka:29093"]
     Topic: "tls-topic"
     Version: "2.8.0"
+    Headers:
+      - key: "env"
+        value: "prod"
     Authentication:
       TLS:
         Enabled: true
@@ -127,7 +136,6 @@ flushers:
         CertFile: "/etc/kafka/ssl/client.crt"
         KeyFile: "/etc/kafka/ssl/client.key"
 ```
-
 ## SASL 示例
 
 ```yaml
@@ -158,4 +166,19 @@ flushers:
         Principal: "client@EXAMPLE.COM"
         Keytab: "/etc/security/keytabs/client.keytab"
         # KinitCmd 可选，通常不需设置；除非有自定义票据刷新方式
+```
+
+## Headers
+
+- 形态：数组，每个元素包含 `key` 与 `value` 两个字段，均为字符串；
+- 特性：静态配置，发送时原样附加到每条 Kafka 消息的 Header 中；
+
+示例：
+
+```yaml
+Headers:
+  - key: "trace_id"
+    value: "fixed-trace"
+  - key: "source"
+    value: "loongcollector"
 ```

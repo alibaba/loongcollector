@@ -77,6 +77,9 @@ private:
     CounterPtr mParamsErrorCnt;
     CounterPtr mOtherErrorCnt;
 
+    std::vector<std::pair<std::string, std::string>> mRecordHeaders;
+    KafkaProducer::HeadersTemplate* mHeadersTemplate = nullptr;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherKafkaUnittest;
 #endif

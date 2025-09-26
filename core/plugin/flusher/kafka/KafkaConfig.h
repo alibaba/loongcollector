@@ -56,6 +56,9 @@ struct KafkaConfig {
     // General Authentication (TLS/SASL/Kerberos)
     AuthConfig Authentication;
 
+    using HeaderEntry = std::pair<std::string, std::string>;
+    std::vector<HeaderEntry> Headers;
+
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
             return false;
@@ -111,6 +114,23 @@ struct KafkaConfig {
             const Json::Value& kafkaConfig = config["Kafka"];
             for (const auto& key : kafkaConfig.getMemberNames()) {
                 CustomConfig[key] = kafkaConfig[key].asString();
+            }
+        }
+
+        if (config.isMember("Headers") && config["Headers"].isArray()) {
+            const Json::Value& headers = config["Headers"];
+            for (const auto& h : headers) {
+                if (!h.isObject()) {
+                    continue;
+                }
+                std::string key;
+                std::string val;
+                if (h.isMember("key") && h["key"].isString())
+                    key = h["key"].asString();
+                if (h.isMember("value") && h["value"].isString())
+                    val = h["value"].asString();
+                if (!key.empty())
+                    Headers.emplace_back(std::move(key), std::move(val));
             }
         }
 

@@ -29,6 +29,7 @@ struct KafkaConfig;
 
 class KafkaProducer {
 public:
+    struct HeadersTemplate;
     enum class ErrorType { SUCCESS, NETWORK_ERROR, AUTH_ERROR, SERVER_ERROR, PARAMS_ERROR, QUEUE_FULL, OTHER_ERROR };
 
     struct ErrorInfo {
@@ -43,10 +44,15 @@ public:
     virtual ~KafkaProducer();
 
     virtual bool Init(const KafkaConfig& config);
+
+    virtual HeadersTemplate* CreateHeadersTemplate(const std::vector<std::pair<std::string, std::string>>& headers);
+    virtual void DestroyHeadersTemplate(HeadersTemplate* tpl);
+
     virtual void ProduceAsync(const std::string& topic,
                               std::string&& value,
                               Callback callback,
-                              const std::string& key = std::string());
+                              const std::string& key = std::string(),
+                              HeadersTemplate* headersTemplate = nullptr);
     virtual bool Flush(int timeoutMs);
     virtual void Close();
 
