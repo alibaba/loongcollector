@@ -381,8 +381,8 @@ void FileDiscoveryOptions::ParseWildcardPath() {
     if (pos == string::npos)
         return;
 
-        // Check if there is only one path separator, for Windows, the first path
-        // separator is next to the first ':'.
+    // Check if there is only one path separator, for Windows, the first path
+    // separator is next to the first ':'.
 #if defined(__linux__)
     if (pos == 0)
 #elif defined(_MSC_VER)
@@ -711,7 +711,6 @@ bool FileDiscoveryOptions::DeleteRawContainerInfo(const std::string& containerID
         return false;
     }
 
-    // 使用迭代器遍历，更安全和现代的做法
     for (auto iter = mContainerInfos->begin(); iter != mContainerInfos->end(); ++iter) {
         if (iter->mRawContainerInfo && iter->mRawContainerInfo->mID == containerID) {
             LOG_INFO(sLogger, ("delete container", containerID));

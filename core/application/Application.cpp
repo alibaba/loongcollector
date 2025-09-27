@@ -253,7 +253,6 @@ void Application::Start() { // GCOVR_EXCL_START
     HttpSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     ProcessorRunner::GetInstance()->Init();
-    // ContainerManager::GetInstance()->Init();
 
     // flusher_sls resource should be explicitly initialized to allow internal metrics and alarms to be sent
     FlusherSLS::InitResource();

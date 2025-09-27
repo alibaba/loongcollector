@@ -53,10 +53,10 @@ public:
     void SaveContainerInfo();
     void LoadContainerInfo();
 
-    ContainerConfigResult CreateContainerConfigResult(const FileDiscoveryOptions* options,
-                                                      const CollectionPipelineContext* ctx,
-                                                      const std::vector<std::string>& pathExistContainerIDs,
-                                                      const std::vector<std::string>& pathNotExistContainerIDs);
+    MatchedContainerInfo CreateMatchedContainerInfo(const FileDiscoveryOptions* options,
+                                                    const CollectionPipelineContext* ctx,
+                                                    const std::vector<std::string>& pathExistContainerIDs,
+                                                    const std::vector<std::string>& pathNotExistContainerIDs);
 
     void UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveConfigContainerInfoPipeline();
@@ -79,7 +79,7 @@ private:
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
     void loadContainerInfoFromContainersFormat(const Json::Value& root, const std::string& configPath);
 
-    void sendConfigContainerInfo(std::vector<std::shared_ptr<ContainerConfigResult>> configResults);
+    void sendConfigContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults);
     void sendAllConfigContainerInfo();
 
     // Helper method for joining container IDs
@@ -87,7 +87,7 @@ private:
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
-    std::unordered_map<std::string, std::shared_ptr<ContainerConfigResult>> mConfigContainerResultMap;
+    std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;

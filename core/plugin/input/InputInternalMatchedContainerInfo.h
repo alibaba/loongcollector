@@ -21,7 +21,7 @@
 
 namespace logtail {
 
-class InputInternalConfigContainerInfo : public Input {
+class InputInternalMatchedContainerInfo : public Input {
 public:
     static const std::string sName;
 

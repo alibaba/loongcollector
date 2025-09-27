@@ -196,15 +196,14 @@ bool ContainerFilters::Init(const ContainerFilterConfig& config, std::string& ex
         // Handle regex compilation errors gracefully
         exception.append("regex_error: ");
         exception.append(logtail::ToString(e.what()));
-        exception.append("; there may be invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
+        exception.append("; invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
                          "K8sContainerRegex");
-        // exception.append(buffer);
         return false;
     } catch (const std::exception& e) {
         // Handle other exceptions gracefully
         exception.append("exception message: ");
         exception.append(e.what());
-        exception.append("; there may be invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
+        exception.append("; invalid regex patterns in the config for K8sNamespaceRegex, K8sPodRegex, "
                          "K8sContainerRegex ");
         return false;
     }
@@ -212,42 +211,42 @@ bool ContainerFilters::Init(const ContainerFilterConfig& config, std::string& ex
     if (!config.mIncludeK8sLabel.empty()) {
         success = SplitRegexFromMap(config.mIncludeK8sLabel, mK8SFilter.mK8sLabelFilter.mIncludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for IncludeK8sLabel");
+            exception.append("; invalid regex patterns in the config for IncludeK8sLabel");
             return success;
         }
     }
     if (!config.mExcludeK8sLabel.empty()) {
         success = SplitRegexFromMap(config.mExcludeK8sLabel, mK8SFilter.mK8sLabelFilter.mExcludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for ExcludeK8sLabel");
+            exception.append("; invalid regex patterns in the config for ExcludeK8sLabel");
             return success;
         }
     }
     if (!config.mIncludeContainerLabel.empty()) {
         success = SplitRegexFromMap(config.mIncludeContainerLabel, mContainerLabelFilter.mIncludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for IncludeContainerLabel");
+            exception.append("; invalid regex patterns in the config for IncludeContainerLabel");
             return success;
         }
     }
     if (!config.mExcludeContainerLabel.empty()) {
         success = SplitRegexFromMap(config.mExcludeContainerLabel, mContainerLabelFilter.mExcludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for ExcludeContainerLabel");
+            exception.append("; invalid regex patterns in the config for ExcludeContainerLabel");
             return success;
         }
     }
     if (!config.mIncludeEnv.empty()) {
         success = SplitRegexFromMap(config.mIncludeEnv, mEnvFilter.mIncludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for IncludeEnv");
+            exception.append("; invalid regex patterns in the config for IncludeEnv");
             return success;
         }
     }
     if (!config.mExcludeEnv.empty()) {
         success = SplitRegexFromMap(config.mExcludeEnv, mEnvFilter.mExcludeFields, exception);
         if (!success) {
-            exception.append("; there may be invalid regex patterns in the config for ExcludeEnv");
+            exception.append("; invalid regex patterns in the config for ExcludeEnv");
             return success;
         }
     }

@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-#include "plugin/input/InputInternalConfigContainerInfo.h"
+#include "plugin/input/InputInternalMatchedContainerInfo.h"
 
 
 namespace logtail {
 
-const std::string InputInternalConfigContainerInfo::sName = "input_internal_config_container_info";
+const std::string InputInternalMatchedContainerInfo::sName = "input_internal_config_container_info";
 
-bool InputInternalConfigContainerInfo::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+bool InputInternalMatchedContainerInfo::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     return true;
 }
 
-bool InputInternalConfigContainerInfo::Start() {
+bool InputInternalMatchedContainerInfo::Start() {
     ContainerManager::GetInstance()->UpdateConfigContainerInfoPipeline(mContext, mIndex);
     return true;
 }
 
-bool InputInternalConfigContainerInfo::Stop(bool isPipelineRemoving) {
+bool InputInternalMatchedContainerInfo::Stop(bool isPipelineRemoving) {
     if (isPipelineRemoving) {
         ContainerManager::GetInstance()->RemoveConfigContainerInfoPipeline();
     }

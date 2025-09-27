@@ -101,7 +101,7 @@ void ContainerManager::pollingLoop() {
 
 void ContainerManager::ApplyContainerDiffs() {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    std::vector<std::shared_ptr<ContainerConfigResult>> configResults;
+    std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     for (auto& pair : mConfigContainerDiffMap) {
         const auto& itr = nameConfigMap.find(pair.first);
         if (itr == nameConfigMap.end()) {
@@ -130,24 +130,18 @@ void ContainerManager::ApplyContainerDiffs() {
             std::vector<std::string> pathNotExistContainerIDs;
             const auto& containerInfos = options->GetContainerInfo();
             if (containerInfos) {
-                if (options->GetContainerDiscoveryOptions().mIsStdio) {
-                    for (const auto& info : *containerInfos) {
+                for (const auto& info : *containerInfos) {
+                    if (CheckExistance(info.mRealBaseDir)) {
                         pathExistContainerIDs.push_back(info.mRawContainerInfo->mID);
-                    }
-                } else {
-                    for (const auto& info : *containerInfos) {
-                        if (CheckExistance(info.mRealBaseDir)) {
-                            pathExistContainerIDs.push_back(info.mRawContainerInfo->mID);
-                        } else {
-                            pathNotExistContainerIDs.push_back(info.mRawContainerInfo->mID);
-                        }
+                    } else {
+                        pathNotExistContainerIDs.push_back(info.mRawContainerInfo->mID);
                     }
                 }
             }
             // Create and store container config result
-            auto configResult = std::make_shared<ContainerConfigResult>(
-                CreateContainerConfigResult(options, ctx, pathExistContainerIDs, pathNotExistContainerIDs));
-            options->GetContainerDiscoveryOptions().mContainerConfigResult = configResult;
+            auto configResult = std::make_shared<MatchedContainerInfo>(
+                CreateMatchedContainerInfo(options, ctx, pathExistContainerIDs, pathNotExistContainerIDs));
+            options->GetContainerDiscoveryOptions().mMatchedContainerInfo = configResult;
             configResults.push_back(configResult);
             LOG_DEBUG(sLogger, ("configResult", configResult->ToString())("configName", ctx->GetConfigName()));
         }
@@ -157,15 +151,15 @@ void ContainerManager::ApplyContainerDiffs() {
 }
 
 void ContainerManager::sendAllConfigContainerInfo() {
-    std::vector<std::shared_ptr<ContainerConfigResult>> configResults;
+    std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
 
     for (auto& pair : nameConfigMap) {
         FileDiscoveryOptions* options = pair.second.first;
         if (options->IsContainerDiscoveryEnabled()) {
             if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
-                && options->GetContainerDiscoveryOptions().mContainerConfigResult) {
-                configResults.push_back(options->GetContainerDiscoveryOptions().mContainerConfigResult);
+                && options->GetContainerDiscoveryOptions().mMatchedContainerInfo) {
+                configResults.push_back(options->GetContainerDiscoveryOptions().mMatchedContainerInfo);
             }
         }
     }
@@ -194,17 +188,15 @@ void ContainerManager::UpdateConfigContainerInfoPipeline(CollectionPipelineConte
     WriteLock lock(mConfigContainerInfoPipelineMux);
     mConfigContainerInfoPipelineCtx = ctx;
     mConfigContainerInfoInputIndex = inputIndex;
-    LOG_INFO(sLogger, ("config container info pipeline", "updated"));
 }
 
 void ContainerManager::RemoveConfigContainerInfoPipeline() {
     WriteLock lock(mConfigContainerInfoPipelineMux);
     mConfigContainerInfoPipelineCtx = nullptr;
     mConfigContainerInfoInputIndex = 0;
-    LOG_INFO(sLogger, ("config container info pipeline", "removed"));
 }
 
-void ContainerManager::sendConfigContainerInfo(std::vector<std::shared_ptr<ContainerConfigResult>> configResults) {
+void ContainerManager::sendConfigContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults) {
     ReadLock lock(mConfigContainerInfoPipelineMux);
     if (mConfigContainerInfoPipelineCtx == nullptr) {
         return;
@@ -293,7 +285,6 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         return false;
     }
 
-    // LOG_INFO(sLogger, ("diff", diff.ToString())("configName", ctx->GetConfigName()));
     mConfigContainerDiffMap[ctx->GetConfigName()] = std::make_shared<ContainerDiff>(diff);
     return true;
 }
@@ -395,15 +386,15 @@ void ContainerManager::refreshAllContainersSnapshot() {
 }
 
 
-ContainerConfigResult
-ContainerManager::CreateContainerConfigResult(const FileDiscoveryOptions* options,
-                                              const CollectionPipelineContext* ctx,
-                                              const std::vector<std::string>& pathExistContainerIDs,
-                                              const std::vector<std::string>& pathNotExistContainerIDs) {
-    ContainerConfigResult result;
+MatchedContainerInfo
+ContainerManager::CreateMatchedContainerInfo(const FileDiscoveryOptions* options,
+                                             const CollectionPipelineContext* ctx,
+                                             const std::vector<std::string>& pathExistContainerIDs,
+                                             const std::vector<std::string>& pathNotExistContainerIDs) {
+    MatchedContainerInfo result;
 
     if (!options || !ctx) {
-        LOG_WARNING(sLogger, ("CreateContainerConfigResult failed", "options or ctx is null"));
+        LOG_WARNING(sLogger, ("CreateMatchedContainerInfo failed", "options or ctx is null"));
         return result;
     }
 

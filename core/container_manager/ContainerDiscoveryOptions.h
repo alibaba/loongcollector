@@ -128,7 +128,7 @@ struct ContainerFilters {
 };
 
 
-struct ContainerConfigResult {
+struct MatchedContainerInfo {
     std::string DataType;
     std::string Project;
     std::string Logstore;
@@ -167,7 +167,7 @@ struct ContainerDiscoveryOptions {
     bool mCollectingContainersMeta = false;
     bool mIsStdio = false;
 
-    std::shared_ptr<ContainerConfigResult> mContainerConfigResult;
+    std::shared_ptr<MatchedContainerInfo> mMatchedContainerInfo;
 
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);

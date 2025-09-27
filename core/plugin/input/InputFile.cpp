@@ -284,11 +284,6 @@ bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& 
         containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path)
             + containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource
             + logPath.substr(containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size());
-        LOG_DEBUG(sLogger,
-                  ("set container base dir", containerInfo.mRealBaseDir)(
-                      "source", containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource)(
-                      "destination", containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination)(
-                      "logPath", logPath));
     } else {
         containerInfo.mRealBaseDir
             = STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mUpperDir + logPath;
