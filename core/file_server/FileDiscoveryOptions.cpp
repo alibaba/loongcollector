@@ -381,8 +381,8 @@ void FileDiscoveryOptions::ParseWildcardPath() {
     if (pos == string::npos)
         return;
 
-    // Check if there is only one path separator, for Windows, the first path
-    // separator is next to the first ':'.
+        // Check if there is only one path separator, for Windows, the first path
+        // separator is next to the first ':'.
 #if defined(__linux__)
     if (pos == 0)
 #elif defined(_MSC_VER)
