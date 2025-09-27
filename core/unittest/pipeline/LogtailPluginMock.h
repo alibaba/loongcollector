@@ -32,6 +32,10 @@ public:
     void UnblockProcess() { processBlockFlag = false; }
     void BlockStop() { stopBlockFlag = true; }
     void UnblockStop() { stopBlockFlag = false; }
+    void SetUpContainersMeta(const std::string& containersMeta) { mMockContainersMeta = containersMeta; }
+    void SetUpDiffContainersMeta(const std::string& diffContainersMeta) {
+        mMockDiffContainersMeta = diffContainersMeta;
+    }
 
     bool LoadPipeline([[maybe_unused]] const std::string& pipelineName,
                       [[maybe_unused]] const std::string& pipeline,
@@ -81,6 +85,9 @@ public:
                                                                                           logGroup)("packId", packId));
     }
 
+    std::string GetAllContainersMeta() const { return mMockContainersMeta; }
+    std::string GetDiffContainersMeta() const { return mMockDiffContainersMeta; }
+
     bool IsStarted() const { return startFlag; }
 
 private:
@@ -88,6 +95,9 @@ private:
     std::atomic_bool processBlockFlag = false;
     std::atomic_bool stopBlockFlag = false;
     std::atomic_bool startFlag = false;
+
+    std::string mMockContainersMeta;
+    std::string mMockDiffContainersMeta;
 };
 
 } // namespace logtail

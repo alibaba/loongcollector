@@ -1,0 +1,238 @@
+{
+    "containers": [
+        {
+            "id": "nginx-prod",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "ENVIRONMENT=production",
+                "VERSION=v1.20.1",
+                "TIER=frontend"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-prod-pod",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "nginx-dev",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx",
+                "ENVIRONMENT=development",
+                "VERSION=v1.21.0",
+                "TIER=frontend"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-dev-pod",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "redis-cache",
+            "labels": {
+                "app": "redis"
+            },
+            "env": [
+                "APP_NAME=redis",
+                "ENVIRONMENT=production",
+                "VERSION=v6.2.5",
+                "ROLE=cache"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "redis-cache-pod",
+                "container_name": "redis",
+                "labels": {
+                    "app.kubernetes.io/name": "redis"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "mysql-db",
+            "labels": {
+                "app": "mysql"
+            },
+            "env": [
+                "APP_NAME=mysql",
+                "ENVIRONMENT=production",
+                "VERSION=v8.0.28",
+                "DATABASE_URL=mysql://localhost:3306"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "mysql-db-pod",
+                "container_name": "mysql",
+                "labels": {
+                    "app.kubernetes.io/name": "mysql"
+                },
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "include_env_exact_match",
+            "description": "测试环境变量精确匹配",
+            "filters": {
+                "IncludeEnv": {
+                    "ENVIRONMENT": "production"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "include_env_key_only",
+            "description": "测试只检查环境变量键存在（value 为空）",
+            "filters": {
+                "IncludeEnv": {
+                    "VERSION": ""
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "nginx-dev",
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "include_env_regex_value",
+            "description": "测试环境变量值正则匹配（以 ^ 开头）",
+            "filters": {
+                "IncludeEnv": {
+                    "VERSION": "^v1\\..*"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "nginx-dev"
+            ]
+        },
+        {
+            "name": "include_env_multiple_variables",
+            "description": "测试多个环境变量条件（OR 关系）",
+            "filters": {
+                "IncludeEnv": {
+                    "ENVIRONMENT": "development",
+                    "ROLE": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-dev",
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_env_case_sensitive",
+            "description": "测试环境变量大小写敏感性",
+            "filters": {
+                "IncludeEnv": {
+                    "environment": "production"
+                }
+            },
+            "expected_matched_ids": []
+        },
+        {
+            "name": "include_env_special_characters",
+            "description": "测试包含特殊字符的环境变量",
+            "filters": {
+                "IncludeEnv": {
+                    "DATABASE_URL": "^mysql://.*"
+                }
+            },
+            "expected_matched_ids": [
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_env_exact_match",
+            "description": "测试排除特定环境变量的容器",
+            "filters": {
+                "ExcludeEnv": {
+                    "ENVIRONMENT": "development"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_env_key_only",
+            "description": "测试排除包含特定环境变量键的容器",
+            "filters": {
+                "ExcludeEnv": {
+                    "ROLE": ""
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "nginx-dev",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_env_regex_value",
+            "description": "测试排除环境变量值正则匹配的容器",
+            "filters": {
+                "ExcludeEnv": {
+                    "VERSION": "^v1\\..*"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_env_multiple_conditions",
+            "description": "测试多个排除环境变量条件",
+            "filters": {
+                "ExcludeEnv": {
+                    "ENVIRONMENT": "development",
+                    "ROLE": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_env_combined_with_include",
+            "description": "测试排除和包含环境变量的组合",
+            "filters": {
+                "IncludeEnv": {
+                    "APP_NAME": "nginx"
+                },
+                "ExcludeEnv": {
+                    "ENVIRONMENT": "development"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-prod"
+            ]
+        }
+    ]
+}

@@ -27,7 +27,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
-#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -278,48 +277,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
-int LogtailPlugin::ExecPluginCmd(
-    const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen) {
-    if (cmdId < (int)PLUGIN_CMD_MIN || cmdId > (int)PLUGIN_CMD_MAX) {
-        LOG_ERROR(sLogger, ("invalid cmd", cmdId));
-        return -2;
-    }
-    string configNameStr(configName, configNameSize);
-    string paramsStr(params, paramsLen);
-    PluginCmdType cmdType = (PluginCmdType)cmdId;
-    LOG_DEBUG(sLogger, ("exec cmd", cmdType)("config", configNameStr)("detail", paramsStr));
-    // cmd 解析json
-    Json::Value jsonParams;
-    std::string errorMsg;
-    if (paramsStr.size() < (size_t)5 || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
-        LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
-        return -2;
-    }
-
-    switch (cmdType) {
-        case PLUGIN_DOCKER_UPDATE_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        case PLUGIN_DOCKER_STOP_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
-        } break;
-        case PLUGIN_DOCKER_REMOVE_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        default:
-            LOG_ERROR(sLogger, ("unknown cmd", cmdType));
-            break;
-    }
-    return 0;
-}
-
 
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
@@ -351,10 +308,7 @@ bool LogtailPlugin::LoadPluginBase() {
         // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
         auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
         if (error.empty()) {
-            registerV2Fun(LogtailPlugin::IsValidToSend,
-                          LogtailPlugin::SendPb,
-                          LogtailPlugin::SendPbV2,
-                          LogtailPlugin::ExecPluginCmd);
+            registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
         } else {
             LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
 
@@ -363,7 +317,7 @@ bool LogtailPlugin::LoadPluginBase() {
                 LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
                 return mPluginValid;
             }
-            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::ExecPluginCmd);
+            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
         }
 
         mPluginAdapterPtr = loader.Release();
@@ -434,10 +388,22 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load Start error, Message", error));
             return mPluginValid;
         }
-        // C++获取容器信息的
+        // C++获取单个容器信息的
         mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
+            return mPluginValid;
+        }
+        // C++获取全量容器信息的
+        mGetAllContainerMetaFun = (GetAllContainerMetaFun)loader.LoadMethod("GetAllContainers", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetAllContainerMetaFun error, Message", error));
+            return mPluginValid;
+        }
+        // C++获取差异容器信息的
+        mGetDiffContainerMetaFun = (GetDiffContainerMetaFun)loader.LoadMethod("GetDiffContainers", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetDiffContainerMetaFun error, Message", error));
             return mPluginValid;
         }
         // C++传递单条数据到golang插件
@@ -579,6 +545,35 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
             free(metrics);
         }
     }
+}
+
+std::string LogtailPlugin::GetAllContainersMeta() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (mPluginValid && mGetAllContainerMetaFun != nullptr) {
+        char* res = mGetAllContainerMetaFun();
+        std::string cppString(res);
+        free(res);
+        return cppString;
+    }
+    return "{}";
+#else
+    return LogtailPluginMock::GetInstance()->GetAllContainersMeta();
+#endif
+}
+
+
+std::string LogtailPlugin::GetDiffContainersMeta() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (mPluginValid && mGetDiffContainerMetaFun != nullptr) {
+        char* res = mGetDiffContainerMetaFun();
+        std::string cppString(res);
+        free(res);
+        return cppString;
+    }
+    return "";
+#else
+    return LogtailPluginMock::GetInstance()->GetDiffContainersMeta();
+#endif
 }
 
 K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {

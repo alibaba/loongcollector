@@ -47,6 +47,7 @@ const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(120)
 var EventListenerTimeout = time.Second * time.Duration(3600)
+var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
 // "io.kubernetes.pod.name": "logtail-z2224",
 // "io.kubernetes.pod.namespace": "kube-system",
@@ -652,7 +653,19 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 		ContainerIP:      ip,
 		lastUpdateTime:   time.Now(),
 	}
-
+	// filter env
+	filteredEnv := make([]string, 0)
+	for _, env := range info.Config.Env {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) == 2 {
+			key := parts[0]
+			if envRegex.MatchString(key) {
+				continue
+			}
+			filteredEnv = append(filteredEnv, env)
+		}
+	}
+	did.ContainerInfo.Config.Env = filteredEnv
 	// Find Env Log Configs
 	did.FindAllEnvConfig(envConfigPrefix, selfConfigFlag)
 

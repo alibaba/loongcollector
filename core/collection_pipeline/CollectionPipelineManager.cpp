@@ -19,6 +19,7 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <type_traits>
 #include <unordered_map>
 
 #include "common/http/AsynCurlRunner.h"
@@ -148,7 +149,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 
     if (isFileServerInputChanged) {
         if (isFileServerStarted) {
-            FileServer::GetInstance()->Resume();
+            FileServer::GetInstance()->Resume(true, false);
         } else {
             FileServer::GetInstance()->Start();
             isFileServerStarted = true;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2023 iLogtail Authors
+ * Copyright 2024 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,20 @@
 
 #pragma once
 
-#include <string>
-
-#include "json/json.h"
+#include "collection_pipeline/plugin/interface/Input.h"
+#include "container_manager/ContainerManager.h"
 
 namespace logtail {
 
-struct ConfigContainerInfoUpdateCmd {
-    std::string mConfigName; // config name
-    bool mDeleteFlag = false; // if this flag is true, delete the container from this config's ContainerInfo array
-    Json::Value mJsonParams; // jsonParams, json string.
+class InputInternalMatchedContainerInfo : public Input {
+public:
+    static const std::string sName;
 
-    ConfigContainerInfoUpdateCmd(const std::string& configName, bool delFlag, const Json::Value& jsonParams)
-        : mConfigName(configName), mDeleteFlag(delFlag), mJsonParams(jsonParams) {}
+    const std::string& Name() const override { return sName; }
+    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
+    bool Start() override;
+    bool Stop(bool isPipelineRemoving) override;
+    bool SupportAck() const override { return true; }
 };
 
 } // namespace logtail

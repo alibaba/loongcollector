@@ -40,6 +40,7 @@
 #include "config/OnetimeConfigInfoManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
@@ -289,7 +290,7 @@ void Application::Start() { // GCOVR_EXCL_START
     OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0, lastContainerCheckTime = 0;
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -350,9 +351,12 @@ void Application::Start() { // GCOVR_EXCL_START
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
-        if (ConfigManager::GetInstance()->IsUpdateContainerPaths()) {
-            FileServer::GetInstance()->Pause();
-            FileServer::GetInstance()->Resume();
+        if (curTime - lastContainerCheckTime >= 3) {
+            if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+                FileServer::GetInstance()->Pause();
+                FileServer::GetInstance()->Resume(false, true);
+            }
+            lastContainerCheckTime = curTime;
         }
 
         // destruct event handlers here so that it will not block file reading task
@@ -404,6 +408,7 @@ void Application::Exit() {
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
+    ContainerManager::GetInstance()->Stop();
     FlusherRunner::GetInstance()->Stop();
     HttpSink::GetInstance()->Stop();
 

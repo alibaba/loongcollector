@@ -119,7 +119,7 @@ protected:
         discoveryOpts.Init(inputConfigJson, ctx, "test");
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
             [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
-                containerInfo.mRealBaseDir = containerInfo.mUpperDir;
+                containerInfo.mRealBaseDir = containerInfo.mRawContainerInfo->mUpperDir;
                 return true;
             });
         mConfig = std::make_pair(&discoveryOpts, &ctx);

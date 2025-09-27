@@ -52,7 +52,6 @@ InputFile::InputFile()
 
 bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     string errorMsg;
-
     if (!mFileDiscovery.Init(config, *mContext, sName)) {
         return false;
     }
@@ -81,13 +80,24 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                               mContext->GetRegion());
     }
     if (mEnableContainerDiscovery) {
-        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
-            return false;
+        ContainerDiscoveryOptions containerDiscovery;
+        if (!containerDiscovery.Init(config, *mContext, sName)) {
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "container discovery config is invalid",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
+        containerDiscovery.mIsStdio = false;
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
         mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
-        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
+        containerDiscovery.GenerateContainerMetaFetchingGoPipeline(
             optionalGoPipeline, &mFileDiscovery, mContext->GetPipeline().GenNextPluginMeta(false));
+
+        mFileDiscovery.SetContainerDiscoveryOptions(std::move(containerDiscovery));
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {
@@ -181,8 +191,7 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
 bool InputFile::Start() {
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
     if (mEnableContainerDiscovery) {
-        mFileDiscovery.SetContainerInfo(
-            FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
+        mFileDiscovery.SetContainerInfo(std::make_shared<vector<ContainerInfo>>());
     }
     FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
     FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
@@ -193,9 +202,6 @@ bool InputFile::Start() {
 }
 
 bool InputFile::Stop(bool isPipelineRemoving) {
-    if (!isPipelineRemoving && mEnableContainerDiscovery) {
-        FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
-    }
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());
@@ -260,32 +266,31 @@ bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& 
     }
     size_t pthSize = logPath.size();
 
-    size_t size = containerInfo.mMounts.size();
+    size_t size = containerInfo.mRawContainerInfo->mMounts.size();
     size_t bestMatchedMountsIndex = size;
     // ParseByJSONObj 确保 Destination、Source、mUpperDir 不会以\或者/结尾
     for (size_t i = 0; i < size; ++i) {
-        StringView dst = containerInfo.mMounts[i].mDestination;
+        StringView dst = containerInfo.mRawContainerInfo->mMounts[i].mDestination;
         size_t dstSize = dst.size();
 
         if (StartWith(logPath, dst)
             && (pthSize == dstSize || (pthSize > dstSize && (logPath[dstSize] == '/' || logPath[dstSize] == '\\')))
             && (bestMatchedMountsIndex == size
-                || containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
+                || containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
             bestMatchedMountsIndex = i;
         }
     }
     if (bestMatchedMountsIndex < size) {
         containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path)
-            + containerInfo.mMounts[bestMatchedMountsIndex].mSource
-            + logPath.substr(containerInfo.mMounts[bestMatchedMountsIndex].mDestination.size());
-        LOG_DEBUG(sLogger,
-                  ("set container base dir",
-                   containerInfo.mRealBaseDir)("source", containerInfo.mMounts[bestMatchedMountsIndex].mSource)(
-                      "destination", containerInfo.mMounts[bestMatchedMountsIndex].mDestination)("logPath", logPath));
+            + containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource
+            + logPath.substr(containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size());
     } else {
-        containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path) + containerInfo.mUpperDir + logPath;
+        containerInfo.mRealBaseDir
+            = STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mUpperDir + logPath;
     }
-    LOG_INFO(sLogger, ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mID));
+    LOG_INFO(
+        sLogger,
+        ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID));
     return true;
 }
 

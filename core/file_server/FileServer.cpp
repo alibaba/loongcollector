@@ -14,9 +14,11 @@
 
 #include "file_server/FileServer.h"
 
+#include "checkpoint/CheckPointManager.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileTagOptions.h"
@@ -41,7 +43,7 @@ FileServer::FileServer() {
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等
 void FileServer::Start() {
-    ConfigManager::GetInstance()->LoadDockerConfig();
+    ContainerManager::GetInstance()->LoadContainerInfo();
     CheckPointManager::Instance()->LoadCheckPoint();
     LOG_INFO(sLogger, ("watch dirs", "start"));
     auto start = GetCurrentTimeInMilliSeconds();
@@ -97,14 +99,21 @@ void FileServer::PauseInner() {
 }
 
 // 恢复文件服务，重新注册事件处理程序和恢复日志输入
-void FileServer::Resume(bool isConfigUpdate) {
+void FileServer::Resume(bool isConfigUpdate, bool isContainerUpdate) {
     if (isConfigUpdate) {
-        ClearContainerInfo();
-        ConfigManager::GetInstance()->DoUpdateContainerPaths();
-        ConfigManager::GetInstance()->SaveDockerConfig();
+        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
+    } else {
+        if (isContainerUpdate) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
     }
-
-    LOG_INFO(sLogger, ("file server resume", "starts"));
+    LOG_INFO(
+        sLogger,
+        ("file server resume", "starts")("isConfigUpdate", isConfigUpdate)("isContainerUpdate", isContainerUpdate));
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
     if (isConfigUpdate) {
@@ -219,31 +228,6 @@ void FileServer::AddFileTagConfig(const std::string& name,
 void FileServer::RemoveFileTagConfig(const string& name) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileTagConfigsMap.erase(name);
-}
-
-
-// 保存容器信息
-void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap[pipeline] = info;
-}
-
-// 获取并移除给定管道的容器信息
-shared_ptr<vector<ContainerInfo>> FileServer::GetAndRemoveContainerInfo(const string& pipeline) {
-    WriteLock lock(mReadWriteLock);
-    auto iter = mAllContainerInfoMap.find(pipeline);
-    if (iter == mAllContainerInfoMap.end()) {
-        return make_shared<vector<ContainerInfo>>();
-    }
-    auto res = iter->second;
-    mAllContainerInfoMap.erase(iter);
-    return res;
-}
-
-// 清除所有容器信息
-void FileServer::ClearContainerInfo() {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap.clear();
 }
 
 // 获取插件的指标管理器

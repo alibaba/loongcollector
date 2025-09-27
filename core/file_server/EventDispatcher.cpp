@@ -1016,7 +1016,7 @@ void EventDispatcher::DumpCheckPoint() {
         LOG_DEBUG(sLogger, ("dump checkpoint to local", "succeeded"));
     // after save checkpoint, we should clear all checkpoint
     CheckPointManager::Instance()->RemoveAllCheckPoint();
-    FileServer::GetInstance()->Resume(false);
+    FileServer::GetInstance()->Resume(false, false);
     LOG_INFO(sLogger, ("checkpoint dump", "succeeded"));
 }
 

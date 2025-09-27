@@ -131,10 +131,10 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
-                reader->SetContainerID(containerPath->mID);
-                reader->SetContainerMetadatas(containerPath->mMetadatas);
-                reader->SetContainerCustomMetadatas(containerPath->mCustomMetadatas);
-                reader->SetContainerExtraTags(containerPath->mTags);
+                reader->SetContainerID(containerPath->mRawContainerInfo->mID);
+                reader->SetContainerMetadatas(containerPath->mRawContainerInfo->mMetadatas);
+                reader->SetContainerCustomMetadatas(containerPath->mRawContainerInfo->mCustomMetadatas);
+                reader->SetContainerExtraTags(containerPath->mExtraTags);
             }
         }
 
@@ -2477,21 +2477,21 @@ bool LogFileReader::UpdateContainerInfo() {
         return false;
     }
     ContainerInfo* containerInfo = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
-    if (containerInfo && containerInfo->mID != mContainerID) {
+    if (containerInfo && containerInfo->mRawContainerInfo->mID != mContainerID) {
         LOG_INFO(sLogger,
                  ("container info of file reader changed", "may be because container restart")(
-                     "old container id", mContainerID)("new container id", containerInfo->mID)(
-                     "container status", containerInfo->mStopped ? "stopped" : "running"));
+                     "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
+                     "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
         // if config have wildcard path, use mWildcardPaths[0] as base path
         SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
                                                                          : discoveryConfig.first->GetBasePath(),
                       containerInfo->mRealBaseDir.size());
-        SetContainerID(containerInfo->mID);
-        mContainerStopped = containerInfo->mStopped;
+        SetContainerID(containerInfo->mRawContainerInfo->mID);
+        mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
         mContainerMetadatas.clear();
         mContainerExtraTags.clear();
-        SetContainerMetadatas(containerInfo->mMetadatas);
-        SetContainerExtraTags(containerInfo->mTags);
+        SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
+        SetContainerExtraTags(containerInfo->mExtraTags);
         return true;
     }
     return false;

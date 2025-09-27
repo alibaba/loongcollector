@@ -62,14 +62,23 @@ bool InputContainerStdio::Init(const Json::Value& config, Json::Value& optionalG
     if (!mFileDiscovery.Init(fileDiscoveryConfig, *mContext, sName)) {
         return false;
     }
+    ContainerDiscoveryOptions containerDiscovery;
+    if (!containerDiscovery.Init(config, *mContext, sName)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           "container discovery config is invalid",
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    containerDiscovery.mIsStdio = true;
     mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
     mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
-
-    if (!mContainerDiscovery.Init(config, *mContext, sName)) {
-        return false;
-    }
-    mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
+    containerDiscovery.GenerateContainerMetaFetchingGoPipeline(
         optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
+    mFileDiscovery.SetContainerDiscoveryOptions(std::move(containerDiscovery));
 
     if (!mFileReader.Init(config, *mContext, sName)) {
         return false;
@@ -242,18 +251,21 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
     if (!containerInfo.mRealBaseDir.empty()) {
         return true;
     }
+
     // ParseByJSONObj 确保 mLogPath不会以\或者/ 结尾
-    std::string realPath = TryGetRealPath(STRING_FLAG(default_container_host_path) + containerInfo.mLogPath);
+    std::string realPath
+        = TryGetRealPath(STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mLogPath);
     if (realPath.empty()) {
-        LOG_ERROR(
-            sLogger,
-            ("failed to set container base dir", "container log path not existed")("container id", containerInfo.mID)(
-                "container log path", containerInfo.mLogPath)("input", sName)("config", ctx->GetPipeline().Name()));
+        LOG_ERROR(sLogger,
+                  ("failed to set container base dir",
+                   "container log path not existed")("container id", containerInfo.mRawContainerInfo->mID)(
+                      "container log path",
+                      containerInfo.mRawContainerInfo->mLogPath)("input", sName)("config", ctx->GetPipeline().Name()));
         ctx->GetAlarm().SendAlarmWarning(
             INVALID_CONTAINER_PATH_ALARM,
             "failed to set container base dir: container log path not existed\tcontainer id: "
-                + ToString(containerInfo.mID) + "\tcontainer log path: " + containerInfo.mLogPath
-                + "\tconfig: " + ctx->GetPipeline().Name(),
+                + ToString(containerInfo.mRawContainerInfo->mID) + "\tcontainer log path: "
+                + containerInfo.mRawContainerInfo->mLogPath + "\tconfig: " + ctx->GetPipeline().Name(),
             ctx->GetRegion(),
             ctx->GetProjectName(),
             ctx->GetPipeline().Name(),
@@ -267,16 +279,16 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
     if (containerInfo.mRealBaseDir.length() > 1 && containerInfo.mRealBaseDir.back() == '/') {
         containerInfo.mRealBaseDir.pop_back();
     }
-    LOG_INFO(sLogger,
-             ("set container base dir",
-              containerInfo.mRealBaseDir)("container id", containerInfo.mID)("config", ctx->GetPipeline().Name()));
+    LOG_INFO(
+        sLogger,
+        ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID)(
+            "raw log path", containerInfo.mRawContainerInfo->mLogPath)("config", ctx->GetPipeline().Name()));
     return true;
 }
 
 bool InputContainerStdio::Start() {
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
-    mFileDiscovery.SetContainerInfo(
-        FileServer::GetInstance()->GetAndRemoveContainerInfo(mContext->GetPipeline().Name()));
+    mFileDiscovery.SetContainerInfo(std::make_shared<vector<ContainerInfo>>());
     FileServer::GetInstance()->AddFileDiscoveryConfig(mContext->GetConfigName(), &mFileDiscovery, mContext);
     FileServer::GetInstance()->AddFileReaderConfig(mContext->GetConfigName(), &mFileReader, mContext);
     FileServer::GetInstance()->AddMultilineConfig(mContext->GetConfigName(), &mMultiline, mContext);
@@ -286,9 +298,6 @@ bool InputContainerStdio::Start() {
 }
 
 bool InputContainerStdio::Stop(bool isPipelineRemoving) {
-    if (!isPipelineRemoving) {
-        FileServer::GetInstance()->SaveContainerInfo(mContext->GetPipeline().Name(), mFileDiscovery.GetContainerInfo());
-    }
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveFileReaderConfig(mContext->GetConfigName());
     FileServer::GetInstance()->RemoveMultilineConfig(mContext->GetConfigName());

@@ -36,31 +36,45 @@ struct Mount {
     Mount() = default;
 };
 
-struct ContainerInfo {
-    std::string mID; // id of this container
-    // container path for this config's path. eg, config path '/home/admin', container path
-    // '/host_all/var/lib/xxxxxx/upper/home/admin' if config is wildcard, this will mapping to config->mWildcardPaths[0]
-    std::string mRealBaseDir;
+struct K8sInfo {
+    std::string mNamespace;
+    std::string mPod;
+    std::string mContainerName;
+    std::unordered_map<std::string, std::string> mLabels;
+    bool mPausedContainer = false;
+};
 
+struct RawContainerInfo {
+    // 容器ID
+    std::string mID;
+    // 容器名称
+    std::string mName;
+    // 标准输出
     std::string mLogPath;
+    // rootfs
     std::string mUpperDir;
-    std::vector<Mount> mMounts; // mounts of this container
-    std::vector<std::pair<std::string, std::string>> mTags; // ExternalEnvTag and ExternalK8sLabelTag.
-    std::vector<std::pair<TagKey, std::string>> mMetadatas; //  ContainerNameTag which is reserved and can be processed
+    // 挂载
+    std::vector<Mount> mMounts;
+    // 容器信息
+    std::vector<std::pair<TagKey, std::string>> mMetadatas;
     std::vector<std::pair<std::string, std::string>>
         mCustomMetadatas; //  ContainerNameTag which is custom, e.g. env config tag
+    // 原始k8s信息
+    K8sInfo mK8sInfo;
+    // 环境变量信息
+    std::unordered_map<std::string, std::string> mEnv;
+    // 容器标签信息
+    std::unordered_map<std::string, std::string> mContainerLabels;
 
-    Json::Value mJson; // this obj's json, for saving to local file
-    bool mStopped = false; // whether this container is stopped
+    bool mStopped = false;
 
-    static bool ParseByJSONObj(const Json::Value&, ContainerInfo&, std::string&);
-    static bool ParseAllByJSONObj(const Json::Value&, std::unordered_map<std::string, ContainerInfo>&, std::string&);
+    std::string mStatus;
 
-    bool operator==(const ContainerInfo& rhs) const {
+    bool operator==(const RawContainerInfo& rhs) const {
         if (mID != rhs.mID) {
             return false;
         }
-        if (mRealBaseDir != rhs.mRealBaseDir) {
+        if (mName != rhs.mName) {
             return false;
         }
         if (mLogPath != rhs.mLogPath) {
@@ -79,31 +93,57 @@ struct ContainerInfo {
                 return false;
             }
         }
-        if (mMetadatas.size() != rhs.mMetadatas.size()) {
+        if (mK8sInfo.mNamespace != rhs.mK8sInfo.mNamespace || mK8sInfo.mPod != rhs.mK8sInfo.mPod
+            || mK8sInfo.mContainerName != rhs.mK8sInfo.mContainerName) {
             return false;
         }
-        for (size_t idx = 0; idx < mMetadatas.size(); ++idx) {
-            const auto& lhsTag = mMetadatas[idx];
-            const auto& rhsTag = rhs.mMetadatas[idx];
-            if (lhsTag.first != rhsTag.first || lhsTag.second != rhsTag.second) {
+        if (mK8sInfo.mLabels.size() != rhs.mK8sInfo.mLabels.size()) {
+            return false;
+        }
+        for (const auto& label : mK8sInfo.mLabels) {
+            const auto& rhsLabel = rhs.mK8sInfo.mLabels.find(label.first);
+            if (rhsLabel == rhs.mK8sInfo.mLabels.end() || rhsLabel->second != label.second) {
                 return false;
             }
         }
-        if (mTags.size() != rhs.mTags.size()) {
+        if (mEnv.size() != rhs.mEnv.size()) {
             return false;
         }
-        for (size_t idx = 0; idx < mTags.size(); ++idx) {
-            const auto& lhsTag = mTags[idx];
-            const auto& rhsTag = rhs.mTags[idx];
-            if (lhsTag.first != rhsTag.first || lhsTag.second != rhsTag.second) {
+        for (const auto& env : mEnv) {
+            const auto& rhsEnv = rhs.mEnv.find(env.first);
+            if (rhsEnv == rhs.mEnv.end() || rhsEnv->second != env.second) {
                 return false;
             }
+        }
+        if (mContainerLabels.size() != rhs.mContainerLabels.size()) {
+            return false;
+        }
+        for (const auto& label : mContainerLabels) {
+            const auto& rhsLabel = rhs.mContainerLabels.find(label.first);
+            if (rhsLabel == rhs.mContainerLabels.end() || rhsLabel->second != label.second) {
+                return false;
+            }
+        }
+        if (mStatus != rhs.mStatus) {
+            return false;
         }
         return true;
     }
-    bool operator!=(const ContainerInfo& rhs) const { return !(*this == rhs); }
+    bool operator!=(const RawContainerInfo& rhs) const { return !(*this == rhs); }
 
     void AddMetadata(const std::string& key, const std::string& value);
+};
+
+
+struct ContainerInfo {
+    // 原始容器信息
+    std::shared_ptr<RawContainerInfo> mRawContainerInfo;
+
+    // container path for this config's path. eg, config path '/home/admin', container path
+    // '/host_all/var/lib/xxxxxx/upper/home/admin' if config is wildcard, this will mapping to config->mWildcardPaths[0]
+    std::string mRealBaseDir;
+
+    std::vector<std::pair<std::string, std::string>> mExtraTags; // ExternalEnvTag and ExternalK8sLabelTag.
 
 private:
 };

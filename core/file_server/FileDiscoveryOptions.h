@@ -19,6 +19,7 @@
 #include <cstdint>
 
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -26,6 +27,7 @@
 #include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/ContainerInfo.h"
 
 namespace logtail {
@@ -44,8 +46,15 @@ public:
     const std::vector<std::string>& GetWildcardPaths() const { return mWildcardPaths; }
     const std::vector<std::string>& GetConstWildcardPaths() const { return mConstWildcardPaths; }
     bool IsContainerDiscoveryEnabled() const { return mEnableContainerDiscovery; }
-    void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = true; }
+    void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = flag; }
     const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
+
+    const std::shared_ptr<std::set<std::string>>& GetFullContainerList() const { return mFullContainerList; }
+    void SetFullContainerList(const std::shared_ptr<std::set<std::string>>& fullList) { mFullContainerList = fullList; }
+
+    void SetContainerDiscoveryOptions(ContainerDiscoveryOptions&& option) { mContainerDiscovery = std::move(option); }
+    ContainerDiscoveryOptions GetContainerDiscoveryOptions() const { return mContainerDiscovery; }
+
     void SetContainerInfo(const std::shared_ptr<std::vector<ContainerInfo>>& info) { mContainerInfos = info; }
     void SetDeduceAndSetContainerBaseDirFunc(bool (*f)(ContainerInfo&,
                                                        const CollectionPipelineContext*,
@@ -60,13 +69,19 @@ public:
     bool IsMatch(const std::string& path, const std::string& name) const;
     bool IsTimeout(const std::string& path) const;
     bool WithinMaxDepth(const std::string& path) const;
-    bool IsSameContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext*);
-    bool UpdateContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext*);
-    bool DeleteContainerInfo(const Json::Value& paramsJSON);
+
+    bool UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
+                                const CollectionPipelineContext*);
+    bool DeleteRawContainerInfo(const std::string& containerID);
+
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
     // 过渡使用
     bool IsTailingAllMatchedFiles() const { return mTailingAllMatchedFiles; }
     void SetTailingAllMatchedFiles(bool flag) { mTailingAllMatchedFiles = flag; }
+
+    uint32_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
+    void SetLastContainerUpdateTime(uint32_t time) { mLastContainerUpdateTime = time; }
+
 
     std::vector<std::string> mFilePaths;
     int32_t mMaxDirSearchDepth = 0;
@@ -112,7 +127,10 @@ private:
     std::vector<std::string> mFileNameBlacklist;
 
     bool mEnableContainerDiscovery = false;
+
+    std::shared_ptr<std::set<std::string>> mFullContainerList = std::make_shared<std::set<std::string>>();
     std::shared_ptr<std::vector<ContainerInfo>> mContainerInfos; // must not be null if container discovery is enabled
+    ContainerDiscoveryOptions mContainerDiscovery;
     bool (*mDeduceAndSetContainerBaseDirFunc)(ContainerInfo& containerInfo,
                                               const CollectionPipelineContext*,
                                               const FileDiscoveryOptions*)
@@ -120,6 +138,8 @@ private:
 
     // 过渡使用
     bool mTailingAllMatchedFiles = false;
+
+    uint32_t mLastContainerUpdateTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;
