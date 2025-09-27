@@ -34,9 +34,9 @@ extern const std::string KAFKA_CONFIG_MESSAGE_TIMEOUT_MS;
 extern const std::string KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES;
 extern const std::string KAFKA_CONFIG_RETRY_BACKOFF_MS;
 
-extern const std::string KAFKA_CONFIG_API_VERSION_REQUEST; // "api.version.request"
-extern const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK; // "broker.version.fallback"
-extern const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS; // "api.version.fallback.ms"
+extern const std::string KAFKA_CONFIG_API_VERSION_REQUEST;
+extern const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK;
+extern const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS;
 
 extern const int KAFKA_POLL_INTERVAL_MS;
 extern const int KAFKA_FLUSH_TIMEOUT_MS;
