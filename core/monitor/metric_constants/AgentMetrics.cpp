@@ -38,5 +38,6 @@ const string METRIC_AGENT_MEMORY = "memory_used_mb";
 const string METRIC_AGENT_MEMORY_GO = "go_memory_used_mb";
 const string METRIC_AGENT_OPEN_FD_TOTAL = "open_fd_total";
 const string METRIC_AGENT_PIPELINE_CONFIG_TOTAL = "pipeline_config_total";
+const string METRIC_AGENT_HOST_MONITOR_TOTAL = "host_monitor_total";
 
 } // namespace logtail
