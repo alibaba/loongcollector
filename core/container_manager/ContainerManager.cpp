@@ -618,6 +618,7 @@ static Json::Value SerializeRawContainerInfo(const std::shared_ptr<RawContainerI
     Json::Value v(Json::objectValue);
     // basic
     v["ID"] = Json::Value(info->mID);
+    v["Name"] = Json::Value(info->mName);
     v["UpperDir"] = Json::Value(info->mUpperDir);
     v["LogPath"] = Json::Value(info->mLogPath);
     v["Stopped"] = Json::Value(info->mStopped);
@@ -679,6 +680,9 @@ static std::shared_ptr<RawContainerInfo> DeserializeRawContainerInfo(const Json:
     // basic
     if (v.isMember("ID") && v["ID"].isString()) {
         info->mID = v["ID"].asString();
+    }
+    if (v.isMember("Name") && v["Name"].isString()) {
+        info->mName = v["Name"].asString();
     }
     if (v.isMember("UpperDir") && v["UpperDir"].isString()) {
         info->mUpperDir = v["UpperDir"].asString();

@@ -45,7 +45,10 @@ struct K8sInfo {
 };
 
 struct RawContainerInfo {
+    // 容器ID
     std::string mID;
+    // 容器名称
+    std::string mName;
     // 标准输出
     std::string mLogPath;
     // rootfs
@@ -69,6 +72,9 @@ struct RawContainerInfo {
 
     bool operator==(const RawContainerInfo& rhs) const {
         if (mID != rhs.mID) {
+            return false;
+        }
+        if (mName != rhs.mName) {
             return false;
         }
         if (mLogPath != rhs.mLogPath) {

@@ -39,7 +39,7 @@ struct ContainerDiff {
         std::stringstream ss;
         ss << "Added: ";
         for (const auto& container : mAdded) {
-            ss << "{" << "containerName:" << container->mName << " ";
+            ss << "{" << "containerName:" << container-> mName << " ";
             ss << "containerID:" << container->mID << " ";
             ss << "containerStatus:" << container->mStatus << " ";
             ss << "}" << " ";

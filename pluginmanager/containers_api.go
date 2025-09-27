@@ -26,6 +26,7 @@ type K8sInfo struct {
 
 type ContainerInfoCmd struct {
 	ID              string
+	Name            string
 	Mounts          []Mount // 容器挂载路径
 	UpperDir        string  // 容器默认路径
 	LogPath         string  // 标准输出路径
@@ -59,6 +60,7 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	for key, val := range info.ContainerNameTag {
 		cmd.MetaDatas[key] = val
 	}
+	cmd.Name = info.ContainerInfo.Name
 	cmd.Status = info.ContainerInfo.State.Status
 
 	// K8s info
