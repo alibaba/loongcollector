@@ -58,8 +58,8 @@ public:
                                                     const std::vector<std::string>& pathExistContainerIDs,
                                                     const std::vector<std::string>& pathNotExistContainerIDs);
 
-    void UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
-    void RemoveConfigContainerInfoPipeline();
+    void UpdateMatchedContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
+    void RemoveMatchedContainerInfoPipeline();
 
 private:
     void pollingLoop();
@@ -79,8 +79,8 @@ private:
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
     void loadContainerInfoFromContainersFormat(const Json::Value& root, const std::string& configPath);
 
-    void sendConfigContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults);
-    void sendAllConfigContainerInfo();
+    void sendMatchedContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults);
+    void sendAllMatchedContainerInfo();
 
     // Helper method for joining container IDs
     std::string joinContainerIDs(const std::vector<std::string>& containerIDs);
@@ -98,9 +98,9 @@ private:
     std::atomic<bool> mIsRunning{false};
     friend class ContainerManagerUnittest;
 
-    mutable ReadWriteLock mConfigContainerInfoPipelineMux;
-    CollectionPipelineContext* mConfigContainerInfoPipelineCtx = nullptr;
-    size_t mConfigContainerInfoInputIndex = 0;
+    mutable ReadWriteLock mMatchedContainerInfoPipelineMux;
+    CollectionPipelineContext* mMatchedContainerInfoPipelineCtx = nullptr;
+    size_t mMatchedContainerInfoInputIndex = 0;
 };
 
 } // namespace logtail

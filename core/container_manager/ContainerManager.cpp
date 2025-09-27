@@ -69,7 +69,7 @@ void ContainerManager::Stop() {
 void ContainerManager::pollingLoop() {
     time_t lastUpdateAllTime = 0;
     time_t lastUpdateDiffTime = 0;
-    time_t lastSendAllConfigContainerInfoTime = 0;
+    time_t lastSendAllMatchedContainerInfoTime = 0;
     bool first = true;
 
     while (true) {
@@ -86,12 +86,12 @@ void ContainerManager::pollingLoop() {
             lastUpdateDiffTime = now;
         }
         if (first) {
-            lastSendAllConfigContainerInfoTime = now;
+            lastSendAllMatchedContainerInfoTime = now;
         } else {
             // 每12小时发送一次所有配置的容器信息
-            if (now - lastSendAllConfigContainerInfoTime >= 43200) {
-                sendAllConfigContainerInfo();
-                lastSendAllConfigContainerInfoTime = now;
+            if (now - lastSendAllMatchedContainerInfoTime >= 43200) {
+                sendAllMatchedContainerInfo();
+                lastSendAllMatchedContainerInfoTime = now;
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(3));
@@ -146,11 +146,11 @@ void ContainerManager::ApplyContainerDiffs() {
             LOG_DEBUG(sLogger, ("configResult", configResult->ToString())("configName", ctx->GetConfigName()));
         }
     }
-    sendConfigContainerInfo(configResults);
+    sendMatchedContainerInfo(configResults);
     mConfigContainerDiffMap.clear();
 }
 
-void ContainerManager::sendAllConfigContainerInfo() {
+void ContainerManager::sendAllMatchedContainerInfo() {
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
 
@@ -163,7 +163,7 @@ void ContainerManager::sendAllConfigContainerInfo() {
             }
         }
     }
-    sendConfigContainerInfo(configResults);
+    sendMatchedContainerInfo(configResults);
 }
 
 bool ContainerManager::CheckContainerDiffForAllConfig() {
@@ -184,21 +184,21 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
     return isUpdate;
 }
 
-void ContainerManager::UpdateConfigContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
-    WriteLock lock(mConfigContainerInfoPipelineMux);
-    mConfigContainerInfoPipelineCtx = ctx;
-    mConfigContainerInfoInputIndex = inputIndex;
+void ContainerManager::UpdateMatchedContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
+    WriteLock lock(mMatchedContainerInfoPipelineMux);
+    mMatchedContainerInfoPipelineCtx = ctx;
+    mMatchedContainerInfoInputIndex = inputIndex;
 }
 
-void ContainerManager::RemoveConfigContainerInfoPipeline() {
-    WriteLock lock(mConfigContainerInfoPipelineMux);
-    mConfigContainerInfoPipelineCtx = nullptr;
-    mConfigContainerInfoInputIndex = 0;
+void ContainerManager::RemoveMatchedContainerInfoPipeline() {
+    WriteLock lock(mMatchedContainerInfoPipelineMux);
+    mMatchedContainerInfoPipelineCtx = nullptr;
+    mMatchedContainerInfoInputIndex = 0;
 }
 
-void ContainerManager::sendConfigContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults) {
-    ReadLock lock(mConfigContainerInfoPipelineMux);
-    if (mConfigContainerInfoPipelineCtx == nullptr) {
+void ContainerManager::sendMatchedContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults) {
+    ReadLock lock(mMatchedContainerInfoPipelineMux);
+    if (mMatchedContainerInfoPipelineCtx == nullptr) {
         return;
     }
 
@@ -239,8 +239,8 @@ void ContainerManager::sendConfigContainerInfo(std::vector<std::shared_ptr<Match
         logEventPtr->SetContent("flusher.target_addresses", itr->FlusherTargetAddress);
     }
     if (pipelineEventGroup.GetEvents().size() > 0) {
-        ProcessorRunner::GetInstance()->PushQueue(mConfigContainerInfoPipelineCtx->GetProcessQueueKey(),
-                                                  mConfigContainerInfoInputIndex,
+        ProcessorRunner::GetInstance()->PushQueue(mMatchedContainerInfoPipelineCtx->GetProcessQueueKey(),
+                                                  mMatchedContainerInfoInputIndex,
                                                   std::move(pipelineEventGroup));
     }
 }

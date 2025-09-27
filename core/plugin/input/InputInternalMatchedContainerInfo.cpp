@@ -26,13 +26,13 @@ bool InputInternalMatchedContainerInfo::Init(const Json::Value& config, Json::Va
 }
 
 bool InputInternalMatchedContainerInfo::Start() {
-    ContainerManager::GetInstance()->UpdateConfigContainerInfoPipeline(mContext, mIndex);
+    ContainerManager::GetInstance()->UpdateMatchedContainerInfoPipeline(mContext, mIndex);
     return true;
 }
 
 bool InputInternalMatchedContainerInfo::Stop(bool isPipelineRemoving) {
     if (isPipelineRemoving) {
-        ContainerManager::GetInstance()->RemoveConfigContainerInfoPipeline();
+        ContainerManager::GetInstance()->RemoveMatchedContainerInfoPipeline();
     }
     return true;
 }
