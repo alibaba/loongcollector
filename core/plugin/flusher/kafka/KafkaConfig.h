@@ -33,6 +33,10 @@ struct KafkaConfig {
 
     std::string Version = "1.0.0";
 
+    std::string PartitionerType;
+    std::vector<std::string> HashKeys;
+    std::string Partitioner;
+
     uint32_t QueueBufferingMaxKbytes = 1048576;
     uint32_t QueueBufferingMaxMessages = 100000;
 
@@ -47,6 +51,19 @@ struct KafkaConfig {
     uint32_t RetryBackoffMs = 100;
 
     std::map<std::string, std::string> CustomConfig;
+
+    bool EnableTLS = false;
+    std::string TLSCaFile;
+    std::string TLSCertFile;
+    std::string TLSKeyFile;
+    std::string TLSKeyPassword;
+
+    bool EnableKerberos = false;
+    std::string SaslMechanisms = "GSSAPI";
+    std::string KerberosPrincipal;
+    std::string KerberosServiceName = "kafka";
+    std::string KerberosKeytab;
+    std::string KerberosKinitCmd;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
@@ -85,6 +102,39 @@ struct KafkaConfig {
 
         GetOptionalUIntParam(config, "QueueBufferingMaxKbytes", QueueBufferingMaxKbytes, errorMsg);
         GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
+
+        GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
+        GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
+
+        if (config.isMember("Authentication") && config["Authentication"].isObject()) {
+            const Json::Value& auth = config["Authentication"];
+            if (auth.isMember("TLS") && auth["TLS"].isObject()) {
+                const Json::Value& tls = auth["TLS"];
+                if (!GetOptionalBoolParam(tls, "Enabled", EnableTLS, errorMsg)) {
+                    return false;
+                }
+                if (EnableTLS) {
+                    GetMandatoryStringParam(tls, "CAFile", TLSCaFile, errorMsg);
+                    GetOptionalStringParam(tls, "CertFile", TLSCertFile, errorMsg);
+                    GetOptionalStringParam(tls, "KeyFile", TLSKeyFile, errorMsg);
+                    GetOptionalStringParam(tls, "KeyPassword", TLSKeyPassword, errorMsg);
+                }
+            }
+
+            if (auth.isMember("Kerberos") && auth["Kerberos"].isObject()) {
+                const Json::Value& krb = auth["Kerberos"];
+                if (!GetOptionalBoolParam(krb, "Enabled", EnableKerberos, errorMsg)) {
+                    return false;
+                }
+                if (EnableKerberos) {
+                    GetOptionalStringParam(krb, "Mechanisms", SaslMechanisms, errorMsg);
+                    GetOptionalStringParam(krb, "ServiceName", KerberosServiceName, errorMsg);
+                    GetOptionalStringParam(krb, "Principal", KerberosPrincipal, errorMsg);
+                    GetOptionalStringParam(krb, "Keytab", KerberosKeytab, errorMsg);
+                    GetOptionalStringParam(krb, "KinitCmd", KerberosKinitCmd, errorMsg);
+                }
+            }
+        }
 
         if (config.isMember("Kafka") && config["Kafka"].isObject()) {
             const Json::Value& kafkaConfig = config["Kafka"];

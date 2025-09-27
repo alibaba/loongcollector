@@ -169,6 +169,99 @@ public:
             }
         }
 
+        if (!mConfig.Partitioner.empty()) {
+            rd_kafka_topic_conf_t* tconf = rd_kafka_topic_conf_new();
+            if (!tconf) {
+                return false;
+            }
+            char errstr2[512];
+            if (rd_kafka_topic_conf_set(
+                    tconf, KAFKA_CONFIG_PARTITIONER.c_str(), mConfig.Partitioner.c_str(), errstr2, sizeof(errstr2))
+                != RD_KAFKA_CONF_OK) {
+                LOG_ERROR(sLogger,
+                          ("Failed to set Kafka topic config",
+                           KAFKA_CONFIG_PARTITIONER)("value", mConfig.Partitioner)("error", errstr2));
+                rd_kafka_topic_conf_destroy(tconf);
+                return false;
+            }
+            rd_kafka_conf_set_default_topic_conf(mConf, tconf);
+        }
+
+        const bool useTLS = mConfig.EnableTLS;
+        const bool useKrb = mConfig.EnableKerberos;
+        if (useTLS || useKrb) {
+            std::string secProto;
+            if (useTLS && useKrb) {
+                secProto = "sasl_ssl";
+            } else if (useTLS) {
+                secProto = "ssl";
+            } else {
+                secProto = "sasl_plaintext";
+            }
+            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, secProto)) {
+                return false;
+            }
+        }
+
+        if (useTLS) {
+            if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.TLSCaFile)) {
+                return false;
+            }
+
+            const bool hasCert = !mConfig.TLSCertFile.empty();
+            const bool hasKey = !mConfig.TLSKeyFile.empty();
+
+            if (hasCert != hasKey) {
+                LOG_ERROR(sLogger,
+                          ("Kafka TLS client auth config error",
+                           "both TLS.CertFile and TLS.KeyFile must be set together, or both unset"));
+                return false;
+            }
+
+            if (hasCert && hasKey) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.TLSCertFile)) {
+                    return false;
+                }
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.TLSKeyFile)) {
+                    return false;
+                }
+                if (!mConfig.TLSKeyPassword.empty()) {
+                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.TLSKeyPassword)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        if (useKrb) {
+            const std::string mech = mConfig.SaslMechanisms.empty() ? std::string("GSSAPI") : mConfig.SaslMechanisms;
+            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mech)) {
+                return false;
+            }
+
+            if (!mConfig.KerberosServiceName.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.KerberosServiceName)) {
+                    return false;
+                }
+            }
+
+            if (!mConfig.KerberosPrincipal.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.KerberosPrincipal)) {
+                    return false;
+                }
+            }
+            if (!mConfig.KerberosKeytab.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.KerberosKeytab)) {
+                    return false;
+                }
+            }
+            if (!mConfig.KerberosKinitCmd.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.KerberosKinitCmd)) {
+                    return false;
+                }
+            }
+        }
+
         for (const auto& kv : mConfig.CustomConfig) {
             if (!SetConfig(kv.first, kv.second)) {
                 return false;
@@ -196,7 +289,10 @@ public:
         return true;
     }
 
-    void ProduceAsync(const std::string& topic, std::string&& value, KafkaProducer::Callback callback) {
+    void ProduceAsync(const std::string& topic,
+                      std::string&& value,
+                      KafkaProducer::Callback callback,
+                      const std::string& key) {
         rd_kafka_t* producer = nullptr;
         {
             std::lock_guard<std::mutex> lock(mProducerMutex);
@@ -214,13 +310,25 @@ public:
         auto* context = GetContext();
         context->callback = std::move(callback);
 
-        rd_kafka_resp_err_t err = rd_kafka_producev(producer,
-                                                    RD_KAFKA_V_TOPIC(topic.c_str()),
-                                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
-                                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
-                                                    RD_KAFKA_V_OPAQUE(context),
-                                                    RD_KAFKA_V_END);
+        rd_kafka_resp_err_t err;
+        if (!key.empty()) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_KEY(key.data(), key.size()),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        } else {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        }
 
         if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
             LOG_ERROR(sLogger,
@@ -325,8 +433,11 @@ bool KafkaProducer::Init(const KafkaConfig& config) {
     return mImpl->Init(config);
 }
 
-void KafkaProducer::ProduceAsync(const std::string& topic, std::string&& value, Callback callback) {
-    mImpl->ProduceAsync(topic, std::move(value), std::move(callback));
+void KafkaProducer::ProduceAsync(const std::string& topic,
+                                 std::string&& value,
+                                 Callback callback,
+                                 const std::string& key) {
+    mImpl->ProduceAsync(topic, std::move(value), std::move(callback), key);
 }
 
 bool KafkaProducer::Flush(int timeoutMs) {
