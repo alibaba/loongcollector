@@ -21,6 +21,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "plugin/flusher/kafka/KafkaConfig.h"
@@ -30,8 +31,10 @@ namespace logtail {
 
 struct ProduceRequest {
     std::string Topic;
+    std::string Key;
     std::string Value;
     KafkaProducer::Callback Callback;
+    std::vector<std::pair<std::string, std::string>> Headers;
 };
 
 class MockKafkaProducer : public KafkaProducer {
@@ -45,8 +48,29 @@ public:
         return mInitSuccess;
     }
 
-    void ProduceAsync(const std::string& topic, std::string&& value, Callback callback) override {
-        ProduceRequest request{topic, std::move(value), std::move(callback)};
+    HeadersTemplate* CreateHeadersTemplate(const std::vector<std::pair<std::string, std::string>>& headers) override {
+        if (headers.empty())
+            return nullptr;
+        auto* key = reinterpret_cast<HeadersTemplate*>(new int(1));
+        mHeadersMap[key] = headers;
+        return key;
+    }
+    void DestroyHeadersTemplate(HeadersTemplate* tpl) override {
+        if (!tpl)
+            return;
+        mHeadersMap.erase(tpl);
+        delete reinterpret_cast<int*>(tpl);
+    }
+
+    void ProduceAsync(const std::string& topic,
+                      std::string&& value,
+                      Callback callback,
+                      const std::string& key = std::string(),
+                      HeadersTemplate* headersTemplate = nullptr) override {
+        ProduceRequest request{topic, key, std::move(value), std::move(callback), {}};
+        auto it = mHeadersMap.find(headersTemplate);
+        if (it != mHeadersMap.end())
+            request.Headers = it->second;
         mRequests.emplace_back(std::move(request));
 
         if (mAutoComplete) {
@@ -110,6 +134,7 @@ public:
     size_t GetRequestCount() const { return mRequests.size() + mCompletedRequests.size(); }
 
 private:
+    std::unordered_map<HeadersTemplate*, std::vector<std::pair<std::string, std::string>>> mHeadersMap;
     bool mInitialized = false;
     bool mClosed = false;
     bool mFlushCalled = false;
