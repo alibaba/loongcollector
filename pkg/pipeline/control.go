@@ -14,7 +14,9 @@
 
 package pipeline
 
-import "sync"
+import (
+	"sync"
+)
 
 // AsyncControl is an asynchronous execution control that can be canceled.
 type AsyncControl struct {
