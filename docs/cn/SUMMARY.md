@@ -41,6 +41,7 @@
   * [什么是输入插件](plugins/input/inputs.md)
   * 原生输入插件
     * [文本日志](plugins/input/native/input-file.md)
+    * [一次性文件采集](plugins/input/native/input-static-file-onetime.md)
     * [容器标准输出](plugins/input/native/input-container-stdio.md)
     * [eBPF网络可观测数据](plugins/input/native/input-network-observer.md)
     * [eBPF进程安全数据](plugins/input/native/input-process-security.md)

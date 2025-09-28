@@ -7,6 +7,7 @@
 | 名称                                                                                           | 提供方   | 简介                                  |
 | ---------------------------------------------------------------------------------------------- | -------- | ------------------------------------- |
 | `input_file`<br>[文本日志](input/native/input-file.md)                                         | SLS 官方 | 文本采集。                            |
+| `input_static_file_onetime`<br>[一次性文件采集](input/native/input-static-file-onetime.md)     | SLS 官方 | 一次性文件采集。                      |
 | `input_container_stdio`<br>[容器标准输出](input/native/input-container-stdio.md)               | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
 | `input_file_security`<br>[eBPF 文件安全数据](input/native/input-file-security.md)              | SLS 官方 | eBPF 文件安全数据采集。               |
 | `input_network_observer`<br>[eBPF 网络可观测数据](input/native/input-network-observer.md)      | SLS 官方 | eBPF 网络可观测数据采集。             |

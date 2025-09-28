@@ -1,4 +1,4 @@
-# 历史文件采集
+# 一次性文件采集
 
 ## 简介
 
@@ -38,15 +38,15 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_static\_file\_onetime。  |
-|  FilePaths  |  \[string\]  |  是  |  /  |  待采集的文件路径列表（目前仅限1个路径）。支持使用\*和\*\*通配符。  |
+|  FilePaths  |  []string  |  是  |  /  |  待采集的文件路径列表（目前仅限1个路径）。支持使用\*和\*\*通配符。  |
 |  MaxDirSearchDepth  |  int  |  否  |  0  |  文件路径中\*\*通配符匹配的最大目录深度。取值范围为0～1000。  |
-|  ExcludeFilePaths  |  \[string\]  |  否  |  空  |  文件路径黑名单。支持使用\*通配符。  |
-|  ExcludeFiles  |  \[string\]  |  否  |  空  |  文件名黑名单。支持使用\*通配符。  |
-|  ExcludeDirs  |  \[string\]  |  否  |  空  |  目录黑名单。支持使用\*通配符。  |
+|  ExcludeFilePaths  |  []string  |  否  |  空  |  文件路径黑名单。支持使用\*通配符。  |
+|  ExcludeFiles  |  []string  |  否  |  空  |  文件名黑名单。支持使用\*通配符。  |
+|  ExcludeDirs  |  []string  |  否  |  空  |  目录黑名单。支持使用\*通配符。  |
 |  FileEncoding  |  string  |  否  |  utf8  |  文件编码格式。可选值包括utf8和gbk。  |
 |  Multiline  |  object  |  否  |  空  |  多行聚合选项。详见表1。  |
 |  AppendingLogPositionMeta  |  bool  |  否  |  false  |  是否在日志中添加该条日志所属文件的元信息，包括\_\_tag\_\_:\_\_inode\_\_字段和\_\_file\_offset\_\_字段。  |
-|  Tags  |  map  |  否  |  空  |  重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。  |
+|  Tags  |  map[string]string  |  否  |  空  |  重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。  |
 
 * 表1：多行聚合选项
 

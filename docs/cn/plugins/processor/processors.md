@@ -51,6 +51,7 @@
 | 输入插件 | 说明 |
 |---------|------|
 | [`input_file`](../input/native/input-file.md) | 文本日志输入插件 |
+| [`input_static_file_onetime`](../input/native/input-static-file-onetime.md) | 一次性文件采集插件 |
 | [`input_container_stdio`](../input/native/input-container-stdio.md) | 容器标准输出插件 |
 | [`input_observer_network`](../input/native/metric-observer.md) | eBPF网络观测插件 |
 | [`input_file_security`](../input/native/input-file-security.md) | 文件安全监控插件 |
