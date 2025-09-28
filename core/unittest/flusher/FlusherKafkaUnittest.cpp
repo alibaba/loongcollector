@@ -97,6 +97,8 @@ public:
     void TestDynamicTopic_FromTags();
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
+    void TestInitWithTLSMinimal();
+    void TestInitWithTLSFullPaths();
 
 protected:
     void SetUp();
@@ -477,6 +479,33 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
 
+void KafkaTlsUnittest::TestInitWithTLSMinimal() {
+    KafkaConfig cfg;
+    cfg.Brokers = {"localhost:9092"};
+    cfg.Topic = "tls-test";
+    cfg.Version = "2.6.0";
+    cfg.EnableTLS = true;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(cfg));
+    p.Close();
+}
+
+void KafkaTlsUnittest::TestInitWithTLSFullPaths() {
+    KafkaConfig cfg;
+    cfg.Brokers = {"localhost:9092"};
+    cfg.Topic = "tls-test";
+    cfg.Version = "2.6.0";
+    cfg.EnableTLS = true;
+    cfg.TLSCaFile = "/tmp/does-not-need-to-exist.ca";
+    cfg.TLSCertFile = "/tmp/does-not-need-to-exist.crt";
+    cfg.TLSKeyFile = "/tmp/does-not-need-to-exist.key";
+    cfg.TLSKeyPassword = "secret";
+
+    KafkaProducer p;
+    APSARA_TEST_FALSE(p.Init(cfg));
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -499,7 +528,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
-
+UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSMinimal)
+UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSFullPaths)
 } // namespace logtail
 
 UNIT_TEST_MAIN
