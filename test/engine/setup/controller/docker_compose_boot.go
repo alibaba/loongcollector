@@ -65,6 +65,8 @@ func (c *BootController) Start(ctx context.Context) error {
 
 func (c *BootController) Clean() {
 	logger.Info(context.Background(), "boot controller is cleaning....")
+	// Try to copy core logs before shutdown for troubleshooting
+	dockercompose.CopyCoreLogs()
 	if err := dockercompose.ShutDown(); err != nil {
 		logger.Error(context.Background(), "BOOT_STOP_ALARM", "err", err)
 	}

@@ -479,31 +479,24 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
 
-void KafkaTlsUnittest::TestInitWithTLSMinimal() {
-    KafkaConfig cfg;
-    cfg.Brokers = {"localhost:9092"};
-    cfg.Topic = "tls-test";
-    cfg.Version = "2.6.0";
-    cfg.EnableTLS = true;
+void FlusherKafkaUnittest::TestInitWithTLSMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
 
-    KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(cfg));
-    p.Close();
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
 
-void KafkaTlsUnittest::TestInitWithTLSFullPaths() {
-    KafkaConfig cfg;
-    cfg.Brokers = {"localhost:9092"};
-    cfg.Topic = "tls-test";
-    cfg.Version = "2.6.0";
-    cfg.EnableTLS = true;
-    cfg.TLSCaFile = "/tmp/does-not-need-to-exist.ca";
-    cfg.TLSCertFile = "/tmp/does-not-need-to-exist.crt";
-    cfg.TLSKeyFile = "/tmp/does-not-need-to-exist.key";
-    cfg.TLSKeyPassword = "secret";
+void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/does-not-need-to-exist.ca";
+    config["Authentication"]["TLS"]["CertFile"] = "/tmp/does-not-need-to-exist.crt";
+    config["Authentication"]["TLS"]["KeyFile"] = "/tmp/does-not-need-to-exist.key";
+    config["Authentication"]["TLS"]["KeyPassword"] = "secret";
 
-    KafkaProducer p;
-    APSARA_TEST_FALSE(p.Init(cfg));
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
 
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
@@ -528,8 +521,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
-UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSMinimal)
-UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
 } // namespace logtail
 
 UNIT_TEST_MAIN
