@@ -99,6 +99,9 @@ public:
     void TestPartitionerHashKeySend();
     void TestInitWithTLSMinimal();
     void TestInitWithTLSFullPaths();
+    void TestInitWithKerberosMinimal();
+    void TestInitWithKerberosAndTLS();
+    void TestInitWithKerberosFull();
 
 protected:
     void SetUp();
@@ -499,6 +502,38 @@ void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
     APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
 
+void FlusherKafkaUnittest::TestInitWithKerberosMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    // default mechanism GSSAPI, service name kafka
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosAndTLS() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/ca.pem"; // path existence is not validated at this stage
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosFull() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["Kerberos"]["Mechanism"] = "GSSAPI";
+    config["Authentication"]["Kerberos"]["ServiceName"] = "kafka";
+    config["Authentication"]["Kerberos"]["Principal"] = "kafka/test@EXAMPLE.COM";
+    config["Authentication"]["Kerberos"]["Keytab"] = "/tmp/test.keytab";
+    config["Authentication"]["Kerberos"]["KinitCmd"] = "kinit -k -t %{sasl.kerberos.keytab} %{sasl.kerberos.principal}";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -523,6 +558,9 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosAndTLS)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosFull)
 } // namespace logtail
 
 UNIT_TEST_MAIN

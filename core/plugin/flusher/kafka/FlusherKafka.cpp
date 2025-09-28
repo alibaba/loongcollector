@@ -225,10 +225,8 @@ bool FlusherKafka::SerializeAndSend(PipelineEventGroup&& group) {
             },
             partitionKey);
     }
-
     return allSuccess;
 }
-
 
 void FlusherKafka::HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo) {
     mSendDoneCnt->Add(1);

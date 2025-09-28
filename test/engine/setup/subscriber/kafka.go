@@ -36,6 +36,12 @@ import (
 
 const kafkaName = "kafka"
 
+// Pre-compiled regular expressions to avoid performance issues
+var (
+	reContent = regexp.MustCompile(`"content"\s*:\s*"((?:\\.|[^"\\])*)"`)
+	reMsg     = regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
+)
+
 type KafkaSubscriber struct {
 	Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
 	Topic   string   `mapstructure:"topic" comment:"kafka topic to consume from"`
@@ -141,8 +147,17 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	out := make(chan *sarama.ConsumerMessage, 1024)
 	for _, pc := range partitionConsumers {
 		go func(c sarama.PartitionConsumer) {
+			defer func() {
+				// Ensure proper cleanup when goroutine exits
+				logger.Debugf(context.Background(), "Partition consumer goroutine exiting")
+			}()
 			for msg := range c.Messages() {
-				out <- msg
+				select {
+				case out <- msg:
+				case <-ctx.Done():
+					// Exit gracefully when context is cancelled
+					return
+				}
 			}
 		}(pc)
 	}
@@ -275,7 +290,6 @@ func init() {
 
 func extractMsgFromRaw(raw string) string {
 	// match content:"<escaped json string>"
-	reContent := regexp.MustCompile(`"content"\s*:\s*"((?:\\.|[^"\\])*)"`)
 	m := reContent.FindStringSubmatch(raw)
 	if len(m) < 2 {
 		return ""
@@ -294,7 +308,6 @@ func extractMsgFromRaw(raw string) string {
 			}
 		}
 	}
-	reMsg := regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
 	mm2 := reMsg.FindStringSubmatch(unescaped)
 	if len(mm2) >= 2 {
 		return mm2[1]
