@@ -82,7 +82,7 @@
 
 ### 基础历史文件采集
 
-采集\`/var/log/history\`目录下所有\`.log\`文件，并将结果输出至stdout。
+采集 `/var/log/history `目录下所有 `.log `文件，并将结果输出至stdout。
 
 **配置文件位置**：`/opt/loongcollector/conf/onetime_pipeline_config/local/historical_logs.yaml`
 
@@ -102,7 +102,7 @@ flushers:
 
 ### 递归目录搜索
 
-采集\`/var/log/archive\`目录下所有子目录中的\`.log\`文件，最大搜索深度为5层。
+采集 `/var/log/archive `目录下所有子目录中的 `.log `文件，最大搜索深度为5层。
 
 ```yaml
 enable: true
@@ -170,7 +170,7 @@ flushers:
 
 ### 文件路径优化
 - 使用精确的文件路径匹配，避免过于宽泛的通配符
-- 合理设置\`MaxDirSearchDepth\`，避免过深的目录搜索
+- 合理设置 `MaxDirSearchDepth `，避免过深的目录搜索
 - 使用黑名单过滤不需要的文件，减少处理开销
 
 ### 内存管理
