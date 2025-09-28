@@ -49,16 +49,11 @@ func Load(path string) error {
 	EngineLogFile = reportDir + CaseName + "_engine.log"
 	LogDir = reportDir + CaseName + "_log"
 
-	// Ensure report directory exists
 	_ = os.MkdirAll(reportDir, 0o750)
 
-	// Use a distinct filename to avoid concatenation ambiguity
 	FlusherFile = reportDir + CaseName + "_default_flusher.json"
 
-	// Ensure default flusher file exists to prevent Docker bind from creating a directory
 	if _, err := os.Stat(FlusherFile); os.IsNotExist(err) {
-		// Write a minimal stdout flusher config to avoid external dependencies in tests
-		// {"type":"flusher_stdout","detail":{}}
 		_ = os.WriteFile(FlusherFile, []byte("{\"type\":\"flusher_stdout\",\"detail\":{}}\n"), 0o600)
 	}
 	return nil
