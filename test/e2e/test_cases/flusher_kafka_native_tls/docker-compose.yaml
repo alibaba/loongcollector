@@ -90,8 +90,7 @@ services:
       zookeeper:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      test: ["CMD", "sh", "-lc", "nc -z localhost 9092 && nc -z localhost 29093"]
       interval: 10s
       timeout: 5s
-      retries: 5
-
+      retries: 10

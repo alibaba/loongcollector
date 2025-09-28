@@ -107,7 +107,7 @@ struct KafkaConfig {
                     return false;
                 }
                 if (EnableTLS) {
-                    GetMandatoryStringParam(tls, "CAFile", TLSCaFile, errorMsg);
+                    GetOptionalStringParam(tls, "CAFile", TLSCaFile, errorMsg);
                     GetOptionalStringParam(tls, "CertFile", TLSCertFile, errorMsg);
                     GetOptionalStringParam(tls, "KeyFile", TLSKeyFile, errorMsg);
                     GetOptionalStringParam(tls, "KeyPassword", TLSKeyPassword, errorMsg);

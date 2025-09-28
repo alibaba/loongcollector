@@ -97,6 +97,8 @@ public:
     void TestDynamicTopic_FromTags();
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
+    void TestInitWithTLSMinimal();
+    void TestInitWithTLSFullPaths();
     void TestPartitionerHashKeyInvalidPrefix();
     void TestUnknownPartitionerType();
     void TestGeneratePartitionKey_NotHash();
@@ -480,6 +482,32 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceA") != keys.end());
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
+void KafkaTlsUnittest::TestInitWithTLSMinimal() {
+    KafkaConfig cfg;
+    cfg.Brokers = {"localhost:9092"};
+    cfg.Topic = "tls-test";
+    cfg.Version = "2.6.0";
+    cfg.EnableTLS = true;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(cfg));
+    p.Close();
+}
+
+void KafkaTlsUnittest::TestInitWithTLSFullPaths() {
+    KafkaConfig cfg;
+    cfg.Brokers = {"localhost:9092"};
+    cfg.Topic = "tls-test";
+    cfg.Version = "2.6.0";
+    cfg.EnableTLS = true;
+    cfg.TLSCaFile = "/tmp/does-not-need-to-exist.ca";
+    cfg.TLSCertFile = "/tmp/does-not-need-to-exist.crt";
+    cfg.TLSKeyFile = "/tmp/does-not-need-to-exist.key";
+    cfg.TLSKeyPassword = "secret";
+
+    KafkaProducer p;
+    APSARA_TEST_FALSE(p.Init(cfg));
+}
 
 void FlusherKafkaUnittest::TestPartitionerHashKeyInvalidPrefix() {
     Json::Value optionalGoPipeline;
@@ -567,6 +595,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
+UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSMinimal)
+UNIT_TEST_CASE(KafkaTlsUnittest, TestInitWithTLSFullPaths)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)
