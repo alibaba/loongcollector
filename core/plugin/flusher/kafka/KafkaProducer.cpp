@@ -187,18 +187,20 @@ public:
             rd_kafka_conf_set_default_topic_conf(mConf, tconf);
         }
 
-        if (mConfig.EnableTLS) {
+        // TLS (TLS-only for this phase) - keep inline style consistent with existing code
+        if (mConfig.Authentication.tls_enabled) {
             if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, "ssl")) {
                 return false;
             }
 
-            if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.TLSCaFile)) {
-                return false;
+            if (!mConfig.Authentication.tls_ca_file.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.tls_ca_file)) {
+                    return false;
+                }
             }
 
-            const bool hasCert = !mConfig.TLSCertFile.empty();
-            const bool hasKey = !mConfig.TLSKeyFile.empty();
-
+            const bool hasCert = !mConfig.Authentication.tls_cert_file.empty();
+            const bool hasKey = !mConfig.Authentication.tls_key_file.empty();
             if (hasCert != hasKey) {
                 LOG_ERROR(sLogger,
                           ("Kafka TLS client auth config error",
@@ -206,15 +208,15 @@ public:
                 return false;
             }
 
-            if (hasCert && hasKey) {
-                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.TLSCertFile)) {
+            if (hasCert) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.tls_cert_file)) {
                     return false;
                 }
-                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.TLSKeyFile)) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.Authentication.tls_key_file)) {
                     return false;
                 }
-                if (!mConfig.TLSKeyPassword.empty()) {
-                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.TLSKeyPassword)) {
+                if (!mConfig.Authentication.tls_key_password.empty()) {
+                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.Authentication.tls_key_password)) {
                         return false;
                     }
                 }
