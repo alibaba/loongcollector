@@ -107,6 +107,8 @@ flushers:
 
 ## TLS配置
 
+支持通过 TLS/SSL 安全连接到 Kafka 集群。TLS 配置支持两种方式：
+
 ```yaml
 flushers:
   - Type: flusher_kafka_native
@@ -117,8 +119,6 @@ flushers:
       TLS:
         Enabled: true
         CAFile: "/etc/kafka/ssl/ca.crt"
-        # 可选：若需要客户端证书/私钥
-        # CertFile: "/etc/kafka/ssl/client.crt"
-        # KeyFile: "/etc/kafka/ssl/client.key"
-        # KeyPassword: "***"
+        CertFile: "/etc/kafka/ssl/client.crt"
+        KeyFile: "/etc/kafka/ssl/client.key"
 ```
