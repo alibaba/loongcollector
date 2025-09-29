@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "common/ParamExtractor.h"
+#include "common/auth/AuthConfig.h"
 #include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
@@ -52,11 +53,8 @@ struct KafkaConfig {
 
     std::map<std::string, std::string> CustomConfig;
 
-    bool EnableTLS = false;
-    std::string TLSCaFile;
-    std::string TLSCertFile;
-    std::string TLSKeyFile;
-    std::string TLSKeyPassword;
+    // General Authentication (TLS for now)
+    AuthConfig Authentication;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
@@ -101,17 +99,11 @@ struct KafkaConfig {
 
         if (config.isMember("Authentication") && config["Authentication"].isObject()) {
             const Json::Value& auth = config["Authentication"];
-            if (auth.isMember("TLS") && auth["TLS"].isObject()) {
-                const Json::Value& tls = auth["TLS"];
-                if (!GetOptionalBoolParam(tls, "Enabled", EnableTLS, errorMsg)) {
-                    return false;
-                }
-                if (EnableTLS) {
-                    GetOptionalStringParam(tls, "CAFile", TLSCaFile, errorMsg);
-                    GetOptionalStringParam(tls, "CertFile", TLSCertFile, errorMsg);
-                    GetOptionalStringParam(tls, "KeyFile", TLSKeyFile, errorMsg);
-                    GetOptionalStringParam(tls, "KeyPassword", TLSKeyPassword, errorMsg);
-                }
+            if (!Authentication.Load(auth, errorMsg)) {
+                return false;
+            }
+            if (!Authentication.Validate(errorMsg)) {
+                return false;
             }
         }
 
