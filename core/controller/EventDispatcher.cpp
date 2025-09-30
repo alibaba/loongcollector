@@ -238,7 +238,10 @@ bool EventDispatcher::RegisterEventHandler(const char* path,
                  ("failed to add inotify watcher for dir", path)("max allowd inotify watchers",
                                                                  INT32_FLAG(default_max_inotify_watch_num)));
         LogtailAlarm::GetInstance()->SendAlarm(INOTIFY_DIR_NUM_LIMIT_ALARM,
-                                               string("failed to register inotify watcher for dir") + path);
+                                               string("failed to register inotify watcher for dir") + path,
+                                               config.second->GetProjectName(),
+                                               config.second->GetLogstoreName(),
+                                               config.second->GetRegion());
     } else {
         // need check mEventListener valid
         if (mEventListener->IsInit() && !AppConfig::GetInstance()->IsInInotifyBlackList(path)) {

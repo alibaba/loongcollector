@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <vector>
-#include <utility>
-#include <algorithm>
 #include "LogIntegrity.h"
-#include "LogstoreSenderQueue.h"
-#include "LogFileReader.h"
+
+#include <algorithm>
+#include <utility>
+#include <vector>
+
 #include "ConfigManager.h"
+#include "LogFileProfiler.h"
+#include "LogFileReader.h"
+#include "LogstoreSenderQueue.h"
+#include "LogtailAlarm.h"
+#include "Sender.h"
+#include "application/Application.h"
+#include "common/Constants.h"
+#include "common/ExceptionBase.h"
+#include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/RuntimeUtil.h"
-#include "common/JsonUtil.h"
-#include "common/ExceptionBase.h"
-#include "common/Constants.h"
-#include "Sender.h"
-#include "LogtailAlarm.h"
-#include "LogFileProfiler.h"
-#include "application/Application.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -274,7 +276,7 @@ void LogIntegrity::Notify(LoggroupTimeValue* data, bool flag) {
     LogIntegrityInfo* info = NULL;
     if (FindLogIntegrityInfo(region, projectName, logstore, filename, info)) {
         info->mLastUpdateTime = data->mEnqueueTime;
-        
+
         info->SetStatus(data->mLogGroupContext.mSeqNum,
                         data->mLogLines,
                         flag ? LogTimeInfo::LogIntegrityStatus_SendOK : LogTimeInfo::LogIntegrityStatus_SendFail);
@@ -360,8 +362,8 @@ void LogIntegrity::SendLogIntegrityInfo() {
                 logTagPtr->set_value(LogFileProfiler::mHostname);
 
                 // send integrity log group
-                bool sendSucceeded
-                    = ProfileSender::GetInstance()->SendInstantly(logGroup, dst.mAliuid, dst.mRegion, dst.mProjectName, dst.mLogstore);
+                bool sendSucceeded = ProfileSender::GetInstance()->SendInstantly(
+                    logGroup, dst.mAliuid, dst.mRegion, dst.mProjectName, dst.mLogstore);
                 if (!sendSucceeded) {
                     LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
                                                            "push data integrity data into batch map fail",
@@ -550,7 +552,11 @@ bool LogIntegrity::ReloadIntegrityDataFromLocalFile() {
 
                 if (!errorMessage.empty()) {
                     LogtailAlarm::GetInstance()->SendAlarm(
-                        LOGTAIL_CONFIG_ALARM, errorMessage, region, projectLogstoreFilename);
+                        LOGTAIL_CONFIG_ALARM,
+                        errorMessage + ", project_logstore_filename: " + projectLogstoreFilename,
+                        "",
+                        "",
+                        region);
                     errorMessage.clear();
                 }
             }
@@ -943,8 +949,8 @@ void LogIntegrity::SendOutDatedFileIntegrityInfo() {
             logTagPtr->set_value(LogFileProfiler::mHostname);
 
             // send integrity log group
-            bool sendSucceeded
-                = ProfileSender::GetInstance()->SendInstantly(logGroup, dst.mAliuid, dst.mRegion, dst.mProjectName, dst.mLogstore);
+            bool sendSucceeded = ProfileSender::GetInstance()->SendInstantly(
+                logGroup, dst.mAliuid, dst.mRegion, dst.mProjectName, dst.mLogstore);
             if (!sendSucceeded) {
                 LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
                                                        "push data integrity data into batch map fail",

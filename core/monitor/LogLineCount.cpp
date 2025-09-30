@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <utility>
 #include "LogLineCount.h"
-#include "LogstoreSenderQueue.h"
+
+#include <utility>
+
 #include "LogFileProfiler.h"
-#include "common/LogtailCommonFlags.h"
-#include "common/StringTools.h"
-#include "common/RuntimeUtil.h"
-#include "common/JsonUtil.h"
-#include "common/ExceptionBase.h"
-#include "config_manager/ConfigManager.h"
-#include "Sender.h"
+#include "LogstoreSenderQueue.h"
 #include "LogtailAlarm.h"
+#include "Sender.h"
 #include "application/Application.h"
+#include "common/ExceptionBase.h"
+#include "common/JsonUtil.h"
+#include "common/LogtailCommonFlags.h"
+#include "common/RuntimeUtil.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "config_manager/ConfigManager.h"
 
 using namespace sls_logs;
 using namespace std;
@@ -303,7 +305,8 @@ bool LogLineCount::ReloadLineCountDataFromLocalFile() {
                 }
 
                 if (!errorMessage.empty()) {
-                    LogtailAlarm::GetInstance()->SendAlarm(LOGTAIL_CONFIG_ALARM, errorMessage, region, projectLogstore);
+                    LogtailAlarm::GetInstance()->SendAlarm(
+                        LOGTAIL_CONFIG_ALARM, errorMessage + ", project_logstore: " + projectLogstore, "", "", region);
                     errorMessage.clear();
                 }
             }
