@@ -219,6 +219,9 @@ public:
     static std::string mUsername;
     static int32_t mSystemBootTime;
     static std::string mStartTime;
+    static std::string mEcsInstanceID;
+    static std::string mEcsUserID;
+    static std::string mEcsRegionID;
 
 private:
     LoongCollectorMonitor();
