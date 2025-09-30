@@ -17,7 +17,6 @@
 #pragma once
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -26,6 +25,10 @@
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
+#include "common/FormattedString.h"
+#include "common/StringView.h"
+#include "models/PipelineEventGroup.h"
+#include "models/PipelineEventPtr.h"
 #include "monitor/MetricManager.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
 #include "plugin/flusher/kafka/KafkaProducer.h"
@@ -55,10 +58,14 @@ public:
 private:
     bool SerializeAndSend(PipelineEventGroup&& group);
     void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
+    std::string GeneratePartitionKey(const PipelineEventPtr& event) const;
 
     KafkaConfig mKafkaConfig;
     std::unique_ptr<KafkaProducer> mProducer;
     std::unique_ptr<EventGroupSerializer> mSerializer;
+
+    FormattedString mTopicFormatter;
+    std::string mExpandedTopic;
 
     CounterPtr mSendCnt;
     CounterPtr mSuccessCnt;
