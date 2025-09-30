@@ -1,0 +1,15 @@
+2025-09-26 13:30:29 [INF] [docker_compose.go:134] [ExecOnLoongCollector] ExecOnLoongCollector:ps -e | grep loongcollector | grep -v grep | awk '{print $1}'	
+2025-09-26 13:30:29 [INF] [docker_compose.go:137] [ExecOnLoongCollector] ExecOnLoongCollector:ps -e | grep loongcollector | grep -v grep | awk '{print $1}'	output:	
+2025-09-26 13:30:29 [INF] [docker_compose_boot.go:32] [Init] boot controller is initializing....:	
+2025-09-26 13:30:29 [INF] [docker_compose_boot.go:41] [Start] boot controller is starting....:	
+2025-09-26 13:30:56 [INF] [kafka.go:141] [GetData] Starting to consume messages from topic: test-topic-compress
+2025-09-26 13:30:58 [INF] [kafka.go:228] [GetData] Successfully collected 1000 messages from topic test-topic-compress
+2025-09-26 13:30:58 [INF] [kafka.go:141] [GetData] Starting to consume messages from topic: test-topic-compress
+2025-09-26 13:30:58 [INF] [kafka.go:228] [GetData] Successfully collected 1000 messages from topic test-topic-compress
+2025-09-26 13:30:59 [INF] [docker_compose.go:134] [ExecOnLoongCollector] ExecOnLoongCollector:cd  && rm -rf *.yaml	
+2025-09-26 13:30:59 [INF] [docker_compose.go:137] [ExecOnLoongCollector] ExecOnLoongCollector:cd  && rm -rf *.yaml	output:	
+2025-09-26 13:30:59 [INF] [docker_compose.go:143] [ExecOnSource] ExecOnSource:rm -rf /tmp/loongcollector/*	
+2025-09-26 13:30:59 [INF] [docker_compose.go:146] [ExecOnSource] ExecOnSource:rm -rf /tmp/loongcollector/*	output:	
+2025-09-26 13:30:59 [INF] [docker_compose_boot.go:68] [Clean] boot controller is cleaning....:	
+2025-09-26 13:31:17 [INF] [docker_compose.go:134] [ExecOnLoongCollector] ExecOnLoongCollector:ps -e | grep loongcollector | grep -v grep | awk '{print $1}'	
+2025-09-26 13:31:17 [INF] [docker_compose.go:137] [ExecOnLoongCollector] ExecOnLoongCollector:ps -e | grep loongcollector | grep -v grep | awk '{print $1}'	output:	
