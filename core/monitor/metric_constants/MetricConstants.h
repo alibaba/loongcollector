@@ -33,6 +33,9 @@ extern const std::string METRIC_LABEL_KEY_PROJECT;
 extern const std::string METRIC_LABEL_KEY_USER_DEFINED_ID;
 extern const std::string METRIC_LABEL_KEY_UUID;
 extern const std::string METRIC_LABEL_KEY_VERSION;
+extern const std::string METRIC_LABEL_KEY_ECS_INSTANCE_ID;
+extern const std::string METRIC_LABEL_KEY_ECS_REGION_ID;
+extern const std::string METRIC_LABEL_KEY_ECS_USER_ID;
 
 // metric keys
 extern const std::string METRIC_AGENT_CPU;

@@ -29,6 +29,9 @@ const string METRIC_LABEL_KEY_PROJECT = "project";
 const string METRIC_LABEL_KEY_USER_DEFINED_ID = "user_defined_id";
 const string METRIC_LABEL_KEY_UUID = "uuid";
 const string METRIC_LABEL_KEY_VERSION = "version";
+const string METRIC_LABEL_KEY_ECS_INSTANCE_ID = "ecs_instance_id";
+const string METRIC_LABEL_KEY_ECS_REGION_ID = "ecs_region_id";
+const string METRIC_LABEL_KEY_ECS_USER_ID = "ecs_user_id";
 
 // metric keys
 const string METRIC_AGENT_CPU = "cpu";
