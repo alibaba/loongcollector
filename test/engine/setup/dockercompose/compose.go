@@ -65,6 +65,7 @@ services:
       - ALICLOUD_LOG_DOCKER_ENV_CONFIG=true
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
+      - MY_ENV=prod
     healthcheck:
       test: "cat /usr/local/loongcollector/log/loongcollector.LOG"
       interval: 15s
@@ -253,6 +254,11 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			services[k] = newServices[k]
 		}
 		loongcollector["depends_on"] = loongcollectorDependOn
+
+		// merge top-level volumes from case compose to support named volumes in mounts
+		if vols, ok := caseCfg["volumes"]; ok {
+			cfg["volumes"] = vols
+		}
 	}
 	// volume
 	loongcollectorMount := services["loongcollectorC"].(map[string]interface{})["volumes"].([]interface{})
