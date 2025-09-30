@@ -627,9 +627,15 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_KEY_UUID, Application::GetInstance()->GetUUID());
     labels.emplace_back(METRIC_LABEL_KEY_VERSION, ILOGTAIL_VERSION);
 #ifdef __ENTERPRISE__
-    labels.emplace_back(METRIC_LABEL_KEY_ECS_INSTANCE_ID, mEcsInstanceID);
-    labels.emplace_back(METRIC_LABEL_KEY_ECS_REGION_ID, mEcsRegionID);
-    labels.emplace_back(METRIC_LABEL_KEY_ECS_USER_ID, mEcsUserID);
+    if (!mEcsInstanceID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_INSTANCE_ID, mEcsInstanceID);
+    }
+    if (!mEcsRegionID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_REGION_ID, mEcsRegionID);
+    }
+    if (!mEcsUserID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_USER_ID, mEcsUserID);
+    }
 #endif
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, []() -> std::string { return FlusherSLS::GetAllProjects(); });
