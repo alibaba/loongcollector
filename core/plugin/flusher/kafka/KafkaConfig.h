@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "common/ParamExtractor.h"
+#include "common/auth/AuthConfig.h"
 #include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
@@ -32,6 +33,10 @@ struct KafkaConfig {
     std::string Topic;
 
     std::string Version = "1.0.0";
+
+    std::string PartitionerType;
+    std::vector<std::string> HashKeys;
+    std::string Partitioner;
 
     uint32_t QueueBufferingMaxKbytes = 1048576;
     uint32_t QueueBufferingMaxMessages = 100000;
@@ -47,6 +52,9 @@ struct KafkaConfig {
     uint32_t RetryBackoffMs = 100;
 
     std::map<std::string, std::string> CustomConfig;
+
+    // General Authentication (TLS/SASL/Kerberos)
+    AuthConfig Authentication;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
@@ -85,6 +93,19 @@ struct KafkaConfig {
 
         GetOptionalUIntParam(config, "QueueBufferingMaxKbytes", QueueBufferingMaxKbytes, errorMsg);
         GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
+
+        GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
+        GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
+
+        if (config.isMember("Authentication") && config["Authentication"].isObject()) {
+            const Json::Value& auth = config["Authentication"];
+            if (!Authentication.Load(auth, errorMsg)) {
+                return false;
+            }
+            if (!Authentication.Validate(errorMsg)) {
+                return false;
+            }
+        }
 
         if (config.isMember("Kafka") && config["Kafka"].isObject()) {
             const Json::Value& kafkaConfig = config["Kafka"];

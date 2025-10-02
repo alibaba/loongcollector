@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -91,6 +92,16 @@ public:
     void TestInitWithFullConfig();
     void TestSendOnUnstarted();
     void TestSendSerializationFailure();
+    void TestDynamicTopic_Success();
+    void TestDynamicTopic_FallbackToStatic();
+    void TestDynamicTopic_FromTags();
+    void TestPartitionerHashConfigValidation();
+    void TestPartitionerHashKeySend();
+    void TestInitWithTLSMinimal();
+    void TestInitWithTLSFullPaths();
+    void TestInitWithKerberosMinimal();
+    void TestInitWithKerberosAndTLS();
+    void TestInitWithKerberosFull();
 
 protected:
     void SetUp();
@@ -370,6 +381,159 @@ void FlusherKafkaUnittest::TestSendSerializationFailure() {
     APSARA_TEST_EQUAL(1, mFlusher->mDiscardCnt->GetValue());
 }
 
+void FlusherKafkaUnittest::TestDynamicTopic_Success() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("test_%{content.application}");
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("application"), StringView("user_behavior_log"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("test_user_behavior_log"), completed.back().Topic);
+    APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
+}
+
+void FlusherKafkaUnittest::TestDynamicTopic_FallbackToStatic() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("test_%{content.application}");
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("key"), StringView("value"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("test_%{content.application}"), completed.back().Topic);
+    APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
+}
+
+void FlusherKafkaUnittest::TestDynamicTopic_FromTags() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("logs_%{tag.namespace}");
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("key"), StringView("value"));
+    group.SetTag(StringView("namespace"), StringView("nginx_access_log"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1, completed.size());
+    APSARA_TEST_EQUAL(std::string("logs_nginx_access_log"), completed.back().Topic);
+    APSARA_TEST_EQUAL(1, mFlusher->mSendCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSendDoneCnt->GetValue());
+    APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
+}
+
+void FlusherKafkaUnittest::TestPartitionerHashConfigValidation() {
+    Json::Value optionalGoPipeline;
+    Json::Value config;
+    config["Brokers"] = Json::Value(Json::arrayValue);
+    config["Brokers"].append("dummy:9092");
+    config["Topic"] = mTopic;
+    config["Version"] = "2.6.0";
+    config["PartitionerType"] = "hash";
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["PartitionerType"] = "hash";
+    Json::Value hashKeys(Json::arrayValue);
+    hashKeys.append("content.application");
+    config["HashKeys"] = hashKeys;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    auto* e1 = group.AddLogEvent();
+    e1->SetContent(StringView("application"), StringView("serviceA"));
+    auto* e2 = group.AddLogEvent();
+    e2->SetContent(StringView("application"), StringView("serviceB"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    APSARA_TEST_EQUAL(2, mFlusher->mSendCnt->GetValue());
+
+    const auto& reqs = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(2U, reqs.size());
+    std::set<std::string> keys;
+    for (const auto& r : reqs) {
+        keys.insert(r.Key);
+    }
+    APSARA_TEST_TRUE(keys.find("serviceA") != keys.end());
+    APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
+}
+
+void FlusherKafkaUnittest::TestInitWithTLSMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("tls-test");
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/does-not-need-to-exist.ca";
+    config["Authentication"]["TLS"]["CertFile"] = "/tmp/does-not-need-to-exist.crt";
+    config["Authentication"]["TLS"]["KeyFile"] = "/tmp/does-not-need-to-exist.key";
+    config["Authentication"]["TLS"]["KeyPassword"] = "secret";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    // default mechanism GSSAPI, service name kafka
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosAndTLS() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/ca.pem"; // path existence is not validated at this stage
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosFull() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["Kerberos"]["Mechanism"] = "GSSAPI";
+    config["Authentication"]["Kerberos"]["ServiceName"] = "kafka";
+    config["Authentication"]["Kerberos"]["Principal"] = "kafka/test@EXAMPLE.COM";
+    config["Authentication"]["Kerberos"]["Keytab"] = "/tmp/test.keytab";
+    config["Authentication"]["Kerberos"]["KinitCmd"] = "kinit -k -t %{sasl.kerberos.keytab} %{sasl.kerberos.principal}";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -387,7 +551,16 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendQueueFullError)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestFlushFailure)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithFullConfig)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendSerializationFailure)
-
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_Success)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosAndTLS)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosFull)
 } // namespace logtail
 
 UNIT_TEST_MAIN

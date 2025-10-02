@@ -1,4 +1,6 @@
-# Copyright 2023 iLogtail Authors
+#!/usr/bin/env bash
+
+# Copyright 2025 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,12 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+sleep 3
+for i in {1..30} ; do
+  echo "{\"env\":\"prod\",\"service\":\"serviceA\",\"msg\":\"hello-$i\"}"
+  sleep 0.1
+done
+sleep 3600
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3
-
-USER root
-WORKDIR /src
-
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
-CMD ["bash", "-c", "gcovr --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*sdk.*\" -e \".*logger.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*protobuf.*\" -e \".*runner.*\""]

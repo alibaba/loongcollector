@@ -65,6 +65,16 @@ services:
       - ALICLOUD_LOG_DOCKER_ENV_CONFIG=true
       - ALICLOUD_LOG_PLUGIN_ENV_CONFIG=false
       - ALIYUN_LOGTAIL_USER_DEFINED_ID=1111
+      - MY_ENV=prod
+      - KRB5CCNAME=FILE:/var/kerberos/krb5cc
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        ( command -v yum >/dev/null 2>&1 && yum -y install -q cyrus-sasl-gssapi krb5-workstation ) ||
+        ( command -v microdnf >/dev/null 2>&1 && microdnf -y install cyrus-sasl-gssapi krb5-workstation ) ||
+        ( command -v apt-get >/dev/null 2>&1 && export DEBIAN_FRONTEND=noninteractive && apt-get update -qq && apt-get install -y -q libsasl2-modules-gssapi-mit krb5-user ) || true;
+        exec /usr/local/loongcollector/loongcollector_control.sh start_and_block
     healthcheck:
       test: "cat /usr/local/loongcollector/log/loongcollector.LOG"
       interval: 15s
@@ -253,6 +263,11 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			services[k] = newServices[k]
 		}
 		loongcollector["depends_on"] = loongcollectorDependOn
+
+		// merge top-level volumes from case compose to support named volumes in mounts
+		if vols, ok := caseCfg["volumes"]; ok {
+			cfg["volumes"] = vols
+		}
 	}
 	// volume
 	loongcollectorMount := services["loongcollectorC"].(map[string]interface{})["volumes"].([]interface{})
@@ -331,7 +346,7 @@ func withExposedService(compose testcontainers.DockerCompose) (wrappers []*Strat
 				portNum, _ = strconv.Atoi(port)
 			}
 			wrapper = StrategyWrapper{
-				original:    wait.ForListeningPort(np),
+				original:    wait.ForListeningPort(np).WithStartupTimeout(5 * time.Minute),
 				service:     serv,
 				virtualPort: np,
 			}

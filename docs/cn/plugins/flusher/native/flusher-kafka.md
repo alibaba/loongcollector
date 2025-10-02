@@ -27,6 +27,22 @@
 | `MaxRetries` | uint | 否 | `3` | 失败重试次数，映射 `message.send.max.retries` |
 | `RetryBackoffMs` | uint | 否 | `100` | 重试退避（毫秒），映射 `retry.backoff.ms` |
 | `Kafka` | map[string]string | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
+| `PartitionerType` | String | 否 | 分区策略：`random` 或 `hash`。默认 `random`。当为 `hash` 时，会基于指定的 `HashKeys` 生成消息键（Key），并使用 `murmur2_random` 作为底层分区器。 |
+| `HashKeys` | String数组 | 否 | 参与分区键生成的字段（仅对 `LOG` 事件生效）。每项必须以 `content.` 前缀开头，如：`["content.service", "content.user"]`。当 `PartitionerType` = `hash` 时必填。 |
+| `Authentication.TLS.Enabled` | bool | 否 | false | 启用 SSL 连接，对应 `security.protocol=ssl` |
+| `Authentication.TLS.CAFile` | string | 否 | / | CA 证书路径，映射 `ssl.ca.location` |
+| `Authentication.TLS.CertFile` | string | 否 | / | 客户端证书路径，映射 `ssl.certificate.location`（与 KeyFile 必须成对配置，否则将视为配置错误） |
+| `Authentication.TLS.KeyFile` | string | 否 | / | 客户端私钥路径，映射 `ssl.key.location`（与 CertFile 必须成对配置，否则将视为配置错误） |
+| `Authentication.TLS.KeyPassword` | string | 否 | / | 私钥口令，映射 `ssl.key.password`（可选） |
+| `Authentication.SASL.Mechanism` | string | 否 | / | SASL 机制：`PLAIN`、`SCRAM-SHA-256`、`SCRAM-SHA-512` 等，对应 `sasl.mechanisms`。 |
+| `Authentication.SASL.Username`  | string | 否 | / | SASL 用户名（当设置 `Mechanism` 时必填），对应 `sasl.username`。 |
+| `Authentication.SASL.Password`  | string | 否 | / | SASL 密码（当设置 `Mechanism` 时必填），对应 `sasl.password`。 |
+| `Authentication.Kerberos.Enabled` | bool | 否 | false | 启用 Kerberos(GSSAPI) 认证，启用后 SASL(PLAIN/SCRAM) 不可同时设置。 |
+| `Authentication.Kerberos.Mechanisms` | string | 否 | `GSSAPI` | Kerberos 机制（通常为 `GSSAPI`），对应 `sasl.mechanisms`。 |
+| `Authentication.Kerberos.ServiceName` | string | 否 | `kafka` | Kafka 服务名，对应 `sasl.kerberos.service.name`。 |
+| `Authentication.Kerberos.Principal` | string | 否 | / | Kerberos 主体（启用 Kerberos 时必填）。 |
+| `Authentication.Kerberos.Keytab` | string | 否 | / | Kerberos keytab（启用 Kerberos 时必填）。 |
+| `Authentication.Kerberos.KinitCmd` | string | 否 | / | 自定义 `kinit` 命令（通常无需配置）。未设置时，librdkafka 将基于 `Principal` 与 `Keytab` 使用其内置流程完成票据获取与续约。 |
 
 ## 样例
 
@@ -45,4 +61,105 @@ flushers:
     MaxRetries: 2
     Kafka:
       compression.type: lz4
+```
+
+## 动态 Topic
+
+`Topic` 支持动态格式化，按事件内容或分组标签动态路由到不同的 Kafka Topic。支持的占位符：
+
+- `%{content.key}`: 取日志内容中的字段值（仅对 `LOG` 类型事件生效）。
+- `%{tag.key}`: 取分组标签（`GroupTags`）中的键值。
+ - `${ENV_NAME}`: 取系统环境变量 `ENV_NAME` 的值（容器/进程环境）。
+
+示例：根据日志中的 `service` 字段动态路由到不同 Topic：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29092"]
+    Topic: "app-%{content.service}"
+    KafkaVersion: "3.6.0"
+```
+
+示例：根据标签 `env` 和日志字段 `service` 组合路由：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29092"]
+    Topic: "${env}-%{content.service}"
+    KafkaVersion: "3.6.0"
+```
+
+当动态格式化失败（字段缺失等）时，将回退到原始 `Topic` 模板字符串对应的静态值，并记录错误日志。
+
+## 分区策略
+
+当需要将相同业务键的日志落到同一分区时，可以开启 `hash` 分区：
+
+- `PartitionerType: "hash"`：启用哈希分区，内部映射为 librdkafka `partitioner=murmur2_random`，与 Java 客户端默认分区器兼容（NULL Key 随机分配）。
+- `HashKeys`：从日志内容中取值拼接成消息 Key（按顺序用 `###` 连接），示例：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29092"]
+    Topic: "hash-topic"
+    Version: "2.8.0"
+    PartitionerType: "hash"
+    HashKeys: ["content.service", "content.user"]
+```
+
+说明：
+- 仅支持从 `content.*` 中取值生成 Key；若键值缺失则不设置消息 Key（按空 Key 发送，随机分区）。
+- 当前实现按事件逐条发送，Key 不同的事件由客户端路由至对应分区。
+
+## TLS配置
+
+支持通过 TLS/SSL 安全连接到 Kafka 集群。TLS 配置支持两种方式：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29093"]
+    Topic: "tls-topic"
+    Version: "2.8.0"
+    Authentication:
+      TLS:
+        Enabled: true
+        CAFile: "/etc/kafka/ssl/ca.crt"
+        CertFile: "/etc/kafka/ssl/client.crt"
+        KeyFile: "/etc/kafka/ssl/client.key"
+```
+
+## SASL 示例
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29093"]
+    Topic: "sasl-topic"
+    Version: "3.6.0"
+    Authentication:
+      SASL:
+        Mechanism: "PLAIN"
+        Username: "user"
+        Password: "pass"
+```
+
+## Kerberos 示例
+
+```yaml
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29093"]
+    Topic: "krb-topic"
+    Version: "2.8.0"
+    Authentication:
+      Kerberos:
+        Enabled: true
+        ServiceName: "kafka"
+        Principal: "client@EXAMPLE.COM"
+        Keytab: "/etc/security/keytabs/client.keytab"
+        # KinitCmd 可选，通常不需设置；除非有自定义票据刷新方式
 ```
