@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3
 
 ARG HOST_OS=Linux
 ARG VERSION=0.0.1
 
 USER root
 WORKDIR /loongcollector
+
+RUN yum install -y cyrus-sasl-devel krb5-devel
 
 RUN mkdir -p /loongcollector/conf/instance_config/local
 RUN mkdir -p /loongcollector/log
