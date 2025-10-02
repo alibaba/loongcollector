@@ -60,5 +60,7 @@ extern const std::string KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME;
 extern const std::string KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL;
 extern const std::string KAFKA_CONFIG_SASL_KERBEROS_KEYTAB;
 extern const std::string KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD;
+extern const std::string KAFKA_CONFIG_SASL_USERNAME;
+extern const std::string KAFKA_CONFIG_SASL_PASSWORD;
 
 } // namespace logtail

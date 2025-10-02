@@ -29,13 +29,16 @@ Feature: flusher kafka native Kerberos
         Brokers: ["kafka:29093"]
         Topic: "kerberos-topic"
         Version: "2.6.0"
+        MessageTimeoutMs: 60000
         Authentication:
           Kerberos:
             Enabled: true
             Mechanisms: "GSSAPI"
             ServiceName: "kafka"
-            Principal: "client@EXAMPLE.COM"
+            Principal: "client"
             Keytab: "/var/kerberos/client.keytab"
+        Kafka:
+          debug: "security,broker"
     """
     Given loongcollector container mount {./flusher_kerberos.log} to {/root/test/1/2/3/kerberos_input.log}
     Given loongcollector container mount {./krb5.conf} to {/etc/krb5.conf}

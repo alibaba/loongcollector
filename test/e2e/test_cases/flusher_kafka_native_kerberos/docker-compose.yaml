@@ -49,16 +49,23 @@ services:
         service krb5-admin-server start &&
         set +e
         kadmin.local -q "addprinc -randkey admin/admin@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "delete_principal -force kafka/kafka@EXAMPLE.COM" 2>/dev/null || true &&
         kadmin.local -q "addprinc -randkey kafka/kafka@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "delete_principal -force client@EXAMPLE.COM" 2>/dev/null || true &&
         kadmin.local -q "addprinc -randkey client@EXAMPLE.COM" 2>/dev/null || true &&
-        kadmin.local -q "ktadd -k /var/kerberos/kafka.keytab -norandkey kafka/kafka@EXAMPLE.COM" || kadmin.local -q "ktadd -k /var/kerberos/kafka.keytab kafka/kafka@EXAMPLE.COM" &&
-        kadmin.local -q "ktadd -k /var/kerberos/client.keytab -norandkey client@EXAMPLE.COM" || kadmin.local -q "ktadd -k /var/kerberos/client.keytab client@EXAMPLE.COM" &&
-        chmod 644 /var/kerberos/*.keytab 2>/dev/null || true &&
+        rm -f /var/kerberos/kafka.keytab /var/kerberos/client.keytab /var/kerberos/krb5cc &&
+        kadmin.local -q "ktadd -k /var/kerberos/kafka.keytab -norandkey kafka/kafka@EXAMPLE.COM" &&
+        kadmin.local -q "ktadd -k /var/kerberos/client.keytab -norandkey client@EXAMPLE.COM" &&
+        chmod 644 /var/kerberos/client.keytab /var/kerberos/kafka.keytab 2>/dev/null || true &&
+        # prepare shared client ccache for other containers (loongcollector, kafka client etc.)
+        export KRB5CCNAME=FILE:/var/kerberos/krb5cc && \
+        for i in $(seq 1 6); do kinit -c /var/kerberos/krb5cc -k -t /var/kerberos/client.keytab client@EXAMPLE.COM && break; sleep 2; done && \
+        klist -c /var/kerberos/krb5cc || true && \
         set -e
         tail -f /dev/null
       '
     healthcheck:
-      test: ["CMD", "sh", "-c", "test -f /var/kerberos/kafka.keytab && test -f /var/kerberos/client.keytab && nc -z localhost 88"]
+      test: ["CMD", "sh", "-c", "test -f /var/kerberos/kafka.keytab && test -f /var/kerberos/client.keytab && test -f /var/kerberos/krb5cc && nc -z localhost 88"]
       interval: 15s
       timeout: 10s
       retries: 20

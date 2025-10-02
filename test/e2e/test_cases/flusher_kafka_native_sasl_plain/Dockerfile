@@ -1,4 +1,4 @@
-# Copyright 2021 iLogtail Authors
+# Copyright 2025 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,17 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3 AS build
+FROM bash
+COPY run.sh /run.sh
+RUN chmod 755 /run.sh
+CMD ["sh", "-c","/run.sh >> /root/flusher_sasl.log"]
 
-USER root
-WORKDIR /src
-
-# Install additional Kerberos dependencies
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
-COPY . .
-
-ARG HOST_OS=Linux
-ARG VERSION=0.0.1
-
-RUN --mount=type=ssh sh generated_files/gen_build.sh
