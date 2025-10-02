@@ -14,11 +14,14 @@
 package pluginmanager
 
 import (
+	"context"
 	goruntimemetrics "runtime/metrics"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
@@ -26,6 +29,29 @@ const (
 	MetricExportTypeGo  = "direct"
 	MetricExportTypeCpp = "cpp_provided"
 )
+
+var globalMetricRecord = globalMetricRecords{records: make(map[*selfmonitor.MetricsRecord]struct{})}
+
+type globalMetricRecords struct {
+	sync.Mutex
+	records map[*selfmonitor.MetricsRecord]struct{}
+}
+
+func RegisterGlobalMetricRecord(labels ...selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
+	globalLabels := []selfmonitor.LabelPair{{Key: selfmonitor.MetricLabelKeyMetricCategory, Value: "runner"}}
+	globalLabels = append(globalLabels, labels...)
+	record := &selfmonitor.MetricsRecord{Labels: globalLabels}
+	globalMetricRecord.Lock()
+	defer globalMetricRecord.Unlock()
+	globalMetricRecord.records[record] = struct{}{}
+	return record
+}
+
+func RemoveGlobalMetricRecord(record *selfmonitor.MetricsRecord) {
+	globalMetricRecord.Lock()
+	defer globalMetricRecord.Unlock()
+	delete(globalMetricRecord.records, record)
+}
 
 func GetMetrics(metricType string) []map[string]string {
 	if metricType == MetricExportTypeGo {
@@ -58,6 +84,8 @@ func GetGoDirectMetrics() []map[string]string {
 	metrics = append(metrics, GetGoPluginMetrics()...)
 	// k8s meta metrics
 	metrics = append(metrics, k8smeta.GetMetaManagerMetrics()...)
+	// global metrics
+	metrics = append(metrics, GetGlobalMetrics()...)
 	return metrics
 }
 
@@ -73,6 +101,10 @@ func GetGoCppProvidedMetrics() []map[string]string {
 	metrics := make([]map[string]string, 0)
 	// agent-level metrics
 	metrics = append(metrics, GetAgentStat()...)
+
+	if logger.DebugFlag() {
+		logger.Debugf(context.Background(), "GetGoCppProvidedMetrics: %+v", metrics)
+	}
 	return metrics
 }
 
@@ -84,6 +116,24 @@ func GetGoPluginMetrics() []map[string]string {
 		metrics = append(metrics, config.Context.ExportMetricRecords()...)
 	}
 	LogtailConfigLock.RUnlock()
+
+	if logger.DebugFlag() {
+		logger.Debugf(context.Background(), "GetGoPluginMetrics: %+v", metrics)
+	}
+	return metrics
+}
+
+func GetGlobalMetrics() []map[string]string {
+	metrics := make([]map[string]string, 0)
+	globalMetricRecord.Lock()
+	defer globalMetricRecord.Unlock()
+	for record := range globalMetricRecord.records {
+		metrics = append(metrics, record.ExportMetricRecords()...)
+	}
+
+	if logger.DebugFlag() {
+		logger.Debugf(context.Background(), "GetGlobalMetrics: %+v", metrics)
+	}
 	return metrics
 }
 
