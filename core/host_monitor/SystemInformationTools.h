@@ -33,7 +33,7 @@
 
 namespace logtail {
 
-bool CheckGPUDeveice();
+bool CheckGPUDevice();
 
 template <typename Signature>
 class FunctionProxy;

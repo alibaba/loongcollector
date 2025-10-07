@@ -40,7 +40,8 @@
 
 namespace logtail {
 
-bool CheckGPUDeveice() {
+bool CheckGPUDevice() {
+#if defined(__linux__)
     if (!std::filesystem::exists(NVIDIACTL)) {
         LOG_ERROR(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
         return false;
@@ -80,6 +81,16 @@ bool CheckGPUDeveice() {
 
     LOG_INFO(sLogger, ("GPU check successful", "GPU monitoring available"));
     return true;
+#elif defined(_MSC_VER)
+    // Windows平台GPU检测实现
+    // 在Windows上，可以通过WMI或DirectX API来检测GPU
+    // 这里先返回false，表示Windows平台暂不支持GPU监控
+    LOG_INFO(sLogger, ("GPU check", "Windows platform GPU monitoring not implemented yet"));
+    return false;
+#else
+    LOG_INFO(sLogger, ("GPU check", "Unsupported platform for GPU monitoring"));
+    return false;
+#endif
 }
 
 template <typename R, typename... Args>
@@ -136,16 +147,6 @@ DCGMCollector::~DCGMCollector() {
 }
 
 bool DCGMCollector::Initialize(const FieldMap& fieldMap) {
-    if (!CanInitialize()) {
-        if (IsFullyInitialized()) {
-            LOG_INFO(sLogger, ("DCGM already initialized", "skipping initialization"));
-            return true;
-        } else {
-            LOG_WARNING(sLogger, ("DCGM initialization skipped", "library not loaded or already initialized"));
-            return false;
-        }
-    }
-
     mFieldMap = fieldMap;
     int numFields = fieldMap.int64Fields.size() + fieldMap.stringFields.size() + fieldMap.doubleFields.size();
     if (numFields == 0) {

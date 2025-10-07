@@ -26,7 +26,7 @@
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/SystemInterface.h"
 
-DEFINE_FLAG_INT32(basic_host_monitor_gpu_collect_interval, "basic host monitor gpu collect interval, seconds", 1);
+DEFINE_FLAG_INT32(basic_host_monitor_gpu_collect_interval, "basic host monitor gpu collect interval, seconds", 15);
 namespace logtail {
 
 const std::string GPUCollector::sName = "gpu";
@@ -65,12 +65,7 @@ const std::chrono::seconds GPUCollector::GetCollectInterval() const {
     return std::chrono::seconds(INT32_FLAG(basic_host_monitor_gpu_collect_interval));
 }
 
-bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
-    if (group == nullptr) {
-        return false;
-    }
-    collectContext.mCount++;
-
+bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     GPUInformation gpuInfo;
     if (!SystemInterface::GetInstance()->GetGPUInformation(collectContext.GetMetricTime(), gpuInfo)) {
         return false;
@@ -98,7 +93,8 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         mCalculateMap[gpu.gpuId].AddValue(gpuMetric);
     }
 
-    if (collectContext.mCount < collectContext.mCountPerReport) {
+    // If group is not provided, just collect data without generating metrics
+    if (!groupPtr) {
         return true;
     }
 
@@ -140,7 +136,7 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             {"gpu_power_readings_power_draw_avg", &avgMetric.powerReadingsPowerDraw},
         };
 
-        MetricEvent* metricEvent = group->AddMetricEvent(true);
+        MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
         if (!metricEvent) {
             return false;
         }
@@ -156,7 +152,6 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *metric.value});
         }
     }
-    collectContext.mCount = 0;
     return true;
 }
 

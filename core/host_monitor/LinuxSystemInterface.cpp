@@ -1150,7 +1150,7 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
 }
 
 bool LinuxSystemInterface::InitGPUCollectorOnce(const FieldMap& fieldMap) {
-    if (!CheckGPUDeveice()) {
+    if (!CheckGPUDevice()) {
         return false;
     }
 
