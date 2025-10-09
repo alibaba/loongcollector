@@ -16,21 +16,15 @@
 
 #pragma once
 
-#include <chrono>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <atomic>
 
 #include "../common/JournalConfig.h"
 #include "JournalConnectionInstance.h"
-#include "JournalConnectionGuard.h"
 
 namespace logtail {
-
-// Forward declarations
-class JournalConnectionGuard;
 
 
 /**
@@ -66,18 +60,6 @@ public:
         const JournalConfig& config);
 
     /**
-     * @brief 获取带守护的journal连接（推荐使用）
-     * @param configName 配置名称
-     * @param idx 配置索引
-     * @param config journal配置
-     * @return 连接守护对象，自动管理使用计数
-     */
-    std::unique_ptr<JournalConnectionGuard> GetGuardedConnection(
-        const std::string& configName,
-        size_t idx,
-        const JournalConfig& config);
-
-    /**
      * @brief 移除指定配置的连接
      * @param configName 配置名称
      * @param idx 配置索引
@@ -85,32 +67,47 @@ public:
     void RemoveConnection(const std::string& configName, size_t idx);
 
     /**
-     * @brief 清理过期连接
-     * @param resetIntervalSec 重置间隔秒数，默认3600秒（1小时）
+     * @brief 清理无效连接（移除自动重置逻辑，连接永远不重建）
      * @return 清理的连接数量
      */
-    size_t CleanupExpiredConnections(int resetIntervalSec = 3600);
+    size_t CleanupExpiredConnections();
     
     /**
-     * @brief 强制重置过期连接（独立于使用状态检查）
+     * @brief 清理无效连接（移除自动重置逻辑，连接永远不重建）
      * 
-     * 这是连接重置的唯一机制，定期检查并重置空闲的过期连接。
-     * 正在使用的过期连接会继续运行，直到空闲时才会被重置。
+     * 只清理无效的连接，有效连接永远不重建。
      * 
-     * @return 重置的连接数量
+     * @return 清理的连接数量
      */
     size_t ResetExpiredConnections();
 
     /**
-     * @brief 智能清理策略：根据重置周期自动调整清理频率
-     * @param resetIntervalSec 重置间隔秒数
-     * @return 建议的清理检查间隔秒数
+     * @brief 获取连接池统计信息
+     * @return 连接池统计信息
      */
-    static int GetRecommendedCleanupInterval(int resetIntervalSec) {
-        // 清理频率 = 重置周期 / 4，但不少于5分钟，不多于30分钟
-        int interval = resetIntervalSec / 4;
-        return std::max(300, std::min(interval, 1800));  // [5分钟, 30分钟]
-    }
+    struct ConnectionPoolStats {
+        size_t totalConnections;
+        size_t activeConnections;
+        size_t invalidConnections;
+        std::vector<std::string> connectionKeys;
+    };
+    ConnectionPoolStats GetConnectionPoolStats() const;
+
+    /**
+     * @brief 获取指定配置的连接信息
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @return 连接信息，如果不存在返回nullptr
+     */
+    std::shared_ptr<JournalConnectionInstance> GetConnectionInfo(const std::string& configName, size_t idx) const;
+
+    /**
+     * @brief 强制重置指定连接（手动重置接口）
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @return true 如果重置成功
+     */
+    bool ForceResetConnection(const std::string& configName, size_t idx);
 
     /**
      * @brief 获取当前连接数量

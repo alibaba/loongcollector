@@ -159,6 +159,32 @@ JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) co
 }
 
 // =============================================================================
+// 3. 连接池管理接口 - Connection Pool Management Interface
+// =============================================================================
+
+JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const {
+    auto stats = JournalConnectionManager::GetInstance()->GetConnectionPoolStats();
+    ConnectionPoolStats result;
+    result.totalConnections = stats.totalConnections;
+    result.activeConnections = stats.activeConnections;
+    result.invalidConnections = stats.invalidConnections;
+    result.connectionKeys = stats.connectionKeys;
+    return result;
+}
+
+std::shared_ptr<JournalConnectionInstance> JournalServer::GetConnectionInfo(const std::string& configName, size_t idx) const {
+    return JournalConnectionManager::GetInstance()->GetConnectionInfo(configName, idx);
+}
+
+bool JournalServer::ForceResetConnection(const std::string& configName, size_t idx) {
+    return JournalConnectionManager::GetInstance()->ForceResetConnection(configName, idx);
+}
+
+size_t JournalServer::GetConnectionCount() const {
+    return JournalConnectionManager::GetInstance()->GetConnectionCount();
+}
+
+// =============================================================================
 // 2. 主线程运行逻辑 - Main Thread Logic
 // =============================================================================
 
@@ -177,13 +203,13 @@ void JournalServer::run() {
             // 每次循环后短暂休眠，避免CPU占用过高
             this_thread::sleep_for(chrono::milliseconds(100));
             
-            // 定期清理连接（清理已标记的连接，兜底处理）
+            // 定期清理无效连接（移除自动重置逻辑，连接永远不重建）
             static time_t sLastConnectionReset = time(nullptr);
             time_t currentTime = time(nullptr);
             if (currentTime - sLastConnectionReset >= 300) {
                 size_t cleanedConnections = JournalConnectionManager::GetInstance()->ResetExpiredConnections();
                 if (cleanedConnections > 0) {
-                    LOG_INFO(sLogger, ("periodic connection cleanup completed", "")("cleaned_count", cleanedConnections));
+                    LOG_INFO(sLogger, ("periodic invalid connection cleanup completed", "")("cleaned_count", cleanedConnections));
                 }
                 sLastConnectionReset = currentTime;
             }

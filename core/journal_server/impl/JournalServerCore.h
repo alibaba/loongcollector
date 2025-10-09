@@ -25,7 +25,6 @@ namespace logtail {
 
 // Forward declarations
 class SystemdJournalReader;
-class JournalConnectionGuard;
 struct JournalEntry;
 class PipelineEventGroup;
 class LogEvent;
@@ -62,7 +61,7 @@ void ProcessJournalConfig(const std::string& configName,
  */
 std::shared_ptr<SystemdJournalReader> SetupJournalConnection(
     const std::string& configName, size_t idx, const JournalConfig& config,
-    std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection);
+    bool& isNewConnection);
 
 /**
  * @brief 智能journal定位操作（仅在必要时执行seek）

@@ -101,6 +101,7 @@ bool MoveToNextJournalEntry(const string& configName, size_t idx, const JournalC
                            bool isFirstEntry, int entryCount) {
     try {
         // 对于head模式或者非首次读取，需要调用Next()移动到下一条
+        // 对于tail模式，首次读取时已经在SeekTail+Previous后定位到最后一个条目，不需要Next()
         if (config.seekPosition == "head" || !isFirstEntry) {
             bool nextSuccess = journalReader->Next();
             if (!nextSuccess) {
@@ -117,6 +118,7 @@ bool MoveToNextJournalEntry(const string& configName, size_t idx, const JournalC
             }
             // 已移动到下一个条目，继续处理
         }
+        // 对于tail模式的首次读取，直接处理当前位置的条目（已在SeekTail+Previous后定位）
         return true;
         
     } catch (const std::exception& e) {

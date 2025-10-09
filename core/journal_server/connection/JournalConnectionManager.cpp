@@ -42,22 +42,24 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
         // 检查连接状态：有效且未待重置的连接可以使用
         if (connInfo->IsValid() && !connInfo->IsPendingReset()) {
             return connInfo->GetReader();
-        } else {
-            // 连接无效或待重置，移除并创建新连接
-            std::string reason = !connInfo->IsValid() ? "invalid" : "pending reset";
-            LOG_WARNING(sLogger, ("existing connection unusable, creating new one", "")("config", configName)("idx", idx)("reason", reason));
-            mConnections.erase(it);
         }
+        
+        // 连接无效或待重置，移除并创建新连接
+        std::string reason = !connInfo->IsValid() ? "invalid" : "pending reset";
+        LOG_WARNING(sLogger, ("existing connection unusable, creating new one", "")("config", configName)("idx", idx)("reason", reason));
+        mConnections.erase(it);
     }
     
     // 创建新连接
     try {
         auto connInfo = std::make_shared<JournalConnectionInstance>(configName, idx, config);
         
-        if (connInfo->IsValid()) {
+        // 先尝试获取reader来触发延迟初始化
+        auto reader = connInfo->GetReader();
+        if (reader && connInfo->IsValid()) {
             mConnections[key] = connInfo;
             LOG_INFO(sLogger, ("new journal connection created", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
-            return connInfo->GetReader();
+            return reader;
         }             
         LOG_ERROR(sLogger, ("failed to create valid journal connection", "")("config", configName)("idx", idx));
         return nullptr;
@@ -66,55 +68,6 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetOrCreateConne
         LOG_ERROR(sLogger, ("exception creating journal connection", e.what())("config", configName)("idx", idx));
         return nullptr;
     }
-}
-
-std::unique_ptr<JournalConnectionGuard> JournalConnectionManager::GetGuardedConnection(
-    const std::string& configName,
-    size_t idx,
-    const JournalConfig& config) {
-    
-    std::string key = makeConnectionKey(configName, idx);
-    
-    std::lock_guard<std::mutex> lock(mConnectionsMutex);
-    
-    auto it = mConnections.find(key);
-    std::shared_ptr<JournalConnectionInstance> connInfo;
-    
-    if (it != mConnections.end()) {
-        connInfo = it->second;
-        
-        // 检查连接状态：无效或待重置的连接都需要重新创建
-        if (!connInfo->IsValid()) {
-            LOG_WARNING(sLogger, ("existing connection invalid, creating new one", "")("config", configName)("idx", idx));
-            mConnections.erase(it);
-            connInfo = nullptr;
-        } else if (connInfo->IsPendingReset()) {
-            LOG_INFO(sLogger, ("connection pending reset, creating new one", "resetInterval reached")("config", configName)("idx", idx));
-            mConnections.erase(it);
-            connInfo = nullptr;
-        }
-    }
-    
-    // 如果连接不存在、已无效或待重置，创建新连接
-    if (!connInfo) {
-        try {
-            connInfo = std::make_shared<JournalConnectionInstance>(configName, idx, config);
-            
-            if (connInfo->IsValid()) {
-                mConnections[key] = connInfo;
-                LOG_INFO(sLogger, ("new guarded journal connection created", "")("config", configName)("idx", idx)("total_connections", mConnections.size()));
-            } else {
-                LOG_ERROR(sLogger, ("failed to create valid journal connection for guarded access", "")("config", configName)("idx", idx));
-                return nullptr;
-            }
-        } catch (const std::exception& e) {
-            LOG_ERROR(sLogger, ("exception creating journal connection for guarded access", e.what())("config", configName)("idx", idx));
-            return nullptr;
-        }
-    }
-    
-    // 创建守护对象
-    return std::make_unique<JournalConnectionGuard>(connInfo);
 }
 
 void JournalConnectionManager::RemoveConnection(const std::string& configName, size_t idx) {
@@ -127,7 +80,7 @@ void JournalConnectionManager::RemoveConnection(const std::string& configName, s
     }
 }
 
-size_t JournalConnectionManager::CleanupExpiredConnections(int resetIntervalSec) {
+size_t JournalConnectionManager::CleanupExpiredConnections() {
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     
     size_t removedCount = 0;
@@ -136,22 +89,13 @@ size_t JournalConnectionManager::CleanupExpiredConnections(int resetIntervalSec)
     while (it != mConnections.end()) {
         auto& connInfo = it->second;
         
-        // 检查连接是否过期或无效，但不清理正在使用中的连接
+        // 只检查连接是否无效，移除自动重置逻辑
         if (!connInfo->IsValid()) {
             // 连接已无效，可以安全清理
             it = mConnections.erase(it);
             removedCount++;
-        } else if (connInfo->ShouldReset(resetIntervalSec)) {
-            // 连接需要重置
-            if (!connInfo->IsInUse()) {
-                // 连接未在使用中，可以清理
-                it = mConnections.erase(it);
-                removedCount++;
-            } else {
-                // 连接正在使用中，跳过清理
-                ++it;
-            }
         } else {
+            // 连接有效，保留连接（永远不重建）
             ++it;
         }
     }
@@ -172,7 +116,18 @@ size_t JournalConnectionManager::ResetExpiredConnections() {
     while (it != mConnections.end()) {
         auto& connInfo = it->second;
         
-        // 检查是否需要重置
+        // 检查是否需要重置 - 移除自动重置逻辑，连接永远不重建
+        // 只检查连接是否无效，无效的连接会被清理
+        if (!connInfo->IsValid()) {
+            // 连接已无效，移除连接
+            LOG_WARNING(sLogger, ("removing invalid connection", "")("config", connInfo->GetConfigName())("idx", connInfo->GetIndex()));
+            it = mConnections.erase(it);
+            resetCount++;
+            continue;
+        }
+        
+        // 注释掉原有的重置逻辑
+        /*
         if (connInfo->ShouldReset(3600)) {
             if (connInfo->IsPendingReset()) {
                 // 连接已标记为待重置，强制重置策略
@@ -213,6 +168,7 @@ size_t JournalConnectionManager::ResetExpiredConnections() {
                 // 正在使用的连接保持等待下次检查
             }
         }
+        */
         
         ++it;
     }
@@ -227,6 +183,61 @@ size_t JournalConnectionManager::ResetExpiredConnections() {
 size_t JournalConnectionManager::GetConnectionCount() const {
     std::lock_guard<std::mutex> lock(mConnectionsMutex);
     return mConnections.size();
+}
+
+JournalConnectionManager::ConnectionPoolStats JournalConnectionManager::GetConnectionPoolStats() const {
+    std::lock_guard<std::mutex> lock(mConnectionsMutex);
+    
+    ConnectionPoolStats stats;
+    stats.totalConnections = mConnections.size();
+    stats.activeConnections = 0;
+    stats.invalidConnections = 0;
+    
+    for (const auto& pair : mConnections) {
+        const auto& connInfo = pair.second;
+        stats.connectionKeys.push_back(pair.first);
+        
+        if (connInfo->IsValid()) {
+            stats.activeConnections++;
+        } else {
+            stats.invalidConnections++;
+        }
+    }
+    
+    return stats;
+}
+
+std::shared_ptr<JournalConnectionInstance> JournalConnectionManager::GetConnectionInfo(const std::string& configName, size_t idx) const {
+    std::string key = makeConnectionKey(configName, idx);
+    
+    std::lock_guard<std::mutex> lock(mConnectionsMutex);
+    auto it = mConnections.find(key);
+    if (it != mConnections.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
+bool JournalConnectionManager::ForceResetConnection(const std::string& configName, size_t idx) {
+    std::string key = makeConnectionKey(configName, idx);
+    
+    std::lock_guard<std::mutex> lock(mConnectionsMutex);
+    auto it = mConnections.find(key);
+    if (it != mConnections.end()) {
+        auto& connInfo = it->second;
+        
+        // 强制重置连接
+        if (connInfo->ResetConnection()) {
+            LOG_INFO(sLogger, ("connection manually reset successfully", "")("config", configName)("idx", idx));
+            return true;
+        }
+        
+        LOG_ERROR(sLogger, ("manual connection reset failed", "")("config", configName)("idx", idx));
+        return false;
+    }
+    
+    LOG_WARNING(sLogger, ("connection not found for manual reset", "")("config", configName)("idx", idx));
+    return false;
 }
 
 void JournalConnectionManager::Clear() {

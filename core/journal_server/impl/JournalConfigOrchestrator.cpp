@@ -21,8 +21,6 @@
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "logger/Logger.h"
-#include "connection/JournalConnectionManager.h"
-#include "connection/JournalConnectionGuard.h"
 
 using namespace std;
 
@@ -105,9 +103,8 @@ void ProcessJournalConfig(const string& configName, size_t idx, JournalConfig& c
     }
     
     // Step 1: 建立journal连接
-    std::unique_ptr<JournalConnectionGuard> connectionGuard;
     bool isNewConnection = false;
-    auto journalReader = SetupJournalConnection(configName, idx, config, connectionGuard, isNewConnection);
+    auto journalReader = SetupJournalConnection(configName, idx, config, isNewConnection);
     if (!journalReader) {
         // 连接失败，标记需要重新seek
         const_cast<JournalConfig&>(config).needsSeek = true;

@@ -34,9 +34,8 @@ JournalConnectionInstance::JournalConnectionInstance(const std::string& configNa
     , mLastResetTime(std::chrono::steady_clock::now())
     , mIsValid(false) {
     
-            // 连接已创建
-    
-    initializeConnection();
+    // 延迟初始化连接，避免在构造函数中调用可能失败的操作
+    // initializeConnection(); // 注释掉，改为在GetReader()中延迟初始化
 }
 
 JournalConnectionInstance::~JournalConnectionInstance() {
@@ -52,39 +51,21 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionInstance::GetReader() {
     
     // 如果连接无效、reader为空，或者reader已关闭，尝试重新初始化
     if (!mIsValid || !mReader || !mReader->IsOpen()) {
-        // 由于无效状态，重新初始化连接
+        // 延迟初始化连接
         initializeConnection();
     }
     
     return (mIsValid && mReader && mReader->IsOpen()) ? mReader : nullptr;
 }
 
-bool JournalConnectionInstance::ShouldReset(int resetIntervalSec) const {
-    // 如果已经标记为待重置，返回true
-    if (mPendingReset.load()) {
-        return true;
-    }
-    
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - mLastResetTime);
-    bool shouldReset = elapsed.count() >= resetIntervalSec;
-    
-    // 如果到达重置时间，立即标记为待重置
-    if (shouldReset) {
-        MarkForReset();
-        LOG_INFO(sLogger, ("connection marked for reset", "resetInterval reached")("config", mConfigName)("idx", mIndex)("elapsed_sec", elapsed.count()));
-    }
-    
-    return shouldReset;
+bool JournalConnectionInstance::ShouldReset(int /* resetIntervalSec */) const {
+    // 移除自动重置逻辑，连接永远不重建
+    // 只检查是否已标记为待重置
+    return mPendingReset.load();
 }
 
 bool JournalConnectionInstance::ResetConnection() {
     std::lock_guard<std::mutex> lock(mMutex);
-    
-    // 检查连接是否正在使用中，如果是则跳过重置
-    if (IsInUse()) {
-        return false; // 返回false表示重置被推迟，但连接仍然有效
-    }
     
     // 关闭旧连接
     if (mReader) {
@@ -166,22 +147,6 @@ bool JournalConnectionInstance::initializeConnection() {
         mReader.reset();
         return false;
     }
-}
-
-//==============================================================================
-// 使用计数管理
-//==============================================================================
-
-void JournalConnectionInstance::IncrementUsageCount() {
-    mUsageCount.fetch_add(1);
-}
-
-void JournalConnectionInstance::DecrementUsageCount() {
-    mUsageCount.fetch_sub(1);
-}
-
-bool JournalConnectionInstance::IsInUse() const {
-    return mUsageCount.load() > 0;
 }
 
 //==============================================================================

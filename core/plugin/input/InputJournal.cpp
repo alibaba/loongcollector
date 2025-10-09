@@ -40,7 +40,6 @@ InputJournal::InputJournal()
     , mParseSyslogFacility(false)
     , mParsePriority(false)
     , mUseJournalEventTime(false)
-    , mResetIntervalSecond(kDefaultResetInterval)
     , mShutdown(false) {
 }
 
@@ -77,7 +76,7 @@ bool InputJournal::Start() {
     config.kernel = mKernel; // 设置kernel
     config.identifiers = mIdentifiers; // 设置identifiers
     config.journalPaths = mJournalPaths; // 设置journal路径
-    config.resetIntervalSecond = mResetIntervalSecond; // 设置重置间隔
+    // 注意：已移除resetIntervalSecond配置，连接永远不重建
     config.ctx = mContext; // 设置context
     
     // 验证和修正配置值
@@ -177,22 +176,6 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
     // 获取use journal event time
     if (!GetOptionalBoolParam(config, "UseJournalEventTime", mUseJournalEventTime, errorMsg)) {
         mUseJournalEventTime = false;
-    }
-    
-    // 获取reset interval second
-    if (!GetOptionalIntParam(config, "ResetIntervalSecond", mResetIntervalSecond, errorMsg)) {
-        mResetIntervalSecond = kDefaultResetInterval;
-    }
-    // 验证重置间隔范围 (1分钟到24小时)
-    if (mResetIntervalSecond <= 0) {
-        LOG_WARNING(sLogger, ("invalid ResetIntervalSecond, using default", mResetIntervalSecond)("default", kDefaultResetInterval));
-        mResetIntervalSecond = kDefaultResetInterval;
-    } else if (mResetIntervalSecond < 60) {
-        LOG_WARNING(sLogger, ("ResetIntervalSecond too small, setting to minimum", mResetIntervalSecond)("min", 60));
-        mResetIntervalSecond = 60;  // 最小1分钟
-    } else if (mResetIntervalSecond > 86400) {
-        LOG_WARNING(sLogger, ("ResetIntervalSecond too large, capping", mResetIntervalSecond)("max", 86400));
-        mResetIntervalSecond = 86400;  // 最大24小时
     }
     
     // 获取max entries per batch (如果有这个配置)

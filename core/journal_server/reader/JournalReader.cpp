@@ -21,8 +21,6 @@
 
 namespace logtail {
 
-static auto sLogger = Logger::Instance().GetLogger("");
-
 /*========================================================
  *  Impl：Linux 下真正干活；非 Linux 下只留空壳
  *========================================================*/

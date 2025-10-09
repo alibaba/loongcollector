@@ -19,7 +19,6 @@
 #include <memory>
 
 #include "connection/JournalConnectionManager.h"
-#include "connection/JournalConnectionGuard.h"
 #include "checkpoint/JournalCheckpointManager.h"
 #include "reader/JournalReader.h"
 #include "logger/Logger.h"
@@ -32,26 +31,20 @@ namespace logtail::impl {
 // 建立连接
 // =============================================================================
 
-std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, std::unique_ptr<JournalConnectionGuard>& connectionGuard, bool& isNewConnection) {
-    // Getting guarded journal connection from manager for config: configName, idx: idx
+std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, bool& isNewConnection) {
+    // Getting journal connection from manager for config: configName, idx: idx
     
     // 记录连接获取前的连接数，用于判断是否创建了新连接
     size_t connectionCountBefore = JournalConnectionManager::GetInstance()->GetConnectionCount();
     
-    connectionGuard = JournalConnectionManager::GetInstance()->GetGuardedConnection(configName, idx, config);
+    auto journalReader = JournalConnectionManager::GetInstance()->GetOrCreateConnection(configName, idx, config);
     
-    if (!connectionGuard) {
-        LOG_ERROR(sLogger, ("failed to get guarded journal connection", "skip processing")("config", configName)("idx", idx));
-        isNewConnection = false;
-        return nullptr;
-    }
-    // 获取journal reader
-    auto journalReader = connectionGuard->GetReader();
     if (!journalReader) {
-        LOG_ERROR(sLogger, ("failed to get journal reader from guard", "skip processing")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("failed to get journal connection", "skip processing")("config", configName)("idx", idx));
         isNewConnection = false;
         return nullptr;
     }
+    
     // 检查journal reader是否打开
     if (!journalReader->IsOpen()) {
         LOG_ERROR(sLogger, ("journal reader not open", "skip processing")("config", configName)("idx", idx));
@@ -63,7 +56,7 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     size_t connectionCountAfter = JournalConnectionManager::GetInstance()->GetConnectionCount();
     isNewConnection = (connectionCountAfter > connectionCountBefore);
     
-    // Guarded journal connection obtained successfully for config: configName, idx: idx, is_new_connection: isNewConnection
+    // Journal connection obtained successfully for config: configName, idx: idx, is_new_connection: isNewConnection
     return journalReader;
 }
 
@@ -82,6 +75,13 @@ bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& con
             // seek到末尾
             seekSuccess = journalReader->SeekTail();
             LOG_INFO(sLogger, ("seek to tail", "")("config", configName)("idx", idx)("success", seekSuccess));
+            
+            // SeekTail()后需要调用Previous()才能读取到实际的日志条目
+            if (seekSuccess) {
+                bool prevSuccess = journalReader->Previous();
+                LOG_INFO(sLogger, ("seek to previous after tail", "")("config", configName)("idx", idx)("success", prevSuccess));
+                // Previous()失败也是正常的（比如journal为空），不影响整体成功
+            }
         } else if (config.seekPosition == "head") {
             // seek到开头
             seekSuccess = journalReader->SeekHead();

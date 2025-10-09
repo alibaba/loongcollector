@@ -64,7 +64,6 @@ private:
     bool mParseSyslogFacility;
     bool mParsePriority;
     bool mUseJournalEventTime;
-    int mResetIntervalSecond;
 
     // Runtime state
     // 不再需要 JournalReader，JournalServer 会处理所有数据
@@ -74,7 +73,6 @@ private:
     // 不再需要线程管理，JournalServer 会处理所有数据
 
     // Constants
-    static constexpr int kDefaultResetInterval = 3600; // 1 hour
     static constexpr int kDefaultCursorFlushPeriodMs = 5000; // 5 seconds
 
     // 不再需要这些辅助方法，JournalServer 会处理所有 journal 操作

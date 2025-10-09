@@ -31,8 +31,8 @@ namespace logtail {
 
 // Forward declarations
 class JournalConnectionManager;
+class JournalConnectionInstance;
 class SystemdJournalReader;
-class JournalConnectionGuard;
 class PipelineEventGroup;
 struct JournalEntry;
 
@@ -76,6 +76,40 @@ public:
     const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& GetAllJournalConfigs() const {
         return mPipelineNameJournalConfigsMap;
     }
+
+    // Connection pool management interface
+    /**
+     * @brief 获取连接池统计信息
+     * @return 连接池统计信息
+     */
+    struct ConnectionPoolStats {
+        size_t totalConnections;
+        size_t activeConnections;
+        size_t invalidConnections;
+        std::vector<std::string> connectionKeys;
+    };
+    ConnectionPoolStats GetConnectionPoolStats() const;
+
+    /**
+     * @brief 获取指定配置的连接信息
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @return 连接信息，如果不存在返回nullptr
+     */
+    std::shared_ptr<JournalConnectionInstance> GetConnectionInfo(const std::string& configName, size_t idx) const;
+
+    /**
+     * @brief 强制重置指定连接（手动重置接口）
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @return true 如果重置成功
+     */
+    bool ForceResetConnection(const std::string& configName, size_t idx);
+
+    /**
+     * @brief 获取当前连接数量
+     */
+    size_t GetConnectionCount() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();

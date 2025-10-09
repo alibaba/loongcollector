@@ -42,7 +42,7 @@ struct JournalConfig {
     bool kernel = true;                      // 启用内核日志过滤器
 
     // 性能配置
-    int resetIntervalSecond = 3600;          // 连接重置间隔
+    // 注意：已移除resetIntervalSecond配置，连接永远不重建
     int maxEntriesPerBatch = 1000;           // 每批最大条目数
     int waitTimeoutMs = 1000;                // 等待超时时间（毫秒）
 
@@ -72,13 +72,6 @@ struct JournalConfig {
         int fixedCount = 0;
         
         // 验证数值字段的范围
-        if (resetIntervalSecond <= 0) {
-            resetIntervalSecond = 3600;  // 默认1小时
-            fixedCount++;
-        } else if (resetIntervalSecond > 86400) {  // 最大24小时
-            resetIntervalSecond = 86400;
-            fixedCount++;
-        }
         
         if (cursorFlushPeriodMs <= 0) {
             cursorFlushPeriodMs = 5000;  // 默认5秒
@@ -119,11 +112,11 @@ struct JournalConfig {
         
         // 验证字符串数组 - 移除空字符串
         auto removeEmpty = [&fixedCount](std::vector<std::string>& vec) {
-            auto original_size = vec.size();
+            auto originalSize = vec.size();
             vec.erase(std::remove_if(vec.begin(), vec.end(), 
                                    [](const std::string& s) { return s.empty(); }), 
                      vec.end());
-            if (vec.size() != original_size) {
+            if (vec.size() != originalSize) {
                 fixedCount++;
             }
         };
@@ -157,8 +150,7 @@ struct JournalConfig {
      * @return true 如果配置有效
      */
     bool IsValid() const {
-        return resetIntervalSecond > 0 && 
-               cursorFlushPeriodMs > 0 && 
+        return cursorFlushPeriodMs > 0 && 
                maxEntriesPerBatch > 0 && 
                waitTimeoutMs >= 0 &&
                !seekPosition.empty() &&

@@ -61,11 +61,6 @@ public:
     // 检查连接是否有效
     bool IsValid() const;
     
-    // 连接使用状态管理 - 防止在使用中的连接被重置
-    void IncrementUsageCount();
-    void DecrementUsageCount();
-    bool IsInUse() const;
-    
     // 强制重置管理
     void MarkForReset() const;
     bool IsPendingReset() const;
@@ -86,9 +81,6 @@ private:
     std::shared_ptr<SystemdJournalReader> mReader;
     std::chrono::steady_clock::time_point mCreateTime;
     std::chrono::steady_clock::time_point mLastResetTime;
-    
-    // 连接使用计数 - 防止重置正在使用的连接
-    std::atomic<int> mUsageCount{0};
     
     // 强制重置标记 - 当resetInterval到达时标记，阻止新的使用
     mutable std::atomic<bool> mPendingReset{false};
