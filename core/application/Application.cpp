@@ -313,6 +313,10 @@ void Application::Start() { // GCOVR_EXCL_START
                 OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
 
+            // after every config loaded, set the flag to true
+            if (lastConfigCheckTime == 0) {
+                TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
+            }
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!instanceConfigDiff.IsEmpty()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);

@@ -143,6 +143,8 @@ std::string ExtractCurrentKey(const std::string& key);
 
 bool GetOptionalBoolParam(const Json::Value& config, const std::string& key, bool& param, std::string& errorMsg);
 
+bool GetOptionalInt64Param(const Json::Value& config, const std::string& key, int64_t& param, std::string& errorMsg);
+
 bool GetOptionalIntParam(const Json::Value& config, const std::string& key, int32_t& param, std::string& errorMsg);
 
 bool GetOptionalUInt64Param(const Json::Value& config, const std::string& key, uint64_t& param, std::string& errorMsg);
@@ -303,6 +305,8 @@ bool GetOptionalMapParam(const Json::Value& config,
 }
 
 bool GetMandatoryBoolParam(const Json::Value& config, const std::string& key, bool& param, std::string& errorMsg);
+
+bool GetMandatoryInt64Param(const Json::Value& config, const std::string& key, int64_t& param, std::string& errorMsg);
 
 bool GetMandatoryIntParam(const Json::Value& config, const std::string& key, int32_t& param, std::string& errorMsg);
 
