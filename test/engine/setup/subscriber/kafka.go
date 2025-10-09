@@ -155,7 +155,7 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 				select {
 				case out <- msg:
 				case <-ctx.Done():
-					// Exit gracefully when context is cancelled
+					// Exit gracefully when context is canceled
 					return
 				}
 			}

@@ -35,7 +35,7 @@ Feature: flusher kafka native Kerberos
             Enabled: true
             Mechanisms: "GSSAPI"
             ServiceName: "kafka"
-            Principal: "client"
+            Principal: "client@EXAMPLE.COM"
             Keytab: "/var/kerberos/client.keytab"
         Kafka:
           debug: "security,broker"
@@ -44,6 +44,8 @@ Feature: flusher kafka native Kerberos
     Given loongcollector container mount {./krb5.conf} to {/etc/krb5.conf}
     Given loongcollector container mount {kerberos_data} to {/var/kerberos}
     Given loongcollector depends on containers {["kafka", "zookeeper", "kerberos-server"]}
+    # Build a local loongcollector image with Kerberos libs for this test only
+    Given run command on datasource {cd test_cases/flusher_kafka_native_kerberos && docker build -t aliyun/loongcollector:0.0.1 -f loongcollector-kerberos.Dockerfile .}
     # Ensure host-side log file exists (avoid docker bind mount creating a directory)
     Given run command on datasource {cd test_cases/flusher_kafka_native_kerberos && rm -rf flusher_kerberos.log && touch flusher_kerberos.log}
     When start docker-compose {flusher_kafka_native_kerberos}
