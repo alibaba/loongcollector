@@ -59,7 +59,7 @@ services:
         chmod 644 /var/kerberos/client.keytab /var/kerberos/kafka.keytab 2>/dev/null || true &&
         # prepare shared client ccache for other containers (loongcollector, kafka client etc.)
         export KRB5CCNAME=FILE:/var/kerberos/krb5cc && \
-        for i in $(seq 1 6); do kinit -c /var/kerberos/krb5cc -k -t /var/kerberos/client.keytab client@EXAMPLE.COM && break; sleep 2; done && \
+        for i in $$(seq 1 6); do kinit -c /var/kerberos/krb5cc -k -t /var/kerberos/client.keytab client@EXAMPLE.COM && break; sleep 2; done && \
         klist -c /var/kerberos/krb5cc || true && \
         set -e
         tail -f /dev/null
