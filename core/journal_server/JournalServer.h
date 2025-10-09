@@ -17,7 +17,6 @@
 #pragma once
 
 #include <atomic>
-#include <condition_variable>
 #include <future>
 #include <map>
 #include <mutex>
@@ -26,15 +25,24 @@
 
 #include "runner/InputRunner.h"
 #include "common/JournalConfig.h"
+#include "group/JournalConfigGroupManager.h"
 
 namespace logtail {
 
 // Forward declarations
-class JournalConnectionManager;
+class JournalConfigGroupManager;
 class JournalConnectionInstance;
 class SystemdJournalReader;
 class PipelineEventGroup;
 struct JournalEntry;
+class TimerManager;
+
+// MonitoredReader struct definition
+struct MonitoredReader {
+    std::shared_ptr<SystemdJournalReader> reader;
+    std::string configName;
+    size_t idx;
+};
 
 /**
  * @brief JournalServer manages all journal input plugins
@@ -59,10 +67,18 @@ public:
 
     ~JournalServer() = default;
 
+    // =============================================================================
+    // 生命周期管理 - Lifecycle Management
+    // =============================================================================
+    
     // InputRunner interface implementation
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
+    
+    // =============================================================================
+    // 配置管理 - Configuration Management
+    // =============================================================================
     
     // Plugin registration interface
     void AddJournalInput(const std::string& configName,
@@ -71,13 +87,19 @@ public:
     void RemoveJournalInput(const std::string& configName, size_t idx);
     void RemoveJournalInputWithoutCleanup(const std::string& configName, size_t idx);
 
-    // Configuration management
+    // Configuration access
     JournalConfig GetJournalConfig(const std::string& name, size_t idx) const;
+    
+    // Update configuration needsSeek status
+    void UpdateJournalConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek);
+    
     const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& GetAllJournalConfigs() const {
         return mPipelineNameJournalConfigsMap;
     }
 
-    // Connection pool management interface
+    // =============================================================================
+    // 连接池管理 - Connection Pool Management
+    // =============================================================================
     /**
      * @brief 获取连接池统计信息
      * @return 连接池统计信息
@@ -96,7 +118,7 @@ public:
      * @param idx 配置索引
      * @return 连接信息，如果不存在返回nullptr
      */
-    std::shared_ptr<JournalConnectionInstance> GetConnectionInfo(const std::string& configName, size_t idx) const;
+    std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName, size_t idx) const;
 
     /**
      * @brief 强制重置指定连接（手动重置接口）
@@ -110,6 +132,47 @@ public:
      * @brief 获取当前连接数量
      */
     size_t GetConnectionCount() const;
+    
+    // =============================================================================
+    // Epoll 管理 - Epoll Management
+    // =============================================================================
+    
+    /**
+     * @brief 获取全局 epoll FD
+     * @return 全局 epoll FD，如果未初始化返回 -1
+     */
+    int GetGlobalEpollFD() const;
+    
+    /**
+     * @brief 清理指定配置的 epoll 监控
+     * @param configName 配置名称
+     * @param idx 配置索引
+     */
+    void CleanupEpollMonitoring(const std::string& configName, size_t idx);
+    
+    /**
+     * @brief 记录 epoll 监控统计信息
+     */
+    void LogEpollStats() const;
+    
+    // =============================================================================
+    // 5. 配置分组管理 - Configuration Grouping Management
+    // =============================================================================
+    
+    /**
+     * @brief 启用配置分组优化（共享相同过滤条件的 inotify 实例）
+     */
+    void EnableConfigGrouping();
+    
+    /**
+     * @brief 禁用配置分组优化
+     */
+    void DisableConfigGrouping();
+    
+    /**
+     * @brief 获取配置分组统计信息
+     */
+    JournalConfigGroupManager::Stats GetConfigGroupStats() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -118,19 +181,41 @@ public:
 private:
     JournalServer() = default;
 
+    // =============================================================================
+    // 事件驱动主循环 - Event-driven Main Loop
+    // =============================================================================
     void run();
+    
+    // =============================================================================
+    // 事件驱动辅助方法 - Event-driven Helper Methods
+    // =============================================================================
+    void setupTimers(TimerManager& timerManager);
+    void updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void processSpecificJournalConfig(const std::string& configName, size_t idx);
+    void processJournalEventForAllConfigs(const std::shared_ptr<SystemdJournalReader>& reader);
+    bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
 
+    // =============================================================================
+    // 成员变量 - Member Variables
+    // =============================================================================
+    
+    // 线程管理 - Thread Management
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
-    mutable std::condition_variable mStopCV;
+    
+    // 全局 epoll FD 管理 - Global Epoll FD Management
+    int mGlobalEpollFD{-1};
+    mutable std::mutex mEpollMutex;
+    
+    // 配置分组管理 - Configuration Grouping Management
+    bool mConfigGroupingEnabled{false};
+    mutable std::mutex mGroupingMutex;
 
-    // Initialization state management
+    // 初始化状态管理 - Initialization State Management
     bool mIsInitialized = false;
     mutable std::mutex mInitMux;
 
-    time_t mStartTime = 0;
-
-    // Configuration storage - accessed by main thread and journal runner thread
+    // 配置存储 - Configuration Storage (accessed by main thread and journal runner thread)
     mutable std::mutex mUpdateMux;
     std::unordered_map<std::string, std::map<size_t, JournalConfig>> mPipelineNameJournalConfigsMap;
 };

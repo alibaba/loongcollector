@@ -22,9 +22,81 @@
 #include <filesystem>
 
 #include "absl/strings/match.h"
-#include "JournalConstants.h"
 
 namespace logtail {
+
+// ============================================================================
+// Journal相关常量定义
+// ============================================================================
+
+// Syslog设施转换映射表（来自Go版本）
+const std::map<std::string, std::string> JournalUtils::kSyslogFacilityString = {
+    {"0",  "kernel"},
+    {"1",  "user"},
+    {"2",  "mail"},
+    {"3",  "daemon"},
+    {"4",  "auth"},
+    {"5",  "syslog"},
+    {"6",  "line printer"},
+    {"7",  "network news"},
+    {"8",  "uucp"},
+    {"9",  "clock daemon"},
+    {"10", "security/auth"},
+    {"11", "ftp"},
+    {"12", "ntp"},
+    {"13", "log audit"},
+    {"14", "log alert"},
+    {"15", "clock daemon"},
+    {"16", "local0"},
+    {"17", "local1"},
+    {"18", "local2"},
+    {"19", "local3"},
+    {"20", "local4"},
+    {"21", "local5"},
+    {"22", "local6"},
+    {"23", "local7"}
+};
+
+// 优先级转换映射表（来自Go版本）
+const std::map<std::string, std::string> JournalUtils::kPriorityConversionMap = {
+    {"0", "emergency"},
+    {"1", "alert"},
+    {"2", "critical"},
+    {"3", "error"},
+    {"4", "warning"},
+    {"5", "notice"},
+    {"6", "informational"},
+    {"7", "debug"}
+};
+
+// Unit name processing constants (from Go implementation)
+const std::string JournalUtils::kLetters = std::string(kLowercaseLetters) + std::string(kUppercaseLetters);
+const std::string JournalUtils::kValidChars = std::string(kDigits) + kLetters + ":-_.\\";
+const std::string JournalUtils::kValidCharsWithAt = "@" + kValidChars;
+const std::string JournalUtils::kValidCharsGlob = kValidCharsWithAt + "[]!-*?";
+
+const std::vector<std::string> JournalUtils::kSystemUnits = {
+    "_SYSTEMD_UNIT",
+    "COREDUMP_UNIT",
+    "UNIT", 
+    "OBJECT_SYSTEMD_UNIT",
+    "_SYSTEMD_SLICE"
+};
+
+const std::vector<std::string> JournalUtils::kUnitTypes = {
+    ".service",
+    ".socket",
+    ".target",
+    ".device",
+    ".mount",
+    ".automount", 
+    ".swap",
+    ".path",
+    ".timer",
+    ".snapshot",
+    ".slice",
+    ".scope"
+};
 
 // ============================================================================
 // 字符串和路径工具函数实现
@@ -32,7 +104,7 @@ namespace logtail {
 
 // 检查字符串是否包含glob模式字符（*、?、[）
 bool JournalUtils::StringIsGlob(const std::string& name) {
-    return name.find_first_of(JournalConstants::kGlobChars) != std::string::npos;
+    return name.find_first_of(kGlobChars) != std::string::npos;
 }
 
 // 检查字符串中的所有字符是否都在指定的字符集中
@@ -108,7 +180,7 @@ bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
         return false;
     }
     
-    return std::any_of(JournalConstants::kUnitTypes.begin(), JournalConstants::kUnitTypes.end(),
+    return std::any_of(kUnitTypes.begin(), kUnitTypes.end(),
                        [&suffix](const std::string& validSuffix) {
                            return suffix == validSuffix;
                        });
@@ -116,7 +188,7 @@ bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
 
 // 检查单元名称是否有效
 bool JournalUtils::UnitNameIsValid(const std::string& name) {
-    if (name.length() >= JournalConstants::kUnitNameMax) {
+    if (name.length() >= kUnitNameMax) {
         return false;
     }
     
@@ -131,7 +203,7 @@ bool JournalUtils::UnitNameIsValid(const std::string& name) {
     }
     
     // 检查单元名称是否只包含有效字符（字母、数字、特殊符号和@）
-    if (!InCharset(name, JournalConstants::kValidCharsWithAt)) {
+    if (!InCharset(name, kValidCharsWithAt)) {
         return false;
     }
     
@@ -164,7 +236,7 @@ std::string JournalUtils::DoEscapeMangle(const std::string& name) {
     for (char c : name) {
         if (c == '/') {
             mangled += '-';
-        } else if (!absl::StrContains(JournalConstants::kValidChars, c)) {
+        } else if (!absl::StrContains(kValidChars, c)) {
             // 转换为十六进制转义序列
             std::ostringstream oss;
             oss << "\\x" << std::hex << static_cast<unsigned char>(c);
@@ -213,7 +285,7 @@ std::string JournalUtils::UnitNameMangle(const std::string& name, const std::str
     }
     
     // 已经是完全有效的glob表达式？如果是，则无需处理...
-    if (StringIsGlob(name) && InCharset(name, JournalConstants::kValidCharsGlob)) {
+    if (StringIsGlob(name) && InCharset(name, kValidCharsGlob)) {
         return name;
     }
     

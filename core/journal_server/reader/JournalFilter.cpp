@@ -20,7 +20,6 @@
 
 #include "absl/strings/match.h"
 #include "logger/Logger.h"
-#include "../common/JournalConstants.h"
 #include "../common/JournalUtils.h"
 
 namespace logtail {
@@ -157,7 +156,7 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
     if (!patterns.empty()) {
         LOG_INFO(sLogger, ("processing glob patterns", "")("config", configName)("idx", configIndex)("patterns_count", patterns.size()));
         
-        std::vector<std::string> matchedUnits = getPossibleUnits(reader, JournalConstants::kSystemUnits, patterns);
+        std::vector<std::string> matchedUnits = getPossibleUnits(reader, JournalUtils::kSystemUnits, patterns);
         LOG_INFO(sLogger, ("glob patterns matched units", "")("config", configName)("idx", configIndex)("matched_count", matchedUnits.size()));
         
         for (const auto& matchedUnit : matchedUnits) {

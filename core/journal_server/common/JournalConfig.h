@@ -44,7 +44,6 @@ struct JournalConfig {
     // 性能配置
     // 注意：已移除resetIntervalSecond配置，连接永远不重建
     int maxEntriesPerBatch = 1000;           // 每批最大条目数
-    int waitTimeoutMs = 1000;                // 等待超时时间（毫秒）
 
     // 字段处理配置
     bool parsePriority = false;              // 解析优先级字段
@@ -86,14 +85,6 @@ struct JournalConfig {
             fixedCount++;
         } else if (maxEntriesPerBatch > 10000) {  // 最大10000条，防止内存爆炸
             maxEntriesPerBatch = 10000;
-            fixedCount++;
-        }
-        
-        if (waitTimeoutMs < 0) {
-            waitTimeoutMs = 1000;  // 默认1秒
-            fixedCount++;
-        } else if (waitTimeoutMs > 60000) {  // 最大1分钟
-            waitTimeoutMs = 60000;
             fixedCount++;
         }
         
@@ -152,7 +143,6 @@ struct JournalConfig {
     bool IsValid() const {
         return cursorFlushPeriodMs > 0 && 
                maxEntriesPerBatch > 0 && 
-               waitTimeoutMs >= 0 &&
                !seekPosition.empty() &&
                !cursorSeekFallback.empty();
     }

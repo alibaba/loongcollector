@@ -20,10 +20,34 @@
 #include <memory>
 #include <string>
 #include <vector>
-
-#include "JournalEntry.h"
+#include <map>
+#include <cstdint>
 
 namespace logtail {
+
+/**
+ * @brief Represents a single journal entry with all its fields and metadata
+ */
+struct JournalEntry {
+    JournalEntry() = default;
+
+    // Fields map (key-value pairs from journal)
+    std::map<std::string, std::string> fields;
+    
+    // Journal metadata
+    std::string cursor;
+    uint64_t realtimeTimestamp = 0;
+    uint64_t monotonicTimestamp = 0;
+    
+    // Helper methods
+    bool HasField(const std::string& key) const;
+    std::string GetField(const std::string& key, const std::string& defaultValue = "") const;
+    void SetField(const std::string& key, const std::string& value);
+    
+    // Timestamp conversion
+    std::chrono::system_clock::time_point GetRealtimeTimestamp() const;
+    std::chrono::steady_clock::time_point GetMonotonicTimestamp() const;
+};
 
 /**
  * @brief Abstract interface for journal reading operations
@@ -63,9 +87,6 @@ public:
     
     // Get unique values for a field (for glob pattern matching)
     virtual std::vector<std::string> GetUniqueValues(const std::string& field) = 0;
-    
-    // Event waiting
-    virtual int Wait(std::chrono::milliseconds timeout) = 0;
     
     // Configuration
     virtual bool SetDataThreshold(size_t threshold) = 0;
@@ -108,12 +129,21 @@ public:
     
     std::vector<std::string> GetUniqueValues(const std::string& field) override;
     
-    int Wait(std::chrono::milliseconds timeout) override;
-    
     bool SetDataThreshold(size_t threshold) override;
     bool SetTimeout(std::chrono::milliseconds timeout) override;
     
     bool SetJournalPaths(const std::vector<std::string>& paths) override;
+    
+#ifdef __linux__
+    // 获取底层的 journal 句柄（用于事件监听）
+    void* GetJournalHandle() const;
+    
+    // 事件监听相关方法
+    bool AddToEpoll(int epollFD);
+    void RemoveFromEpoll(int epollFD);
+    bool ProcessJournalEvent();
+    int GetJournalFD() const;
+#endif
 
 private:
     class Impl;

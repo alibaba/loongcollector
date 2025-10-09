@@ -14,26 +14,33 @@
  * limitations under the License.
  */
 
-#include "JournalServerCore.h"
-
-#include <chrono>
 #include <algorithm>
 #include <memory>
 
 #include "checkpoint/JournalCheckpointManager.h"
-#include "reader/JournalEntry.h"
 #include "reader/JournalReader.h"
+#include "common/JournalConfig.h"
 #include "models/PipelineEventGroup.h"
 #include "common/memory/SourceBuffer.h"
 #include "common/TimeUtil.h"
 #include "app_config/AppConfig.h"
 #include "runner/ProcessorRunner.h"
-#include "common/JournalConstants.h"
+#include "common/JournalUtils.h"
 #include "logger/Logger.h"
 
 using namespace std;
 
 namespace logtail::impl {
+
+// 前向声明
+bool MoveToNextJournalEntry(const string& configName, size_t idx, const JournalConfig& config,
+                           const shared_ptr<SystemdJournalReader>& journalReader, 
+                           bool isFirstEntry, int entryCount);
+bool ReadAndValidateEntry(const string& configName, size_t idx,
+                         const shared_ptr<SystemdJournalReader>& journalReader, JournalEntry& entry);
+bool CreateAndPushEventGroup(const string& configName, size_t idx, const JournalConfig& config,
+                            const JournalEntry& entry, QueueKey queueKey);
+void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config);
 
 // =============================================================================
 // 读取条目
@@ -111,10 +118,8 @@ bool MoveToNextJournalEntry(const string& configName, size_t idx, const JournalC
                     return false;
                 }
                 
-                // 使用wait功能等待新的entries
-                if (!HandleJournalWait(configName, idx, config, journalReader, entryCount)) {
-                    return false;
-                }
+                // 在事件驱动模式下，不需要等待，直接返回false让上层处理
+                return false;
             }
             // 已移动到下一个条目，继续处理
         }
@@ -171,56 +176,6 @@ bool ReadAndValidateEntry(const string& configName, size_t idx,
         LOG_ERROR(sLogger, ("unknown exception during journal entry reading", "")("config", configName)("idx", idx));
         // 清空entry以确保不会使用部分读取的数据
         entry = JournalEntry();
-        return false;
-    }
-}
-
-bool HandleJournalWait(const string& configName, size_t idx, const JournalConfig& config,
-                      const std::shared_ptr<SystemdJournalReader>& journalReader, int entryCount) {
-    try {
-        // 动态调整等待时间：如果已经读到了一些entries，缩短等待时间以保持响应性
-        int waitTimeout = (entryCount == 0) ? config.waitTimeoutMs : std::min(config.waitTimeoutMs / 4, 250);
-        
-        // 当前无可用条目，等待新条目到达（使用动态超时时间）
-        
-        int waitResult = journalReader->Wait(std::chrono::milliseconds(waitTimeout));
-        if (waitResult > 0) {
-            // 有新的数据可用，继续尝试读取
-            // 等待后检测到新条目，继续处理
-            
-            // 在wait之后重新检查连接状态
-            if (!journalReader->IsOpen()) {
-                LOG_WARNING(sLogger, ("journal connection closed during wait", "aborting batch")("config", configName)("idx", idx));
-                return false;
-            }
-            
-            bool nextSuccess = journalReader->Next();
-            if (!nextSuccess) {
-                // 等待显示有新数据，但Next()失败，可能连接有问题
-                if (!journalReader->IsOpen()) {
-                    LOG_WARNING(sLogger, ("connection lost after wait", "")("config", configName)("idx", idx));
-                }
-                return false;
-            }
-            return true;
-        }
-        if (waitResult == 0) {
-            // 等待超时，没有新数据（可能未发现新条目，或批次已完成）
-            return false;
-        }
-        // 错误，可能是连接被重置或其他问题
-        LOG_WARNING(sLogger, ("wait failed", "")("config", configName)("idx", idx)("wait_result", waitResult)("entries_processed", entryCount));
-        
-        if (!journalReader->IsOpen()) {
-            LOG_WARNING(sLogger, ("connection lost during wait operation", "")("config", configName)("idx", idx));
-        }
-        return false;
-        
-    } catch (const std::exception& e) {
-        LOG_ERROR(sLogger, ("exception during journal wait operation", e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
-        return false;
-    } catch (...) {
-        LOG_ERROR(sLogger, ("unknown exception during journal wait operation", "")("config", configName)("idx", idx)("entries_processed", entryCount));
         return false;
     }
 }
@@ -291,8 +246,8 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
         auto it = entry.fields.find("PRIORITY");
         if (it != entry.fields.end()) {
             // 查找PRIORITY字段对应的值
-            auto priorityIt = JournalConstants::kPriorityConversionMap.find(it->second);
-            if (priorityIt != JournalConstants::kPriorityConversionMap.end()) {
+            auto priorityIt = JournalUtils::kPriorityConversionMap.find(it->second);
+            if (priorityIt != JournalUtils::kPriorityConversionMap.end()) {
                 // 如果找到对应的值，则更新PRIORITY字段
                 it->second = priorityIt->second;
             }
@@ -304,8 +259,8 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
         auto it = entry.fields.find("SYSLOG_FACILITY");
         if (it != entry.fields.end()) {
             // 查找SYSLOG_FACILITY字段对应的值
-            auto facilityIt = JournalConstants::kSyslogFacilityString.find(it->second);
-            if (facilityIt != JournalConstants::kSyslogFacilityString.end()) {
+            auto facilityIt = JournalUtils::kSyslogFacilityString.find(it->second);
+            if (facilityIt != JournalUtils::kSyslogFacilityString.end()) {
                 // 如果找到对应的值，则更新SYSLOG_FACILITY字段
                 it->second = facilityIt->second;
             }

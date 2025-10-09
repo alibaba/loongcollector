@@ -14,11 +14,9 @@
  * limitations under the License.
  */
 
-#include "JournalServerCore.h"
-
 #include <memory>
 
-#include "connection/JournalConnectionManager.h"
+#include "JournalConfigGroupManager.h"
 #include "checkpoint/JournalCheckpointManager.h"
 #include "reader/JournalReader.h"
 #include "logger/Logger.h"
@@ -35,9 +33,22 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     // Getting journal connection from manager for config: configName, idx: idx
     
     // 记录连接获取前的连接数，用于判断是否创建了新连接
-    size_t connectionCountBefore = JournalConnectionManager::GetInstance()->GetConnectionCount();
+    size_t connectionCountBefore = JournalConfigGroupManager::GetInstance().GetConnectionCount();
     
-    auto journalReader = JournalConnectionManager::GetInstance()->GetOrCreateConnection(configName, idx, config);
+    // 注意：这里需要创建一个临时的配置处理器
+    auto handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 空的处理器，仅用于连接建立
+    };
+    
+    // 添加配置到分组管理器
+    bool added = JournalConfigGroupManager::GetInstance().AddConfig(configName, idx, config, handler);
+    if (!added) {
+        LOG_ERROR(sLogger, ("failed to add config to group manager", "skip processing")("config", configName)("idx", idx));
+        isNewConnection = false;
+        return nullptr;
+    }
+    
+    auto journalReader = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
     
     if (!journalReader) {
         LOG_ERROR(sLogger, ("failed to get journal connection", "skip processing")("config", configName)("idx", idx));
@@ -53,7 +64,7 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     }
     
     // 检查是否创建了新连接
-    size_t connectionCountAfter = JournalConnectionManager::GetInstance()->GetConnectionCount();
+    size_t connectionCountAfter = JournalConfigGroupManager::GetInstance().GetConnectionCount();
     isNewConnection = (connectionCountAfter > connectionCountBefore);
     
     // Journal connection obtained successfully for config: configName, idx: idx, is_new_connection: isNewConnection
@@ -113,6 +124,7 @@ bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& con
         
         // Seek成功，清除needsSeek标记
         config.needsSeek = false;
+        LOG_DEBUG(sLogger, ("journal seek completed successfully", "")("config", configName)("idx", idx)("needsSeek", false));
         return true;
         
     } catch (const std::exception& e) {

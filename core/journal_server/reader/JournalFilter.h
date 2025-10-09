@@ -19,7 +19,7 @@
 #include <string>
 #include <vector>
 
-#include "../reader/JournalReader.h"
+#include "JournalReader.h"
 
 namespace logtail {
 

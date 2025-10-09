@@ -15,11 +15,47 @@
 #ifdef __linux__
 #include <systemd/sd-journal.h>
 #include <errno.h>
+#include <sys/epoll.h>
+#include <unistd.h>
 #endif
 
-#include "logger/Logger.h"
-
 namespace logtail {
+
+// ============================================================================
+// JournalEntry 实现
+// ============================================================================
+
+bool JournalEntry::HasField(const std::string& key) const {
+    return fields.find(key) != fields.end();
+}
+
+std::string JournalEntry::GetField(const std::string& key, const std::string& defaultValue) const {
+    auto it = fields.find(key);
+    if (it != fields.end()) {
+        return it->second;
+    }
+    return defaultValue;
+}
+
+void JournalEntry::SetField(const std::string& key, const std::string& value) {
+    fields[key] = value;
+}
+
+std::chrono::system_clock::time_point JournalEntry::GetRealtimeTimestamp() const {
+    // Convert microseconds to system_clock time_point
+    auto duration = std::chrono::microseconds(realtimeTimestamp);
+    return std::chrono::system_clock::time_point(duration);
+}
+
+std::chrono::steady_clock::time_point JournalEntry::GetMonotonicTimestamp() const {
+    // Convert microseconds to steady_clock time_point
+    auto duration = std::chrono::microseconds(monotonicTimestamp);
+    return std::chrono::steady_clock::time_point(duration);
+}
+
+// ============================================================================
+// SystemdJournalReader 实现
+// ============================================================================
 
 /*========================================================
  *  Impl：Linux 下真正干活；非 Linux 下只留空壳
@@ -28,7 +64,9 @@ class SystemdJournalReader::Impl {
 public:
     Impl() = default;
 
-    ~Impl() { Close(); }
+    ~Impl() { 
+        Close(); 
+    }
     
     // Delete copy and move operations
     Impl(const Impl&) = delete;
@@ -318,24 +356,6 @@ public:
        return values;
    }
 
-    int Wait(std::chrono::milliseconds timeout) {
-#ifdef __linux__
-        if (!IsOpen()) { 
-            return -1;
-        }
-        
-        // 参数验证
-        if (timeout.count() < 0) {
-            return -1;
-        }
-        
-        return sd_journal_wait(mJournal,
-              std::chrono::duration_cast<std::chrono::microseconds>(timeout).count());
-#else
-       std::this_thread::sleep_for(timeout);
-        return 1; // 模拟有数据
-#endif
-    }
 
     /*---------------  配置接口  ----------------*/
     bool SetDataThreshold(size_t t) {
@@ -349,6 +369,82 @@ public:
     }
     bool SetTimeout(std::chrono::milliseconds timeout)  { mTimeoutMs = (int)timeout.count(); return true; }
     bool SetJournalPaths(const std::vector<std::string>& p) { mJournalPaths = p; return true; }
+    
+#ifdef __linux__
+    void* GetJournalHandle() const { return mJournal; }
+    
+    bool AddToEpoll(int epollFD) {
+        if (!IsOpen() || epollFD < 0) {
+            printf("[JournalReader] AddToEpoll failed: reader not open or invalid epollFD (is_open=%d, epoll_fd=%d)\n", 
+                   IsOpen() ? 1 : 0, epollFD);
+            return false;
+        }
+        
+        int fd = sd_journal_get_fd(mJournal);
+        if (fd < 0) {
+            printf("[JournalReader] AddToEpoll failed: sd_journal_get_fd returned negative (fd=%d, errno=%d)\n", 
+                   fd, errno);
+            return false;
+        }
+        
+        struct epoll_event event = {};
+        event.events = EPOLLIN | EPOLLET;
+        event.data.fd = fd;
+        
+        int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
+        if (result != 0) {
+            printf("[JournalReader] AddToEpoll failed: epoll_ctl failed (epoll_fd=%d, journal_fd=%d, errno=%d, error=%s)\n", 
+                   epollFD, fd, errno, strerror(errno));
+            return false;
+        }
+        
+        printf("[JournalReader] AddToEpoll succeeded (epoll_fd=%d, journal_fd=%d)\n", epollFD, fd);
+        return true;
+    }
+    
+    void RemoveFromEpoll(int epollFD) {
+        if (!IsOpen() || epollFD < 0) {
+            return;
+        }
+        
+        int fd = sd_journal_get_fd(mJournal);
+        if (fd >= 0) {
+            epoll_ctl(epollFD, EPOLL_CTL_DEL, fd, nullptr);
+        }
+    }
+    
+    bool ProcessJournalEvent() {
+        if (!IsOpen()) {
+            return false;
+        }
+        
+        int ret = sd_journal_process(mJournal);
+        
+        if (ret == SD_JOURNAL_INVALIDATE) {
+            // journal 文件被添加或删除
+            return false;
+        }
+        
+        return (ret == SD_JOURNAL_APPEND || ret == SD_JOURNAL_NOP);
+    }
+    
+    int GetJournalFD() const {
+        if (!IsOpen()) {
+            printf("[JournalReader] GetJournalFD failed: reader not open\n");
+            return -1;
+        }
+        
+        int fd = sd_journal_get_fd(mJournal);
+        printf("[JournalReader] GetJournalFD: journal_fd=%d, errno=%d\n", fd, errno);
+        
+        if (fd < 0) {
+            printf("[JournalReader] GetJournalFD failed: sd_journal_get_fd returned %d, errno=%d (%s)\n", 
+                   fd, errno, strerror(errno));
+        }
+        
+        return fd;
+    }
+#endif
 
 private:
 #ifdef __linux__
@@ -447,10 +543,31 @@ bool  SystemdJournalReader::AddMatch(const std::string& f,
                                     const std::string& v)  { FWD(AddMatch(f,v)); }
 bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
 std::vector<std::string> SystemdJournalReader::GetUniqueValues(const std::string& field) { FWD(GetUniqueValues(field)); }
-int   SystemdJournalReader::Wait(std::chrono::milliseconds timeout){ FWD(Wait(timeout)); }
 bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
 bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }
 bool  SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p){ FWD(SetJournalPaths(p)); }
+
+#ifdef __linux__
+void* SystemdJournalReader::GetJournalHandle() const {
+    return mImpl->GetJournalHandle();
+}
+
+bool SystemdJournalReader::AddToEpoll(int epollFD) {
+    return mImpl->AddToEpoll(epollFD);
+}
+
+void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
+    mImpl->RemoveFromEpoll(epollFD);
+}
+
+bool SystemdJournalReader::ProcessJournalEvent() {
+    return mImpl->ProcessJournalEvent();
+}
+
+int SystemdJournalReader::GetJournalFD() const {
+    return mImpl->GetJournalFD();
+}
+#endif
 #undef FWD
 
 } // namespace logtail

@@ -16,18 +16,47 @@
 
 #pragma once
 
+#include <map>
 #include <string>
+#include <vector>
 
 namespace logtail {
 
 /**
- * @brief Journal相关的工具函数集合
+ * @brief Journal相关的工具函数和常量集合
  * 
  * 提供字符串处理、路径处理和systemd单元名称处理等通用工具函数
+ * 以及Journal相关的常量和映射表
  * 这些函数基于Go版本实现，确保与现有逻辑保持一致
  */
 class JournalUtils {
 public:
+    // ============================================================================
+    // Journal相关常量
+    // ============================================================================
+    
+    // Syslog设施转换映射表
+    static const std::map<std::string, std::string> kSyslogFacilityString;
+    
+    // 优先级转换映射表
+    static const std::map<std::string, std::string> kPriorityConversionMap;
+    
+    // 过滤单元名称处理常量 (from Go implementation)
+    static constexpr size_t kUnitNameMax = 256;
+    static constexpr const char* kGlobChars = "*?[";
+    static constexpr const char* kUppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    static constexpr const char* kLowercaseLetters = "abcdefghijklmnopqrstuvwxyz";
+    static constexpr const char* kDigits = "0123456789";
+    
+    static const std::string kLetters;
+    static const std::string kValidChars;
+    static const std::string kValidCharsWithAt;
+    static const std::string kValidCharsGlob;
+    
+    // System unit fields and types
+    static const std::vector<std::string> kSystemUnits;
+    static const std::vector<std::string> kUnitTypes;
+    
     // ============================================================================
     // 字符串和路径工具函数
     // ============================================================================
