@@ -296,14 +296,14 @@ void LoongSuiteForwardServiceUnittest::TestProcessForwardRequest() {
     APSARA_TEST_EQUAL_FATAL("Invalid request", status.error_message());
 
     // Test with empty data
-    request.set_data("");
+    request.clear_data();
     status = grpc::Status::OK; // Reset status
     service->ProcessForwardRequest(&request, config, 1, status);
     APSARA_TEST_EQUAL_FATAL(grpc::StatusCode::INVALID_ARGUMENT, status.error_code());
     APSARA_TEST_EQUAL_FATAL("Empty data in forward request", status.error_message());
 
     // Test with valid data
-    request.set_data("test data");
+    request.add_data("test data");
     status = grpc::Status::OK;
     service->ProcessForwardRequest(&request, config, 1, status);
     APSARA_TEST_EQUAL_FATAL(grpc::StatusCode::UNAVAILABLE, status.error_code());
@@ -338,7 +338,7 @@ void LoongSuiteForwardServiceUnittest::TestForwardWithValidRequest() {
 
     // Create request with data
     LoongSuiteForwardRequest request;
-    request.set_data("valid test data");
+    request.add_data("valid test data");
     LoongSuiteForwardResponse response;
     grpc::CallbackServerContext context;
 
@@ -365,7 +365,7 @@ void LoongSuiteForwardServiceUnittest::TestForwardWithEmptyData() {
 
     // Create request with empty data
     LoongSuiteForwardRequest request;
-    request.set_data("");
+    request.clear_data("");
     LoongSuiteForwardResponse response;
     grpc::CallbackServerContext context;
 

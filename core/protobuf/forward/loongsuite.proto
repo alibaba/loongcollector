@@ -22,7 +22,7 @@ service LoongSuiteForwardService {
 }
 
 message LoongSuiteForwardRequest {
-    bytes data = 1;
+    repeated bytes data = 1;
 }
 
 message LoongSuiteForwardResponse {
