@@ -71,6 +71,9 @@ target_link_libraries(network_util_unittest ${UT_BASE_TARGET})
 add_executable(lru_benchmark LRUBenchmark.cpp)
 target_link_libraries(lru_benchmark ${UT_BASE_TARGET})
 
+add_executable(archive_helper_unittest ArchiveHelperUnittest.cpp)
+target_link_libraries(archive_helper_unittest ${UT_BASE_TARGET})
+
 add_executable(timekeeper_benchmark TimeKeeperBenchmark.cpp)
 target_link_libraries(timekeeper_benchmark ${UT_BASE_TARGET})
 
@@ -95,5 +98,6 @@ if (LINUX)
 endif()
 gtest_discover_tests(network_util_unittest)
 gtest_discover_tests(lru_benchmark)
+gtest_discover_tests(archive_helper_unittest)
 gtest_discover_tests(timekeeper_benchmark)
 gtest_discover_tests(ecs_metadata_unittest)

@@ -14,6 +14,8 @@
 
 #include "application/Application.h"
 
+#include "task_pipeline/TaskRegistry.h"
+
 #ifndef LOGTAIL_NO_TC_MALLOC
 #include "gperftools/malloc_extension.h"
 #endif
@@ -259,6 +261,8 @@ void Application::Start() { // GCOVR_EXCL_START
 
     // plugin registration
     PluginRegistry::GetInstance()->LoadPlugins();
+
+    TaskRegistry::GetInstance()->LoadPlugins();
     InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -396,6 +400,7 @@ void Application::Exit() {
     CollectionPipelineManager::GetInstance()->StopAllPipelines();
 
     PluginRegistry::GetInstance()->UnloadPlugins();
+    TaskRegistry::GetInstance()->UnloadPlugins();
 
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Stop();

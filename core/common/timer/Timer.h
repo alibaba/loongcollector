@@ -67,6 +67,7 @@ private:
     friend class TimerUnittest;
     friend class ScrapeSchedulerUnittest;
     friend class HostMonitorInputRunnerUnittest;
+    friend class ApmInjectRunnerUnittest;
 #endif
 };
 
