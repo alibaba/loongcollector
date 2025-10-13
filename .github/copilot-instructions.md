@@ -1,6 +1,6 @@
 # AGENT.md
 
-Please anwser in Chinese-Simplified whenever possible.
+Please answer in Chinese-Simplified whenever possible.
 
 ## Project Overview
 
@@ -44,7 +44,7 @@ cd /workspaces/loongcollector-github/build && make -sj96 all
 cd /workspaces/loongcollector-github/build && make -sj96 loongcollector
 
 # Build loongcollector with specific version
-cd /workspaces/loongcollector-github/build && make -sj96 make VERSION=3.1.0 loongcollector
+cd /workspaces/loongcollector-github/build && make -sj96 VERSION=3.1.0 loongcollector
 
 # Build a unittest
 cd /workspaces/loongcollector-github/build && make -sj96 common_string_tools_unittest
@@ -183,7 +183,7 @@ The system supports both Go and C++ plugins:
 
     - 类型安全：JSON解析先验证类型，如`if (json.isString()) value = json.asString();`
 
-    - 资源管理：使用RAII和智能指针，避免内存泄漏，如`std::unique_ptr`、`std::shard_ptr`。优先使用现成的RAII封装，如需自定义清理逻辑可使用unique\_ptr + lambda构建。
+    - 资源管理：使用RAII和智能指针，避免内存泄漏，如`std::unique_ptr`、`std::shared_ptr`。优先使用现成的RAII封装，如需自定义清理逻辑可使用unique\_ptr + lambda构建。
 
     - 错误处理：外部输入防御式编程，包括读配置（如`std::ios_base::failure`、`std::filesystem::filesystem_error`、`boost::regex_error`）、文件、数据库、网络，必须有异常处理和完备日志
 
