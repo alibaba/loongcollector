@@ -391,17 +391,16 @@ void* LogProcess::ProcessLoop(int32_t threadNo) {
                                             false,
                                             false,
                                             logBuffer->exactlyOnceCheckpoint);
-                    if (!Sender::Instance()->Send(
-                            projectName,
-                            logFileReader->GetSourceId(),
-                            *(pLogGroup.get()),
-                            logFileReader->GetLogGroupKey(),
-                            flusherSLS,
-                            flusherSLS->mBatch.mMergeType,
-                            (uint32_t)(profile.logGroupSize * DOUBLE_FLAG(loggroup_bytes_inflation)),
-                            "",
-                            convertedPath,
-                            context)) {
+                    if (!Sender::Instance()->Send(projectName,
+                                                  logFileReader->GetSourceId(),
+                                                  *(pLogGroup.get()),
+                                                  logFileReader->GetLogGroupKey(),
+                                                  flusherSLS,
+                                                  flusherSLS->mBatch.mMergeType,
+                                                  0,
+                                                  "",
+                                                  convertedPath,
+                                                  context)) {
                         LogtailAlarm::GetInstance()->SendAlarm(DISCARD_DATA_ALARM,
                                                                "push file data into batch map fail",
                                                                projectName,
