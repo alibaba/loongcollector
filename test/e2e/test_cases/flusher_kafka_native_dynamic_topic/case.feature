@@ -105,7 +105,7 @@ Feature: flusher kafka native dynamic topic
     """
     brokers:
       - "localhost:9092"
-    topic: "app-prod"
+    topic: "app-1111"
     """
     Given {flusher-kafka-native-dynamic-topic-case} local config as below
     """
@@ -123,7 +123,7 @@ Feature: flusher kafka native dynamic topic
     flushers:
       - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
-        Topic: "app-${MY_ENV}"
+        Topic: "app-${ALIYUN_LOGTAIL_USER_DEFINED_ID}"
         Version: "2.8.0"
         BulkFlushFrequency: 0
         BulkMaxSize: 2048
@@ -142,6 +142,6 @@ Feature: flusher kafka native dynamic topic
     Then there is at least {10} logs
     Then the log fields match kv
     """
-    topic: "app-prod"
+    topic: "app-1111"
     content: ".*"
     """
