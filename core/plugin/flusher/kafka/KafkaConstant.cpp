@@ -21,6 +21,7 @@
 namespace logtail {
 
 const std::string KAFKA_CONFIG_BOOTSTRAP_SERVERS = "bootstrap.servers";
+const std::string KAFKA_CONFIG_PARTITIONER = "partitioner";
 
 const std::string KAFKA_CONFIG_BATCH_NUM_MESSAGES = "batch.num.messages";
 const std::string KAFKA_CONFIG_LINGER_MS = "linger.ms";
@@ -38,7 +39,29 @@ const std::string KAFKA_CONFIG_API_VERSION_REQUEST = "api.version.request";
 const std::string KAFKA_CONFIG_BROKER_VERSION_FALLBACK = "broker.version.fallback";
 const std::string KAFKA_CONFIG_API_VERSION_FALLBACK_MS = "api.version.fallback.ms";
 
+const std::string KAFKA_CONFIG_COMPRESSION_CODEC = "compression.codec";
+const std::string KAFKA_CONFIG_COMPRESSION_LEVEL = "compression.level";
+
 const int KAFKA_POLL_INTERVAL_MS = 100;
 const int KAFKA_FLUSH_TIMEOUT_MS = 5000;
+
+const std::string PARTITIONER_RANDOM = "random";
+const std::string PARTITIONER_HASH = "hash";
+const std::string PARTITIONER_PREFIX = "content.";
+
+const std::string LIBRDKAFKA_PARTITIONER_RANDOM = "random";
+const std::string LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM = "murmur2_random";
+
+const std::string KAFKA_CONFIG_SECURITY_PROTOCOL = "security.protocol";
+const std::string KAFKA_CONFIG_SSL_CA_LOCATION = "ssl.ca.location";
+const std::string KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION = "ssl.certificate.location";
+const std::string KAFKA_CONFIG_SSL_KEY_LOCATION = "ssl.key.location";
+const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD = "ssl.key.password";
+
+const std::string KAFKA_CONFIG_SASL_MECHANISMS = "sasl.mechanisms";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME = "sasl.kerberos.service.name";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL = "sasl.kerberos.principal";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_KEYTAB = "sasl.kerberos.keytab";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD = "sasl.kerberos.kinit.cmd";
 
 } // namespace logtail

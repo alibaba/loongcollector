@@ -49,6 +49,7 @@ public:
     void TestCustomConfig();
     void TestBatchConfig();
     void TestDeliveryConfig();
+    void TestCompressionConfig();
     void TestErrorTypeMapping();
     void TestDeliveryReportCallback();
 
@@ -215,6 +216,19 @@ void KafkaProducerUnittest::TestDeliveryConfig() {
     APSARA_TEST_TRUE(mProducer->IsInitialized());
 }
 
+void KafkaProducerUnittest::TestCompressionConfig() {
+    KafkaConfig cfg = mConfig;
+    cfg.Compression = "snappy";
+    cfg.CompressionLevel = -1;
+    cfg.QueueBufferingMaxMs = 0;
+    mProducer->Init(cfg);
+    APSARA_TEST_TRUE(mProducer->IsInitialized());
+
+    const auto& c = mProducer->GetConfig();
+    APSARA_TEST_EQUAL(std::string("snappy"), c.Compression);
+    APSARA_TEST_EQUAL(-1, c.CompressionLevel);
+}
+
 void KafkaProducerUnittest::TestErrorTypeMapping() {
     APSARA_TEST_EQUAL(KafkaProducer::ErrorType::SUCCESS, KafkaProducer::MapKafkaError(RD_KAFKA_RESP_ERR_NO_ERROR));
 
@@ -280,6 +294,7 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestEmptyBrokers)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestCustomConfig)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestBatchConfig)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryConfig)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCompressionConfig)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestErrorTypeMapping)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryReportCallback)
 
