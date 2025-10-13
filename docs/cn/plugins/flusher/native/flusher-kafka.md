@@ -56,7 +56,7 @@ flushers:
 
 - `%{content.key}`: 取日志内容中的字段值（仅对 `LOG` 类型事件生效）。
 - `%{tag.key}`: 取分组标签（`GroupTags`）中的键值。
- - `${ENV_NAME}`: 取系统环境变量 `ENV_NAME` 的值（容器/进程环境）。
+- `${ENV_NAME}`: 取分组标签中名为 `ENV_NAME` 的值（通常由上游处理器/输入端注入）。
 
 示例：根据日志中的 `service` 字段动态路由到不同 Topic：
 
@@ -85,7 +85,7 @@ flushers:
 当需要将相同业务键的日志落到同一分区时，可以开启 `hash` 分区：
 
 - `PartitionerType: "hash"`：启用哈希分区，内部映射为 librdkafka `partitioner=murmur2_random`，与 Java 客户端默认分区器兼容（NULL Key 随机分配）。
-- `HashKeys`：从日志内容中取值拼接成消息 Key（按顺序用 `###` 连接），示例：
+- `HashKeys`：从日志内容中取值拼接成消息 Key，示例：
 
 ```yaml
 flushers:
@@ -96,7 +96,3 @@ flushers:
     PartitionerType: "hash"
     HashKeys: ["content.service", "content.user"]
 ```
-
-说明：
-- 仅支持从 `content.*` 中取值生成 Key；若键值缺失则不设置消息 Key（按空 Key 发送，随机分区）。
-- 当前实现按事件逐条发送，Key 不同的事件由客户端路由至对应分区。

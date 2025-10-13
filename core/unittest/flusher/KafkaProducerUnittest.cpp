@@ -51,6 +51,9 @@ public:
     void TestDeliveryConfig();
     void TestErrorTypeMapping();
     void TestDeliveryReportCallback();
+    void TestInitWithPartitionerAndProduceWithAndWithoutKey_Real();
+    void TestInitWithInvalidPartitioner_Real();
+    void TestProduceAsyncWithoutInit_Real();
 
 protected:
     void SetUp();
@@ -266,6 +269,56 @@ void KafkaProducerUnittest::TestDeliveryReportCallback() {
     });
 }
 
+void KafkaProducerUnittest::TestInitWithPartitionerAndProduceWithAndWithoutKey_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Partitioner = LIBRDKAFKA_PARTITIONER_MURMUR2_RANDOM; // 触发 topic config 路径
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    // 带 key
+    std::atomic<bool> cb1{false};
+    p.ProduceAsync(
+        "ut_topic",
+        "v1",
+        [&](bool /*success*/, const KafkaProducer::ErrorInfo& /*info*/) { cb1.store(true, std::memory_order_relaxed); },
+        "k1");
+
+    // 不带 key
+    std::atomic<bool> cb2{false};
+    p.ProduceAsync("ut_topic", "v2", [&](bool /*success*/, const KafkaProducer::ErrorInfo& /*info*/) {
+        cb2.store(true, std::memory_order_relaxed);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    p.Close();
+}
+
+void KafkaProducerUnittest::TestInitWithInvalidPartitioner_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Partitioner = "invalid_partitioner_choice";
+
+    KafkaProducer p;
+    APSARA_TEST_FALSE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithoutInit_Real() {
+    KafkaProducer p;
+    std::atomic<bool> called{false};
+    p.ProduceAsync("topic_x", "value_y", [&](bool success, const KafkaProducer::ErrorInfo& info) {
+        called.store(true, std::memory_order_relaxed);
+        APSARA_TEST_FALSE(success);
+        APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::OTHER_ERROR, (int)info.type);
+    });
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+}
+
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitFailure)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncSuccess)
@@ -282,6 +335,9 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestBatchConfig)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryConfig)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestErrorTypeMapping)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryReportCallback)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithPartitionerAndProduceWithAndWithoutKey_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithInvalidPartitioner_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithoutInit_Real)
 
 } // namespace logtail
 
