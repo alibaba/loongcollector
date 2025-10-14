@@ -31,6 +31,20 @@ using namespace std;
 
 namespace logtail {
 
+#if defined(_MSC_VER)
+// Normalize Windows path by converting only the drive letter to lowercase
+// This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest of the path
+// Example: "C:\Path\To\File" -> "c:\Path\To\File"
+inline string NormalizeWindowsPath(const string& path) {
+    if (path.size() >= 2 && path[1] == ':' && isalpha(static_cast<unsigned char>(path[0]))) {
+        string normalized = path;
+        normalized[0] = tolower(static_cast<unsigned char>(path[0]));
+        return normalized;
+    }
+    return path;
+}
+#endif
+
 // basePath must not stop with '/'
 inline bool _IsSubPath(const string& basePath, const string& subPath) {
     size_t pathSize = subPath.size();
@@ -174,7 +188,9 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
     }
 #if defined(_MSC_VER)
     mBasePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mBasePath);
+    mBasePath = NormalizeWindowsPath(mBasePath);
     mFilePattern = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePattern);
+    // File patterns don't have drive letters, no normalization needed
 #endif
     size_t len = mBasePath.size();
     if (len > 2 && mBasePath[len - 1] == '*' && mBasePath[len - 2] == '*'
@@ -226,11 +242,12 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
     } else {
         for (size_t i = 0; i < mExcludeFilePaths.size(); ++i) {
 #if defined(_MSC_VER)
-            string convertedPath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFilePaths[i]);
+            string excludeFilePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFilePaths[i]);
+            excludeFilePath = NormalizeWindowsPath(excludeFilePath);
 #else
-            const string& convertedPath = mExcludeFilePaths[i];
+            const string& excludeFilePath = mExcludeFilePaths[i];
 #endif
-            if (!filesystem::path(convertedPath).is_absolute()) {
+            if (!filesystem::path(excludeFilePath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeFilePaths[" + ToString(i) + "] is not absolute",
@@ -243,9 +260,9 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeFilePaths[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLFilePathBlacklist.push_back(convertedPath);
+                mMLFilePathBlacklist.push_back(excludeFilePath);
             } else {
-                mFilePathBlacklist.push_back(convertedPath);
+                mFilePathBlacklist.push_back(excludeFilePath);
             }
         }
     }
@@ -274,11 +291,12 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                 continue;
             }
 #if defined(_MSC_VER)
-            string convertedFileName = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFiles[i]);
+            string excludeFileName = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFiles[i]);
+            // File names don't have drive letters, but apply encoding conversion
 #else
-            const string& convertedFileName = mExcludeFiles[i];
+            const string& excludeFileName = mExcludeFiles[i];
 #endif
-            mFileNameBlacklist.push_back(convertedFileName);
+            mFileNameBlacklist.push_back(excludeFileName);
         }
     }
 
@@ -295,11 +313,13 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
     } else {
         for (size_t i = 0; i < mExcludeDirs.size(); ++i) {
 #if defined(_MSC_VER)
-            string convertedDirPath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeDirs[i]);
+            string excludeDir = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeDirs[i]);
+            excludeDir = NormalizeWindowsPath(excludeDir);
 #else
-            const string& convertedDirPath = mExcludeDirs[i];
+            string excludeDir = mExcludeDirs[i];
 #endif
-            if (!filesystem::path(convertedDirPath).is_absolute()) {
+            
+            if (!filesystem::path(excludeDir).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeDirs[" + ToString(i) + "] is not absolute",
@@ -312,15 +332,15 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeDirs[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLWildcardDirPathBlacklist.push_back(convertedDirPath);
+                mMLWildcardDirPathBlacklist.push_back(excludeDir);
                 continue;
             }
             bool isWildcardPath
                 = mExcludeDirs[i].find("*") != string::npos || mExcludeDirs[i].find("?") != string::npos;
             if (isWildcardPath) {
-                mWildcardDirPathBlacklist.push_back(convertedDirPath);
+                mWildcardDirPathBlacklist.push_back(excludeDir);
             } else {
-                mDirPathBlacklist.push_back(convertedDirPath);
+                mDirPathBlacklist.push_back(excludeDir);
             }
         }
     }
@@ -437,6 +457,7 @@ void FileDiscoveryOptions::ParseWildcardPath() {
 }
 
 bool FileDiscoveryOptions::IsFilenameMatched(const std::string& filename) const {
+    // File names don't have drive letters, no normalization needed
     return fnmatch(mFilePattern.c_str(), filename.c_str(), 0) == 0;
 }
 
@@ -445,18 +466,24 @@ bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
         return false;
     }
 
+#if defined(_MSC_VER)
+    const string curDir = NormalizeWindowsPath(dir);
+#else
+    const string& curDir = dir;
+#endif
+
     for (auto& dp : mDirPathBlacklist) {
-        if (_IsSubPath(dp, dir)) {
+        if (_IsSubPath(dp, curDir)) {
             return true;
         }
     }
     for (auto& dp : mWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dir.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(dp.c_str(), curDir.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& dp : mMLWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dir.c_str(), 0)) {
+        if (0 == fnmatch(dp.c_str(), curDir.c_str(), 0)) {
             return true;
         }
     }
@@ -468,13 +495,19 @@ bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) co
         return false;
     }
 
+#if defined(_MSC_VER)
+    const string curPath = NormalizeWindowsPath(filepath);
+#else
+    const string& curPath = filepath;
+#endif
+
     for (const auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filepath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), curPath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (const auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filepath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), curPath.c_str(), 0)) {
             return true;
         }
     }
@@ -494,13 +527,19 @@ bool FileDiscoveryOptions::IsObjectInBlacklist(const string& path, const string&
     }
 
     auto const filePath = PathJoin(path, name);
+#if defined(_MSC_VER)
+    const string curPath = NormalizeWindowsPath(filePath);
+#else
+    const string& curPath = filePath;
+#endif
+
     for (auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filePath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), curPath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filePath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), curPath.c_str(), 0)) {
             return true;
         }
     }
@@ -513,6 +552,7 @@ bool FileDiscoveryOptions::IsFilenameInBlacklist(const string& fileName) const {
         return false;
     }
 
+    // File names don't have drive letters, no normalization needed
     for (auto& pattern : mFileNameBlacklist) {
         if (0 == fnmatch(pattern.c_str(), fileName.c_str(), 0)) {
             return true;
@@ -527,7 +567,7 @@ bool FileDiscoveryOptions::IsFilenameInBlacklist(const string& fileName) const {
 bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const {
     // Check if the file name is matched or blacklisted.
     if (!name.empty()) {
-        if (fnmatch(mFilePattern.c_str(), name.c_str(), 0) != 0)
+        if (!IsFilenameMatched(name))
             return false;
         if (IsFilenameInBlacklist(name)) {
             return false;
@@ -576,11 +616,17 @@ bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const
 }
 
 bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string& name) const {
+#if defined(_MSC_VER)
+    const string curPath = NormalizeWindowsPath(path);
+#else
+    const string& curPath = path;
+#endif
+    
     size_t pos = 0;
     int16_t d = 0;
     int16_t maxWildcardDepth = mWildcardDepth + 1;
     while (d < maxWildcardDepth) {
-        pos = path.find(PATH_SEPARATOR[0], pos);
+        pos = curPath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             break;
         ++d;
@@ -590,9 +636,9 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
     if (d < mWildcardDepth)
         return false;
     else if (d == mWildcardDepth) {
-        return fnmatch(mBasePath.c_str(), path.c_str(), FNM_PATHNAME) == 0 && !IsObjectInBlacklist(path, name);
+        return fnmatch(mBasePath.c_str(), curPath.c_str(), FNM_PATHNAME) == 0 && !IsObjectInBlacklist(path, name);
     } else if (pos > 0) {
-        if (!(fnmatch(mBasePath.c_str(), path.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
+        if (!(fnmatch(mBasePath.c_str(), curPath.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
               && !IsObjectInBlacklist(path, name))) {
             return false;
         }
@@ -605,7 +651,7 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
         return true;
     int depth = 1;
     while (depth < mMaxDirSearchDepth + 1) {
-        pos = path.find(PATH_SEPARATOR[0], pos);
+        pos = curPath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             return true;
         ++depth;
