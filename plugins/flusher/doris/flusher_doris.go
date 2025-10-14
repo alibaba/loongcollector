@@ -257,9 +257,10 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 		}
 
 		if response.Status == load.SUCCESS {
-			logger.Infof(f.context.GetRuntimeContext(), "Doris load success, loadedRows: %d, loadBytes: %d, label: %s",
+			logger.Infof(f.context.GetRuntimeContext(), "Doris load success, loadedRows: %d, loadBytes: %d, loadTimeMs: %d, label: %s",
 				response.Resp.NumberLoadedRows,
 				response.Resp.LoadBytes,
+				response.Resp.LoadTimeMs,
 				response.Resp.Label)
 
 			// Update statistics
