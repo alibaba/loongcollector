@@ -225,7 +225,12 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeFilePaths.size(); ++i) {
-            if (!filesystem::path(mExcludeFilePaths[i]).is_absolute()) {
+#if defined(_MSC_VER)
+            string convertedPath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFilePaths[i]);
+#else
+            const string& convertedPath = mExcludeFilePaths[i];
+#endif
+            if (!filesystem::path(convertedPath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeFilePaths[" + ToString(i) + "] is not absolute",
@@ -238,9 +243,9 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeFilePaths[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLFilePathBlacklist.push_back(mExcludeFilePaths[i]);
+                mMLFilePathBlacklist.push_back(convertedPath);
             } else {
-                mFilePathBlacklist.push_back(mExcludeFilePaths[i]);
+                mFilePathBlacklist.push_back(convertedPath);
             }
         }
     }
@@ -268,7 +273,12 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                                      ctx.GetRegion());
                 continue;
             }
-            mFileNameBlacklist.push_back(mExcludeFiles[i]);
+#if defined(_MSC_VER)
+            string convertedFileName = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFiles[i]);
+#else
+            const string& convertedFileName = mExcludeFiles[i];
+#endif
+            mFileNameBlacklist.push_back(convertedFileName);
         }
     }
 
@@ -284,7 +294,12 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeDirs.size(); ++i) {
-            if (!filesystem::path(mExcludeDirs[i]).is_absolute()) {
+#if defined(_MSC_VER)
+            string convertedDirPath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeDirs[i]);
+#else
+            const string& convertedDirPath = mExcludeDirs[i];
+#endif
+            if (!filesystem::path(convertedDirPath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeDirs[" + ToString(i) + "] is not absolute",
@@ -297,15 +312,15 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeDirs[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLWildcardDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mMLWildcardDirPathBlacklist.push_back(convertedDirPath);
                 continue;
             }
             bool isWildcardPath
                 = mExcludeDirs[i].find("*") != string::npos || mExcludeDirs[i].find("?") != string::npos;
             if (isWildcardPath) {
-                mWildcardDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mWildcardDirPathBlacklist.push_back(convertedDirPath);
             } else {
-                mDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mDirPathBlacklist.push_back(convertedDirPath);
             }
         }
     }
