@@ -17,6 +17,9 @@ package doris
 import (
 	"bytes"
 	"fmt"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -37,11 +40,32 @@ type FlusherDoris struct {
 	// Table name configuration
 	Table          string            // Target Doris table name
 	LoadProperties map[string]string // Additional Stream Load properties to set in header
+	// Progress log interval in seconds, default 10s, set to 0 to disable
+	LogProgressInterval int
 
 	dorisClient *load.DorisLoadClient
 	context     pipeline.Context
 	converter   *converter.Converter
 	Convert     convertConfig
+
+	// Statistics for progress logging
+	stats          *statistics
+	progressTicker *time.Ticker
+	stopChan       chan struct{}
+	wg             sync.WaitGroup
+}
+
+// statistics holds the metrics for progress logging
+type statistics struct {
+	startTime       time.Time
+	totalBytes      uint64 // atomic
+	totalRows       uint64 // atomic
+	lastBytes       uint64 // atomic
+	lastRows        uint64 // atomic
+	lastReportTime  time.Time
+	lastReportBytes uint64
+	lastReportRows  uint64
+	mu              sync.Mutex
 }
 
 type convertConfig struct {
@@ -67,12 +91,16 @@ func NewFlusherDoris() *FlusherDoris {
 				Database: "",
 			},
 		},
-
-		Table: "",
+		Table:               "",
+		LogProgressInterval: 10, // Default 10 seconds
 		Convert: convertConfig{
 			Protocol: converter.ProtocolCustomSingle,
 			Encoding: converter.EncodingJSON,
 		},
+		stats: &statistics{
+			startTime: time.Now(),
+		},
+		stopChan: make(chan struct{}),
 	}
 }
 
@@ -102,6 +130,11 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 	if err := f.initDorisClient(); err != nil {
 		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris client fail, error", err)
 		return err
+	}
+
+	// Start progress logging if enabled
+	if f.LogProgressInterval > 0 {
+		f.startProgressLogging()
 	}
 
 	return nil
@@ -134,7 +167,8 @@ func (f *FlusherDoris) initDorisClient() error {
 		Table:       f.Table,
 		Format:      load.DefaultJSONFormat(),
 		Retry:       load.DefaultRetry(),
-		GroupCommit: load.ASYNC,
+		GroupCommit: load.OFF,
+		LabelPrefix: "LoongCollector_doris_flusher",
 		Options:     f.LoadProperties,
 	}
 
@@ -207,6 +241,9 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 				"loadedRows", response.Resp.NumberLoadedRows,
 				"loadBytes", response.Resp.LoadBytes,
 				"label", response.Resp.Label)
+
+			// Update statistics
+			f.updateStatistics(uint64(response.Resp.LoadBytes), uint64(response.Resp.NumberLoadedRows))
 		} else {
 			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
 				"doris load failed with status", response.Status,
@@ -225,7 +262,88 @@ func (f *FlusherDoris) IsReady(projectName string, logstoreName string, logstore
 func (f *FlusherDoris) SetUrgent(flag bool) {}
 
 func (f *FlusherDoris) Stop() error {
+	// Stop progress logging
+	if f.progressTicker != nil {
+		close(f.stopChan)
+		f.progressTicker.Stop()
+		f.wg.Wait()
+	}
 	return nil
+}
+
+// startProgressLogging starts a goroutine that periodically logs progress statistics
+func (f *FlusherDoris) startProgressLogging() {
+	f.progressTicker = time.NewTicker(time.Duration(f.LogProgressInterval) * time.Second)
+	f.wg.Add(1)
+
+	go func() {
+		defer f.wg.Done()
+		for {
+			select {
+			case <-f.progressTicker.C:
+				f.logProgress()
+			case <-f.stopChan:
+				return
+			}
+		}
+	}()
+}
+
+// updateStatistics updates the statistics with new load results
+func (f *FlusherDoris) updateStatistics(bytes, rows uint64) {
+	atomic.AddUint64(&f.stats.totalBytes, bytes)
+	atomic.AddUint64(&f.stats.totalRows, rows)
+	atomic.AddUint64(&f.stats.lastBytes, bytes)
+	atomic.AddUint64(&f.stats.lastRows, rows)
+}
+
+// logProgress logs the current progress statistics
+func (f *FlusherDoris) logProgress() {
+	f.stats.mu.Lock()
+	defer f.stats.mu.Unlock()
+
+	now := time.Now()
+	totalBytes := atomic.LoadUint64(&f.stats.totalBytes)
+	totalRows := atomic.LoadUint64(&f.stats.totalRows)
+
+	// Calculate total elapsed time since start
+	totalElapsed := now.Sub(f.stats.startTime).Seconds()
+	if totalElapsed == 0 {
+		totalElapsed = 1
+	}
+
+	// Calculate total speed
+	totalMB := float64(totalBytes) / 1024 / 1024
+	totalSpeedMBps := totalMB / totalElapsed
+	totalSpeedRps := float64(totalRows) / totalElapsed
+
+	// Calculate speed since last report
+	lastBytes := atomic.SwapUint64(&f.stats.lastBytes, 0)
+	lastRows := atomic.SwapUint64(&f.stats.lastRows, 0)
+
+	intervalElapsed := float64(f.LogProgressInterval)
+	if !f.stats.lastReportTime.IsZero() {
+		intervalElapsed = now.Sub(f.stats.lastReportTime).Seconds()
+	}
+	if intervalElapsed == 0 {
+		intervalElapsed = 1
+	}
+
+	lastMB := float64(lastBytes) / 1024 / 1024
+	lastSpeedMBps := lastMB / intervalElapsed
+	lastSpeedRps := float64(lastRows) / intervalElapsed
+
+	f.stats.lastReportTime = now
+	f.stats.lastReportBytes = totalBytes
+	f.stats.lastReportRows = totalRows
+
+	// Format: total 11 MB 18978 ROWS, total speed 0 MB/s 632 R/s, last 10 seconds speed 1 MB/s 1897 R/s
+	logger.Info(f.context.GetRuntimeContext(),
+		fmt.Sprintf("total %.0f MB %d ROWS, total speed %.0f MB/s %.0f R/s, last %d seconds speed %.0f MB/s %.0f R/s",
+			totalMB, totalRows,
+			totalSpeedMBps, totalSpeedRps,
+			f.LogProgressInterval,
+			lastSpeedMBps, lastSpeedRps))
 }
 
 // Register the plugin to the Flushers array.
