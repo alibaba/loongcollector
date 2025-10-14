@@ -16,7 +16,9 @@ package doris
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,6 +44,8 @@ type FlusherDoris struct {
 	LoadProperties map[string]string // Additional Stream Load properties to set in header
 	// Progress log interval in seconds, default 10s, set to 0 to disable
 	LogProgressInterval int
+	// Group commit mode: "sync", "async", or "off" (default: "off")
+	GroupCommit string
 
 	dorisClient *load.DorisLoadClient
 	context     pipeline.Context
@@ -92,7 +96,8 @@ func NewFlusherDoris() *FlusherDoris {
 			},
 		},
 		Table:               "",
-		LogProgressInterval: 10, // Default 10 seconds
+		LogProgressInterval: 10,    // Default 10 seconds
+		GroupCommit:         "off", // Default: disable group commit
 		Convert: convertConfig{
 			Protocol: converter.ProtocolCustomSingle,
 			Encoding: converter.EncodingJSON,
@@ -150,6 +155,21 @@ func (f *FlusherDoris) Description() string {
 	return "Doris flusher for logtail"
 }
 
+// parseGroupCommitMode converts string to GroupCommitMode
+func parseGroupCommitMode(mode string) load.GroupCommitMode {
+	switch strings.ToLower(mode) {
+	case "sync":
+		return load.SYNC
+	case "async":
+		return load.ASYNC
+	case "off", "":
+		return load.OFF
+	default:
+		logger.Warningf(context.Background(), "Unknown group commit mode: %s, using 'off'", mode)
+		return load.OFF
+	}
+}
+
 // initDorisClient initializes the Doris Stream Load client
 func (f *FlusherDoris) initDorisClient() error {
 	// Get authentication credentials
@@ -167,7 +187,7 @@ func (f *FlusherDoris) initDorisClient() error {
 		Table:       f.Table,
 		Format:      load.DefaultJSONFormat(),
 		Retry:       load.DefaultRetry(),
-		GroupCommit: load.OFF,
+		GroupCommit: parseGroupCommitMode(f.GroupCommit),
 		LabelPrefix: "LoongCollector_doris_flusher",
 		Options:     f.LoadProperties,
 	}
@@ -179,8 +199,8 @@ func (f *FlusherDoris) initDorisClient() error {
 	}
 
 	f.dorisClient = client
-	logger.Info(f.context.GetRuntimeContext(), "Doris client initialized successfully",
-		"endpoints", f.Addresses, "database", f.Database, "table", f.Table)
+	logger.Infof(f.context.GetRuntimeContext(), "Doris client initialized successfully, endpoints: %v, database: %s, table: %s",
+		f.Addresses, f.Database, f.Table)
 
 	return nil
 }
@@ -237,10 +257,10 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 		}
 
 		if response.Status == load.SUCCESS {
-			logger.Info(f.context.GetRuntimeContext(), "Doris load success",
-				"loadedRows", response.Resp.NumberLoadedRows,
-				"loadBytes", response.Resp.LoadBytes,
-				"label", response.Resp.Label)
+			logger.Infof(f.context.GetRuntimeContext(), "Doris load success, loadedRows: %d, loadBytes: %d, label: %s",
+				response.Resp.NumberLoadedRows,
+				response.Resp.LoadBytes,
+				response.Resp.Label)
 
 			// Update statistics
 			f.updateStatistics(uint64(response.Resp.LoadBytes), uint64(response.Resp.NumberLoadedRows))
