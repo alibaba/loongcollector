@@ -432,7 +432,6 @@ void FileDiscoveryOptions::ParseWildcardPath() {
 }
 
 bool FileDiscoveryOptions::IsFilenameMatched(const std::string& filename) const {
-    // File names don't have drive letters, no normalization needed
     return fnmatch(mFilePattern.c_str(), filename.c_str(), 0) == 0;
 }
 
@@ -515,7 +514,6 @@ bool FileDiscoveryOptions::IsFilenameInBlacklist(const string& fileName) const {
         return false;
     }
 
-    // File names don't have drive letters, no normalization needed
     for (auto& pattern : mFileNameBlacklist) {
         if (0 == fnmatch(pattern.c_str(), fileName.c_str(), 0)) {
             return true;

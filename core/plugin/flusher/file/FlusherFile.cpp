@@ -15,6 +15,7 @@
 #include "plugin/flusher/file/FlusherFile.h"
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/FileSystemUtil.h"
 
 using namespace std;
 

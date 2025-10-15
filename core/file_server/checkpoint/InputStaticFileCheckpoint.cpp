@@ -14,6 +14,7 @@
 
 #include "file_server/checkpoint/InputStaticFileCheckpoint.h"
 
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"

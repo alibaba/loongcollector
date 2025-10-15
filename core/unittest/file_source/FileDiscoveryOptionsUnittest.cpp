@@ -20,7 +20,6 @@
 
 #include "FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
-#include "common/EncodingConverter.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "unittest/Unittest.h"
