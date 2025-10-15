@@ -46,6 +46,10 @@ type FlusherDoris struct {
 	LogProgressInterval int
 	// Group commit mode: "sync", "async", or "off" (default: "off")
 	GroupCommit string
+	// Concurrency controls how many goroutines are used to send data concurrently
+	Concurrency int
+	// QueueCapacity controls the capacity of the task queue
+	QueueCapacity int
 
 	dorisClient *load.DorisLoadClient
 	context     pipeline.Context
@@ -56,10 +60,15 @@ type FlusherDoris struct {
 	stats          *statistics
 	progressTicker *time.Ticker
 	stopChan       chan struct{}
-	wg             sync.WaitGroup
+	progressWg     sync.WaitGroup // Separate WaitGroup for progress logging
 
 	// Buffer pool for reusing buffers to reduce memory allocations
 	bufferPool sync.Pool
+
+	// Async task queue for concurrent flushing
+	queue     chan []*protocol.LogGroup
+	counter   sync.WaitGroup
+	workersWg sync.WaitGroup // Separate WaitGroup for async workers
 }
 
 // statistics holds the metrics for progress logging
@@ -101,6 +110,8 @@ func NewFlusherDoris() *FlusherDoris {
 		Table:               "",
 		LogProgressInterval: 10,    // Default 10 seconds
 		GroupCommit:         "off", // Default: disable group commit
+		Concurrency:         1,     // Default: synchronous (no concurrency)
+		QueueCapacity:       1024,  // Default queue capacity
 		Convert: convertConfig{
 			Protocol: converter.ProtocolCustomSingle,
 			Encoding: converter.EncodingJSON,
@@ -111,10 +122,10 @@ func NewFlusherDoris() *FlusherDoris {
 		stopChan: make(chan struct{}),
 		bufferPool: sync.Pool{
 			New: func() interface{} {
-				// Pre-allocate buffer with reasonable capacity to reduce reallocations
-				// Typical log size: ~400 bytes, 20000 logs = ~8MB
+				// Pre-allocate buffer with reasonable initial capacity
+				// Will grow dynamically as needed
 				buf := new(bytes.Buffer)
-				buf.Grow(8 * 1024 * 1024) // 8MB initial capacity
+				buf.Grow(256 * 1024) // 256KB initial capacity (more reasonable default)
 				return buf
 			},
 		},
@@ -147,6 +158,23 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 	if err := f.initDorisClient(); err != nil {
 		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris client fail, error", err)
 		return err
+	}
+
+	// Init async queue and worker pool if concurrency > 1
+	if f.Concurrency > 1 {
+		if f.QueueCapacity <= 0 {
+			f.QueueCapacity = 1024
+		}
+		f.queue = make(chan []*protocol.LogGroup, f.QueueCapacity)
+
+		// Start worker goroutines
+		for i := 0; i < f.Concurrency; i++ {
+			f.workersWg.Add(1)
+			go f.runFlushWorker()
+		}
+
+		logger.Info(f.context.GetRuntimeContext(), "Doris flusher async mode enabled",
+			"concurrency", f.Concurrency, "queueCapacity", f.QueueCapacity)
 	}
 
 	// Start progress logging if enabled
@@ -240,10 +268,59 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 		return nil
 	}
 
+	// Async mode: add task to queue and return immediately
+	if f.Concurrency > 1 {
+		return f.addTask(logGroupList)
+	}
+
+	// Sync mode: process immediately
+	return f.flushSync(logGroupList)
+}
+
+// addTask adds a flush task to the queue for async processing
+func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
+	f.counter.Add(1)
+
+	select {
+	case f.queue <- logGroupList:
+		return nil
+	default:
+		f.counter.Done()
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
+			"doris flusher queue is full, data dropped, queue capacity", f.QueueCapacity)
+		return fmt.Errorf("doris flusher queue is full")
+	}
+}
+
+// runFlushWorker is the worker goroutine that processes flush tasks from the queue
+func (f *FlusherDoris) runFlushWorker() {
+	defer f.workersWg.Done()
+
+	for logGroupList := range f.queue {
+		err := f.flushSync(logGroupList)
+		if err != nil {
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
+				"worker failed to flush data to doris, error", err)
+		}
+		f.counter.Done()
+	}
+}
+
+// flushSync performs synchronous flush operation
+func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 	// Get buffer from pool to reduce allocations
 	buffer := f.bufferPool.Get().(*bytes.Buffer)
 	buffer.Reset() // Reset buffer for reuse
-	defer f.bufferPool.Put(buffer)
+	defer func() {
+		// Shrink buffer if it's too large to prevent memory waste
+		// Keep buffers under 10MB to balance between performance and memory
+		if buffer.Cap() > 10*1024*1024 {
+			buffer = nil // Let GC reclaim large buffers
+		}
+		if buffer != nil {
+			f.bufferPool.Put(buffer)
+		}
+	}()
 
 	totalLogCount := 0
 
@@ -311,22 +388,38 @@ func (f *FlusherDoris) IsReady(projectName string, logstoreName string, logstore
 func (f *FlusherDoris) SetUrgent(flag bool) {}
 
 func (f *FlusherDoris) Stop() error {
-	// Stop progress logging
+	// Stop progress logging first
 	if f.progressTicker != nil {
 		close(f.stopChan)
 		f.progressTicker.Stop()
-		f.wg.Wait()
+		f.progressWg.Wait() // Wait for progress logging goroutine to exit
+		logger.Debug(f.context.GetRuntimeContext(), "Doris flusher progress logging stopped")
 	}
+
+	// Stop async workers if running
+	if f.Concurrency > 1 && f.queue != nil {
+		// Wait for all pending tasks to be added
+		f.counter.Wait()
+
+		// Close queue to signal workers to exit
+		close(f.queue)
+
+		// Wait for all workers to finish
+		f.workersWg.Wait()
+
+		logger.Info(f.context.GetRuntimeContext(), "Doris flusher async workers stopped")
+	}
+
 	return nil
 }
 
 // startProgressLogging starts a goroutine that periodically logs progress statistics
 func (f *FlusherDoris) startProgressLogging() {
 	f.progressTicker = time.NewTicker(time.Duration(f.LogProgressInterval) * time.Second)
-	f.wg.Add(1)
+	f.progressWg.Add(1)
 
 	go func() {
-		defer f.wg.Done()
+		defer f.progressWg.Done()
 		for {
 			select {
 			case <-f.progressTicker.C:
