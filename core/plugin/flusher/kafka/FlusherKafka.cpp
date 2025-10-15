@@ -285,6 +285,7 @@ std::string FlusherKafka::GeneratePartitionKey(const PipelineEventPtr& event) co
         }
         StringView fieldName(key.data() + PARTITIONER_PREFIX.size(), key.size() - PARTITIONER_PREFIX.size());
 
+        // TODO: future support more event types such as MetricEvent or SpanEvent
         if (event->GetType() == PipelineEvent::Type::LOG) {
             const LogEvent& logEvent = event.Cast<LogEvent>();
             StringView v = logEvent.GetContent(fieldName);
