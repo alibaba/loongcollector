@@ -186,6 +186,13 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             mBasePath = mBasePath.substr(0, len - 2);
         } else {
             mBasePath = mBasePath.substr(0, len - 3);
+#if defined(_MSC_VER)
+            // For Windows, if the result is a drive letter (e.g., "C:"), append backslash
+            // to make it a proper root path (e.g., "C:\\")
+            if (mBasePath.size() == 2 && mBasePath[1] == ':') {
+                mBasePath += filesystem::path::preferred_separator;
+            }
+#endif
         }
         // MaxDirSearchDepth is only valid when parent path ends with **
         if (!GetOptionalIntParam(config, "MaxDirSearchDepth", mMaxDirSearchDepth, errorMsg)) {
