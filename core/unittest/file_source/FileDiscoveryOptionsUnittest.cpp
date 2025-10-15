@@ -20,8 +20,8 @@
 
 #include "FileSystemUtil.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
-#include "common/JsonUtil.h"
 #include "common/EncodingConverter.h"
+#include "common/JsonUtil.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "unittest/Unittest.h"
 
@@ -532,7 +532,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     // Windows: Chinese path tests with proper exception handling
     // Note: UTF-8 to ACP conversion may fail depending on system locale
     // These tests verify the system handles Chinese paths gracefully
-    
+
     // Windows Test 1: Chinese path - basic functionality
     // Using UTF-8 literal (will be converted to ACP internally)
     {
@@ -541,7 +541,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             string chineseDir = "\xE6\xB5\x8B\xE8\xAF\x95\xE7\x9B\xAE\xE5\xBD\x95";
             filesystem::path basePath = filesystem::current_path();
             string fullPath = basePath.string() + "\\" + chineseDir + "\\**\\*.log";
-            
+
             configStr = R"(
                 {
                     "FilePaths": []
@@ -550,22 +550,23 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
             configJson["FilePaths"].append(Json::Value(fullPath));
             config.reset(new FileDiscoveryOptions());
-            
+
             bool initSuccess = config->Init(configJson, ctx, pluginType);
             if (initSuccess) {
                 // If encoding conversion succeeds, verify basic properties
                 APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
                 APSARA_TEST_FALSE(config->GetBasePath().empty());
-                
+
                 // Verify the base path contains the Chinese directory name
                 // Convert UTF-8 to ACP for comparison
                 string chineseDirACP = EncodingConverter::GetInstance()->FromUTF8ToACP(chineseDir);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseDirACP) != string::npos);
-                
+
                 LOG_INFO(sLogger, ("Chinese path test", "PASSED - encoding conversion succeeded"));
             } else {
                 // If Init fails, it's acceptable on systems with incompatible locale
-                LOG_WARNING(sLogger, ("Chinese path test", "SKIPPED - encoding conversion not supported on this system"));
+                LOG_WARNING(sLogger,
+                            ("Chinese path test", "SKIPPED - encoding conversion not supported on this system"));
             }
         } catch (const std::exception& e) {
             // Encoding conversion or filesystem operation failed
@@ -582,7 +583,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             filesystem::path basePath = filesystem::current_path();
             string fullPath = basePath.string() + "\\" + chineseLog + "\\**\\*.log";
             string excludePath = basePath.string() + "\\" + chineseLog + "\\" + chineseBlacklist;
-            
+
             configStr = R"(
                 {
                     "FilePaths": [],
@@ -593,16 +594,16 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             configJson["FilePaths"].append(Json::Value(fullPath));
             configJson["ExcludeDirs"].append(Json::Value(excludePath));
             config.reset(new FileDiscoveryOptions());
-            
+
             bool initSuccess = config->Init(configJson, ctx, pluginType);
             if (initSuccess) {
                 APSARA_TEST_EQUAL(1U, config->mExcludeDirs.size());
                 APSARA_TEST_TRUE(config->mHasBlacklist);
-                
+
                 // Verify the base path contains Chinese directory name
                 string chineseLogACP = EncodingConverter::GetInstance()->FromUTF8ToACP(chineseLog);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseLogACP) != string::npos);
-                
+
                 LOG_INFO(sLogger, ("Chinese ExcludeDirs test", "PASSED"));
             } else {
                 LOG_WARNING(sLogger, ("Chinese ExcludeDirs test", "SKIPPED - encoding not supported"));
@@ -622,7 +623,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             // UTF-8: "排除.log" and "测试.log"
             string excludeFile1 = "\xE6\x8E\x92\xE9\x99\xA4.log";
             string excludeFile2 = "\xE6\xB5\x8B\xE8\xAF\x95.log";
-            
+
             configStr = R"(
                 {
                     "FilePaths": [],
@@ -634,22 +635,22 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             configJson["ExcludeFiles"].append(Json::Value(excludeFile1));
             configJson["ExcludeFiles"].append(Json::Value(excludeFile2));
             config.reset(new FileDiscoveryOptions());
-            
+
             bool initSuccess = config->Init(configJson, ctx, pluginType);
             if (initSuccess) {
                 APSARA_TEST_EQUAL(2U, config->mExcludeFiles.size());
                 APSARA_TEST_TRUE(config->mHasBlacklist);
-                
+
                 // Verify the base path contains Chinese directory name
                 string chineseMixedACP = EncodingConverter::GetInstance()->FromUTF8ToACP(chineseMixed);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseMixedACP) != string::npos);
-                
+
                 // Verify ExcludeFiles contain Chinese filenames (converted to ACP)
                 string excludeFile1ACP = EncodingConverter::GetInstance()->FromUTF8ToACP(excludeFile1);
                 string excludeFile2ACP = EncodingConverter::GetInstance()->FromUTF8ToACP(excludeFile2);
                 APSARA_TEST_EQUAL(excludeFile1ACP, config->mFileNameBlacklist[0]);
                 APSARA_TEST_EQUAL(excludeFile2ACP, config->mFileNameBlacklist[1]);
-                
+
                 LOG_INFO(sLogger, ("Chinese ExcludeFiles test", "PASSED"));
             } else {
                 LOG_WARNING(sLogger, ("Chinese ExcludeFiles test", "SKIPPED - encoding not supported"));
@@ -669,7 +670,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             // UTF-8: "排除文件.log"
             string excludeFileName = "\xE6\x8E\x92\xE9\x99\xA4\xE6\x96\x87\xE4\xBB\xB6.log";
             string excludeFile = basePath.string() + "\\" + chineseDoc + "\\" + excludeFileName;
-            
+
             configStr = R"(
                 {
                     "FilePaths": [],
@@ -680,21 +681,21 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             configJson["FilePaths"].append(Json::Value(fullPath));
             configJson["ExcludeFilePaths"].append(Json::Value(excludeFile));
             config.reset(new FileDiscoveryOptions());
-            
+
             bool initSuccess = config->Init(configJson, ctx, pluginType);
             if (initSuccess) {
                 APSARA_TEST_EQUAL(1U, config->mExcludeFilePaths.size());
                 APSARA_TEST_TRUE(config->mHasBlacklist);
-                
+
                 // Verify the base path contains Chinese directory name
                 string chineseDocACP = EncodingConverter::GetInstance()->FromUTF8ToACP(chineseDoc);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseDocACP) != string::npos);
-                
+
                 // Verify ExcludeFilePaths contains Chinese filename (converted to ACP and normalized)
                 string excludeFileACP = EncodingConverter::GetInstance()->FromUTF8ToACP(excludeFile);
                 excludeFileACP = NormalizeWindowsPath(excludeFileACP);
                 APSARA_TEST_EQUAL(excludeFileACP, config->mFilePathBlacklist[0]);
-                
+
                 LOG_INFO(sLogger, ("Chinese ExcludeFilePaths test", "PASSED"));
             } else {
                 LOG_WARNING(sLogger, ("Chinese ExcludeFilePaths test", "SKIPPED - encoding not supported"));
