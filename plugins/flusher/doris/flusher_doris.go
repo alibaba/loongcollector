@@ -57,6 +57,9 @@ type FlusherDoris struct {
 	progressTicker *time.Ticker
 	stopChan       chan struct{}
 	wg             sync.WaitGroup
+
+	// Buffer pool for reusing buffers to reduce memory allocations
+	bufferPool sync.Pool
 }
 
 // statistics holds the metrics for progress logging
@@ -106,6 +109,15 @@ func NewFlusherDoris() *FlusherDoris {
 			startTime: time.Now(),
 		},
 		stopChan: make(chan struct{}),
+		bufferPool: sync.Pool{
+			New: func() interface{} {
+				// Pre-allocate buffer with reasonable capacity to reduce reallocations
+				// Typical log size: ~400 bytes, 20000 logs = ~8MB
+				buf := new(bytes.Buffer)
+				buf.Grow(8 * 1024 * 1024) // 8MB initial capacity
+				return buf
+			},
+		},
 	}
 }
 
@@ -206,7 +218,7 @@ func (f *FlusherDoris) initDorisClient() error {
 }
 
 func (f *FlusherDoris) Validate() error {
-	if f.Addresses == nil || len(f.Addresses) == 0 {
+	if len(f.Addresses) == 0 {
 		var err = fmt.Errorf("doris addrs is nil")
 		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris flusher error", err)
 		return err
@@ -234,8 +246,10 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 			continue
 		}
 
-		// Combine all logs into a single buffer
-		var buffer bytes.Buffer
+		// Get buffer from pool to reduce allocations
+		buffer := f.bufferPool.Get().(*bytes.Buffer)
+		buffer.Reset() // Reset buffer for reuse
+
 		logCount := 0
 		for _, log := range serializedLogs.([][]byte) {
 			buffer.Write(log)
@@ -245,12 +259,23 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 
 		if buffer.Len() == 0 {
 			logger.Debug(f.context.GetRuntimeContext(), "No logs to flush")
+			f.bufferPool.Put(buffer) // Return buffer to pool
 			continue
 		}
 
+		// Create a bytes.Reader from buffer data to support seeking
+		// bytes.Reader supports io.Seeker, so SDK won't buffer internally
+		dataToLoad := buffer.Bytes()
+		reader := bytes.NewReader(dataToLoad)
+
 		// Load data to Doris using SDK
-		logger.Debug(f.context.GetRuntimeContext(), "Loading data to Doris", "logCount", logCount, "dataSize", buffer.Len())
-		response, err := f.dorisClient.Load(&buffer)
+		logger.Debug(f.context.GetRuntimeContext(), "Loading data to Doris", "logCount", logCount, "dataSize", len(dataToLoad))
+		response, err := f.dorisClient.Load(reader)
+
+		// Return buffer to pool after Load completes
+		// IMPORTANT: Must be after Load() because reader references buffer's underlying data
+		f.bufferPool.Put(buffer)
+
 		if err != nil {
 			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush doris load fail, error", err)
 			return fmt.Errorf("failed to load data to doris: %w", err)
