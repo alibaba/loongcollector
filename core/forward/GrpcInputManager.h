@@ -24,6 +24,7 @@
 
 #include "json/value.h"
 
+#include "Logger.h"
 #include "forward/BaseService.h"
 #include "grpcpp/server.h"
 #include "grpcpp/support/interceptor.h"
@@ -105,8 +106,7 @@ public:
 
     template <typename T>
     bool AddListenInput(const std::string& configName, const std::string& address, const Json::Value& config);
-    template <typename T>
-    bool RemoveListenInput(const std::string& address, const std::string& configName);
+    bool RemoveListenInput(const std::string& configName, const std::string& address, const Json::Value& config);
 
 private:
     GrpcInputManager() = default;
@@ -117,10 +117,8 @@ private:
     mutable std::mutex mListenAddressToInputMapMutex;
     std::unordered_map<std::string, GrpcListenInput> mListenAddressToInputMap;
 
-    std::atomic_bool mIsStarted = false;
-
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class GrpcRunnerUnittest;
+    friend class GrpcInputManagerUnittest;
 #endif
 };
 

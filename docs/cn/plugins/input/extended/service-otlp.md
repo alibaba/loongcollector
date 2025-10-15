@@ -16,7 +16,7 @@
 
 | 参数               | 类型      | 是否必选 | 说明                                       |
 |-------------------|----------|-------|------------------------------------------|
-| Type              | String   | 是    | 插件类型, 固定为`service_otlp`。                        |
+| Type              | string   | 是    | 插件类型, 固定为`service_otlp`。                        |
 | Protocals           | Struct   | 是    |   <p>接收的协议</p>                       |
 | Protocals.GRPC    | Struct | 否    | 是否启用gRPC Server                                |
 | Protocals.GRPC.Endpoint | string   | 否    | <p>gRPC Server 地址。</p><p>默认取值为:`0.0.0.0:4317`。</p>                            |

@@ -18,7 +18,7 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type | String，无默认值（必填） | 插件类型，固定为`service_kubernetes_meta`。 |
+| Type | string，无默认值（必填） | 插件类型，固定为`service_kubernetes_meta`。 |
 | Interval | int, 30 | 采集间隔时间，单位为秒。 |
 | Pod | bool, false | 是否采集Pod元数据。 |
 | Node | bool, false | 是否采集Node元数据。 |

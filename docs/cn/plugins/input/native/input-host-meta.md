@@ -16,7 +16,7 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type | String，无默认值（必填） | 插件类型，固定为`input_host_meta`。 |
+| Type | string，无默认值（必填） | 插件类型，固定为`input_host_meta`。 |
 | Interval | int, 60 | 采集间隔时间，单位为秒。 |
 
 ## 样例

@@ -144,6 +144,8 @@ typedef GoInt (*InitPluginBaseV2Fun)(GoString cfg);
 typedef GoInt (*ProcessLogsFun)(GoString c, GoSlice l, GoString p, GoString t, GoSlice tags);
 typedef GoInt (*ProcessLogGroupFun)(GoString c, GoSlice l, GoString p);
 typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
+typedef char* (*GetAllContainerMetaFun)();
+typedef char* (*GetDiffContainerMetaFun)();
 typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
 
 // Methods export by adapter.
@@ -166,14 +168,9 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            const char* shardHash,
                            int shardHashSize);
 
-typedef int (*PluginCtlCmdFun)(
-    const char* configName, int configNameSize, int optId, const char* params, int paramsLen);
 
-typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun, PluginCtlCmdFun cmdFun);
-typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun,
-                                          SendPbFun sendFun,
-                                          SendPbV2Fun sendV2Fun,
-                                          PluginCtlCmdFun cmdFun);
+typedef void (*RegisterLogtailCallBack)(IsValidToSendFun checkFun, SendPbFun sendFun);
+typedef void (*RegisterLogtailCallBackV2)(IsValidToSendFun checkFun, SendPbFun sendFun, SendPbV2Fun sendV2Fun);
 
 typedef int (*PluginAdapterVersion)();
 }
@@ -183,15 +180,6 @@ class LogtailPlugin {
 public:
     LogtailPlugin();
     ~LogtailPlugin();
-
-    enum PluginCmdType {
-        PLUGIN_CMD_MIN = 0,
-        PLUGIN_DOCKER_UPDATE_FILE = 1,
-        PLUGIN_DOCKER_REMOVE_FILE = 2,
-        PLUGIN_DOCKER_UPDATE_FILE_ALL = 3,
-        PLUGIN_DOCKER_STOP_FILE = 4,
-        PLUGIN_CMD_MAX = 5
-    };
 
     static LogtailPlugin* GetInstance() {
         if (s_instance == NULL) {
@@ -252,10 +240,11 @@ public:
                         const char* shardHash,
                         int shardHashSize);
 
-    static int ExecPluginCmd(const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen);
-
     K8sContainerMeta GetContainerMeta(logtail::StringView containerID);
     K8sContainerMeta GetContainerMeta(const std::string& containerID);
+
+    std::string GetAllContainersMeta();
+    std::string GetDiffContainersMeta();
 
     void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
 
@@ -276,6 +265,8 @@ private:
     ProcessLogsFun mProcessLogsFun;
     ProcessLogGroupFun mProcessLogGroupFun;
     GetContainerMetaFun mGetContainerMetaFun;
+    GetAllContainerMetaFun mGetAllContainerMetaFun;
+    GetDiffContainerMetaFun mGetDiffContainerMetaFun;
     GetGoMetricsFun mGetGoMetricsFun;
 
     // Configuration for plugin system in JSON format.

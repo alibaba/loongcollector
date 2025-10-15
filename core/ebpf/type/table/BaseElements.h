@@ -575,7 +575,7 @@ inline constexpr DataElement kSaddr = {
     "source.addr",
     "saddr",
     "saddr",
-    "network.saddr",
+    "net.saddr",
     "source address",
 };
 
@@ -583,7 +583,7 @@ inline constexpr DataElement kDaddr = {
     "dest.addr",
     "",
     "",
-    "network.daddr",
+    "net.daddr",
     "dest address",
 };
 
@@ -591,7 +591,7 @@ inline constexpr DataElement kSport = {
     "source.port",
     "",
     "",
-    "network.sport",
+    "net.sport",
     "source port",
 };
 
@@ -599,7 +599,7 @@ inline constexpr DataElement kState = {
     "state",
     "state",
     "",
-    "network.state",
+    "net.state",
     "connection state",
 };
 
@@ -607,7 +607,7 @@ inline constexpr DataElement kDport = {
     "dest.port",
     "",
     "",
-    "network.dport",
+    "net.dport",
     "dest port",
 };
 
@@ -615,7 +615,7 @@ inline constexpr DataElement kL4Protocol = {
     "protocol",
     "",
     "",
-    "network.protocol",
+    "net.protocol",
     "L4 protocol",
 };
 

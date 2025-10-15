@@ -43,6 +43,7 @@ public:
     static const std::string INTERNAL_DATA_TYPE_ALARM;
     static const std::string INTERNAL_DATA_TYPE_METRIC;
     static const std::string INTERNAL_DATA_TYPE_TASK_STATUS;
+    static const std::string INTERNAL_DATA_TYPE_CONTAINER;
 
 private:
     SelfMonitorServer();

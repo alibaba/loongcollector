@@ -17,22 +17,24 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_container\_stdio。  |
-|  IgnoringStdout  |  Boolean  |  否  |  false  |  是否忽略标准输出stdout。  |
-|  IgnoringStderr  |  Boolean  |  否  |  false  |  是否忽略标准出错信息stderr。 |
+|  IgnoringStdout  |  bool  |  否  |  false  |  是否忽略标准输出stdout。  |
+|  IgnoringStderr  |  bool  |  否  |  false  |  是否忽略标准出错信息stderr。 |
+|  IgnoreParseWarning  |  bool  |  否  |  false  |  解析容器日志时，是否忽略解析告警。  |
+|  KeepingSourceWhenParseFail  |  bool  |  否  |  true  |  当解析失败时是否保留原始内容。  |
 |  TailSizeKB  |  uint  |  否  |  1024  |  配置首次生效时，标准输出文件的起始采集位置距离文件结尾的大小。如果文件大小小于该值，则从头开始采集，取值范围为0～10485760KB。  |
 |  Multiline  |  object  |  否  |  空  |  多行聚合选项，详见表1。  |
 |  ContainerFilters  |  object  |  否  |  空  |  容器过滤选项。多个选项之间为“且”的关系，详见表2。  |
-|  ExternalK8sLabelTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s_label_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
-|  ExternalEnvTag  |  map  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
+|  ExternalK8sLabelTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s_label_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
+|  ExternalEnvTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
 |  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的容器的标准输出日志。  |
-|  Tags | map | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
+|  Tags | map[string]string | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
 
 * 表1：多行聚合选项
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Mode  |  string  |  否  |  custom  |  多行聚合模式。仅支持custom。  |
+|  Mode  |  string  |  否  |  custom  |  多行聚合模式。可选值包括custom和JSON。  |
 |  StartPattern  |  string  |  当Multiline.Mode取值为custom时，至少1个必填  |  空  |  行首正则表达式。  |
 |  ContinuePattern  |  string  |  |  空  |  行继续正则表达式。  |
 |  EndPattern  |  string  |  |  空  |  行尾正则表达式。  |
@@ -44,13 +46,13 @@
 | --- | --- | --- | --- | --- |
 |  K8sNamespaceRegex  |  string  |  否  |  空  |  对于部署于K8s环境的容器，指定待采集容器所在Pod所属的命名空间条件。如果未添加该参数，则表示采集所有容器。支持正则匹配。  |
 |  K8sPodRegex  |  string  |  否  |  空  |  对于部署于K8s环境的容器，指定待采集容器所在Pod的名称条件。如果未添加该参数，则表示采集所有容器。支持正则匹配。  |
-|  IncludeK8sLabel  |  map  |  否  |  空  |  对于部署于K8s环境的容器，指定待采集容器所在pod的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为Pod标签名，value为Pod标签的值，说明如下：<ul><li>如果map中的value为空，则pod标签中包含以key为键的pod都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当pod标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的pod会被匹配；</li><li>其他情况下，当pod标签中存在以key为标签名且以value为标签值的情况时，相应的pod会被匹配。</li></ul></ul>       |
-|  ExcludeK8sLabel  |  map  |  否  |  空  |  对于部署于K8s环境的容器，指定需要排除采集容器所在pod的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为pod标签名，value为pod标签的值，说明如下：<ul><li>如果map中的value为空，则pod标签中包含以key为键的pod都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当pod标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的pod会被匹配；</li><li>其他情况下，当pod标签中存在以key为标签名且以value为标签值的情况时，相应的pod会被匹配。</li></ul></ul>       |
+|  IncludeK8sLabel  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，指定待采集容器所在pod的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为Pod标签名，value为Pod标签的值，说明如下：<ul><li>如果map中的value为空，则pod标签中包含以key为键的pod都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当pod标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的pod会被匹配；</li><li>其他情况下，当pod标签中存在以key为标签名且以value为标签值的情况时，相应的pod会被匹配。</li></ul></ul>       |
+|  ExcludeK8sLabel  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，指定需要排除采集容器所在pod的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为pod标签名，value为pod标签的值，说明如下：<ul><li>如果map中的value为空，则pod标签中包含以key为键的pod都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当pod标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的pod会被匹配；</li><li>其他情况下，当pod标签中存在以key为标签名且以value为标签值的情况时，相应的pod会被匹配。</li></ul></ul>       |
 |  K8sContainerRegex  |  string  |  否  |  空  |  对于部署于K8s环境的容器，指定待采集容器的名称条件。如果未添加该参数，则表示采集所有容器。支持正则匹配。  |
-|  IncludeEnv  |  map  |  否  |  空  |  指定待采集容器的环境变量条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为环境变量名，value为环境变量的值，说明如下：<ul><li>如果map中的value为空，则容器环境变量中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器环境变量中存在以key为环境变量名且对应环境变量值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器环境变量中存在以key为环境变量名且以value为环境变量值的情况时，相应的容器会被匹配。</li></ul></ul>       |
-|  ExcludeEnv  |  map  |  否  |  空  |  指定需要排除采集容器的环境变量条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为环境变量名，value为环境变量的值，说明如下：<ul><li>如果map中的value为空，则容器环境变量中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器环境变量中存在以key为环境变量名且对应环境变量值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器环境变量中存在以key为环境变量名且以value为环境变量值的情况时，相应的容器会被匹配。</li></ul></ul>       |
-|  IncludeContainerLabel  |  map  |  否  |  空  |  指定待采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
-|  ExcludeContainerLabel  |  map  |  否  |  空  |  指定需要排除采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
+|  IncludeEnv  |  map[string]string  |  否  |  空  |  指定待采集容器的环境变量条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为环境变量名，value为环境变量的值，说明如下：<ul><li>如果map中的value为空，则容器环境变量中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器环境变量中存在以key为环境变量名且对应环境变量值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器环境变量中存在以key为环境变量名且以value为环境变量值的情况时，相应的容器会被匹配。</li></ul></ul>       |
+|  ExcludeEnv  |  map[string]string  |  否  |  空  |  指定需要排除采集容器的环境变量条件。多个条件之间为“或”的关系，如果未添加该参数，则表示采集所有容器。支持正则匹配。 map中的key为环境变量名，value为环境变量的值，说明如下：<ul><li>如果map中的value为空，则容器环境变量中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器环境变量中存在以key为环境变量名且对应环境变量值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器环境变量中存在以key为环境变量名且以value为环境变量值的情况时，相应的容器会被匹配。</li></ul></ul>       |
+|  IncludeContainerLabel  |  map[string]string  |  否  |  空  |  指定待采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
+|  ExcludeContainerLabel  |  map[string]string  |  否  |  空  |  指定需要排除采集容器的标签条件。多个条件之间为“或”的关系，如果未添加该参数，则默认为空，表示采集所有容器。支持正则匹配。 map中的key为容器标签名，value为容器标签的值，说明如下：<ul><li>如果map中的value为空，则容器标签中包含以key为键的容器都会被匹配；</li><li>如果map中的value不为空，则：<ul></li><li>若value以`^`开头并且以`$`结尾，则当容器标签中存在以key为标签名且对应标签值能正则匹配value的情况时，相应的容器会被匹配；</li><li>其他情况下，当容器标签中存在以key为标签名且以value为标签值的情况时，相应的容器会被匹配。</li></ul></ul>       |
 
 ## 默认日志字段
 

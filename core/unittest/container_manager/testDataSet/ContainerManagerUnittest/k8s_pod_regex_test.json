@@ -1,0 +1,118 @@
+{
+    "containers": [
+        {
+            "id": "nginx-app-deployment",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-app-deployment-12345-abcde",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "nginx-web-deployment",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-web-deployment-67890-fghij",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "redis-pod",
+            "labels": {
+                "app": "redis"
+            },
+            "env": [
+                "APP_NAME=redis"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "redis-pod-11111",
+                "container_name": "redis",
+                "labels": {
+                    "app.kubernetes.io/name": "redis"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "mysql-statefulset",
+            "labels": {
+                "app": "mysql"
+            },
+            "env": [
+                "APP_NAME=mysql"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "mysql-statefulset-0",
+                "container_name": "mysql",
+                "labels": {
+                    "app.kubernetes.io/name": "mysql"
+                },
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "k8s_pod_exact_match",
+            "description": "测试 Pod 名称精确匹配",
+            "filters": {
+                "K8sPodRegex": "nginx-app-deployment-12345-abcde"
+            },
+            "expected_matched_ids": [
+                "nginx-app-deployment"
+            ]
+        },
+        {
+            "name": "k8s_pod_regex_match",
+            "description": "测试 Pod 名称正则匹配（如 ^app-.*-deployment）",
+            "filters": {
+                "K8sPodRegex": "^nginx-.*-deployment-.*"
+            },
+            "expected_matched_ids": [
+                "nginx-app-deployment",
+                "nginx-web-deployment"
+            ]
+        },
+        {
+            "name": "k8s_pod_partial_regex",
+            "description": "测试 Pod 名称部分匹配正则",
+            "filters": {
+                "K8sPodRegex": ".*-deployment-.*"
+            },
+            "expected_matched_ids": [
+                "nginx-app-deployment",
+                "nginx-web-deployment"
+            ]
+        },
+        {
+            "name": "k8s_pod_no_match",
+            "description": "测试 Pod 名称不匹配的情况",
+            "filters": {
+                "K8sPodRegex": "^frontend-.*"
+            },
+            "expected_matched_ids": []
+        }
+    ]
+}

@@ -20,6 +20,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "application/Application.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/HashUtil.h"
@@ -51,6 +52,7 @@ extern "C" {
 DEFINE_FLAG_INT32(ebpf_networkobserver_max_connections, "maximum connections", 5000);
 DEFINE_FLAG_STRING(ebpf_networkobserver_enable_protocols, "enable application protocols, split by comma", "HTTP");
 DEFINE_FLAG_DOUBLE(ebpf_networkobserver_default_sample_rate, "ebpf network observer default sample rate", 1.0);
+DEFINE_FLAG_STRING(ebpf_networkobserver_agent_env, "deploy env: ACSK8S,Serverless,ECS_AUTO", "ACSK8S");
 
 namespace logtail::ebpf {
 
@@ -1223,8 +1225,10 @@ int NetworkObserverManager::Init() {
     pc->mConfig = config;
     auto ret = mEBPFAdapter->StartPlugin(PluginType::NETWORK_OBSERVE, std::move(pc));
     if (!ret) {
+        LOG_WARNING(sLogger, ("start network observer plugin", "failed"));
         return -1;
     }
+    LOG_INFO(sLogger, ("start network observer plugin", "success"));
     mInited = true;
 
     return 0;
@@ -1364,7 +1368,7 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
     }
 
     updateConfigVersionAndWhitelist({}, std::move(expiredCids));
-    Resume(opt);
+    resume(opt);
     return 0;
 }
 
@@ -1680,9 +1684,6 @@ const static std::string kAgentInfoServiceIdKey = "acs_arms_service_id";
 const static std::string kAgentInfoWorkspaceKey = "acs_cms_workspace";
 const static std::string kAgentInfoPropertiesKey = "properties";
 
-const static std::string kAgentInfoAgentEnvACKVal = "ACSK8S";
-const static std::string kAgentInfoAgentEnvECSAutoVal = "ECS_AUTO";
-const static std::string kAgentInfoAgentEnvDefaultVal = "DEFAULT";
 const static std::string kAgentInfoPropertiesKeyClusterId = "k8s.cluster.uid";
 const static std::string kAgentInfoPropertiesKeyClusterName = "k8s.cluster.name";
 const static std::string kAgentInfoPropertiesKeyNamespace = "k8s.namespace.name";
@@ -1740,18 +1741,26 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
         event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
         event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
         event->SetContent(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
-        event->SetContentNoCopy(kAgentInfoAgentEnvKey, kAgentInfoAgentEnvACKVal);
+        event->SetContentNoCopy(kAgentInfoAgentEnvKey, STRING_FLAG(ebpf_networkobserver_agent_env));
+        event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
+        event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
+        event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
         if (Connection::gSelfPodIp.empty()) {
             event->SetContent(kAgentInfoIpKey, GetHostIp());
         } else {
             event->SetContentNoCopy(kAgentInfoIpKey, Connection::gSelfPodIp);
         }
-
         if (Connection::gSelfPodName.empty()) {
             event->SetContent(kAgentInfoHostnameKey, GetHostName());
         } else {
             event->SetContentNoCopy(kAgentInfoHostnameKey, Connection::gSelfPodName);
         }
+        event->SetContent(kAgentInfoAppnameKey, appConfig->mAppName);
+        event->SetContent(kAgentInfoLanguageKey, appConfig->mLanguage);
+        event->SetContentNoCopy(kAgentInfoAgentVersionKey, ILOGTAIL_VERSION);
+        static auto sStartTime = ToString(Application::GetInstance()->GetStartTime()) + "000";
+        event->SetContent(kAgentInfoStartTsKey, sStartTime); // ms
+        event->SetContent(kAgentInfoTimestampKey, ToString(now * 1000));
         event->SetTimestamp(now, 0);
     } else {
         if (!K8sMetadata::GetInstance().Enable()) {
@@ -1769,6 +1778,7 @@ bool NetworkObserverManager::reportAgentInfo(const time_t& now,
             LOG_DEBUG(sLogger, ("[AgentInfo] generate for cid", containerId)("podName", podMeta->mPodName));
 
             auto* event = eventGroup.AddLogEvent(true, mEventPool);
+            event->SetContentNoCopy(kAgentInfoAgentEnvKey, STRING_FLAG(ebpf_networkobserver_agent_env));
             event->SetContent(kAgentInfoAppIdKey, appConfig->mAppId);
             event->SetContent(kAgentInfoServiceIdKey, appConfig->mServiceId);
             event->SetContent(kAgentInfoWorkspaceKey, appConfig->mWorkspace);
@@ -1902,8 +1912,12 @@ int NetworkObserverManager::Destroy() {
         return 0;
     }
     LOG_INFO(sLogger, ("prepare to destroy", ""));
-    mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
-    LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog"));
+    auto ret = mEBPFAdapter->StopPlugin(PluginType::NETWORK_OBSERVE);
+    if (ret) {
+        LOG_INFO(sLogger, ("destroy stage", "shutdown ebpf prog success"));
+    } else {
+        LOG_WARNING(sLogger, ("destroy stage", "shutdown ebpf prog failed"));
+    }
     this->mInited = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN

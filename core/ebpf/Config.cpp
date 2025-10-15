@@ -489,7 +489,8 @@ bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
     if (!config.isMember("ProbeConfig")) {
         // No ProbeConfig, use default, no warning
         return false;
-    } else if (!config["ProbeConfig"].isObject()) {
+    }
+    if (!config["ProbeConfig"].isObject()) {
         // ProbeConfig is not empty but of wrong type, use default
         errorMsg = "ProbeConfig is not of type map, use probe config with default filter";
         return false;
@@ -502,6 +503,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                            const CollectionPipelineContext* mContext,
                            const std::string& sName) {
     std::string errorMsg;
+    SecurityOption thisSecurityOption;
 
     // ProbeConfig (Optional)
     if (!CheckProbeConfigValid(config, errorMsg)) {
@@ -515,42 +517,38 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                  mContext->GetLogstoreName(),
                                  mContext->GetRegion());
         }
-        SecurityOption thisSecurityOption;
-        GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
-        mOptionList.emplace_back(std::move(thisSecurityOption));
-        return true;
+    } else {
+        const auto& innerConfig = config["ProbeConfig"];
+        // Genral Filter (Optional)
+        std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> thisFilter;
+        switch (probeType) {
+            case SecurityProbeType::FILE: {
+                SecurityFileFilter thisFileFilter;
+                InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
+                thisFilter.emplace<SecurityFileFilter>(std::move(thisFileFilter));
+                break;
+            }
+            case SecurityProbeType::NETWORK: {
+                SecurityNetworkFilter thisNetworkFilter;
+                InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
+                thisFilter.emplace<SecurityNetworkFilter>(std::move(thisNetworkFilter));
+                break;
+            }
+            case SecurityProbeType::PROCESS: {
+                break;
+            }
+            default:
+                PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                     mContext->GetAlarm(),
+                                     "Unknown security eBPF probe type",
+                                     sName,
+                                     mContext->GetConfigName(),
+                                     mContext->GetProjectName(),
+                                     mContext->GetLogstoreName(),
+                                     mContext->GetRegion());
+        }
+        thisSecurityOption.mFilter = thisFilter;
     }
-    const auto& innerConfig = config["ProbeConfig"];
-    SecurityOption thisSecurityOption;
-    // Genral Filter (Optional)
-    std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> thisFilter;
-    switch (probeType) {
-        case SecurityProbeType::FILE: {
-            SecurityFileFilter thisFileFilter;
-            InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
-            thisFilter.emplace<SecurityFileFilter>(std::move(thisFileFilter));
-            break;
-        }
-        case SecurityProbeType::NETWORK: {
-            SecurityNetworkFilter thisNetworkFilter;
-            InitSecurityNetworkFilter(innerConfig, thisNetworkFilter, mContext, sName);
-            thisFilter.emplace<SecurityNetworkFilter>(std::move(thisNetworkFilter));
-            break;
-        }
-        case SecurityProbeType::PROCESS: {
-            break;
-        }
-        default:
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 "Unknown security eBPF probe type",
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
-    }
-    thisSecurityOption.mFilter = thisFilter;
     GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;

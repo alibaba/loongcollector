@@ -42,6 +42,20 @@ bool GetOptionalBoolParam(const Json::Value& config, const string& key, bool& pa
     return true;
 }
 
+bool GetOptionalInt64Param(const Json::Value& config, const string& key, int64_t& param, string& errorMsg) {
+    errorMsg.clear();
+    string curKey = ExtractCurrentKey(key);
+    const Json::Value* itr = config.find(curKey.c_str(), curKey.c_str() + curKey.length());
+    if (itr != nullptr) {
+        if (!itr->isInt64()) {
+            errorMsg = "param " + key + " is not of type int64";
+            return false;
+        }
+        param = itr->asInt64();
+    }
+    return true;
+}
+
 bool GetOptionalIntParam(const Json::Value& config, const string& key, int32_t& param, string& errorMsg) {
     errorMsg.clear();
     string curKey = ExtractCurrentKey(key);
@@ -119,6 +133,15 @@ bool GetMandatoryBoolParam(const Json::Value& config, const string& key, bool& p
         return false;
     }
     return GetOptionalBoolParam(config, key, param, errorMsg);
+}
+
+bool GetMandatoryInt64Param(const Json::Value& config, const string& key, int64_t& param, string& errorMsg) {
+    errorMsg.clear();
+    if (!config.isMember(ExtractCurrentKey(key))) {
+        errorMsg = "mandatory param " + key + " is missing";
+        return false;
+    }
+    return GetOptionalInt64Param(config, key, param, errorMsg);
 }
 
 bool GetMandatoryIntParam(const Json::Value& config, const string& key, int32_t& param, string& errorMsg) {

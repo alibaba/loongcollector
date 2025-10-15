@@ -29,6 +29,7 @@
 #include <limits>
 #include <numeric>
 #include <random>
+#include <sstream>
 
 #include "boost/filesystem.hpp"
 #include "boost/regex.hpp"
@@ -130,10 +131,10 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                           ? discoveryConfig.first->GetWildcardPaths()[0]
                                           : discoveryConfig.first->GetBasePath(),
                                       containerPath->mRealBaseDir.size());
-                reader->SetContainerID(containerPath->mID);
-                reader->SetContainerMetadatas(containerPath->mMetadatas);
-                reader->SetContainerCustomMetadatas(containerPath->mCustomMetadatas);
-                reader->SetContainerExtraTags(containerPath->mTags);
+                reader->SetContainerID(containerPath->mRawContainerInfo->mID);
+                reader->SetContainerMetadatas(containerPath->mRawContainerInfo->mMetadatas);
+                reader->SetContainerCustomMetadatas(containerPath->mRawContainerInfo->mCustomMetadatas);
+                reader->SetContainerExtraTags(containerPath->mExtraTags);
             }
         }
 
@@ -699,6 +700,24 @@ void LogFileReader::SetFilePosBackwardToFixedPos(LogFileOperator& op) {
     mLastFilePos = endOffset <= ((int64_t)mReaderConfig.first->mTailSizeKB * 1024)
         ? 0
         : (endOffset - ((int64_t)mReaderConfig.first->mTailSizeKB * 1024));
+
+    // If data at the beginning of the file is skipped, send a warning and an alarm
+    if (mLastFilePos > 0) {
+        std::ostringstream oss;
+        oss << "File size " << (endOffset / 1024) << "KB > " << mReaderConfig.first->mTailSizeKB
+            << "KB when discovered, skipped " << mLastFilePos << " bytes from the beginning of file: " << mHostLogPath
+            << ", potential data loss may occur. Consider increasing mTailSizeKB if complete file reading is required.";
+        std::string warningMsg = oss.str();
+
+        LOG_WARNING(sLogger,
+                    ("project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
+                        "file path", mHostLogPath)("file device", ToString(mDevInode.dev))(
+                        "file inode", ToString(mDevInode.inode))("first open", warningMsg.c_str()));
+
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            SKIP_READ_LOG_ALARM, warningMsg, GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+    }
+
     mCache.clear();
     FixLastFilePos(op, endOffset);
 }
@@ -2458,21 +2477,21 @@ bool LogFileReader::UpdateContainerInfo() {
         return false;
     }
     ContainerInfo* containerInfo = discoveryConfig.first->GetContainerPathByLogPath(mHostLogPathDir);
-    if (containerInfo && containerInfo->mID != mContainerID) {
+    if (containerInfo && containerInfo->mRawContainerInfo->mID != mContainerID) {
         LOG_INFO(sLogger,
                  ("container info of file reader changed", "may be because container restart")(
-                     "old container id", mContainerID)("new container id", containerInfo->mID)(
-                     "container status", containerInfo->mStopped ? "stopped" : "running"));
+                     "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
+                     "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
         // if config have wildcard path, use mWildcardPaths[0] as base path
         SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
                                                                          : discoveryConfig.first->GetBasePath(),
                       containerInfo->mRealBaseDir.size());
-        SetContainerID(containerInfo->mID);
-        mContainerStopped = containerInfo->mStopped;
+        SetContainerID(containerInfo->mRawContainerInfo->mID);
+        mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
         mContainerMetadatas.clear();
         mContainerExtraTags.clear();
-        SetContainerMetadatas(containerInfo->mMetadatas);
-        SetContainerExtraTags(containerInfo->mTags);
+        SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);
+        SetContainerExtraTags(containerInfo->mExtraTags);
         return true;
     }
     return false;

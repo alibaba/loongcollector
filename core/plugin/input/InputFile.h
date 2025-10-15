@@ -46,7 +46,6 @@ public:
 
     FileDiscoveryOptions mFileDiscovery;
     bool mEnableContainerDiscovery = false;
-    ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
     FileTagOptions mFileTag;

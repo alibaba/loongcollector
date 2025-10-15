@@ -43,6 +43,7 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
 #include "file_server/checkpoint/CheckPointManager.h"
@@ -250,11 +251,13 @@ bool ConfigManager::RegisterHandlers() {
     }
     sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
     bool result = true;
+    bool hasContainerConfig = false;
     for (auto itr = sortedConfigs.begin(); itr != sortedConfigs.end(); ++itr) {
         const FileDiscoveryOptions* config = itr->first;
         if (!config->IsContainerDiscoveryEnabled()) {
             result &= RegisterHandlers(config->GetBasePath(), *itr);
         } else {
+            hasContainerConfig = true;
             for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
                 result &= RegisterHandlers((*config->GetContainerInfo())[i].mRealBaseDir, *itr);
             }
@@ -265,10 +268,14 @@ bool ConfigManager::RegisterHandlers() {
         if (!config->IsContainerDiscoveryEnabled()) {
             RegisterWildcardPath(*itr, config->GetWildcardPaths()[0], 0);
         } else {
+            hasContainerConfig = true;
             for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
                 RegisterWildcardPath(*itr, (*config->GetContainerInfo())[i].mRealBaseDir, 0);
             }
         }
+    }
+    if (hasContainerConfig) {
+        ContainerManager::GetInstance()->Init();
     }
     return result;
 }
@@ -880,242 +887,11 @@ void ConfigManager::GetRelatedConfigs(const std::string& path, std::vector<FileD
     }
 }
 
-bool ConfigManager::UpdateContainerPath(ConfigContainerInfoUpdateCmd* cmd) {
-    mContainerInfoCmdLock.lock();
-    mContainerInfoCmdVec.push_back(cmd);
-    mContainerInfoCmdLock.unlock();
-    return true;
-}
-
-bool ConfigManager::DoUpdateContainerPaths() {
-    mContainerInfoCmdLock.lock();
-    std::vector<ConfigContainerInfoUpdateCmd*> tmpPathCmdVec = mContainerInfoCmdVec;
-    mContainerInfoCmdVec.clear();
-    mContainerInfoCmdLock.unlock();
-    LOG_INFO(sLogger, ("update container path", tmpPathCmdVec.size()));
-    for (size_t i = 0; i < tmpPathCmdVec.size(); ++i) {
-        FileDiscoveryConfig config = FileServer::GetInstance()->GetFileDiscoveryConfig(tmpPathCmdVec[i]->mConfigName);
-        if (!config.first) {
-            LOG_ERROR(sLogger,
-                      ("invalid container path update cmd",
-                       tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            continue;
-        }
-        if (tmpPathCmdVec[i]->mDeleteFlag) {
-            if (config.first->DeleteContainerInfo(tmpPathCmdVec[i]->mJsonParams)) {
-                LOG_DEBUG(sLogger,
-                          ("container path delete cmd success",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            } else {
-                LOG_ERROR(sLogger,
-                          ("container path delete cmd fail",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            }
-        } else {
-            if (config.first->UpdateContainerInfo(tmpPathCmdVec[i]->mJsonParams, config.second)) {
-                LOG_DEBUG(sLogger,
-                          ("container path update cmd success",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            } else {
-                LOG_ERROR(sLogger,
-                          ("container path update cmd fail",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            }
-        }
-        delete tmpPathCmdVec[i];
-    }
-    return true;
-}
-
-bool ConfigManager::IsUpdateContainerPaths() {
-    mContainerInfoCmdLock.lock();
-    bool rst = false;
-    for (size_t i = 0; i < mContainerInfoCmdVec.size(); ++i) {
-        ConfigContainerInfoUpdateCmd* pCmd = mContainerInfoCmdVec[i];
-        if (pCmd->mDeleteFlag) {
-            rst = true;
-            break;
-        }
-        FileDiscoveryConfig pConfig = FileServer::GetInstance()->GetFileDiscoveryConfig(pCmd->mConfigName);
-        if (!pConfig.first) {
-            continue;
-        }
-        if (!pConfig.first->IsSameContainerInfo(pCmd->mJsonParams, pConfig.second)) {
-            rst = true;
-            break;
-        }
-    }
-    if (mContainerInfoCmdVec.size() > 0) {
-        LOG_INFO(sLogger, ("check container path update flag", rst)("size", mContainerInfoCmdVec.size()));
-    }
-    if (rst == false) {
-        for (size_t i = 0; i < mContainerInfoCmdVec.size(); ++i) {
-            delete mContainerInfoCmdVec[i];
-        }
-        mContainerInfoCmdVec.clear();
-    }
-    mContainerInfoCmdLock.unlock();
-
-    /********** qps limit : only update docker config INT32_FLAG(max_docker_config_update_times) times in 3 minutes
-     * ********/
-    static int32_t s_lastUpdateTime = 0;
-    static int32_t s_lastUpdateCount = 0;
-    if (!rst) {
-        return rst;
-    }
-    int32_t nowTime = time(NULL);
-    // not in 3 minutes window
-    if (nowTime / 180 != s_lastUpdateTime / 180) {
-        s_lastUpdateCount = 1;
-        s_lastUpdateTime = nowTime;
-        return rst;
-    }
-    // this window's update times < INT32_FLAG(max_docker_config_update_times)
-    // min interval : 10 seconds
-    // For case with frequent container update (eg. K8s short job), adjust this parameter.
-    if (s_lastUpdateCount < INT32_FLAG(max_docker_config_update_times)
-        && nowTime - s_lastUpdateTime >= INT32_FLAG(docker_config_update_interval)) {
-        ++s_lastUpdateCount;
-        s_lastUpdateTime = nowTime;
-        return rst;
-    }
-    // return false if s_lastUpdateCount >= INT32_FLAG(max_docker_config_update_times) and last update time is in same
-    // window
-    return false;
-    /************************************************************************************************************************/
-}
-
-bool ConfigManager::UpdateContainerStopped(ConfigContainerInfoUpdateCmd* cmd) {
-    PTScopedLock lock(mDockerContainerStoppedCmdLock);
-    mDockerContainerStoppedCmdVec.push_back(cmd);
-    return true;
-}
 
 void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
-    std::vector<ConfigContainerInfoUpdateCmd*> cmdVec;
-    {
-        PTScopedLock lock(mDockerContainerStoppedCmdLock);
-        cmdVec.swap(mDockerContainerStoppedCmdVec);
-    }
-    for (auto& cmd : cmdVec) {
-        // find config and container's path, then emit stopped event
-        FileDiscoveryConfig config = FileServer::GetInstance()->GetFileDiscoveryConfig(cmd->mConfigName);
-        if (!config.first) {
-            continue;
-        }
-        ContainerInfo containerInfo;
-        std::string errorMsg;
-        if (!ContainerInfo::ParseByJSONObj(cmd->mJsonParams, containerInfo, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
-            continue;
-        }
-        std::vector<ContainerInfo>::iterator iter = config.first->GetContainerInfo()->begin();
-        std::vector<ContainerInfo>::iterator iend = config.first->GetContainerInfo()->end();
-        for (; iter != iend; ++iter) {
-            if (iter->mID == containerInfo.mID) {
-                break;
-            }
-        }
-        if (iter == iend) {
-            continue;
-        }
-        Event* pStoppedEvent = new Event(iter->mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
-        pStoppedEvent->SetConfigName(cmd->mConfigName);
-        pStoppedEvent->SetContainerID(containerInfo.mID);
-        iter->mStopped = true;
-        LOG_DEBUG(
-            sLogger,
-            ("GetContainerStoppedEvent Type", pStoppedEvent->GetType())("Source", pStoppedEvent->GetSource())(
-                "Object", pStoppedEvent->GetEventObject())("Config", pStoppedEvent->GetConfigName())(
-                "IsDir", pStoppedEvent->IsDir())("IsCreate", pStoppedEvent->IsCreate())("IsModify",
-                                                                                        pStoppedEvent->IsModify())(
-                "IsDeleted", pStoppedEvent->IsDeleted())("IsMoveFrom", pStoppedEvent->IsMoveFrom())(
-                "IsContainerStopped", pStoppedEvent->IsContainerStopped())("IsMoveTo", pStoppedEvent->IsMoveTo()));
-        eventVec.push_back(pStoppedEvent);
-    }
-    for (auto cmd : cmdVec) {
-        delete cmd;
-    }
+    ContainerManager::GetInstance()->GetContainerStoppedEvents(eventVec);
 }
 
-void ConfigManager::SaveDockerConfig() {
-    string dockerPathConfigName = AppConfig::GetInstance()->GetDockerFilePathConfig();
-    Json::Value dockerPathValueRoot;
-    dockerPathValueRoot["version"] = Json::Value(STRING_FLAG(ilogtail_docker_path_version));
-    Json::Value dockerPathValueDetail;
-    mContainerInfoCmdLock.lock();
-    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto it = nameConfigMap.begin(); it != nameConfigMap.end(); ++it) {
-        if (it->second.first->GetContainerInfo()) {
-            std::vector<ContainerInfo>& containerPathVec = *(it->second.first->GetContainerInfo());
-            for (size_t i = 0; i < containerPathVec.size(); ++i) {
-                Json::Value dockerPathValue;
-                dockerPathValue["config_name"] = Json::Value(it->first);
-                dockerPathValue["container_id"] = Json::Value(containerPathVec[i].mID);
-                containerPathVec[i].mJson["Path"] = Json::Value(containerPathVec[i].mRealBaseDir);
-                dockerPathValue["params"] = Json::Value(containerPathVec[i].mJson.toStyledString());
-                dockerPathValueDetail.append(dockerPathValue);
-            }
-        }
-    }
-    mContainerInfoCmdLock.unlock();
-    dockerPathValueRoot["detail"] = dockerPathValueDetail;
-    string dockerInfo = dockerPathValueRoot.toStyledString();
-    OverwriteFile(dockerPathConfigName, dockerInfo);
-    LOG_INFO(sLogger, ("dump docker path info", dockerPathConfigName));
-}
-
-void ConfigManager::LoadDockerConfig() {
-    string dockerPathConfigName = AppConfig::GetInstance()->GetDockerFilePathConfig();
-    Json::Value dockerPathValueRoot;
-    ParseConfResult rst = ParseConfig(dockerPathConfigName, dockerPathValueRoot);
-    if (rst == CONFIG_INVALID_FORMAT) {
-        LOG_ERROR(sLogger, ("invalid docker config json", rst)("file path", dockerPathConfigName));
-    }
-    if (rst != CONFIG_OK) {
-        return;
-    }
-    if (!dockerPathValueRoot.isMember("detail")) {
-        return;
-    }
-    Json::Value dockerPathValueDetail = dockerPathValueRoot["detail"];
-    if (!dockerPathValueDetail.isArray()) {
-        return;
-    }
-    std::vector<ConfigContainerInfoUpdateCmd*> localPaths;
-    for (Json::Value::iterator iter = dockerPathValueDetail.begin(); iter != dockerPathValueDetail.end(); ++iter) {
-        const Json::Value& dockerPathItem = *iter;
-        string configName = dockerPathItem.isMember("config_name") && dockerPathItem["config_name"].isString()
-            ? dockerPathItem["config_name"].asString()
-            : string();
-        string containerID = dockerPathItem.isMember("container_id") && dockerPathItem["container_id"].isString()
-            ? dockerPathItem["container_id"].asString()
-            : string();
-        string params = dockerPathItem.isMember("params") && dockerPathItem["params"].isString()
-            ? dockerPathItem["params"].asString()
-            : string();
-        LOG_INFO(sLogger, ("load docker path, config", configName)("container id", containerID)("params", params));
-        if (configName.empty() || containerID.empty() || params.empty()) {
-            continue;
-        }
-
-        // cmd 解析json
-        Json::Value jsonParams;
-        std::string errorMsg;
-        if (params.size() < (size_t)5 || !ParseJsonTable(params, jsonParams, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid docker container params", params)("errorMsg", errorMsg));
-            continue;
-        }
-        ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configName, false, jsonParams);
-        localPaths.push_back(cmd);
-    }
-    mContainerInfoCmdLock.lock();
-    localPaths.insert(localPaths.end(), mContainerInfoCmdVec.begin(), mContainerInfoCmdVec.end());
-    mContainerInfoCmdVec = localPaths;
-    mContainerInfoCmdLock.unlock();
-
-    DoUpdateContainerPaths();
-}
 
 void ConfigManager::ClearFilePipelineMatchCache() {
     ScopedSpinLock lock(mCacheFileConfigMapLock);

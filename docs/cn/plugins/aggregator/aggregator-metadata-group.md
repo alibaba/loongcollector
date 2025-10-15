@@ -16,8 +16,8 @@
 
 | 参数                  | 类型       | 是否必选 | 说明                                                           |
 |---------------------|----------|------|--------------------------------------------------------------|
-| Type                | String   | 是    | 插件类型，指定为`aggregator_metadata_group`。                         |
-| GroupMetadataKeys   | []String | 否    | 指定需要按照其值分组的Key列表, 为空是表示丢弃Metadata, 只进行打包聚合。                  |
+| Type                | string   | 是    | 插件类型，指定为`aggregator_metadata_group`。                         |
+| GroupMetadataKeys   | []string | 否    | 指定需要按照其值分组的Key列表, 为空是表示丢弃Metadata, 只进行打包聚合。                  |
 | GroupMaxEventLength | int      | 否    | 聚合时，单个PipelineGroupEvents中的最大Events数量，默认1024                 |
 | GroupMaxByteLength  | int      | 否    | 聚合时，单个PipelineGroupEvents中Events总的字节长度，仅支持ByteArray类型，默认3MiB |
 | DropOversizeEvent   | int      | 否    | 遇到单个PipelineGroupEvent字节长度超过上限是否丢弃,默认为true                   |

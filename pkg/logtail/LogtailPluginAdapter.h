@@ -50,8 +50,6 @@ extern "C" {
         int lines,
         const char *shardHash, int shardHashSize);
 
-    int LogtailCtlCmd(const char * configName, int configNameSize, int cmdId, const char * params, int paramsLen);
-
     // version for logtail plugin adapter, used for check plugin adapter version
     int PluginAdapterVersion();
 

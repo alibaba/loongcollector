@@ -1,0 +1,702 @@
+# Copyright 2025 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Auto Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 3.1.4)'
+        required: true
+        type: string
+        pattern: '^[0-9]+\.[0-9]+\.[0-9]+.*$'
+      milestone_id:
+        description: 'Milestone ID from GitHub (e.g., 26 for https://github.com/alibaba/ilogtail/milestone/26)'
+        required: true
+        type: string
+        pattern: '^[0-9]+$'
+      build_linux_amd64:
+        description: 'Build Linux AMD64 package'
+        required: false
+        type: boolean
+        default: true
+      build_linux_arm64:
+        description: 'Build Linux ARM64 package'
+        required: false
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build Windows package'
+        required: false
+        type: boolean
+        default: true
+      test_mode:
+        description: 'Enable test mode (creates mock packages instead of real builds)'
+        required: false
+        type: boolean
+        default: false
+      create_release:
+        description: 'Create GitHub Release after building and uploading'
+        required: false
+        type: boolean
+        default: true
+
+env:
+  GO_VERSION: 1.19.10
+
+jobs:
+  create-release-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      branch_name: ${{ steps.create-branch.outputs.branch_name }}
+      version: ${{ github.event.inputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set custom submodule URL and fetch
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch
+        id: create-branch
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          MILESTONE_ID="${{ github.event.inputs.milestone_id }}"
+          # 提取大版本号，如3.1.4 -> 3.1
+          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1,2)
+          MAJOR_BRANCH_NAME="${MAJOR_VERSION}"
+          
+          # 确保我们在main分支上
+          git checkout main
+          git pull origin main
+          
+          # 检查大版本分支是否存在，如果不存在则从main创建
+          if ! git show-ref --verify --quiet refs/remotes/origin/$MAJOR_BRANCH_NAME; then
+            echo "Major version branch $MAJOR_BRANCH_NAME does not exist, creating from main..."
+            git checkout -b "$MAJOR_BRANCH_NAME"
+            git push origin "$MAJOR_BRANCH_NAME"
+          else
+            echo "Major version branch $MAJOR_BRANCH_NAME exists, switching to it..."
+            git checkout "$MAJOR_BRANCH_NAME"
+            git pull origin "$MAJOR_BRANCH_NAME"
+            # 同步main分支的最新内容
+            git merge main --no-ff -m "Sync main branch for release v$VERSION"
+          fi
+          
+          # 更新版本号
+          echo "Updating version to $VERSION"
+          sed -i "s/VERSION ?= .*/VERSION ?= $VERSION/" Makefile
+          
+          # 生成changelog
+          echo "Generating changelog for version $VERSION with milestone ID $MILESTONE_ID"
+          
+          chmod +x scripts/gen_release_markdown.sh
+          ./scripts/gen_release_markdown.sh $VERSION $MILESTONE_ID
+          
+          # 提交更改
+          git add -A
+          git commit -m "chore: prepare release v$VERSION"
+          
+          # 推送分支
+          git push origin "$MAJOR_BRANCH_NAME"
+          
+          echo "branch_name=$MAJOR_BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Output branch name
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          MAJOR_VERSION=$(echo $VERSION | cut -d. -f1,2)
+          MAJOR_BRANCH_NAME="${MAJOR_VERSION}"
+          echo "Release prepared on branch: $MAJOR_BRANCH_NAME"
+          echo "Please trigger the publish-release workflow with branch name: $MAJOR_BRANCH_NAME and version: $VERSION"
+
+  # 第一步：构建不同架构的安装包
+  build-linux:
+    needs: create-release-branch
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            should_build: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            should_build: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
+    steps:
+      - name: Check out code
+        if: matrix.should_build
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Go
+        if: matrix.should_build
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set custom submodule URL and fetch
+        if: matrix.should_build
+        run: |
+          SUBMODULE_PATH="core/_thirdparty/coolbpf"
+          git config submodule.$SUBMODULE_PATH.url "https://github.com/aliyun/coolbpf.git"
+          git submodule update --init
+          cd $SUBMODULE_PATH
+          echo "Current commit: $(git rev-parse HEAD)"
+
+      - name: Build Linux ${{ matrix.arch }} package
+        if: matrix.should_build
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # 快速测试模式：创建模拟的构建产物
+          if [[ "${{ github.event.inputs.test_mode }}" == "true" ]]; then
+            echo "Running in test mode - creating mock packages..."
+            mkdir -p dist/
+            
+            # 创建模拟的 loongcollector 目录结构
+            mkdir -p mock_loongcollector/loongcollector-$VERSION
+            echo "Mock loongcollector binary for ${{ matrix.arch }}" > mock_loongcollector/loongcollector-$VERSION/loongcollector
+            echo "Mock config" > mock_loongcollector/loongcollector-$VERSION/ilogtail_config.json
+            echo "Mock script" > mock_loongcollector/loongcollector-$VERSION/loongcollector_control.sh
+            chmod +x mock_loongcollector/loongcollector-$VERSION/loongcollector
+            chmod +x mock_loongcollector/loongcollector-$VERSION/loongcollector_control.sh
+            
+            # 创建 tar.gz 包
+            tar -czf dist/loongcollector-$VERSION.linux-${{ matrix.arch }}.tar.gz -C mock_loongcollector loongcollector-$VERSION
+            echo "Created mock package: dist/loongcollector-$VERSION.linux-${{ matrix.arch }}.tar.gz"
+          else
+            # 正常构建模式
+            make dist
+          fi
+          
+          ls -la dist/
+
+      - name: Upload Linux ${{ matrix.arch }} artifacts
+        if: matrix.should_build
+        uses: actions/upload-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.linux-${{ matrix.arch }}.tar.gz
+          path: dist/loongcollector-${{ github.event.inputs.version }}.linux-${{ matrix.arch }}.tar.gz
+          retention-days: 1
+
+  build-windows:
+    needs: create-release-branch
+    runs-on: ${{ github.event.inputs.test_mode == 'true' && 'windows-latest' || 'Windows' }}
+    timeout-minutes: 60
+    if: github.event.inputs.build_windows == 'true'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Build Windows package
+        run: |
+          $VERSION = "${{ github.event.inputs.version }}"
+          
+          # 快速测试模式：创建模拟的构建产物
+          if ("${{ github.event.inputs.test_mode }}" -eq "true") {
+            Write-Host "Running in test mode - creating mock Windows package..."
+            
+            # 创建模拟的 output 目录结构
+            New-Item -ItemType Directory -Path "output" -Force | Out-Null
+            "Mock loongcollector.exe for Windows" | Out-File -FilePath "output\loongcollector.exe" -Encoding UTF8
+            "Mock GoPluginAdapter.dll" | Out-File -FilePath "output\GoPluginAdapter.dll" -Encoding UTF8
+            "Mock GoPluginBase.dll" | Out-File -FilePath "output\GoPluginBase.dll" -Encoding UTF8
+            "{}" | Out-File -FilePath "output\ilogtail_config.json" -Encoding UTF8
+            
+            # 创建 dist 目录
+            New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+            
+            # 创建 zip 包
+            Compress-Archive -Path "output\*" -DestinationPath "dist\loongcollector-$VERSION.windows-amd64.zip" -Force
+            Write-Host "Created mock Windows package: dist\loongcollector-$VERSION.windows-amd64.zip"
+          } else {
+            # 正常构建模式
+            Write-Host "Starting Windows build..."
+            Write-Host "Using version: $VERSION"
+            .\scripts\windows64_build.bat $VERSION
+          }
+          
+          # 检查构建结果
+          if (Test-Path "output") {
+            Write-Host "Build successful. Output files:"
+            Get-ChildItem -Path "output" -Recurse
+            
+            # 创建 dist 目录并打包
+            Write-Host "Creating dist directory and packaging..."
+            New-Item -ItemType Directory -Path "dist" -Force | Out-Null
+            
+            # 创建 zip 包
+            $zipPath = "dist\loongcollector-$VERSION.windows-amd64.zip"
+            Compress-Archive -Path "output\*" -DestinationPath $zipPath -Force
+            Write-Host "Created Windows package: $zipPath"
+            
+            # 验证zip文件
+            if (Test-Path $zipPath) {
+              $zipSize = (Get-Item $zipPath).Length
+              Write-Host "Zip file created successfully, size: $zipSize bytes"
+            } else {
+              Write-Error "Failed to create zip file"
+              exit 1
+            }
+          } else {
+            Write-Error "Build failed - output directory not found"
+            exit 1
+          }
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
+          path: dist/loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
+          retention-days: 1
+
+  # 第二步：合并包并准备上传
+  prepare-upload:
+    needs: [create-release-branch, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      always() &&
+      (needs.create-release-branch.result == 'success') &&
+      (needs.build-linux.result == 'success' || needs.build-linux.result == 'skipped') &&
+      (needs.build-windows.result == 'success' || needs.build-windows.result == 'skipped')
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Download Linux AMD64 artifacts
+        if: github.event.inputs.build_linux_amd64 == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.linux-amd64.tar.gz
+          path: temp-amd64/
+
+      - name: Download Linux ARM64 artifacts
+        if: github.event.inputs.build_linux_arm64 == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.linux-arm64.tar.gz
+          path: temp-arm64/
+
+      - name: Download Windows artifacts
+        if: github.event.inputs.build_windows == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-${{ github.event.inputs.version }}.windows-amd64.zip
+          path: temp-windows/
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Available artifacts:"
+          ls -la temp-amd64/ temp-arm64/ temp-windows/ || true
+
+      - name: Merge artifacts and generate SHA256
+        run: |
+          mkdir -p dist/
+          cp temp-amd64/* dist/ || true
+          cp temp-arm64/* dist/ || true
+          cp temp-windows/* dist/ || true
+          
+          # Generate SHA256 files for GitHub release
+          cd dist
+          for file in *.tar.gz *.zip; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "$file.sha256"
+              echo "Generated SHA256 for $file"
+            fi
+          done
+          cd ..
+          ls -la dist/
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+          retention-days: 1
+
+  # 第三步：构建和上传 Docker 镜像
+  upload-images:
+    needs: [create-release-branch, prepare-upload]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: |
+      always() &&
+      (needs.create-release-branch.result == 'success') &&
+      (needs.prepare-upload.result == 'success' || needs.prepare-upload.result == 'skipped')
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download build artifacts for Docker build
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: List artifacts for Docker build
+        run: |
+          echo "Artifacts available for Docker build:"
+          ls -la dist/ || echo "No artifacts found"
+
+      - name: Build and push Docker images to GitHub Container Registry
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          echo "Building and pushing Docker images for version $VERSION to GitHub Container Registry"
+          
+          # 检查是否有Linux构建产物
+          LINUX_AMD64_FILE="dist/loongcollector-$VERSION.linux-amd64.tar.gz"
+          LINUX_ARM64_FILE="dist/loongcollector-$VERSION.linux-arm64.tar.gz"
+          
+          if [ ! -f "$LINUX_AMD64_FILE" ] && [ ! -f "$LINUX_ARM64_FILE" ]; then
+            echo "Error: No Linux packages found for Docker build"
+            echo "Available files in dist/:"
+            ls -la dist/ || echo "dist/ directory is empty"
+            echo "Expected files:"
+            echo "- $LINUX_AMD64_FILE"
+            echo "- $LINUX_ARM64_FILE"
+            exit 1
+          fi
+          
+          # 确定要构建的平台
+          PLATFORMS=""
+          if [ -f "$LINUX_AMD64_FILE" ]; then
+            PLATFORMS="$PLATFORMS,linux/amd64"
+            echo "Found Linux AMD64 package: $LINUX_AMD64_FILE"
+          fi
+          if [ -f "$LINUX_ARM64_FILE" ]; then
+            PLATFORMS="$PLATFORMS,linux/arm64"
+            echo "Found Linux ARM64 package: $LINUX_ARM64_FILE"
+          fi
+          
+          # 移除开头的逗号
+          PLATFORMS=$(echo $PLATFORMS | sed 's/^,//')
+          
+          echo "Building Docker images for platforms: $PLATFORMS"
+          
+          # 构建并推送多架构镜像到 GitHub Container Registry
+          docker buildx build --platform "$PLATFORMS" \
+            --file docker/Dockerfile_release \
+            --build-arg VERSION=$VERSION \
+            --build-arg HOST_OS=Linux \
+            --tag ghcr.io/$REPO_OWNER/loongcollector:$VERSION \
+            --tag ghcr.io/$REPO_OWNER/loongcollector:latest \
+            --push .
+          
+          echo "Docker images pushed successfully:"
+          echo "- ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
+          echo "- ghcr.io/$REPO_OWNER/loongcollector:latest"
+
+  # 第四步：测试链接和产物
+  test-release:
+    needs: [create-release-branch, upload-images]
+    if: |
+      always() &&
+      (needs.create-release-branch.result == 'success') &&
+      (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+
+      - name: Generate release markdown
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          MILESTONE_ID="${{ github.event.inputs.milestone_id }}"
+          chmod +x scripts/gen_release_markdown.sh
+          ./scripts/gen_release_markdown.sh $VERSION $MILESTONE_ID
+
+      - name: Test release links
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          DOC_FILE="changes/v${VERSION}.md"
+          
+          if [ ! -f "$DOC_FILE" ]; then
+            echo "Error: Release document $DOC_FILE not found"
+            exit 1
+          fi
+          
+          echo "Testing links in $DOC_FILE..."
+          
+          # 提取所有链接并测试
+          grep -o 'https://[^)]*' "$DOC_FILE" | while read -r url; do
+            echo "Testing URL: $url"
+            if curl -f -s -o /dev/null "$url"; then
+              echo "✓ URL accessible: $url"
+            else
+              echo "✗ URL failed: $url"
+              exit 1
+            fi
+          done
+          
+          # 测试 GitHub Container Registry 镜像
+          echo "Testing GitHub Container Registry images..."
+          
+          # 测试 Docker 镜像是否可访问
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          
+          # 测试镜像标签
+          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/$VERSION" | grep -q "200 OK"; then
+            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION accessible"
+          else
+            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION failed"
+            exit 1
+          fi
+          
+          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/latest" | grep -q "200 OK"; then
+            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest accessible"
+          else
+            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest failed"
+            exit 1
+          fi
+          
+          echo "All tests passed!" 
+
+  # 第五步：创建 GitHub Release
+  create-release:
+    needs: [create-release-branch, upload-images, test-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: |
+      always() &&
+      (needs.create-release-branch.result == 'success') &&
+      (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped') &&
+      (needs.test-release.result == 'success' || needs.test-release.result == 'skipped') &&
+      github.event.inputs.create_release == 'true'
+    permissions:
+      contents: write
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release-branch.outputs.branch_name }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Check GitHub CLI status
+        run: |
+          echo "Checking GitHub CLI status..."
+          gh --version
+          echo "Current repository: ${{ github.repository }}"
+          
+          # 使用GitHub token进行认证
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          
+          # 验证认证状态
+          gh auth status
+
+      - name: Set version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using version: $VERSION"
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="v$VERSION"
+          
+          # 检查标签是否已存在
+          if git tag -l | grep -q "^$TAG_NAME$"; then
+            echo "Tag $TAG_NAME already exists. Deleting it..."
+            git tag -d "$TAG_NAME"
+            git push origin ":refs/tags/$TAG_NAME" || true
+          fi
+          
+          # 创建新标签
+          echo "Creating tag $TAG_NAME..."
+          git tag -a "$TAG_NAME" -m "Release $TAG_NAME"
+          git push origin "$TAG_NAME"
+          
+          echo "Tag $TAG_NAME created and pushed successfully"
+          
+          # 验证标签是否创建成功
+          echo "Verifying tag creation..."
+          git tag -l | grep "^$TAG_NAME$" || echo "Warning: Tag not found locally"
+          git ls-remote --tags origin | grep "$TAG_NAME" || echo "Warning: Tag not found remotely"
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # 检查 release notes 文件是否存在
+          if [ ! -f "changes/v${VERSION}.md" ]; then
+            echo "Error: Release notes file changes/v${VERSION}.md not found"
+            exit 1
+          fi
+          
+          # 获取上一个 release tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 --match "v*" HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "Previous tag found: $PREVIOUS_TAG"
+            # 生成比较链接
+            COMPARE_URL="https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...v${VERSION}"
+            echo "Compare URL: $COMPARE_URL"
+          else
+            echo "No previous tag found, this appears to be the first release"
+            COMPARE_URL=""
+          fi
+          
+          # 读取 release notes 内容
+          RELEASE_NOTES=$(cat "changes/v${VERSION}.md")
+          
+          # 如果有比较链接，添加到 release notes 中
+          if [ -n "$COMPARE_URL" ]; then
+            echo "" >> release_notes.md
+            echo "## Changes since $PREVIOUS_TAG" >> release_notes.md
+            echo "" >> release_notes.md
+            echo "See [full changelog]($COMPARE_URL) for all changes since $PREVIOUS_TAG." >> release_notes.md
+          fi
+          
+          # 保存到文件
+          echo "$RELEASE_NOTES" > release_notes.md
+          echo "Release notes generated successfully"
+
+      - name: Download build artifacts from current workflow
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: List downloaded artifacts
+        run: |
+          echo "Downloaded artifacts from current workflow:"
+          ls -la dist/ || echo "No artifacts found in dist/ directory"
+
+      - name: Check available artifacts
+        run: |
+          echo "Checking available artifacts in dist/ directory:"
+          ls -la dist/ || echo "No artifacts found in dist/ directory"
+          
+          if [ ! "$(ls -A dist/ 2>/dev/null)" ]; then
+            echo "No artifacts found. The release will be created without files."
+            echo "Make sure the build artifacts have been generated by the previous steps."
+          else
+            echo "Found artifacts:"
+            ls -la dist/
+          fi
+
+      - name: Create GitHub Release
+        run: |
+          VERSION="${{ env.VERSION }}"
+          
+          # 检查release notes文件
+          echo "Checking release notes file..."
+          if [ ! -f "release_notes.md" ]; then
+            echo "Error: release_notes.md not found"
+            exit 1
+          fi
+          
+          echo "Release notes content (first 500 chars):"
+          head -c 500 release_notes.md
+          echo ""
+          
+          # 检查是否有可用的 artifacts
+          if [ "$(ls -A dist/ 2>/dev/null)" ]; then
+            echo "Found artifacts, creating release with files..."
+            echo "Artifacts to upload:"
+            ls -la dist/
+            
+            # 创建release并上传文件
+            gh release create "v$VERSION" \
+              --title "Release v$VERSION" \
+              --notes-file release_notes.md \
+              dist/*.tar.gz dist/*.zip dist/*.sha256
+          else
+            echo "No artifacts found, creating release without files..."
+            gh release create "v$VERSION" \
+              --title "Release v$VERSION" \
+              --notes-file release_notes.md
+          fi
+          
+          # 检查release是否创建成功
+          if [ $? -eq 0 ]; then
+            echo "Release created successfully!"
+            gh release view "v$VERSION"
+          else
+            echo "Failed to create release"
+            exit 1
+          fi
+
+      - name: Output release info
+        run: |
+          echo "Release v${{ env.VERSION }} has been published successfully!"
+          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/v${{ env.VERSION }}"
+          echo "Branch: ${{ needs.create-release-branch.outputs.branch_name }}"
+          echo "Version: ${{ env.VERSION }}"
+
+  actions-timeline:
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - uses: Kesin11/actions-timeline@v2

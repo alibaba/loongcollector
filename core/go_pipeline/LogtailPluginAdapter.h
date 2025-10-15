@@ -46,15 +46,11 @@ typedef int (*SendPbV2Fun)(const char* configName,
                            int lines,
                            const char* shardHash,
                            int shardHashSize);
-typedef int (*PluginCtlCmdFun)(
-    const char* configName, int configNameSize, int optId, const char* params, int paramsLen);
 
-PLUGIN_ADAPTER_API void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun, PluginCtlCmdFun cmdFun);
+PLUGIN_ADAPTER_API void RegisterLogtailCallBack(IsValidToSendFun checkFun, SendPbFun sendFun);
 
-PLUGIN_ADAPTER_API void RegisterLogtailCallBackV2(IsValidToSendFun checkFun,
-                                                  SendPbFun sendV1Fun,
-                                                  SendPbV2Fun sendV2Fun,
-                                                  PluginCtlCmdFun cmdFun);
+PLUGIN_ADAPTER_API void
+RegisterLogtailCallBackV2(IsValidToSendFun checkFun, SendPbFun sendV1Fun, SendPbV2Fun sendV2Fun);
 
 PLUGIN_ADAPTER_API int LogtailIsValidToSend(long long logstoreKey);
 
@@ -76,8 +72,6 @@ PLUGIN_ADAPTER_API int LogtailSendPbV2(const char* configName,
                                        const char* shardHash,
                                        int shardHashSize);
 
-PLUGIN_ADAPTER_API int
-LogtailCtlCmd(const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen);
 
 // version for logtail plugin adapter, used for check plugin adapter version
 PLUGIN_ADAPTER_API int PluginAdapterVersion();

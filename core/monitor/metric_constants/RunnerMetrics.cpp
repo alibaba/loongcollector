@@ -38,6 +38,7 @@ const string& METRIC_RUNNER_IN_EVENT_GROUPS_TOTAL = METRIC_IN_EVENT_GROUPS_TOTAL
 const string& METRIC_RUNNER_IN_SIZE_BYTES = METRIC_IN_SIZE_BYTES;
 const string& METRIC_RUNNER_IN_ITEMS_TOTAL = METRIC_IN_ITEMS_TOTAL;
 const string METRIC_RUNNER_LAST_RUN_TIME = "last_run_time";
+const string& METRIC_RUNNER_OUT_SIZE_BYTES = METRIC_OUT_SIZE_BYTES;
 const string& METRIC_RUNNER_OUT_ITEMS_TOTAL = METRIC_OUT_ITEMS_TOTAL;
 const string& METRIC_RUNNER_TOTAL_DELAY_MS = METRIC_TOTAL_DELAY_MS;
 const string METRIC_RUNNER_CLIENT_REGISTER_STATE = "client_register_state";
@@ -58,6 +59,7 @@ const string METRIC_RUNNER_SINK_SEND_CONCURRENCY = "send_concurrency";
  *   flusher runner
  **********************************************************/
 const string METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES = "in_raw_size_bytes";
+const string METRIC_RUNNER_FLUSHER_OUT_RAW_SIZE_BYTES = "out_raw_size_bytes";
 const string METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL = "waiting_items_total";
 
 /**********************************************************

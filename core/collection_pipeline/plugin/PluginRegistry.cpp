@@ -33,7 +33,9 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputForward.h"
 #include "plugin/input/InputInternalAlarms.h"
+#include "plugin/input/InputInternalMatchedContainerInfo.h"
 #include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputStaticFile.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
@@ -154,6 +156,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputFile>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMatchedContainerInfo>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
@@ -172,6 +175,7 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 

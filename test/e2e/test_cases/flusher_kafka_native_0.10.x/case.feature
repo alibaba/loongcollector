@@ -1,9 +1,9 @@
 @flusher
-Feature: flusher kafka cpp 0.10.x
-  Test flusher kafka cpp with native input_file on Kafka 0.10.x
+Feature: flusher kafka native 0.10.x
+  Test flusher kafka native with native input_file on Kafka 0.10.x
 
   @e2e @docker-compose
-  Scenario: TestFlusherKafkaCpp_0.10.x
+  Scenario: TestFlusherKafkaNative_0.10.x
     Given {docker-compose} environment
     Given subcribe data from {kafka} with config
     """
@@ -12,7 +12,7 @@ Feature: flusher kafka cpp 0.10.x
     topic: "test-topic-010x"
     version: "0.10.2.0"
     """
-    Given {flusher-kafka-cpp-0.10.x-case} local config as below
+    Given {flusher-kafka-native-0.10.x-case} local config as below
     """
     enable: true
     global:
@@ -25,7 +25,7 @@ Feature: flusher kafka cpp 0.10.x
         MaxDirSearchDepth: 10
         TailingAllMatchedFiles: true
     flushers:
-      - Type: flusher_kafka_cpp
+      - Type: flusher_kafka_native
         Brokers: ["kafka:29092"]
         Topic: "test-topic-010x"
         Version: "0.10.2.1"
@@ -42,7 +42,7 @@ Feature: flusher kafka cpp 0.10.x
     """
     Given loongcollector container mount {./flusher_test_0.10.x.log} to {/root/test/1/2/3/flusher_testxxxx.log}
     Given loongcollector depends on containers {["kafka", "zookeeper"]}
-    When start docker-compose {flusher_kafka_cpp_0.10.x}
+    When start docker-compose {flusher_kafka_native_0.10.x}
     Then there is at least {1000} logs
     Then the log fields match kv
     """
