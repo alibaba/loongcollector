@@ -31,20 +31,6 @@ using namespace std;
 
 namespace logtail {
 
-#if defined(_MSC_VER)
-// Normalize Windows path by converting only the drive letter to lowercase
-// This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest of the path
-// Example: "C:\Path\To\File" -> "c:\Path\To\File"
-inline string NormalizeWindowsPath(const string& path) {
-    if (path.size() >= 2 && path[1] == ':' && isalpha(static_cast<unsigned char>(path[0]))) {
-        string normalized = path;
-        normalized[0] = tolower(static_cast<unsigned char>(path[0]));
-        return normalized;
-    }
-    return path;
-}
-#endif
-
 // basePath must not stop with '/'
 inline bool _IsSubPath(const string& basePath, const string& subPath) {
     size_t pathSize = subPath.size();
@@ -318,7 +304,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
 #else
             string excludeDir = mExcludeDirs[i];
 #endif
-            
+
             if (!filesystem::path(excludeDir).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
@@ -621,7 +607,7 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
 #else
     const string& curPath = path;
 #endif
-    
+
     size_t pos = 0;
     int16_t d = 0;
     int16_t maxWildcardDepth = mWildcardDepth + 1;

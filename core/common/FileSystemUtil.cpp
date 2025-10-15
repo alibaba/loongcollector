@@ -430,6 +430,17 @@ void Chmod(const char* filePath, mode_t mode) {
 #endif
 }
 
+#if defined(_MSC_VER)
+std::string NormalizeWindowsPath(const std::string& path) {
+    if (path.size() >= 2 && path[1] == ':' && isalpha(static_cast<unsigned char>(path[0]))) {
+        std::string normalized = path;
+        normalized[0] = toupper(static_cast<unsigned char>(path[0]));
+        return normalized;
+    }
+    return path;
+}
+#endif
+
 bool IsValidSuffix(const std::string& filename) {
     // such as compress file (*.gz) or its rollback file (*.gz.*) will be ignored
     static const std::string FILTER_LIST[] = {".gz", ".bz", ".tar"};

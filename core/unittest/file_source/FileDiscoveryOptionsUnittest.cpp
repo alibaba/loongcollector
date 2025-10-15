@@ -44,6 +44,9 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     Json::Value configJson;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+#if defined(_MSC_VER)
+    filePath = NormalizeWindowsPath(filePath.string());
+#endif
     filesystem::path ex1, ex2, ex3, ex4, ex5;
 
     // only mandatory param
@@ -121,6 +124,10 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     ex1 = filesystem::path(".") / "test" / "a.log"; // not absolute
     ex2 = filesystem::current_path() / "**" / "b.log"; // ML
     ex3 = filesystem::absolute(ex1);
+#if defined(_MSC_VER)
+    ex2 = NormalizeWindowsPath(ex2.string());
+    ex3 = NormalizeWindowsPath(ex3.string());
+#endif
     configStr = R"(
         {
             "FilePaths": [],
@@ -142,6 +149,9 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     // ExcludeFiles
     ex1 = "a.log";
     ex2 = filesystem::current_path() / "b.log"; // has path separator
+#if defined(_MSC_VER)
+    ex2 = NormalizeWindowsPath(ex2.string());
+#endif
     configStr = R"(
         {
             "FilePaths": [],
@@ -164,6 +174,12 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     ex3 = filesystem::current_path() / "a*"; // *
     ex4 = filesystem::current_path() / "a?"; // ?
     ex5 = filesystem::absolute(ex1);
+#if defined(_MSC_VER)
+    ex2 = NormalizeWindowsPath(ex2.string());
+    ex3 = NormalizeWindowsPath(ex3.string());
+    ex4 = NormalizeWindowsPath(ex4.string());
+    ex5 = NormalizeWindowsPath(ex5.string());
+#endif
     configStr = R"(
         {
             "FilePaths": [],
@@ -205,6 +221,9 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     Json::Value configJson;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+#if defined(_MSC_VER)
+    filePath = NormalizeWindowsPath(filePath.string());
+#endif
 
     // no FilePaths
     config.reset(new FileDiscoveryOptions());
@@ -224,6 +243,9 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
 
     // invalid filepath
     filePath = filesystem::current_path();
+#if defined(_MSC_VER)
+    filePath = NormalizeWindowsPath(filePath.string());
+#endif
     configStr = R"(
         {
             "FilePaths": []
@@ -248,7 +270,11 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "test").string(), config->GetBasePath());
+    filesystem::path expectedBasePath = filesystem::current_path() / "test";
+#if defined(_MSC_VER)
+    expectedBasePath = NormalizeWindowsPath(expectedBasePath.string());
+#endif
+    APSARA_TEST_EQUAL(expectedBasePath.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     configJson.clear();
 
@@ -259,13 +285,25 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test" / "?").string(), config->GetBasePath());
+    filesystem::path expectedBasePath1 = filesystem::current_path() / "*" / "test" / "?";
+    filesystem::path expectedWildcard0 = filesystem::current_path();
+    filesystem::path expectedWildcard1 = filesystem::current_path() / "*";
+    filesystem::path expectedWildcard2 = filesystem::current_path() / "*" / "test";
+    filesystem::path expectedWildcard3 = filesystem::current_path() / "*" / "test" / "?";
+#if defined(_MSC_VER)
+    expectedBasePath1 = NormalizeWindowsPath(expectedBasePath1.string());
+    expectedWildcard0 = NormalizeWindowsPath(expectedWildcard0.string());
+    expectedWildcard1 = NormalizeWindowsPath(expectedWildcard1.string());
+    expectedWildcard2 = NormalizeWindowsPath(expectedWildcard2.string());
+    expectedWildcard3 = NormalizeWindowsPath(expectedWildcard3.string());
+#endif
+    APSARA_TEST_EQUAL(expectedBasePath1.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     APSARA_TEST_EQUAL(4U, config->GetWildcardPaths().size());
-    APSARA_TEST_EQUAL(filesystem::current_path().string(), config->GetWildcardPaths()[0]);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "*").string(), config->GetWildcardPaths()[1]);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test").string(), config->GetWildcardPaths()[2]);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test" / "?").string(), config->GetWildcardPaths()[3]);
+    APSARA_TEST_EQUAL(expectedWildcard0.string(), config->GetWildcardPaths()[0]);
+    APSARA_TEST_EQUAL(expectedWildcard1.string(), config->GetWildcardPaths()[1]);
+    APSARA_TEST_EQUAL(expectedWildcard2.string(), config->GetWildcardPaths()[2]);
+    APSARA_TEST_EQUAL(expectedWildcard3.string(), config->GetWildcardPaths()[3]);
     APSARA_TEST_EQUAL(3U, config->GetConstWildcardPaths().size());
     APSARA_TEST_EQUAL("", config->GetConstWildcardPaths()[0]);
     APSARA_TEST_EQUAL("test", config->GetConstWildcardPaths()[1]);
@@ -279,7 +317,11 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(1, config->mMaxDirSearchDepth);
-    APSARA_TEST_EQUAL((filesystem::current_path() / "*" / "test").string(), config->GetBasePath());
+    filesystem::path expectedBasePath2 = filesystem::current_path() / "*" / "test";
+#if defined(_MSC_VER)
+    expectedBasePath2 = NormalizeWindowsPath(expectedBasePath2.string());
+#endif
+    APSARA_TEST_EQUAL(expectedBasePath2.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
 }
 

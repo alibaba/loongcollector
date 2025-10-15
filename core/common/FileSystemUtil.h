@@ -141,6 +141,13 @@ typedef int mode_t;
 #endif
 void Chmod(const char* filePath, mode_t mode);
 
+#if defined(_MSC_VER)
+// Normalize Windows path by converting only the drive letter to uppercase
+// This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest of the path
+// Example: "c:\Path\To\File" -> "C:\Path\To\File"
+std::string NormalizeWindowsPath(const std::string& path);
+#endif
+
 namespace fsutil {
 
 class Entry {
