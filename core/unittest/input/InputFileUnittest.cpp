@@ -22,6 +22,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/ContainerInfo.h"
 #include "file_server/FileServer.h"

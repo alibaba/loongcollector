@@ -16,6 +16,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/StaticFileServer.h"
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
