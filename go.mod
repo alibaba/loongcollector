@@ -8,7 +8,6 @@ require (
 	github.com/VictoriaMetrics/VictoriaMetrics v1.83.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/apache/pulsar-client-go v0.10.0
-	github.com/bingquanzhao/go-doris-sdk v0.0.0-20250608154242-7467dabcf56b
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
@@ -49,6 +48,7 @@ require (
 	github.com/prometheus/procfs v0.8.0
 	github.com/prometheus/prometheus v1.8.2-0.20210430082741-2a4b8e12bbf2
 	github.com/pyroscope-io/pyroscope v1.5.0
+	github.com/selectdb/go-doris-sdk v0.0.0-20250608154242-7467dabcf56b
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	github.com/smartystreets/goconvey v1.7.2
@@ -293,7 +293,6 @@ replace (
 	github.com/VictoriaMetrics/metrics => github.com/iLogtail/metrics v1.23.0-ilogtail
 	github.com/alibaba/ilogtail/pkg => ./pkg
 	github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner => ./external/github.com/aliyun/alibaba-cloud-sdk-go/services/sls_inner
-	github.com/bingquanzhao/go-doris-sdk => ./external/go-doris-sdk
 	github.com/elastic/beats/v7 => ./external/github.com/elastic/beats/v7
 	github.com/jeromer/syslogparser => ./external/github.com/jeromer/syslogparser
 	github.com/mindprince/gonvml => github.com/iLogtail/gonvml v1.0.0
@@ -303,5 +302,6 @@ replace (
 	github.com/pyroscope-io/jfr-parser => github.com/iLogtail/jfr-parser v0.6.0
 	github.com/pyroscope-io/pyroscope => github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
+	github.com/selectdb/go-doris-sdk => ./external/github.com/selectdb/go-doris-sdk
 	github.com/streadway/handy => github.com/iLogtail/handy v0.0.0-20230327021402-6a47ec586270
 )

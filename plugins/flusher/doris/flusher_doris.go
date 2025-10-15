@@ -27,7 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
-	"github.com/bingquanzhao/go-doris-sdk/pkg/load"
+	"github.com/selectdb/go-doris-sdk/pkg/load"
 )
 
 // FlusherDoris implements a data flusher that sends logs to Apache Doris via Stream Load.

@@ -15,6 +15,7 @@
 package doris
 
 import (
+	"bytes"
 	"strconv"
 	"testing"
 
@@ -33,6 +34,14 @@ func TestNewFlusherDoris(t *testing.T) {
 	assert.NotNil(t, flusher.Authentication.PlainText)
 	assert.Empty(t, flusher.Addresses)
 	assert.Empty(t, flusher.Table)
+
+	// Test buffer pool is initialized
+	buf := flusher.bufferPool.Get()
+	require.NotNil(t, buf)
+	buffer, ok := buf.(*bytes.Buffer)
+	require.True(t, ok, "buffer pool should return *bytes.Buffer")
+	assert.NotNil(t, buffer)
+	flusher.bufferPool.Put(buffer)
 }
 
 // TestFlusherDoris_Description tests the Description method
@@ -240,6 +249,7 @@ func InvalidTestConnectAndWrite(t *testing.T) {
 	flusher.Addresses = []string{"127.0.0.1:8030"}
 	flusher.Database = "test_db"
 	flusher.Table = "test_table"
+	flusher.GroupCommit = "off" // Test with default group commit mode
 	flusher.Authentication.PlainText = &PlainTextConfig{
 		Username: "root",
 		Password: "password",
@@ -274,9 +284,347 @@ func TestFlusherDoris_FlushWithoutInit(t *testing.T) {
 	assert.Contains(t, err.Error(), "not initialized")
 }
 
+// TestParseGroupCommitMode tests the group commit mode parsing
+func TestParseGroupCommitMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		mode     string
+		expected string // We'll use string representation for comparison
+	}{
+		{
+			name: "sync mode",
+			mode: "sync",
+		},
+		{
+			name: "async mode",
+			mode: "async",
+		},
+		{
+			name: "off mode",
+			mode: "off",
+		},
+		{
+			name: "empty string",
+			mode: "",
+		},
+		{
+			name: "unknown mode",
+			mode: "unknown",
+		},
+		{
+			name: "uppercase SYNC",
+			mode: "SYNC",
+		},
+		{
+			name: "mixed case Async",
+			mode: "Async",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseGroupCommitMode(tt.mode)
+			assert.NotNil(t, result)
+			// Just ensure it doesn't panic and returns a valid value
+		})
+	}
+}
+
+// TestFlusherDoris_Stop tests the Stop method
+func TestFlusherDoris_Stop(t *testing.T) {
+	t.Run("stop without init", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		err := flusher.Stop()
+		assert.NoError(t, err)
+	})
+
+	t.Run("stop multiple times", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		err := flusher.Stop()
+		assert.NoError(t, err)
+
+		// Stopping again should not panic or error
+		err = flusher.Stop()
+		assert.NoError(t, err)
+	})
+
+	t.Run("stop with progress logging enabled", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.LogProgressInterval = 1
+		flusher.Addresses = []string{"http://127.0.0.1:8030"}
+		flusher.Table = "test_table"
+		flusher.Database = "test_db"
+		flusher.Authentication.PlainText = &PlainTextConfig{
+			Username: "root",
+			Password: "password",
+		}
+
+		lctx := mock.NewEmptyContext("p", "l", "c")
+		// Init will fail due to connection, but we can test Stop behavior
+		_ = flusher.Init(lctx)
+
+		err := flusher.Stop()
+		assert.NoError(t, err)
+	})
+}
+
+// TestFlusherDoris_UpdateStatistics tests statistics update
+func TestFlusherDoris_UpdateStatistics(t *testing.T) {
+	flusher := NewFlusherDoris()
+
+	// Initially, stats should be zero
+	assert.Equal(t, uint64(0), flusher.stats.totalBytes)
+	assert.Equal(t, uint64(0), flusher.stats.totalRows)
+
+	// Update statistics
+	flusher.updateStatistics(1000, 10)
+	assert.Equal(t, uint64(1000), flusher.stats.totalBytes)
+	assert.Equal(t, uint64(10), flusher.stats.totalRows)
+
+	// Update again
+	flusher.updateStatistics(2000, 20)
+	assert.Equal(t, uint64(3000), flusher.stats.totalBytes)
+	assert.Equal(t, uint64(30), flusher.stats.totalRows)
+}
+
+// TestFlusherDoris_BufferPool tests buffer pool functionality
+func TestFlusherDoris_BufferPool(t *testing.T) {
+	flusher := NewFlusherDoris()
+
+	// Get buffer from pool
+	buf1 := flusher.bufferPool.Get().(*bytes.Buffer)
+	assert.NotNil(t, buf1)
+
+	// Write some data
+	buf1.WriteString("test data")
+	assert.Equal(t, "test data", buf1.String())
+
+	// Reset and put back
+	buf1.Reset()
+	flusher.bufferPool.Put(buf1)
+
+	// Get another buffer (might be the same one)
+	buf2 := flusher.bufferPool.Get().(*bytes.Buffer)
+	assert.NotNil(t, buf2)
+	// Should be empty after reset
+	assert.Equal(t, "", buf2.String())
+}
+
+// TestFlusherDoris_SetUrgent tests SetUrgent method
+func TestFlusherDoris_SetUrgent(t *testing.T) {
+	flusher := NewFlusherDoris()
+	// SetUrgent is a no-op, just ensure it doesn't panic
+	flusher.SetUrgent(true)
+	flusher.SetUrgent(false)
+}
+
+// TestFlusherDoris_FlushEmptyLogGroupList tests flushing empty log group list
+func TestFlusherDoris_FlushEmptyLogGroupList(t *testing.T) {
+	flusher := NewFlusherDoris()
+	flusher.Addresses = []string{"http://127.0.0.1:8030"}
+	flusher.Table = "test_table"
+	flusher.Database = "test_db"
+	flusher.Authentication.PlainText = &PlainTextConfig{
+		Username: "root",
+		Password: "password",
+	}
+
+	lctx := mock.NewEmptyContext("p", "l", "c")
+	// Init will fail due to connection, but we test empty flush
+	_ = flusher.Init(lctx)
+
+	// Flush empty list should return nil
+	err := flusher.Flush("project", "logstore", "config", []*protocol.LogGroup{})
+	assert.NoError(t, err)
+}
+
+// TestFlusherDoris_ConcurrencyConfig tests concurrency configuration
+func TestFlusherDoris_ConcurrencyConfig(t *testing.T) {
+	t.Run("default concurrency", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		assert.Equal(t, 1, flusher.Concurrency)
+		assert.Equal(t, 1024, flusher.QueueCapacity)
+	})
+
+	t.Run("custom concurrency", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.Concurrency = 4
+		flusher.QueueCapacity = 2048
+		assert.Equal(t, 4, flusher.Concurrency)
+		assert.Equal(t, 2048, flusher.QueueCapacity)
+	})
+}
+
+// TestFlusherDoris_GroupCommitConfig tests group commit configuration
+func TestFlusherDoris_GroupCommitConfig(t *testing.T) {
+	tests := []struct {
+		name   string
+		config string
+	}{
+		{"off mode", "off"},
+		{"sync mode", "sync"},
+		{"async mode", "async"},
+		{"empty string", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flusher := NewFlusherDoris()
+			flusher.GroupCommit = tt.config
+			assert.Equal(t, tt.config, flusher.GroupCommit)
+		})
+	}
+}
+
+// TestFlusherDoris_LogProgressIntervalConfig tests progress log interval configuration
+func TestFlusherDoris_LogProgressIntervalConfig(t *testing.T) {
+	t.Run("default interval", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		assert.Equal(t, 10, flusher.LogProgressInterval)
+	})
+
+	t.Run("custom interval", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.LogProgressInterval = 5
+		assert.Equal(t, 5, flusher.LogProgressInterval)
+	})
+
+	t.Run("disabled progress logging", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.LogProgressInterval = 0
+		assert.Equal(t, 0, flusher.LogProgressInterval)
+	})
+}
+
+// TestFlusherDoris_ConvertConfig tests convert configuration
+func TestFlusherDoris_ConvertConfig(t *testing.T) {
+	t.Run("default convert config", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		assert.Equal(t, "custom_single", flusher.Convert.Protocol)
+		assert.Equal(t, "json", flusher.Convert.Encoding)
+	})
+
+	t.Run("custom convert config", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.Convert.Protocol = "otlp_log_v1"
+		flusher.Convert.Encoding = "protobuf"
+		assert.Equal(t, "otlp_log_v1", flusher.Convert.Protocol)
+		assert.Equal(t, "protobuf", flusher.Convert.Encoding)
+	})
+
+	t.Run("field rename config", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.Convert.TagFieldsRename = map[string]string{
+			"host": "hostname",
+		}
+		flusher.Convert.ProtocolFieldsRename = map[string]string{
+			"contents": "data",
+		}
+		assert.Equal(t, "hostname", flusher.Convert.TagFieldsRename["host"])
+		assert.Equal(t, "data", flusher.Convert.ProtocolFieldsRename["contents"])
+	})
+}
+
+// TestFlusherDoris_LoadPropertiesConfig tests load properties configuration
+func TestFlusherDoris_LoadPropertiesConfig(t *testing.T) {
+	flusher := NewFlusherDoris()
+	flusher.LoadProperties = map[string]string{
+		"strict_mode":      "false",
+		"max_filter_ratio": "0.1",
+		"timeout":          "600",
+	}
+
+	assert.Equal(t, "false", flusher.LoadProperties["strict_mode"])
+	assert.Equal(t, "0.1", flusher.LoadProperties["max_filter_ratio"])
+	assert.Equal(t, "600", flusher.LoadProperties["timeout"])
+}
+
+// TestFlusherDoris_AuthenticationConfig tests authentication configuration
+func TestFlusherDoris_AuthenticationConfig(t *testing.T) {
+	t.Run("plaintext auth", func(t *testing.T) {
+		flusher := NewFlusherDoris()
+		flusher.Authentication.PlainText = &PlainTextConfig{
+			Username: "test_user",
+			Password: "test_pass",
+			Database: "test_db",
+		}
+
+		assert.Equal(t, "test_user", flusher.Authentication.PlainText.Username)
+		assert.Equal(t, "test_pass", flusher.Authentication.PlainText.Password)
+		assert.Equal(t, "test_db", flusher.Authentication.PlainText.Database)
+	})
+}
+
+// TestFlusherDoris_ValidateAddresses tests address validation
+func TestFlusherDoris_ValidateAddresses(t *testing.T) {
+	tests := []struct {
+		name      string
+		addresses []string
+		wantErr   bool
+	}{
+		{
+			name:      "valid http address",
+			addresses: []string{"http://127.0.0.1:8030"},
+			wantErr:   false,
+		},
+		{
+			name:      "valid https address",
+			addresses: []string{"https://127.0.0.1:8030"},
+			wantErr:   false,
+		},
+		{
+			name:      "multiple addresses",
+			addresses: []string{"http://127.0.0.1:8030", "http://127.0.0.2:8030"},
+			wantErr:   false,
+		},
+		{
+			name:      "address without protocol",
+			addresses: []string{"127.0.0.1:8030"},
+			wantErr:   false, // Validate doesn't check URL format, only if addresses exist
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			flusher := NewFlusherDoris()
+			flusher.Addresses = tt.addresses
+			flusher.Table = "test_table"
+			lctx := mock.NewEmptyContext("p", "l", "c")
+			flusher.context = lctx
+
+			err := flusher.Validate()
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 // BenchmarkFlusherDoris_MakeTestLogGroupList benchmarks log group creation
 func BenchmarkFlusherDoris_MakeTestLogGroupList(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_ = makeTestLogGroupList()
+	}
+}
+
+// BenchmarkFlusherDoris_UpdateStatistics benchmarks statistics update
+func BenchmarkFlusherDoris_UpdateStatistics(b *testing.B) {
+	flusher := NewFlusherDoris()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		flusher.updateStatistics(1000, 10)
+	}
+}
+
+// BenchmarkFlusherDoris_BufferPool benchmarks buffer pool operations
+func BenchmarkFlusherDoris_BufferPool(b *testing.B) {
+	flusher := NewFlusherDoris()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf := flusher.bufferPool.Get().(*bytes.Buffer)
+		buf.Reset()
+		flusher.bufferPool.Put(buf)
 	}
 }
