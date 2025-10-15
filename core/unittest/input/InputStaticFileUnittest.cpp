@@ -699,9 +699,6 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         { ofstream fout("test_logs/notstem/test3.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/app.*/subdir/*.log");
-#if defined(_MSC_VER)
-        filePath = NormalizeWindowsPath(filePath.string());
-#endif
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -731,9 +728,6 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         { ofstream fout("test_logs/release.2024.01.16/logs/app.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/release.*/logs/**/*.log");
-#if defined(_MSC_VER)
-        filePath = NormalizeWindowsPath(filePath.string());
-#endif
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -761,9 +755,6 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         { ofstream fout("test_logs/node_modules.backup/lib/test.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/node_modules.backup/lib/*.log");
-#if defined(_MSC_VER)
-        filePath = NormalizeWindowsPath(filePath.string());
-#endif
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
