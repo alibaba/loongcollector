@@ -90,14 +90,6 @@ public:
     void ClearCheckpoint(const std::string& configName, size_t configIndex);
     
     /**
-     * @brief 检查是否存在checkpoint
-     * @param configName 配置名称
-     * @param configIndex 配置索引
-     * @return 是否存在
-     */
-    bool HasCheckpoint(const std::string& configName, size_t configIndex) const;
-    
-    /**
      * @brief 批量保存所有变更的checkpoint到磁盘
      * @param forceAll 是否强制保存所有checkpoint（忽略changed标志）
      * @return 保存的checkpoint数量
@@ -118,15 +110,6 @@ public:
      */
     size_t ClearConfigCheckpoints(const std::string& configName);
     
-    /**
-     * @brief 获取当前缓存的checkpoint数量
-     */
-    size_t GetCheckpointCount() const;
-    
-    /**
-     * @brief 获取变更的checkpoint数量（需要持久化）
-     */
-    size_t GetChangedCheckpointCount() const;
 
     /**
      * @brief 从磁盘加载checkpoint（初始化时调用）

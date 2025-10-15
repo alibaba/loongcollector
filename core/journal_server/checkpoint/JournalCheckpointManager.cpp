@@ -18,7 +18,6 @@
 #include "logger/Logger.h"
 #include "app_config/AppConfig.h"
 #include <sstream>
-#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iterator>
@@ -236,12 +235,6 @@ std::string JournalCheckpointManager::GetCheckpoint(const std::string& configNam
     return "";  // 如果不存在返回空字符串
 }
 
-bool JournalCheckpointManager::HasCheckpoint(const std::string& configName, size_t configIndex) const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    
-    std::string key = makeCheckpointKey(configName, configIndex);
-    return mCheckpoints.find(key) != mCheckpoints.end();
-}
 
 void JournalCheckpointManager::ClearCheckpoint(const std::string& configName, size_t configIndex) {
     std::lock_guard<std::mutex> lock(mMutex);
@@ -366,20 +359,5 @@ size_t JournalCheckpointManager::ClearConfigCheckpoints(const std::string& confi
     return cleanedCount;
 }
 
-//=============================================================================
-// 4. 状态监控层
-//=============================================================================
-
-size_t JournalCheckpointManager::GetCheckpointCount() const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    return mCheckpoints.size();
-}
-
-size_t JournalCheckpointManager::GetChangedCheckpointCount() const {
-    std::lock_guard<std::mutex> lock(mMutex);
-    
-    return std::count_if(mCheckpoints.begin(), mCheckpoints.end(),
-                        [](const auto& pair) { return pair.second->changed; });
-}
 
 } // namespace logtail 
