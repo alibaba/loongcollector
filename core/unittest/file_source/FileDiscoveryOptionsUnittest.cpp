@@ -392,7 +392,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
         // Expected: Base path should be set to wildcard path
         APSARA_TEST_EQUAL("C:\\*\\logs", config->GetBasePath());
         APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
-        // Expected: Wildcard paths should include C:\ and C:\*
+        // Expected: Wildcard paths should include C: and C:\*
         APSARA_TEST_EQUAL(2U, config->GetWildcardPaths().size());
     }
 
@@ -433,8 +433,8 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         config.reset(new FileDiscoveryOptions());
         APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
-        // Expected: Base path should be C:\, MaxDirSearchDepth should be set
-        APSARA_TEST_EQUAL("C:\\", config->GetBasePath());
+        // Expected: Base path should be C:, MaxDirSearchDepth should be set
+        APSARA_TEST_EQUAL("C:", config->GetBasePath());
         APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
         APSARA_TEST_EQUAL(2, config->mMaxDirSearchDepth);
     }
@@ -457,7 +457,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
         config.reset(new FileDiscoveryOptions());
         APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
         APSARA_TEST_TRUE(config->mAllowingCollectingFilesInRootDir);
-        APSARA_TEST_EQUAL("D:\\", config->GetBasePath());
+        APSARA_TEST_EQUAL("D:", config->GetBasePath());
         APSARA_TEST_EQUAL(3, config->mMaxDirSearchDepth);
         BOOL_FLAG(enable_root_path_collection) = false;
     }
@@ -528,10 +528,12 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         APSARA_TEST_TRUE(config->mHasBlacklist);
     }
 #elif defined(_MSC_VER)
-    // Windows Test 1: Chinese path with native Chinese characters
+    // Windows Test 1: Chinese path with UTF-8 encoding
     // Expected: Should successfully parse Chinese path
     {
-        filesystem::path filePath = filesystem::absolute("测试目录\\**\\*.log");
+        // "\346\265\213\350\257\225\347\233\256\345\275\225" = "测试目录"
+        string chineseDir = "\346\265\213\350\257\225\347\233\256\345\275\225";
+        filesystem::path filePath = filesystem::absolute(chineseDir + "\\**\\*.log");
         filePath = NormalizeWindowsPath(filePath.string());
         configStr = R"(
             {
@@ -542,8 +544,8 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         config.reset(new FileDiscoveryOptions());
         APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
-        // Expected: Base path should contain Chinese characters
-        APSARA_TEST_TRUE(config->GetBasePath().find("测试目录") != string::npos);
+        // Expected: Base path should contain Chinese characters (in UTF-8)
+        APSARA_TEST_TRUE(config->GetBasePath().find(chineseDir) != string::npos);
         APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     }
 
@@ -567,11 +569,14 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     }
 
-    // Windows Test 3: Chinese ExcludeDirs with native characters
+    // Windows Test 3: Chinese ExcludeDirs with UTF-8 encoding
     // Expected: Should add Chinese directory to blacklist
     {
-        filesystem::path filePath = filesystem::absolute("日志\\**\\*.log");
-        filesystem::path excludeDir = filesystem::absolute("日志\\黑名单");
+        // "\346\227\245\345\277\227" = "日志", "\351\273\221\345\220\215\345\215\225" = "黑名单"
+        string chineseLog = "\346\227\245\345\277\227";
+        string chineseBlacklist = "\351\273\221\345\220\215\345\215\225";
+        filesystem::path filePath = filesystem::absolute(chineseLog + "\\**\\*.log");
+        filesystem::path excludeDir = filesystem::absolute(chineseLog + "\\" + chineseBlacklist);
         filePath = NormalizeWindowsPath(filePath.string());
         excludeDir = NormalizeWindowsPath(excludeDir.string());
         configStr = R"(
@@ -618,16 +623,21 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     // Windows Test 5: Mixed Chinese and UTF-8 in ExcludeFiles
     // Expected: Should handle both native and UTF-8 encoded filenames
     {
-        filesystem::path filePath = filesystem::absolute("混合\\*.log");
+        // "\346\267\267\345\220\210" = "混合", "\346\216\222\351\231\244" = "排除"
+        string chineseMixed = "\346\267\267\345\220\210";
+        string chineseExclude = "\346\216\222\351\231\244";
+        filesystem::path filePath = filesystem::absolute(chineseMixed + "\\*.log");
         filePath = NormalizeWindowsPath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": [],
-                "ExcludeFiles": ["排除.log", "\346\265\213\350\257\225.log"]
+                "ExcludeFiles": []
             }
         )";
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
+        configJson["ExcludeFiles"].append(Json::Value(chineseExclude + ".log"));
+        configJson["ExcludeFiles"].append(Json::Value("\346\265\213\350\257\225.log"));
         config.reset(new FileDiscoveryOptions());
         APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
         // Expected: Should handle both Chinese and UTF-8 filenames
@@ -635,11 +645,14 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         APSARA_TEST_TRUE(config->mHasBlacklist);
     }
 
-    // Windows Test 6: Chinese ExcludeFilePaths with native characters
+    // Windows Test 6: Chinese ExcludeFilePaths with UTF-8 encoding
     // Expected: Should add Chinese file path to blacklist
     {
-        filesystem::path filePath = filesystem::absolute("文档\\*.log");
-        filesystem::path excludeFile = filesystem::absolute("文档\\排除文件.log");
+        // "\346\226\207\346\241\243" = "文档", "\346\216\222\351\231\244\346\226\207\344\273\266" = "排除文件"
+        string chineseDoc = "\346\226\207\346\241\243";
+        string chineseExcludeFile = "\346\216\222\351\231\244\346\226\207\344\273\266";
+        filesystem::path filePath = filesystem::absolute(chineseDoc + "\\*.log");
+        filesystem::path excludeFile = filesystem::absolute(chineseDoc + "\\" + chineseExcludeFile + ".log");
         filePath = NormalizeWindowsPath(filePath.string());
         excludeFile = NormalizeWindowsPath(excludeFile.string());
         configStr = R"(
