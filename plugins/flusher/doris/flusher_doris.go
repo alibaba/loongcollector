@@ -69,6 +69,9 @@ type FlusherDoris struct {
 	queue     chan []*protocol.LogGroup
 	counter   sync.WaitGroup
 	workersWg sync.WaitGroup // Separate WaitGroup for async workers
+
+	// Ensure Stop() is only called once
+	stopOnce sync.Once
 }
 
 // statistics holds the metrics for progress logging
@@ -278,17 +281,27 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 }
 
 // addTask adds a flush task to the queue for async processing
+// This method will BLOCK if the queue is full, ensuring NO DATA LOSS
 func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
 	f.counter.Add(1)
 
+	// First, try non-blocking send to detect queue congestion
 	select {
 	case f.queue <- logGroupList:
+		// Successfully sent without blocking
 		return nil
 	default:
-		f.counter.Done()
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
-			"doris flusher queue is full, data dropped, queue capacity", f.QueueCapacity)
-		return fmt.Errorf("doris flusher queue is full")
+		// Queue is full, log warning and then block
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_QUEUE_FULL",
+			"doris flusher queue is full, blocking until space available",
+			"queueCapacity", f.QueueCapacity,
+			"concurrency", f.Concurrency,
+			"suggestion", "consider increasing Concurrency or QueueCapacity")
+
+		// Now block until queue has space - NEVER drop data
+		// This creates backpressure to upstream components when system is overloaded
+		f.queue <- logGroupList
+		return nil
 	}
 }
 
@@ -354,7 +367,10 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 	reader := bytes.NewReader(dataToLoad)
 
 	// Load all data to Doris in a single batch
-	logger.Debug(f.context.GetRuntimeContext(), "Loading data to Doris", "logGroupCount", len(logGroupList), "totalLogCount", totalLogCount, "dataSize", len(dataToLoad))
+	logger.Info(f.context.GetRuntimeContext(), "Loading data to Doris",
+		"logGroupCount", len(logGroupList),
+		"totalLogCount", totalLogCount,
+		"dataSize", len(dataToLoad))
 	response, err := f.dorisClient.Load(reader)
 
 	if err != nil {
@@ -388,27 +404,30 @@ func (f *FlusherDoris) IsReady(projectName string, logstoreName string, logstore
 func (f *FlusherDoris) SetUrgent(flag bool) {}
 
 func (f *FlusherDoris) Stop() error {
-	// Stop progress logging first
-	if f.progressTicker != nil {
-		close(f.stopChan)
-		f.progressTicker.Stop()
-		f.progressWg.Wait() // Wait for progress logging goroutine to exit
-		logger.Debug(f.context.GetRuntimeContext(), "Doris flusher progress logging stopped")
-	}
+	// Ensure Stop() is only executed once to avoid panic from closing channels twice
+	f.stopOnce.Do(func() {
+		// Stop progress logging first
+		if f.progressTicker != nil {
+			close(f.stopChan)
+			f.progressTicker.Stop()
+			f.progressWg.Wait() // Wait for progress logging goroutine to exit
+			logger.Debug(f.context.GetRuntimeContext(), "Doris flusher progress logging stopped")
+		}
 
-	// Stop async workers if running
-	if f.Concurrency > 1 && f.queue != nil {
-		// Wait for all pending tasks to be added
-		f.counter.Wait()
+		// Stop async workers if running
+		if f.Concurrency > 1 && f.queue != nil {
+			// Wait for all pending tasks to be added
+			f.counter.Wait()
 
-		// Close queue to signal workers to exit
-		close(f.queue)
+			// Close queue to signal workers to exit
+			close(f.queue)
 
-		// Wait for all workers to finish
-		f.workersWg.Wait()
+			// Wait for all workers to finish
+			f.workersWg.Wait()
 
-		logger.Info(f.context.GetRuntimeContext(), "Doris flusher async workers stopped")
-	}
+			logger.Info(f.context.GetRuntimeContext(), "Doris flusher async workers stopped")
+		}
+	})
 
 	return nil
 }
