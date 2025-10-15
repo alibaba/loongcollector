@@ -22,6 +22,9 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#if defined(_MSC_VER)
+#include "common/FileSystemUtil.h"
+#endif
 #include "common/JsonUtil.h"
 #include "file_server/ContainerInfo.h"
 #include "file_server/FileServer.h"
