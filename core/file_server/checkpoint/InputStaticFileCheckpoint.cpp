@@ -17,6 +17,10 @@
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
+#if defined(_MSC_VER)
+#include "common/EncodingConverter.h"
+#include "common/FileSystemUtil.h"
+#endif
 
 using namespace std;
 
@@ -269,6 +273,10 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".filepath", filepath, *errMsg)) {
             return false;
         }
+#if defined(_MSC_VER)
+        filepath = EncodingConverter::GetInstance()->FromUTF8ToACP(filepath);
+        filepath = NormalizeWindowsPath(filepath);
+#endif
         cpt.mFilePath = filepath;
 
         string statusStr;
