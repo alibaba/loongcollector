@@ -236,6 +236,18 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 		return fmt.Errorf("doris client not initialized")
 	}
 
+	if len(logGroupList) == 0 {
+		return nil
+	}
+
+	// Get buffer from pool to reduce allocations
+	buffer := f.bufferPool.Get().(*bytes.Buffer)
+	buffer.Reset() // Reset buffer for reuse
+	defer f.bufferPool.Put(buffer)
+
+	totalLogCount := 0
+
+	// Merge all LogGroups into a single batch
 	for _, logGroup := range logGroupList {
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 
@@ -246,56 +258,47 @@ func (f *FlusherDoris) Flush(projectName string, logstoreName string, configName
 			continue
 		}
 
-		// Get buffer from pool to reduce allocations
-		buffer := f.bufferPool.Get().(*bytes.Buffer)
-		buffer.Reset() // Reset buffer for reuse
-
-		logCount := 0
+		// Append all logs to the same buffer
 		for _, log := range serializedLogs.([][]byte) {
 			buffer.Write(log)
 			buffer.WriteByte('\n') // Add newline separator for JSON object line format
-			logCount++
+			totalLogCount++
 		}
+	}
 
-		if buffer.Len() == 0 {
-			logger.Debug(f.context.GetRuntimeContext(), "No logs to flush")
-			f.bufferPool.Put(buffer) // Return buffer to pool
-			continue
-		}
+	if buffer.Len() == 0 {
+		logger.Debug(f.context.GetRuntimeContext(), "No logs to flush")
+		return nil
+	}
 
-		// Create a bytes.Reader from buffer data to support seeking
-		// bytes.Reader supports io.Seeker, so SDK won't buffer internally
-		dataToLoad := buffer.Bytes()
-		reader := bytes.NewReader(dataToLoad)
+	// Create a bytes.Reader from buffer data to support seeking
+	// bytes.Reader supports io.Seeker, so SDK won't buffer internally
+	dataToLoad := buffer.Bytes()
+	reader := bytes.NewReader(dataToLoad)
 
-		// Load data to Doris using SDK
-		logger.Debug(f.context.GetRuntimeContext(), "Loading data to Doris", "logCount", logCount, "dataSize", len(dataToLoad))
-		response, err := f.dorisClient.Load(reader)
+	// Load all data to Doris in a single batch
+	logger.Debug(f.context.GetRuntimeContext(), "Loading data to Doris", "logGroupCount", len(logGroupList), "totalLogCount", totalLogCount, "dataSize", len(dataToLoad))
+	response, err := f.dorisClient.Load(reader)
 
-		// Return buffer to pool after Load completes
-		// IMPORTANT: Must be after Load() because reader references buffer's underlying data
-		f.bufferPool.Put(buffer)
+	if err != nil {
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush doris load fail, error", err)
+		return fmt.Errorf("failed to load data to doris: %w", err)
+	}
 
-		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush doris load fail, error", err)
-			return fmt.Errorf("failed to load data to doris: %w", err)
-		}
+	if response.Status == load.SUCCESS {
+		logger.Infof(f.context.GetRuntimeContext(), "Doris load success, loadedRows: %d, loadBytes: %d, loadTimeMs: %d, label: %s",
+			response.Resp.NumberLoadedRows,
+			response.Resp.LoadBytes,
+			response.Resp.LoadTimeMs,
+			response.Resp.Label)
 
-		if response.Status == load.SUCCESS {
-			logger.Infof(f.context.GetRuntimeContext(), "Doris load success, loadedRows: %d, loadBytes: %d, loadTimeMs: %d, label: %s",
-				response.Resp.NumberLoadedRows,
-				response.Resp.LoadBytes,
-				response.Resp.LoadTimeMs,
-				response.Resp.Label)
-
-			// Update statistics
-			f.updateStatistics(uint64(response.Resp.LoadBytes), uint64(response.Resp.NumberLoadedRows))
-		} else {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
-				"doris load failed with status", response.Status,
-				"message", response.ErrorMessage)
-			return fmt.Errorf("doris load failed: %s", response.ErrorMessage)
-		}
+		// Update statistics
+		f.updateStatistics(uint64(response.Resp.LoadBytes), uint64(response.Resp.NumberLoadedRows))
+	} else {
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
+			"doris load failed with status", response.Status,
+			"message", response.ErrorMessage)
+		return fmt.Errorf("doris load failed: %s", response.ErrorMessage)
 	}
 
 	return nil
