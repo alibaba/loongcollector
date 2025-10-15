@@ -115,7 +115,7 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
 
     auto srcFilePathW = std::wstring(dump_path) + minidump_id + L".dmp";
     std::string srcFilePath(srcFilePathW.begin(), srcFilePathW.end());
-    
+
     // Backup the dump file to the execution directory with a fixed name
     auto backupFilePath = AppConfig::GetInstance()->GetProcessExecutionDir() + "crash_dump.dmp";
     // Remove old backup if exists
@@ -128,7 +128,7 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
         fseek(srcFile, 0, SEEK_END);
         long fileSize = ftell(srcFile);
         fseek(srcFile, 0, SEEK_SET);
-        
+
         std::vector<char> buffer(fileSize);
         if (fread(buffer.data(), 1, fileSize, srcFile) == fileSize) {
             FILE* backupFile = fopen(backupFilePath.c_str(), "wb");
@@ -142,7 +142,7 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
         }
         fclose(srcFile);
     }
-    
+
     if (rename(srcFilePath.c_str(), trgFilePath.c_str())) {
         printf("Rename %s to %s failed: %d", srcFilePath.c_str(), trgFilePath.c_str(), errno);
         return false;
@@ -185,16 +185,18 @@ std::string GetCrashBackTrace() {
     // For Windows, don't read the dump content, just return a hint message
     fclose(pStackFile);
     remove(stackFilePath.c_str());
-    
+
     // Return a message with the backup dump file path
     auto backupFilePath = AppConfig::GetInstance()->GetProcessExecutionDir() + "crash_dump.dmp";
-    std::string hint = "Crash dump file has been saved. Please use debugging tools (e.g., WinDbg, Visual Studio) to analyze the dump file at: " + backupFilePath;
+    std::string hint = "Crash dump file has been saved. Please use debugging tools (e.g., WinDbg, Visual Studio) to "
+                       "analyze the dump file at: "
+        + backupFilePath;
     return hint;
 #elif defined(__linux__)
     const int MAX_FILE_SIZE = 1024 * 10;
     char buf[MAX_FILE_SIZE + 1];
     memset(buf, 0, MAX_FILE_SIZE + 1);
-    
+
     auto len = fread(buf, 1, MAX_FILE_SIZE, pStackFile);
     fflush(pStackFile);
     fclose(pStackFile);
