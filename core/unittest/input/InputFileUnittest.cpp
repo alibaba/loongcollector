@@ -74,9 +74,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-#if defined(_MSC_VER)
-    filePath = NormalizeWindowsPath(filePath.string());
-#endif
+    filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
     configStr = R"(
@@ -199,9 +197,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-#if defined(_MSC_VER)
-    filePath = NormalizeWindowsPath(filePath.string());
-#endif
+    filePath = NormalizeNativePath(filePath.string());
 
     configStr = R"(
             {
@@ -273,9 +269,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-#if defined(_MSC_VER)
-    filePath = NormalizeWindowsPath(filePath.string());
-#endif
+    filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
         configStr = R"(
@@ -481,9 +475,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-#if defined(_MSC_VER)
-    filePath = NormalizeWindowsPath(filePath.string());
-#endif
+    filePath = NormalizeNativePath(filePath.string());
 
     configStr = R"(
         {

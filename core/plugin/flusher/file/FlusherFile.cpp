@@ -15,10 +15,6 @@
 #include "plugin/flusher/file/FlusherFile.h"
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
-#if defined(_MSC_VER)
-#include "common/EncodingConverter.h"
-#include "common/FileSystemUtil.h"
-#endif
 
 using namespace std;
 
@@ -43,10 +39,7 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-#if defined(_MSC_VER)
-    mFilePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePath);
-    mFilePath = NormalizeWindowsPath(mFilePath);
-#endif
+    mFilePath = PathToNative(mFilePath);
     // MaxFileSize
     GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles

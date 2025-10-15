@@ -172,12 +172,10 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                            ctx.GetLogstoreName(),
                            ctx.GetRegion());
     }
-#if defined(_MSC_VER)
-    mBasePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mBasePath);
-    mBasePath = NormalizeWindowsPath(mBasePath);
-    mFilePattern = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePattern);
-    // File patterns don't have drive letters, no normalization needed
-#endif
+    // Convert to native platform encoding
+    mBasePath = PathToNative(mBasePath);
+    mFilePattern = PathToNative(mFilePattern);
+
     size_t len = mBasePath.size();
     if (len > 2 && mBasePath[len - 1] == '*' && mBasePath[len - 2] == '*'
         && mBasePath[len - 3] == filesystem::path::preferred_separator) {
@@ -234,12 +232,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeFilePaths.size(); ++i) {
-#if defined(_MSC_VER)
-            string excludeFilePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFilePaths[i]);
-            excludeFilePath = NormalizeWindowsPath(excludeFilePath);
-#else
-            const string& excludeFilePath = mExcludeFilePaths[i];
-#endif
+            string excludeFilePath = PathToNative(mExcludeFilePaths[i]);
             if (!filesystem::path(excludeFilePath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
@@ -283,13 +276,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                                      ctx.GetRegion());
                 continue;
             }
-#if defined(_MSC_VER)
-            string excludeFileName = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeFiles[i]);
-            // File names don't have drive letters, but apply encoding conversion
-#else
-            const string& excludeFileName = mExcludeFiles[i];
-#endif
-            mFileNameBlacklist.push_back(excludeFileName);
+            mFileNameBlacklist.push_back(PathToNative(mExcludeFiles[i]));
         }
     }
 
@@ -305,12 +292,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeDirs.size(); ++i) {
-#if defined(_MSC_VER)
-            string excludeDir = EncodingConverter::GetInstance()->FromUTF8ToACP(mExcludeDirs[i]);
-            excludeDir = NormalizeWindowsPath(excludeDir);
-#else
-            string excludeDir = mExcludeDirs[i];
-#endif
+            string excludeDir = PathToNative(mExcludeDirs[i]);
 
             if (!filesystem::path(excludeDir).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
@@ -459,24 +441,20 @@ bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
         return false;
     }
 
-#if defined(_MSC_VER)
-    const string curDir = NormalizeWindowsPath(dir);
-#else
-    const string& curDir = dir;
-#endif
+    const string nativeDir = NormalizeNativePath(dir);
 
     for (auto& dp : mDirPathBlacklist) {
-        if (_IsSubPath(dp, curDir)) {
+        if (_IsSubPath(dp, nativeDir)) {
             return true;
         }
     }
     for (auto& dp : mWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), curDir.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(dp.c_str(), nativeDir.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& dp : mMLWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), curDir.c_str(), 0)) {
+        if (0 == fnmatch(dp.c_str(), nativeDir.c_str(), 0)) {
             return true;
         }
     }
@@ -488,19 +466,15 @@ bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) co
         return false;
     }
 
-#if defined(_MSC_VER)
-    const string curPath = NormalizeWindowsPath(filepath);
-#else
-    const string& curPath = filepath;
-#endif
+    const string nativePath = NormalizeNativePath(filepath);
 
     for (const auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), curPath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (const auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), curPath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), 0)) {
             return true;
         }
     }
@@ -520,19 +494,15 @@ bool FileDiscoveryOptions::IsObjectInBlacklist(const string& path, const string&
     }
 
     auto const filePath = PathJoin(path, name);
-#if defined(_MSC_VER)
-    const string curPath = NormalizeWindowsPath(filePath);
-#else
-    const string& curPath = filePath;
-#endif
+    const string nativePath = NormalizeNativePath(filePath);
 
     for (auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), curPath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), curPath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), 0)) {
             return true;
         }
     }
@@ -609,17 +579,13 @@ bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const
 }
 
 bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string& name) const {
-#if defined(_MSC_VER)
-    const string curPath = NormalizeWindowsPath(path);
-#else
-    const string& curPath = path;
-#endif
+    const string nativePath = NormalizeNativePath(path);
 
     size_t pos = 0;
     int16_t d = 0;
     int16_t maxWildcardDepth = mWildcardDepth + 1;
     while (d < maxWildcardDepth) {
-        pos = curPath.find(PATH_SEPARATOR[0], pos);
+        pos = nativePath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             break;
         ++d;
@@ -629,9 +595,9 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
     if (d < mWildcardDepth)
         return false;
     else if (d == mWildcardDepth) {
-        return fnmatch(mBasePath.c_str(), curPath.c_str(), FNM_PATHNAME) == 0 && !IsObjectInBlacklist(path, name);
+        return fnmatch(mBasePath.c_str(), nativePath.c_str(), FNM_PATHNAME) == 0 && !IsObjectInBlacklist(path, name);
     } else if (pos > 0) {
-        if (!(fnmatch(mBasePath.c_str(), curPath.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
+        if (!(fnmatch(mBasePath.c_str(), nativePath.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
               && !IsObjectInBlacklist(path, name))) {
             return false;
         }
@@ -644,7 +610,7 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
         return true;
     int depth = 1;
     while (depth < mMaxDirSearchDepth + 1) {
-        pos = curPath.find(PATH_SEPARATOR[0], pos);
+        pos = nativePath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             return true;
         ++depth;

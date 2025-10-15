@@ -25,7 +25,6 @@
 
 #include "RuntimeUtil.h"
 #include "StringTools.h"
-#include "common/EncodingConverter.h"
 #include "common/EnvUtil.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
@@ -1099,10 +1098,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         for (const auto& s : blacklist) {
             auto s1 = TrimString(s);
             if (!s1.empty()) {
-#if defined(_MSC_VER)
-                s1 = EncodingConverter::GetInstance()->FromUTF8ToACP(s1);
-                s1 = NormalizeWindowsPath(s1);
-#endif
+                s1 = PathToNative(s1);
                 mHostPathBlacklist.emplace_back(std::move(s1));
             }
         }

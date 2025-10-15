@@ -29,6 +29,7 @@
 
 #include "boost/filesystem.hpp"
 
+#include "EncodingConverter.h"
 #include "RuntimeUtil.h"
 #include "StringTools.h"
 #include "logger/Logger.h"
@@ -430,16 +431,32 @@ void Chmod(const char* filePath, mode_t mode) {
 #endif
 }
 
+std::string NormalizeNativePath(const std::string& path) {
 #if defined(_MSC_VER)
-std::string NormalizeWindowsPath(const std::string& path) {
+    // On Windows, only normalize the drive letter to uppercase
+    // This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest
     if (path.size() >= 2 && path[1] == ':' && isalpha(static_cast<unsigned char>(path[0]))) {
         std::string normalized = path;
         normalized[0] = toupper(static_cast<unsigned char>(path[0]));
         return normalized;
     }
     return path;
-}
+#else
+    // On Linux, return as-is
+    return path;
 #endif
+}
+
+std::string PathToNative(const std::string& path) {
+#if defined(_MSC_VER)
+    // On Windows, convert UTF-8 to ACP and normalize the drive letter
+    std::string nativePath = EncodingConverter::GetInstance()->FromUTF8ToACP(path);
+    return NormalizeNativePath(nativePath);
+#else
+    // On Linux, UTF-8 is the native encoding, return as-is
+    return path;
+#endif
+}
 
 bool IsValidSuffix(const std::string& filename) {
     // such as compress file (*.gz) or its rollback file (*.gz.*) will be ignored
