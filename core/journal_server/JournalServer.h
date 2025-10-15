@@ -150,11 +150,6 @@ public:
      */
     void CleanupEpollMonitoring(const std::string& configName, size_t idx);
     
-    /**
-     * @brief 记录 epoll 监控统计信息
-     */
-    void LogEpollStats() const;
-    
     // =============================================================================
     // 5. 配置分组管理 - Configuration Grouping Management
     // =============================================================================
@@ -168,11 +163,6 @@ public:
      * @brief 禁用配置分组优化
      */
     void DisableConfigGrouping();
-    
-    /**
-     * @brief 获取配置分组统计信息
-     */
-    JournalConfigGroupManager::Stats GetConfigGroupStats() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();

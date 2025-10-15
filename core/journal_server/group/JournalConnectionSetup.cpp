@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include "JournalConnectionSetup.h"
+
 #include <memory>
 
 #include "JournalConfigGroupManager.h"
