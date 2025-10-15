@@ -366,11 +366,6 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 	dataToLoad := buffer.Bytes()
 	reader := bytes.NewReader(dataToLoad)
 
-	// Load all data to Doris in a single batch
-	logger.Info(f.context.GetRuntimeContext(), "Loading data to Doris",
-		"logGroupCount", len(logGroupList),
-		"totalLogCount", totalLogCount,
-		"dataSize", len(dataToLoad))
 	response, err := f.dorisClient.Load(reader)
 
 	if err != nil {
