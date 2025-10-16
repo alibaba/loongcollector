@@ -47,7 +47,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     Json::Value configJson;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
     filesystem::path ex1, ex2, ex3, ex4, ex5;
 
     // only mandatory param
@@ -125,8 +125,8 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     ex1 = filesystem::path(".") / "test" / "a.log"; // not absolute
     ex2 = filesystem::current_path() / "**" / "b.log"; // ML
     ex3 = filesystem::absolute(ex1);
-    ex2 = NormalizePath(ex2.string());
-    ex3 = NormalizePath(ex3.string());
+    ex2 = NormalizeNativePath(ex2.string());
+    ex3 = NormalizeNativePath(ex3.string());
     configStr = R"(
         {
             "FilePaths": [],
@@ -148,7 +148,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     // ExcludeFiles
     ex1 = "a.log";
     ex2 = filesystem::current_path() / "b.log"; // has path separator
-    ex2 = NormalizePath(ex2.string());
+    ex2 = NormalizeNativePath(ex2.string());
     configStr = R"(
         {
             "FilePaths": [],
@@ -171,10 +171,10 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     ex3 = filesystem::current_path() / "a*"; // *
     ex4 = filesystem::current_path() / "a?"; // ?
     ex5 = filesystem::absolute(ex1);
-    ex2 = NormalizePath(ex2.string());
-    ex3 = NormalizePath(ex3.string());
-    ex4 = NormalizePath(ex4.string());
-    ex5 = NormalizePath(ex5.string());
+    ex2 = NormalizeNativePath(ex2.string());
+    ex3 = NormalizeNativePath(ex3.string());
+    ex4 = NormalizeNativePath(ex4.string());
+    ex5 = NormalizeNativePath(ex5.string());
     configStr = R"(
         {
             "FilePaths": [],
@@ -216,7 +216,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     Json::Value configJson;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
 
     // no FilePaths
     config.reset(new FileDiscoveryOptions());
@@ -236,7 +236,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
 
     // invalid filepath
     filePath = filesystem::current_path();
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
     configStr = R"(
         {
             "FilePaths": []
@@ -262,7 +262,7 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
     filesystem::path expectedBasePath = filesystem::current_path() / "test";
-    expectedBasePath = NormalizePath(expectedBasePath.string());
+    expectedBasePath = NormalizeNativePath(expectedBasePath.string());
     APSARA_TEST_EQUAL(expectedBasePath.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     configJson.clear();
@@ -279,11 +279,11 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     filesystem::path expectedWildcard1 = filesystem::current_path() / "*";
     filesystem::path expectedWildcard2 = filesystem::current_path() / "*" / "test";
     filesystem::path expectedWildcard3 = filesystem::current_path() / "*" / "test" / "?";
-    expectedBasePath1 = NormalizePath(expectedBasePath1.string());
-    expectedWildcard0 = NormalizePath(expectedWildcard0.string());
-    expectedWildcard1 = NormalizePath(expectedWildcard1.string());
-    expectedWildcard2 = NormalizePath(expectedWildcard2.string());
-    expectedWildcard3 = NormalizePath(expectedWildcard3.string());
+    expectedBasePath1 = NormalizeNativePath(expectedBasePath1.string());
+    expectedWildcard0 = NormalizeNativePath(expectedWildcard0.string());
+    expectedWildcard1 = NormalizeNativePath(expectedWildcard1.string());
+    expectedWildcard2 = NormalizeNativePath(expectedWildcard2.string());
+    expectedWildcard3 = NormalizeNativePath(expectedWildcard3.string());
     APSARA_TEST_EQUAL(expectedBasePath1.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
     APSARA_TEST_EQUAL(4U, config->GetWildcardPaths().size());
@@ -305,7 +305,7 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(1, config->mMaxDirSearchDepth);
     filesystem::path expectedBasePath2 = filesystem::current_path() / "*" / "test";
-    expectedBasePath2 = NormalizePath(expectedBasePath2.string());
+    expectedBasePath2 = NormalizeNativePath(expectedBasePath2.string());
     APSARA_TEST_EQUAL(expectedBasePath2.string(), config->GetBasePath());
     APSARA_TEST_EQUAL("*.log", config->GetFilePattern());
 }
@@ -320,7 +320,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Init should succeed but mAllowingCollectingFilesInRootDir should be false
     {
         filesystem::path filePath = "C:\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": []
@@ -339,7 +339,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     {
         BOOL_FLAG(enable_root_path_collection) = true;
         filesystem::path filePath = "C:\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": [],
@@ -361,7 +361,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Should parse correctly and set base path to C:\*\logs
     {
         filesystem::path filePath = "C:\\*\\logs\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": []
@@ -383,7 +383,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     {
         BOOL_FLAG(enable_root_path_collection) = true;
         filesystem::path filePath = "C:\\*\\logs\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": [],
@@ -404,7 +404,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Should parse correctly with ** at root
     {
         filesystem::path filePath = "C:\\**\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": [],
@@ -426,7 +426,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     {
         BOOL_FLAG(enable_root_path_collection) = true;
         filesystem::path filePath = "D:\\**\\*.log";
-        filePath = NormalizePath(filePath.string());
+        filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
             {
                 "FilePaths": [],
@@ -540,7 +540,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
 
                 // Verify the base path contains the Chinese directory name
                 // Convert UTF-8 to ACP for comparison
-                string chineseDirACP = ConvertAndNormalizePath(chineseDir);
+                string chineseDirACP = ConvertAndNormalizeNativePath(chineseDir);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseDirACP) != string::npos);
 
                 LOG_INFO(sLogger, ("Chinese path test", "PASSED - encoding conversion succeeded"));
@@ -582,7 +582,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
                 APSARA_TEST_TRUE(config->mHasBlacklist);
 
                 // Verify the base path contains Chinese directory name
-                string chineseLogACP = ConvertAndNormalizePath(chineseLog);
+                string chineseLogACP = ConvertAndNormalizeNativePath(chineseLog);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseLogACP) != string::npos);
 
                 LOG_INFO(sLogger, ("Chinese ExcludeDirs test", "PASSED"));
@@ -623,12 +623,12 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
                 APSARA_TEST_TRUE(config->mHasBlacklist);
 
                 // Verify the base path contains Chinese directory name
-                string chineseMixedACP = ConvertAndNormalizePath(chineseMixed);
+                string chineseMixedACP = ConvertAndNormalizeNativePath(chineseMixed);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseMixedACP) != string::npos);
 
                 // Verify ExcludeFiles contain Chinese filenames (converted to ACP)
-                string excludeFile1ACP = ConvertAndNormalizePath(excludeFile1);
-                string excludeFile2ACP = ConvertAndNormalizePath(excludeFile2);
+                string excludeFile1ACP = ConvertAndNormalizeNativePath(excludeFile1);
+                string excludeFile2ACP = ConvertAndNormalizeNativePath(excludeFile2);
                 APSARA_TEST_EQUAL(excludeFile1ACP, config->mFileNameBlacklist[0]);
                 APSARA_TEST_EQUAL(excludeFile2ACP, config->mFileNameBlacklist[1]);
 
@@ -669,11 +669,11 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
                 APSARA_TEST_TRUE(config->mHasBlacklist);
 
                 // Verify the base path contains Chinese directory name
-                string chineseDocACP = ConvertAndNormalizePath(chineseDoc);
+                string chineseDocACP = ConvertAndNormalizeNativePath(chineseDoc);
                 APSARA_TEST_TRUE(config->GetBasePath().find(chineseDocACP) != string::npos);
 
                 // Verify ExcludeFilePaths contains Chinese filename (converted to ACP and normalized)
-                string excludeFileACP = ConvertAndNormalizePath(excludeFile);
+                string excludeFileACP = ConvertAndNormalizeNativePath(excludeFile);
                 APSARA_TEST_EQUAL(excludeFileACP, config->mFilePathBlacklist[0]);
 
                 LOG_INFO(sLogger, ("Chinese ExcludeFilePaths test", "PASSED"));
@@ -689,8 +689,8 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     {
         filesystem::path filePath = filesystem::absolute("test_logs\\**\\*.log");
         filesystem::path excludeDir = filesystem::absolute("test_logs\\exclude");
-        filePath = NormalizePath(filePath.string());
-        excludeDir = NormalizePath(excludeDir.string());
+        filePath = NormalizeNativePath(filePath.string());
+        excludeDir = NormalizeNativePath(excludeDir.string());
         configStr = R"(
             {
                 "FilePaths": [],
@@ -703,7 +703,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         configJson["ExcludeDirs"].append(Json::Value(excludeDir.string()));
         filesystem::path excludeFile = filesystem::absolute("test_logs\\exclude.log");
-        excludeFile = NormalizePath(excludeFile.string());
+        excludeFile = NormalizeNativePath(excludeFile.string());
         configJson["ExcludeFilePaths"].append(Json::Value(excludeFile.string()));
         config.reset(new FileDiscoveryOptions());
         APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
@@ -723,7 +723,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsDriveLetterCaseInsensitive() const
     string configStr, errorMsg;
 
     // Test 1: Base path with lowercase drive letter
-    // Expected: Should parse correctly (NormalizePath will convert to uppercase)
+    // Expected: Should parse correctly (NormalizeNativePath will convert to uppercase)
     {
         string lowerCasePath = "c:\\test\\*.log";
         configStr = R"(

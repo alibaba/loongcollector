@@ -40,7 +40,7 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    mFilePath = ConvertAndNormalizePath(mFilePath);
+    mFilePath = ConvertAndNormalizeNativePath(mFilePath);
     // MaxFileSize
     GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles

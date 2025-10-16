@@ -72,7 +72,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
     configStr = R"(
@@ -195,7 +195,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    string filePathStr = NormalizePath(filePath.string());
+    string filePathStr = NormalizeNativePath(filePath.string());
 
     configStr = R"(
             {
@@ -230,7 +230,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     configJson["FilePaths"].append(Json::Value(filePathStr));
     optionalGoPipelineJson["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
     optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"]
-        = Json::Value(NormalizePath(filePath.parent_path().string()));
+        = Json::Value(NormalizeNativePath(filePath.parent_path().string()));
     PluginInstance::PluginMeta meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
@@ -268,7 +268,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
         configStr = R"(
@@ -474,7 +474,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizePath(filePath.string());
+    filePath = NormalizeNativePath(filePath.string());
 
     configStr = R"(
         {
