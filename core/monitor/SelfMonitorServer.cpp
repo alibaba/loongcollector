@@ -248,7 +248,7 @@ LogEvent* SelfMonitorServer::AddTaskStatus(const std::string& region) {
     std::lock_guard<std::mutex> lock(mTaskStatusMutex);
     if (mTaskStatusMap.find(region) == mTaskStatusMap.end()) {
         PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
-        // metadata for flusher(region, dataType
+        // metadata for flusher (region, dataType)
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
                                        SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS);

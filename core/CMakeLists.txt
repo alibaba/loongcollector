@@ -147,7 +147,7 @@ set(SUB_DIRECTORIES_LIST
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
         runner runner/sink/http
         task_pipeline
-        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
+        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender monitor/task_status_constants
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
