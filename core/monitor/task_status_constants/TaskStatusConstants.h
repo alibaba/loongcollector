@@ -15,14 +15,11 @@
  */
 #pragma once
 
-#include <mutex>
 #include <string>
-
-#include "models/PipelineEventGroup.h"
 
 namespace logtail {
 
-// task content keys
+// Task content keys
 extern const std::string TASK_CONTENT_KEY_TASK_TYPE;
 extern const std::string TASK_CONTENT_KEY_PROJECT;
 extern const std::string TASK_CONTENT_KEY_CONFIG_NAME;
@@ -30,25 +27,7 @@ extern const std::string TASK_CONTENT_KEY_STATUS;
 extern const std::string TASK_CONTENT_KEY_START_TIME;
 extern const std::string TASK_CONTENT_KEY_EXPIRE_TIME;
 
-// task types
+// Task types
 extern const std::string& TASK_TYPE_STATIC_FILE;
-
-class TaskStatusManager {
-public:
-    static TaskStatusManager* GetInstance() {
-        static TaskStatusManager instance;
-        return &instance;
-    }
-
-    LogEvent* AddTaskStatus(const std::string& region);
-    void FlushTaskStatus(std::vector<PipelineEventGroup>& pipelineEventGroupList);
-
-private:
-    TaskStatusManager() = default;
-    ~TaskStatusManager() = default;
-
-    std::mutex mMutex;
-    std::map<std::string, PipelineEventGroup> mTaskStatusMap;
-};
 
 } // namespace logtail

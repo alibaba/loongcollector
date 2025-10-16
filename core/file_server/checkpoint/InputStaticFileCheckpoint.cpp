@@ -18,8 +18,9 @@
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
-#include "monitor/TaskStatusManager.h"
+#include "monitor/SelfMonitorServer.h"
 #include "monitor/profile_sender/ProfileSender.h"
+#include "monitor/task_status_constants/TaskStatusConstants.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "provider/Provider.h"
 
@@ -164,7 +165,7 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
 void InputStaticFileCheckpoint::SetAbort() {
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         mStatus = StaticFileReadingStatus::ABORT;
-        mAbortTime = time(nullptr);
+        mFinishTime = time(nullptr);
         LOG_WARNING(sLogger, ("file read abort, config", mConfigName)("input idx", mInputIdx));
     }
 }
@@ -184,11 +185,8 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
     if (mStatus == StaticFileReadingStatus::RUNNING) {
         root["current_file_index"] = mCurrentFileIndex;
     }
-    if (mStatus == StaticFileReadingStatus::FINISHED) {
+    if (mStatus == StaticFileReadingStatus::FINISHED || mStatus == StaticFileReadingStatus::ABORT) {
         root["finish_time"] = mFinishTime;
-    }
-    if (mStatus == StaticFileReadingStatus::ABORT) {
-        root["abort_time"] = mAbortTime;
     }
     root["files"] = Json::arrayValue;
     auto& files = root["files"];
@@ -269,11 +267,8 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
             return false;
         }
     }
-    if (mStatus == StaticFileReadingStatus::FINISHED) {
+    if (mStatus == StaticFileReadingStatus::FINISHED || mStatus == StaticFileReadingStatus::ABORT) {
         GetOptionalUIntParam(res, "finish_time", mFinishTime, *errMsg);
-    }
-    if (mStatus == StaticFileReadingStatus::ABORT) {
-        GetOptionalUIntParam(res, "abort_time", mAbortTime, *errMsg);
     }
 
     uint32_t fileCnt = 0;
@@ -449,7 +444,7 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
     for (size_t i = startIndex; i < mFileCheckpoints.size(); ++i) {
         const auto& cpt = mFileCheckpoints[i];
 
-        LogEvent* logEvent = TaskStatusManager::GetInstance()->AddTaskStatus(region);
+        LogEvent* logEvent = SelfMonitorServer::GetInstance()->AddTaskStatus(region);
         if (!logEvent) {
             continue;
         }
@@ -468,11 +463,8 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
         if (mStatus == StaticFileReadingStatus::RUNNING) {
             logEvent->SetContent("current_file_index", ToString(mCurrentFileIndex));
         }
-        if (mStatus == StaticFileReadingStatus::FINISHED) {
+        if (mStatus == StaticFileReadingStatus::FINISHED || mStatus == StaticFileReadingStatus::ABORT) {
             logEvent->SetContent("finish_time", ToString(mFinishTime));
-        }
-        if (mStatus == StaticFileReadingStatus::ABORT) {
-            logEvent->SetContent("abort_time", ToString(mAbortTime));
         }
         logEvent->SetContent("file_info", buildFileInfoJson(cpt));
 

@@ -18,7 +18,6 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
-#include "monitor/TaskStatusManager.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -221,7 +220,16 @@ void SelfMonitorServer::SendTaskStatus() {
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__task_status__
     vector<PipelineEventGroup> pipelineEventGroupList;
-    TaskStatusManager::GetInstance()->FlushTaskStatus(pipelineEventGroupList);
+    {
+        std::lock_guard<std::mutex> lock(mTaskStatusMutex);
+        for (auto& [key, pipelineEventGroup] : mTaskStatusMap) {
+            if (pipelineEventGroup.GetEvents().size() <= 0) {
+                continue;
+            }
+            pipelineEventGroupList.emplace_back(std::move(pipelineEventGroup));
+        }
+        mTaskStatusMap.clear();
+    }
 
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {
@@ -234,6 +242,19 @@ void SelfMonitorServer::SendTaskStatus() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
+}
+
+LogEvent* SelfMonitorServer::AddTaskStatus(const std::string& region) {
+    std::lock_guard<std::mutex> lock(mTaskStatusMutex);
+    if (mTaskStatusMap.find(region) == mTaskStatusMap.end()) {
+        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
+        // metadata for flusher(region, dataType
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                       SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS);
+        mTaskStatusMap.emplace(region, std::move(pipelineEventGroup));
+    }
+    return mTaskStatusMap.at(region).AddLogEvent();
 }
 
 } // namespace logtail
