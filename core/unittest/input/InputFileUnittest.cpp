@@ -195,7 +195,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
-    filePath = NormalizeNativePath(filePath.string());
+    string filePathStr = NormalizeNativePath(filePath.string());
 
     configStr = R"(
             {
@@ -227,9 +227,9 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
         )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
-    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    configJson["FilePaths"].append(Json::Value(filePathStr));
     optionalGoPipelineJson["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-    optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(filePath.parent_path().string());
+    optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(NormalizeNativePath(filePath.parent_path().string()));
     PluginInstance::PluginMeta meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
@@ -250,7 +250,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
             }
         )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    configJson["FilePaths"].append(Json::Value(filePathStr));
     meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
