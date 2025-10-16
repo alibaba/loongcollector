@@ -25,12 +25,12 @@
 
 #include "runner/InputRunner.h"
 #include "common/JournalConfig.h"
-#include "group/JournalConfigGroupManager.h"
+#include "reader/JournalReaderManager.h"
 
 namespace logtail {
 
 // Forward declarations
-class JournalConfigGroupManager;
+class JournalReaderManager;
 class JournalConnectionInstance;
 class SystemdJournalReader;
 class PipelineEventGroup;
@@ -150,16 +150,16 @@ public:
     void CleanupEpollMonitoring(const std::string& configName, size_t idx);
     
     // =============================================================================
-    // 5. 配置分组管理 - Configuration Grouping Management
+    // 5. 配置管理 - Configuration Management
     // =============================================================================
     
     /**
-     * @brief 启用配置分组优化（共享相同过滤条件的 inotify 实例）
+     * @brief 启用配置管理（每个配置独立的journal reader）
      */
     void EnableConfigGrouping();
     
     /**
-     * @brief 禁用配置分组优化
+     * @brief 禁用配置管理（调试用）
      */
     void DisableConfigGrouping();
 
@@ -195,7 +195,7 @@ private:
     int mGlobalEpollFD{-1};
     mutable std::mutex mEpollMutex;
     
-    // 配置分组管理 - Configuration Grouping Management
+    // 配置管理 - Configuration Management
     bool mConfigGroupingEnabled{false};
     mutable std::mutex mGroupingMutex;
 

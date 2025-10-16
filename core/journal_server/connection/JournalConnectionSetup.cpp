@@ -18,8 +18,8 @@
 
 #include <memory>
 
-#include "JournalConfigGroupManager.h"
-#include "reader/JournalReader.h"
+#include "../reader/JournalReaderManager.h"
+#include "../reader/JournalReader.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -31,28 +31,29 @@ namespace logtail::impl {
 // =============================================================================
 
 std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& configName, size_t idx, const JournalConfig& config, bool& isNewConnection) {
-    // Getting journal connection from manager for config: configName, idx: idx
+    // 为配置创建独立的journal reader
     
     // 记录连接获取前的连接数，用于判断是否创建了新连接
-    size_t connectionCountBefore = JournalConfigGroupManager::GetInstance().GetConnectionCount();
+    size_t connectionCountBefore = JournalReaderManager::GetInstance().GetConnectionCount();
     
-    // 注意：这里需要创建一个临时的配置处理器
+    // 创建空的处理器（实际处理在其他地方）
     auto handler = [](const std::string&, size_t, const JournalEntry&) {
         // 空的处理器，仅用于连接建立
     };
     
-    // 添加配置到分组管理器
-    bool added = JournalConfigGroupManager::GetInstance().AddConfig(configName, idx, config, handler);
+    // 添加配置到管理器（会为每个配置创建独立的reader）
+    bool added = JournalReaderManager::GetInstance().AddConfig(configName, idx, config, handler);
     if (!added) {
-        LOG_ERROR(sLogger, ("failed to add config to group manager", "skip processing")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("failed to add config to manager", "skip processing")("config", configName)("idx", idx));
         isNewConnection = false;
         return nullptr;
     }
     
-    auto journalReader = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+    // 获取刚创建的独立reader
+    auto journalReader = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
     
     if (!journalReader) {
-        LOG_ERROR(sLogger, ("failed to get journal connection", "skip processing")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger, ("failed to get journal reader", "skip processing")("config", configName)("idx", idx));
         isNewConnection = false;
         return nullptr;
     }
@@ -65,10 +66,10 @@ std::shared_ptr<SystemdJournalReader> SetupJournalConnection(const string& confi
     }
     
     // 检查是否创建了新连接
-    size_t connectionCountAfter = JournalConfigGroupManager::GetInstance().GetConnectionCount();
+    size_t connectionCountAfter = JournalReaderManager::GetInstance().GetConnectionCount();
     isNewConnection = (connectionCountAfter > connectionCountBefore);
     
-    // Journal connection obtained successfully for config: configName, idx: idx, is_new_connection: isNewConnection
+    LOG_INFO(sLogger, ("journal reader created successfully", "")("config", configName)("idx", idx)("is_new", isNewConnection));
     return journalReader;
 }
 

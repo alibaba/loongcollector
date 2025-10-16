@@ -32,88 +32,81 @@ struct JournalEntry;
 class SystemdJournalReader;
 
 /**
- * @brief Journal配置分组管理器
+ * @brief Journal Reader管理器
  * 
  * 设计目标：
- * 1. 根据filter hash对配置进行分组
- * 2. 相同filter的配置共享inotify实例
- * 3. 减少系统资源使用，提高性能
+ * 1. 每个配置拥有独立的journal reader
+ * 2. 每个reader有独立的fd，不共享
+ * 3. 简化管理逻辑，提高隔离性
  */
-class JournalConfigGroupManager {
+class JournalReaderManager {
 public:
     using ConfigHandler = std::function<void(const std::string& configName, size_t idx, const JournalEntry& entry)>;
     
-    static JournalConfigGroupManager& GetInstance();
+    static JournalReaderManager& GetInstance();
     
-    // 初始化分组管理器
+    // 初始化管理器
     bool Initialize();
     
     // 清理资源
     void Cleanup();
     
-    // 添加配置到分组
+    // 添加配置（创建独立的reader）
     bool AddConfig(const std::string& configName, size_t idx, const JournalConfig& config, const ConfigHandler& handler);
     
-    // 移除配置
+    // 移除配置（关闭并删除reader）
     void RemoveConfig(const std::string& configName, size_t idx);
     
     // 获取统计信息
     struct Stats {
-        int totalGroups;
-        int totalConfigs;
-        int sharedInotifyInstances;
-        std::vector<std::string> groupKeys;
-        // 增强的连接池统计信息
-        size_t totalConnections;
+        size_t totalConfigs;
         size_t activeConnections;
         size_t invalidConnections;
         std::vector<std::string> connectionKeys;
+        
+        // 保持兼容性的字段（已废弃）
+        int totalGroups;
+        int sharedInotifyInstances;
+        std::vector<std::string> groupKeys;
+        size_t totalConnections;
     };
     Stats GetStats() const;
     
-    // 获取指定配置的连接信息
+    // 获取指定配置的reader
     std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName, size_t idx) const;
     
-    // 获取使用指定reader的所有配置
+    // 获取使用指定reader的配置（现在每个reader只对应一个配置）
     std::vector<std::pair<std::string, size_t>> GetConfigsUsingReader(const std::shared_ptr<SystemdJournalReader>& reader) const;
     
-    // 强制重置指定连接（手动重置接口）
+    // 强制重置指定连接
     bool ForceResetConnection(const std::string& configName, size_t idx);
     
     // 获取当前连接数量
     size_t GetConnectionCount() const;
 
 private:
-    JournalConfigGroupManager() = default;
-    ~JournalConfigGroupManager() = default;
+    JournalReaderManager() = default;
+    ~JournalReaderManager() = default;
     
     // 禁用拷贝和移动
-    JournalConfigGroupManager(const JournalConfigGroupManager&) = delete;
-    JournalConfigGroupManager& operator=(const JournalConfigGroupManager&) = delete;
-    JournalConfigGroupManager(JournalConfigGroupManager&&) = delete;
-    JournalConfigGroupManager& operator=(JournalConfigGroupManager&&) = delete;
+    JournalReaderManager(const JournalReaderManager&) = delete;
+    JournalReaderManager& operator=(const JournalReaderManager&) = delete;
+    JournalReaderManager(JournalReaderManager&&) = delete;
+    JournalReaderManager& operator=(JournalReaderManager&&) = delete;
     
-    // 计算配置的filter hash
-    std::string calculateFilterHash(const JournalConfig& config) const;
+    // 生成配置的唯一key
+    std::string makeConfigKey(const std::string& configName, size_t idx) const;
     
-    // 配置信息
+    // 配置信息结构
     struct ConfigInfo {
         std::string configName;
         size_t idx;
         JournalConfig config;
         ConfigHandler handler;
-        std::string lastCursor;  // 用于检查点管理
+        std::shared_ptr<SystemdJournalReader> reader;  // 每个配置独立的reader
     };
     
-    // 分组信息
-    struct GroupInfo {
-        std::string filterHash;
-        std::shared_ptr<SystemdJournalReader> sharedReader;
-        std::map<std::string, ConfigInfo> configs;  // key: "configName:idx"
-        int epollFD = -1;  // 共享的epoll FD
-    };
-    
-    std::map<std::string, std::shared_ptr<GroupInfo>> mGroups;  // key: filterHash
+    std::map<std::string, ConfigInfo> mConfigs;  // key: "configName:idx"
     mutable std::mutex mMutex;
     bool mInitialized{false};
 };

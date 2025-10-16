@@ -16,7 +16,6 @@
 
 #include "JournalServer.h"
 
-#include <chrono>
 #include <utility>
 
 #ifdef __linux__
@@ -25,8 +24,8 @@
 #include <errno.h>
 #endif
 
-#include "group/JournalConfigGroupManager.h"
-#include "group/JournalConnectionSetup.h"
+#include "reader/JournalReaderManager.h"
+#include "connection/JournalConnectionSetup.h"
 #include "reader/JournalReader.h"
 #include "JournalEntryProcessor.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -50,10 +49,10 @@ void JournalServer::Init() {
     
     mThreadRes = async(launch::async, &JournalServer::run, this);
     
-    // 初始化配置分组管理器
-    JournalConfigGroupManager::GetInstance().Initialize();
+    // 初始化配置管理器
+    JournalReaderManager::GetInstance().Initialize();
     
-    // 启用配置分组优化
+    // 启用配置管理
     EnableConfigGrouping();
     
     mIsInitialized = true;
@@ -70,8 +69,8 @@ void JournalServer::Stop() {
         mThreadRes.get();
     }
     
-    // 清理配置分组管理器
-    JournalConfigGroupManager::GetInstance().Cleanup();
+    // 清理配置管理器
+    JournalReaderManager::GetInstance().Cleanup();
     
     mIsInitialized = false;
     LOG_INFO(sLogger, ("JournalServer stopped", ""));
@@ -104,12 +103,12 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
         LOG_INFO(sLogger, ("journal input added after validation", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
     }
     
-    // 检查是否启用配置分组优化
+    // 检查是否启用配置管理
     {
         std::lock_guard<std::mutex> groupingLock(mGroupingMutex);
         if (mConfigGroupingEnabled) {
-            // 使用配置分组优化
-            auto groupManager = &JournalConfigGroupManager::GetInstance();
+            // 使用配置管理器
+            auto groupManager = &JournalReaderManager::GetInstance();
             
             // 创建配置处理器
             auto handler = [this, configName, idx](const std::string&, size_t, const JournalEntry&) {
@@ -118,19 +117,19 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
             };
             
             if (groupManager->AddConfig(configName, idx, validatedConfig, handler)) {
-                LOG_INFO(sLogger, ("config added to grouping manager", "")("config", configName)("idx", idx));
+                LOG_INFO(sLogger, ("config added to manager", "")("config", configName)("idx", idx));
                 
-                // 记录分组统计信息
+                // 记录统计信息
                 auto stats = groupManager->GetStats();
-                LOG_INFO(sLogger, ("grouping stats", "")("total_groups", stats.totalGroups)("total_configs", stats.totalConfigs)("shared_inotify", stats.sharedInotifyInstances));
+                LOG_INFO(sLogger, ("manager stats", "")("total_configs", stats.totalConfigs)("active_connections", stats.activeConnections));
                 
                 return;
             } else {
-                LOG_ERROR(sLogger, ("failed to add config to grouping manager", "")("config", configName)("idx", idx));
+                LOG_ERROR(sLogger, ("failed to add config to manager", "")("config", configName)("idx", idx));
                 return;
             }
         } else {
-            LOG_ERROR(sLogger, ("configuration grouping optimization is disabled", "")("config", configName)("idx", idx));
+            LOG_ERROR(sLogger, ("configuration management is disabled", "")("config", configName)("idx", idx));
             return;
         }
     }
@@ -155,7 +154,7 @@ void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
     CleanupEpollMonitoring(configName, idx);
     
     // 移除config对应的连接
-    JournalConfigGroupManager::GetInstance().RemoveConfig(configName, idx);
+    JournalReaderManager::GetInstance().RemoveConfig(configName, idx);
     
     LOG_INFO(sLogger, ("journal input removed with automatic connection cleanup", "")("config", configName)("idx", idx));
 }
@@ -176,7 +175,7 @@ void JournalServer::RemoveJournalInputWithoutCleanup(const string& configName, s
     }
     
     // 移除config对应的连接
-    JournalConfigGroupManager::GetInstance().RemoveConfig(configName, idx);
+    JournalReaderManager::GetInstance().RemoveConfig(configName, idx);
     
     LOG_INFO(sLogger, ("journal input removed without cleanup", "")("config", configName)("idx", idx));
 }
@@ -212,7 +211,7 @@ void JournalServer::UpdateJournalConfigNeedsSeek(const std::string& configName, 
 // =============================================================================
 
 JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const {
-    auto stats = JournalConfigGroupManager::GetInstance().GetStats();
+    auto stats = JournalReaderManager::GetInstance().GetStats();
     ConnectionPoolStats result;
     result.totalConnections = stats.totalConnections;
     result.activeConnections = stats.activeConnections;
@@ -222,7 +221,7 @@ JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const
 }
 
 std::shared_ptr<SystemdJournalReader> JournalServer::GetConnectionInfo(const std::string& configName, size_t idx) const {
-    return JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+    return JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
 }
 
 bool JournalServer::ForceResetConnection(const std::string& configName, size_t idx) {
@@ -230,7 +229,7 @@ bool JournalServer::ForceResetConnection(const std::string& configName, size_t i
     CleanupEpollMonitoring(configName, idx);
     
     // 然后重置连接
-    bool result = JournalConfigGroupManager::GetInstance().ForceResetConnection(configName, idx);
+    bool result = JournalReaderManager::GetInstance().ForceResetConnection(configName, idx);
     
     if (result) {
         LOG_INFO(sLogger, ("connection reset completed with epoll cleanup", "")("config", configName)("idx", idx));
@@ -240,7 +239,7 @@ bool JournalServer::ForceResetConnection(const std::string& configName, size_t i
 }
 
 size_t JournalServer::GetConnectionCount() const {
-    return JournalConfigGroupManager::GetInstance().GetConnectionCount();
+    return JournalReaderManager::GetInstance().GetConnectionCount();
 }
 
 // =============================================================================
@@ -259,7 +258,7 @@ void JournalServer::CleanupEpollMonitoring(const std::string& configName, size_t
         return;
     }
     
-    auto reader = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+    auto reader = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
     if (reader && reader->IsOpen()) {
         // Cleaning up epoll monitoring for config: configName[idx]
         reader->RemoveFromEpoll(epollFD);
@@ -267,19 +266,19 @@ void JournalServer::CleanupEpollMonitoring(const std::string& configName, size_t
 }
 
 // =============================================================================
-// 5. 配置分组管理 - Configuration Grouping Management
+// 5. 配置管理 - Configuration Management
 // =============================================================================
 
 void JournalServer::EnableConfigGrouping() {
     std::lock_guard<std::mutex> lock(mGroupingMutex);
     mConfigGroupingEnabled = true;
-    LOG_INFO(sLogger, ("configuration grouping optimization enabled", ""));
+    LOG_INFO(sLogger, ("configuration management enabled", ""));
 }
 
 void JournalServer::DisableConfigGrouping() {
     std::lock_guard<std::mutex> lock(mGroupingMutex);
     mConfigGroupingEnabled = false;
-    LOG_INFO(sLogger, ("configuration grouping optimization disabled", ""));
+    LOG_INFO(sLogger, ("configuration management disabled", ""));
 }
 
 // =============================================================================
@@ -335,8 +334,8 @@ void JournalServer::run() {
                     const auto& monitoredReader = it->second;
                     // Processing journal event for config: configName[idx]
                     if (monitoredReader.reader && monitoredReader.reader->ProcessJournalEvent()) {
-                        // 有新数据，需要分发给所有使用相同journal reader的配置
-                        processJournalEventForAllConfigs(monitoredReader.reader);
+                        // 处理该配置的journal事件（每个reader对应一个独立的配置）
+                        processSpecificJournalConfig(monitoredReader.configName, monitoredReader.idx);
                     }
                     // Note: No new data available or event processed without data
                 }
@@ -395,7 +394,7 @@ void JournalServer::updateReaderMonitoring(int epollFD, std::map<int, MonitoredR
                 // Config needs seek, attempting to initialize: configName[idx]
                 
                 // 尝试获取连接并执行seek操作
-                auto connection = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+                auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
                 if (connection && connection->IsOpen()) {
                     // 获取配置的副本并执行seek
                     JournalConfig config = idxConfig.second;
@@ -457,7 +456,7 @@ void JournalServer::updateReaderMonitoring(int epollFD, std::map<int, MonitoredR
                 continue; // 跳过未完成初始化的配置
             }
             
-            auto connection = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+            auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
             if (connection && connection->IsOpen()) {
                 // Checking reader for epoll monitoring: configName[idx]
                 
@@ -526,7 +525,7 @@ void logtail::JournalServer::processSpecificJournalConfig(const std::string& con
     }
     
     // 直接读取和处理journal条目（连接和seek已经完成）
-    auto connection = JournalConfigGroupManager::GetInstance().GetConnectionInfo(configName, idx);
+    auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
     if (!connection || !connection->IsOpen()) {
         LOG_ERROR(sLogger, ("connection not available for event processing", "")("config", configName)("idx", idx));
         return;
@@ -543,14 +542,12 @@ void logtail::JournalServer::processSpecificJournalConfig(const std::string& con
 }
 
 void logtail::JournalServer::processJournalEventForAllConfigs(const std::shared_ptr<SystemdJournalReader>& reader) {
-    // 获取所有使用这个reader的配置
-    auto configs = JournalConfigGroupManager::GetInstance().GetConfigsUsingReader(reader);
+    // 注意：现在每个reader只对应一个配置（不再共享），这个函数已不再需要
+    // 但为了保持接口兼容性，暂时保留
+    auto configs = JournalReaderManager::GetInstance().GetConfigsUsingReader(reader);
     
-    // Processing journal event for all configs sharing this reader (count: configs.size())
-    
-    // 为每个配置处理journal条目
+    // 处理该reader对应的配置（现在只会有一个）
     for (const auto& [configName, idx] : configs) {
-        // Processing journal event for config: configName[idx]
         processSpecificJournalConfig(configName, idx);
     }
 }
