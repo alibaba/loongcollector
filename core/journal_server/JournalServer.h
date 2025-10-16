@@ -35,7 +35,6 @@ class JournalConnectionInstance;
 class SystemdJournalReader;
 class PipelineEventGroup;
 struct JournalEntry;
-class TimerManager;
 
 // MonitoredReader struct definition
 struct MonitoredReader {
@@ -179,7 +178,6 @@ private:
     // =============================================================================
     // 事件驱动辅助方法 - Event-driven Helper Methods
     // =============================================================================
-    void setupTimers(TimerManager& timerManager);
     void updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void processSpecificJournalConfig(const std::string& configName, size_t idx);
     void processJournalEventForAllConfigs(const std::shared_ptr<SystemdJournalReader>& reader);

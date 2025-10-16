@@ -31,7 +31,6 @@
 #include "JournalEntryProcessor.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "logger/Logger.h"
-#include "common/TimerManager.h"
 
 
 using namespace std;
@@ -304,12 +303,6 @@ void JournalServer::run() {
     constexpr int kMaxEvents = 64;
     LOG_INFO(sLogger, ("global epoll instance created", "")("epoll_fd", mGlobalEpollFD)("max_events", kMaxEvents));
     
-    // 创建定时器管理器
-    TimerManager timerManager;
-    
-    // 设置定时任务
-    setupTimers(timerManager);
-    
     struct epoll_event events[kMaxEvents];
     
     // 存储已监听的 reader 及其对应的配置信息
@@ -317,18 +310,13 @@ void JournalServer::run() {
     
     while (mIsThreadRunning.load()) {
         try {
-            // 计算下次定时器到期时间
-            auto nextTimerInterval = timerManager.GetNextTimerInterval();
             int timeoutMs = 100; // 默认100ms超时
-            if (nextTimerInterval.count() < timeoutMs) {
-                timeoutMs = static_cast<int>(nextTimerInterval.count());
-            }
             
-                   // 更新连接监听状态
-                   updateReaderMonitoring(mGlobalEpollFD, monitoredReaders);
-                   
-                   // 等待事件
-                   int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, timeoutMs);
+            // 更新连接监听状态
+            updateReaderMonitoring(mGlobalEpollFD, monitoredReaders);
+            
+            // 等待事件
+            int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, timeoutMs);
             
             if (nfds == -1) {
                 if (errno == EINTR) {
@@ -354,9 +342,6 @@ void JournalServer::run() {
                 }
                 // Note: Unknown fd in epoll event (might be already cleaned up)
             }
-            
-            // 处理定时任务
-            timerManager.ProcessTimers();
             
         } catch (const exception& e) {
             LOG_ERROR(sLogger, ("exception in JournalServer event loop", e.what()));
@@ -393,10 +378,6 @@ void JournalServer::run() {
 // =============================================================================
 // 7. 事件驱动辅助方法 - Event-driven Helper Methods
 // =============================================================================
-
-void JournalServer::setupTimers(TimerManager& timerManager) {
-    // No timers needed for now
-}
 
 void JournalServer::updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     // 获取当前配置

@@ -143,7 +143,7 @@ set(SUB_DIRECTORIES_LIST
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
-        journal_server journal_server/reader journal_server/checkpoint journal_server/group journal_server/common
+        journal_server journal_server/reader journal_server/group journal_server/common
         parser
         )
 if (LINUX)
