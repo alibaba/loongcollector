@@ -66,6 +66,8 @@ DEFINE_FLAG_INT32(rotate_overflow_error_interval, "second", 60);
 
 namespace logtail {
 
+const string DELETED_FILE_SUFFIX = "(deleted)";
+
 void NormalEventHandler::Handle(const Event& event) {
     bool fileCreateModify = false;
     if (event.IsCreate() || event.IsMoveTo()) {
@@ -535,6 +537,21 @@ void ModifyHandler::Handle(const Event& event) {
                                                                                    readerArray[0]->GetFileSize()));
                         // release fd as quick as possible
                         readerArray[0]->CloseFilePtr();
+                        if (readerArray[0]->GetRealLogPath().length() > DELETED_FILE_SUFFIX.length()
+                            && readerArray[0]->GetRealLogPath().compare(readerArray[0]->GetRealLogPath().length()
+                                                                            - DELETED_FILE_SUFFIX.length(),
+                                                                        DELETED_FILE_SUFFIX.length(),
+                                                                        DELETED_FILE_SUFFIX)
+                                == 0) {
+                            LOG_INFO(sLogger,
+                                     ("file is really deleted", "will be removed from the log reader queue")(
+                                         "real path", readerArray[0]->GetRealLogPath())(
+                                         "host path",
+                                         readerArray[0]->GetHostLogPath())("dev", readerArray[0]->GetDevInode().dev)(
+                                         "inode", readerArray[0]->GetDevInode().inode));
+                            mDevInodeReaderMap.erase(readerArray[0]->GetDevInode());
+                            readerArray.pop_front();
+                        }
                     }
                 }
             }
