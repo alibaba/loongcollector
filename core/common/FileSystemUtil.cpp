@@ -431,7 +431,7 @@ void Chmod(const char* filePath, mode_t mode) {
 #endif
 }
 
-std::string NormalizeNativePath(const std::string& path) {
+std::string NormalizePath(const std::string& path) {
 #if defined(_MSC_VER)
     // On Windows, only normalize the drive letter to uppercase
     // This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest
@@ -447,11 +447,11 @@ std::string NormalizeNativePath(const std::string& path) {
 #endif
 }
 
-std::string PathToNative(const std::string& path) {
+std::string ConvertAndNormalizePath(const std::string& path) {
 #if defined(_MSC_VER)
     // On Windows, convert UTF-8 to ACP and normalize the drive letter
     std::string nativePath = EncodingConverter::GetInstance()->FromUTF8ToACP(path);
-    return NormalizeNativePath(nativePath);
+    return NormalizePath(nativePath);
 #else
     // On Linux, UTF-8 is the native encoding, return as-is
     return path;

@@ -173,8 +173,8 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                            ctx.GetRegion());
     }
     // Convert to native platform encoding
-    mBasePath = PathToNative(mBasePath);
-    mFilePattern = PathToNative(mFilePattern);
+    mBasePath = ConvertAndNormalizePath(mBasePath);
+    mFilePattern = ConvertAndNormalizePath(mFilePattern);
 
     size_t len = mBasePath.size();
     if (len > 2 && mBasePath[len - 1] == '*' && mBasePath[len - 2] == '*'
@@ -232,7 +232,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeFilePaths.size(); ++i) {
-            string excludeFilePath = PathToNative(mExcludeFilePaths[i]);
+            string excludeFilePath = ConvertAndNormalizePath(mExcludeFilePaths[i]);
             if (!filesystem::path(excludeFilePath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
@@ -276,7 +276,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                                      ctx.GetRegion());
                 continue;
             }
-            mFileNameBlacklist.push_back(PathToNative(mExcludeFiles[i]));
+            mFileNameBlacklist.push_back(ConvertAndNormalizePath(mExcludeFiles[i]));
         }
     }
 
@@ -292,7 +292,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeDirs.size(); ++i) {
-            string excludeDir = PathToNative(mExcludeDirs[i]);
+            string excludeDir = ConvertAndNormalizePath(mExcludeDirs[i]);
 
             if (!filesystem::path(excludeDir).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
@@ -440,7 +440,7 @@ bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
         return false;
     }
 
-    const string nativeDir = NormalizeNativePath(dir);
+    const string nativeDir = NormalizePath(dir);
 
     for (auto& dp : mDirPathBlacklist) {
         if (_IsSubPath(dp, nativeDir)) {
@@ -465,7 +465,7 @@ bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) co
         return false;
     }
 
-    const string nativePath = NormalizeNativePath(filepath);
+    const string nativePath = NormalizePath(filepath);
 
     for (const auto& fp : mFilePathBlacklist) {
         if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
@@ -493,7 +493,7 @@ bool FileDiscoveryOptions::IsObjectInBlacklist(const string& path, const string&
     }
 
     auto const filePath = PathJoin(path, name);
-    const string nativePath = NormalizeNativePath(filePath);
+    const string nativePath = NormalizePath(filePath);
 
     for (auto& fp : mFilePathBlacklist) {
         if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
@@ -577,7 +577,7 @@ bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const
 }
 
 bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string& name) const {
-    const string nativePath = NormalizeNativePath(path);
+    const string nativePath = NormalizePath(path);
 
     size_t pos = 0;
     int16_t d = 0;

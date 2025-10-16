@@ -270,7 +270,7 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".filepath", filepath, *errMsg)) {
             return false;
         }
-        cpt.mFilePath = PathToNative(filepath);
+        cpt.mFilePath = ConvertAndNormalizePath(filepath);
 
         string statusStr;
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
