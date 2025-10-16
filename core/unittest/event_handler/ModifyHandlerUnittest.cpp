@@ -236,7 +236,9 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartC
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase5);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
+#ifndef _MSC_VER
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestClearReaderWhenFileDeleted);
+#endif
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));

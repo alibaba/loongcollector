@@ -548,6 +548,8 @@ void ModifyHandler::Handle(const Event& event) {
                                          "real path", realPath)("host path", readerArray[0]->GetHostLogPath())(
                                          "dev", readerArray[0]->GetDevInode().dev)(
                                          "inode", readerArray[0]->GetDevInode().inode));
+                            // When read with closed reader, will only read cache
+                            ForceReadLogAndPush(readerArray[0]);
                             mDevInodeReaderMap.erase(readerArray[0]->GetDevInode());
                             readerArray.pop_front();
                         }
