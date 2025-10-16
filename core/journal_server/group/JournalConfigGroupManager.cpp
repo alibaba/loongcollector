@@ -17,7 +17,6 @@
 #include "JournalConfigGroupManager.h"
 #include "../reader/JournalReader.h"
 #include "../reader/JournalFilter.h"
-#include "../checkpoint/JournalCheckpointManager.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -114,17 +113,8 @@ bool JournalConfigGroupManager::AddConfig(const std::string& configName, size_t 
             bool seekSuccess = false;
             if (config.seekPosition == "tail") {
                 seekSuccess = groupInfo->sharedReader->SeekTail();
-            } else if (config.seekPosition == "head") {
+            } else {
                 seekSuccess = groupInfo->sharedReader->SeekHead();
-            } else if (config.seekPosition == "cursor") {
-                // 对于cursor，需要从checkpoint获取实际的cursor值
-                std::string checkpointCursor = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
-                if (!checkpointCursor.empty()) {
-                    seekSuccess = groupInfo->sharedReader->SeekCursor(checkpointCursor);
-                } else {
-                    // 没有checkpoint，fallback到head
-                    seekSuccess = groupInfo->sharedReader->SeekHead();
-                }
             }
             
             if (!seekSuccess) {

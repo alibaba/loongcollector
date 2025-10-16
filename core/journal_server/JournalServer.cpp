@@ -28,16 +28,11 @@
 #include "group/JournalConfigGroupManager.h"
 #include "group/JournalConnectionSetup.h"
 #include "reader/JournalReader.h"
-#include "checkpoint/JournalCheckpointManager.h"
 #include "JournalEntryProcessor.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "common/Flags.h"
 #include "logger/Logger.h"
 #include "common/TimerManager.h"
 
-// Journal checkpoint 清理配置
-DEFINE_FLAG_INT32(journal_checkpoint_cleanup_interval_sec, "cleanup interval for journal checkpoints in seconds, default 1 hour", 3600); 
-DEFINE_FLAG_INT32(journal_checkpoint_expired_threshold_hours, "expired threshold for journal checkpoints in hours, default 24 hours", 24);
 
 using namespace std;
 
@@ -97,12 +92,6 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
     if (!validateJournalConfig(configName, idx, config, queueKey)) {
         LOG_ERROR(sLogger, ("journal input validation failed", "config not added")("config", configName)("idx", idx));
         return;
-    }
-    
-    // 尝试从磁盘加载现有检查点（用于配置更新场景）
-    bool hasExistingCheckpoint = JournalCheckpointManager::GetInstance().LoadCheckpointFromDisk(configName, idx);
-    if (hasExistingCheckpoint) {
-        LOG_INFO(sLogger, ("existing checkpoint loaded for config update", "")("config", configName)("idx", idx));
     }
     
     // 验证成功后，缓存queueKey并添加配置
@@ -169,13 +158,7 @@ void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
     // 移除config对应的连接
     JournalConfigGroupManager::GetInstance().RemoveConfig(configName, idx);
     
-    // 清理configName对应的所有checkpoints
-    size_t clearedCheckpoints = JournalCheckpointManager::GetInstance().ClearConfigCheckpoints(configName);
-    if (clearedCheckpoints > 0) {
-        LOG_INFO(sLogger, ("config checkpoints cleared", "")("config", configName)("count", clearedCheckpoints));
-    }
-    
-    LOG_INFO(sLogger, ("journal input removed with automatic connection and checkpoint cleanup", "")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("journal input removed with automatic connection cleanup", "")("config", configName)("idx", idx));
 }
 
 void JournalServer::RemoveJournalInputWithoutCleanup(const string& configName, size_t idx) {
@@ -196,8 +179,7 @@ void JournalServer::RemoveJournalInputWithoutCleanup(const string& configName, s
     // 移除config对应的连接
     JournalConfigGroupManager::GetInstance().RemoveConfig(configName, idx);
     
-    // 注意：不清理检查点，保留给配置更新后的新实例使用
-    LOG_INFO(sLogger, ("journal input removed without checkpoint cleanup", "checkpoints preserved for config update")("config", configName)("idx", idx));
+    LOG_INFO(sLogger, ("journal input removed without cleanup", "")("config", configName)("idx", idx));
 }
 
 JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) const {
@@ -413,20 +395,7 @@ void JournalServer::run() {
 // =============================================================================
 
 void JournalServer::setupTimers(TimerManager& timerManager) {
-    // 设置checkpoint清理定时器
-    timerManager.AddTimer("checkpoint_cleanup", []() {
-        size_t cleanedCheckpoints = JournalCheckpointManager::GetInstance().CleanupExpiredCheckpoints(
-            INT32_FLAG(journal_checkpoint_expired_threshold_hours));
-        if (cleanedCheckpoints > 0) {
-            LOG_INFO(sLogger, ("expired checkpoints cleaned", "")("count", cleanedCheckpoints));
-        }
-    }, std::chrono::seconds(INT32_FLAG(journal_checkpoint_cleanup_interval_sec)));
-    
-    // 设置checkpoint刷新定时器（每30秒）
-    timerManager.AddTimer("checkpoint_flush", []() {
-        size_t flushedCount = JournalCheckpointManager::GetInstance().FlushAllCheckpoints(false);
-        // Journal checkpoints flushed to disk (count: flushedCount)
-    }, std::chrono::seconds(30));
+    // No timers needed for now
 }
 
 void JournalServer::updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
@@ -636,7 +605,6 @@ bool logtail::JournalServer::validateJournalConfig(const std::string& configName
 void JournalServer::Clear() {
     lock_guard<mutex> lock(mUpdateMux);
     mPipelineNameJournalConfigsMap.clear();
-    // Note: Checkpoint cleanup is handled by JournalCheckpointManager
 }
 #endif
 

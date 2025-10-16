@@ -19,7 +19,6 @@
 #include <memory>
 
 #include "JournalConfigGroupManager.h"
-#include "checkpoint/JournalCheckpointManager.h"
 #include "reader/JournalReader.h"
 #include "logger/Logger.h"
 
@@ -95,28 +94,10 @@ bool PerformJournalSeek(const string& configName, size_t idx, JournalConfig& con
                 LOG_INFO(sLogger, ("seek to previous after tail", "")("config", configName)("idx", idx)("success", prevSuccess));
                 // Previous()失败也是正常的（比如journal为空），不影响整体成功
             }
-        } else if (config.seekPosition == "head") {
+        } else {
             // seek到开头
             seekSuccess = journalReader->SeekHead();
             LOG_INFO(sLogger, ("seek to head", "")("config", configName)("idx", idx)("success", seekSuccess));
-        } else {
-            // 尝试从checkpoint加载cursor并seek
-            string checkpointCursor = JournalCheckpointManager::GetInstance().GetCheckpoint(configName, idx);
-            if (!checkpointCursor.empty()) {
-                // 有checkpoint，seek到指定位置
-                seekSuccess = journalReader->SeekCursor(checkpointCursor);
-                LOG_INFO(sLogger, ("seek to checkpoint cursor", "")("config", configName)("idx", idx)("cursor", checkpointCursor)("success", seekSuccess));
-                
-                if (!seekSuccess) {
-                    // 如果cursor seek失败，fallback到head
-                    LOG_WARNING(sLogger, ("checkpoint cursor seek failed, falling back to head", "")("config", configName)("idx", idx)("cursor", checkpointCursor));
-                    seekSuccess = journalReader->SeekHead();
-                }
-            } else {
-                // 没有checkpoint，默认从head开始
-                seekSuccess = journalReader->SeekHead();
-                LOG_INFO(sLogger, ("no checkpoint found, seek to head", "")("config", configName)("idx", idx)("success", seekSuccess));
-            }
         }
         
         if (!seekSuccess) {

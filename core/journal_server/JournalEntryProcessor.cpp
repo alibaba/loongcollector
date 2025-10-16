@@ -18,7 +18,6 @@
 #include <memory>
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/JournalCheckpointManager.h"
 #include "common/JournalConfig.h"
 #include "common/JournalUtils.h"
 #include "common/TimeUtil.h"
@@ -233,8 +232,6 @@ void ReadJournalEntries(const string& configName,
 
             entryCount++;
             isFirstEntry = false;
-
-            JournalCheckpointManager::GetInstance().SaveCheckpoint(configName, idx, entry.cursor);
         }
 
         // 只在没有处理任何条目且可能存在问题时记录警告
