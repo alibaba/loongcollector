@@ -87,6 +87,19 @@ public:
 
     size_t TagsSize() const { return mTags.mInner.size(); }
 
+    StringView GetMetadata(StringView key) const;
+    bool HasMetadata(StringView key) const;
+    void SetMetadata(StringView key, StringView val);
+    void SetMetadata(const std::string& key, const std::string& val);
+    void SetMetadataNoCopy(const StringBuffer& key, const StringBuffer& val);
+    void SetMetadataNoCopy(StringView key, StringView val);
+    void DelMetadata(StringView key);
+
+    std::map<StringView, StringView>::const_iterator MetadataBegin() const { return mMetadata.mInner.begin(); }
+    std::map<StringView, StringView>::const_iterator MetadataEnd() const { return mMetadata.mInner.end(); }
+
+    size_t MetadataSize() const { return mMetadata.mInner.size(); }
+
     size_t DataSize() const override;
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -100,6 +113,7 @@ private:
     StringView mName;
     MetricValue mValue;
     SizedVectorTags mTags;
+    SizedMap mMetadata;
 };
 
 } // namespace logtail

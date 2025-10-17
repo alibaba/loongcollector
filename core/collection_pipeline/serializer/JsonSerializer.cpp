@@ -117,6 +117,12 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     }
                     writer.EndObject();
                 }
+                // __apm_metric_type__
+                auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
+                if (!type.empty()) {
+                    writer.Key(METRIC_RESERVED_KEY_APM_METRIC_TYPE.c_str());
+                    writer.String(type.to_string().c_str());
+                }
                 writer.EndObject();
                 res.append(jsonBuffer.GetString());
                 res.append("\n");
