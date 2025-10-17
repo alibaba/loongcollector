@@ -38,6 +38,7 @@ void MetricEvent::Reset() {
     mName = gEmptyStringView;
     mValue = MetricValue();
     mTags.Clear();
+    mMetadata.Clear();
 }
 
 void MetricEvent::SetName(const string& name) {
@@ -82,8 +83,41 @@ void MetricEvent::DelTag(StringView key) {
     mTags.Erase(key);
 }
 
+
+StringView MetricEvent::GetMetadata(StringView key) const {
+    auto it = mMetadata.mInner.find(key);
+    if (it != mMetadata.mInner.end()) {
+        return it->second;
+    }
+    return gEmptyStringView;
+}
+
+bool MetricEvent::HasMetadata(StringView key) const {
+    return mMetadata.mInner.find(key) != mMetadata.mInner.end();
+}
+
+void MetricEvent::SetMetadata(StringView key, StringView val) {
+    SetMetadataNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
+}
+
+void MetricEvent::SetMetadata(const string& key, const string& val) {
+    SetMetadataNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
+}
+
+void MetricEvent::SetMetadataNoCopy(const StringBuffer& key, const StringBuffer& val) {
+    SetMetadataNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
+}
+
+void MetricEvent::SetMetadataNoCopy(StringView key, StringView val) {
+    mMetadata.Insert(key, val);
+}
+
+void MetricEvent::DelMetadata(StringView key) {
+    mMetadata.Erase(key);
+}
+
 size_t MetricEvent::DataSize() const {
-    return PipelineEvent::DataSize() + mName.size() + logtail::DataSize(mValue) + mTags.DataSize();
+    return PipelineEvent::DataSize() + mName.size() + logtail::DataSize(mValue) + mTags.DataSize() + mMetadata.DataSize();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -116,6 +150,12 @@ Json::Value MetricEvent::ToJson(bool enableEventMeta) const {
             tags[tag.first.to_string()] = tag.second.to_string();
         }
     }
+    if (!mMetadata.mInner.empty()) {
+        Json::Value& metadata = root["metadata"];
+        for (const auto& meta : mMetadata.mInner) {
+            metadata[meta.first.to_string()] = meta.second.to_string();
+        }
+    }
     return root;
 }
 
@@ -140,6 +180,12 @@ bool MetricEvent::FromJson(const Json::Value& root) {
         Json::Value tags = root["tags"];
         for (const auto& key : tags.getMemberNames()) {
             SetTag(key, tags[key].asString());
+        }
+    }
+    if (!mMetadata.mInner.empty()) {
+        Json::Value& metadata = root["metadata"];
+        for (const auto& meta : mMetadata.mInner) {
+            metadata[meta.first.to_string()] = meta.second.to_string();
         }
     }
     return true;
