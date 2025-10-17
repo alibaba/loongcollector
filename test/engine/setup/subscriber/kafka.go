@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -145,26 +146,43 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	logger.Infof(context.Background(), "Starting to consume messages from topic: %s", k.Topic)
 
 	out := make(chan *sarama.ConsumerMessage, 1024)
+	var wg sync.WaitGroup
 	for _, pc := range partitionConsumers {
+		wg.Add(1)
 		go func(c sarama.PartitionConsumer) {
 			defer func() {
-				// Ensure proper cleanup when goroutine exits
 				logger.Debugf(context.Background(), "Partition consumer goroutine exiting")
+				wg.Done()
 			}()
-			for msg := range c.Messages() {
+			for {
 				select {
-				case out <- msg:
 				case <-ctx.Done():
-					// Exit gracefully when context is canceled
 					return
+				case msg, ok := <-c.Messages():
+					if !ok {
+						return
+					}
+					select {
+					case out <- msg:
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}(pc)
 	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
 
+LOOP:
 	for messageCount < maxMessages {
 		select {
-		case msg := <-out:
+		case msg, ok := <-out:
+			if !ok {
+				break LOOP
+			}
 			if msg == nil || len(msg.Value) == 0 {
 				continue
 			}
@@ -229,6 +247,10 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 			}
 			return []*protocol.LogGroup{logGroup}, nil
 		}
+	}
+
+	if messageCount == 0 {
+		return nil, fmt.Errorf("no messages received from kafka topic %s", k.Topic)
 	}
 
 	logger.Infof(context.Background(), "Successfully collected %d messages from topic %s", messageCount, k.Topic)

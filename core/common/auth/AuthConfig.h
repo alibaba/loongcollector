@@ -35,17 +35,17 @@ public:
     std::string TlsKeyPassword;
 
     // SASL (PLAIN/SCRAM)
-    std::string sasl_mechanism; // e.g., "PLAIN", "SCRAM-SHA-256", "SCRAM-SHA-512"
-    std::string sasl_username;
-    std::string sasl_password;
+    std::string SaslMechanism;
+    std::string SaslUsername;
+    std::string SaslPassword;
 
     // Kerberos (GSSAPI)
-    bool kerberos_enabled = false;
-    std::string kerberos_mechanisms = "GSSAPI"; // usually GSSAPI
-    std::string kerberos_service_name = "kafka";
-    std::string kerberos_principal; // required when kerberos_enabled
-    std::string kerberos_keytab; // required when kerberos_enabled
-    std::string kerberos_kinit_cmd; // optional override
+    bool KerberosEnabled = false;
+    std::string KerberosMechanisms = "GSSAPI";
+    std::string KerberosServiceName = "kafka";
+    std::string KerberosPrincipal;
+    std::string KerberosKeytab;
+    std::string KerberosKinitCmd;
 
     // Load authentication (TLS & SASL) from a JSON object.
     // The input should be the value of config["Authentication"].

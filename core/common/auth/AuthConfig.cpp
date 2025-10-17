@@ -45,22 +45,22 @@ bool AuthConfig::Load(const Json::Value& auth, std::string& errorMsg) {
 
     if (auth.isMember("SASL") && auth["SASL"].isObject()) {
         const Json::Value& sasl = auth["SASL"];
-        GetOptionalStringParam(sasl, "Mechanism", sasl_mechanism, errorMsg);
-        GetOptionalStringParam(sasl, "Username", sasl_username, errorMsg);
-        GetOptionalStringParam(sasl, "Password", sasl_password, errorMsg);
+        GetOptionalStringParam(sasl, "Mechanism", SaslMechanism, errorMsg);
+        GetOptionalStringParam(sasl, "Username", SaslUsername, errorMsg);
+        GetOptionalStringParam(sasl, "Password", SaslPassword, errorMsg);
     }
 
     if (auth.isMember("Kerberos") && auth["Kerberos"].isObject()) {
         const Json::Value& krb = auth["Kerberos"];
-        if (!GetOptionalBoolParam(krb, "Enabled", kerberos_enabled, errorMsg)) {
+        if (!GetOptionalBoolParam(krb, "Enabled", KerberosEnabled, errorMsg)) {
             return false;
         }
-        if (kerberos_enabled) {
-            GetOptionalStringParam(krb, "Mechanisms", kerberos_mechanisms, errorMsg);
-            GetOptionalStringParam(krb, "ServiceName", kerberos_service_name, errorMsg);
-            GetOptionalStringParam(krb, "Principal", kerberos_principal, errorMsg);
-            GetOptionalStringParam(krb, "Keytab", kerberos_keytab, errorMsg);
-            GetOptionalStringParam(krb, "KinitCmd", kerberos_kinit_cmd, errorMsg);
+        if (KerberosEnabled) {
+            GetOptionalStringParam(krb, "Mechanisms", KerberosMechanisms, errorMsg);
+            GetOptionalStringParam(krb, "ServiceName", KerberosServiceName, errorMsg);
+            GetOptionalStringParam(krb, "Principal", KerberosPrincipal, errorMsg);
+            GetOptionalStringParam(krb, "Keytab", KerberosKeytab, errorMsg);
+            GetOptionalStringParam(krb, "KinitCmd", KerberosKinitCmd, errorMsg);
         }
     }
 
@@ -79,26 +79,26 @@ bool AuthConfig::Validate(std::string& errorMsg) const {
         }
     }
 
-    if (!sasl_mechanism.empty()) {
-        if (sasl_username.empty() || sasl_password.empty()) {
+    if (!SaslMechanism.empty()) {
+        if (SaslUsername.empty() || SaslPassword.empty()) {
             errorMsg = "Authentication.SASL: Username and Password are required when Mechanism is set";
             return false;
         }
     }
 
-    if (kerberos_enabled) {
-        if (kerberos_principal.empty()) {
+    if (KerberosEnabled) {
+        if (KerberosPrincipal.empty()) {
             errorMsg = "Authentication.Kerberos: Principal is required when Enabled=true";
             return false;
         }
-        if (kerberos_keytab.empty()) {
+        if (KerberosKeytab.empty()) {
             errorMsg = "Authentication.Kerberos: Keytab is required when Enabled=true";
             return false;
         }
     }
 
     // Conflict: SASL (PLAIN/SCRAM) cannot be set together with Kerberos
-    if (kerberos_enabled && !sasl_mechanism.empty()) {
+    if (KerberosEnabled && !SaslMechanism.empty()) {
         errorMsg = "Authentication: Kerberos and SASL cannot be enabled together";
         return false;
     }
