@@ -15,6 +15,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -48,6 +49,18 @@ func Load(path string) error {
 	EngineLogFile = reportDir + CaseName + "_engine.log"
 	LogDir = reportDir + CaseName + "_log"
 
-	FlusherFile = reportDir + CaseName + "default_flusher.json"
+	if mkErr := os.MkdirAll(reportDir, 0o750); mkErr != nil {
+		return mkErr
+	}
+
+	FlusherFile = reportDir + CaseName + "_default_flusher.json"
+
+	if _, statErr := os.Stat(FlusherFile); os.IsNotExist(statErr) {
+		if writeErr := os.WriteFile(FlusherFile, []byte("{\"type\":\"flusher_stdout\",\"detail\":{}}\n"), 0o600); writeErr != nil {
+			return writeErr
+		}
+	} else if statErr != nil {
+		return statErr
+	}
 	return nil
 }

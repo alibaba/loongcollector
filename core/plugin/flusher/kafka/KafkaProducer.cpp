@@ -24,6 +24,7 @@
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
+#include "plugin/flusher/kafka/KafkaConstant.h"
 #include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
@@ -115,7 +116,6 @@ public:
         if (brokersStr.empty()) {
             return false;
         }
-
         if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
             return false;
         }
@@ -129,12 +129,8 @@ public:
             return false;
         }
 
-        std::string acksStr;
-        if (mConfig.RequiredAcks < 0) {
-            acksStr = "all";
-        } else {
-            acksStr = std::to_string(mConfig.RequiredAcks);
-        }
+        // 3) 投递/重试
+        std::string acksStr = (mConfig.RequiredAcks < 0) ? "all" : std::to_string(mConfig.RequiredAcks);
         if (!SetConfig(KAFKA_CONFIG_ACKS, acksStr)
             || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Timeout))
             || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.MessageTimeoutMs))
@@ -147,24 +143,27 @@ public:
                      "message.timeout.ms", mConfig.MessageTimeoutMs)("message.send.max.retries", mConfig.MaxRetries)(
                      "retry.backoff.ms", mConfig.RetryBackoffMs));
 
-        std::map<std::string, std::string> derivedConfigs;
-        KafkaUtil::DeriveApiVersionConfigs(mConfig.Version, derivedConfigs);
-        if (!derivedConfigs.empty()) {
-            LOG_INFO(sLogger,
-                     ("Apply Version derived configs",
-                      "")(KAFKA_CONFIG_API_VERSION_REQUEST,
-                          derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
-                              ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]
-                              : "<unset>")(KAFKA_CONFIG_BROKER_VERSION_FALLBACK,
-                                           derivedConfigs.count(KAFKA_CONFIG_BROKER_VERSION_FALLBACK)
-                                               ? derivedConfigs[KAFKA_CONFIG_BROKER_VERSION_FALLBACK]
-                                               : "<unset>")(KAFKA_CONFIG_API_VERSION_FALLBACK_MS,
-                                                            derivedConfigs.count(KAFKA_CONFIG_API_VERSION_FALLBACK_MS)
-                                                                ? derivedConfigs[KAFKA_CONFIG_API_VERSION_FALLBACK_MS]
-                                                                : "<unset>"));
-            for (const auto& kv : derivedConfigs) {
-                if (!SetConfig(kv.first, kv.second)) {
-                    return false;
+        // 4) 版本派生配置
+        {
+            std::map<std::string, std::string> derivedConfigs;
+            KafkaUtil::DeriveApiVersionConfigs(mConfig.Version, derivedConfigs);
+            if (!derivedConfigs.empty()) {
+                LOG_INFO(sLogger,
+                         ("Apply Version derived configs", "")(KAFKA_CONFIG_API_VERSION_REQUEST,
+                                                               derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
+                                                                   ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]
+                                                                   : "<unset>")(
+                             KAFKA_CONFIG_BROKER_VERSION_FALLBACK,
+                             derivedConfigs.count(KAFKA_CONFIG_BROKER_VERSION_FALLBACK)
+                                 ? derivedConfigs[KAFKA_CONFIG_BROKER_VERSION_FALLBACK]
+                                 : "<unset>")(KAFKA_CONFIG_API_VERSION_FALLBACK_MS,
+                                              derivedConfigs.count(KAFKA_CONFIG_API_VERSION_FALLBACK_MS)
+                                                  ? derivedConfigs[KAFKA_CONFIG_API_VERSION_FALLBACK_MS]
+                                                  : "<unset>"));
+                for (const auto& kv : derivedConfigs) {
+                    if (!SetConfig(kv.first, kv.second)) {
+                        return false;
+                    }
                 }
             }
         }
@@ -185,6 +184,95 @@ public:
                 return false;
             }
             rd_kafka_conf_set_default_topic_conf(mConf, tconf);
+        }
+
+        const bool enableTLS = mConfig.Authentication.TlsEnabled;
+        const bool enableKerberos = mConfig.Authentication.KerberosEnabled;
+        const bool enableSASL = !mConfig.Authentication.SaslMechanism.empty();
+
+        // 6.1 security.protocol 只设置一次
+        std::string securityProtocol;
+        if (enableKerberos || enableSASL) {
+            securityProtocol = enableTLS ? "sasl_ssl" : "sasl_plaintext";
+        } else if (enableTLS) {
+            securityProtocol = "ssl";
+        }
+        if (!securityProtocol.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, securityProtocol)) {
+                return false;
+            }
+        }
+
+        if (enableTLS) {
+            if (!mConfig.Authentication.TlsCaFile.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.TlsCaFile)) {
+                    return false;
+                }
+            }
+            const bool hasCert = !mConfig.Authentication.TlsCertFile.empty();
+            const bool hasKey = !mConfig.Authentication.TlsKeyFile.empty();
+            if (hasCert != hasKey) {
+                LOG_ERROR(sLogger,
+                          ("Kafka TLS client auth config error",
+                           "both TLS.CertFile and TLS.KeyFile must be set together, or both unset"));
+                return false;
+            }
+            if (hasCert) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.TlsCertFile)) {
+                    return false;
+                }
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.Authentication.TlsKeyFile)) {
+                    return false;
+                }
+                if (!mConfig.Authentication.TlsKeyPassword.empty()) {
+                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.Authentication.TlsKeyPassword)) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        // 6.3 Kerberos 或 SASL
+        if (enableKerberos) {
+            // mechanisms
+            const std::string mechanism = mConfig.Authentication.KerberosMechanisms.empty()
+                ? std::string("GSSAPI")
+                : mConfig.Authentication.KerberosMechanisms;
+            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mechanism)) {
+                return false;
+            }
+            if (!mConfig.Authentication.KerberosServiceName.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.Authentication.KerberosServiceName)) {
+                    return false;
+                }
+            }
+            // 不再强制拼接/注入 kinit 命令，除非用户显式提供。
+            // librdkafka 在设置 principal/keytab 后会使用其内置的 kinit 逻辑处理票据获取与续约。
+            if (!mConfig.Authentication.KerberosKinitCmd.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.Authentication.KerberosKinitCmd)) {
+                    return false;
+                }
+            }
+            if (!mConfig.Authentication.KerberosPrincipal.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.Authentication.KerberosPrincipal)) {
+                    return false;
+                }
+            }
+            if (!mConfig.Authentication.KerberosKeytab.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.Authentication.KerberosKeytab)) {
+                    return false;
+                }
+            }
+        } else if (enableSASL) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mConfig.Authentication.SaslMechanism)) {
+                return false;
+            }
+            if (!SetConfig(KAFKA_CONFIG_SASL_USERNAME, mConfig.Authentication.SaslUsername)) {
+                return false;
+            }
+            if (!SetConfig(KAFKA_CONFIG_SASL_PASSWORD, mConfig.Authentication.SaslPassword)) {
+                return false;
+            }
         }
 
         for (const auto& kv : mConfig.CustomConfig) {
