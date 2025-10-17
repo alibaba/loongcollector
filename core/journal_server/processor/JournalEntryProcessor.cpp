@@ -38,40 +38,63 @@ namespace {
  * @param journalReader journal reader指针
  * @param configName 配置名称
  * @param idx 配置索引
+ * @param cursorSeekFallback cursor回退位置（"head" 或 "tail"）
  * @param errorContext 错误上下文描述
  * @return true 如果恢复成功，false 如果恢复失败
  */
 bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journalReader,
                              const string& configName,
                              size_t idx,
+                             const string& cursorSeekFallback,
                              const string& errorContext) {
     LOG_WARNING(sLogger,
                ("journal error detected, attempting recovery",
                 errorContext)
-               ("config", configName)("idx", idx));
+               ("config", configName)("idx", idx)("fallback", cursorSeekFallback));
     
-    // 尝试恢复策略1：重新seek到head（当前可读的最早日志）
-    if (journalReader->SeekHead()) {
-        LOG_INFO(sLogger,
-                ("recovered from journal error by seeking to head",
-                 "continuing from earliest available entry")
-                ("config", configName)("idx", idx)("context", errorContext));
-        return true;
+    // 根据配置的cursorSeekFallback决定恢复策略
+    bool seekSuccess = false;
+    if (cursorSeekFallback == "head") {
+        // 恢复策略1：重新seek到head（当前可读的最早日志）
+        seekSuccess = journalReader->SeekHead();
+        if (seekSuccess) {
+            LOG_INFO(sLogger,
+                    ("recovered from journal error by seeking to head",
+                     "continuing from earliest available entry")
+                    ("config", configName)("idx", idx)("context", errorContext));
+        }
+    } else if (cursorSeekFallback == "tail") {
+        // 恢复策略2：重新seek到tail（最新日志）
+        seekSuccess = journalReader->SeekTail();
+        if (seekSuccess) {
+            LOG_INFO(sLogger,
+                    ("recovered from journal error by seeking to tail",
+                     "continuing from latest entry")
+                    ("config", configName)("idx", idx)("context", errorContext));
+        }
+    } else {
+        LOG_WARNING(sLogger,
+                   ("invalid cursorSeekFallback value, using head as default",
+                    cursorSeekFallback)
+                   ("config", configName)("idx", idx));
+        seekSuccess = journalReader->SeekHead();
     }
     
-    // 如果SeekHead失败，可以在这里添加其他恢复策略
-    // 例如：重新打开连接、尝试SeekTail等
+    if (seekSuccess) {
+        return true;
+    }
     
     LOG_ERROR(sLogger,
              ("failed to recover from journal error",
               "all recovery attempts failed")
-             ("config", configName)("idx", idx)("context", errorContext));
+             ("config", configName)("idx", idx)("context", errorContext)("fallback", cursorSeekFallback));
     return false;
 }
 
 bool MoveToNextJournalEntry(const string& configName,
                             size_t idx,
                             const std::shared_ptr<SystemdJournalReader>& journalReader,
+                            const string& cursorSeekFallback,
                             int entryCount) {
     try {
         // 统一处理：每次都先移动到下一条（无论是 head 还是 tail 模式）
@@ -92,7 +115,8 @@ bool MoveToNextJournalEntry(const string& configName,
         return RecoverFromJournalError(
             journalReader, 
             configName, 
-            idx, 
+            idx,
+            cursorSeekFallback,
             "navigation error during Next(), cursor may be invalidated by log rotation");
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
@@ -101,7 +125,7 @@ bool MoveToNextJournalEntry(const string& configName,
         
         // 尝试错误恢复
         string errorMsg = string("exception during navigation: ") + e.what();
-        if (RecoverFromJournalError(journalReader, configName, idx, errorMsg)) {
+        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorMsg)) {
             // 恢复成功，可以继续处理
             return true;
         }
@@ -112,7 +136,7 @@ bool MoveToNextJournalEntry(const string& configName,
                    "")("config", configName)("idx", idx)("entries_processed", entryCount));
         
         // 尝试错误恢复
-        if (RecoverFromJournalError(journalReader, configName, idx, 
+        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback,
                                    "unknown exception during navigation")) {
             // 恢复成功，可以继续处理
             return true;
@@ -124,6 +148,7 @@ bool MoveToNextJournalEntry(const string& configName,
 bool ReadAndValidateEntry(const string& configName,
                           size_t idx,
                           const std::shared_ptr<SystemdJournalReader>& journalReader,
+                          const string& cursorSeekFallback,
                           JournalEntry& entry) {
     try {
         // 读取当前entry
@@ -145,7 +170,7 @@ bool ReadAndValidateEntry(const string& configName,
                        ("config", configName)("idx", idx));
             
             // 尝试错误恢复
-            if (RecoverFromJournalError(journalReader, configName, idx, errorContext)) {
+            if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorContext)) {
                 // 恢复成功，重试读取
                 if (journalReader->GetEntry(entry)) {
                     return true;
@@ -175,7 +200,7 @@ bool ReadAndValidateEntry(const string& configName,
         
         // 尝试错误恢复
         string errorMsg = string("exception during GetEntry: ") + e.what();
-        if (RecoverFromJournalError(journalReader, configName, idx, errorMsg)) {
+        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorMsg)) {
             // 恢复成功，重试读取
             return journalReader->GetEntry(entry);
         }
@@ -185,7 +210,7 @@ bool ReadAndValidateEntry(const string& configName,
         entry = JournalEntry();
         
         // 尝试错误恢复
-        if (RecoverFromJournalError(journalReader, configName, idx, 
+        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback,
                                    "unknown exception during GetEntry")) {
             // 恢复成功，重试读取
             return journalReader->GetEntry(entry);
@@ -304,13 +329,13 @@ void ReadJournalEntries(const string& configName,
             // Step 1: 先移动到下一条（统一处理，无需判断 seekPosition）
             // - head 模式：SeekHead() 后第一次 Next() 移动到第一条
             // - tail 模式：SeekTail() + Previous() 后第一次 Next() 移动到新日志
-            if (!MoveToNextJournalEntry(configName, idx, journalReader, entryCount)) {
+            if (!MoveToNextJournalEntry(configName, idx, journalReader, config.cursorSeekFallback, entryCount)) {
                 break;
             }
 
             // Step 2: 读取和验证entry
             JournalEntry entry;
-            if (!ReadAndValidateEntry(configName, idx, journalReader, entry)) {
+            if (!ReadAndValidateEntry(configName, idx, journalReader, config.cursorSeekFallback, entry)) {
                 // 如果entry为空，则跳过
                 if (entry.fields.empty() && !entry.cursor.empty()) {
                     entryCount++;

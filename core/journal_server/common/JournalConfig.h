@@ -93,9 +93,9 @@ struct JournalConfig {
             fixedCount++;
         }
         
-        // 验证seek fallback
+        // 验证seek fallback（参照fluentbit的行为，默认head）
         if (cursorSeekFallback != "head" && cursorSeekFallback != "tail") {
-            cursorSeekFallback = "tail";  // 默认tail
+            cursorSeekFallback = "head";  // 默认head
             fixedCount++;
         }
         
