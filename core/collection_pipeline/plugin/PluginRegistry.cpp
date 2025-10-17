@@ -62,6 +62,7 @@
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
 #include "plugin/input/InputPrometheus.h"
+#include "plugin/input/InputJournal.h"
 #include "plugin/processor/inner/ProcessorPromParseMetricNative.h"
 #include "plugin/processor/inner/ProcessorPromRelabelMetricNative.h"
 #endif
@@ -176,6 +177,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
+    RegisterContinuousInputCreator(new StaticInputCreator<InputJournal>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 
