@@ -23,6 +23,7 @@
 
 #include "config/TaskConfig.h"
 #include "task_pipeline/Task.h"
+#include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail {
 
@@ -46,6 +47,7 @@ private:
     bool mIsOnetime = false;
     std::unique_ptr<Json::Value> mConfig;
     uint32_t mCreateTime = 0;
+    mutable TaskPipelineContext mContext;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TaskPipelineUnittest;
