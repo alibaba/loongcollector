@@ -103,6 +103,7 @@ public:
     void TestUnknownPartitionerType();
     void TestGeneratePartitionKey_NotHash();
     void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
+    void TestInitTLSCertKeyMismatch();
 
 protected:
     void SetUp();
@@ -539,6 +540,15 @@ void FlusherKafkaUnittest::TestGeneratePartitionKey_NotHash() {
     APSARA_TEST_EQUAL(std::string(), mFlusher->GeneratePartitionKey(ev));
 }
 
+void FlusherKafkaUnittest::TestInitTLSCertKeyMismatch() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CertFile"] = "/tmp/dummy.crt";
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
 void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
     Json::Value optionalGoPipeline;
     Json::Value config = CreateKafkaTestConfig(mTopic);
@@ -591,6 +601,7 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitTLSCertKeyMismatch)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)

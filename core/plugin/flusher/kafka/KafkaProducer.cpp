@@ -188,28 +188,28 @@ public:
         }
 
         // TLS (TLS-only for this phase) - keep inline style consistent with existing code
-        if (mConfig.Authentication.tls_enabled) {
+        if (mConfig.Authentication.TlsEnabled) {
             if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, "ssl")) {
                 return false;
             }
 
-            if (!mConfig.Authentication.tls_ca_file.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.tls_ca_file)) {
+            if (!mConfig.Authentication.TlsCaFile.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.TlsCaFile)) {
                     return false;
                 }
             }
 
-            const bool hasCert = !mConfig.Authentication.tls_cert_file.empty();
+            const bool hasCert = !mConfig.Authentication.TlsCertFile.empty();
 
             if (hasCert) {
-                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.tls_cert_file)) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.TlsCertFile)) {
                     return false;
                 }
-                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.Authentication.tls_key_file)) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.Authentication.TlsKeyFile)) {
                     return false;
                 }
-                if (!mConfig.Authentication.tls_key_password.empty()) {
-                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.Authentication.tls_key_password)) {
+                if (!mConfig.Authentication.TlsKeyPassword.empty()) {
+                    if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.Authentication.TlsKeyPassword)) {
                         return false;
                     }
                 }

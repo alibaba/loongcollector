@@ -31,15 +31,15 @@ bool AuthConfig::Load(const Json::Value& auth, std::string& errorMsg) {
 
     if (auth.isMember("TLS") && auth["TLS"].isObject()) {
         const Json::Value& tls = auth["TLS"];
-        if (!GetOptionalBoolParam(tls, "Enabled", tls_enabled, errorMsg)) {
+        if (!GetOptionalBoolParam(tls, "Enabled", TlsEnabled, errorMsg)) {
             return false;
         }
-        if (tls_enabled) {
+        if (TlsEnabled) {
             // optional paths/password
-            GetOptionalStringParam(tls, "CAFile", tls_ca_file, errorMsg);
-            GetOptionalStringParam(tls, "CertFile", tls_cert_file, errorMsg);
-            GetOptionalStringParam(tls, "KeyFile", tls_key_file, errorMsg);
-            GetOptionalStringParam(tls, "KeyPassword", tls_key_password, errorMsg);
+            GetOptionalStringParam(tls, "CAFile", TlsCaFile, errorMsg);
+            GetOptionalStringParam(tls, "CertFile", TlsCertFile, errorMsg);
+            GetOptionalStringParam(tls, "KeyFile", TlsKeyFile, errorMsg);
+            GetOptionalStringParam(tls, "KeyPassword", TlsKeyPassword, errorMsg);
         }
     }
 
@@ -49,9 +49,9 @@ bool AuthConfig::Load(const Json::Value& auth, std::string& errorMsg) {
 bool AuthConfig::Validate(std::string& errorMsg) const {
     errorMsg.clear();
 
-    if (tls_enabled) {
-        const bool hasCert = !tls_cert_file.empty();
-        const bool hasKey = !tls_key_file.empty();
+    if (TlsEnabled) {
+        const bool hasCert = !TlsCertFile.empty();
+        const bool hasKey = !TlsKeyFile.empty();
         if (hasCert != hasKey) {
             errorMsg = "Authentication.TLS: CertFile and KeyFile must be set together";
             return false;

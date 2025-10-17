@@ -27,11 +27,11 @@ namespace logtail {
 class AuthConfig {
 public:
     // TLS/SSL
-    bool tls_enabled = false;
-    std::string tls_ca_file;
-    std::string tls_cert_file;
-    std::string tls_key_file;
-    std::string tls_key_password;
+    bool TlsEnabled = false;
+    std::string TlsCaFile;
+    std::string TlsCertFile;
+    std::string TlsKeyFile;
+    std::string TlsKeyPassword;
 
     // Load authentication (TLS-only for this phase) from a JSON object.
     // The input should be the value of config["Authentication"].
