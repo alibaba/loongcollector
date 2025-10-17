@@ -206,6 +206,11 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
                 += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(), e.GetTimestampNanosecond() ? 19U : 10U);
             contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].mLabelSize);
             logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
+            // Add metadata
+            auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
+            if (!type.empty()) {
+                contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_APM_METRIC_TYPE.size(), type.size());
+            }
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             if (e.GetValue<UntypedMultiDoubleValues>()->ValuesSize() == 0) {
                 LOG_WARNING(sLogger,
@@ -334,6 +339,16 @@ void SLSEventGroupSerializer::SerializeLogEvent(LogGroupSerializer& serializer,
 //      label2: value2
 //      value1: 123
 //      value2: 456
+// Metric with __apm_metric_type__ in Metadata
+// event: {"labels": {"label1": "value1", "label2": "value2"}, "values": {"value1": 123, "value2": 456}, "metadata": {"__apm_metric_type__": "app"}}
+// result:
+//   __time__: 1234567890
+//   content:
+//      __label__: label1#$#value1|label2#$#value2
+//      __time_nano__: 1234567890
+//      __name__: value
+//      __value__: 123
+//      __apm_metric_type__: app
 void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serializer,
                                                    BatchedEvents& group,
                                                    std::vector<MetricEventContentCacheItem>& metricEventContentCache,
@@ -357,6 +372,10 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             serializer.AddLogContentMetricTimeNano(e);
             serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].mMetricEventContentCache[0]);
             serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
+            auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
+            if (!type.empty()) {
+                serializer.AddLogContent(METRIC_RESERVED_KEY_APM_METRIC_TYPE, type);
+            }
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
             if (metricEventContentCache[i].mMetricEventContentCache.size() != multiValue->ValuesSize()) {
