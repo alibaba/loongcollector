@@ -15,6 +15,7 @@
 #include "plugin/flusher/file/FlusherFile.h"
 
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/FileSystemUtil.h"
 
 using namespace std;
 
@@ -39,6 +40,7 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
+    mFilePath = ConvertAndNormalizeNativePath(mFilePath);
     // MaxFileSize
     GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles

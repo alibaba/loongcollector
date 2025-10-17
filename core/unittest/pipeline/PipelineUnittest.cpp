@@ -77,7 +77,11 @@ protected:
 
 private:
     const string configName = "test_config";
+#if defined(_MSC_VER)
+    const filesystem::path filepath = "C:\\path\\to\\test";
+#else
     const filesystem::path filepath = "/path/to/test";
+#endif
 };
 
 void PipelineUnittest::OnSuccessfulInit() const {

@@ -66,6 +66,7 @@ public:
     static void SetUpTestCase() {
         gRootDir = GetProcessExecutionDir() + "var" + PATH_SEPARATOR;
 #if defined(_MSC_VER)
+        gRootDir = NormalizeNativePath(gRootDir);
         gTestMatrix = {
             {"log", "log\\app\\0", "log\\app\\1", 0, false, true, true, false, true},
             {"*\\log", "app\\log\\0", "app\\log\\1", 0, true, true, false, false, true},
