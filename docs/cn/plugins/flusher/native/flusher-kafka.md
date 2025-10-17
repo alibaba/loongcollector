@@ -101,13 +101,9 @@ flushers:
     HashKeys: ["content.service", "content.user"]
 ```
 
-说明：
-- 仅支持从 `content.*` 中取值生成 Key；若键值缺失则不设置消息 Key（按空 Key 发送，随机分区）。
-- 当前实现按事件逐条发送，Key 不同的事件由客户端路由至对应分区。
-
 ## TLS配置
 
-支持通过 TLS/SSL 安全连接到 Kafka 集群。TLS 配置支持两种方式：
+支持通过 TLS/SSL 安全连接到 Kafka 集群。
 
 ```yaml
 flushers:
