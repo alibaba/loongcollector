@@ -16,12 +16,12 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <map>
-#include <mutex>
 #include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "../common/JournalConfig.h"
 
@@ -32,18 +32,18 @@ struct JournalEntry;
 class SystemdJournalReader;
 
 /**
- * @brief Journal Reader管理器
+ * @brief Journal连接管理器
  * 
- * 设计目标：
- * 1. 每个配置拥有独立的journal reader
- * 2. 每个reader有独立的fd，不共享
- * 3. 简化管理逻辑，提高隔离性
+ * 负责管理journal配置和连接的生命周期：
+ * 1. 每个配置拥有独立的journal reader/连接
+ * 2. 管理配置到连接的映射关系
+ * 3. 提供连接池统计和管理接口
  */
-class JournalReaderManager {
+class JournalConnectionManager {
 public:
     using ConfigHandler = std::function<void(const std::string& configName, size_t idx, const JournalEntry& entry)>;
     
-    static JournalReaderManager& GetInstance();
+    static JournalConnectionManager& GetInstance();
     
     // 初始化管理器
     bool Initialize();
@@ -51,10 +51,10 @@ public:
     // 清理资源
     void Cleanup();
     
-    // 添加配置（创建独立的reader）
+    // 添加配置（创建独立的连接）
     bool AddConfig(const std::string& configName, size_t idx, const JournalConfig& config, const ConfigHandler& handler);
     
-    // 移除配置（关闭并删除reader）
+    // 移除配置（关闭并删除连接）
     void RemoveConfig(const std::string& configName, size_t idx);
     
     // 获取统计信息
@@ -63,36 +63,49 @@ public:
         size_t activeConnections;
         size_t invalidConnections;
         std::vector<std::string> connectionKeys;
-        
-        // 保持兼容性的字段（已废弃）
-        int totalGroups;
-        int sharedInotifyInstances;
-        std::vector<std::string> groupKeys;
-        size_t totalConnections;
+        size_t totalConnections;  // 总连接数（与totalConfigs相同）
     };
     Stats GetStats() const;
     
-    // 获取指定配置的reader
-    std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName, size_t idx) const;
+    // 获取指定配置的连接（reader）
+    std::shared_ptr<SystemdJournalReader> GetConnection(const std::string& configName, size_t idx) const;
     
-    // 获取使用指定reader的配置（现在每个reader只对应一个配置）
-    std::vector<std::pair<std::string, size_t>> GetConfigsUsingReader(const std::shared_ptr<SystemdJournalReader>& reader) const;
+    // 获取指定配置
+    JournalConfig GetConfig(const std::string& configName, size_t idx) const;
+    
+    // 更新配置的needsSeek状态
+    void UpdateConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek);
+    
+    // 获取所有配置（用于遍历）
+    std::map<std::pair<std::string, size_t>, JournalConfig> GetAllConfigs() const;
+    
+    // 获取使用指定连接的配置（每个连接只对应一个配置）
+    std::vector<std::pair<std::string, size_t>> GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const;
     
     // 强制重置指定连接
     bool ForceResetConnection(const std::string& configName, size_t idx);
     
     // 获取当前连接数量
     size_t GetConnectionCount() const;
+    
+    /**
+     * @brief 执行 journal seek 操作
+     * @param configName 配置名称
+     * @param idx 配置索引
+     * @param forceSeek 是否强制执行 seek（忽略 needsSeek 标记）
+     * @return seek 是否成功
+     */
+    bool PerformSeek(const std::string& configName, size_t idx, bool forceSeek = false);
 
 private:
-    JournalReaderManager() = default;
-    ~JournalReaderManager() = default;
+    JournalConnectionManager() = default;
+    ~JournalConnectionManager() = default;
     
     // 禁用拷贝和移动
-    JournalReaderManager(const JournalReaderManager&) = delete;
-    JournalReaderManager& operator=(const JournalReaderManager&) = delete;
-    JournalReaderManager(JournalReaderManager&&) = delete;
-    JournalReaderManager& operator=(JournalReaderManager&&) = delete;
+    JournalConnectionManager(const JournalConnectionManager&) = delete;
+    JournalConnectionManager& operator=(const JournalConnectionManager&) = delete;
+    JournalConnectionManager(JournalConnectionManager&&) = delete;
+    JournalConnectionManager& operator=(JournalConnectionManager&&) = delete;
     
     // 生成配置的唯一key
     std::string makeConfigKey(const std::string& configName, size_t idx) const;
@@ -103,7 +116,7 @@ private:
         size_t idx;
         JournalConfig config;
         ConfigHandler handler;
-        std::shared_ptr<SystemdJournalReader> reader;  // 每个配置独立的reader
+        std::shared_ptr<SystemdJournalReader> reader;  // 每个配置独立的reader/连接
     };
     
     std::map<std::string, ConfigInfo> mConfigs;  // key: "configName:idx"
@@ -112,3 +125,4 @@ private:
 };
 
 } // namespace logtail
+

@@ -19,7 +19,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/JournalConfig.h"
-#include "common/JournalUtils.h"
+#include "common/JournalUtils.h" // IWYU pragma: keep
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "logger/Logger.h"
@@ -29,7 +29,9 @@
 
 using namespace std;
 
-namespace logtail::impl {
+namespace logtail {
+
+namespace {
 
 bool MoveToNextJournalEntry(const string& configName,
                             size_t idx,
@@ -188,6 +190,8 @@ bool CreateAndPushEventGroup(
     return true;
 }
 
+} // anonymous namespace
+
 void ReadJournalEntries(const string& configName,
                         size_t idx,
                         const JournalConfig& config,
@@ -251,4 +255,4 @@ void ReadJournalEntries(const string& configName,
     }
 }
 
-} // namespace logtail::impl
+} // namespace logtail

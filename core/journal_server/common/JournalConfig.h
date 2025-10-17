@@ -42,7 +42,7 @@ struct JournalConfig {
     bool kernel = true;                      // 启用内核日志过滤器
 
     // 性能配置
-    // 注意：已移除resetIntervalSecond配置，连接永远不重建
+    // 注意：与Go插件不同已移除resetIntervalSecond配置，连接永远不重建
     int maxEntriesPerBatch = 1000;           // 每批最大条目数
 
     // 字段处理配置
@@ -58,7 +58,6 @@ struct JournalConfig {
     
     // 运行时状态（在验证期间设置）
     mutable QueueKey queueKey = -1;  // 验证后缓存的队列键值（-1 = 未验证）
-    mutable std::string lastSeekCheckpoint;  // 我们成功定位到的最后一个检查点
     mutable bool needsSeek = true;  // 下次读取时是否需要执行定位
     
     JournalConfig() = default;

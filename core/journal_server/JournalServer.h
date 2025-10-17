@@ -25,12 +25,11 @@
 
 #include "runner/InputRunner.h"
 #include "common/JournalConfig.h"
-#include "reader/JournalReaderManager.h"
 
 namespace logtail {
 
 // Forward declarations
-class JournalReaderManager;
+class JournalConnectionManager;
 class JournalConnectionInstance;
 class SystemdJournalReader;
 class PipelineEventGroup;
@@ -86,15 +85,14 @@ public:
     void RemoveJournalInput(const std::string& configName, size_t idx);
     void RemoveJournalInputWithoutCleanup(const std::string& configName, size_t idx);
 
-    // Configuration access
-    JournalConfig GetJournalConfig(const std::string& name, size_t idx) const;
-    
     // Update configuration needsSeek status
     void UpdateJournalConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek);
     
-    const std::unordered_map<std::string, std::map<size_t, JournalConfig>>& GetAllJournalConfigs() const {
-        return mPipelineNameJournalConfigsMap;
-    }
+    /**
+     * @brief 获取所有配置
+     * @return 所有配置的映射
+     */
+    std::map<std::pair<std::string, size_t>, JournalConfig> GetAllJournalConfigs() const;
 
     // =============================================================================
     // 连接池管理 - Connection Pool Management
@@ -149,19 +147,6 @@ public:
      */
     void CleanupEpollMonitoring(const std::string& configName, size_t idx);
     
-    // =============================================================================
-    // 5. 配置管理 - Configuration Management
-    // =============================================================================
-    
-    /**
-     * @brief 启用配置管理（每个配置独立的journal reader）
-     */
-    void EnableConfigGrouping();
-    
-    /**
-     * @brief 禁用配置管理（调试用）
-     */
-    void DisableConfigGrouping();
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -180,8 +165,7 @@ private:
     // =============================================================================
     void updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void processSpecificJournalConfig(const std::string& configName, size_t idx);
-    void processJournalEventForAllConfigs(const std::shared_ptr<SystemdJournalReader>& reader);
-    bool validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
+    bool validateAndGetQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
 
     // =============================================================================
     // 成员变量 - Member Variables
@@ -194,18 +178,13 @@ private:
     // 全局 epoll FD 管理 - Global Epoll FD Management
     int mGlobalEpollFD{-1};
     mutable std::mutex mEpollMutex;
-    
-    // 配置管理 - Configuration Management
-    bool mConfigGroupingEnabled{false};
-    mutable std::mutex mGroupingMutex;
 
     // 初始化状态管理 - Initialization State Management
     bool mIsInitialized = false;
     mutable std::mutex mInitMux;
 
-    // 配置存储 - Configuration Storage (accessed by main thread and journal runner thread)
+    // 配置存储已移至 JournalConnectionManager
     mutable std::mutex mUpdateMux;
-    std::unordered_map<std::string, std::map<size_t, JournalConfig>> mPipelineNameJournalConfigsMap;
 };
 
 } // namespace logtail 

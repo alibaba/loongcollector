@@ -24,8 +24,7 @@
 #include <errno.h>
 #endif
 
-#include "reader/JournalReaderManager.h"
-#include "connection/JournalConnectionSetup.h"
+#include "connection/JournalConnectionManager.h"
 #include "reader/JournalReader.h"
 #include "processor/JournalEntryProcessor.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -49,11 +48,8 @@ void JournalServer::Init() {
     
     mThreadRes = async(launch::async, &JournalServer::run, this);
     
-    // 初始化配置管理器
-    JournalReaderManager::GetInstance().Initialize();
-    
-    // 启用配置管理
-    EnableConfigGrouping();
+    // 初始化连接管理器
+    JournalConnectionManager::GetInstance().Initialize();
     
     mIsInitialized = true;
     LOG_INFO(sLogger, ("JournalServer initialized", ""));
@@ -69,25 +65,24 @@ void JournalServer::Stop() {
         mThreadRes.get();
     }
     
-    // 清理配置管理器
-    JournalReaderManager::GetInstance().Cleanup();
+    // 清理连接管理器
+    JournalConnectionManager::GetInstance().Cleanup();
     
     mIsInitialized = false;
     LOG_INFO(sLogger, ("JournalServer stopped", ""));
 }
 
 bool JournalServer::HasRegisteredPlugins() const {
-    lock_guard<mutex> lock(mUpdateMux);
-    return !mPipelineNameJournalConfigsMap.empty();
+    return JournalConnectionManager::GetInstance().GetConnectionCount() > 0;
 }
 // =============================================================================
 // 2. 配置管理 - Configuration Management
 // =============================================================================
 
 void JournalServer::AddJournalInput(const string& configName, size_t idx, const JournalConfig& config) {
-    // 首先验证配置
+    // 首先验证配置并获取队列键
     QueueKey queueKey = 0;
-    if (!validateJournalConfig(configName, idx, config, queueKey)) {
+    if (!validateAndGetQueueKey(configName, idx, config, queueKey)) {
         LOG_ERROR(sLogger, ("journal input validation failed", "config not added")("config", configName)("idx", idx));
         return;
     }
@@ -96,114 +91,52 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
     JournalConfig validatedConfig = config;
     validatedConfig.queueKey = queueKey;
     
-    {
-        lock_guard<mutex> lock(mUpdateMux);
-        mPipelineNameJournalConfigsMap[configName][idx] = validatedConfig;
-        
-        LOG_INFO(sLogger, ("journal input added after validation", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey)("total_pipelines", mPipelineNameJournalConfigsMap.size()));
-    }
+    LOG_INFO(sLogger, ("journal input validated", "")("config", configName)("idx", idx)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey));
     
-    // 检查是否启用配置管理
-    {
-        std::lock_guard<std::mutex> groupingLock(mGroupingMutex);
-        if (mConfigGroupingEnabled) {
-            // 使用配置管理器
-            auto groupManager = &JournalReaderManager::GetInstance();
-            
-            // 创建配置处理器
-            auto handler = [this, configName, idx](const std::string&, size_t, const JournalEntry&) {
-                // 处理 journal 条目
-                processSpecificJournalConfig(configName, idx);
-            };
-            
-            if (groupManager->AddConfig(configName, idx, validatedConfig, handler)) {
-                LOG_INFO(sLogger, ("config added to manager", "")("config", configName)("idx", idx));
-                
-                // 记录统计信息
-                auto stats = groupManager->GetStats();
-                LOG_INFO(sLogger, ("manager stats", "")("total_configs", stats.totalConfigs)("active_connections", stats.activeConnections));
-                
-                return;
-            } else {
-                LOG_ERROR(sLogger, ("failed to add config to manager", "")("config", configName)("idx", idx));
-                return;
-            }
-        } else {
-            LOG_ERROR(sLogger, ("configuration management is disabled", "")("config", configName)("idx", idx));
-            return;
-        }
+    // 使用配置管理器添加配置
+    auto connectionManager = &JournalConnectionManager::GetInstance();
+    
+    // 创建配置处理器
+    auto handler = [this, configName, idx](const std::string&, size_t, const JournalEntry&) {
+        // 处理 journal 条目
+        processSpecificJournalConfig(configName, idx);
+    };
+    
+    if (connectionManager->AddConfig(configName, idx, validatedConfig, handler)) {
+        LOG_INFO(sLogger, ("config added to manager", "")("config", configName)("idx", idx));
+        
+        // 记录统计信息
+        auto stats = connectionManager->GetStats();
+        LOG_INFO(sLogger, ("manager stats", "")("total_configs", stats.totalConfigs)("active_connections", stats.activeConnections));
+    } else {
+        LOG_ERROR(sLogger, ("failed to add config to manager", "")("config", configName)("idx", idx));
     }
 }
 
 void JournalServer::RemoveJournalInput(const string& configName, size_t idx) {
-    {
-        lock_guard<mutex> lock(mUpdateMux);
-        auto configItr = mPipelineNameJournalConfigsMap.find(configName);
-        // 如果配置存在，则移除
-        if (configItr != mPipelineNameJournalConfigsMap.end()) {
-            configItr->second.erase(idx);
-            // 如果配置为空，则移除整个配置
-            if (configItr->second.empty()) {
-                // 移除整个配置
-                mPipelineNameJournalConfigsMap.erase(configItr);
-            }
-        }
-    }
-    
     // 清理 epoll 监控
     CleanupEpollMonitoring(configName, idx);
     
-    // 移除config对应的连接
-    JournalReaderManager::GetInstance().RemoveConfig(configName, idx);
+    // 移除config对应的连接（同时会移除配置）
+    JournalConnectionManager::GetInstance().RemoveConfig(configName, idx);
     
     LOG_INFO(sLogger, ("journal input removed with automatic connection cleanup", "")("config", configName)("idx", idx));
 }
 
 void JournalServer::RemoveJournalInputWithoutCleanup(const string& configName, size_t idx) {
-    {
-        lock_guard<mutex> lock(mUpdateMux);
-        auto configItr = mPipelineNameJournalConfigsMap.find(configName);
-        // 如果配置存在，则移除
-        if (configItr != mPipelineNameJournalConfigsMap.end()) {
-            configItr->second.erase(idx);
-            // 如果配置为空，则移除整个配置
-            if (configItr->second.empty()) {
-                // 移除整个配置
-                mPipelineNameJournalConfigsMap.erase(configItr);
-            }
-        }
-    }
-    
-    // 移除config对应的连接
-    JournalReaderManager::GetInstance().RemoveConfig(configName, idx);
+    // 移除config对应的连接（不清理 epoll）
+    JournalConnectionManager::GetInstance().RemoveConfig(configName, idx);
     
     LOG_INFO(sLogger, ("journal input removed without cleanup", "")("config", configName)("idx", idx));
 }
 
-JournalConfig JournalServer::GetJournalConfig(const string& name, size_t idx) const {
-    lock_guard<mutex> lock(mUpdateMux);
-    auto configItr = mPipelineNameJournalConfigsMap.find(name);
-    if (configItr != mPipelineNameJournalConfigsMap.end()) {
-        // 如果配置存在，则获取idx对应的配置
-        auto idxItr = configItr->second.find(idx);
-        if (idxItr != configItr->second.end()) {
-            return idxItr->second;
-        }
-    }
-    // 如果配置不存在，则返回空配置
-    return JournalConfig();
+void JournalServer::UpdateJournalConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek) {
+    // 直接更新 ConnectionManager 中的配置
+    JournalConnectionManager::GetInstance().UpdateConfigNeedsSeek(configName, idx, needsSeek);
 }
 
-void JournalServer::UpdateJournalConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek) {
-    lock_guard<mutex> lock(mUpdateMux);
-    auto configItr = mPipelineNameJournalConfigsMap.find(configName);
-    if (configItr != mPipelineNameJournalConfigsMap.end()) {
-        auto idxItr = configItr->second.find(idx);
-        if (idxItr != configItr->second.end()) {
-            idxItr->second.needsSeek = needsSeek;
-            // Updated needsSeek status for config: configName[idx]
-        }
-    }
+std::map<std::pair<std::string, size_t>, JournalConfig> JournalServer::GetAllJournalConfigs() const {
+    return JournalConnectionManager::GetInstance().GetAllConfigs();
 }
 
 // =============================================================================
@@ -211,7 +144,7 @@ void JournalServer::UpdateJournalConfigNeedsSeek(const std::string& configName, 
 // =============================================================================
 
 JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const {
-    auto stats = JournalReaderManager::GetInstance().GetStats();
+    auto stats = JournalConnectionManager::GetInstance().GetStats();
     ConnectionPoolStats result;
     result.totalConnections = stats.totalConnections;
     result.activeConnections = stats.activeConnections;
@@ -221,7 +154,7 @@ JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const
 }
 
 std::shared_ptr<SystemdJournalReader> JournalServer::GetConnectionInfo(const std::string& configName, size_t idx) const {
-    return JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
+    return JournalConnectionManager::GetInstance().GetConnection(configName, idx);
 }
 
 bool JournalServer::ForceResetConnection(const std::string& configName, size_t idx) {
@@ -229,7 +162,7 @@ bool JournalServer::ForceResetConnection(const std::string& configName, size_t i
     CleanupEpollMonitoring(configName, idx);
     
     // 然后重置连接
-    bool result = JournalReaderManager::GetInstance().ForceResetConnection(configName, idx);
+    bool result = JournalConnectionManager::GetInstance().ForceResetConnection(configName, idx);
     
     if (result) {
         LOG_INFO(sLogger, ("connection reset completed with epoll cleanup", "")("config", configName)("idx", idx));
@@ -239,7 +172,7 @@ bool JournalServer::ForceResetConnection(const std::string& configName, size_t i
 }
 
 size_t JournalServer::GetConnectionCount() const {
-    return JournalReaderManager::GetInstance().GetConnectionCount();
+    return JournalConnectionManager::GetInstance().GetConnectionCount();
 }
 
 // =============================================================================
@@ -258,7 +191,7 @@ void JournalServer::CleanupEpollMonitoring(const std::string& configName, size_t
         return;
     }
     
-    auto reader = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
+    auto reader = JournalConnectionManager::GetInstance().GetConnection(configName, idx);
     if (reader && reader->IsOpen()) {
         // Cleaning up epoll monitoring for config: configName[idx]
         reader->RemoveFromEpoll(epollFD);
@@ -266,23 +199,7 @@ void JournalServer::CleanupEpollMonitoring(const std::string& configName, size_t
 }
 
 // =============================================================================
-// 5. 配置管理 - Configuration Management
-// =============================================================================
-
-void JournalServer::EnableConfigGrouping() {
-    std::lock_guard<std::mutex> lock(mGroupingMutex);
-    mConfigGroupingEnabled = true;
-    LOG_INFO(sLogger, ("configuration management enabled", ""));
-}
-
-void JournalServer::DisableConfigGrouping() {
-    std::lock_guard<std::mutex> lock(mGroupingMutex);
-    mConfigGroupingEnabled = false;
-    LOG_INFO(sLogger, ("configuration management disabled", ""));
-}
-
-// =============================================================================
-// 6. 事件驱动主循环 - Event-driven Main Loop
+// 5. 事件驱动主循环 - Event-driven Main Loop
 // =============================================================================
 
 void JournalServer::run() {
@@ -380,137 +297,134 @@ void JournalServer::run() {
 
 void JournalServer::updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     // 获取当前配置
-    const auto& allConfigs = GetAllJournalConfigs();
+    auto allConfigs = GetAllJournalConfigs();
     
     // 检查需要添加监听的配置（只处理已经准备好的连接）
-    for (const auto& pipelineConfig : allConfigs) {
-        const std::string& configName = pipelineConfig.first;
+    for (const auto& [configKey, config] : allConfigs) {
+        const std::string& configName = configKey.first;
+        size_t idx = configKey.second;
         
-        for (const auto& idxConfig : pipelineConfig.second) {
-            size_t idx = idxConfig.first;
+        // 只处理不需要seek的配置（即已经完成初始化的配置）
+        if (config.needsSeek) {
+            // Config needs seek, attempting to initialize: configName[idx]
             
-            // 只处理不需要seek的配置（即已经完成初始化的配置）
-            if (idxConfig.second.needsSeek) {
-                // Config needs seek, attempting to initialize: configName[idx]
+            // 尝试执行seek操作
+            if (JournalConnectionManager::GetInstance().PerformSeek(configName, idx, false)) {
+                // Seek成功，更新本地配置状态
+                UpdateJournalConfigNeedsSeek(configName, idx, false);
+                LOG_INFO(sLogger, ("journal seek completed, config ready for monitoring", "")("config", configName)("idx", idx));
                 
-                // 尝试获取连接并执行seek操作
-                auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
+                // 获取连接用于监控
+                auto connection = JournalConnectionManager::GetInstance().GetConnection(configName, idx);
                 if (connection && connection->IsOpen()) {
-                    // 获取配置的副本并执行seek
-                    JournalConfig config = idxConfig.second;
-                    if (logtail::impl::PerformJournalSeek(configName, idx, config, connection, false)) {
-                        // Seek成功，更新配置状态
-                        UpdateJournalConfigNeedsSeek(configName, idx, false);
-                        LOG_INFO(sLogger, ("journal seek completed, config ready for monitoring", "")("config", configName)("idx", idx));
+                    
+                    // 继续处理这个配置，将其添加到监控中
+                    // 检查是否已经监听
+                    bool alreadyMonitored = false;
+                    for (const auto& pair : monitoredReaders) {
+                        if (pair.second.reader == connection) {
+                            alreadyMonitored = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!alreadyMonitored) {
+                        // Attempting to add reader to epoll for config: configName[idx]
                         
-                        // 继续处理这个配置，将其添加到监控中
-                        // 检查是否已经监听
-                        bool alreadyMonitored = false;
-                        for (const auto& pair : monitoredReaders) {
-                            if (pair.second.reader == connection) {
-                                alreadyMonitored = true;
-                                break;
-                            }
+                        // 检查 reader 状态
+                        if (!connection->IsOpen()) {
+                            LOG_WARNING(sLogger, ("reader is not open", "")("config", configName)("idx", idx));
+                            continue;
                         }
                         
-                        if (!alreadyMonitored) {
-                            // Attempting to add reader to epoll for config: configName[idx]
-                            
-                            // 检查 reader 状态
-                            if (!connection->IsOpen()) {
-                                LOG_WARNING(sLogger, ("reader is not open", "")("config", configName)("idx", idx));
-                                continue;
-                            }
-                            
-                            // Reader is open, checking journal fd
-                            
-                            // 检查 journal fd
-                            int journalFD = connection->GetJournalFD();
-                            if (journalFD < 0) {
-                                LOG_WARNING(sLogger, ("journal fd is invalid", "")("config", configName)("idx", idx)("fd", journalFD)("errno", errno));
-                                continue;
-                            }
-                            
-                            // Journal fd obtained successfully
-                            
-                            // 添加 reader 到全局 epoll
-                            if (connection->AddToEpoll(epollFD)) {
-                                MonitoredReader monitoredReader;
-                                monitoredReader.reader = connection;
-                                monitoredReader.configName = configName;
-                                monitoredReader.idx = idx;
-                                monitoredReaders[journalFD] = monitoredReader;
-                                LOG_INFO(sLogger, ("journal reader added to epoll monitoring", "")("config", configName)("idx", idx)("fd", journalFD));
-                            } else {
-                                LOG_WARNING(sLogger, ("failed to add reader to epoll", "")("config", configName)("idx", idx)("fd", journalFD)("epoll_fd", epollFD));
-                            }
+                        // Reader is open, checking journal fd
+                        
+                        // 检查 journal fd
+                        int journalFD = connection->GetJournalFD();
+                        if (journalFD < 0) {
+                            LOG_WARNING(sLogger, ("journal fd is invalid", "")("config", configName)("idx", idx)("fd", journalFD)("errno", errno));
+                            continue;
+                        }
+                        
+                        // Journal fd obtained successfully
+                        
+                        // 添加 reader 到全局 epoll
+                        if (connection->AddToEpoll(epollFD)) {
+                            MonitoredReader monitoredReader;
+                            monitoredReader.reader = connection;
+                            monitoredReader.configName = configName;
+                            monitoredReader.idx = idx;
+                            monitoredReaders[journalFD] = monitoredReader;
+                            LOG_INFO(sLogger, ("journal reader added to epoll monitoring", "")("config", configName)("idx", idx)("fd", journalFD));
                         } else {
-                            // Reader already monitored for config: configName[idx]
+                            LOG_WARNING(sLogger, ("failed to add reader to epoll", "")("config", configName)("idx", idx)("fd", journalFD)("epoll_fd", epollFD));
                         }
                     } else {
-                        LOG_WARNING(sLogger, ("journal seek failed, config will be retried later", "")("config", configName)("idx", idx));
+                        // Reader already monitored for config: configName[idx]
                     }
                 } else {
-                    LOG_WARNING(sLogger, ("no connection available for seek operation", "")("config", configName)("idx", idx));
+                    LOG_WARNING(sLogger, ("connection not available after seek", "")("config", configName)("idx", idx));
                 }
-                continue; // 跳过未完成初始化的配置
+            } else {
+                LOG_WARNING(sLogger, ("journal seek failed, config will be retried later", "")("config", configName)("idx", idx));
+            }
+            continue; // 跳过未完成初始化的配置
+        }
+        
+        auto connection = JournalConnectionManager::GetInstance().GetConnection(configName, idx);
+        if (connection && connection->IsOpen()) {
+            // Checking reader for epoll monitoring: configName[idx]
+            
+            // 检查是否已经监听
+            bool alreadyMonitored = false;
+            for (const auto& pair : monitoredReaders) {
+                if (pair.second.reader == connection) {
+                    alreadyMonitored = true;
+                    break;
+                }
             }
             
-            auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
-            if (connection && connection->IsOpen()) {
-                // Checking reader for epoll monitoring: configName[idx]
+            if (!alreadyMonitored) {
+                // Attempting to add reader to epoll for config: configName[idx]
                 
-                // 检查是否已经监听
-                bool alreadyMonitored = false;
-                for (const auto& pair : monitoredReaders) {
-                    if (pair.second.reader == connection) {
-                        alreadyMonitored = true;
-                        break;
-                    }
+                // 检查 reader 状态
+                if (!connection->IsOpen()) {
+                    LOG_WARNING(sLogger, ("reader is not open", "")("config", configName)("idx", idx));
+                    continue;
                 }
                 
-                if (!alreadyMonitored) {
-                    // Attempting to add reader to epoll for config: configName[idx]
-                    
-                    // 检查 reader 状态
-                    if (!connection->IsOpen()) {
-                        LOG_WARNING(sLogger, ("reader is not open", "")("config", configName)("idx", idx));
-                        continue;
-                    }
-                    
-                    // Reader is open, checking journal fd
-                    
-                    // 检查 journal fd
-                    int journalFD = connection->GetJournalFD();
-                    if (journalFD < 0) {
-                        LOG_WARNING(sLogger, ("journal fd is invalid", "")("config", configName)("idx", idx)("fd", journalFD)("errno", errno));
-                        continue;
-                    }
-                    
-                    // Journal fd obtained successfully
-                    
-                    // 添加 reader 到全局 epoll
-                    if (connection->AddToEpoll(epollFD)) {
-                        MonitoredReader monitoredReader;
-                        monitoredReader.reader = connection;
-                        monitoredReader.configName = configName;
-                        monitoredReader.idx = idx;
-                        monitoredReaders[journalFD] = monitoredReader;
-                        LOG_INFO(sLogger, ("journal reader added to epoll monitoring", "")("config", configName)("idx", idx)("fd", journalFD));
-                    } else {
-                        LOG_WARNING(sLogger, ("failed to add reader to epoll", "")("config", configName)("idx", idx)("fd", journalFD)("epoll_fd", epollFD));
-                    }
+                // Reader is open, checking journal fd
+                
+                // 检查 journal fd
+                int journalFD = connection->GetJournalFD();
+                if (journalFD < 0) {
+                    LOG_WARNING(sLogger, ("journal fd is invalid", "")("config", configName)("idx", idx)("fd", journalFD)("errno", errno));
+                    continue;
+                }
+                
+                // Journal fd obtained successfully
+                
+                // 添加 reader 到全局 epoll
+                if (connection->AddToEpoll(epollFD)) {
+                    MonitoredReader monitoredReader;
+                    monitoredReader.reader = connection;
+                    monitoredReader.configName = configName;
+                    monitoredReader.idx = idx;
+                    monitoredReaders[journalFD] = monitoredReader;
+                    LOG_INFO(sLogger, ("journal reader added to epoll monitoring", "")("config", configName)("idx", idx)("fd", journalFD));
                 } else {
-                    // Reader already monitored for config: configName[idx]
+                    LOG_WARNING(sLogger, ("failed to add reader to epoll", "")("config", configName)("idx", idx)("fd", journalFD)("epoll_fd", epollFD));
                 }
+            } else {
+                // Reader already monitored for config: configName[idx]
             }
         }
     }
 }
 
 void logtail::JournalServer::processSpecificJournalConfig(const std::string& configName, size_t idx) {
-    // 获取指定配置
-    JournalConfig config = GetJournalConfig(configName, idx);
+    // 从 JournalConnectionManager 获取配置
+    JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(configName, idx);
     // Processing journal config: configName[idx], needsSeek=config.needsSeek, queueKey=config.queueKey
     
     if (config.queueKey == -1) {
@@ -525,7 +439,7 @@ void logtail::JournalServer::processSpecificJournalConfig(const std::string& con
     }
     
     // 直接读取和处理journal条目（连接和seek已经完成）
-    auto connection = JournalReaderManager::GetInstance().GetConnectionInfo(configName, idx);
+    auto connection = JournalConnectionManager::GetInstance().GetConnection(configName, idx);
     if (!connection || !connection->IsOpen()) {
         LOG_ERROR(sLogger, ("connection not available for event processing", "")("config", configName)("idx", idx));
         return;
@@ -538,21 +452,10 @@ void logtail::JournalServer::processSpecificJournalConfig(const std::string& con
     }
     
     // 直接读取和处理journal条目
-    logtail::impl::ReadJournalEntries(configName, idx, config, reader, config.queueKey);
+    ReadJournalEntries(configName, idx, config, reader, config.queueKey);
 }
 
-void logtail::JournalServer::processJournalEventForAllConfigs(const std::shared_ptr<SystemdJournalReader>& reader) {
-    // 注意：现在每个reader只对应一个配置（不再共享），这个函数已不再需要
-    // 但为了保持接口兼容性，暂时保留
-    auto configs = JournalReaderManager::GetInstance().GetConfigsUsingReader(reader);
-    
-    // 处理该reader对应的配置（现在只会有一个）
-    for (const auto& [configName, idx] : configs) {
-        processSpecificJournalConfig(configName, idx);
-    }
-}
-
-bool logtail::JournalServer::validateJournalConfig(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey) {
+bool logtail::JournalServer::validateAndGetQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey) {
     // 基本验证
     if (!config.ctx) {
         LOG_ERROR(sLogger, ("CRITICAL: no context available for journal config", "this indicates initialization problem")("config", configName)("idx", idx));
@@ -581,8 +484,8 @@ bool logtail::JournalServer::validateJournalConfig(const std::string& configName
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void JournalServer::Clear() {
-    lock_guard<mutex> lock(mUpdateMux);
-    mPipelineNameJournalConfigsMap.clear();
+    // 配置已移至 JournalConnectionManager，通过 Cleanup() 清理
+    JournalConnectionManager::GetInstance().Cleanup();
 }
 #endif
 

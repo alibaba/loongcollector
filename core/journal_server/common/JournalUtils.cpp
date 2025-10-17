@@ -102,29 +102,24 @@ const std::vector<std::string> JournalUtils::kUnitTypes = {
 // 字符串和路径工具函数实现
 // ============================================================================
 
-// 检查字符串是否包含glob模式字符（*、?、[）
 bool JournalUtils::StringIsGlob(const std::string& name) {
     return name.find_first_of(kGlobChars) != std::string::npos;
 }
 
-// 检查字符串中的所有字符是否都在指定的字符集中
 bool JournalUtils::InCharset(const std::string& s, const std::string& charset) {
     return std::all_of(s.begin(), s.end(), [&charset](char c) {
         return absl::StrContains(charset, c);
     });
 }
 
-// 检查路径是否是设备路径（以/dev/或/sys/开头）
 bool JournalUtils::IsDevicePath(const std::string& path) {
     return path.length() >= 5 && (path.substr(0, 5) == "/dev/" || path.substr(0, 5) == "/sys/");
 }
 
-// 检查路径是否是绝对路径（以/开头）
 bool JournalUtils::PathIsAbsolute(const std::string& path) {
     return !path.empty() && path[0] == '/';
 }
 
-// 使用glob模式匹配字符串
 bool JournalUtils::MatchPattern(const std::string& pattern, const std::string& string) {
     // 使用正则表达式进行简单的glob匹配
     // 将glob模式转换为正则表达式模式
@@ -174,7 +169,6 @@ bool JournalUtils::MatchPattern(const std::string& pattern, const std::string& s
 // Systemd单元相关工具函数实现
 // ============================================================================
 
-// 检查单元后缀是否有效（必须以.开头且在有效类型列表中）
 bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
     if (suffix.empty() || suffix[0] != '.') {
         return false;
@@ -186,7 +180,6 @@ bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
                        });
 }
 
-// 检查单元名称是否有效
 bool JournalUtils::UnitNameIsValid(const std::string& name) {
     if (name.length() >= kUnitNameMax) {
         return false;
@@ -220,17 +213,6 @@ bool JournalUtils::UnitNameIsValid(const std::string& name) {
     return false;
 }
 
-/**
- * @brief 转义单元名称中的无效字符
- * 
- * 将字符串中的无效字符进行转义处理，使其符合systemd单元名称规范：
- * - 将斜杠 '/' 转换为破折号 '-'
- * - 将其他无效字符转换为十六进制转义序列 "\xNN"
- * - 保留有效字符不变
- * 
- * @param name 需要转义的字符串
- * @return 转义后的字符串
- */
 std::string JournalUtils::DoEscapeMangle(const std::string& name) {
     std::string mangled;
     for (char c : name) {
@@ -248,27 +230,6 @@ std::string JournalUtils::DoEscapeMangle(const std::string& name) {
     return mangled;
 }
 
-/**
- * @brief 将任意字符串转换为有效的systemd单元名称
- * 
- * 这个函数实现了systemd单元名称的标准化转换规则，支持以下转换：
- * 1. 设备路径（如/dev/sda）→ 设备单元（sda.device）
- * 2. 挂载路径（如/home）→ 挂载单元（home.mount）
- * 3. 普通字符串 → 添加指定后缀的单元名称
- * 4. 处理无效字符的转义
- * 5. 保持glob模式和已有效单元名称不变
- * 
- * @param name 待转换的字符串（可以是路径、服务名等）
- * @param suffix 默认后缀（如".service"）
- * @return 标准化的systemd单元名称
- * @throws std::invalid_argument 如果输入为空、以点号开头或后缀无效
- * 
- * @example
- * UnitNameMangle("/dev/sda1", ".service") → "sda1.device"
- * UnitNameMangle("/home", ".service") → "home.mount"  
- * UnitNameMangle("my-app", ".service") → "my-app.service"
- * UnitNameMangle("*.service", ".service") → "*.service" (保持glob不变)
- */
 std::string JournalUtils::UnitNameMangle(const std::string& name, const std::string& suffix) {
     // 不能为空或以点号开头
     if (name.empty() || name[0] == '.') {
