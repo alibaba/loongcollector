@@ -27,7 +27,7 @@
 #include "reader/JournalReaderManager.h"
 #include "connection/JournalConnectionSetup.h"
 #include "reader/JournalReader.h"
-#include "JournalEntryProcessor.h"
+#include "processor/JournalEntryProcessor.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "logger/Logger.h"
 
