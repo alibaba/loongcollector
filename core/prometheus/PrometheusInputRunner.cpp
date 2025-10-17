@@ -95,7 +95,12 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
         mTargetSubscriberSchedulerMap[targetSubscriber->GetId()] = targetSubscriber;
     }
     // 2. build Ticker Event and add it to Timer
-    targetSubscriber->ScheduleNext();
+    // if host only mode, build target subscriber directly, otherwise build scrape scheduler
+    if (targetSubscriber->IsHostOnlyMode()) {
+        targetSubscriber->ScheduleHostOnlyTargets();
+    } else {
+        targetSubscriber->ScheduleNext();
+    }
     {
         ReadLock lock(mSubscriberMapRWLock);
         SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
@@ -140,6 +145,7 @@ void PrometheusInputRunner::Init() {
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
     // only register when operator exist
+    // empty service host means in host only mode
     if (!mServiceHost.empty()) {
         mIsThreadRunning.store(true);
         mThreadRes = std::async(launch::async, [this]() {
