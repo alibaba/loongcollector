@@ -55,6 +55,7 @@ openssl pkcs12 -export -in "$CERT_DIR/server.crt" -inkey "$CERT_DIR/server.key" 
 echo "$PASSWORD" > "$CERT_DIR/keystore_creds"
 echo "$PASSWORD" > "$CERT_DIR/key_creds"
 
-chmod 644 "$CERT_DIR"/*
+chmod 600 "$CERT_DIR"/*.key
+chmod 644 "$CERT_DIR"/*.crt "$CERT_DIR"/*.p12 "$CERT_DIR"/*_creds
 touch "$CERT_DIR/.certs_ready"
 tail -f /dev/null

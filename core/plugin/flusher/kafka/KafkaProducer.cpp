@@ -200,13 +200,6 @@ public:
             }
 
             const bool hasCert = !mConfig.Authentication.tls_cert_file.empty();
-            const bool hasKey = !mConfig.Authentication.tls_key_file.empty();
-            if (hasCert != hasKey) {
-                LOG_ERROR(sLogger,
-                          ("Kafka TLS client auth config error",
-                           "both TLS.CertFile and TLS.KeyFile must be set together, or both unset"));
-                return false;
-            }
 
             if (hasCert) {
                 if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.tls_cert_file)) {

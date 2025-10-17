@@ -49,12 +49,18 @@ func Load(path string) error {
 	EngineLogFile = reportDir + CaseName + "_engine.log"
 	LogDir = reportDir + CaseName + "_log"
 
-	_ = os.MkdirAll(reportDir, 0o750)
+	if err := os.MkdirAll(reportDir, 0o750); err != nil {
+		return err
+	}
 
 	FlusherFile = reportDir + CaseName + "_default_flusher.json"
 
 	if _, err := os.Stat(FlusherFile); os.IsNotExist(err) {
-		_ = os.WriteFile(FlusherFile, []byte("{\"type\":\"flusher_stdout\",\"detail\":{}}\n"), 0o600)
+		if err := os.WriteFile(FlusherFile, []byte("{\"type\":\"flusher_stdout\",\"detail\":{}}\n"), 0o600); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
 	}
 	return nil
 }
