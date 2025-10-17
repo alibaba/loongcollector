@@ -22,38 +22,6 @@
 namespace logtail {
 
 // ============================================================================
-// JournalEntry 实现
-// ============================================================================
-
-bool JournalEntry::HasField(const std::string& key) const {
-    return fields.find(key) != fields.end();
-}
-
-std::string JournalEntry::GetField(const std::string& key, const std::string& defaultValue) const {
-    auto it = fields.find(key);
-    if (it != fields.end()) {
-        return it->second;
-    }
-    return defaultValue;
-}
-
-void JournalEntry::SetField(const std::string& key, const std::string& value) {
-    fields[key] = value;
-}
-
-std::chrono::system_clock::time_point JournalEntry::GetRealtimeTimestamp() const {
-    // Convert microseconds to system_clock time_point
-    auto duration = std::chrono::microseconds(realtimeTimestamp);
-    return std::chrono::system_clock::time_point(duration);
-}
-
-std::chrono::steady_clock::time_point JournalEntry::GetMonotonicTimestamp() const {
-    // Convert microseconds to steady_clock time_point
-    auto duration = std::chrono::microseconds(monotonicTimestamp);
-    return std::chrono::steady_clock::time_point(duration);
-}
-
-// ============================================================================
 // SystemdJournalReader 实现
 // ============================================================================
 
@@ -392,20 +360,9 @@ public:
 
 
     /*---------------  配置接口  ----------------*/
-    bool SetDataThreshold(size_t t) {
-        mDataThreshold = t;
-#ifdef __linux__
-        if (IsOpen()) {
-           sd_journal_set_data_threshold(mJournal, t);
-        }
-#endif
-        return true;
-    }
-    bool SetTimeout(std::chrono::milliseconds timeout)  { mTimeoutMs = (int)timeout.count(); return true; }
     bool SetJournalPaths(const std::vector<std::string>& p) { mJournalPaths = p; return true; }
     
 #ifdef __linux__
-    void* GetJournalHandle() const { return mJournal; }
     
     bool AddToEpoll(int epollFD) {
         if (!IsOpen() || epollFD < 0) {
@@ -565,11 +522,9 @@ private:
 #endif
 
     static constexpr size_t kDefaultDataThreshold = 64 * 1024;
-   static constexpr int kDefaultTimeoutMs = 1000;
    
    bool mIsOpen{false};
    size_t mDataThreshold{kDefaultDataThreshold};
-   int mTimeoutMs{kDefaultTimeoutMs};
    std::vector<std::string> mJournalPaths;
 };
 
@@ -601,15 +556,9 @@ bool  SystemdJournalReader::AddMatch(const std::string& f,
                                     const std::string& v)  { FWD(AddMatch(f,v)); }
 bool  SystemdJournalReader::AddDisjunction()                { FWD(AddDisjunction()); }
 std::vector<std::string> SystemdJournalReader::GetUniqueValues(const std::string& field) { FWD(GetUniqueValues(field)); }
-bool  SystemdJournalReader::SetDataThreshold(size_t t)      { FWD(SetDataThreshold(t)); }
-bool  SystemdJournalReader::SetTimeout(std::chrono::milliseconds timeout){ FWD(SetTimeout(timeout)); }
 bool  SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p){ FWD(SetJournalPaths(p)); }
 
 #ifdef __linux__
-void* SystemdJournalReader::GetJournalHandle() const {
-    return mImpl->GetJournalHandle();
-}
-
 bool SystemdJournalReader::AddToEpoll(int epollFD) {
     return mImpl->AddToEpoll(epollFD);
 }

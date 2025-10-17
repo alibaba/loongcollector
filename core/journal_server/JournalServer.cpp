@@ -306,25 +306,19 @@ void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>&
             }
             
             if (!alreadyMonitored) {
-                // Attempting to add reader to epoll for config: configName[idx]
-                
                 // 检查 reader 状态
                 if (!connection->IsOpen()) {
                     LOG_WARNING(sLogger, ("reader is not open", "")("config", configName)("idx", idx));
                     continue;
                 }
-                
-                // Reader is open, checking journal fd
-                
+                                
                 // 检查 journal fd
                 int journalFD = connection->GetJournalFD();
                 if (journalFD < 0) {
                     LOG_WARNING(sLogger, ("journal fd is invalid", "")("config", configName)("idx", idx)("fd", journalFD)("errno", errno));
                     continue;
                 }
-                
-                // Journal fd obtained successfully
-                
+                                
                 // 添加 reader 到全局 epoll
                 if (connection->AddToEpoll(epollFD)) {
                     MonitoredReader monitoredReader;

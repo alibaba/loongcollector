@@ -71,31 +71,29 @@ bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journa
 
 bool MoveToNextJournalEntry(const string& configName,
                             size_t idx,
-                            const JournalConfig& config,
                             const std::shared_ptr<SystemdJournalReader>& journalReader,
-                            bool isFirstEntry,
                             int entryCount) {
     try {
-        if (config.seekPosition == "head" || !isFirstEntry) {
-            JournalReadStatus status = journalReader->NextWithStatus();
-            
-            if (status == JournalReadStatus::kOk) {
-                // 成功移动到下一条
-                return true;
-            }
-            if (status == JournalReadStatus::kEndOfJournal) {
-                // 到达末尾，正常结束
-                return false;
-            }
-            // 错误情况：可能是日志轮转导致cursor失效
-            // 尝试错误恢复
-            return RecoverFromJournalError(
-                journalReader, 
-                configName, 
-                idx, 
-                "navigation error during Next(), cursor may be invalidated by log rotation");
+        // 统一处理：每次都先移动到下一条（无论是 head 还是 tail 模式）
+        // head 模式：SeekHead() 后第一次 Next() 会移动到第一条
+        // tail 模式：SeekTail() + Previous() 后第一次 Next() 会移动到新日志
+        JournalReadStatus status = journalReader->NextWithStatus();
+        
+        if (status == JournalReadStatus::kOk) {
+            // 成功移动到下一条
+            return true;
         }
-        return true;
+        if (status == JournalReadStatus::kEndOfJournal) {
+            // 到达末尾，正常结束
+            return false;
+        }
+        // 错误情况：可能是日志轮转导致cursor失效
+        // 尝试错误恢复
+        return RecoverFromJournalError(
+            journalReader, 
+            configName, 
+            idx, 
+            "navigation error during Next(), cursor may be invalidated by log rotation");
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
                   ("exception during journal entry navigation",
@@ -300,12 +298,13 @@ void ReadJournalEntries(const string& configName,
                     ("maxEntriesPerBatch clamped to safe range", "")("config", configName)("idx", idx)(
                         "original", config.maxEntriesPerBatch)("clamped", maxEntriesPerBatch));
     }
-    bool isFirstEntry = true;
 
     try {
         while (entryCount < maxEntriesPerBatch) {
-            // Step 1: 移动到下一个entry，如果需要的话
-            if (!MoveToNextJournalEntry(configName, idx, config, journalReader, isFirstEntry, entryCount)) {
+            // Step 1: 先移动到下一条（统一处理，无需判断 seekPosition）
+            // - head 模式：SeekHead() 后第一次 Next() 移动到第一条
+            // - tail 模式：SeekTail() + Previous() 后第一次 Next() 移动到新日志
+            if (!MoveToNextJournalEntry(configName, idx, journalReader, entryCount)) {
                 break;
             }
 
@@ -314,7 +313,6 @@ void ReadJournalEntries(const string& configName,
             if (!ReadAndValidateEntry(configName, idx, journalReader, entry)) {
                 // 如果entry为空，则跳过
                 if (entry.fields.empty() && !entry.cursor.empty()) {
-                    isFirstEntry = false;
                     entryCount++;
                     continue;
                 }
@@ -322,13 +320,12 @@ void ReadJournalEntries(const string& configName,
                 break;
             }
 
-            // Step 3: 处理enrty (transform, create event, push)
+            // Step 3: 处理entry (transform, create event, push)
             if (!CreateAndPushEventGroup(configName, idx, config, entry, queueKey)) {
                 LOG_ERROR(sLogger, ("failed to process journal entry", "continue")("config", configName)("idx", idx));
             }
 
             entryCount++;
-            isFirstEntry = false;
         }
 
         // 只在没有处理任何条目且可能存在问题时记录警告
