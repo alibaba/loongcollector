@@ -113,7 +113,7 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         LOG_INFO(sLogger, ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName())("idx", mIndex));
     } else {
         // 配置更新：只移除注册，保留检查点
-        JournalServer::GetInstance()->RemoveJournalInputWithoutCleanup(mContext->GetConfigName(), mIndex);
+        JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName(), mIndex);
         LOG_INFO(sLogger, ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName())("idx", mIndex));
     }
     

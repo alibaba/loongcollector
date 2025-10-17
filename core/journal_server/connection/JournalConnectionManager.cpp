@@ -220,16 +220,6 @@ JournalConfig JournalConnectionManager::GetConfig(const std::string& configName,
     return JournalConfig();
 }
 
-void JournalConnectionManager::UpdateConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    
-    std::string configKey = makeConfigKey(configName, idx);
-    auto it = mConfigs.find(configKey);
-    if (it != mConfigs.end()) {
-        it->second.config.needsSeek = needsSeek;
-    }
-}
-
 std::map<std::pair<std::string, size_t>, JournalConfig> JournalConnectionManager::GetAllConfigs() const {
     std::lock_guard<std::mutex> lock(mMutex);
     
@@ -256,99 +246,9 @@ std::vector<std::pair<std::string, size_t>> JournalConnectionManager::GetConfigs
     return configs;
 }
 
-bool JournalConnectionManager::ForceResetConnection(const std::string& configName, size_t idx) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    
-    std::string configKey = makeConfigKey(configName, idx);
-    auto it = mConfigs.find(configKey);
-    
-    if (it != mConfigs.end()) {
-        LOG_INFO(sLogger, ("forcing connection reset", "")("config", configName)("idx", idx));
-        
-        // 关闭并删除连接
-        if (it->second.reader) {
-            it->second.reader->Close();
-        }
-        
-        mConfigs.erase(it);
-        LOG_INFO(sLogger, ("connection reset completed", "")("config", configName)("idx", idx));
-        
-        return true;
-    }
-    
-    LOG_WARNING(sLogger, ("config not found for reset", "")("config", configName)("idx", idx));
-    return false;
-}
-
 size_t JournalConnectionManager::GetConnectionCount() const {
     std::lock_guard<std::mutex> lock(mMutex);
     return mConfigs.size();
-}
-
-bool JournalConnectionManager::PerformSeek(const std::string& configName, size_t idx, bool forceSeek) {
-    std::lock_guard<std::mutex> lock(mMutex);
-    
-    std::string configKey = makeConfigKey(configName, idx);
-    auto it = mConfigs.find(configKey);
-    
-    if (it == mConfigs.end()) {
-        LOG_ERROR(sLogger, ("config not found for seek operation", "")("config", configName)("idx", idx));
-        return false;
-    }
-    
-    auto& configInfo = it->second;
-    auto& config = configInfo.config;
-    auto& reader = configInfo.reader;
-    
-    if (!reader || !reader->IsOpen()) {
-        LOG_ERROR(sLogger, ("connection not available for seek", "")("config", configName)("idx", idx));
-        return false;
-    }
-    
-    try {
-        // 检查是否需要执行seek操作
-        bool shouldSeek = forceSeek || config.needsSeek;
-        if (!shouldSeek) {
-            // 如果不需要seek，直接返回成功
-            return true;
-        }
-        
-        bool seekSuccess = false;
-        
-        if (config.seekPosition == "tail") {
-            // seek到末尾
-            seekSuccess = reader->SeekTail();
-            LOG_INFO(sLogger, ("seek to tail", "")("config", configName)("idx", idx)("success", seekSuccess));
-            
-            // SeekTail()后需要调用Previous()才能读取到实际的日志条目
-            if (seekSuccess) {
-                bool prevSuccess = reader->Previous();
-                LOG_INFO(sLogger, ("seek to previous after tail", "")("config", configName)("idx", idx)("success", prevSuccess));
-                // Previous()失败也是正常的（比如journal为空），不影响整体成功
-            }
-        } else {
-            // seek到开头
-            seekSuccess = reader->SeekHead();
-            LOG_INFO(sLogger, ("seek to head", "")("config", configName)("idx", idx)("success", seekSuccess));
-        }
-        
-        if (!seekSuccess) {
-            LOG_ERROR(sLogger, ("journal seek failed", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
-            return false;
-        }
-        
-        // Seek成功，清除needsSeek标记
-        config.needsSeek = false;
-        LOG_DEBUG(sLogger, ("journal seek completed successfully", "")("config", configName)("idx", idx)("needsSeek", false));
-        return true;
-        
-    } catch (const std::exception& e) {
-        LOG_ERROR(sLogger, ("exception during journal seek operation", e.what())("config", configName)("idx", idx)("seek_position", config.seekPosition));
-        return false;
-    } catch (...) {
-        LOG_ERROR(sLogger, ("unknown exception during journal seek operation", "")("config", configName)("idx", idx)("seek_position", config.seekPosition));
-        return false;
-    }
 }
 
 } // namespace logtail

@@ -199,7 +199,7 @@ void ReadJournalEntries(const string& configName,
                         QueueKey queueKey) {
     int entryCount = 0;
     // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
-    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000));
+    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000));//公平参数
 
     // 如果配置值被修正，记录警告
     if (config.maxEntriesPerBatch != maxEntriesPerBatch) {

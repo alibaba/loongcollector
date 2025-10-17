@@ -83,10 +83,7 @@ public:
                         size_t idx,
                         const JournalConfig& config);
     void RemoveJournalInput(const std::string& configName, size_t idx);
-    void RemoveJournalInputWithoutCleanup(const std::string& configName, size_t idx);
-
-    // Update configuration needsSeek status
-    void UpdateJournalConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek);
+    void RemoveConfigOnly(const std::string& configName, size_t idx);
     
     /**
      * @brief 获取所有配置
@@ -116,14 +113,6 @@ public:
      * @return 连接信息，如果不存在返回nullptr
      */
     std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName, size_t idx) const;
-
-    /**
-     * @brief 强制重置指定连接（手动重置接口）
-     * @param configName 配置名称
-     * @param idx 配置索引
-     * @return true 如果重置成功
-     */
-    bool ForceResetConnection(const std::string& configName, size_t idx);
 
     /**
      * @brief 获取当前连接数量
@@ -163,9 +152,9 @@ private:
     // =============================================================================
     // 事件驱动辅助方法 - Event-driven Helper Methods
     // =============================================================================
-    void updateReaderMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void processSpecificJournalConfig(const std::string& configName, size_t idx);
-    bool validateAndGetQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
+    void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void processJournal(const std::string& configName, size_t idx);
+    bool validateQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
 
     // =============================================================================
     // 成员变量 - Member Variables

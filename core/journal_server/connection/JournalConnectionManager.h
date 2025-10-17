@@ -73,29 +73,14 @@ public:
     // 获取指定配置
     JournalConfig GetConfig(const std::string& configName, size_t idx) const;
     
-    // 更新配置的needsSeek状态
-    void UpdateConfigNeedsSeek(const std::string& configName, size_t idx, bool needsSeek);
-    
     // 获取所有配置（用于遍历）
     std::map<std::pair<std::string, size_t>, JournalConfig> GetAllConfigs() const;
     
     // 获取使用指定连接的配置（每个连接只对应一个配置）
     std::vector<std::pair<std::string, size_t>> GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const;
     
-    // 强制重置指定连接
-    bool ForceResetConnection(const std::string& configName, size_t idx);
-    
     // 获取当前连接数量
     size_t GetConnectionCount() const;
-    
-    /**
-     * @brief 执行 journal seek 操作
-     * @param configName 配置名称
-     * @param idx 配置索引
-     * @param forceSeek 是否强制执行 seek（忽略 needsSeek 标记）
-     * @return seek 是否成功
-     */
-    bool PerformSeek(const std::string& configName, size_t idx, bool forceSeek = false);
 
 private:
     JournalConnectionManager() = default;

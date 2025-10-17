@@ -58,7 +58,6 @@ struct JournalConfig {
     
     // 运行时状态（在验证期间设置）
     mutable QueueKey queueKey = -1;  // 验证后缓存的队列键值（-1 = 未验证）
-    mutable bool needsSeek = true;  // 下次读取时是否需要执行定位
     
     JournalConfig() = default;
     
