@@ -168,6 +168,33 @@ public:
 #endif
     }
     
+    JournalReadStatus NextWithStatus() {
+#ifdef __linux__
+        if (!IsOpen()) {
+            return JournalReadStatus::kError;
+        }
+        
+        int ret = sd_journal_next(mJournal);
+        
+        if (ret > 0) {
+            // 成功移动到下一条，有数据
+            return JournalReadStatus::kOk;
+        }
+        if (ret == 0) {
+            // 到达末尾，没有更多数据
+            return JournalReadStatus::kEndOfJournal;
+        }
+        // 错误情况 (ret < 0)
+        // 常见错误码：
+        // -ESTALE (116): Journal文件已被删除/轮转，cursor失效
+        // -EINVAL: 参数无效
+        // -EBADMSG: 日志文件损坏
+        return JournalReadStatus::kError;
+#else
+        return mIsOpen ? JournalReadStatus::kOk : JournalReadStatus::kError;
+#endif
+    }
+    
     bool Previous() { 
 #ifdef __linux__
         if (!IsOpen()) {
@@ -202,12 +229,19 @@ public:
         std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
         entry.cursor = cursor.get();
 
+        // 读取 realtime 时间戳
+        // 注意：根据 fluentbit 经验，如果这里返回错误，通常意味着 journal 文件已被删除（轮转）
+        // 需要触发错误恢复流程
         uint64_t timestamp = 0;
         int timeRet = sd_journal_get_realtime_usec(mJournal, &timestamp);
-        if (timeRet >= 0) {
-            entry.realtimeTimestamp = timestamp;
+        if (timeRet < 0) {
+            // 时间戳读取失败，这通常表示 journal 文件已被轮转删除
+            // 返回 false 触发上层的错误恢复逻辑
+            return false;
         }
+        entry.realtimeTimestamp = timestamp;
         
+        // 读取 monotonic 时间戳（这个可以失败，不是致命的）
         uint64_t monotonicTimestamp = 0;
         sd_id128_t bootId;
         int monoRet = sd_journal_get_monotonic_usec(mJournal, &monotonicTimestamp, &bootId);
@@ -418,14 +452,37 @@ public:
             return false;
         }
         
+        // 调用 sd_journal_process() 来处理 journal 事件
+        // 返回值含义：
+        // - SD_JOURNAL_NOP (0): 没有变化
+        // - SD_JOURNAL_APPEND (1): 新条目被添加
+        // - SD_JOURNAL_INVALIDATE (2): 条目被移除/失效（日志轮转）
+        // - 负值: 错误
         int ret = sd_journal_process(mJournal);
         
-        if (ret == SD_JOURNAL_INVALIDATE) {
-            // journal 文件被添加或删除
-            return false;
+        if (ret == SD_JOURNAL_NOP) {
+            // 没有变化，可以继续处理
+            return true;
         }
         
-        return (ret == SD_JOURNAL_APPEND || ret == SD_JOURNAL_NOP);
+        if (ret == SD_JOURNAL_APPEND) {
+            // 新条目被添加，可以继续处理
+            return true;
+        }
+        
+        if (ret == SD_JOURNAL_INVALIDATE) {
+            // Journal 文件被添加、删除或轮转
+            // 根据 fluentbit 经验：打印日志，但继续处理
+            // 后续的 Next() 调用会处理这种情况（通过错误恢复机制）
+            printf("[JournalReader] ProcessJournalEvent: SD_JOURNAL_INVALIDATE received (ret=%d), "
+                   "journal files changed (rotation/deletion), continuing\n", ret);
+            return true;
+        }
+        
+        // 错误情况（ret < 0）
+        printf("[JournalReader] ProcessJournalEvent failed: sd_journal_process returned %d, "
+               "errno=%d (%s)\n", ret, errno, strerror(errno));
+        return false;
     }
     
     int GetJournalFD() const {
@@ -537,6 +594,7 @@ bool  SystemdJournalReader::SeekTail()                      { FWD(SeekTail()); }
 bool  SystemdJournalReader::SeekCursor(const std::string& c){ FWD(SeekCursor(c)); }
 bool  SystemdJournalReader::Next()                          { FWD(Next()); }
 bool  SystemdJournalReader::Previous()                      { FWD(Previous()); }
+JournalReadStatus SystemdJournalReader::NextWithStatus()    { FWD(NextWithStatus()); }
 bool  SystemdJournalReader::GetEntry(JournalEntry& e)       { FWD(GetEntry(e)); }
 std::string SystemdJournalReader::GetCursor()               { FWD(GetCursor()); }
 bool  SystemdJournalReader::AddMatch(const std::string& f,

@@ -227,11 +227,26 @@ void JournalServer::run() {
                 if (it != monitoredReaders.end()) {
                     const auto& monitoredReader = it->second;
                     // Processing journal event for config: configName[idx]
+                    
+                    // 调用 ProcessJournalEvent() 处理 epoll 事件
+                    // 返回值含义：
+                    // - true: SD_JOURNAL_NOP, SD_JOURNAL_APPEND, SD_JOURNAL_INVALIDATE（都可以继续处理）
+                    // - false: 错误情况（sd_journal_process 返回负值）
                     if (monitoredReader.reader && monitoredReader.reader->ProcessJournalEvent()) {
                         // 处理该配置的journal事件（每个reader对应一个独立的配置）
                         processJournal(monitoredReader.configName, monitoredReader.idx);
+                    } else {
+                        // ProcessJournalEvent 返回 false 表示遇到错误
+                        // 记录警告日志，但不中断循环（继续处理其他配置）
+                        if (monitoredReader.reader) {
+                            LOG_WARNING(sLogger, 
+                                       ("ProcessJournalEvent failed", 
+                                        "sd_journal_process returned error, skipping this event")
+                                       ("config", monitoredReader.configName)
+                                       ("idx", monitoredReader.idx)
+                                       ("fd", fd));
+                        }
                     }
-                    // Note: No new data available or event processed without data
                 }
                 // Note: Unknown fd in epoll event (might be already cleaned up)
             }

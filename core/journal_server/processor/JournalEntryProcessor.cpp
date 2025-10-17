@@ -33,6 +33,42 @@ namespace logtail {
 
 namespace {
 
+/**
+ * @brief 尝试从journal错误中恢复（如日志轮转导致的cursor失效）
+ * @param journalReader journal reader指针
+ * @param configName 配置名称
+ * @param idx 配置索引
+ * @param errorContext 错误上下文描述
+ * @return true 如果恢复成功，false 如果恢复失败
+ */
+bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journalReader,
+                             const string& configName,
+                             size_t idx,
+                             const string& errorContext) {
+    LOG_WARNING(sLogger,
+               ("journal error detected, attempting recovery",
+                errorContext)
+               ("config", configName)("idx", idx));
+    
+    // 尝试恢复策略1：重新seek到head（当前可读的最早日志）
+    if (journalReader->SeekHead()) {
+        LOG_INFO(sLogger,
+                ("recovered from journal error by seeking to head",
+                 "continuing from earliest available entry")
+                ("config", configName)("idx", idx)("context", errorContext));
+        return true;
+    }
+    
+    // 如果SeekHead失败，可以在这里添加其他恢复策略
+    // 例如：重新打开连接、尝试SeekTail等
+    
+    LOG_ERROR(sLogger,
+             ("failed to recover from journal error",
+              "all recovery attempts failed")
+             ("config", configName)("idx", idx)("context", errorContext));
+    return false;
+}
+
 bool MoveToNextJournalEntry(const string& configName,
                             size_t idx,
                             const JournalConfig& config,
@@ -40,24 +76,49 @@ bool MoveToNextJournalEntry(const string& configName,
                             bool isFirstEntry,
                             int entryCount) {
     try {
-        // 对于head模式或者非首次读取，需要调用Next()移动到下一条
-        // 对于tail模式，首次读取时已经在SeekTail+Previous后定位到最后一个条目，不需要Next()
         if (config.seekPosition == "head" || !isFirstEntry) {
-            bool nextSuccess = journalReader->Next();
-            if (!nextSuccess) {
+            JournalReadStatus status = journalReader->NextWithStatus();
+            
+            if (status == JournalReadStatus::kOk) {
+                // 成功移动到下一条
+                return true;
+            }
+            if (status == JournalReadStatus::kEndOfJournal) {
+                // 到达末尾，正常结束
                 return false;
             }
+            // 错误情况：可能是日志轮转导致cursor失效
+            // 尝试错误恢复
+            return RecoverFromJournalError(
+                journalReader, 
+                configName, 
+                idx, 
+                "navigation error during Next(), cursor may be invalidated by log rotation");
         }
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
                   ("exception during journal entry navigation",
                    e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
+        
+        // 尝试错误恢复
+        string errorMsg = string("exception during navigation: ") + e.what();
+        if (RecoverFromJournalError(journalReader, configName, idx, errorMsg)) {
+            // 恢复成功，可以继续处理
+            return true;
+        }
         return false;
     } catch (...) {
         LOG_ERROR(sLogger,
                   ("unknown exception during journal entry navigation",
                    "")("config", configName)("idx", idx)("entries_processed", entryCount));
+        
+        // 尝试错误恢复
+        if (RecoverFromJournalError(journalReader, configName, idx, 
+                                   "unknown exception during navigation")) {
+            // 恢复成功，可以继续处理
+            return true;
+        }
         return false;
     }
 }
@@ -71,16 +132,34 @@ bool ReadAndValidateEntry(const string& configName,
         bool getEntrySuccess = journalReader->GetEntry(entry);
 
         if (!getEntrySuccess) {
-            LOG_WARNING(sLogger, ("failed to get journal entry", "skipping")("config", configName)("idx", idx));
-
-            // 检查是否是连接问题导致的失败
-            if (!journalReader->IsOpen()) {
-                LOG_WARNING(
-                    sLogger,
-                    ("GetEntry failed due to closed connection", "aborting batch")("config", configName)("idx", idx));
+            // GetEntry 失败可能的原因：
+            // 1. 连接已关闭
+            // 2. journal 文件被轮转删除（sd_journal_get_realtime_usec 返回错误）
+            // 3. cursor 失效
+            // 
+            // 无论哪种情况，都应该尝试错误恢复
+            string errorContext = !journalReader->IsOpen() 
+                ? "GetEntry failed, connection closed"
+                : "GetEntry failed (possibly due to journal rotation or timestamp read error)";
+            
+            LOG_WARNING(sLogger,
+                       ("GetEntry failed, attempting recovery", errorContext)
+                       ("config", configName)("idx", idx));
+            
+            // 尝试错误恢复
+            if (RecoverFromJournalError(journalReader, configName, idx, errorContext)) {
+                // 恢复成功，重试读取
+                if (journalReader->GetEntry(entry)) {
+                    return true;
+                }
+                // 恢复后重试仍然失败，跳过这条
+                LOG_WARNING(sLogger, 
+                           ("GetEntry still failed after recovery", "skipping entry")
+                           ("config", configName)("idx", idx));
                 return false;
             }
-            return false; // Read failed but connection ok, caller should continue
+            // 恢复失败，中止批次
+            return false;
         }
         // 检查entry是否为空
         if (entry.fields.empty()) {
@@ -95,10 +174,24 @@ bool ReadAndValidateEntry(const string& configName,
         LOG_ERROR(sLogger, ("exception during journal entry reading", e.what())("config", configName)("idx", idx));
         // 清空entry以确保不会使用部分读取的数据
         entry = JournalEntry();
+        
+        // 尝试错误恢复
+        string errorMsg = string("exception during GetEntry: ") + e.what();
+        if (RecoverFromJournalError(journalReader, configName, idx, errorMsg)) {
+            // 恢复成功，重试读取
+            return journalReader->GetEntry(entry);
+        }
         return false;
     } catch (...) {
         LOG_ERROR(sLogger, ("unknown exception during journal entry reading", "")("config", configName)("idx", idx));
         entry = JournalEntry();
+        
+        // 尝试错误恢复
+        if (RecoverFromJournalError(journalReader, configName, idx, 
+                                   "unknown exception during GetEntry")) {
+            // 恢复成功，重试读取
+            return journalReader->GetEntry(entry);
+        }
         return false;
     }
 }

@@ -53,6 +53,15 @@ struct JournalEntry {
  * @brief Abstract interface for journal reading operations
  * This allows for different implementations (systemd-journal, mock for testing, etc.)
  */
+/**
+ * @brief Journal navigation result status
+ */
+enum class JournalReadStatus {
+    kOk = 1,           // Successfully moved to next entry with data
+    kEndOfJournal = 0,  // No more entries (reached end)
+    kError = -1        // Error occurred (e.g., cursor invalidated by log rotation)
+};
+
 class JournalReader {
 public:
     // Add default constructor
@@ -76,6 +85,12 @@ public:
     virtual bool SeekCursor(const std::string& cursor) = 0;
     virtual bool Next() = 0;
     virtual bool Previous() = 0;
+    
+    /**
+     * @brief Move to next entry with detailed status
+     * @return JournalReadStatus indicating success, end of journal, or error
+     */
+    virtual JournalReadStatus NextWithStatus() = 0;
     
     // Reading operations
     virtual bool GetEntry(JournalEntry& entry) = 0;
@@ -120,6 +135,7 @@ public:
     bool SeekCursor(const std::string& cursor) override;
     bool Next() override;
     bool Previous() override;
+    JournalReadStatus NextWithStatus() override;
     
     bool GetEntry(JournalEntry& entry) override;
     std::string GetCursor() override;
