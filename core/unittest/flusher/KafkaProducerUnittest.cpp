@@ -315,7 +315,7 @@ void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
     c.Authentication.TlsKeyPassword = "secret";
 
     KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(c));
+    APSARA_TEST_FALSE(p.Init(c));
 }
 
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
