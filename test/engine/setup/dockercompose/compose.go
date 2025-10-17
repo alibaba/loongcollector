@@ -253,6 +253,11 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			services[k] = newServices[k]
 		}
 		loongcollector["depends_on"] = loongcollectorDependOn
+
+		// merge top-level volumes from case compose to support named volumes in mounts
+		if vols, ok := caseCfg["volumes"]; ok {
+			cfg["volumes"] = vols
+		}
 	}
 	// volume
 	loongcollectorMount := services["loongcollectorC"].(map[string]interface{})["volumes"].([]interface{})

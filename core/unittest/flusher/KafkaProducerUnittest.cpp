@@ -53,6 +53,8 @@ public:
     void TestDeliveryReportCallback();
     void TestInitWithInvalidPartitioner_Real();
     void TestProduceAsyncWithoutInit_Real();
+    void TestInitWithTLSMinimal_Real();
+    void TestInitWithTLSFull_Real();
 
 protected:
     void SetUp();
@@ -290,6 +292,32 @@ void KafkaProducerUnittest::TestProduceAsyncWithoutInit_Real() {
     APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
 }
 
+void KafkaProducerUnittest::TestInitWithTLSMinimal_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Authentication.TlsEnabled = true;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Authentication.TlsEnabled = true;
+    c.Authentication.TlsCaFile = "/tmp/does-not-need-to-exist.ca";
+    c.Authentication.TlsCertFile = "/tmp/does-not-need-to-exist.crt";
+    c.Authentication.TlsKeyFile = "/tmp/does-not-need-to-exist.key";
+    c.Authentication.TlsKeyPassword = "secret";
+
+    KafkaProducer p;
+    APSARA_TEST_FALSE(p.Init(c));
+}
+
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitFailure)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncSuccess)
@@ -308,6 +336,8 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestErrorTypeMapping)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryReportCallback)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithInvalidPartitioner_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithoutInit_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSMinimal_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSFull_Real)
 
 } // namespace logtail
 
