@@ -191,9 +191,14 @@ public:
             return false;
         }
 
-        const bool enableTLS = mConfig.Authentication.tls_enabled;
-        const bool enableKerberos = mConfig.Authentication.kerberos_enabled;
-        const bool enableSASL = !mConfig.Authentication.sasl_mechanism.empty();
+        // Initialize TLS configuration if enabled
+        if (!InitTlsConfig()) {
+            return false;
+        }
+
+        const bool enableTLS = mConfig.Authentication.TlsEnabled;
+        const bool enableKerberos = mConfig.Authentication.KerberosEnabled;
+        const bool enableSASL = !mConfig.Authentication.SaslMechanism.empty();
 
         // 6.1 security.protocol 只设置一次
         std::string securityProtocol;
@@ -209,13 +214,13 @@ public:
         }
 
         if (enableTLS) {
-            if (!mConfig.Authentication.tls_ca_file.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.tls_ca_file)) {
+            if (!mConfig.Authentication.TlsCaFile.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.TlsCaFile)) {
                     return false;
                 }
             }
-            const bool hasCert = !mConfig.Authentication.tls_cert_file.empty();
-            const bool hasKey = !mConfig.Authentication.tls_key_file.empty();
+            const bool hasCert = !mConfig.Authentication.TlsCertFile.empty();
+            const bool hasKey = !mConfig.Authentication.TlsKeyFile.empty();
             if (hasCert != hasKey) {
                 LOG_ERROR(sLogger,
                           ("Kafka TLS client auth config error",
@@ -240,42 +245,42 @@ public:
         // 6.3 Kerberos 或 SASL
         if (enableKerberos) {
             // mechanisms
-            const std::string mechanism = mConfig.Authentication.kerberos_mechanisms.empty()
+            const std::string mechanism = mConfig.Authentication.KerberosMechanisms.empty()
                 ? std::string("GSSAPI")
-                : mConfig.Authentication.kerberos_mechanisms;
+                : mConfig.Authentication.KerberosMechanisms;
             if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mechanism)) {
                 return false;
             }
-            if (!mConfig.Authentication.kerberos_service_name.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.Authentication.kerberos_service_name)) {
+            if (!mConfig.Authentication.KerberosServiceName.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.Authentication.KerberosServiceName)) {
                     return false;
                 }
             }
             // 不再强制拼接/注入 kinit 命令，除非用户显式提供。
             // librdkafka 在设置 principal/keytab 后会使用其内置的 kinit 逻辑处理票据获取与续约。
-            if (!mConfig.Authentication.kerberos_kinit_cmd.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.Authentication.kerberos_kinit_cmd)) {
+            if (!mConfig.Authentication.KerberosKinitCmd.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.Authentication.KerberosKinitCmd)) {
                     return false;
                 }
             }
-            if (!mConfig.Authentication.kerberos_principal.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.Authentication.kerberos_principal)) {
+            if (!mConfig.Authentication.KerberosPrincipal.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.Authentication.KerberosPrincipal)) {
                     return false;
                 }
             }
-            if (!mConfig.Authentication.kerberos_keytab.empty()) {
-                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.Authentication.kerberos_keytab)) {
+            if (!mConfig.Authentication.KerberosKeytab.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.Authentication.KerberosKeytab)) {
                     return false;
                 }
             }
         } else if (enableSASL) {
-            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mConfig.Authentication.sasl_mechanism)) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mConfig.Authentication.SaslMechanism)) {
                 return false;
             }
-            if (!SetConfig(KAFKA_CONFIG_SASL_USERNAME, mConfig.Authentication.sasl_username)) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_USERNAME, mConfig.Authentication.SaslUsername)) {
                 return false;
             }
-            if (!SetConfig(KAFKA_CONFIG_SASL_PASSWORD, mConfig.Authentication.sasl_password)) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_PASSWORD, mConfig.Authentication.SaslPassword)) {
                 return false;
             }
         }
