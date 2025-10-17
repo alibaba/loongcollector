@@ -33,7 +33,9 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputForward.h"
 #include "plugin/input/InputInternalAlarms.h"
+#include "plugin/input/InputInternalMatchedContainerInfo.h"
 #include "plugin/input/InputInternalMetrics.h"
 #include "plugin/input/InputStaticFile.h"
 #include "plugin/processor/ProcessorDesensitizeNative.h"
@@ -49,6 +51,9 @@
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 #include "plugin/processor/inner/ProcessorTagNative.h"
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+#include "plugin/flusher/kafka/FlusherKafka.h"
+#endif
 #if defined(__linux__) && !defined(__ANDROID__)
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputHostMeta.h"
@@ -152,6 +157,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterContinuousInputCreator(new StaticInputCreator<InputFile>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalAlarms>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMetrics>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputInternalMatchedContainerInfo>(), true);
 #if defined(__linux__) && !defined(__ANDROID__)
     RegisterContinuousInputCreator(new StaticInputCreator<InputContainerStdio>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputPrometheus>());
@@ -170,6 +176,7 @@ void PluginRegistry::LoadStaticPlugins() {
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
     RegisterContinuousInputCreator(new StaticInputCreator<InputJournal>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
@@ -200,6 +207,9 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLS>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherBlackHole>());
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
+#if defined(__linux__) && !defined(__ENTERPRISE__)
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
+#endif
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif

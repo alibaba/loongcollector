@@ -16,7 +16,19 @@ cmake_minimum_required(VERSION 3.22)
 project(container_manager_unittest)
 
 add_executable(container_discovery_options_unittest ContainerDiscoveryOptionsUnittest.cpp)
+add_executable(container_manager_unittest ContainerManagerUnittest.cpp)
 target_link_libraries(container_discovery_options_unittest ${UT_BASE_TARGET})
+target_link_libraries(container_manager_unittest ${UT_BASE_TARGET})
+
+if (UNIX)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testDataSet)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testDataSet/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/testDataSet/)
+elseif (MSVC)
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/testDataSet)
+    file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/testDataSet/ DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_BUILD_TYPE}/testDataSet/)
+endif ()
 
 include(GoogleTest)
 gtest_discover_tests(container_discovery_options_unittest)
+gtest_discover_tests(container_manager_unittest)
+

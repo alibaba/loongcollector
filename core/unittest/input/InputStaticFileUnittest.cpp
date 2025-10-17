@@ -35,6 +35,7 @@ public:
     void TestCreateInnerProcessors();
     void OnPipelineUpdate();
     void TestGetFiles();
+    void TestDirectoryNameWithDot();
     void OnEnableContainerDiscovery();
 
 protected:
@@ -440,6 +441,8 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
                     "config_name" : "test_config",
                     "current_file_index" : 0,
                     "file_count" : 1,
+                    "start_time" : 1739349980,
+                    "expire_time" : 1739349981,
                     "files" :
                     [
                         {
@@ -679,6 +682,100 @@ void InputStaticFileUnittest::TestGetFiles() {
     }
 }
 
+void InputStaticFileUnittest::TestDirectoryNameWithDot() {
+    unique_ptr<InputStaticFile> input;
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+
+    // Test 1: Directory name containing dot (e.g., "dir.test")
+    // This test ensures that filename() is used instead of stem() for directory matching
+    // stem() would strip everything after the dot, causing match failure
+    {
+        filesystem::create_directories("test_logs/app.v1/subdir");
+        filesystem::create_directories("test_logs/app.v2/subdir");
+        filesystem::create_directories("test_logs/notstem");
+        { ofstream fout("test_logs/app.v1/subdir/test1.log"); }
+        { ofstream fout("test_logs/app.v2/subdir/test2.log"); }
+        { ofstream fout("test_logs/notstem/test3.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/app.*/subdir/*.log");
+        configStr = R"(
+            {
+                "Type": "input_static_file_onetime",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputStaticFile());
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
+        // Expected: Should find 2 files from app.v1 and app.v2 directories
+        // If stem() was used, it would match "app" only and fail to match "app.v1" and "app.v2"
+        auto files = input->GetFiles();
+        APSARA_TEST_EQUAL(2U, files.size());
+
+        filesystem::remove_all("test_logs");
+    }
+
+    // Test 2: Directory with multiple dots using ** pattern
+    {
+        filesystem::create_directories("test_logs/release.2024.01.15/logs");
+        filesystem::create_directories("test_logs/release.2024.01.16/logs");
+        { ofstream fout("test_logs/release.2024.01.15/logs/app.log"); }
+        { ofstream fout("test_logs/release.2024.01.16/logs/app.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/release.*/logs/**/*.log");
+        configStr = R"(
+            {
+                "Type": "input_static_file_onetime",
+                "FilePaths": [],
+                "MaxDirSearchDepth": 10
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputStaticFile());
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
+        // Expected: Should find 2 files from both release directories
+        auto files = input->GetFiles();
+        APSARA_TEST_EQUAL(2U, files.size());
+
+        filesystem::remove_all("test_logs");
+    }
+
+    // Test 3: Exact directory name with dot
+    {
+        filesystem::create_directories("test_logs/node_modules.backup/lib");
+        { ofstream fout("test_logs/node_modules.backup/lib/test.log"); }
+
+        filesystem::path filePath = filesystem::absolute("test_logs/node_modules.backup/lib/*.log");
+        configStr = R"(
+            {
+                "Type": "input_static_file_onetime",
+                "FilePaths": []
+            }
+        )";
+        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+        configJson["FilePaths"].append(Json::Value(filePath.string()));
+        input.reset(new InputStaticFile());
+        input->SetContext(ctx);
+        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
+        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+        input->CommitMetricsRecordRef();
+        // Expected: Should find 1 file
+        auto files = input->GetFiles();
+        APSARA_TEST_EQUAL(1U, files.size());
+
+        filesystem::remove_all("test_logs");
+    }
+}
+
 void InputStaticFileUnittest::OnEnableContainerDiscovery() {
 }
 
@@ -687,6 +784,7 @@ UNIT_TEST_CASE(InputStaticFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnPipelineUpdate)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestGetFiles)
+UNIT_TEST_CASE(InputStaticFileUnittest, TestDirectoryNameWithDot)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnEnableContainerDiscovery)
 
 } // namespace logtail

@@ -46,6 +46,7 @@ public:
     void Init();
     void Stop();
     void PushEvent(std::unique_ptr<TimerEvent>&& e);
+    void InitMetrics();
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif
@@ -59,8 +60,7 @@ private:
         mQueue;
 
     std::future<void> mThreadRes;
-    mutable std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = false;
+    std::atomic_bool mIsThreadRunning = false;
     mutable std::condition_variable mCV;
 
 #ifdef APSARA_UNIT_TEST_MAIN

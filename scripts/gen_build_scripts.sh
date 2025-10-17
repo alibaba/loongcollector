@@ -110,6 +110,7 @@ function generateCopyScript() {
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/forward && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/forward core/protobuf/forward' >>$COPY_SCRIPT_FILE
     fi
   else
     echo 'docker cp "$id":'${PATH_IN_DOCKER}'/'${OUT_DIR}'/libGoPluginBase.so $BINDIR' >>$COPY_SCRIPT_FILE
@@ -120,11 +121,13 @@ function generateCopyScript() {
       echo 'docker cp "$id":'${PATH_IN_DOCKER}'/core/build core/build' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/sls && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/sls core/protobuf/sls' >>$COPY_SCRIPT_FILE
       echo 'rm -rf core/protobuf/models && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/models core/protobuf/models' >>$COPY_SCRIPT_FILE
+      echo 'rm -rf core/protobuf/forward && docker cp "$id":'${PATH_IN_DOCKER}'/core/protobuf/forward core/protobuf/forward' >>$COPY_SCRIPT_FILE
     fi
   fi
   echo 'mkdir -p $BINDIR/conf/instance_config/local/' >>$COPY_SCRIPT_FILE
   echo 'echo -e "{\n}" > $BINDIR/conf/instance_config/local/loongcollector_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/conf/continuous_pipeline_config/local' >>$COPY_SCRIPT_FILE
+  echo 'mkdir -p $BINDIR/conf/onetime_pipeline_config/local' >>$COPY_SCRIPT_FILE
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
 }
 

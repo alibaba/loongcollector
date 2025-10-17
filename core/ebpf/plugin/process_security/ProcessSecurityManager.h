@@ -72,6 +72,11 @@ public:
 
     int RemoveConfig(const std::string&) override;
 
+    int Suspend() override {
+        mSuspendFlag = true;
+        return 0;
+    }
+
     std::unique_ptr<PluginConfig> GeneratePluginConfig(
         [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
@@ -79,12 +84,18 @@ public:
         return ebpfConfig;
     }
 
-    int Update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
+
+protected:
+    int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
         return 0;
     }
 
-    void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
+    int resume([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
+        mSuspendFlag = false;
+        return 0;
+    }
 
 private:
     int64_t mSendIntervalMs = 400;

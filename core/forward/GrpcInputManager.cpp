@@ -34,20 +34,15 @@
 #endif
 
 DEFINE_FLAG_INT32(grpc_server_stop_timeout, "grpc server stop timeout, second", 3);
+DEFINE_FLAG_INT32(grpc_server_forward_max_retry_times, "grpc server forward max retry times", 100);
 
 namespace logtail {
 
 void GrpcInputManager::Init() {
-    if (mIsStarted.exchange(true)) {
-        return;
-    }
     LOG_INFO(sLogger, ("GrpcInputManager", "Start"));
 }
 
 void GrpcInputManager::Stop() {
-    if (!mIsStarted.exchange(false)) {
-        return;
-    }
     {
         std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
         for (auto& it : mListenAddressToInputMap) {
@@ -137,12 +132,13 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
 }
 
 // Remove an address from the listen inputs
-template <typename T>
-bool GrpcInputManager::RemoveListenInput(const std::string& address, const std::string& configName) {
+bool GrpcInputManager::RemoveListenInput(const std::string& configName,
+                                         const std::string& address,
+                                         const Json::Value& config) {
     std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
     auto it = mListenAddressToInputMap.find(address);
     if (it != mListenAddressToInputMap.end()) {
-        if (it->second.mService && it->second.mService->Remove(configName)) {
+        if (it->second.mService && it->second.mService->Remove(configName, config)) {
             it->second.mReferenceCount--;
         }
     } else {
@@ -187,12 +183,10 @@ bool GrpcInputManager::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<
 template bool GrpcInputManager::AddListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
                                                                              const std::string&,
                                                                              const Json::Value&);
-template bool GrpcInputManager::RemoveListenInput<LoongSuiteForwardServiceImpl>(const std::string&, const std::string&);
 
 #ifdef APSARA_UNIT_TEST_MAIN
 template bool
 GrpcInputManager::AddListenInput<MockServiceImpl>(const std::string&, const std::string&, const Json::Value&);
-template bool GrpcInputManager::RemoveListenInput<MockServiceImpl>(const std::string&, const std::string&);
 #endif
 
 } // namespace logtail

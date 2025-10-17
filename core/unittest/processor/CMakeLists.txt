@@ -71,6 +71,9 @@ if (LINUX)
     target_link_libraries(parse_container_log_benchmark ${UT_BASE_TARGET})
 endif()
 
+add_executable(json_benchmark_test JsonBenchmark.cpp)
+target_link_libraries(json_benchmark_test ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(processor_split_log_string_native_unittest)
 gtest_discover_tests(processor_split_multiline_log_string_native_unittest)

@@ -16,15 +16,15 @@
 
 | 参数              | 类型       | 是否必选 | 说明                                                          |
 | --------------- | -------- | ---- | ----------------------------------------------------------- |
-| Type            | String   | 是    | 插件类型                                                        |
+| Type            | string   | 是    | 插件类型                                                        |
 | Brokers         | String数组 | 是    | Kafka Brokers                                               |
-| Topic           | String   | 是    | Kafka Topic                                                 |
-| SASLUsername    | String   | 否    | SASL用户名                                                     |
-| SASLPassword    | String   | 否    | SASL密码                                                      |
-| PartitionerType | String   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。 |
+| Topic           | string   | 是    | Kafka Topic                                                 |
+| SASLUsername    | string   | 否    | SASL用户名                                                     |
+| SASLPassword    | string   | 否    | SASL密码                                                      |
+| PartitionerType | string   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。 |
 | HashKeys        | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                        |
-| HashOnce        | Boolean  | 否    |                                                             |
-| ClientID        | String   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                     |
+| HashOnce        | bool  | 否    |                                                             |
+| ClientID        | string   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                     |
 
 ## 样例
 

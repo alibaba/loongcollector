@@ -40,6 +40,7 @@
 #include "config/OnetimeConfigInfoManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
@@ -216,17 +217,29 @@ void Application::Start() { // GCOVR_EXCL_START
 
     // config provider
     {
-        // add local config dir
-        filesystem::path localConfigPath = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
-            / GetContinuousPipelineConfigDir() / "local";
-        error_code ec;
-        filesystem::create_directories(localConfigPath, ec);
-        if (ec) {
+        // add local continuous config dir
+        filesystem::path localContinuousConfigPath
+            = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir()) / GetContinuousPipelineConfigDir()
+            / "local";
+        error_code ec1;
+        filesystem::create_directories(localContinuousConfigPath, ec1);
+        if (ec1) {
             LOG_WARNING(sLogger,
                         ("failed to create dir for local continuous_pipeline_config",
-                         "manual creation may be required")("error code", ec.value())("error msg", ec.message()));
+                         "manual creation may be required")("error code", ec1.value())("error msg", ec1.message()));
         }
-        PipelineConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
+        PipelineConfigWatcher::GetInstance()->AddSource(localContinuousConfigPath.string());
+        // add local onetime config dir
+        filesystem::path localOnetimeConfigPath = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir())
+            / "onetime_pipeline_config" / "local";
+        error_code ec2;
+        filesystem::create_directories(localOnetimeConfigPath, ec2);
+        if (ec2) {
+            LOG_WARNING(sLogger,
+                        ("failed to create dir for local onetime_pipeline_config",
+                         "manual creation may be required")("error code", ec2.value())("error msg", ec2.message()));
+        }
+        PipelineConfigWatcher::GetInstance()->AddSource(localOnetimeConfigPath.string());
     }
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Start();
@@ -277,7 +290,7 @@ void Application::Start() { // GCOVR_EXCL_START
     OnetimeConfigInfoManager::GetInstance()->LoadCheckpointFile();
 
     time_t curTime = 0, lastOnetimeConfigTimeoutCheckTime = 0, lastConfigCheckTime = 0, lastUpdateMetricTime = 0,
-           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0;
+           lastCheckTagsTime = 0, lastQueueGCTime = 0, lastCheckUnusedCheckpointsTime = 0, lastContainerCheckTime = 0;
     while (true) {
         curTime = time(NULL);
         if (curTime - lastCheckTagsTime >= INT32_FLAG(file_tags_update_interval)) {
@@ -300,6 +313,10 @@ void Application::Start() { // GCOVR_EXCL_START
                 OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
 
+            // after every config loaded, set the flag to true
+            if (lastConfigCheckTime == 0) {
+                TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
+            }
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
             if (!instanceConfigDiff.IsEmpty()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
@@ -338,9 +355,12 @@ void Application::Start() { // GCOVR_EXCL_START
         // 过渡使用
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
-        if (ConfigManager::GetInstance()->IsUpdateContainerPaths()) {
-            FileServer::GetInstance()->Pause();
-            FileServer::GetInstance()->Resume();
+        if (curTime - lastContainerCheckTime >= 3) {
+            if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+                FileServer::GetInstance()->Pause();
+                FileServer::GetInstance()->Resume(false, true);
+            }
+            lastContainerCheckTime = curTime;
         }
 
         // destruct event handlers here so that it will not block file reading task
@@ -392,6 +412,7 @@ void Application::Exit() {
     LogtailPlugin::GetInstance()->StopBuiltInModules();
     // from now on, alarm should not be used.
 
+    ContainerManager::GetInstance()->Stop();
     FlusherRunner::GetInstance()->Stop();
     HttpSink::GetInstance()->Stop();
 

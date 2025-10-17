@@ -32,19 +32,23 @@ public:
     void UnblockProcess() { processBlockFlag = false; }
     void BlockStop() { stopBlockFlag = true; }
     void UnblockStop() { stopBlockFlag = false; }
+    void SetUpContainersMeta(const std::string& containersMeta) { mMockContainersMeta = containersMeta; }
+    void SetUpDiffContainersMeta(const std::string& diffContainersMeta) {
+        mMockDiffContainersMeta = diffContainersMeta;
+    }
 
-    bool LoadPipeline(const std::string& pipelineName,
-                      const std::string& pipeline,
-                      const std::string& project,
-                      const std::string& logstore,
-                      const std::string& region,
-                      logtail::QueueKey logstoreKey) {
+    bool LoadPipeline([[maybe_unused]] const std::string& pipelineName,
+                      [[maybe_unused]] const std::string& pipeline,
+                      [[maybe_unused]] const std::string& project,
+                      [[maybe_unused]] const std::string& logstore,
+                      [[maybe_unused]] const std::string& region,
+                      [[maybe_unused]] logtail::QueueKey logstoreKey) {
         return true;
     }
 
-    bool UnloadPipeline(const std::string& pipelineName) { return true; }
+    bool UnloadPipeline([[maybe_unused]] const std::string& pipelineName) { return true; }
 
-    void StopAllPipelines(bool withInputFlag) {}
+    void StopAllPipelines([[maybe_unused]] bool withInputFlag) {}
 
     void Start(const std::string& configName) {
         while (startBlockFlag) {
@@ -54,7 +58,7 @@ public:
         LOG_INFO(sLogger, ("LogtailPluginMock start", "success")("config", configName));
     }
 
-    void Stop(const std::string& configName, bool removingFlag) {
+    void Stop(const std::string& configName, [[maybe_unused]] bool removingFlag) {
         while (stopBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -81,6 +85,9 @@ public:
                                                                                           logGroup)("packId", packId));
     }
 
+    std::string GetAllContainersMeta() const { return mMockContainersMeta; }
+    std::string GetDiffContainersMeta() const { return mMockDiffContainersMeta; }
+
     bool IsStarted() const { return startFlag; }
 
 private:
@@ -88,6 +95,9 @@ private:
     std::atomic_bool processBlockFlag = false;
     std::atomic_bool stopBlockFlag = false;
     std::atomic_bool startFlag = false;
+
+    std::string mMockContainersMeta;
+    std::string mMockDiffContainersMeta;
 };
 
 } // namespace logtail

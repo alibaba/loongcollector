@@ -74,6 +74,12 @@ target_link_libraries(lru_benchmark ${UT_BASE_TARGET})
 add_executable(timekeeper_benchmark TimeKeeperBenchmark.cpp)
 target_link_libraries(timekeeper_benchmark ${UT_BASE_TARGET})
 
+add_executable(ecs_metadata_unittest EcsMetaDataUnittest.cpp)
+target_link_libraries(ecs_metadata_unittest ${UT_BASE_TARGET})
+
+add_executable(formatted_string_unittest FormattedStringUnittest.cpp)
+target_link_libraries(formatted_string_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(common_simple_utils_unittest)
 gtest_discover_tests(common_logfileoperator_unittest)
@@ -93,3 +99,5 @@ endif()
 gtest_discover_tests(network_util_unittest)
 gtest_discover_tests(lru_benchmark)
 gtest_discover_tests(timekeeper_benchmark)
+gtest_discover_tests(ecs_metadata_unittest)
+gtest_discover_tests(formatted_string_unittest)

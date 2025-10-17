@@ -135,7 +135,8 @@ void NetworkObserverConfigUpdateUnittest::AddConfig() {
     context.SetConfigName("test-config-1");
     context.SetProcessQueueKey(1);
     ObserverNetworkOption options;
-    options.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    options.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -168,7 +169,8 @@ void NetworkObserverConfigUpdateUnittest::UpdateConfig() {
     context.SetConfigName("test-config-1");
     context.SetProcessQueueKey(1);
     ObserverNetworkOption options;
-    options.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    options.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -199,7 +201,8 @@ void NetworkObserverConfigUpdateUnittest::RemoveConfig() {
     context.SetConfigName("test-config-1");
     context.SetProcessQueueKey(1);
     ObserverNetworkOption options;
-    options.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    options.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -230,7 +233,8 @@ void NetworkObserverConfigUpdateUnittest::AddContainer() {
     context.SetConfigName("test-config-1");
     context.SetProcessQueueKey(1);
     ObserverNetworkOption options;
-    options.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    options.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -296,7 +300,8 @@ void NetworkObserverConfigUpdateUnittest::RemoveContainer() {
     context.SetConfigName("test-config-1");
     context.SetProcessQueueKey(1);
     ObserverNetworkOption options;
-    options.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    options.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     options.mL4Config.mEnable = true;
     options.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -337,7 +342,8 @@ void NetworkObserverConfigUpdateUnittest::ConfigAndContainerOrthogonal() {
     ctx1.SetConfigName("config1");
     ctx1.SetProcessQueueKey(1);
     ObserverNetworkOption opt1;
-    opt1.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt1.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt1.mL4Config.mEnable = true;
     opt1.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -354,7 +360,8 @@ void NetworkObserverConfigUpdateUnittest::ConfigAndContainerOrthogonal() {
     ctx2.SetConfigName("config2");
     ctx2.SetProcessQueueKey(2);
     ObserverNetworkOption opt2;
-    opt2.mApmConfig = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mServiceId = "sid2"};
+    opt2.mApmConfig
+        = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mLanguage = "go", .mServiceId = "sid2"};
     opt2.mL4Config.mEnable = false;
     opt2.mL7Config
         = {.mEnable = true, .mEnableSpan = false, .mEnableMetric = true, .mEnableLog = false, .mSampleRate = 0.5};
@@ -400,12 +407,14 @@ void NetworkObserverConfigUpdateUnittest::MultiConfigContainerIndependence() {
     ctx2.SetConfigName("config2");
     ctx2.SetProcessQueueKey(2);
     ObserverNetworkOption opt1, opt2;
-    opt1.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt1.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt1.mL4Config.mEnable = true;
     opt1.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
     opt1.mSelectors = {{"workload1", "kind1", "ns1"}};
-    opt2.mApmConfig = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mServiceId = "sid2"};
+    opt2.mApmConfig
+        = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mLanguage = "go", .mServiceId = "sid2"};
     opt2.mL4Config.mEnable = false;
     opt2.mL7Config
         = {.mEnable = true, .mEnableSpan = false, .mEnableMetric = true, .mEnableLog = false, .mSampleRate = 0.5};
@@ -481,12 +490,14 @@ void NetworkObserverConfigUpdateUnittest::ContainerMigrationBetweenConfigs() {
     ctx2.SetConfigName("config2");
     ctx2.SetProcessQueueKey(2);
     ObserverNetworkOption opt1, opt2;
-    opt1.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt1.mApmConfig
+        = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt1.mL4Config.mEnable = true;
     opt1.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
     opt1.mSelectors = {{"workload1", "kind1", "ns1"}};
-    opt2.mApmConfig = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mServiceId = "sid2"};
+    opt2.mApmConfig
+        = {.mWorkspace = "w2", .mAppName = "app2", .mAppId = "id2", .mLanguage = "go", .mServiceId = "sid2"};
     opt2.mL4Config.mEnable = false;
     opt2.mL7Config
         = {.mEnable = true, .mEnableSpan = false, .mEnableMetric = true, .mEnableLog = false, .mSampleRate = 0.5};
@@ -550,7 +561,7 @@ void NetworkObserverConfigUpdateUnittest::SelectorChangeAffectsContainer() {
     ctx.SetConfigName("config1");
     ctx.SetProcessQueueKey(1);
     ObserverNetworkOption opt;
-    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt.mL4Config.mEnable = true;
     opt.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -598,7 +609,7 @@ void NetworkObserverConfigUpdateUnittest::IdempotentAddRemove() {
     ctx.SetConfigName("config1");
     ctx.SetProcessQueueKey(1);
     ObserverNetworkOption opt;
-    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt.mL4Config.mEnable = true;
     opt.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -632,7 +643,7 @@ void NetworkObserverConfigUpdateUnittest::EmptySelectorAndContainer() {
     ctx.SetConfigName("config1");
     ctx.SetProcessQueueKey(1);
     ObserverNetworkOption opt;
-    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt.mL4Config.mEnable = true;
     opt.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};
@@ -656,7 +667,7 @@ void NetworkObserverConfigUpdateUnittest::PartialFieldUpdate() {
     ctx.SetConfigName("config1");
     ctx.SetProcessQueueKey(1);
     ObserverNetworkOption opt;
-    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mServiceId = "sid1"};
+    opt.mApmConfig = {.mWorkspace = "w1", .mAppName = "app1", .mAppId = "id1", .mLanguage = "go", .mServiceId = "sid1"};
     opt.mL4Config.mEnable = true;
     opt.mL7Config
         = {.mEnable = true, .mEnableSpan = true, .mEnableMetric = true, .mEnableLog = true, .mSampleRate = 1.0};

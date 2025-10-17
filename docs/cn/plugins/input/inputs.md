@@ -18,6 +18,7 @@
 | 名称                                                                           | 提供方   | 功能简介                              |
 | ------------------------------------------------------------------------------ | -------- | ------------------------------------- |
 | `input_file`<br>[文本日志](native/input-file.md)                               | SLS 官方 | 文本采集。                            |
+| `input_static_file_onetime`<br>[一次性文件采集](native/input-static-file-onetime.md) | SLS 官方 | 一次性文件采集。                      |
 | `input_container_stdio`<br> [容器标准输出](native/input-container-stdio.md)    | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
 | `input_file_security`<br>[文件安全数据](native/input-file-security.md)         | SLS 官方 | 文件安全数据采集。                    |
 | `input_network_observer`<br>[网络可观测数据](native/input-network-observer.md) | SLS 官方 | 网络可观测数据采集。                  |

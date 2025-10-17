@@ -16,8 +16,8 @@ cmake_minimum_required(VERSION 3.22)
 project(driver)
 
 if (LINUX)
-    set(ENABLE_PROFILE OFF)
-    set(BUILD_TESTING OFF)
+    set(ENABLE_PROFILE OFF CACHE BOOL "Enable profile" FORCE)
+    set(BUILD_TESTING OFF CACHE BOOL "Build test cases" FORCE)
     set(CMAKE_INSTALL_PREFIX ${DEFAULT_DEPS_ROOT})
     
     # Save the original C flags

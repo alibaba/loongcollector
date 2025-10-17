@@ -44,7 +44,9 @@ public:
 
     bool CreateCheckpoint(const std::string& configName,
                           size_t idx,
-                          const std::optional<std::vector<std::filesystem::path>>& files = std::nullopt);
+                          const std::optional<std::vector<std::filesystem::path>>& files = std::nullopt,
+                          uint32_t startTime = 0,
+                          uint32_t expireTime = 0);
     bool DeleteCheckpoint(const std::string& configName, size_t idx);
     bool UpdateCurrentFileCheckpoint(const std::string& configName, size_t idx, uint64_t offset, uint64_t size);
     bool InvalidateCurrentFileCheckpoint(const std::string& configName, size_t idx);

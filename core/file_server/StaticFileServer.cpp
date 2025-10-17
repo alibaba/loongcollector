@@ -83,7 +83,22 @@ void StaticFileServer::AddInput(const string& configName,
                                 const MultilineOptions* multilineOpts,
                                 const FileTagOptions* fileTagOpts,
                                 const CollectionPipelineContext* ctx) {
-    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files);
+    // check if the server is started, if not, start it
+    if (!mThreadRes.valid()) {
+        Init();
+    }
+
+    // 安全获取Pipeline的时间值，避免空指针解引用
+    uint32_t startTime = 0;
+    uint32_t expireTime = 0;
+
+    if (ctx != nullptr && ctx->HasValidPipeline()) {
+        const auto& pipeline = ctx->GetPipeline();
+        startTime = pipeline.GetOnetimeStartTime().value_or(0);
+        expireTime = pipeline.GetOnetimeExpireTime().value_or(0);
+    }
+
+    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files, startTime, expireTime);
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileDiscoveryOpts, ctx));
@@ -259,6 +274,7 @@ FileTagConfig StaticFileServer::GetFileTagConfig(const std::string& name, size_t
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void StaticFileServer::Clear() {
+    Stop();
     lock_guard<mutex> lock(mUpdateMux);
     mInputFileDiscoveryConfigsMap.clear();
     mInputFileReaderConfigsMap.clear();

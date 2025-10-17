@@ -342,7 +342,6 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                               ctx.GetLogstoreName(),
                               ctx.GetRegion());
     }
-
     return true;
 }
 
@@ -681,125 +680,44 @@ ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& log
     return NULL;
 }
 
-bool FileDiscoveryOptions::IsSameContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext* ctx) {
-    if (!mEnableContainerDiscovery)
-        return true;
 
-    if (!paramsJSON.isMember("AllCmd")) {
-        ContainerInfo containerInfo;
-        string errorMsg;
-        if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
-            return true;
-        }
-        if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
-            return true;
-        }
-        // try update
-        for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            if ((*mContainerInfos)[i] == containerInfo) {
-                return true;
-            }
-        }
+bool FileDiscoveryOptions::UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
+                                                  const CollectionPipelineContext* ctx) {
+    if (!mContainerInfos) {
         return false;
     }
-
-    // check all
-    unordered_map<string, ContainerInfo> allPathMap;
-    string errorMsg;
-    if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
-        LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
-        return true;
-    }
-
-    // need add
-    if (mContainerInfos->size() != allPathMap.size()) {
-        return false;
-    }
-
-    for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-        unordered_map<string, ContainerInfo>::iterator iter = allPathMap.find((*mContainerInfos)[i].mID);
-        // need delete
-        if (iter == allPathMap.end()) {
-            return false;
-        }
-        if (!mDeduceAndSetContainerBaseDirFunc(iter->second, ctx, this)) {
-            return true;
-        }
-        // need update
-        if ((*mContainerInfos)[i] != iter->second) {
-            return false;
-        }
-    }
-    // same
-    return true;
-}
-
-bool FileDiscoveryOptions::UpdateContainerInfo(const Json::Value& paramsJSON, const CollectionPipelineContext* ctx) {
-    if (!mContainerInfos)
-        return false;
-
-    if (!paramsJSON.isMember("AllCmd")) {
-        ContainerInfo containerInfo;
-        string errorMsg;
-        if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
-            return false;
-        }
-        if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
-            return false;
-        }
-        // try update
-        for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            if ((*mContainerInfos)[i].mID == containerInfo.mID) {
-                // update
-                (*mContainerInfos)[i] = containerInfo;
-                return true;
-            }
-        }
-        // add
-        mContainerInfos->push_back(containerInfo);
-        return true;
-    }
-
-    unordered_map<string, ContainerInfo> allPathMap;
-    string errorMsg;
-    if (!ContainerInfo::ParseAllByJSONObj(paramsJSON["AllCmd"], allPathMap, errorMsg)) {
-        LOG_ERROR(sLogger,
-                  ("invalid all docker container params",
-                   "skip this path")("params", paramsJSON.toStyledString())("errorMsg", errorMsg));
-        return false;
-    }
-    bool success = true;
-    // if update all, clear and reset
-    mContainerInfos->clear();
-    for (auto& iter : allPathMap) {
-        if (!mDeduceAndSetContainerBaseDirFunc(iter.second, ctx, this)) {
-            success = false;
-            continue;
-        }
-        mContainerInfos->push_back(iter.second);
-    }
-    return success;
-}
-
-bool FileDiscoveryOptions::DeleteContainerInfo(const Json::Value& paramsJSON) {
-    if (!mContainerInfos)
-        return false;
 
     ContainerInfo containerInfo;
-    string errorMsg;
-    if (!ContainerInfo::ParseByJSONObj(paramsJSON, containerInfo, errorMsg)) {
-        LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
+    containerInfo.mRawContainerInfo = rawContainerInfo;
+
+    mContainerDiscovery.GetCustomExternalTags(
+        rawContainerInfo->mEnv, rawContainerInfo->mK8sInfo.mLabels, containerInfo.mExtraTags);
+
+    if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
         return false;
     }
-    for (vector<ContainerInfo>::iterator iter = mContainerInfos->begin(); iter != mContainerInfos->end(); ++iter) {
-        if (iter->mID == containerInfo.mID) {
-            mContainerInfos->erase(iter);
-            break;
+    for (size_t i = 0; i < mContainerInfos->size(); ++i) {
+        if ((*mContainerInfos)[i].mRawContainerInfo->mID == rawContainerInfo->mID) {
+            (*mContainerInfos)[i] = containerInfo;
+            return true;
         }
     }
+    mContainerInfos->push_back(containerInfo);
     return true;
 }
 
+bool FileDiscoveryOptions::DeleteRawContainerInfo(const std::string& containerID) {
+    if (!mContainerInfos) {
+        return false;
+    }
+
+    for (auto iter = mContainerInfos->begin(); iter != mContainerInfos->end(); ++iter) {
+        if (iter->mRawContainerInfo && iter->mRawContainerInfo->mID == containerID) {
+            LOG_INFO(sLogger, ("delete container", containerID));
+            mContainerInfos->erase(iter);
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace logtail

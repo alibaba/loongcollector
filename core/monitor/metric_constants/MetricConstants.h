@@ -33,6 +33,9 @@ extern const std::string METRIC_LABEL_KEY_PROJECT;
 extern const std::string METRIC_LABEL_KEY_USER_DEFINED_ID;
 extern const std::string METRIC_LABEL_KEY_UUID;
 extern const std::string METRIC_LABEL_KEY_VERSION;
+extern const std::string METRIC_LABEL_KEY_ECS_INSTANCE_ID;
+extern const std::string METRIC_LABEL_KEY_ECS_REGION_ID;
+extern const std::string METRIC_LABEL_KEY_ECS_USER_ID;
 
 // metric keys
 extern const std::string METRIC_AGENT_CPU;
@@ -177,6 +180,7 @@ extern const std::string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS;
 extern const std::string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL;
+extern const std::string METRIC_PLUGIN_FLUSHER_RETRY_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL;
 extern const std::string METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL;
@@ -298,6 +302,7 @@ extern const std::string& METRIC_RUNNER_IN_EVENT_GROUPS_TOTAL;
 extern const std::string& METRIC_RUNNER_IN_SIZE_BYTES;
 extern const std::string& METRIC_RUNNER_IN_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_LAST_RUN_TIME;
+extern const std::string& METRIC_RUNNER_OUT_SIZE_BYTES;
 extern const std::string& METRIC_RUNNER_OUT_ITEMS_TOTAL;
 extern const std::string& METRIC_RUNNER_TOTAL_DELAY_MS;
 extern const std::string METRIC_RUNNER_CLIENT_REGISTER_STATE;
@@ -318,6 +323,7 @@ extern const std::string METRIC_RUNNER_SINK_SEND_CONCURRENCY;
  *   flusher runner
  **********************************************************/
 extern const std::string METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES;
+extern const std::string METRIC_RUNNER_FLUSHER_OUT_RAW_SIZE_BYTES;
 extern const std::string METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL;
 
 /**********************************************************

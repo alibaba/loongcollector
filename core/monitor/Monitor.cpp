@@ -63,6 +63,9 @@ string LoongCollectorMonitor::mHostname;
 string LoongCollectorMonitor::mIpAddr;
 string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
+string LoongCollectorMonitor::mEcsInstanceID;
+string LoongCollectorMonitor::mEcsRegionID;
+string LoongCollectorMonitor::mEcsUserID;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
 string LoongCollectorMonitor::mStartTime;
 #ifndef LOGTAIL_NO_TC_MALLOC
@@ -600,6 +603,11 @@ LoongCollectorMonitor::LoongCollectorMonitor() {
     mIpAddr = GetHostIp();
     mOsDetail = GetOsDetail();
     mUsername = GetUsername();
+#ifdef __ENTERPRISE__
+    mEcsInstanceID = InstanceIdentity::Instance()->GetEntity()->GetEcsInstanceID().to_string();
+    mEcsRegionID = InstanceIdentity::Instance()->GetEntity()->GetEcsRegionID().to_string();
+    mEcsUserID = InstanceIdentity::Instance()->GetEntity()->GetEcsUserID().to_string();
+#endif
 }
 
 LoongCollectorMonitor::~LoongCollectorMonitor() {
@@ -618,6 +626,17 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_KEY_OS_DETAIL, mOsDetail);
     labels.emplace_back(METRIC_LABEL_KEY_UUID, Application::GetInstance()->GetUUID());
     labels.emplace_back(METRIC_LABEL_KEY_VERSION, ILOGTAIL_VERSION);
+#ifdef __ENTERPRISE__
+    if (!mEcsInstanceID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_INSTANCE_ID, mEcsInstanceID);
+    }
+    if (!mEcsRegionID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_REGION_ID, mEcsRegionID);
+    }
+    if (!mEcsUserID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_USER_ID, mEcsUserID);
+    }
+#endif
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, []() -> std::string { return FlusherSLS::GetAllProjects(); });
 #ifdef __ENTERPRISE__

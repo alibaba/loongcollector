@@ -26,8 +26,8 @@
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 
-namespace logtail {
-namespace ebpf {
+
+namespace logtail::ebpf {
 
 class EBPFServer;
 
@@ -150,9 +150,6 @@ int FileSecurityManager::SendEvents() {
             // set process tag
             auto sharedEvent = sharedEventGroup.CreateLogEvent(true, mEventPool);
             bool hit = processCacheMgr->AttachProcessData(group->mPid, group->mKtime, *sharedEvent, eventGroup);
-            if (!hit) {
-                LOG_WARNING(sLogger, ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime));
-            }
 
             for (const auto& commonEvent : group->mInnerEvents) {
                 auto* innerEvent = static_cast<FileEvent*>(commonEvent.get());
@@ -198,6 +195,12 @@ int FileSecurityManager::SendEvents() {
                     default:
                         break;
                 }
+                if (!hit) {
+                    LOG_WARNING(
+                        sLogger,
+                        ("failed to finalize process tags for pid ", group->mPid)("ktime", group->mKtime)(
+                            "path", innerEvent->mPath)("eventType", magic_enum::enum_name(innerEvent->mEventType)));
+                }
             }
         });
     }
@@ -222,6 +225,9 @@ int FileSecurityManager::SendEvents() {
 }
 
 int FileSecurityManager::Init() {
+    if (mInited) {
+        return 0;
+    }
     mInited = true;
     return 0;
 }
@@ -230,6 +236,11 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
                                            uint32_t index,
                                            const PluginMetricManagerPtr& metricMgr,
                                            const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
+    if (!ctx) {
+        LOG_ERROR(sLogger, ("ctx is null", ""));
+        return -1;
+    }
+
     // init metrics ...
     if (metricMgr) {
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
@@ -239,40 +250,45 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     }
 
-    if (mConfigName.size()) {
+    if (RegisteredConfigCount() != 0) {
         // update
         LOG_DEBUG(sLogger, ("FileSecurity Update", ""));
         // update config (BPF tailcall, filter map etc.)
-        if (Update(options)) {
+        if (update(options)) {
             LOG_WARNING(sLogger, ("FileSecurity Update failed", ""));
             return 1;
         }
         // resume
-        if (Resume(options)) {
+        if (resume(options)) {
             LOG_WARNING(sLogger, ("FileSecurity Resume failed", ""));
             return 1;
         }
-    } else {
-        std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
-        pc->mPluginType = PluginType::FILE_SECURITY;
-        FileSecurityConfig config;
-        SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        config.mOptions = opts->mOptionList;
-        config.mPerfBufferSpec
-            = {{"file_secure_output",
-                128,
-                this,
-                [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
-                [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
-        pc->mConfig = std::move(config);
-
-        auto res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
-        LOG_INFO(sLogger, ("start file probe, status", res));
-        if (!res) {
-            LOG_WARNING(sLogger, ("failed to start file probe", ""));
-            return 1;
-        }
+        return 0;
     }
+
+    std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::FILE_SECURITY;
+    FileSecurityConfig config;
+    SecurityOptions* opts = std::get<SecurityOptions*>(options);
+    if (!opts) {
+        LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+        return -1;
+    }
+    config.mOptions = opts->mOptionList;
+    config.mPerfBufferSpec
+        = {{"file_secure_output",
+            128,
+            this,
+            [](void* ctx, int cpu, void* data, uint32_t size) { HandleFileKernelEvent(ctx, cpu, data, size); },
+            [](void* ctx, int cpu, unsigned long long cnt) { HandleFileKernelEventLoss(ctx, cpu, cnt); }}};
+    pc->mConfig = std::move(config);
+
+    bool res = mEBPFAdapter->StartPlugin(PluginType::FILE_SECURITY, std::move(pc));
+    if (!res) {
+        LOG_WARNING(sLogger, ("start file security plugin", "failed"));
+        return 1;
+    }
+    LOG_INFO(sLogger, ("start file security plugin", "success"));
 
     mConfigName = ctx->GetConfigName();
     mMetricMgr = metricMgr;
@@ -291,8 +307,13 @@ int FileSecurityManager::RemoveConfig(const std::string&) {
         }
     }
     mRegisteredConfigCount = 0;
+    mConfigName.clear();
     auto res = mEBPFAdapter->StopPlugin(PluginType::FILE_SECURITY);
-    LOG_INFO(sLogger, ("stop file plugin, status", res)("configCount", mRegisteredConfigCount));
+    if (res) {
+        LOG_INFO(sLogger, ("stop file security plugin", "success"));
+    } else {
+        LOG_WARNING(sLogger, ("stop file security plugin", "failed"));
+    }
     mRetryableEventCache.Clear();
     return res ? 0 : 1;
 }
@@ -314,6 +335,7 @@ std::array<size_t, 2> GenerateAggKeyForFileEvent(const std::shared_ptr<CommonEve
 
 int FileSecurityManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (!event) {
+        LOG_ERROR(sLogger, ("cannot handle", "event is null"));
         return 1;
     }
     auto* fileEvent = static_cast<FileEvent*>(event.get());
@@ -344,5 +366,4 @@ int FileSecurityManager::Destroy() {
     return 0;
 }
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

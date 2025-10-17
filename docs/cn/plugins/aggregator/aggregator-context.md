@@ -16,11 +16,11 @@
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
-| Type | String | 是 | 插件类型，指定为`aggregator_context`。 |
-| MaxLogGroupCount | Int | 否 | 在执行Flush之前，每一个日志来源所允许存在的最大LogGroup数量。如果未添加该参数，则默认每一个日志来源最多允许存在2个LogGroup。 |
-| MaxLogCount | Int | 否 | 每个LogGroup最多可包含的日志条数。如果未添加该参数，则默认每个LogGroup最多可包含1024条日志。 |
-| PackFlag | Boolean | 否 | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
-| Topic | String | 否 | 额外设置的LogGroup的Topic名。如果未添加该参数，则每个LogGroup的Topic名默认值如下：<li>空，如果input插件不提供设置Topic的能力；<li>input插件中设置的topic名称，如果input插件提供设置Topic的能力。 |
+| Type | string | 是 | 插件类型，指定为`aggregator_context`。 |
+| MaxLogGroupCount | int | 否 | 在执行Flush之前，每一个日志来源所允许存在的最大LogGroup数量。如果未添加该参数，则默认每一个日志来源最多允许存在2个LogGroup。 |
+| MaxLogCount | int | 否 | 每个LogGroup最多可包含的日志条数。如果未添加该参数，则默认每个LogGroup最多可包含1024条日志。 |
+| PackFlag | bool | 否 | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
+| Topic | string | 否 | 额外设置的LogGroup的Topic名。如果未添加该参数，则每个LogGroup的Topic名默认值如下：<li>空，如果input插件不提供设置Topic的能力；<li>input插件中设置的topic名称，如果input插件提供设置Topic的能力。 |
 
 ## 样例
 

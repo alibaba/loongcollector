@@ -41,13 +41,13 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override { return true; }
-    void Process(PipelineEventGroup& logGroup) override { ++mCnt; };
+    bool Init([[maybe_unused]] const Json::Value& config) override { return true; }
+    void Process([[maybe_unused]] PipelineEventGroup& logGroup) override { ++mCnt; };
 
     uint32_t mCnt = 0;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+    bool IsSupportedEvent([[maybe_unused]] const PipelineEventPtr& e) const override { return true; };
 };
 
 const std::string ProcessorInnerMock::sName = "processor_inner_mock";
@@ -57,7 +57,7 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         if (config.isMember("SupportAck")) {
             mSupportAck = config["SupportAck"].asBool();
         }
@@ -68,7 +68,7 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override {
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -92,7 +92,7 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         if (config.isMember("SupportAck")) {
             mSupportAck = config["SupportAck"].asBool();
         }
@@ -103,7 +103,7 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override {
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -127,7 +127,7 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         if (config.isMember("SupportAck")) {
             mSupportAck = config["SupportAck"].asBool();
         }
@@ -138,7 +138,7 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override {
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -165,12 +165,12 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override {
+    bool Init([[maybe_unused]] const Json::Value& config) override {
         mLocalContentKey = PROCESSOR_MOCK_LOCAL_CONTENT_KEY;
         mLocalContentValue = PROCESSOR_MOCK_LOCAL_CONTENT_VALUE;
         return true;
     }
-    void Process(PipelineEventGroup& logGroup) override {
+    void Process([[maybe_unused]] PipelineEventGroup& logGroup) override {
         for (auto& e : logGroup.MutableEvents()) {
             if (e.Is<LogEvent>()) {
                 auto& logEvent = e.Cast<LogEvent>();
@@ -190,7 +190,7 @@ public:
     uint32_t mCnt = 0;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+    bool IsSupportedEvent([[maybe_unused]] const PipelineEventPtr& e) const override { return true; };
 
     std::atomic_bool mBlockFlag = false;
     std::string mLocalContentKey;
@@ -204,12 +204,12 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
         SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
         return true;
     }
-    bool Send(PipelineEventGroup&& g) override { return mIsValid; }
+    bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
     bool Flush(size_t key) override {
         mFlushedQueues.push_back(key);
         return true;
@@ -227,12 +227,12 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
         SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
         return true;
     }
-    bool Send(PipelineEventGroup&& g) override { return mIsValid; }
+    bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
     bool Flush(size_t key) override {
         mFlushedQueues.push_back(key);
         return true;
@@ -241,7 +241,7 @@ public:
     bool BuildRequest(SenderQueueItem* item,
                       std::unique_ptr<HttpSinkRequest>& req,
                       bool* keepItem,
-                      std::string* errMsg) override {
+                      [[maybe_unused]] std::string* errMsg) override {
         if (item->mData == "invalid_keep") {
             *keepItem = true;
             return false;
@@ -254,7 +254,7 @@ public:
             "", false, "", 80, "", "", std::map<std::string, std::string>(), "", nullptr);
         return true;
     }
-    void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override {}
+    void OnSendDone([[maybe_unused]] const HttpResponse& response, [[maybe_unused]] SenderQueueItem* item) override {}
 
     bool mIsValid = true;
     std::vector<size_t> mFlushedQueues;
@@ -267,14 +267,14 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override {
+    bool Init([[maybe_unused]] const Json::Value& config) override {
         if (config.isMember("Valid")) {
             return config["Valid"].asBool();
         }
         return true;
     }
     void Start() override { mIsRunning = true; }
-    void Stop(bool isRemoving) { mIsRunning = false; }
+    void Stop([[maybe_unused]] bool isRemoving) override { mIsRunning = false; }
 
     bool mIsRunning = false;
 };

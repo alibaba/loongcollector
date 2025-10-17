@@ -34,7 +34,7 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type    | String，无默认值（必填） | 插件类型，固定为`processor_fields_with_condition`      |
+| Type    | string，无默认值（必填） | 插件类型，固定为`processor_fields_with_condition`      |
 | DropIfNotMatchCondition | Boolean，`false`| 当条均件不满足时，日志是被丢弃（true）还是被保留（false）。|
 | Switch | Array，其中value为Condition，无默认值（必填） | 切换行动的条件。 |
 
@@ -49,16 +49,16 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| LogicalOperator | String，`and` | 多个条件字段之间的逻辑运算符（and/or）。 |
-| RelationOperator | String，`equals` | 条件字段的关系运算符（equals/regexp/contains/startwith）。 |
+| LogicalOperator | string，`and` | 多个条件字段之间的逻辑运算符（and/or）。 |
+| RelationOperator | string，`equals` | 条件字段的关系运算符（equals/regexp/contains/startwith）。 |
 | FieldConditions | Map，其中fieldKey和fieldValue为String类型，无默认值（必填） | 字段名和表达式的键值对。 |
 
 ### `ConditionAction`类型说明
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| type | String，无默认值（必填） |  行动类型，可选值是`processor_add_fields`/`processor_drop`。|
-| IgnoreIfExist | Boolean，`false` | 当相同的键存在时是否要忽略。 |
+| type | string，无默认值（必填） |  行动类型，可选值是`processor_add_fields`/`processor_drop`。|
+| IgnoreIfExist | bool，`false` | 当相同的键存在时是否要忽略。 |
 | Fields | Map，其中fieldKey和fieldValue为String类型，无默认值（必填） | 附加字段的键值对。 |
 | DropKeys | Array，其中value为String，无默认值（必填） | 丢弃字段。 |
 

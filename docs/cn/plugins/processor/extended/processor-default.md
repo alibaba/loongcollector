@@ -22,7 +22,7 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type    | String，无默认值（必填） | 插件类型，固定为`processor_default`      |
+| Type    | string，无默认值（必填） | 插件类型，固定为`processor_default`      |
 
 ## 样例
 

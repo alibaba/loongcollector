@@ -131,7 +131,7 @@ void BlockedEventManager::GetFeedbackEvent(vector<Event*>& res) {
     for (auto& key : keys) {
         for (auto iter = mEventMap.begin(); iter != mEventMap.end();) {
             auto& e = iter->second;
-            if (e.mEvent != nullptr && e.mQueueKey == key) {
+            if (e.mEvent != nullptr && e.mQueueKey == key && !e.mEvent->IsReaderFlushTimeout()) {
                 res.push_back(e.mEvent);
                 iter = mEventMap.erase(iter);
             } else {

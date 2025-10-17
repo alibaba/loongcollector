@@ -16,17 +16,17 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type                | String，无默认值（必填）                 | 插件类型，固定为`processor_grok` |
-| CustomPatternDir    | Array，其中 value 为 String，`[]`      | 自定义的GROK模式所在的文件夹地址，会读取文件夹内的所有文件。需要重启生效。 |
-| CustomPatterns      | Map，其中 key 和 value 为 String，`{}` | 自定义的GROK模式，key 为规则名，value 为 grok 表达式。 |
-| SourceKey           | String，`content`                     | 需要匹配的目标字段。    |
-| Match               | Array，其中 value 为 String，`[]`      | 用来匹配的 Grok 表达式数组。Grok 插件会从上至下依次使用 Match 中的表达式对日志进行匹配，并返回第一个匹配成功的结果。配置多条会影响性能，可以参考[效率与优化](#效率与优化)   |
-| TimeoutMilliSeconds | Long，`0`                             | 解析 grok 表达式的最大尝试时间，单位为毫秒，设置为 0 禁用超时。     |
+| Type                | string，无默认值（必填）                 | 插件类型，固定为`processor_grok` |
+| CustomPatternDir    | Array，其中 value 为 string，`[]`      | 自定义的GROK模式所在的文件夹地址，会读取文件夹内的所有文件。需要重启生效。 |
+| CustomPatterns      | Map，其中 key 和 value 为 string，`{}` | 自定义的GROK模式，key 为规则名，value 为 grok 表达式。 |
+| SourceKey           | string，`content`                     | 需要匹配的目标字段。    |
+| Match               | Array，其中 value 为 string，`[]`      | 用来匹配的 Grok 表达式数组。Grok 插件会从上至下依次使用 Match 中的表达式对日志进行匹配，并返回第一个匹配成功的结果。配置多条会影响性能，可以参考[效率与优化](#效率与优化)   |
+| TimeoutMilliSeconds | long，`0`                             | 解析 grok 表达式的最大尝试时间，单位为毫秒，设置为 0 禁用超时。     |
 | IgnoreParseFailure  | Boolean，`true`                       | 指定解析失败后的操作，不配置表示放弃解析，直接填充所返回的 content 字段。配置为 false ，表示解析失败时丢弃日志。 |
-| KeepSource          | Boolean，`true`                       | 是否保留原字段。     |
-| NoKeyError          | Boolean，`false`                      | 无匹配的原始字段时是否报错。     |
-| NoMatchError        | Boolean，`true`                      | Match 中的表达式全不匹配时是否报错。     |
-| TimeoutError        | Boolean，`true`                      | 匹配超时是否返回错误。      |
+| KeepSource          | bool，`true`                       | 是否保留原字段。     |
+| NoKeyError          | bool，`false`                      | 无匹配的原始字段时是否报错。     |
+| NoMatchError        | bool，`true`                      | Match 中的表达式全不匹配时是否报错。     |
+| TimeoutError        | bool，`true`                      | 匹配超时是否返回错误。      |
 
 ## 样例
 

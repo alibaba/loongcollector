@@ -566,6 +566,7 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     mSendDoneCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SEND_DONE_TOTAL);
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);
+    mRetryCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_RETRY_TOTAL);
     mDiscardCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_DISCARD_TOTAL);
     mNetworkErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_NETWORK_ERROR_TOTAL);
     mServerErrorCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SERVER_ERROR_TOTAL);
@@ -622,12 +623,15 @@ bool FlusherSLS::FlushAll() {
 bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>& req, bool* keepItem, string* errMsg) {
     ADD_COUNTER(mSendCnt, 1);
 
-    SLSClientManager::AuthType type;
-    string accessKeyId, accessKeySecret;
-    if (!SLSClientManager::GetInstance()->GetAccessKey(mAliuid, type, accessKeyId, accessKeySecret)) {
+    AuthType type;
+    string accessKeyId, accessKeySecret, secToken, errorMsg;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(
+            mAliuid, type, accessKeyId, accessKeySecret, secToken, errorMsg)) {
 #ifdef __ENTERPRISE__
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 mProject, type, accessKeyId, accessKeySecret)) {
+            AlarmManager::GetInstance()->SendAlarmError(
+                GLOBAL_CONFIG_ALARM, "failed to get access key: " + errorMsg, mRegion, mProject, "", mLogstore);
             *keepItem = true;
             *errMsg = "failed to get access key";
             return false;
@@ -686,18 +690,18 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
     switch (mTelemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
-            req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            req = CreatePostLogStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST:
-            req = CreatePostHostMetricsRequest(accessKeyId, accessKeySecret, type, data);
+            req = CreatePostHostMetricsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
-            req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, type, data);
+            req = CreatePostMetricStoreLogsRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, type, data);
+            req = CreatePostAPMBackendRequest(accessKeyId, accessKeySecret, secToken, type, data);
             break;
         default:
             break;
@@ -876,6 +880,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
                 ++item->mTryCnt;
+                ADD_COUNTER(mRetryCnt, 1);
                 FlusherRunner::GetInstance()->PushToHttpSink(item, false);
                 break;
             case OperationOnFail::RETRY_LATER:
@@ -884,12 +889,13 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                     LOG_WARNING(sLogger, LOG_PATTERN);
                     data->mLastLogWarningTime = curTime;
                 }
+                ADD_COUNTER(mRetryCnt, 1);
                 SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
                 DealSenderQueueItemAfterSend(item, true);
                 break;
             case OperationOnFail::DISCARD:
-                ADD_COUNTER(mDiscardCnt, 1);
             default:
+                ADD_COUNTER(mDiscardCnt, 1);
                 LOG_WARNING(sLogger, LOG_PATTERN);
                 if (!isProfileData) {
                     AlarmManager::GetInstance()->SendAlarmCritical(
@@ -1198,7 +1204,8 @@ void FlusherSLS::AddPackId(BatchedEvents& g) const {
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const string& accessKeyId,
                                                                       const string& accessKeySecret,
-                                                                      SLSClientManager::AuthType type,
+                                                                      const string& secToken,
+                                                                      AuthType type,
                                                                       SLSSenderQueueItem* item) const {
     optional<uint64_t> seqId;
     if (item->mExactlyOnceCheckpoint) {
@@ -1208,6 +1215,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
     map<string, string> header;
     PreparePostLogStoreLogsRequest(accessKeyId,
                                    accessKeySecret,
+                                   secToken,
                                    type,
                                    item->mCurrentHost,
                                    item->mRealIpFlag,
@@ -1239,12 +1247,14 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const string& accessKeyId,
                                                                      const string& accessKeySecret,
-                                                                     SLSClientManager::AuthType type,
+                                                                     const std::string& secToken,
+                                                                     AuthType type,
                                                                      SLSSenderQueueItem* item) const {
     string path, query;
     map<string, string> header;
     PreparePostHostMetricsRequest(accessKeyId,
                                   accessKeySecret,
+                                  secToken,
                                   type,
                                   CompressTypeToString(mCompressor->GetCompressType()),
                                   item->mType,
@@ -1269,12 +1279,14 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const string& accessKeyId,
                                                                          const string& accessKeySecret,
-                                                                         SLSClientManager::AuthType type,
+                                                                         const string& secToken,
+                                                                         AuthType type,
                                                                          SLSSenderQueueItem* item) const {
     string path;
     map<string, string> header;
     PreparePostMetricStoreLogsRequest(accessKeyId,
                                       accessKeySecret,
+                                      secToken,
                                       type,
                                       item->mCurrentHost,
                                       item->mRealIpFlag,
@@ -1302,13 +1314,16 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
 
 unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string& accessKeyId,
                                                                     const string& accessKeySecret,
-                                                                    SLSClientManager::AuthType type,
+                                                                    const string& secToken,
+                                                                    AuthType type,
                                                                     SLSSenderQueueItem* item) const {
+    string query;
     map<string, string> header;
     header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
     header.insert({APM_HEADER_PROJECT, mProject});
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
+                                 secToken,
                                  type,
                                  item->mCurrentHost,
                                  item->mRealIpFlag,

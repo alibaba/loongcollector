@@ -1,0 +1,225 @@
+{
+    "containers": [
+        {
+            "id": "nginx-frontend",
+            "labels": {
+                "app": "nginx",
+                "tier": "frontend",
+                "version": "1.20",
+                "component": "web"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-frontend-pod",
+                "container_name": "nginx",
+                "labels": {},
+                "paused_container": false
+            }
+        },
+        {
+            "id": "nginx-backend",
+            "labels": {
+                "app": "nginx",
+                "tier": "backend",
+                "version": "1.21",
+                "component": "api"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-backend-pod",
+                "container_name": "nginx",
+                "labels": {},
+                "paused_container": false
+            }
+        },
+        {
+            "id": "redis-cache",
+            "labels": {
+                "app": "redis",
+                "tier": "backend",
+                "version": "6.2",
+                "component": "cache",
+                "port": "6379"
+            },
+            "env": [
+                "APP_NAME=redis"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "redis-cache-pod",
+                "container_name": "redis",
+                "labels": {},
+                "paused_container": false
+            }
+        },
+        {
+            "id": "mysql-db",
+            "labels": {
+                "app": "mysql",
+                "tier": "database",
+                "version": "8.0"
+            },
+            "env": [
+                "APP_NAME=mysql"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "mysql-db-pod",
+                "container_name": "mysql",
+                "labels": {},
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "include_container_label_exact_match",
+            "description": "测试容器标签精确匹配",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "app": "nginx"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend"
+            ]
+        },
+        {
+            "name": "include_container_label_key_only",
+            "description": "测试只检查容器标签键存在（value 为空）",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "component": ""
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend",
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_container_label_regex_value",
+            "description": "测试容器标签值正则匹配（以 ^ 开头）",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "version": "^1\\..*"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend"
+            ]
+        },
+        {
+            "name": "include_container_label_multiple_labels",
+            "description": "测试多个容器标签条件（OR 关系）",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "tier": "frontend",
+                    "component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_container_label_numeric_values",
+            "description": "测试数值类型的标签值",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "port": "6379"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_container_label_empty_labels",
+            "description": "测试容器无标签的情况",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "nonexistent": "value"
+                }
+            },
+            "expected_matched_ids": []
+        },
+        {
+            "name": "exclude_container_label_exact_match",
+            "description": "测试排除特定容器标签",
+            "filters": {
+                "ExcludeContainerLabel": {
+                    "app": "nginx"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_container_label_key_only",
+            "description": "测试排除包含特定标签键的容器",
+            "filters": {
+                "ExcludeContainerLabel": {
+                    "component": ""
+                }
+            },
+            "expected_matched_ids": [
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_container_label_regex_value",
+            "description": "测试排除标签值正则匹配的容器",
+            "filters": {
+                "ExcludeContainerLabel": {
+                    "version": "^1\\..*"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_container_label_multiple_conditions",
+            "description": "测试多个排除容器标签条件",
+            "filters": {
+                "ExcludeContainerLabel": {
+                    "tier": "frontend",
+                    "component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-backend",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_container_label_combined_with_include",
+            "description": "测试排除和包含容器标签的组合",
+            "filters": {
+                "IncludeContainerLabel": {
+                    "app": "nginx"
+                },
+                "ExcludeContainerLabel": {
+                    "tier": "frontend"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-backend"
+            ]
+        }
+    ]
+}

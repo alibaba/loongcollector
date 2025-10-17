@@ -16,15 +16,15 @@
 
 | 参数    | 类型                    | 是否必选 | 说明                                 |
 |-------|-----------------------|------|------------------------------------|
-| Tags  | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Tags的 key,value     |
-| Metas | Map<String,Condition> | 否    | 需要过滤的GroupInfo.Metadata的 key,value |
+| Tags  | Map<string,Condition> | 否    | 需要过滤的GroupInfo.Tags的 key,value     |
+| Metas | Map<string,Condition> | 否    | 需要过滤的GroupInfo.Metadata的 key,value |
 
 其中，**Condition** 的字段结构如下：
 
 | 字段      | 类型      | 是否必填 | 说明                        |
 |---------|---------|------|---------------------------|
-| Pattern | String  | 是    | 匹配正则表达式                   |
-| Reverse | Boolean | 否    | 是否反向选择，即选择不匹配 Pattern 的数据 |
+| Pattern | string  | 是    | 匹配正则表达式                   |
+| Reverse | bool | 否    | 是否反向选择，即选择不匹配 Pattern 的数据 |
 
 ## 样例
 

@@ -34,6 +34,7 @@ cmake_dependent_option(ENABLE_CORP_FEATURE "Enable corp feature" OFF "ENABLE_ENT
 option(WITHOUTGDB "Build Logtail without gdb")
 option(WITHSPL "Build Logtail and UT with SPL" ON)
 option(BUILD_LOGTAIL_UT "Build unit test for Logtail")
+option(BUILD_LOGTAIL_UT_WITH_BENCHMARK "Build unit test for benchmark" OFF)
 cmake_dependent_option(ENABLE_ADDRESS_SANITIZER "Enable address sanitizer" ON "CMAKE_BUILD_TYPE STREQUAL Debug;NOT ANDROID" OFF)
 set(PROVIDER_PATH ${CMAKE_CURRENT_SOURCE_DIR}/provider CACHE PATH "Path to the provider module") # external provider path can be set with -DPROVIDER_PATH
 set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the unittest module") # external unittest path can be set with -DUNITTEST_PATH
@@ -60,7 +61,11 @@ endif ()
 
 if (NOT WITHSPL)
     add_definitions(-D__EXCLUDE_SPL__)
+else ()
+    add_definitions(-D__INCLUDE_SSE4_2__)
 endif()
+
+message(STATUS "loongcollector Cpp compile flags: ${CMAKE_CXX_FLAGS}")
 
 add_definitions(-DXXH_DISPATCH_AVX2=0)
 add_definitions(-DXXH_DISPATCH_AVX512=0)
@@ -84,9 +89,11 @@ if (UNIX)
     string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
     string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
     if (BUILD_LOGTAIL_UT)
-        SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
-        SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
-        SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+        if (NOT BUILD_LOGTAIL_UT_WITH_BENCHMARK) 
+            SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
+            SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-arcs -ftest-coverage")
+            SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fprofile-arcs -ftest-coverage")
+        endif ()
     endif ()
 elseif (MSVC)
     add_definitions(-DNOMINMAX)
@@ -140,7 +147,7 @@ set(SUB_DIRECTORIES_LIST
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
         runner runner/sink/http
         task_pipeline
-        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender
+        monitor monitor/metric_constants monitor/metric_models monitor/profile_sender monitor/task_status_constants
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         journal_server journal_server/reader journal_server/connection journal_server/processor journal_server/common
@@ -152,7 +159,7 @@ if (LINUX)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        host_monitor host_monitor/collector forward forward/loongsuite
+        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
 elseif(MSVC)
 endif ()

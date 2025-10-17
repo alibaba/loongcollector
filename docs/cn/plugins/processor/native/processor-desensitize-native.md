@@ -2,7 +2,7 @@
 
 ## 简介
 
-`processor_filter_regex_native`插件根据事件字段内容来过滤事件。
+`processor_desensitize_native` 插件对事件指定字段内容进行脱敏。
 
 ## 版本
 

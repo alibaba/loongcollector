@@ -35,6 +35,7 @@ public:
     void TestGetPreciseTimestampFromLogtailTime();
     void TestBootTimeDiff();
     void TestKernelTimeToUTC();
+    void TestGetTimeStamp();
 };
 
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestDeduceYear, 0);
@@ -44,6 +45,7 @@ APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestStrptimeNanosecond, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetPreciseTimestampFromLogtailTime, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestBootTimeDiff, 0);
 APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestKernelTimeToUTC, 0);
+APSARA_UNIT_TEST_CASE(TimeUtilUnittest, TestGetTimeStamp, 0);
 
 void TimeUtilUnittest::TestBootTimeDiff() {
     auto diff = GetTimeDiffFromMonotonic();
@@ -268,6 +270,12 @@ void TimeUtilUnittest::TestGetPreciseTimestampFromLogtailTime() {
     EXPECT_EQ(1640970061123456780UL, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
     lt.tv_nsec = 123456789;
     EXPECT_EQ(1640970061123456789UL, GetPreciseTimestampFromLogtailTime(lt, preciseTimestampConfig));
+}
+
+
+void TimeUtilUnittest::TestGetTimeStamp() {
+    time_t tm = 1755065971;
+    APSARA_TEST_EQUAL(GetTimeStamp(tm, "%Y-%m-%dT%H:%M:%SZ", false), "2025-08-13T06:19:31Z");
 }
 
 } // namespace logtail
