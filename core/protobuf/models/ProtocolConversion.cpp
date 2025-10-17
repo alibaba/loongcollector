@@ -104,6 +104,10 @@ bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::M
     for (auto& tagPair : src.tags()) {
         dst.SetTag(tagPair.first, tagPair.second);
     }
+    // metadata
+    for (auto& metaPair : src.metadata()) {
+        dst.SetMetadata(metaPair.first, metaPair.second);
+    }
     return true;
 }
 

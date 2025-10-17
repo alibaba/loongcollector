@@ -29,6 +29,7 @@ public:
     void TestUntypedSingleValue();
     void TestUntypedMultiDoubleValues();
     void TestTag();
+    void TestMetadata();
     void TestUntypedSingleValueSize();
     void TestUntypedMultiDoubleValuesSize();
     void TestReset();
@@ -37,6 +38,7 @@ public:
     void TestUntypedSingleValueFromJson();
     void TestUntypedMultiDoubleValuesFromJson();
     void TestTagsIterator();
+    void TestMetadataIterator();
     void TestCopy();
 
 protected:
@@ -146,6 +148,51 @@ void MetricEventUnittest::TestTag() {
         mMetricEvent->DelTag(key);
         APSARA_TEST_FALSE(mMetricEvent->HasTag(key));
         APSARA_TEST_EQUAL("", mMetricEvent->GetTag(key).to_string());
+    }
+}
+
+void MetricEventUnittest::TestMetadata() {
+    {
+        string key = "key1";
+        string value = "value1";
+        mMetricEvent->SetMetadata(key, value);
+        APSARA_TEST_TRUE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL(value, mMetricEvent->GetMetadata(key).to_string());
+    }
+    {
+        string key = "key2";
+        string value = "value2";
+        mMetricEvent->SetMetadata(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
+        APSARA_TEST_TRUE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL(value, mMetricEvent->GetMetadata(key).to_string());
+    }
+    {
+        string key = "key3";
+        string value = "value3";
+        mMetricEvent->SetMetadataNoCopy(mMetricEvent->GetSourceBuffer()->CopyString(key),
+                                   mMetricEvent->GetSourceBuffer()->CopyString(value));
+        APSARA_TEST_TRUE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL(value, mMetricEvent->GetMetadata(key).to_string());
+    }
+    {
+        string key = "key4";
+        string value = "value4";
+        const StringBuffer& kb = mMetricEvent->GetSourceBuffer()->CopyString(key);
+        const StringBuffer& vb = mMetricEvent->GetSourceBuffer()->CopyString(value);
+        mMetricEvent->SetMetadataNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
+        APSARA_TEST_TRUE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL(value, mMetricEvent->GetMetadata(key).to_string());
+    }
+    {
+        string key = "key5";
+        APSARA_TEST_FALSE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL("", mMetricEvent->GetMetadata(key).to_string());
+    }
+    {
+        string key = "key1";
+        mMetricEvent->DelMetadata(key);
+        APSARA_TEST_FALSE(mMetricEvent->HasMetadata(key));
+        APSARA_TEST_EQUAL("", mMetricEvent->GetMetadata(key).to_string());
     }
 }
 
@@ -292,6 +339,9 @@ void MetricEventUnittest::TestUntypedSingleValueFromJson() {
         "tags": {
             "key1": "value1"
         },
+        "metadata": {
+            "key2": "value2"
+        },
         "timestamp" : 12345678901,
         "timestampNanosecond" : 0,
         "value": {
@@ -309,6 +359,7 @@ void MetricEventUnittest::TestUntypedSingleValueFromJson() {
     APSARA_TEST_TRUE(mMetricEvent->Is<UntypedSingleValue>());
     APSARA_TEST_EQUAL(10.0, mMetricEvent->GetValue<UntypedSingleValue>()->mValue);
     APSARA_TEST_EQUAL("value1", mMetricEvent->GetTag("key1").to_string());
+    APSARA_TEST_EQUAL("value2", mMetricEvent->GetMetadata("key2").to_string());
 }
 
 void MetricEventUnittest::TestUntypedMultiDoubleValuesFromJson() {
@@ -317,6 +368,9 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesFromJson() {
         "name": "test",
         "tags": {
             "key1": "value1"
+        },
+        "metadata": {
+            "key2": "value2"
         },
         "timestamp" : 12345678901,
         "timestampNanosecond" : 0,
@@ -350,6 +404,7 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesFromJson() {
     APSARA_TEST_EQUAL(UntypedValueMetricType::MetricTypeGauge, val.MetricType);
     APSARA_TEST_EQUAL(2.0, val.Value);
     APSARA_TEST_EQUAL("value1", mMetricEvent->GetTag("key1").to_string());
+    APSARA_TEST_EQUAL("value2", mMetricEvent->GetMetadata("key2").to_string());
 }
 
 void MetricEventUnittest::TestTagsIterator() {
@@ -373,6 +428,29 @@ void MetricEventUnittest::TestTagsIterator() {
         APSARA_TEST_EQUAL(rawMap[it->first.to_string()], it->second.to_string());
     }
     APSARA_TEST_EQUAL((size_t)3, mMetricEvent->TagsSize());
+}
+
+void MetricEventUnittest::TestMetadataIterator() {
+    string key1 = "key1";
+    string value1 = "value1";
+    string key2 = "key2";
+    string value2 = "value2";
+    string key3 = "key3";
+    string value3 = "value3";
+
+    map<string, string> rawMap;
+    rawMap[key1] = value1;
+    rawMap[key2] = value2;
+    rawMap[key3] = value3;
+
+    mMetricEvent->SetMetadata(key1, value1);
+    mMetricEvent->SetMetadata(key2, value2);
+    mMetricEvent->SetMetadata(key3, value3);
+
+    for (auto it = mMetricEvent->MetadataBegin(); it != mMetricEvent->MetadataEnd(); ++it) {
+        APSARA_TEST_EQUAL(rawMap[it->first.to_string()], it->second.to_string());
+    }
+    APSARA_TEST_EQUAL((size_t)3, mMetricEvent->MetadataSize());
 }
 
 void MetricEventUnittest::TestCopy() {
@@ -401,6 +479,7 @@ UNIT_TEST_CASE(MetricEventUnittest, TestName)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValue)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValues)
 UNIT_TEST_CASE(MetricEventUnittest, TestTag)
+UNIT_TEST_CASE(MetricEventUnittest, TestMetadata)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesSize)
 UNIT_TEST_CASE(MetricEventUnittest, TestReset)
@@ -409,6 +488,7 @@ UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesToJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedSingleValueFromJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestUntypedMultiDoubleValuesFromJson)
 UNIT_TEST_CASE(MetricEventUnittest, TestTagsIterator)
+UNIT_TEST_CASE(MetricEventUnittest, TestMetadataIterator)
 UNIT_TEST_CASE(MetricEventUnittest, TestCopy)
 
 } // namespace logtail
