@@ -212,6 +212,11 @@ public:
         SET_GAUGE(mAgentConfigTotal, total);
 #endif
     }
+    void SetAgentHostMonitorTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        SET_GAUGE(mAgentHostMonitorTotal, total);
+#endif
+    }
 
     static std::string mHostname;
     static std::string mIpAddr;
@@ -246,6 +251,7 @@ private:
     IntGaugePtr mAgentGoRoutinesTotal;
     IntGaugePtr mAgentOpenFdTotal;
     IntGaugePtr mAgentConfigTotal;
+    IntGaugePtr mAgentHostMonitorTotal;
 };
 
 } // namespace logtail
