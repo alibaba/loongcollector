@@ -182,10 +182,10 @@ bool MetricEvent::FromJson(const Json::Value& root) {
             SetTag(key, tags[key].asString());
         }
     }
-    if (!mMetadata.mInner.empty()) {
+    if (root.isMember("metadata")) {
         Json::Value metadata = root["metadata"];
-        for (const auto& meta : mMetadata.mInner) {
-            metadata[meta.first.to_string()] = meta.second.to_string();
+        for (const auto& key : metadata.getMemberNames()) {
+            SetMetadata(key, metadata[key].asString());
         }
     }
     return true;
