@@ -183,7 +183,7 @@ bool MetricEvent::FromJson(const Json::Value& root) {
         }
     }
     if (!mMetadata.mInner.empty()) {
-        Json::Value& metadata = root["metadata"];
+        Json::Value metadata = root["metadata"];
         for (const auto& meta : mMetadata.mInner) {
             metadata[meta.first.to_string()] = meta.second.to_string();
         }
