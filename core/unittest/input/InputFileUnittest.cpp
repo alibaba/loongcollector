@@ -22,6 +22,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
 #include "plugin/input/InputFile.h"
@@ -70,6 +71,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
     configStr = R"(
@@ -192,6 +194,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    string filePathStr = NormalizeNativePath(filePath.string());
 
     configStr = R"(
             {
@@ -223,9 +226,10 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
         )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
     APSARA_TEST_TRUE(ParseJsonTable(optionalGoPipelineStr, optionalGoPipelineJson, errorMsg));
-    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    configJson["FilePaths"].append(Json::Value(filePathStr));
     optionalGoPipelineJson["global"]["DefaultLogQueueSize"] = Json::Value(INT32_FLAG(default_plugin_log_queue_size));
-    optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"] = Json::Value(filePath.parent_path().string());
+    optionalGoPipelineJson["inputs"][0]["detail"]["LogPath"]
+        = Json::Value(NormalizeNativePath(filePath.parent_path().string()));
     PluginInstance::PluginMeta meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
@@ -246,7 +250,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
             }
         )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-    configJson["FilePaths"].append(Json::Value(filePath.string()));
+    configJson["FilePaths"].append(Json::Value(filePathStr));
     meta = ctx.GetPipeline().GenNextPluginMeta(false);
     input.reset(new InputFile());
     input->SetContext(ctx);
@@ -263,6 +267,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
         configStr = R"(
@@ -468,6 +473,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     input.SetContext(ctx);
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
 
     configStr = R"(
         {

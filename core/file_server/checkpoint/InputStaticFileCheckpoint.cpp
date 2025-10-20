@@ -14,6 +14,7 @@
 
 #include "file_server/checkpoint/InputStaticFileCheckpoint.h"
 
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -269,7 +270,7 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".filepath", filepath, *errMsg)) {
             return false;
         }
-        cpt.mFilePath = filepath;
+        cpt.mFilePath = ConvertAndNormalizeNativePath(filepath);
 
         string statusStr;
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
