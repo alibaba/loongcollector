@@ -51,4 +51,12 @@ constexpr DataElement kCnt = {
     "call stack count",
 };
 
+constexpr DataElement kTraceId = {
+    "trace_id",
+    "trace_id", // metric
+    "trace_id", // span
+    "trace_id", // log
+    "call stack trace id",
+};
+
 } // namespace logtail::ebpf
