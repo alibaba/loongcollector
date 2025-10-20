@@ -35,7 +35,7 @@ const std::string InputJournal::kSeekPositionDefault = "none";
 InputJournal::InputJournal()
     : mSeekPosition(kSeekPositionTail)
     , mCursorFlushPeriodMs(kDefaultCursorFlushPeriodMs)
-    , mCursorSeekFallback(kSeekPositionTail)
+    , mCursorSeekFallback(kSeekPositionHead) // 默认head，参照fluentbit的行为
     , mKernel(true)
     , mParseSyslogFacility(false)
     , mParsePriority(false)
@@ -70,7 +70,7 @@ bool InputJournal::Start() {
     // 创建journal配置对象
     JournalConfig config;
     config.seekPosition = mSeekPosition; // 设置seek位置
-    config.cursorFlushPeriodMs = mCursorFlushPeriodMs; // 设置cursor刷新周期
+    // config.cursorFlushPeriodMs = mCursorFlushPeriodMs; // TODO: 暂时不使用，保留未来支持checkpoint后再启用
     config.cursorSeekFallback = mCursorSeekFallback; // 设置cursor回退位置
     config.units = mUnits; // 设置units
     config.kernel = mKernel; // 设置kernel
@@ -148,14 +148,14 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
         mCursorFlushPeriodMs = 300000;
     }
     
-    // 获取cursor回退位置
+    // 获取cursor回退位置（参照fluentbit的行为，默认head， 与go实现不同go实现默认tail）
     if (!GetOptionalStringParam(config, "CursorSeekFallback", mCursorSeekFallback, errorMsg)) {
-        mCursorSeekFallback = kSeekPositionTail;
+        mCursorSeekFallback = kSeekPositionHead;
     }
     // 验证cursor回退位置的有效性
     if (mCursorSeekFallback != "head" && mCursorSeekFallback != "tail") {
-        LOG_WARNING(sLogger, ("invalid CursorSeekFallback value, using default", mCursorSeekFallback)("default", kSeekPositionTail));
-        mCursorSeekFallback = kSeekPositionTail;
+        LOG_WARNING(sLogger, ("invalid CursorSeekFallback value, using default", mCursorSeekFallback)("default", kSeekPositionHead));
+        mCursorSeekFallback = kSeekPositionHead;
     }
     
     // 获取kernel

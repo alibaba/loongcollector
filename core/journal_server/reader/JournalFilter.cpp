@@ -26,17 +26,17 @@ namespace logtail {
 
 bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& config) {
     if (!reader) {
-        LOG_ERROR(sLogger, ("journal reader is null", "")("config", config.configName)("idx", config.configIndex));
+        LOG_ERROR(sLogger, ("journal filter but journal reader is null", "")("config", config.configName)("idx", config.configIndex));
         return false;
     }
 
     LOG_INFO(sLogger,
-             ("applying journal filters",
+             ("journal filter applying journal filters",
               "")("config", config.configName)("idx", config.configIndex)("description", GetConfigDescription(config)));
 
     // 验证配置
     if (!ValidateConfig(config)) {
-        LOG_ERROR(sLogger, ("invalid filter config", "")("config", config.configName)("idx", config.configIndex));
+        LOG_ERROR(sLogger, ("journal filter with invalid filter config", "")("config", config.configName)("idx", config.configIndex));
         return false;
     }
 
@@ -45,10 +45,10 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         // 1. 应用units过滤（如果配置了）- 包含glob模式支持
         if (!config.units.empty()) {
             LOG_INFO(sLogger,
-                     ("applying units filter",
+                     ("journal filter applying units filter",
                       "")("config", config.configName)("idx", config.configIndex)("units_count", config.units.size()));
             if (!AddUnitsFilter(reader, config.units, config.configName, config.configIndex)) {
-                LOG_ERROR(sLogger, ("units filter failed", "")("config", config.configName)("idx", config.configIndex));
+                LOG_ERROR(sLogger, ("journal filter units filter failed", "")("config", config.configName)("idx", config.configIndex));
                 return false;
             }
         }
@@ -56,11 +56,11 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         // 2. 应用自定义匹配模式（如果配置了）- 与Go版本顺序一致
         if (!config.matchPatterns.empty()) {
             LOG_INFO(sLogger,
-                     ("applying match patterns filter", "")("config", config.configName)("idx", config.configIndex)(
+                     ("journal filter applying match patterns filter", "")("config", config.configName)("idx", config.configIndex)(
                          "patterns_count", config.matchPatterns.size()));
             if (!AddMatchPatternsFilter(reader, config.matchPatterns, config.configName, config.configIndex)) {
                 LOG_ERROR(sLogger,
-                          ("match patterns filter failed", "")("config", config.configName)("idx", config.configIndex));
+                          ("journal filter match patterns filter failed", "")("config", config.configName)("idx", config.configIndex));
                 return false;
             }
         }
@@ -68,10 +68,10 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         // 3. 应用kernel过滤（如果配置了units且启用kernel）
         // 与Golang版本保持一致：只有在配置了units且enableKernel=true时才添加kernel过滤器
         if (!config.units.empty() && config.enableKernel) {
-            LOG_INFO(sLogger, ("applying kernel filter", "")("config", config.configName)("idx", config.configIndex));
+            LOG_INFO(sLogger, ("journal filter applying kernel filter", "")("config", config.configName)("idx", config.configIndex));
             if (!AddKernelFilter(reader, config.configName, config.configIndex)) {
                 LOG_ERROR(sLogger,
-                          ("kernel filter failed", "")("config", config.configName)("idx", config.configIndex));
+                          ("journal filter kernel filter failed", "")("config", config.configName)("idx", config.configIndex));
                 return false;
             }
         }
@@ -79,11 +79,11 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         // 4. 应用identifiers过滤（如果配置了）- 与Go版本顺序一致
         if (!config.identifiers.empty()) {
             LOG_INFO(sLogger,
-                     ("applying identifiers filter", "")("config", config.configName)("idx", config.configIndex)(
+                     ("journal server applying identifiers filter", "")("config", config.configName)("idx", config.configIndex)(
                          "identifiers_count", config.identifiers.size()));
             if (!AddIdentifiersFilter(reader, config.identifiers, config.configName, config.configIndex)) {
                 LOG_ERROR(sLogger,
-                          ("identifiers filter failed", "")("config", config.configName)("idx", config.configIndex));
+                          ("journal filter identifiers filter failed", "")("config", config.configName)("idx", config.configIndex));
                 return false;
             }
         }
@@ -92,25 +92,25 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         if (config.units.empty() && config.identifiers.empty() && !config.enableKernel
             && config.matchPatterns.empty()) {
             LOG_WARNING(sLogger,
-                        ("no filters configured, will collect all journal entries",
+                        ("journal filter no filters configured, will collect all journal entries",
                          "")("config", config.configName)("idx", config.configIndex));
         }
 
         // 如果只有kernel过滤器，提醒用户这会只收集内核消息
         if (config.units.empty() && config.identifiers.empty() && config.enableKernel && config.matchPatterns.empty()) {
             LOG_INFO(sLogger,
-                     ("kernel-only filter active, will collect only kernel messages",
+                     ("journal filter kernel-only filter active, will collect only kernel messages",
                       "")("config", config.configName)("idx", config.configIndex));
         }
 
         LOG_INFO(sLogger,
-                 ("all filters applied successfully", "")("config", config.configName)("idx", config.configIndex));
+                 ("journal filter all filters applied successfully", "")("config", config.configName)("idx", config.configIndex));
         return true;
 
     } catch (const std::exception& e) {
         LOG_ERROR(
             sLogger,
-            ("exception during filter application", e.what())("config", config.configName)("idx", config.configIndex));
+            ("journal filter exception during filter application", e.what())("config", config.configName)("idx", config.configIndex));
         return false;
     }
 }
@@ -124,7 +124,7 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
     }
 
     LOG_INFO(sLogger,
-             ("adding units filter", "")("config", configName)("idx", configIndex)("units_count", units.size()));
+             ("journal filter adding units filter", "")("config", configName)("idx", configIndex)("units_count", units.size()));
 
     std::vector<std::string> patterns;
     
@@ -137,39 +137,39 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
             if (JournalUtils::StringIsGlob(mangledUnit)) {
                 // 收集glob模式以备后续处理
                 patterns.push_back(mangledUnit);
-                LOG_DEBUG(sLogger, ("glob pattern collected", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
+                LOG_DEBUG(sLogger, ("journal filter glob pattern collected", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
             } else {
                 // 立即添加具体单元匹配
                 if (!addSingleUnitMatches(reader, mangledUnit, configName, configIndex)) {
-                    LOG_ERROR(sLogger, ("failed to add unit filter", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
+                    LOG_ERROR(sLogger, ("journal filter failed to add unit filter", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
                     return false;
                 }
-                LOG_DEBUG(sLogger, ("specific unit filter added", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
+                LOG_DEBUG(sLogger, ("journal filter specific unit filter added", mangledUnit)("original", unit)("config", configName)("idx", configIndex));
             }
         } catch (const std::exception& e) {
-            LOG_ERROR(sLogger, ("unit name mangle failed", e.what())("unit", unit)("config", configName)("idx", configIndex));
+            LOG_ERROR(sLogger, ("journal filter unit name mangle failed", e.what())("unit", unit)("config", configName)("idx", configIndex));
             return false;
         }
     }
 
     // 现在处理glob模式（如果有的话）
     if (!patterns.empty()) {
-        LOG_INFO(sLogger, ("processing glob patterns", "")("config", configName)("idx", configIndex)("patterns_count", patterns.size()));
+        LOG_INFO(sLogger, ("journal filter processing glob patterns", "")("config", configName)("idx", configIndex)("patterns_count", patterns.size()));
         
         std::vector<std::string> matchedUnits = getPossibleUnits(reader, JournalUtils::kSystemUnits, patterns);
-        LOG_INFO(sLogger, ("glob patterns matched units", "")("config", configName)("idx", configIndex)("matched_count", matchedUnits.size()));
+        LOG_INFO(sLogger, ("journal filter glob patterns matched units", "")("config", configName)("idx", configIndex)("matched_count", matchedUnits.size()));
         
         for (const auto& matchedUnit : matchedUnits) {
             if (!addSingleUnitMatches(reader, matchedUnit, configName, configIndex)) {
-                LOG_ERROR(sLogger, ("failed to add glob-matched unit filter", matchedUnit)("config", configName)("idx", configIndex));
+                LOG_ERROR(sLogger, ("journal filter failed to add glob-matched unit filter", matchedUnit)("config", configName)("idx", configIndex));
                 return false;
             }
-            LOG_DEBUG(sLogger, ("glob-matched unit filter added", matchedUnit)("config", configName)("idx", configIndex));
+            LOG_DEBUG(sLogger, ("journal filter glob-matched unit filter added", matchedUnit)("config", configName)("idx", configIndex));
         }
     }
 
     LOG_INFO(sLogger,
-             ("units filter completed", "")("config", configName)("idx", configIndex)("units_processed", units.size()));
+             ("journal filter units filter completed", "")("config", configName)("idx", configIndex)("units_processed", units.size()));
     return true;
 }
 
@@ -183,7 +183,7 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
     try {
         // 1. 查找服务本身的消息
         if (!reader->AddMatch("_SYSTEMD_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add unit match", unit)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter failed to add unit match", unit)("config", configName)("idx", configIndex));
             return false;
         }
 
@@ -192,43 +192,43 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
         // systemd-coredump服务在记录进程崩溃信息时使用这个标准ID
         if (!reader->AddDisjunction() || !reader->AddMatch("MESSAGE_ID", "fc2e22bc6ee647b6b90729ab34a250b1")
             || !reader->AddMatch("_UID", "0") || !reader->AddMatch("COREDUMP_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add coredump match", unit)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter failed to add coredump match", unit)("config", configName)("idx", configIndex));
             return false;
         }
 
         // 3. 查找PID 1关于此服务的消息
         if (!reader->AddDisjunction() || !reader->AddMatch("_PID", "1") || !reader->AddMatch("UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add PID1 match", unit)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter failed to add PID1 match", unit)("config", configName)("idx", configIndex));
             return false;
         }
 
         // 4. 查找授权守护进程关于此服务的消息
         if (!reader->AddDisjunction() || !reader->AddMatch("_UID", "0")
             || !reader->AddMatch("OBJECT_SYSTEMD_UNIT", unit)) {
-            LOG_WARNING(sLogger, ("failed to add daemon match", unit)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter failed to add daemon match", unit)("config", configName)("idx", configIndex));
             return false;
         }
 
         // 5. 显示属于slice的所有消息
         if (absl::StrContains(unit, ".slice")) {
             if (!reader->AddDisjunction() || !reader->AddMatch("_SYSTEMD_SLICE", unit)) {
-                LOG_WARNING(sLogger, ("failed to add slice match", unit)("config", configName)("idx", configIndex));
+                LOG_WARNING(sLogger, ("journal filter failed to add slice match", unit)("config", configName)("idx", configIndex));
                 return false;
             }
         }
 
         // 6. 为此unit添加最终的析取
         if (!reader->AddDisjunction()) {
-            LOG_WARNING(sLogger, ("failed to add final disjunction", unit)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter failed to add final disjunction", unit)("config", configName)("idx", configIndex));
             return false;
         }
 
-        LOG_DEBUG(sLogger, ("comprehensive unit filter added", unit)("config", configName)("idx", configIndex));
+        LOG_DEBUG(sLogger, ("journal filter comprehensive unit filter added", unit)("config", configName)("idx", configIndex));
         return true;
 
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
-                  ("exception adding unit filter", e.what())("unit", unit)("config", configName)("idx", configIndex));
+                  ("journal filter exception adding unit filter", e.what())("unit", unit)("config", configName)("idx", configIndex));
         return false;
     }
 }
@@ -242,47 +242,47 @@ bool JournalFilter::AddIdentifiersFilter(JournalReader* reader,
     }
 
     LOG_INFO(sLogger,
-             ("adding identifiers filter", "")("config", configName)("idx", configIndex)("identifiers_count",
+             ("journal filter adding identifiers filter", "")("config", configName)("idx", configIndex)("identifiers_count",
                                                                                          identifiers.size()));
 
     for (const auto& identifier : identifiers) {
         if (!reader->AddMatch("SYSLOG_IDENTIFIER", identifier)) {
             LOG_WARNING(sLogger,
-                        ("failed to add identifier match", identifier)("config", configName)("idx", configIndex));
+                        ("journal filter failed to add identifier match", identifier)("config", configName)("idx", configIndex));
             return false;
         }
 
         // 与Go版本保持一致，每个identifier后都调用AddDisjunction
         if (!reader->AddDisjunction()) {
             LOG_WARNING(sLogger,
-                        ("failed to add identifier disjunction", identifier)("config", configName)("idx", configIndex));
+                        ("journal filter failed to add identifier disjunction", identifier)("config", configName)("idx", configIndex));
             return false;
         }
 
-        LOG_DEBUG(sLogger, ("identifier filter added", identifier)("config", configName)("idx", configIndex));
+        LOG_DEBUG(sLogger, ("journal filter identifier filter added", identifier)("config", configName)("idx", configIndex));
     }
 
     LOG_INFO(sLogger,
-             ("identifiers filter completed", "")("config", configName)("idx", configIndex)("identifiers_processed",
-                                                                                            identifiers.size()));
+             ("journal filter identifiers filter completed", "")("config", configName)("idx", configIndex)("identifiers_processed",
+                                                                                             identifiers.size()));
     return true;
 }
 
 bool JournalFilter::AddKernelFilter(JournalReader* reader, const std::string& configName, size_t configIndex) {
-    LOG_INFO(sLogger, ("adding kernel filter", "")("config", configName)("idx", configIndex));
+    LOG_INFO(sLogger, ("journal filter adding kernel filter", "")("config", configName)("idx", configIndex));
 
     if (!reader->AddMatch("_TRANSPORT", "kernel")) {
-        LOG_WARNING(sLogger, ("failed to add kernel transport match", "")("config", configName)("idx", configIndex));
+        LOG_WARNING(sLogger, ("journal filter failed to add kernel transport match", "")("config", configName)("idx", configIndex));
         return false;
     }
 
     // 添加AddDisjunction()以与其他过滤器形成OR逻辑关系，与Golang版本保持一致
     if (!reader->AddDisjunction()) {
-        LOG_WARNING(sLogger, ("failed to add kernel disjunction", "")("config", configName)("idx", configIndex));
+        LOG_WARNING(sLogger, ("journal filter failed to add kernel disjunction", "")("config", configName)("idx", configIndex));
         return false;
     }
 
-    LOG_DEBUG(sLogger, ("kernel filter added", "")("config", configName)("idx", configIndex));
+    LOG_DEBUG(sLogger, ("journal filter kernel filter added", "")("config", configName)("idx", configIndex));
     return true;
 }
 
@@ -295,20 +295,20 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
     }
 
     LOG_INFO(sLogger,
-             ("adding match patterns filter", "")("config", configName)("idx", configIndex)("patterns_count",
-                                                                                            patterns.size()));
+             ("journal filter adding match patterns filter", "")("config", configName)("idx", configIndex)("patterns_count",
+                                                                                             patterns.size()));
 
     // 与Go版本相同的方式处理模式 - 直接传递完整模式给AddMatch
     for (const auto& pattern : patterns) {
         if (pattern.empty()) {
-            LOG_WARNING(sLogger, ("empty pattern skipped", "")("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter empty pattern skipped", "")("config", configName)("idx", configIndex));
             continue;
         }
 
         // 解析FIELD=VALUE格式的模式以匹配Go版本行为
         size_t equalPos = pattern.find('=');
         if (equalPos == std::string::npos) {
-            LOG_WARNING(sLogger, ("pattern missing '=' separator", pattern)("config", configName)("idx", configIndex));
+            LOG_WARNING(sLogger, ("journal filter pattern missing '=' separator", pattern)("config", configName)("idx", configIndex));
             continue;
         }
         
@@ -316,36 +316,36 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
         std::string value = pattern.substr(equalPos + 1);
         
         if (!reader->AddMatch(field, value)) {
-            LOG_ERROR(sLogger, ("failed to add pattern match", pattern)("config", configName)("idx", configIndex));
+            LOG_ERROR(sLogger, ("journal filter failed to add pattern match", pattern)("config", configName)("idx", configIndex));
             return false;
         }
 
         if (!reader->AddDisjunction()) {
             LOG_ERROR(sLogger,
-                      ("failed to add pattern disjunction", pattern)("config", configName)("idx", configIndex));
+                      ("journal filter failed to add pattern disjunction", pattern)("config", configName)("idx", configIndex));
             return false;
         }
 
-        LOG_DEBUG(sLogger, ("pattern filter added", pattern)("config", configName)("idx", configIndex));
+        LOG_DEBUG(sLogger, ("journal filter pattern filter added", pattern)("config", configName)("idx", configIndex));
     }
 
     LOG_INFO(sLogger,
-             ("match patterns filter completed", "")("config", configName)("idx", configIndex)("patterns_processed",
-                                                                                               patterns.size()));
+             ("journal filter match patterns filter completed", "")("config", configName)("idx", configIndex)("patterns_processed",
+                                                                                                patterns.size()));
     return true;
 }
 
 bool JournalFilter::ValidateConfig(const FilterConfig& config) {
     // 基本验证
     if (config.configName.empty()) {
-        LOG_WARNING(sLogger, ("filter config missing configName", ""));
+        LOG_WARNING(sLogger, ("journal filter config missing configName", ""));
         return false;
     }
 
     // 验证units配置
     for (const auto& unit : config.units) {
         if (unit.empty()) {
-            LOG_WARNING(sLogger, ("empty unit name in config", "")("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter empty unit name in config", "")("config", config.configName));
             return false;
         }
     }
@@ -353,7 +353,7 @@ bool JournalFilter::ValidateConfig(const FilterConfig& config) {
     // 验证identifiers配置
     for (const auto& identifier : config.identifiers) {
         if (identifier.empty()) {
-            LOG_WARNING(sLogger, ("empty identifier in config", "")("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter empty identifier in config", "")("config", config.configName));
             return false;
         }
     }
@@ -361,7 +361,7 @@ bool JournalFilter::ValidateConfig(const FilterConfig& config) {
     // 验证matchPatterns配置
     for (const auto& pattern : config.matchPatterns) {
         if (pattern.empty() || !absl::StrContains(pattern, '=')) {
-            LOG_WARNING(sLogger, ("invalid match pattern", pattern)("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter invalid match pattern", pattern)("config", config.configName));
             return false;
         }
     }

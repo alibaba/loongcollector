@@ -65,18 +65,10 @@ public:
 
     ~JournalServer() = default;
 
-    // =============================================================================
-    // 生命周期管理 - Lifecycle Management
-    // =============================================================================
-    
     // InputRunner interface implementation
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
-    
-    // =============================================================================
-    // 配置管理 - Configuration Management
-    // =============================================================================
     
     // Plugin registration interface
     void AddJournalInput(const std::string& configName,
@@ -91,9 +83,6 @@ public:
      */
     std::map<std::pair<std::string, size_t>, JournalConfig> GetAllJournalConfigs() const;
 
-    // =============================================================================
-    // 连接池管理 - Connection Pool Management
-    // =============================================================================
     /**
      * @brief 获取连接池统计信息
      * @return 连接池统计信息
@@ -117,12 +106,8 @@ public:
     /**
      * @brief 获取当前连接数量
      */
+
     size_t GetConnectionCount() const;
-    
-    // =============================================================================
-    // Epoll 管理 - Epoll Management
-    // =============================================================================
-    
     /**
      * @brief 获取全局 epoll FD
      * @return 全局 epoll FD，如果未初始化返回 -1
@@ -143,23 +128,12 @@ public:
 
 private:
     JournalServer() = default;
-
-    // =============================================================================
-    // 事件驱动主循环 - Event-driven Main Loop
-    // =============================================================================
-    void run();
     
-    // =============================================================================
-    // 事件驱动辅助方法 - Event-driven Helper Methods
-    // =============================================================================
+    void run();
     void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void processJournal(const std::string& configName, size_t idx);
     bool validateQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
 
-    // =============================================================================
-    // 成员变量 - Member Variables
-    // =============================================================================
-    
     // 线程管理 - Thread Management
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
@@ -172,7 +146,6 @@ private:
     bool mIsInitialized = false;
     mutable std::mutex mInitMux;
 
-    // 配置存储已移至 JournalConnectionManager
     mutable std::mutex mUpdateMux;
 };
 

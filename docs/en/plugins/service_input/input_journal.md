@@ -189,7 +189,7 @@ OR
   "JournalPaths": ["/var/log/journal"],
   "SeekPosition": "tail",
   "CursorFlushPeriodMs": 1000,
-  "CursorSeekFallback": "tail",
+  "CursorSeekFallback": "head",
   "ResetIntervalSecond": 3600,
   
   "Units": ["nginx.service", "mysql.service"],
@@ -210,7 +210,7 @@ OR
 | `JournalPaths` | Array | `[]` | Journal file paths (empty = system journal) |
 | `SeekPosition` | String | `"tail"` | Initial read position: `head`, `tail`, `cursor` |
 | `CursorFlushPeriodMs` | Integer | `1000` | Checkpoint save frequency (milliseconds) |
-| `CursorSeekFallback` | String | `"tail"` | Fallback position when cursor invalid |
+| `CursorSeekFallback` | String | `"head"` | Fallback position when cursor invalid (following fluentbit behavior, options: `head` or `tail`) |
 | `ResetIntervalSecond` | Integer | `3600` | Checkpoint reset interval |
 | `Units` | Array | `[]` | Systemd units to monitor |
 | `Kernel` | Boolean | `false` | Enable kernel log collection |

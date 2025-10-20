@@ -19,11 +19,9 @@
 #include <unistd.h>
 #endif
 
-namespace logtail {
+#include "logger/Logger.h"
 
-// ============================================================================
-// SystemdJournalReader 实现
-// ============================================================================
+namespace logtail {
 
 /*========================================================
  *  Impl：Linux 下真正干活；非 Linux 下只留空壳
@@ -366,15 +364,11 @@ public:
     
     bool AddToEpoll(int epollFD) {
         if (!IsOpen() || epollFD < 0) {
-            printf("[JournalReader] AddToEpoll failed: reader not open or invalid epollFD (is_open=%d, epoll_fd=%d)\n", 
-                   IsOpen() ? 1 : 0, epollFD);
             return false;
         }
         
         int fd = sd_journal_get_fd(mJournal);
         if (fd < 0) {
-            printf("[JournalReader] AddToEpoll failed: sd_journal_get_fd returned negative (fd=%d, errno=%d)\n", 
-                   fd, errno);
             return false;
         }
         
@@ -384,12 +378,9 @@ public:
         
         int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
         if (result != 0) {
-            printf("[JournalReader] AddToEpoll failed: epoll_ctl failed (epoll_fd=%d, journal_fd=%d, errno=%d, error=%s)\n", 
-                   epollFD, fd, errno, strerror(errno));
             return false;
         }
         
-        printf("[JournalReader] AddToEpoll succeeded (epoll_fd=%d, journal_fd=%d)\n", epollFD, fd);
         return true;
     }
     
@@ -431,31 +422,19 @@ public:
             // Journal 文件被添加、删除或轮转
             // 根据 fluentbit 经验：打印日志，但继续处理
             // 后续的 Next() 调用会处理这种情况（通过错误恢复机制）
-            printf("[JournalReader] ProcessJournalEvent: SD_JOURNAL_INVALIDATE received (ret=%d), "
-                   "journal files changed (rotation/deletion), continuing\n", ret);
             return true;
         }
         
         // 错误情况（ret < 0）
-        printf("[JournalReader] ProcessJournalEvent failed: sd_journal_process returned %d, "
-               "errno=%d (%s)\n", ret, errno, strerror(errno));
         return false;
     }
     
     int GetJournalFD() const {
         if (!IsOpen()) {
-            printf("[JournalReader] GetJournalFD failed: reader not open\n");
             return -1;
         }
         
         int fd = sd_journal_get_fd(mJournal);
-        printf("[JournalReader] GetJournalFD: journal_fd=%d, errno=%d\n", fd, errno);
-        
-        if (fd < 0) {
-            printf("[JournalReader] GetJournalFD failed: sd_journal_get_fd returned %d, errno=%d (%s)\n", 
-                   fd, errno, strerror(errno));
-        }
-        
         return fd;
     }
 #endif

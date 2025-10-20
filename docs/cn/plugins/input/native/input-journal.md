@@ -189,7 +189,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
   "JournalPaths": ["/var/log/journal"],
   "SeekPosition": "tail",
   "CursorFlushPeriodMs": 1000,
-  "CursorSeekFallback": "tail",
+  "CursorSeekFallback": "head",
   "ResetIntervalSecond": 3600,
   
   "Units": ["nginx.service", "mysql.service"],
@@ -210,7 +210,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 | `JournalPaths` | 数组 | `[]` | 日志文件路径（空=系统日志） |
 | `SeekPosition` | 字符串 | `"tail"` | 初始读取位置: `head`、`tail`、`cursor` |
 | `CursorFlushPeriodMs` | 整数 | `1000` | 检查点保存频率（毫秒） |
-| `CursorSeekFallback` | 字符串 | `"tail"` | 游标无效时的回退位置 |
+| `CursorSeekFallback` | 字符串 | `"head"` | 游标无效时的回退位置（参照fluentbit的行为，可选值：`head` 或 `tail`） |
 | `ResetIntervalSecond` | 整数 | `3600` | 检查点重置间隔 |
 | `Units` | 数组 | `[]` | 要监控的Systemd单元 |
 | `Kernel` | 布尔值 | `false` | 启用内核日志收集 |

@@ -45,7 +45,7 @@
 | ParsePriority | bool，`false` | 是否解析Priority字段。|
 | UseJournalEventTime | bool，`false` | 是否使用Journal日志中的字段作为日志时间，即使用采集时间作为日志时间（实时日志采集一般相差3秒以内）。|
 | CursorFlushPeriodMs | Integer，`5000` | 日志读取检查点的刷新时间。 |
-| CursorSeekFallback | string，`SeekPositionTail` | 日志读取检查点回退的位置。 |
+| CursorSeekFallback | string，`head` | 日志读取检查点回退的位置（参照fluentbit的行为，可选值为 `head` 或 `tail`）。 |
 | Identifiers | Array，其中value为String，`[]` | syslog标识符，可以添加到监视器。 |
 | MatchPatterns | Array，其中value为String，`[]` | 匹配规则，可以添加到监视器。 |
 
