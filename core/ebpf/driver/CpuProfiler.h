@@ -48,8 +48,10 @@ using livetrace_profiler_read_cb_t = void (*)(uint32_t pid, const char *comm,
 void livetrace_profiler_read(struct Profiler *profiler,
                              livetrace_profiler_read_cb_t cb);
 
-using livetrace_profiler_read_cb_ctx_t = void (*)(uint32_t pid, const char *comm,
-                                              const char *stack, uint32_t cnt, void *ctx);
+using livetrace_profiler_read_cb_ctx_t
+    = void (*)(uint32_t pid, const char* comm, const char* stack, uint32_t cnt, void* ctx);
+
+void livetrace_enable_tracing(void);
 }
 
 namespace logtail {
@@ -64,6 +66,7 @@ public:
     void Start(livetrace_profiler_read_cb_ctx_t handler, void *ctx, std::optional<std::string> hostRootPath) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
+            livetrace_enable_tracing();
             mProfiler = livetrace_profiler_create();
             assert(mProfiler != nullptr);
             mHandler = handler;
