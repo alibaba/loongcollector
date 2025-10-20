@@ -143,11 +143,12 @@ int CpuProfilingManager::Suspend() {
     return 0;
 }
 
-using StackCnt = std::pair<std::string, uint32_t>;
+// stack, cnt, trace_id
+using StackCnt = std::tuple<std::string, uint32_t, std::string>;
 
-static void parseStackCnt(char const *symbol, std::vector<StackCnt> &result) {
-    // Format: "<comm>:<pid>;<stacks> <cnt>\n"
-    // Example: "bash:1234;func1;func2;func3 10\n"
+static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
+    // Format: "<comm>:<pid>;<stacks> <cnt> <trace_id>\n"
+    // Example: "bash:1234;func1;func2;func3 10 xxxxx\n"
 
     std::istringstream ssymbol;
     ssymbol.str(symbol);
@@ -163,12 +164,20 @@ static void parseStackCnt(char const *symbol, std::vector<StackCnt> &result) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
         }
+        auto pos3 = line.rfind(' ', pos2 - 1);
+        if (pos3 == std::string::npos || pos3 < pos1) {
+            LOG_ERROR(sLogger, ("Invalid symbol format", line));
+            continue;
+        }
 
-        auto stack = line.substr(pos1 + 1, pos2 - pos1 - 1);
-        auto cntStr = line.substr(pos2 + 1);
+        auto stack = line.substr(pos1 + 1, pos3 - pos1 - 1);
+        auto cntStr = line.substr(pos3 + 1, pos2 - pos3 - 1);
         uint32_t cnt = std::stoul(cntStr);
-
-        result.push_back(std::make_pair(stack, cnt));
+        auto traceId = line.substr(pos2 + 1);
+        if (traceId == "null") {
+            traceId = "";
+        }
+        result.push_back(std::make_tuple(stack, cnt, traceId));
     }
 }
 
@@ -207,15 +216,17 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
     
     auto pidSb = sourceBuffer->CopyString(std::to_string(pid));
     auto commSb = sourceBuffer->CopyString(std::string(comm));
-    for (auto &[stack, cnt] : stacks) {
+    for (auto& [stack, cnt, traceId] : stacks) {
         auto* event = eventGroup.AddLogEvent();
         event->SetTimestamp(logtime);
         auto stackSb = sourceBuffer->CopyString(stack);
         auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
+        auto traceIdSb = sourceBuffer->CopyString(traceId);
         event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
         event->SetContentNoCopy(kComm.LogKey(), StringView(commSb.data, commSb.size));
         event->SetContentNoCopy(kStack.LogKey(), StringView(stackSb.data, stackSb.size));
         event->SetContentNoCopy(kCnt.LogKey(), StringView(cntSb.data, cntSb.size));
+        event->SetContentNoCopy(kTraceId.LogKey(), StringView(traceIdSb.data, traceIdSb.size));
     }
 
     for (auto& key : targets) {
