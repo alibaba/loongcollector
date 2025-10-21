@@ -40,7 +40,7 @@
 #include "unittest/host_monitor/MockSystemInterface.h"
 #endif
 
-DEFINE_FLAG_INT32(system_interface_cache_queue_size, "system interface default cache size", 15);
+DEFINE_FLAG_INT32(system_interface_cache_queue_size, "system interface default cache size", 5);
 DEFINE_FLAG_INT32(system_interface_cache_entry_expire_seconds, "cache entry expire time in seconds", 60);
 DEFINE_FLAG_INT32(system_interface_cache_cleanup_interval_seconds, "cache cleanup interval in seconds", 300);
 DEFINE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size, "max entries to cleanup in one batch", 50);
