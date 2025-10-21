@@ -221,9 +221,9 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                                "collect data")("collector", context->mCollectorName)("size", group.GetEvents().size()));
                     if (group.GetEvents().size() > 0) {
                         AddHostLabels(group);
-                        PushQueue(context, std::move(group));
                         mOutItemsSize->Add(group.DataSize());
                         mOutItemsTotal->Add(group.GetEvents().size());
+                        PushQueue(context, std::move(group));
                     }
                 } else {
                     LOG_ERROR(
@@ -249,7 +249,8 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
         }
 
         if (!isSelfCheckCollector) {
-            mLatencyTimeMs->Add(std::chrono::steady_clock::now() - startTime);
+            mLatencyTimeMs->Add(
+                std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - startTime));
         }
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
@@ -353,18 +354,5 @@ void HostMonitorInputRunner::InitMetrics() {
     // Initialize collector metrics
     CollectorMetrics::GetInstance()->Init();
 }
-
-void HostMonitorInputRunner::UpdateMetrics(uint64_t outItemsSize, uint64_t dropItems, uint64_t latencyMs) {
-    if (mOutItemsSize) {
-        mOutItemsSize->Add(outItemsSize);
-    }
-    if (mDropItemsTotal && dropItems > 0) {
-        mDropItemsTotal->Add(dropItems);
-    }
-    if (mLatencyTimeMs) {
-        mLatencyTimeMs->Add(std::chrono::nanoseconds(latencyMs * 1000000)); // Convert ms to ns
-    }
-}
-
 
 } // namespace logtail

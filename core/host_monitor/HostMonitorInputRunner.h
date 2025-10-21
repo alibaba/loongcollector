@@ -93,7 +93,6 @@ public:
                             const std::string& collectorName);
     void ScheduleOnce(CollectContextPtr collectContext);
     void InitMetrics();
-    void UpdateMetrics(uint64_t outItemsSize, uint64_t dropItems, uint64_t latencyMs);
 
 private:
     HostMonitorInputRunner();
