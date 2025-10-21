@@ -216,7 +216,6 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
             CollectorKey key{context->mConfigName, context->mCollectorName};
-
             auto it = mRegisteredStartTime.find(key);
             if (it == mRegisteredStartTime.end() || it->second != context->mStartTime) {
                 LOG_DEBUG(sLogger,
