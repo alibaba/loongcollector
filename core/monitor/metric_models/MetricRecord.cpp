@@ -181,19 +181,19 @@ const DynamicMetricLabelsPtr& MetricsRecordRef::GetDynamicLabels() const {
 }
 
 CounterPtr MetricsRecordRef::CreateCounter(const std::string& name) {
-    return mMetrics->CreateCounter(name, forceCreateWhenCommitted);
+    return mMetrics->CreateCounter(name);
 }
 
 TimeCounterPtr MetricsRecordRef::CreateTimeCounter(const std::string& name) {
-    return mMetrics->CreateTimeCounter(name, forceCreateWhenCommitted);
+    return mMetrics->CreateTimeCounter(name);
 }
 
 IntGaugePtr MetricsRecordRef::CreateIntGauge(const std::string& name) {
-    return mMetrics->CreateIntGauge(name, forceCreateWhenCommitted);
+    return mMetrics->CreateIntGauge(name);
 }
 
 DoubleGaugePtr MetricsRecordRef::CreateDoubleGauge(const std::string& name) {
-    return mMetrics->CreateDoubleGauge(name, forceCreateWhenCommitted);
+    return mMetrics->CreateDoubleGauge(name);
 }
 
 void MetricsRecordRef::AddLabels(MetricLabels&& labels) {
