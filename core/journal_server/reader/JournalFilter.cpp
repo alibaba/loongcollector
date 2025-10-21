@@ -19,8 +19,19 @@
 #include <sstream>
 
 #include "../common/JournalUtils.h"
-#include "absl/strings/match.h"
 #include "logger/Logger.h"
+
+// Windows平台下使用标准库替代absl
+#ifdef _WIN32
+#include <string>
+namespace absl {
+    inline bool StrContains(const std::string& haystack, const std::string& needle) {
+        return haystack.find(needle) != std::string::npos;
+    }
+}
+#else
+#include "absl/strings/match.h"
+#endif
 
 namespace logtail {
 

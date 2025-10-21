@@ -106,17 +106,29 @@ public:
 
     /*---------------  遍历  ----------------*/
     bool SeekHead() {
+#ifdef __linux__
         return call([](auto journal) { return sd_journal_seek_head(journal); });
+#else
+        return mIsOpen;
+#endif
     }
     bool SeekTail() {
+#ifdef __linux__
         return call([](auto journal) { return sd_journal_seek_tail(journal); });
+#else
+        return mIsOpen;
+#endif
     }
     bool SeekCursor(const std::string& cursor) {
         // 添加参数验证
         if (cursor.empty()) {
             return false;
         }
+#ifdef __linux__
         return call([&](auto journal) { return sd_journal_seek_cursor(journal, cursor.c_str()); });
+#else
+        return mIsOpen;
+#endif
     }
 
     bool Next() {
@@ -263,7 +275,11 @@ public:
         }
         return true;
 #else
-        entry = {"simulated_cursor", 0, 0, {{"MESSAGE", "Simulated entry"}, {"_SYSTEMD_UNIT", "simulated.service"}}};
+        entry.cursor = "simulated_cursor";
+        entry.realtimeTimestamp = 0;
+        entry.monotonicTimestamp = 0;
+        entry.fields["MESSAGE"] = "Simulated entry";
+        entry.fields["_SYSTEMD_UNIT"] = "simulated.service";
         return mIsOpen;
 #endif
     }
@@ -584,6 +600,23 @@ bool SystemdJournalReader::ProcessJournalEvent() {
 
 int SystemdJournalReader::GetJournalFD() const {
     return mImpl->GetJournalFD();
+}
+#else
+// Windows平台下的空实现
+bool SystemdJournalReader::AddToEpoll(int epollFD) {
+    return false; // Windows不支持epoll
+}
+
+void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
+    // Windows不支持epoll，空实现
+}
+
+bool SystemdJournalReader::ProcessJournalEvent() {
+    return false; // Windows不支持systemd journal
+}
+
+int SystemdJournalReader::GetJournalFD() const {
+    return -1; // Windows不支持journal FD
 }
 #endif
 #undef FWD
