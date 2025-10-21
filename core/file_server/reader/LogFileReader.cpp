@@ -98,6 +98,8 @@ size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
 
 const int64_t kFirstHashKeySeqID = 1;
 
+const string DELETED_FILE_SUFFIX = "(deleted)";
+
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
                                                   const DevInode& devInode,
@@ -1195,7 +1197,7 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
     return false;
 }
 
-void LogFileReader::CloseFilePtr() {
+bool LogFileReader::CloseFilePtr() {
     if (mLogFileOp.IsOpen()) {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
@@ -1251,6 +1253,15 @@ void LogFileReader::CloseFilePtr() {
         // always call OnFileClose
         GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
     }
+    string curRealLogPath = mLogFileOp.GetFilePath();
+    if (curRealLogPath.length() > DELETED_FILE_SUFFIX.length()
+        && curRealLogPath.compare(curRealLogPath.length() - DELETED_FILE_SUFFIX.length(),
+                                  DELETED_FILE_SUFFIX.length(),
+                                  DELETED_FILE_SUFFIX)
+            == 0) {
+        return true;
+    }
+    return false;
 }
 
 uint64_t LogFileReader::GetLogstoreKey() const {
