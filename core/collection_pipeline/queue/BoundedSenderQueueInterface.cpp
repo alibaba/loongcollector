@@ -30,6 +30,7 @@ BoundedSenderQueueInterface::BoundedSenderQueueInterface(
     mFetchRejectedByRateLimiterTimesCnt
         = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL);
     mExtraBufferDataSizeBytes = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE_BYTES);
+    mRateLimiterCurrentLimit = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_RATE_LIMITER_CURRENT_LIMIT);
 }
 
 void BoundedSenderQueueInterface::SetFeedback(FeedbackInterface* feedback) {
@@ -43,6 +44,10 @@ void BoundedSenderQueueInterface::SetFeedback(FeedbackInterface* feedback) {
 void BoundedSenderQueueInterface::SetRateLimiter(uint32_t maxRate) {
     if (maxRate > 0) {
         mRateLimiter = RateLimiter(maxRate);
+        mRateLimiterCurrentLimit->Set(maxRate);
+    } else {
+        mRateLimiter.reset();
+        mRateLimiterCurrentLimit->Set(0);
     }
 }
 
@@ -76,6 +81,7 @@ void BoundedSenderQueueInterface::GiveFeedback() const {
 void BoundedSenderQueueInterface::Reset(size_t cap, size_t low, size_t high) {
     deque<unique_ptr<SenderQueueItem>>().swap(mExtraBuffer);
     mRateLimiter.reset();
+    mRateLimiterCurrentLimit->Set(0);
     mConcurrencyLimiters.clear();
     BoundedQueueInterface::Reset(low, high);
     QueueInterface::Reset(cap);

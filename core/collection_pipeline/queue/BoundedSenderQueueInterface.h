@@ -77,6 +77,7 @@ protected:
 
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
+    IntGaugePtr mRateLimiterCurrentLimit;
     CounterPtr mFetchRejectedByRateLimiterTimesCnt;
 
 private:
