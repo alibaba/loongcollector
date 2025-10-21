@@ -278,7 +278,6 @@ extern const std::string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_REGION_LIMITER
 extern const std::string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_PROJECT_LIMITER_TIMES_TOTAL;
 extern const std::string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_LOGSTORE_LIMITER_TIMES_TOTAL;
 extern const std::string METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL;
-extern const std::string METRIC_COMPONENT_QUEUE_RATE_LIMITER_CURRENT_LIMIT;
 
 //////////////////////////////////////////////////////////////////////////
 // runner
