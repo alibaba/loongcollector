@@ -205,12 +205,12 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             contentSZ
                 += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(), e.GetTimestampNanosecond() ? 19U : 10U);
             contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].mLabelSize);
-            logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
             // Add metadata
             auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
             if (!type.empty()) {
                 contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_APM_METRIC_TYPE.size(), type.size());
             }
+            logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             if (e.GetValue<UntypedMultiDoubleValues>()->ValuesSize() == 0) {
                 LOG_WARNING(sLogger,
