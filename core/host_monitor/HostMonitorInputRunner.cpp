@@ -205,6 +205,8 @@ bool HostMonitorInputRunner::IsCollectTaskValid(const std::chrono::steady_clock:
 void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
     auto collectFn = [this, context]() {
         auto startTime = std::chrono::steady_clock::now();
+        bool isSelfCheckCollector = (context->mCollectorName == SelfCheckCollector::sName);
+
         try {
             bool result = false;
             if (context->ShouldGenerateMetric()) {
@@ -242,7 +244,10 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                        "collect error")("collector", context->mCollectorName)("error", e.what()));
             CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
         }
-        mLatencyTimeMs->Add(std::chrono::steady_clock::now() - startTime);
+
+        if (!isSelfCheckCollector) {
+            mLatencyTimeMs->Add(std::chrono::steady_clock::now() - startTime);
+        }
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
             CollectorKey key{context->mConfigName, context->mCollectorName};

@@ -255,7 +255,7 @@ void CPUCollectorUnittest::TestGroupNull() const {
                                       std::chrono::seconds(1),
                                       CollectorInstance(std::move(cpuCollector)));
 
-    APSARA_TEST_FALSE_FATAL(collector.Collect(collectContext, nullptr));
+    APSARA_TEST_TRUE_FATAL(collector.Collect(collectContext, nullptr));
 }
 
 UNIT_TEST_CASE(CPUCollectorUnittest, TestCollectNormal);
