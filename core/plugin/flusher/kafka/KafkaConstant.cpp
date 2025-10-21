@@ -54,5 +54,6 @@ const std::string KAFKA_CONFIG_SSL_CA_LOCATION = "ssl.ca.location";
 const std::string KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION = "ssl.certificate.location";
 const std::string KAFKA_CONFIG_SSL_KEY_LOCATION = "ssl.key.location";
 const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD = "ssl.key.password";
+const std::string KAFKA_SECURITY_PROTOCOL_SSL = "ssl";
 
 } // namespace logtail

@@ -54,5 +54,6 @@ extern const std::string KAFKA_CONFIG_SSL_CA_LOCATION;
 extern const std::string KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION;
 extern const std::string KAFKA_CONFIG_SSL_KEY_LOCATION;
 extern const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD;
+extern const std::string KAFKA_SECURITY_PROTOCOL_SSL;
 
 } // namespace logtail
