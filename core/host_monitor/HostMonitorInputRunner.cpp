@@ -40,11 +40,14 @@
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
+#include "host_monitor/collector/SelfCheckCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
+#include "monitor/MetricManager.h"
 #include "monitor/Monitor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "runner/ProcessorRunner.h"
 
 #ifdef __ENTERPRISE__
@@ -63,6 +66,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<DiskCollector>();
     RegisterCollector<ProcessCollector>();
     RegisterCollector<NetCollector>();
+    RegisterCollector<SelfCheckCollector>();
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
@@ -107,9 +111,13 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
         collectContext->Reset();
 
         { // add collector to registered collector map
-            std::unique_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
+            std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
             CollectorKey key{configName, collectorName};
-            mRegisteredStartTime[key] = collectContext->mStartTime;
+            CollectorRunInfo runInfo;
+            runInfo.startTime = collectContext->mStartTime;
+            runInfo.lastRunTime = collectContext->mStartTime;
+            runInfo.interval = std::chrono::seconds(newCollectorInfos[i].interval);
+            mRegisteredCollector[key] = runInfo;
         }
 
         // add timer event
@@ -117,23 +125,31 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
         Timer::GetInstance()->PushEvent(std::move(event));
         LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collectorName));
     }
+
+    mRunningPipelineCount++;
+    LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(mRunningPipelineCount);
 }
 
 void HostMonitorInputRunner::RemoveCollector(const std::string& configName) {
-    std::unique_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
-    auto it = mRegisteredStartTime.begin();
-    while (it != mRegisteredStartTime.end()) {
-        if (it->first.configName == configName) {
-            it = mRegisteredStartTime.erase(it);
-        } else {
-            ++it;
+    {
+        std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
+        auto it = mRegisteredCollector.begin();
+        while (it != mRegisteredCollector.end()) {
+            if (it->first.configName == configName) {
+                it = mRegisteredCollector.erase(it);
+            } else {
+                ++it;
+            }
         }
     }
+    mRunningPipelineCount--;
+    LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(mRunningPipelineCount);
 }
 
 void HostMonitorInputRunner::RemoveAllCollector() {
-    std::unique_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
-    mRegisteredStartTime.clear();
+    std::unique_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
+    mRegisteredCollector.clear();
+    LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(0);
 }
 
 void HostMonitorInputRunner::Init() {
@@ -141,10 +157,16 @@ void HostMonitorInputRunner::Init() {
         return;
     }
 
+    InitMetrics();
     LOG_INFO(sLogger, ("HostMonitorInputRunner", "Start"));
 #ifndef APSARA_UNIT_TEST_MAIN
     mThreadPool->Start();
     Timer::GetInstance()->Init();
+
+    UpdateCollector("loongcollector-host-monitor-self-check",
+                    {{SelfCheckCollector::sName, 0, HostMonitorCollectType::kSingleValue}},
+                    QueueKey(),
+                    0);
 #endif
 }
 
@@ -164,24 +186,25 @@ void HostMonitorInputRunner::Stop() {
 }
 
 bool HostMonitorInputRunner::HasRegisteredPlugins() const {
-    std::shared_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
-    return !mRegisteredStartTime.empty();
+    std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
+    return !mRegisteredCollector.empty();
 }
 
 bool HostMonitorInputRunner::IsCollectTaskValid(const std::chrono::steady_clock::time_point& startTime,
                                                 const std::string& configName,
                                                 const std::string& collectorName) {
-    std::shared_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
+    std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
     CollectorKey key{configName, collectorName};
-    auto it = mRegisteredStartTime.find(key);
-    if (it == mRegisteredStartTime.end()) {
+    auto it = mRegisteredCollector.find(key);
+    if (it == mRegisteredCollector.end()) {
         return false;
     }
-    return it->second == startTime;
+    return it->second.startTime == startTime;
 }
 
 void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
     auto collectFn = [this, context]() {
+        auto startTime = std::chrono::steady_clock::now();
         try {
             bool result = false;
             if (context->ShouldGenerateMetric()) {
@@ -194,11 +217,15 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                     if (group.GetEvents().size() > 0) {
                         AddHostLabels(group);
                         PushQueue(context, std::move(group));
+                        mOutItemsSize->Add(group.DataSize());
+                        mOutItemsTotal->Add(group.GetEvents().size());
                     }
                 } else {
                     LOG_ERROR(
                         sLogger,
                         ("host monitor collect data failed", "collect error")("collector", context->mCollectorName));
+                    mDropItemsTotal->Add(group.GetEvents().size());
+                    CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
                 }
             } else {
                 result = context->mCollector.Collect(*context, nullptr);
@@ -206,34 +233,40 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                     LOG_ERROR(
                         sLogger,
                         ("host monitor collect data failed", "collect error")("collector", context->mCollectorName));
+                    CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
                 }
             }
         } catch (const std::exception& e) {
             LOG_ERROR(sLogger,
                       ("host monitor collect data failed",
                        "collect error")("collector", context->mCollectorName)("error", e.what()));
+            CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
         }
+        mLatencyTimeMs->Add(std::chrono::steady_clock::now() - startTime);
         {
-            std::shared_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
+            std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
             CollectorKey key{context->mConfigName, context->mCollectorName};
-            auto it = mRegisteredStartTime.find(key);
-            if (it == mRegisteredStartTime.end() || it->second != context->mStartTime) {
+            auto it = mRegisteredCollector.find(key);
+            if (it == mRegisteredCollector.end() || it->second.startTime != context->mStartTime) {
                 LOG_DEBUG(sLogger,
                           ("old collector is removed, will not collect again",
                            "discard data")("config", context->mConfigName)("collector", context->mCollectorName));
                 return;
             }
+            it->second.lastRunTime = std::chrono::steady_clock::now();
         }
         PushNextTimerEvent(context);
     };
     mThreadPool->Add(collectFn);
+    mLastRunTime->Set(
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
 void HostMonitorInputRunner::PushQueue(CollectContextPtr context, PipelineEventGroup&& group) {
-    std::shared_lock<std::shared_mutex> lock(mRegisteredStartTimeMutex);
+    std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
     CollectorKey key{context->mConfigName, context->mCollectorName};
-    auto it = mRegisteredStartTime.find(key);
-    if (it == mRegisteredStartTime.end() || it->second != context->mStartTime) {
+    auto it = mRegisteredCollector.find(key);
+    if (it == mRegisteredCollector.end() || it->second.startTime != context->mStartTime) {
         return;
     }
     bool pushResult
@@ -294,5 +327,36 @@ void HostMonitorInputRunner::AddHostLabels(PipelineEventGroup& group) {
     }
 #endif
 }
+
+void HostMonitorInputRunner::InitMetrics() {
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "host_monitor");
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
+
+    mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_TOTAL);
+    mOutItemsSize = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_SIZE);
+    mDropItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_HOST_MONITOR_DROP_ITEMS_TOTAL);
+    mLatencyTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS);
+    mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+
+    // Initialize collector metrics
+    CollectorMetrics::GetInstance()->Init();
+}
+
+void HostMonitorInputRunner::UpdateMetrics(uint64_t outItemsSize, uint64_t dropItems, uint64_t latencyMs) {
+    if (mOutItemsSize) {
+        mOutItemsSize->Add(outItemsSize);
+    }
+    if (mDropItemsTotal && dropItems > 0) {
+        mDropItemsTotal->Add(dropItems);
+    }
+    if (mLatencyTimeMs) {
+        mLatencyTimeMs->Add(std::chrono::nanoseconds(latencyMs * 1000000)); // Convert ms to ns
+    }
+}
+
 
 } // namespace logtail

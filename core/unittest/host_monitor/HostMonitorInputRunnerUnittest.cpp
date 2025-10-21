@@ -54,7 +54,7 @@ void HostMonitorInputRunnerUnittest::TestUpdateAndRemoveCollector() const {
     std::string configName = "test";
     runner->UpdateCollector(
         configName, {{MockCollector::sName, 60, HostMonitorCollectType::kMultiValue}}, QueueKey{}, 0);
-    auto startTime = runner->mRegisteredStartTime.at({configName, MockCollector::sName});
+    auto startTime = runner->mRegisteredCollector.at({configName, MockCollector::sName}).startTime;
     APSARA_TEST_TRUE_FATAL(runner->IsCollectTaskValid(startTime, configName, MockCollector::sName));
     APSARA_TEST_FALSE_FATAL(
         runner->IsCollectTaskValid(startTime - std::chrono::seconds(60), configName, MockCollector::sName));
@@ -104,7 +104,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
                                                                 std::chrono::seconds(60),
                                                                 CollectorInstance(std::move(mockCollector2)));
     collectContext2->mStartTime
-        = HostMonitorInputRunner::GetInstance()->mRegisteredStartTime.at({configName, MockCollector::sName});
+        = HostMonitorInputRunner::GetInstance()->mRegisteredCollector.at({configName, MockCollector::sName}).startTime;
     runner->ScheduleOnce(collectContext2);
     std::this_thread::sleep_for(std::chrono::seconds(1));
     APSARA_TEST_EQUAL_FATAL(2, Timer::GetInstance()->mQueue.size());

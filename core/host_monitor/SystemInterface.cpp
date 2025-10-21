@@ -31,6 +31,8 @@
 
 #include "common/Flags.h"
 #include "logger/Logger.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #ifdef __linux__
 #include "host_monitor/LinuxSystemInterface.h"
 #endif
@@ -298,11 +300,19 @@ bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache
                                    const std::string& errorType,
                                    Args... args) {
     if (cache.Get(now, info, args...)) {
+        // Cache hit - update cache metrics
+        UpdateCacheMetrics();
         return true;
     }
+
+    // Cache miss - need to call system API
     bool status = std::forward<F>(func)(info, args...);
     // We should use real time here, because input time may be delayed
     info.collectTime = time(nullptr);
+
+    // Update system operation metrics
+    UpdateSystemOpMetrics(status);
+
     if (status) {
         cache.Set(info, args...);
     } else {
@@ -497,6 +507,63 @@ template <typename InfoT, typename... Args>
 size_t SystemInterface::SystemInformationCache<InfoT, Args...>::GetCacheSize() const {
     std::lock_guard<std::mutex> lock(mMutex);
     return mCache.size();
+}
+
+template <typename InfoT>
+size_t SystemInterface::SystemInformationCache<InfoT>::GetCacheSize() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    return mCache.size();
+}
+
+void SystemInterface::InitMetrics() {
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "system_interface");
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
+
+    mSystemOpTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_TOTAL);
+    mSystemOpFailTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL);
+    mUseCacheTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_USE_CACHE_TOTAL);
+    mCacheItemsSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+}
+
+void SystemInterface::UpdateSystemOpMetrics(bool success) {
+    if (mSystemOpTotal) {
+        mSystemOpTotal->Add(1);
+    }
+    if (!success && mSystemOpFailTotal) {
+        mSystemOpFailTotal->Add(1);
+    }
+}
+
+void SystemInterface::UpdateCacheMetrics() {
+    if (mCacheItemsSize) {
+        size_t totalCacheSize = 0;
+        totalCacheSize += mCPUInformationCache.GetCacheSize();
+        totalCacheSize += mProcessListInformationCache.GetCacheSize();
+        totalCacheSize += mProcessInformationCache.GetCacheSize();
+        totalCacheSize += mSystemLoadInformationCache.GetCacheSize();
+        totalCacheSize += mMemInformationCache.GetCacheSize();
+        totalCacheSize += mFileSystemListInformationCache.GetCacheSize();
+        totalCacheSize += mSystemUptimeInformationCache.GetCacheSize();
+        totalCacheSize += mSerialIdInformationCache.GetCacheSize();
+        totalCacheSize += mDiskStateInformationCache.GetCacheSize();
+        totalCacheSize += mFileSystemInformationCache.GetCacheSize();
+        totalCacheSize += mProcessCmdlineCache.GetCacheSize();
+        totalCacheSize += mProcessStatmCache.GetCacheSize();
+        totalCacheSize += mProcessStatusCache.GetCacheSize();
+        totalCacheSize += mProcessFdCache.GetCacheSize();
+        totalCacheSize += mExecutePathCache.GetCacheSize();
+        totalCacheSize += mTCPStatInformationCache.GetCacheSize();
+        totalCacheSize += mNetInterfaceInformationCache.GetCacheSize();
+
+        mCacheItemsSize->Set(totalCacheSize);
+    }
+    if (mUseCacheTotal) {
+        mUseCacheTotal->Add(1);
+    }
 }
 
 } // namespace logtail

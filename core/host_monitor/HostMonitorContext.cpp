@@ -16,6 +16,7 @@
 
 #include "host_monitor/HostMonitorContext.h"
 
+#include "SelfCheckCollector.h"
 #include "host_monitor/collector/BaseCollector.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -82,6 +83,9 @@ bool HostMonitorContext::CheckClockRolling() {
 }
 
 bool HostMonitorContext::ShouldGenerateMetric() {
+    if (mCollectorName == SelfCheckCollector::sName) {
+        return false;
+    }
     if (mCollectType == HostMonitorCollectType::kMultiValue) {
         ++mCount;
         if (mCount < mCountPerReport) {

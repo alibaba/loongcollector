@@ -32,6 +32,8 @@
 #include "common/ThreadPool.h"
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/CollectorMetrics.h"
+#include "monitor/metric_models/MetricRecord.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -40,6 +42,12 @@ struct CollectorInfo {
     std::string name;
     uint32_t interval;
     HostMonitorCollectType type;
+};
+
+struct CollectorRunInfo {
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point lastRunTime;
+    std::chrono::seconds interval;
 };
 
 class HostMonitorInputRunner : public InputRunner {
@@ -84,6 +92,8 @@ public:
                             const std::string& configName,
                             const std::string& collectorName);
     void ScheduleOnce(CollectContextPtr collectContext);
+    void InitMetrics();
+    void UpdateMetrics(uint64_t outItemsSize, uint64_t dropItems, uint64_t latencyMs);
 
 private:
     HostMonitorInputRunner();
@@ -101,12 +111,22 @@ private:
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
+    std::atomic_uint64_t mRunningPipelineCount = 0;
 
-    mutable std::shared_mutex mRegisteredStartTimeMutex;
-    std::map<CollectorKey, std::chrono::steady_clock::time_point> mRegisteredStartTime;
+    mutable std::shared_mutex mRegisteredCollectorMutex;
+    std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;
 
     std::unordered_map<std::string, std::function<CollectorInstance()>> mCollectorCreatorMap;
 
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mOutItemsTotal;
+    CounterPtr mOutItemsSize;
+    CounterPtr mDropItemsTotal;
+    TimeCounterPtr mLatencyTimeMs;
+    IntGaugePtr mLastRunTime;
+
+    friend class SelfCheckCollector;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class HostMonitorInputRunnerUnittest;
 #endif

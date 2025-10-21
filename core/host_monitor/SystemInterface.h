@@ -39,6 +39,7 @@
 #include "collector/MetricCalculate.h"
 #include "common/Flags.h"
 #include "common/ProcParser.h"
+#include "monitor/metric_models/MetricRecord.h"
 
 DECLARE_FLAG_INT32(system_interface_cache_queue_size);
 DECLARE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size);
@@ -660,6 +661,7 @@ public:
         SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
         bool Get(time_t targetTime, InfoT& info);
         bool Set(InfoT& info);
+        size_t GetCacheSize() const;
 
     private:
         mutable std::mutex mMutex;
@@ -717,8 +719,14 @@ public:
           mProcessFdCache(cacheSize),
           mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
-          mNetInterfaceInformationCache(cacheSize) {}
+          mNetInterfaceInformationCache(cacheSize) {
+        InitMetrics();
+    }
     virtual ~SystemInterface() = default;
+
+    void InitMetrics();
+    void UpdateSystemOpMetrics(bool success);
+    void UpdateCacheMetrics();
 
 private:
     template <typename F, typename InfoT, typename... Args>
@@ -768,6 +776,13 @@ private:
     SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
+
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mSystemOpTotal;
+    CounterPtr mSystemOpFailTotal;
+    CounterPtr mUseCacheTotal;
+    IntGaugePtr mCacheItemsSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;
