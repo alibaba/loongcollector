@@ -381,6 +381,13 @@ bool logtail::JournalServer::validateQueueKey(const std::string& configName,
         return false;
     }
 
+    // 如果配置中已经有queueKey，直接使用（用于测试环境）
+    if (config.queueKey != -1) {
+        queueKey = config.queueKey;
+        LOG_INFO(sLogger, ("journal server using pre-set queue key", "")("config", configName)("idx", idx)("queue_key", queueKey));
+        return true;
+    }
+
     // 从pipeline context获取queue key
     queueKey = config.ctx->GetProcessQueueKey();
     if (queueKey == -1) {
