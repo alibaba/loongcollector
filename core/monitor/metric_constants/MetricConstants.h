@@ -381,7 +381,7 @@ extern const std::string METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS;
  **********************************************************/
 extern const std::string METRIC_RUNNER_SYSTEM_OP_TOTAL;
 extern const std::string METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL;
-extern const std::string METRIC_RUNNER_SYSTEM_USE_CACHE_TOTAL;
+extern const std::string METRIC_RUNNER_SYSTEM_CACHE_HIT_TOTAL;
 extern const std::string METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE;
 
 /**********************************************************

@@ -40,6 +40,7 @@
 #include "constants/Constants.h"
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
+#include "host_monitor/HostMonitorInputRunner.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
@@ -236,6 +237,11 @@ void LogtailMonitor::Monitor() {
                 if (BOOL_FLAG(logtail_dump_monitor_info)) {
                     if (!DumpMonitorInfo(monitorTime))
                         LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
+                }
+
+                if (HostMonitorInputRunner::GetInstance()->ShouldRestart()) {
+                    mShouldSuicide.store(true);
+                    break;
                 }
             }
         }

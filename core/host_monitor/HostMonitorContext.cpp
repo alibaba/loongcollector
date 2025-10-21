@@ -16,7 +16,6 @@
 
 #include "host_monitor/HostMonitorContext.h"
 
-#include "SelfCheckCollector.h"
 #include "host_monitor/collector/BaseCollector.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
