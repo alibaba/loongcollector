@@ -223,7 +223,7 @@ bool LoongSuiteGrpcClientUnittest::SendRawData(const std::string& data, const st
         LOG_ERROR(sLogger, ("gRPC stub not initialized", ""));
         return false;
     }
-    
+
     try {
         // 创建请求
         LoongSuiteForwardRequest request;
