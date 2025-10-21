@@ -33,7 +33,7 @@ const string METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS = "latency_time_ms";
 // System interface metrics
 const string METRIC_RUNNER_SYSTEM_OP_TOTAL = "system_op_total";
 const string METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL = "system_op_fail_total";
-const string METRIC_RUNNER_SYSTEM_USE_CACHE_TOTAL = "use_cache_total";
+const string METRIC_RUNNER_SYSTEM_CACHE_HIT_TOTAL = "cache_hit_total";
 const string METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE = "cache_items_size";
 
 // Collector fail metrics

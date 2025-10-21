@@ -783,7 +783,7 @@ private:
     MetricsRecordRef mMetricsRecordRef;
     CounterPtr mSystemOpTotal;
     CounterPtr mSystemOpFailTotal;
-    CounterPtr mUseCacheTotal;
+    CounterPtr mCacheHitTotal;
     IntGaugePtr mCacheItemsSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN

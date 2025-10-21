@@ -94,6 +94,8 @@ public:
     void ScheduleOnce(CollectContextPtr collectContext);
     void InitMetrics();
 
+    bool ShouldRestart();
+
 private:
     HostMonitorInputRunner();
     ~HostMonitorInputRunner() override = default;
@@ -125,7 +127,6 @@ private:
     TimeCounterPtr mLatencyTimeMs;
     IntGaugePtr mLastRunTime;
 
-    friend class SelfCheckCollector;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class HostMonitorInputRunnerUnittest;
 #endif

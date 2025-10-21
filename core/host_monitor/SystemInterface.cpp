@@ -535,7 +535,7 @@ void SystemInterface::InitMetrics() {
 
     mSystemOpTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_TOTAL);
     mSystemOpFailTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL);
-    mUseCacheTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_USE_CACHE_TOTAL);
+    mCacheHitTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_CACHE_HIT_TOTAL);
     mCacheItemsSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE);
 
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);

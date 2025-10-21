@@ -56,6 +56,7 @@
 #endif
 
 DEFINE_FLAG_INT32(host_monitor_thread_pool_size, "host monitor thread pool size", 3);
+DEFINE_FLAG_INT32(host_monitor_max_blocked_count, "host monitor max blocked count to restart", 5);
 DECLARE_FLAG_INT32(self_check_collector_interval);
 
 namespace logtail {
@@ -128,7 +129,7 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
         LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collectorName));
     }
 
-    if (newCollectorInfos.size() > 0 && newCollectorInfos.front().name != SelfCheckCollector::sName) {
+    if (newCollectorInfos.size() > 0) {
         mRunningPipelineCount++;
         LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(mRunningPipelineCount);
     }
@@ -207,6 +208,23 @@ void HostMonitorInputRunner::Stop() {
 #endif
 }
 
+bool HostMonitorInputRunner::ShouldRestart() {
+    if (mRunningPipelineCount == 0) {
+        return false;
+    }
+    {
+        auto now = std::chrono::steady_clock::now();
+        std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
+        for (const auto& [key, runInfo] : mRegisteredCollector) {
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime) > runInfo.interval * INT32_FLAG(host_monitor_max_blocked_count)) {
+                LOG_WARNING(sLogger, ("host monitor", "collector blocked")("collector", key.collectorName)("config", key.configName)("interval", runInfo.interval.count())("seconds since last run", std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime).count()));
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool HostMonitorInputRunner::HasRegisteredPlugins() const {
     std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
     return !mRegisteredCollector.empty();
@@ -225,10 +243,7 @@ bool HostMonitorInputRunner::IsCollectTaskValid(const std::chrono::steady_clock:
 }
 
 void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
-    auto collectFn = [this, context]() {
-        auto startTime = std::chrono::steady_clock::now();
-        bool isSelfCheckCollector = (context->mCollectorName == SelfCheckCollector::sName);
-
+    auto collectFn = [this, context, startTime = std::chrono::steady_clock::now()]() {
         try {
             bool result = false;
             if (context->ShouldGenerateMetric()) {
@@ -266,12 +281,9 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                        "collect error")("collector", context->mCollectorName)("error", e.what()));
             CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
         }
-
-        if (!isSelfCheckCollector) {
-            ADD_COUNTER(
+        ADD_COUNTER(
                 mLatencyTimeMs,
                 std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - startTime));
-        }
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
             CollectorKey key{context->mConfigName, context->mCollectorName};
