@@ -58,10 +58,10 @@ public:
     const std::vector<TimeCounterPtr>& GetTimeCounters() const;
     const std::vector<IntGaugePtr>& GetIntGauges() const;
     const std::vector<DoubleGaugePtr>& GetDoubleGauges() const;
-    CounterPtr CreateCounter(const std::string& name, bool forceCreateWhenCommitted = false);
-    TimeCounterPtr CreateTimeCounter(const std::string& name, bool forceCreateWhenCommitted = false);
-    IntGaugePtr CreateIntGauge(const std::string& name, bool forceCreateWhenCommitted = false);
-    DoubleGaugePtr CreateDoubleGauge(const std::string& name, bool forceCreateWhenCommitted = false);
+    CounterPtr CreateCounter(const std::string& name);
+    TimeCounterPtr CreateTimeCounter(const std::string& name);
+    IntGaugePtr CreateIntGauge(const std::string& name);
+    DoubleGaugePtr CreateDoubleGauge(const std::string& name);
     void AddLabels(MetricLabels&& labels);
     MetricsRecord* Collect();
     void SetNext(MetricsRecord* next);
@@ -87,10 +87,10 @@ public:
     const std::string& GetCategory() const;
     const MetricLabelsPtr& GetLabels() const;
     const DynamicMetricLabelsPtr& GetDynamicLabels() const;
-    CounterPtr CreateCounter(const std::string& name, bool forceCreateWhenCommitted = false);
-    TimeCounterPtr CreateTimeCounter(const std::string& name, bool forceCreateWhenCommitted = false);
-    IntGaugePtr CreateIntGauge(const std::string& name, bool forceCreateWhenCommitted = false);
-    DoubleGaugePtr CreateDoubleGauge(const std::string& name, bool forceCreateWhenCommitted = false);
+    CounterPtr CreateCounter(const std::string& name);
+    TimeCounterPtr CreateTimeCounter(const std::string& name);
+    IntGaugePtr CreateIntGauge(const std::string& name);
+    DoubleGaugePtr CreateDoubleGauge(const std::string& name);
     void AddLabels(MetricLabels&& labels);
     const MetricsRecord* operator->() const;
 #ifdef APSARA_UNIT_TEST_MAIN

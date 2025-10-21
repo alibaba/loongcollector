@@ -36,8 +36,8 @@ MetricsRecord::MetricsRecord(const std::string& category, MetricLabelsPtr labels
       mDeleted(false) {
 }
 
-CounterPtr MetricsRecord::CreateCounter(const std::string& name, bool forceCreateWhenCommitted) {
-    if (mCommitted && !forceCreateWhenCommitted) {
+CounterPtr MetricsRecord::CreateCounter(const std::string& name) {
+    if (mCommitted) {
         return nullptr;
     }
     CounterPtr counterPtr = std::make_shared<Counter>(name);
@@ -45,8 +45,8 @@ CounterPtr MetricsRecord::CreateCounter(const std::string& name, bool forceCreat
     return counterPtr;
 }
 
-TimeCounterPtr MetricsRecord::CreateTimeCounter(const std::string& name, bool forceCreateWhenCommitted) {
-    if (mCommitted && !forceCreateWhenCommitted) {
+TimeCounterPtr MetricsRecord::CreateTimeCounter(const std::string& name) {
+    if (mCommitted) {
         return nullptr;
     }
     TimeCounterPtr counterPtr = std::make_shared<TimeCounter>(name);
@@ -54,8 +54,8 @@ TimeCounterPtr MetricsRecord::CreateTimeCounter(const std::string& name, bool fo
     return counterPtr;
 }
 
-IntGaugePtr MetricsRecord::CreateIntGauge(const std::string& name, bool forceCreateWhenCommitted) {
-    if (mCommitted && !forceCreateWhenCommitted) {
+IntGaugePtr MetricsRecord::CreateIntGauge(const std::string& name) {
+    if (mCommitted) {
         return nullptr;
     }
     IntGaugePtr gaugePtr = std::make_shared<IntGauge>(name);
@@ -63,8 +63,8 @@ IntGaugePtr MetricsRecord::CreateIntGauge(const std::string& name, bool forceCre
     return gaugePtr;
 }
 
-DoubleGaugePtr MetricsRecord::CreateDoubleGauge(const std::string& name, bool forceCreateWhenCommitted) {
-    if (mCommitted && !forceCreateWhenCommitted) {
+DoubleGaugePtr MetricsRecord::CreateDoubleGauge(const std::string& name) {
+    if (mCommitted) {
         return nullptr;
     }
     DoubleGaugePtr gaugePtr = std::make_shared<Gauge<double>>(name);
@@ -180,19 +180,19 @@ const DynamicMetricLabelsPtr& MetricsRecordRef::GetDynamicLabels() const {
     return mMetrics->GetDynamicLabels();
 }
 
-CounterPtr MetricsRecordRef::CreateCounter(const std::string& name, bool forceCreateWhenCommitted) {
+CounterPtr MetricsRecordRef::CreateCounter(const std::string& name) {
     return mMetrics->CreateCounter(name, forceCreateWhenCommitted);
 }
 
-TimeCounterPtr MetricsRecordRef::CreateTimeCounter(const std::string& name, bool forceCreateWhenCommitted) {
+TimeCounterPtr MetricsRecordRef::CreateTimeCounter(const std::string& name) {
     return mMetrics->CreateTimeCounter(name, forceCreateWhenCommitted);
 }
 
-IntGaugePtr MetricsRecordRef::CreateIntGauge(const std::string& name, bool forceCreateWhenCommitted) {
+IntGaugePtr MetricsRecordRef::CreateIntGauge(const std::string& name) {
     return mMetrics->CreateIntGauge(name, forceCreateWhenCommitted);
 }
 
-DoubleGaugePtr MetricsRecordRef::CreateDoubleGauge(const std::string& name, bool forceCreateWhenCommitted) {
+DoubleGaugePtr MetricsRecordRef::CreateDoubleGauge(const std::string& name) {
     return mMetrics->CreateDoubleGauge(name, forceCreateWhenCommitted);
 }
 
