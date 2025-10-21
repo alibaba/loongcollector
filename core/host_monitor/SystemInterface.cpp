@@ -554,7 +554,7 @@ void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSiz
     } else {
         SUB_GAUGE(mCacheItemsSize, cacheSizeBefore - cacheSizeAfter);
     }
-    ADD_COUNTER(mUseCacheTotal, 1);
+    ADD_COUNTER(mCacheHitTotal, 1);
 }
 
 } // namespace logtail

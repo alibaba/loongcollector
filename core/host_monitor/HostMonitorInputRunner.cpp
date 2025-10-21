@@ -41,7 +41,6 @@
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
-#include "host_monitor/collector/SelfCheckCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
@@ -69,7 +68,6 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<DiskCollector>();
     RegisterCollector<ProcessCollector>();
     RegisterCollector<NetCollector>();
-    RegisterCollector<SelfCheckCollector>();
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
@@ -167,13 +165,6 @@ void HostMonitorInputRunner::Init() {
 #ifndef APSARA_UNIT_TEST_MAIN
     mThreadPool->Start();
     Timer::GetInstance()->Init();
-
-    UpdateCollector("loongcollector-host-monitor-self-check",
-                    {{SelfCheckCollector::sName,
-                      static_cast<uint32_t>(INT32_FLAG(self_check_collector_interval)),
-                      HostMonitorCollectType::kSingleValue}},
-                    QueueKey(),
-                    0);
 #endif
 }
 
@@ -216,8 +207,13 @@ bool HostMonitorInputRunner::ShouldRestart() {
         auto now = std::chrono::steady_clock::now();
         std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
         for (const auto& [key, runInfo] : mRegisteredCollector) {
-            if (std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime) > runInfo.interval * INT32_FLAG(host_monitor_max_blocked_count)) {
-                LOG_WARNING(sLogger, ("host monitor", "collector blocked")("collector", key.collectorName)("config", key.configName)("interval", runInfo.interval.count())("seconds since last run", std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime).count()));
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime)
+                > runInfo.interval * INT32_FLAG(host_monitor_max_blocked_count)) {
+                LOG_WARNING(sLogger,
+                            ("host monitor", "collector blocked")("collector", key.collectorName)(
+                                "config", key.configName)("interval", runInfo.interval.count())(
+                                "seconds since last run",
+                                std::chrono::duration_cast<std::chrono::seconds>(now - runInfo.lastRunTime).count()));
                 return true;
             }
         }
@@ -281,9 +277,8 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                        "collect error")("collector", context->mCollectorName)("error", e.what()));
             CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
         }
-        ADD_COUNTER(
-                mLatencyTimeMs,
-                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - startTime));
+        ADD_COUNTER(mLatencyTimeMs,
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - startTime));
         {
             std::shared_lock<std::shared_mutex> lock(mRegisteredCollectorMutex);
             CollectorKey key{context->mConfigName, context->mCollectorName};

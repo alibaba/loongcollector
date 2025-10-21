@@ -82,9 +82,6 @@ bool HostMonitorContext::CheckClockRolling() {
 }
 
 bool HostMonitorContext::ShouldGenerateMetric() {
-    if (mCollectorName == SelfCheckCollector::sName) {
-        return false;
-    }
     if (mCollectType == HostMonitorCollectType::kMultiValue) {
         ++mCount;
         if (mCount < mCountPerReport) {
