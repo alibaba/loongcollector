@@ -51,7 +51,7 @@ private:
     void parseBasicParams(const Json::Value& config);
     void parseArrayParams(const Json::Value& config);
     void parseStringArray(const Json::Value& config, const std::string& key, std::vector<std::string>& target);
-    
+
     // Configuration options
     std::string mSeekPosition;
     int mCursorFlushPeriodMs;
@@ -67,7 +67,7 @@ private:
 
     // Runtime state
     // 不再需要 JournalReader，JournalServer 会处理所有数据
-    
+
     // Threading
     std::atomic<bool> mShutdown;
     // 不再需要线程管理，JournalServer 会处理所有数据
@@ -76,7 +76,7 @@ private:
     static constexpr int kDefaultCursorFlushPeriodMs = 5000; // 5 seconds
 
     // 不再需要这些辅助方法，JournalServer 会处理所有 journal 操作
-    
+
     // Seek position constants
     static const std::string kSeekPositionCursor;
     static const std::string kSeekPositionHead;
@@ -88,4 +88,4 @@ private:
 #endif
 };
 
-} // namespace logtail 
+} // namespace logtail

@@ -23,8 +23,8 @@
 #include <string>
 #include <unordered_map>
 
-#include "runner/InputRunner.h"
 #include "common/JournalConfig.h"
+#include "runner/InputRunner.h"
 
 namespace logtail {
 
@@ -44,7 +44,7 @@ struct MonitoredReader {
 
 /**
  * @brief JournalServer manages all journal input plugins
- * 
+ *
  * It follows the same pattern as FileServer and StaticFileServer:
  * 1. Manages journal configurations from registered plugins
  * 2. Runs in a separate thread to process journal entries
@@ -69,14 +69,12 @@ public:
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
-    
+
     // Plugin registration interface
-    void AddJournalInput(const std::string& configName,
-                        size_t idx,
-                        const JournalConfig& config);
+    void AddJournalInput(const std::string& configName, size_t idx, const JournalConfig& config);
     void RemoveJournalInput(const std::string& configName, size_t idx);
     void RemoveConfigOnly(const std::string& configName, size_t idx);
-    
+
     /**
      * @brief 获取所有配置
      * @return 所有配置的映射
@@ -113,14 +111,14 @@ public:
      * @return 全局 epoll FD，如果未初始化返回 -1
      */
     int GetGlobalEpollFD() const;
-    
+
     /**
      * @brief 清理指定配置的 epoll 监控
      * @param configName 配置名称
      * @param idx 配置索引
      */
     void CleanupEpollMonitoring(const std::string& configName, size_t idx);
-    
+
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -128,7 +126,7 @@ public:
 
 private:
     JournalServer() = default;
-    
+
     void run();
     void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void processJournal(const std::string& configName, size_t idx);
@@ -137,7 +135,7 @@ private:
     // 线程管理 - Thread Management
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
-    
+
     // 全局 epoll FD 管理 - Global Epoll FD Management
     int mGlobalEpollFD{-1};
     mutable std::mutex mEpollMutex;
@@ -149,4 +147,4 @@ private:
     mutable std::mutex mUpdateMux;
 };
 
-} // namespace logtail 
+} // namespace logtail

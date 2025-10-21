@@ -25,13 +25,13 @@ namespace logtail {
 
 /**
  * @brief Journal过滤器管理类
- * 
+ *
  * 负责处理所有journal相关的过滤逻辑：
  * - Units过滤：指定systemd unit过滤，不配置则全采集
  * - Identifiers过滤：指定syslog identifier过滤，同units逻辑
  * - Kernel过滤：kernel日志过滤，仅在配置了units且启用时生效
  * - 自定义匹配模式过滤
- * 
+ *
  * 所有过滤器之间使用OR逻辑关系，与Golang版本保持一致
  */
 class JournalFilter {
@@ -40,11 +40,11 @@ public:
      * @brief 过滤器配置结构
      */
     struct FilterConfig {
-        std::vector<std::string> units;           // systemd units过滤列表，空则全采集
-        std::vector<std::string> identifiers;    // syslog identifiers过滤列表，空则全采集
-        std::vector<std::string> matchPatterns;  // 自定义匹配模式
-        bool enableKernel = true;                 // 是否采集kernel日志，默认true
-        
+        std::vector<std::string> units; // systemd units过滤列表，空则全采集
+        std::vector<std::string> identifiers; // syslog identifiers过滤列表，空则全采集
+        std::vector<std::string> matchPatterns; // 自定义匹配模式
+        bool enableKernel = true; // 是否采集kernel日志，默认true
+
         // 用于调试和日志的配置信息
         std::string configName;
         size_t configIndex = 0;
@@ -60,32 +60,32 @@ public:
 
     /**
      * @brief Units过滤：根据systemd unit配置过滤
-     * 
+     *
      * 不配置units则全采集，配置了则只采集指定的units
      * 支持以下类型的匹配：
      * - 服务本身的消息：_SYSTEMD_UNIT=unit
-     * - 服务的coredump：MESSAGE_ID + COREDUMP_UNIT  
+     * - 服务的coredump：MESSAGE_ID + COREDUMP_UNIT
      * - PID1关于服务的消息：_PID=1 + UNIT
      * - 守护进程关于服务的消息：_UID=0 + OBJECT_SYSTEMD_UNIT
      * - slice相关消息：_SYSTEMD_SLICE
-     * 
+     *
      * @param reader journal reader实例
      * @param units units列表
      * @param configName 配置名称（用于日志）
      * @param configIndex 配置索引（用于日志）
      * @return 成功返回true，失败返回false
      */
-    static bool AddUnitsFilter(JournalReader* reader, 
+    static bool AddUnitsFilter(JournalReader* reader,
                                const std::vector<std::string>& units,
-                               const std::string& configName, 
+                               const std::string& configName,
                                size_t configIndex);
 
     /**
      * @brief Identifiers过滤：根据syslog identifier配置过滤
-     * 
+     *
      * 不配置identifiers则全采集，配置了则只采集指定的identifiers
      * 匹配SYSLOG_IDENTIFIER字段
-     * 
+     *
      * @param reader journal reader实例
      * @param identifiers identifiers列表
      * @param configName 配置名称（用于日志）
@@ -99,25 +99,23 @@ public:
 
     /**
      * @brief Kernel过滤：采集kernel日志
-     * 
+     *
      * 与Golang版本保持一致：只有在配置了units且enableKernel=true时才添加kernel过滤器
      * 匹配_TRANSPORT=kernel，并调用AddDisjunction()形成OR逻辑关系
-     * 
+     *
      * @param reader journal reader实例
      * @param configName 配置名称（用于日志）
      * @param configIndex 配置索引（用于日志）
      * @return 成功返回true，失败返回false
      */
-    static bool AddKernelFilter(JournalReader* reader,
-                                const std::string& configName,
-                                size_t configIndex);
+    static bool AddKernelFilter(JournalReader* reader, const std::string& configName, size_t configIndex);
 
     /**
      * @brief 自定义匹配模式过滤
-     * 
+     *
      * 支持自定义的journal匹配模式
      * 每个pattern直接传递给journal的AddMatch
-     * 
+     *
      * @param reader journal reader实例
      * @param patterns 匹配模式列表
      * @param configName 配置名称（用于日志）
@@ -154,17 +152,15 @@ private:
     ~JournalFilter() = default;
 
     // 辅助方法
-    static bool addSingleUnitMatches(JournalReader* reader, 
+    static bool addSingleUnitMatches(JournalReader* reader,
                                      const std::string& unit,
                                      const std::string& configName,
                                      size_t configIndex);
-    
+
     // Glob pattern support functions
-    static std::vector<std::string> getPossibleUnits(JournalReader* reader, 
+    static std::vector<std::string> getPossibleUnits(JournalReader* reader,
                                                      const std::vector<std::string>& fields,
                                                      const std::vector<std::string>& patterns);
-    
-
 };
 
-} // namespace logtail 
+} // namespace logtail

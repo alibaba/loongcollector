@@ -16,8 +16,9 @@
 
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
+
 #include "common/JournalConfig.h"
 #include "reader/JournalReader.h"
 
@@ -29,17 +30,20 @@ using QueueKey = int64_t;
 
 /**
  * @brief 读取并处理journal条目
- * 
+ *
  * 从journal reader中读取条目，应用字段转换，创建日志事件并推送到处理队列。
  * 会根据配置的maxEntriesPerBatch限制每批读取的条目数量。
- * 
+ *
  * @param configName 配置名称
  * @param idx 配置索引
  * @param config journal配置
  * @param journalReader journal reader指针
  * @param queueKey 队列键值，用于推送事件
  */
-void ReadJournalEntries(const std::string& configName, size_t idx, const JournalConfig& config,
-                       const std::shared_ptr<SystemdJournalReader>& journalReader, QueueKey queueKey);
+void ReadJournalEntries(const std::string& configName,
+                        size_t idx,
+                        const JournalConfig& config,
+                        const std::shared_ptr<SystemdJournalReader>& journalReader,
+                        QueueKey queueKey);
 
 } // namespace logtail

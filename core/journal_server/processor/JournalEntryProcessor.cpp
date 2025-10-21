@@ -48,10 +48,9 @@ bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journa
                              const string& cursorSeekFallback,
                              const string& errorContext) {
     LOG_WARNING(sLogger,
-               ("journal processor journal error detected, attempting recovery",
-                errorContext)
-               ("config", configName)("idx", idx)("fallback", cursorSeekFallback));
-    
+                ("journal processor journal error detected, attempting recovery",
+                 errorContext)("config", configName)("idx", idx)("fallback", cursorSeekFallback));
+
     // 根据配置的cursorSeekFallback决定恢复策略
     bool seekSuccess = false;
     if (cursorSeekFallback == "head") {
@@ -59,35 +58,32 @@ bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journa
         seekSuccess = journalReader->SeekHead();
         if (seekSuccess) {
             LOG_INFO(sLogger,
-                    ("journal processor recovered from journal error by seeking to head",
-                     "continuing from earliest available entry")
-                    ("config", configName)("idx", idx)("context", errorContext));
+                     ("journal processor recovered from journal error by seeking to head",
+                      "continuing from earliest available entry")("config", configName)("idx", idx)("context",
+                                                                                                    errorContext));
         }
     } else if (cursorSeekFallback == "tail") {
         // 恢复策略2：重新seek到tail（最新日志）
         seekSuccess = journalReader->SeekTail();
         if (seekSuccess) {
             LOG_INFO(sLogger,
-                    ("journal processor recovered from journal error by seeking to tail",
-                     "continuing from latest entry")
-                    ("config", configName)("idx", idx)("context", errorContext));
+                     ("journal processor recovered from journal error by seeking to tail",
+                      "continuing from latest entry")("config", configName)("idx", idx)("context", errorContext));
         }
     } else {
         LOG_WARNING(sLogger,
-                   ("journal processor invalid cursorSeekFallback value, using head as default",
-                    cursorSeekFallback)
-                   ("config", configName)("idx", idx));
+                    ("journal processor invalid cursorSeekFallback value, using head as default",
+                     cursorSeekFallback)("config", configName)("idx", idx));
         seekSuccess = journalReader->SeekHead();
     }
-    
+
     if (seekSuccess) {
         return true;
     }
-    
+
     LOG_ERROR(sLogger,
-             ("journal processor failed to recover from journal error",
-              "all recovery attempts failed")
-             ("config", configName)("idx", idx)("context", errorContext)("fallback", cursorSeekFallback));
+              ("journal processor failed to recover from journal error", "all recovery attempts failed")(
+                  "config", configName)("idx", idx)("context", errorContext)("fallback", cursorSeekFallback));
     return false;
 }
 
@@ -101,7 +97,7 @@ bool MoveToNextJournalEntry(const string& configName,
         // head 模式：SeekHead() 后第一次 Next() 会移动到第一条
         // tail 模式：SeekTail() + Previous() 后第一次 Next() 会移动到新日志
         JournalReadStatus status = journalReader->NextWithStatus();
-        
+
         if (status == JournalReadStatus::kOk) {
             // 成功移动到下一条
             return true;
@@ -112,17 +108,16 @@ bool MoveToNextJournalEntry(const string& configName,
         }
         // 错误情况：可能是日志轮转导致cursor失效
         // 尝试错误恢复
-        return RecoverFromJournalError(
-            journalReader, 
-            configName, 
-            idx,
-            cursorSeekFallback,
-            "navigation error during Next(), cursor may be invalidated by log rotation");
+        return RecoverFromJournalError(journalReader,
+                                       configName,
+                                       idx,
+                                       cursorSeekFallback,
+                                       "navigation error during Next(), cursor may be invalidated by log rotation");
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
                   ("journal processor exception during journal entry navigation",
                    e.what())("config", configName)("idx", idx)("entries_processed", entryCount));
-        
+
         // 尝试错误恢复
         string errorMsg = string("exception during navigation: ") + e.what();
         if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorMsg)) {
@@ -134,10 +129,10 @@ bool MoveToNextJournalEntry(const string& configName,
         LOG_ERROR(sLogger,
                   ("journal processor unknown exception during journal entry navigation",
                    "")("config", configName)("idx", idx)("entries_processed", entryCount));
-        
+
         // 尝试错误恢复
-        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback,
-                                   "unknown exception during navigation")) {
+        if (RecoverFromJournalError(
+                journalReader, configName, idx, cursorSeekFallback, "unknown exception during navigation")) {
             // 恢复成功，可以继续处理
             return true;
         }
@@ -159,16 +154,16 @@ bool ReadAndValidateEntry(const string& configName,
             // 1. 连接已关闭
             // 2. journal 文件被轮转删除（sd_journal_get_realtime_usec 返回错误）
             // 3. cursor 失效
-            // 
+            //
             // 无论哪种情况，都应该尝试错误恢复
-            string errorContext = !journalReader->IsOpen() 
+            string errorContext = !journalReader->IsOpen()
                 ? "GetEntry failed, connection closed"
                 : "GetEntry failed (possibly due to journal rotation or timestamp read error)";
-            
+
             LOG_WARNING(sLogger,
-                       ("journal processor get entry failed, attempting recovery", errorContext)
-                       ("config", configName)("idx", idx));
-            
+                        ("journal processor get entry failed, attempting recovery",
+                         errorContext)("config", configName)("idx", idx));
+
             // 尝试错误恢复
             if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorContext)) {
                 // 恢复成功，重试读取
@@ -176,9 +171,9 @@ bool ReadAndValidateEntry(const string& configName,
                     return true;
                 }
                 // 恢复后重试仍然失败，跳过这条
-                LOG_WARNING(sLogger, 
-                           ("journal processor get entry still failed after recovery", "skipping entry")
-                           ("config", configName)("idx", idx));
+                LOG_WARNING(sLogger,
+                            ("journal processor get entry still failed after recovery",
+                             "skipping entry")("config", configName)("idx", idx));
                 return false;
             }
             // 恢复失败，中止批次
@@ -187,17 +182,19 @@ bool ReadAndValidateEntry(const string& configName,
         // 检查entry是否为空
         if (entry.fields.empty()) {
             LOG_WARNING(sLogger,
-                        ("journal processor journal entry is empty", "no fields found")("config", configName)("idx", idx)("cursor",
-                                                                                                        entry.cursor));
+                        ("journal processor journal entry is empty",
+                         "no fields found")("config", configName)("idx", idx)("cursor", entry.cursor));
             return false; // Empty entry, special handling needed by caller
         }
         return true;
 
     } catch (const std::exception& e) {
-        LOG_ERROR(sLogger, ("journal processor exception during journal entry reading", e.what())("config", configName)("idx", idx));
+        LOG_ERROR(
+            sLogger,
+            ("journal processor exception during journal entry reading", e.what())("config", configName)("idx", idx));
         // 清空entry以确保不会使用部分读取的数据
         entry = JournalEntry();
-        
+
         // 尝试错误恢复
         string errorMsg = string("exception during GetEntry: ") + e.what();
         if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback, errorMsg)) {
@@ -206,12 +203,14 @@ bool ReadAndValidateEntry(const string& configName,
         }
         return false;
     } catch (...) {
-        LOG_ERROR(sLogger, ("journal processor unknown exception during journal entry reading", "")("config", configName)("idx", idx));
+        LOG_ERROR(
+            sLogger,
+            ("journal processor unknown exception during journal entry reading", "")("config", configName)("idx", idx));
         entry = JournalEntry();
-        
+
         // 尝试错误恢复
-        if (RecoverFromJournalError(journalReader, configName, idx, cursorSeekFallback,
-                                   "unknown exception during GetEntry")) {
+        if (RecoverFromJournalError(
+                journalReader, configName, idx, cursorSeekFallback, "unknown exception during GetEntry")) {
             // 恢复成功，重试读取
             return journalReader->GetEntry(entry);
         }
@@ -315,13 +314,13 @@ void ReadJournalEntries(const string& configName,
                         QueueKey queueKey) {
     int entryCount = 0;
     // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
-    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000));//公平参数
+    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000)); // 公平参数
 
     // 如果配置值被修正，记录警告
     if (config.maxEntriesPerBatch != maxEntriesPerBatch) {
         LOG_WARNING(sLogger,
-                    ("journal processor maxEntriesPerBatch clamped to safe range", "")("config", configName)("idx", idx)(
-                        "original", config.maxEntriesPerBatch)("clamped", maxEntriesPerBatch));
+                    ("journal processor maxEntriesPerBatch clamped to safe range", "")("config", configName)(
+                        "idx", idx)("original", config.maxEntriesPerBatch)("clamped", maxEntriesPerBatch));
     }
 
     try {
@@ -347,7 +346,9 @@ void ReadJournalEntries(const string& configName,
 
             // Step 3: 处理entry (transform, create event, push)
             if (!CreateAndPushEventGroup(configName, idx, config, entry, queueKey)) {
-                LOG_ERROR(sLogger, ("journal processor failed to process journal entry", "continue")("config", configName)("idx", idx));
+                LOG_ERROR(sLogger,
+                          ("journal processor failed to process journal entry", "continue")("config", configName)("idx",
+                                                                                                                  idx));
             }
 
             entryCount++;
@@ -356,8 +357,8 @@ void ReadJournalEntries(const string& configName,
         // 只在没有处理任何条目且可能存在问题时记录警告
         if (entryCount == 0 && config.seekPosition != "tail") {
             LOG_WARNING(sLogger,
-                        ("journal processor no journal entries processed", "may indicate configuration issue")("config", configName)(
-                            "idx", idx)("seek_position", config.seekPosition));
+                        ("journal processor no journal entries processed", "may indicate configuration issue")(
+                            "config", configName)("idx", idx)("seek_position", config.seekPosition));
         }
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
