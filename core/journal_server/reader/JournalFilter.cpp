@@ -25,10 +25,10 @@
 #ifdef _WIN32
 #include <string>
 namespace absl {
-    inline bool StrContains(const std::string& haystack, const std::string& needle) {
-        return haystack.find(needle) != std::string::npos;
-    }
+inline bool StrContains(const std::string& haystack, const std::string& needle) {
+    return haystack.find(needle) != std::string::npos;
 }
+} // namespace absl
 #else
 #include "absl/strings/match.h"
 #endif
