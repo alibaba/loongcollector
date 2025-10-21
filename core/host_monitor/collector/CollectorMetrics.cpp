@@ -30,7 +30,7 @@ namespace logtail {
 void CollectorMetrics::Init() {
     MetricLabels labels;
     WriteMetrics::GetInstance()->CreateMetricsRecordRef(
-        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN, std::move(labels));
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE, std::move(labels));
 
     // Initialize fail counters for each collector type
     mFailCounters[CPUCollector::sName] = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_CPU_FAIL_TOTAL);

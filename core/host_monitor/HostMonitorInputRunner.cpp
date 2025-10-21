@@ -55,6 +55,7 @@
 #endif
 
 DEFINE_FLAG_INT32(host_monitor_thread_pool_size, "host monitor thread pool size", 3);
+DECLARE_FLAG_INT32(self_check_collector_interval);
 
 namespace logtail {
 
@@ -126,8 +127,10 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
         LOG_INFO(sLogger, ("host monitor", "add new collector")("collector", collectorName));
     }
 
-    mRunningPipelineCount++;
-    LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(mRunningPipelineCount);
+    if (newCollectorInfos.size() > 0 && newCollectorInfos.front().name != SelfCheckCollector::sName) {
+        mRunningPipelineCount++;
+        LoongCollectorMonitor::GetInstance()->SetAgentHostMonitorTotal(mRunningPipelineCount);
+    }
 }
 
 void HostMonitorInputRunner::RemoveCollector(const std::string& configName) {

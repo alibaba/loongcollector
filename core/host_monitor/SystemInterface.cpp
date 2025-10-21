@@ -299,9 +299,10 @@ bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache
                                    InfoT& info,
                                    const std::string& errorType,
                                    Args... args) {
+    auto cacheSizeBefore = cache.GetCacheSize();
     if (cache.Get(now, info, args...)) {
-        // Cache hit - update cache metrics
-        UpdateCacheMetrics();
+        auto cacheSizeAfter = cache.GetCacheSize();
+        UpdateCacheMetrics(cacheSizeBefore, cacheSizeAfter);
         return true;
     }
 
@@ -364,11 +365,13 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::Set(InfoT& info, A
         info = *insertPos;
     } else {
         deque.insert(insertPos, info);
+        ++mCurrentSize;
     }
 
     // Remove oldest entries if size exceeds limit
     if (deque.size() > mCacheDequeSize) {
         deque.pop_front();
+        --mCurrentSize;
     }
 
     // Update access time
@@ -415,11 +418,13 @@ bool SystemInterface::SystemInformationCache<InfoT>::Set(InfoT& info) {
         info = *insertPos;
     } else {
         mCache.insert(insertPos, info);
+        ++mCurrentSize;
     }
 
     // Remove oldest entries if size exceeds limit
     if (mCache.size() > mCacheDequeSize) {
         mCache.pop_front();
+        --mCurrentSize;
     }
     return true;
 }
@@ -488,6 +493,7 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::ClearExpiredEntrie
 
     for (auto it = mCache.begin(); it != mCache.end() && cleanedCount < maxCleanupCount;) {
         if (now - it->second.lastAccessTime > maxAge) {
+            mCurrentSize -= it->second.data.size();
             it = mCache.erase(it);
             ++cleanedCount;
         } else {
@@ -506,13 +512,13 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::ShouldPerformClean
 template <typename InfoT, typename... Args>
 size_t SystemInterface::SystemInformationCache<InfoT, Args...>::GetCacheSize() const {
     std::lock_guard<std::mutex> lock(mMutex);
-    return mCache.size();
+    return mCurrentSize;
 }
 
 template <typename InfoT>
 size_t SystemInterface::SystemInformationCache<InfoT>::GetCacheSize() const {
     std::lock_guard<std::mutex> lock(mMutex);
-    return mCache.size();
+    return mCurrentSize;
 }
 
 void SystemInterface::InitMetrics() {
@@ -538,28 +544,9 @@ void SystemInterface::UpdateSystemOpMetrics(bool success) {
     }
 }
 
-void SystemInterface::UpdateCacheMetrics() {
+void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter) {
     if (mCacheItemsSize) {
-        size_t totalCacheSize = 0;
-        totalCacheSize += mCPUInformationCache.GetCacheSize();
-        totalCacheSize += mProcessListInformationCache.GetCacheSize();
-        totalCacheSize += mProcessInformationCache.GetCacheSize();
-        totalCacheSize += mSystemLoadInformationCache.GetCacheSize();
-        totalCacheSize += mMemInformationCache.GetCacheSize();
-        totalCacheSize += mFileSystemListInformationCache.GetCacheSize();
-        totalCacheSize += mSystemUptimeInformationCache.GetCacheSize();
-        totalCacheSize += mSerialIdInformationCache.GetCacheSize();
-        totalCacheSize += mDiskStateInformationCache.GetCacheSize();
-        totalCacheSize += mFileSystemInformationCache.GetCacheSize();
-        totalCacheSize += mProcessCmdlineCache.GetCacheSize();
-        totalCacheSize += mProcessStatmCache.GetCacheSize();
-        totalCacheSize += mProcessStatusCache.GetCacheSize();
-        totalCacheSize += mProcessFdCache.GetCacheSize();
-        totalCacheSize += mExecutePathCache.GetCacheSize();
-        totalCacheSize += mTCPStatInformationCache.GetCacheSize();
-        totalCacheSize += mNetInterfaceInformationCache.GetCacheSize();
-
-        mCacheItemsSize->Set(totalCacheSize);
+        mCacheItemsSize->Set(cacheSizeAfter - cacheSizeBefore);
     }
     if (mUseCacheTotal) {
         mUseCacheTotal->Add(1);

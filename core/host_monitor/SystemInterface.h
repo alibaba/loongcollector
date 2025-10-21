@@ -645,6 +645,7 @@ public:
         mutable std::mutex mMutex;
         std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
         std::chrono::steady_clock::time_point mLastCleanupTime;
         int32_t mMaxCleanupCount;
         std::chrono::seconds mCleanupInterval;
@@ -667,6 +668,7 @@ public:
         mutable std::mutex mMutex;
         std::deque<InfoT> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -726,7 +728,7 @@ public:
 
     void InitMetrics();
     void UpdateSystemOpMetrics(bool success);
-    void UpdateCacheMetrics();
+    void UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter);
 
 private:
     template <typename F, typename InfoT, typename... Args>
