@@ -35,10 +35,6 @@ public:
     const std::string& Name() const override { return sName; }
 
 private:
-    // Check if a collector needs to be restarted based on last run time
-    bool ShouldRestartCollector(const std::chrono::steady_clock::time_point& lastRunTime,
-                                const std::chrono::seconds& interval) const;
-
     // Restart entire ilogtail process when collector timeout is detected
     void RestartAgent();
 };

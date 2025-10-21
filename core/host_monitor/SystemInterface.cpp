@@ -319,6 +319,10 @@ bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache
     } else {
         LOG_ERROR(sLogger, ("failed to get system information", errorType));
     }
+    auto cacheSizeAfter = cache.GetCacheSize();
+    if (mCacheItemsSize) {
+        mCacheItemsSize->Add(mCacheItemsSize->GetValue() + cacheSizeAfter - cacheSizeBefore);
+    }
     return status;
 }
 
@@ -546,7 +550,7 @@ void SystemInterface::UpdateSystemOpMetrics(bool success) {
 
 void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter) {
     if (mCacheItemsSize) {
-        mCacheItemsSize->Set(cacheSizeAfter - cacheSizeBefore);
+        mCacheItemsSize->Set(mCacheItemsSize->GetValue() + cacheSizeAfter - cacheSizeBefore);
     }
     if (mUseCacheTotal) {
         mUseCacheTotal->Add(1);

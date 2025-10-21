@@ -14,6 +14,9 @@
 
 #include "common/timer/Timer.h"
 
+#include <chrono>
+
+#include "MetricTypes.h"
 #include "application/Application.h"
 #include "logger/Logger.h"
 #include "monitor/MetricManager.h"
@@ -63,11 +66,8 @@ void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
     } else {
         mQueue.push(std::move(e));
     }
-    // Update metrics
-    if (mInItemsTotal) {
-        mInItemsTotal->Add(1);
-    }
-    UpdateMetrics();
+    ADD_COUNTER(mInItemsTotal, 1);
+    SET_GAUGE(mQueueItemsTotal, mQueue.size());
 }
 
 void Timer::Run() {
@@ -91,20 +91,17 @@ void Timer::Run() {
                     queueLock.unlock();
 
                     if (mLatencyTimeMs) {
-                        auto latency = chrono::duration_cast<chrono::milliseconds>(now - execTime);
-                        mLatencyTimeMs->Add(chrono::duration_cast<chrono::nanoseconds>(latency));
+                        auto latency = chrono::duration_cast<chrono::nanoseconds>(now - execTime);
+                        ADD_COUNTER(mLatencyTimeMs, latency);
                     }
                     if (!e->IsValid()) {
                         LOG_INFO(sLogger, ("invalid timer event", "task is cancelled"));
                     } else {
                         e->Execute();
-                        // Update metrics
-                        if (mOutItemsTotal) {
-                            mOutItemsTotal->Add(1);
-                        }
+                        ADD_COUNTER(mOutItemsTotal, 1);
                     }
                     queueLock.lock();
-                    UpdateMetrics();
+                    SET_GAUGE(mQueueItemsTotal, mQueue.size());
                 }
             }
         }
@@ -123,12 +120,6 @@ void Timer::InitMetrics() {
     mLatencyTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_TIMER_LATENCY_TIME_MS);
 
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
-}
-
-void Timer::UpdateMetrics() {
-    if (mQueueItemsTotal) {
-        mQueueItemsTotal->Set(mQueue.size());
-    }
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

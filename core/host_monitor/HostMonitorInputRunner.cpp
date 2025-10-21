@@ -18,12 +18,13 @@
 
 #include <cstdint>
 
+#include <atomic>
 #include <chrono>
-#include <future>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -167,7 +168,9 @@ void HostMonitorInputRunner::Init() {
     Timer::GetInstance()->Init();
 
     UpdateCollector("loongcollector-host-monitor-self-check",
-                    {{SelfCheckCollector::sName, 0, HostMonitorCollectType::kSingleValue}},
+                    {{SelfCheckCollector::sName,
+                      static_cast<uint32_t>(INT32_FLAG(self_check_collector_interval)),
+                      HostMonitorCollectType::kSingleValue}},
                     QueueKey(),
                     0);
 #endif
@@ -179,11 +182,27 @@ void HostMonitorInputRunner::Stop() {
     }
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    std::future<void> result = std::async(std::launch::async, [this]() { mThreadPool->Stop(); });
-    if (result.wait_for(std::chrono::seconds(3)) == std::future_status::timeout) {
+    // Use a shared flag to track completion status
+    auto completed = std::make_shared<std::atomic<bool>>(false);
+
+    // Start thread pool stop operation in detached thread
+    std::thread([this, completed]() {
+        try {
+            mThreadPool->Stop();
+            completed->store(true);
+        } catch (...) {
+            completed->store(true);
+        }
+    }).detach();
+
+    // Wait for completion or timeout
+    auto start = std::chrono::steady_clock::now();
+    while (!completed->load() && std::chrono::steady_clock::now() - start < std::chrono::seconds(3)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    if (!completed->load()) {
         LOG_ERROR(sLogger, ("host monitor runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
-    } else {
-        LOG_INFO(sLogger, ("host monitor runner", "stop successfully"));
     }
 #endif
 }
@@ -221,15 +240,15 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
                                "collect data")("collector", context->mCollectorName)("size", group.GetEvents().size()));
                     if (group.GetEvents().size() > 0) {
                         AddHostLabels(group);
-                        mOutItemsSize->Add(group.DataSize());
-                        mOutItemsTotal->Add(group.GetEvents().size());
+                        ADD_COUNTER(mOutItemsSize, group.DataSize());
+                        ADD_COUNTER(mOutItemsTotal, group.GetEvents().size());
                         PushQueue(context, std::move(group));
                     }
                 } else {
                     LOG_ERROR(
                         sLogger,
                         ("host monitor collect data failed", "collect error")("collector", context->mCollectorName));
-                    mDropItemsTotal->Add(group.GetEvents().size());
+                    ADD_COUNTER(mDropItemsTotal, group.GetEvents().size());
                     CollectorMetrics::GetInstance()->UpdateFailMetrics(context->mCollectorName);
                 }
             } else {
@@ -249,7 +268,8 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
         }
 
         if (!isSelfCheckCollector) {
-            mLatencyTimeMs->Add(
+            ADD_COUNTER(
+                mLatencyTimeMs,
                 std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - startTime));
         }
         {
@@ -267,7 +287,8 @@ void HostMonitorInputRunner::ScheduleOnce(CollectContextPtr context) {
         PushNextTimerEvent(context);
     };
     mThreadPool->Add(collectFn);
-    mLastRunTime->Set(
+    SET_GAUGE(
+        mLastRunTime,
         std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
