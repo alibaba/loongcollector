@@ -58,6 +58,7 @@ public:
 private:
     bool SerializeAndSend(PipelineEventGroup&& group);
     void HandleDeliveryResult(bool success, const KafkaProducer::ErrorInfo& errorInfo);
+    std::string GeneratePartitionKey(const PipelineEventPtr& event) const;
 
     KafkaConfig mKafkaConfig;
     std::unique_ptr<KafkaProducer> mProducer;

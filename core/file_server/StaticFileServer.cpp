@@ -88,7 +88,17 @@ void StaticFileServer::AddInput(const string& configName,
         Init();
     }
 
-    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files);
+    // 安全获取Pipeline的时间值，避免空指针解引用
+    uint32_t startTime = 0;
+    uint32_t expireTime = 0;
+
+    if (ctx != nullptr && ctx->HasValidPipeline()) {
+        const auto& pipeline = ctx->GetPipeline();
+        startTime = pipeline.GetOnetimeStartTime().value_or(0);
+        expireTime = pipeline.GetOnetimeExpireTime().value_or(0);
+    }
+
+    InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(configName, idx, files, startTime, expireTime);
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.try_emplace(make_pair(configName, idx), make_pair(fileDiscoveryOpts, ctx));

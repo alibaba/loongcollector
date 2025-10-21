@@ -27,6 +27,8 @@
 | `MaxRetries` | uint | 否 | `3` | 失败重试次数，映射 `message.send.max.retries` |
 | `RetryBackoffMs` | uint | 否 | `100` | 重试退避（毫秒），映射 `retry.backoff.ms` |
 | `Kafka` | map[string]string | 否 | / | 透传自定义 librdkafka 配置，如 `{ "compression.type": "lz4" }` |
+| `PartitionerType` | String | 否 | 分区策略：`random` 或 `hash`。默认 `random`。当为 `hash` 时，会基于指定的 `HashKeys` 生成消息键（Key），并使用 `murmur2_random` 作为底层分区器。 |
+| `HashKeys` | String数组 | 否 | 参与分区键生成的字段（仅对 `LOG` 事件生效）。每项必须以 `content.` 前缀开头，如：`["content.service", "content.user"]`。当 `PartitionerType` = `hash` 时必填。 |
 
 ## 样例
 
@@ -77,3 +79,20 @@ flushers:
 ```
 
 当动态格式化失败（字段缺失等）时，将回退到原始 `Topic` 模板字符串对应的静态值，并记录错误日志。
+
+## 分区策略
+
+当需要将相同业务键的日志落到同一分区时，可以开启 `hash` 分区：
+
+- `PartitionerType: "hash"`：启用哈希分区，内部映射为 librdkafka `partitioner=murmur2_random`，与 Java 客户端默认分区器兼容（NULL Key 随机分配）。
+- `HashKeys`：从日志内容中取值拼接成消息 Key，示例：
+
+```yaml
+flushers:
+  - Type: flusher_kafka_cpp
+    Brokers: ["kafka:29092"]
+    Topic: "hash-topic"
+    Version: "2.8.0"
+    PartitionerType: "hash"
+    HashKeys: ["content.service", "content.user"]
+```

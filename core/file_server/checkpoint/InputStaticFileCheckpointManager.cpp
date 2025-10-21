@@ -14,6 +14,7 @@
 
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 
+#include "SelfMonitorServer.h"
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
 #include "common/HashUtil.h"
@@ -40,7 +41,9 @@ InputStaticFileCheckpointManager::InputStaticFileCheckpointManager()
 
 bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName,
                                                         size_t idx,
-                                                        const optional<vector<filesystem::path>>& files) {
+                                                        const optional<vector<filesystem::path>>& files,
+                                                        uint32_t startTime,
+                                                        uint32_t expireTime) {
     if (!files.has_value()) {
         InputStaticFileCheckpoint cpt;
         if (RetrieveCheckpointFromFile(configName, idx, &cpt)) {
@@ -51,7 +54,9 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         } else {
             lock_guard<mutex> lock(mUpdateMux);
             auto it
-                = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, vector<FileCheckpoint>())
+                = mInputCheckpointMap
+                      .try_emplace(
+                          make_pair(configName, idx), configName, idx, vector<FileCheckpoint>(), startTime, expireTime)
                       .first;
             it->second.SetAbort();
             LOG_WARNING(sLogger,
@@ -117,7 +122,9 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
     {
         lock_guard<mutex> lock(mUpdateMux);
         auto it
-            = mInputCheckpointMap.try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts)).first;
+            = mInputCheckpointMap
+                  .try_emplace(make_pair(configName, idx), configName, idx, std::move(fileCpts), startTime, expireTime)
+                  .first;
         if (!DumpCheckpointFile(it->second)) {
             LOG_WARNING(sLogger, ("failed to dump checkpoint file on creation, config", configName)("input idx", idx));
         }
@@ -234,6 +241,10 @@ void InputStaticFileCheckpointManager::DumpAllCheckpointFiles() const {
             LOG_WARNING(sLogger,
                         ("failed to dump checkpoint file, config",
                          item.second.GetConfigName())("input idx", item.second.GetInputIndex()));
+        } else {
+#ifdef __ENTERPRISE__
+            SelfMonitorServer::GetInstance()->SendTaskStatus();
+#endif
         }
     }
 }
@@ -332,6 +343,13 @@ bool InputStaticFileCheckpointManager::DumpCheckpointFile(const InputStaticFileC
         // should not happen
         return false;
     }
+#ifdef __ENTERPRISE__
+    if (!cpt.SerializeToLogEvents()) {
+        // should not happen
+        return false;
+    }
+#endif
+
     string errMsg;
     return UpdateFileContent(
         mCheckpointRootPath / GetCheckpointFileName(cpt.GetConfigName(), cpt.GetInputIndex()), res, errMsg);

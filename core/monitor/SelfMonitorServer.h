@@ -38,8 +38,14 @@ public:
     void UpdateAlarmPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveAlarmPipeline();
 
+    void SendTaskStatus(); // use Alarm pipeline to send task status immediately in enterprise version
+
+    // Task status management
+    LogEvent* AddTaskStatus(const std::string& region);
+
     static const std::string INTERNAL_DATA_TYPE_ALARM;
     static const std::string INTERNAL_DATA_TYPE_METRIC;
+    static const std::string INTERNAL_DATA_TYPE_TASK_STATUS;
     static const std::string INTERNAL_DATA_TYPE_CONTAINER;
 
 private:
@@ -69,6 +75,10 @@ private:
     mutable ReadWriteLock mAlarmPipelineMux;
     CollectionPipelineContext* mAlarmPipelineCtx = nullptr;
     size_t mAlarmInputIndex = 0;
+
+    // task status
+    std::mutex mTaskStatusMutex;
+    std::map<std::string, PipelineEventGroup> mTaskStatusMap;
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalAlarmsUnittest;
     friend class InputInternalMetricsUnittest;

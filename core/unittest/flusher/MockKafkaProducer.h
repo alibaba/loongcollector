@@ -30,6 +30,7 @@ namespace logtail {
 
 struct ProduceRequest {
     std::string Topic;
+    std::string Key;
     std::string Value;
     KafkaProducer::Callback Callback;
 };
@@ -45,8 +46,11 @@ public:
         return mInitSuccess;
     }
 
-    void ProduceAsync(const std::string& topic, std::string&& value, Callback callback) override {
-        ProduceRequest request{topic, std::move(value), std::move(callback)};
+    void ProduceAsync(const std::string& topic,
+                      std::string&& value,
+                      Callback callback,
+                      const std::string& key = std::string()) override {
+        ProduceRequest request{topic, key, std::move(value), std::move(callback)};
         mRequests.emplace_back(std::move(request));
 
         if (mAutoComplete) {

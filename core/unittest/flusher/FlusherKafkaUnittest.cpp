@@ -21,6 +21,7 @@
 
 #include <functional>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -94,6 +95,12 @@ public:
     void TestDynamicTopic_Success();
     void TestDynamicTopic_FallbackToStatic();
     void TestDynamicTopic_FromTags();
+    void TestPartitionerHashConfigValidation();
+    void TestPartitionerHashKeySend();
+    void TestPartitionerHashKeyInvalidPrefix();
+    void TestUnknownPartitionerType();
+    void TestGeneratePartitionKey_NotHash();
+    void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
 
 protected:
     void SetUp();
@@ -432,6 +439,111 @@ void FlusherKafkaUnittest::TestDynamicTopic_FromTags() {
     APSARA_TEST_EQUAL(1, mFlusher->mSuccessCnt->GetValue());
 }
 
+void FlusherKafkaUnittest::TestPartitionerHashConfigValidation() {
+    Json::Value optionalGoPipeline;
+    Json::Value config;
+    config["Brokers"] = Json::Value(Json::arrayValue);
+    config["Brokers"].append("dummy:9092");
+    config["Topic"] = mTopic;
+    config["Version"] = "2.6.0";
+    config["PartitionerType"] = "hash";
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["PartitionerType"] = "hash";
+    Json::Value hashKeys(Json::arrayValue);
+    hashKeys.append("content.application");
+    config["HashKeys"] = hashKeys;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup group(sourceBuffer);
+    auto* e1 = group.AddLogEvent();
+    e1->SetContent(StringView("application"), StringView("serviceA"));
+    auto* e2 = group.AddLogEvent();
+    e2->SetContent(StringView("application"), StringView("serviceB"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+    APSARA_TEST_EQUAL(2, mFlusher->mSendCnt->GetValue());
+
+    const auto& reqs = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(2U, reqs.size());
+    std::set<std::string> keys;
+    for (const auto& r : reqs) {
+        keys.insert(r.Key);
+    }
+    APSARA_TEST_TRUE(keys.find("serviceA") != keys.end());
+    APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
+}
+
+void FlusherKafkaUnittest::TestPartitionerHashKeyInvalidPrefix() {
+    Json::Value optionalGoPipeline;
+    Json::Value config;
+    config["Brokers"] = Json::Value(Json::arrayValue);
+    config["Brokers"].append("dummy:9092");
+    config["Topic"] = mTopic;
+    config["Version"] = "2.6.0";
+    config["PartitionerType"] = "hash";
+    Json::Value keys(Json::arrayValue);
+    keys.append("app"); // 非 content. 前缀，触发参数错误分支
+    config["HashKeys"] = keys;
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestUnknownPartitionerType() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["PartitionerType"] = "unknown_partitioner";
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestGeneratePartitionKey_NotHash() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("k"), StringView("v"));
+    const auto& ev = group.GetEvents()[0];
+
+    APSARA_TEST_EQUAL(std::string(), mFlusher->GeneratePartitionKey(ev));
+}
+
+void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["PartitionerType"] = "hash";
+    Json::Value keys(Json::arrayValue);
+    keys.append("content.user");
+    keys.append("content.");
+    keys.append("content.app");
+    config["HashKeys"] = keys;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+
+    PipelineEventGroup g(std::make_shared<SourceBuffer>());
+    auto* e = g.AddLogEvent();
+    e->SetContent(StringView("user"), StringView("alice"));
+    e->SetContent(StringView("app"), StringView("svc"));
+    const auto& ev = g.GetEvents()[0];
+    auto k = mFlusher->GeneratePartitionKey(ev);
+    APSARA_TEST_EQUAL(std::string("alice###svc"), k);
+
+    PipelineEventGroup g2(std::make_shared<SourceBuffer>());
+    g2.AddMetricEvent();
+    const auto& ev2 = g2.GetEvents()[0];
+    auto k2 = mFlusher->GeneratePartitionKey(ev2);
+    APSARA_TEST_EQUAL(std::string(""), k2);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -452,6 +564,12 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestSendSerializationFailure)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_Success)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)
 
 } // namespace logtail
 

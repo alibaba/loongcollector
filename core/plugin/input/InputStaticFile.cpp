@@ -263,7 +263,7 @@ void InputStaticFile::GetValidBaseDirs(const filesystem::path& dir,
             const auto& path = entry.path();
             const auto& status = entry.status();
             if (filesystem::is_directory(status)
-                && (fnmatch(pattern.string().c_str(), path.stem().string().c_str(), FNM_PATHNAME) == 0)) {
+                && (fnmatch(pattern.string().c_str(), path.filename().string().c_str(), FNM_PATHNAME) == 0)) {
                 if (finish) {
                     filepaths.emplace_back(path);
                 } else {

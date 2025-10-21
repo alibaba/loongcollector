@@ -17,6 +17,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/YamlUtil.h"
+#include "constants/Constants.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -26,7 +27,7 @@ namespace logtail {
 bool LoadConfigDetailFromFile(const filesystem::path& filepath, Json::Value& detail) {
     const string& ext = filepath.extension().string();
     const string& configName = filepath.stem().string();
-    if (configName == "region_config") {
+    if (configName == REGION_CONFIG || configName == READABLE_REGION_CONFIG) {
         return false;
     }
     if (ext != ".yaml" && ext != ".yml" && ext != ".json") {

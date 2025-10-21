@@ -1098,6 +1098,7 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         for (const auto& s : blacklist) {
             auto s1 = TrimString(s);
             if (!s1.empty()) {
+                s1 = ConvertAndNormalizeNativePath(s1);
                 mHostPathBlacklist.emplace_back(std::move(s1));
             }
         }

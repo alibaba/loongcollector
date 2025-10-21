@@ -141,6 +141,21 @@ typedef int mode_t;
 #endif
 void Chmod(const char* filePath, mode_t mode);
 
+// ConvertAndNormalizeNativePath converts a UTF-8 encoded path/name string to the native platform format.
+// On Windows: Converts UTF-8 to ACP (ANSI Code Page) and normalizes the drive letter to uppercase.
+// On Linux: Returns the path as-is (UTF-8 is the native encoding).
+// This function should be used for paths from configuration files (UTF-8 encoded).
+// Example: "c:\测试\文件.txt" -> "C:\测试\文件.txt" (Windows, with proper encoding)
+//          "*.log" or "文件名.log" -> properly encoded for the platform
+std::string ConvertAndNormalizeNativePath(const std::string& path);
+
+// NormalizeNativePath normalizes a path that is already in native encoding.
+// On Windows: Only normalizes the drive letter to uppercase (no encoding conversion).
+// On Linux: Returns the path as-is.
+// This function should be used for paths from filesystem APIs (already in native encoding).
+// Example: "c:\测试\文件.txt" -> "C:\测试\文件.txt" (Windows, no encoding change)
+std::string NormalizeNativePath(const std::string& path);
+
 namespace fsutil {
 
 class Entry {

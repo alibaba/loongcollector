@@ -78,6 +78,9 @@ DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
+#if defined(__ENTERPRISE__) && defined(_MSC_VER)
+DECLARE_FLAG_STRING(loongcollector_daemon_startup_hints);
+#endif
 
 using namespace std;
 
@@ -124,7 +127,12 @@ void Application::Init() {
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
 #if defined(__linux__)
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
-        AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM, "Logtail Restart");
+        AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM, "LoongCollector Restart");
+    }
+#elif defined(_MSC_VER)
+    // Check daemon startup hints on Windows
+    if (STRING_FLAG(loongcollector_daemon_startup_hints) == "Crash") {
+        AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM, "LoongCollector Restart");
     }
 #endif
     // get last crash info

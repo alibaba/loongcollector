@@ -72,6 +72,8 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         "config_name" : "test_config_3",
         "current_file_index" : 0,
         "file_count" : 1,
+        "start_time" : 1739349980,
+        "expire_time" : 1739349981,
         "files" : 
         [
             {
@@ -475,6 +477,8 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
             "config_name" : "test_config_1",
             "current_file_index" : 2,
             "file_count" : 4,
+            "start_time" : 1739349980,
+            "expire_time" : 1739349981,
             "files" : 
             [
                 {

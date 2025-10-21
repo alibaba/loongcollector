@@ -34,4 +34,7 @@ const std::string USER_CONFIG_NODE = "metrics";
 const std::string AGENT_NAME = "LoongCollector";
 const std::string LOONGCOLLECTOR_CONFIG = "loongcollector_config.json";
 
+const std::string REGION_CONFIG = "region_config";
+const std::string READABLE_REGION_CONFIG = "readable_region_config";
+
 } // namespace logtail
