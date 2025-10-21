@@ -1253,11 +1253,9 @@ bool LogFileReader::CloseFilePtr() {
         // always call OnFileClose
         GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
     }
-    string curRealLogPath = mLogFileOp.GetFilePath();
-    if (curRealLogPath.length() > DELETED_FILE_SUFFIX.length()
-        && curRealLogPath.compare(curRealLogPath.length() - DELETED_FILE_SUFFIX.length(),
-                                  DELETED_FILE_SUFFIX.length(),
-                                  DELETED_FILE_SUFFIX)
+    if (mRealLogPath.length() > DELETED_FILE_SUFFIX.length()
+        && mRealLogPath.compare(
+               mRealLogPath.length() - DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX)
             == 0) {
         return true;
     }
