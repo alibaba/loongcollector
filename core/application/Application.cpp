@@ -56,7 +56,9 @@
 #include "runner/ProcessorRunner.h"
 #include "runner/sink/http/HttpSink.h"
 #include "task_pipeline/TaskPipelineManager.h"
+#include "task_pipeline/TaskRegistry.h"
 #ifdef __ENTERPRISE__
+#include "config/provider/ApmConfigProvider.h"
 #include "config/provider/EnterpriseConfigProvider.h"
 #include "config/provider/LegacyConfigProvider.h"
 #if defined(__linux__) && !defined(__ANDROID__)
@@ -125,6 +127,7 @@ void Application::Init() {
     LoongCollectorMonitor::GetInstance();
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Init("enterprise");
+    ApmConfigProvider::GetInstance()->Init("apm");
 #if defined(__linux__)
     if (GlobalConf::Instance()->mStartWorkerStatus == "Crash") {
         AlarmManager::GetInstance()->SendAlarmCritical(LOGTAIL_CRASH_ALARM, "LoongCollector Restart");
@@ -251,6 +254,7 @@ void Application::Start() { // GCOVR_EXCL_START
     }
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Start();
+    ApmConfigProvider::GetInstance()->Start();
     LegacyConfigProvider::GetInstance()->Init("legacy");
 #else
     InitRemoteConfigProviders();
@@ -267,6 +271,8 @@ void Application::Start() { // GCOVR_EXCL_START
 
     // plugin registration
     PluginRegistry::GetInstance()->LoadPlugins();
+    TaskRegistry::GetInstance()->LoadPlugins();
+
     InputFeedbackInterfaceRegistry::GetInstance()->LoadFeedbackInterfaces();
 
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -404,9 +410,11 @@ void Application::Exit() {
     CollectionPipelineManager::GetInstance()->StopAllPipelines();
 
     PluginRegistry::GetInstance()->UnloadPlugins();
+    TaskRegistry::GetInstance()->UnloadPlugins();
 
 #ifdef __ENTERPRISE__
     EnterpriseConfigProvider::GetInstance()->Stop();
+    ApmConfigProvider::GetInstance()->Stop();
     LegacyConfigProvider::GetInstance()->Stop();
 #else
     auto remoteConfigProviders = GetRemoteConfigProviders();

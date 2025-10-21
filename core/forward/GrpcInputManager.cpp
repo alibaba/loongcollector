@@ -126,6 +126,7 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
             return false;
         }
 
+#if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
         // For Unix domain socket, change the socket file permission to allow non-root users to connect
         if (StartWith(address, "unix://")) {
             std::string socketPath = address.substr(7); // Remove "unix://" prefix
@@ -135,6 +136,7 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
                                 "error", strerror(errno)));
             }
         }
+#endif
 
         LOG_INFO(sLogger,
                  ("GrpcInputManager", "new address inserted into listen inputs")("address", address)("service",

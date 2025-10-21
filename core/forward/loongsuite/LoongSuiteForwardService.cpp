@@ -131,6 +131,11 @@ void LoongSuiteForwardServiceImpl::ProcessForwardRequest(const LoongSuiteForward
         event->SetTimestamp(time(nullptr), 0);
     }
 
+    if (eventGroup.GetEvents().empty()) {
+        status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "No raw event in forward request");
+        return;
+    }
+
     bool result = ProcessorRunner::GetInstance()->PushQueue(
         config->queueKey, config->inputIndex, std::move(eventGroup), retryTimes);
 

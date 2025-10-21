@@ -365,7 +365,7 @@ void LoongSuiteForwardServiceUnittest::TestForwardWithEmptyData() {
 
     // Create request with empty data
     LoongSuiteForwardRequest request;
-    request.clear_data("");
+    request.clear_data();
     LoongSuiteForwardResponse response;
     grpc::CallbackServerContext context;
 
