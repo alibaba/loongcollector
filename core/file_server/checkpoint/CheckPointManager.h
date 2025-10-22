@@ -51,12 +51,14 @@ public:
     std::string mCache;
     std::string mConfigName;
     std::string mFileName;
+    std::string mResolvedFileName;
     std::string mRealFileName;
     int32_t mIdxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
 
     CheckPoint() {}
 
     CheckPoint(const std::string& filename,
+               const std::string& resolvedFileName,
                int64_t offset,
                uint32_t signatureSize,
                uint64_t signatureHash,
@@ -78,6 +80,7 @@ public:
           mLastForceRead(lastForceRead),
           mConfigName(configName),
           mFileName(filename),
+          mResolvedFileName(resolvedFileName),
           mRealFileName(realFileName) {}
 };
 
