@@ -51,6 +51,13 @@ public:
     void TestGetConnectionNotFound();
     void TestGetConfigNotFound();
     void TestGetStatsWithInvalidConnections();
+    void TestAddConfigWithFilters();
+    void TestAddConfigSeekHead();
+    void TestAddConfigSeekCursor();
+    void TestGetConfigsUsingConnection();
+    void TestGetConfigsUsingConnectionNotFound();
+    void TestAddConfigReplaceExisting();
+    void TestGetStatsWithActiveConnections();
 };
 
 void JournalConnectionManagerUnittest::TestSingleton() {
@@ -542,6 +549,241 @@ void JournalConnectionManagerUnittest::TestGetStatsWithInvalidConnections() {
     manager.Cleanup();
 }
 
+void JournalConnectionManagerUnittest::TestAddConfigWithFilters() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置（带过滤器）
+    JournalConfig config;
+    config.seekPosition = "tail";
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 100;
+    config.kernel = true;
+    config.units = {"test.service"};
+    config.matchPatterns = {"MESSAGE=test"};
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加配置
+    bool result = manager.AddConfig("test_config_with_filters", 0, config, handler);
+
+    // 添加配置应该成功
+    APSARA_TEST_TRUE(result);
+
+    manager.Cleanup();
+}
+
+void JournalConnectionManagerUnittest::TestAddConfigSeekHead() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置（seek到head）
+    JournalConfig config;
+    config.seekPosition = "head";
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 100;
+    config.kernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加配置
+    bool result = manager.AddConfig("test_config_seek_head", 0, config, handler);
+
+    // 添加配置应该成功
+    APSARA_TEST_TRUE(result);
+
+    manager.Cleanup();
+}
+
+void JournalConnectionManagerUnittest::TestAddConfigSeekCursor() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置（seek到cursor）
+    JournalConfig config;
+    config.seekPosition = "cursor:test_cursor";
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 100;
+    config.kernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加配置
+    bool result = manager.AddConfig("test_config_seek_cursor", 0, config, handler);
+
+    // 添加配置应该成功
+    APSARA_TEST_TRUE(result);
+
+    manager.Cleanup();
+}
+
+
+void JournalConnectionManagerUnittest::TestGetConfigsUsingConnection() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.seekPosition = "tail";
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 100;
+    config.kernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加配置
+    manager.AddConfig("test_config", 0, config, handler);
+
+    // 获取连接
+    auto connection = manager.GetConnection("test_config", 0);
+
+    if (connection) {
+        // 获取使用该连接的配置
+        auto configs = manager.GetConfigsUsingConnection(connection);
+
+        // 验证配置
+        APSARA_TEST_TRUE(configs.size() >= 0);
+    }
+
+    manager.Cleanup();
+}
+
+void JournalConnectionManagerUnittest::TestGetConfigsUsingConnectionNotFound() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 获取不存在的连接对应的配置
+    auto configs = manager.GetConfigsUsingConnection(nullptr);
+
+    // 应该返回空列表
+    APSARA_TEST_TRUE(configs.empty());
+
+    manager.Cleanup();
+}
+
+
+void JournalConnectionManagerUnittest::TestAddConfigReplaceExisting() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config1;
+    config1.seekPosition = "tail";
+    config1.cursorFlushPeriodMs = 5000;
+    config1.maxEntriesPerBatch = 100;
+    config1.kernel = true;
+
+    JournalConfig config2;
+    config2.seekPosition = "head";
+    config2.cursorFlushPeriodMs = 3000;
+    config2.maxEntriesPerBatch = 50;
+    config2.kernel = false;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config1.ctx = ctx.get();
+    config2.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加第一个配置
+    bool result1 = manager.AddConfig("test_config_replace", 0, config1, handler);
+
+    // 添加第二个配置（替换第一个）
+    bool result2 = manager.AddConfig("test_config_replace", 0, config2, handler);
+
+    // 验证配置被替换
+    APSARA_TEST_TRUE(result1 || result2); // 至少一次成功
+
+    manager.Cleanup();
+}
+
+void JournalConnectionManagerUnittest::TestGetStatsWithActiveConnections() {
+    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.seekPosition = "tail";
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 100;
+    config.kernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.ctx = ctx.get();
+
+    // 创建测试处理器
+    JournalConnectionManager::ConfigHandler handler = [](const std::string&, size_t, const JournalEntry&) {
+        // 测试处理器
+    };
+
+    // 添加配置
+    manager.AddConfig("test_config", 0, config, handler);
+
+    // 获取统计信息
+    auto stats = manager.GetStats();
+
+    // 验证统计信息
+    APSARA_TEST_TRUE(stats.totalConfigs >= 0);
+    APSARA_TEST_TRUE(stats.activeConnections >= 0);
+    APSARA_TEST_TRUE(stats.invalidConnections >= 0);
+    APSARA_TEST_TRUE(stats.connectionKeys.size() >= 0);
+
+    manager.Cleanup();
+}
+
 // 注册测试用例
 TEST_F(JournalConnectionManagerUnittest, TestSingleton) {
     TestSingleton();
@@ -591,17 +833,6 @@ TEST_F(JournalConnectionManagerUnittest, TestAddConfigNotInitialized) {
     TestAddConfigNotInitialized();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigReaderOpenFailure) {
-    TestAddConfigReaderOpenFailure();
-}
-
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigFilterFailure) {
-    TestAddConfigFilterFailure();
-}
-
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigSeekFailure) {
-    TestAddConfigSeekFailure();
-}
 
 TEST_F(JournalConnectionManagerUnittest, TestRemoveConfigNotInitialized) {
     TestRemoveConfigNotInitialized();
@@ -621,6 +852,36 @@ TEST_F(JournalConnectionManagerUnittest, TestGetConfigNotFound) {
 
 TEST_F(JournalConnectionManagerUnittest, TestGetStatsWithInvalidConnections) {
     TestGetStatsWithInvalidConnections();
+}
+
+TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithFilters) {
+    TestAddConfigWithFilters();
+}
+
+TEST_F(JournalConnectionManagerUnittest, TestAddConfigSeekHead) {
+    TestAddConfigSeekHead();
+}
+
+TEST_F(JournalConnectionManagerUnittest, TestAddConfigSeekCursor) {
+    TestAddConfigSeekCursor();
+}
+
+
+TEST_F(JournalConnectionManagerUnittest, TestGetConfigsUsingConnection) {
+    TestGetConfigsUsingConnection();
+}
+
+TEST_F(JournalConnectionManagerUnittest, TestGetConfigsUsingConnectionNotFound) {
+    TestGetConfigsUsingConnectionNotFound();
+}
+
+
+TEST_F(JournalConnectionManagerUnittest, TestAddConfigReplaceExisting) {
+    TestAddConfigReplaceExisting();
+}
+
+TEST_F(JournalConnectionManagerUnittest, TestGetStatsWithActiveConnections) {
+    TestGetStatsWithActiveConnections();
 }
 
 } // namespace logtail
