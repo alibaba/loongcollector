@@ -92,9 +92,6 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathNormalFile() {
     // Open the file
     reader.UpdateReaderManual();
 
-    // Call ResolveHostLogPath
-    reader.ResolveHostLogPath();
-
     APSARA_TEST_EQUAL_FATAL(reader.mResolvedHostLogPath, filePath);
 
     // Clean up
@@ -124,9 +121,6 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathSymbolicLink() {
 
     // Open the file through the symbolic link
     reader.UpdateReaderManual();
-
-    // Call ResolveHostLogPath
-    reader.ResolveHostLogPath();
 
     APSARA_TEST_EQUAL_FATAL(reader.mResolvedHostLogPath, realFilePath);
 

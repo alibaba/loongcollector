@@ -2530,6 +2530,7 @@ void LogFileReader::UpdateReaderManual() {
     mLogFileOp.Open(mHostLogPath.c_str());
     mDevInode = GetFileDevInode(mHostLogPath);
     mRealLogPath = mHostLogPath;
+    ResolveHostLogPath();
 }
 #endif
 
