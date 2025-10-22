@@ -150,14 +150,14 @@ set(SUB_DIRECTORIES_LIST
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender monitor/task_status_constants
         protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
-        journal_server journal_server/reader journal_server/connection journal_server/processor journal_server/common
         parser
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
     endif()
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} journal_server journal_server/reader journal_server/connection journal_server/processor journal_server/common
+        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
