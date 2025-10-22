@@ -2505,6 +2505,10 @@ void LogFileReader::ResolveHostLogPath() {
     if (!mResolvedHostLogPath.empty()) {
         return;
     }
+    if (mSymbolicLinkFlag) {
+        mResolvedHostLogPath = mHostLogPath;
+        return;
+    }
     if (mLogFileOp.IsOpen()) {
         mResolvedHostLogPath = mLogFileOp.GetFilePath();
     } else {
@@ -2512,9 +2516,9 @@ void LogFileReader::ResolveHostLogPath() {
     }
     if (mResolvedHostLogPath != mHostLogPath) {
         LOG_INFO(sLogger,
-                 ("open file", "symbolic link exists")("host log path", mHostLogPath)("resolved host log path",
-                                                                                      mResolvedHostLogPath)(
-                     "dev", ToString(mDevInode.dev))("inode", ToString(mDevInode.inode)));
+                 ("open file", "symbolic link exists in absolute path")("host log path", mHostLogPath)(
+                     "resolved host log path",
+                     mResolvedHostLogPath)("dev", ToString(mDevInode.dev))("inode", ToString(mDevInode.inode)));
     }
 }
 
