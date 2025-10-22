@@ -37,6 +37,13 @@ public:
     void TestIsValid();
     void TestFieldSettings();
     void TestContextAssignment();
+    void TestValidateAndFixConfigEdgeCases();
+    void TestValidateAndFixConfigBoundaryValues();
+    void TestValidateAndFixConfigInvalidSeekPosition();
+    void TestValidateAndFixConfigInvalidCursorSeekFallback();
+    void TestValidateAndFixConfigEmptyStringArrays();
+    void TestValidateAndFixConfigInvalidJournalPaths();
+    void TestIsValidEdgeCases();
 };
 
 void JournalConfigUnittest::TestDefaultValues() {
@@ -182,6 +189,112 @@ void JournalConfigUnittest::TestContextAssignment() {
     APSARA_TEST_EQUAL(config.queueKey, 12345);
 }
 
+void JournalConfigUnittest::TestValidateAndFixConfigEdgeCases() {
+    JournalConfig config;
+
+    // 测试边界值
+    config.cursorFlushPeriodMs = 0;
+    config.maxEntriesPerBatch = 0;
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该修复这些值
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_TRUE(config.cursorFlushPeriodMs > 0);
+    APSARA_TEST_TRUE(config.maxEntriesPerBatch > 0);
+}
+
+void JournalConfigUnittest::TestValidateAndFixConfigBoundaryValues() {
+    JournalConfig config;
+
+    // 测试最大值边界
+    config.cursorFlushPeriodMs = 300001; // 超过最大值
+    config.maxEntriesPerBatch = 10001; // 超过最大值
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该修复这些值
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_EQUAL(config.cursorFlushPeriodMs, 300000);
+    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 10000);
+}
+
+void JournalConfigUnittest::TestValidateAndFixConfigInvalidSeekPosition() {
+    JournalConfig config;
+
+    // 测试无效的seek位置
+    config.seekPosition = "invalid_position";
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该修复为默认值
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_EQUAL(config.seekPosition, "tail");
+}
+
+void JournalConfigUnittest::TestValidateAndFixConfigInvalidCursorSeekFallback() {
+    JournalConfig config;
+
+    // 测试无效的cursor seek fallback
+    config.cursorSeekFallback = "invalid_fallback";
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该修复为默认值
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_EQUAL(config.cursorSeekFallback, "head");
+}
+
+void JournalConfigUnittest::TestValidateAndFixConfigEmptyStringArrays() {
+    JournalConfig config;
+
+    // 测试包含空字符串的数组
+    config.units = {"nginx", "", "apache", ""};
+    config.identifiers = {"", "nginx", "", "apache"};
+    config.matchPatterns = {"*error*", "", "*warning*"};
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该移除空字符串
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_EQUAL(config.units.size(), 2);
+    APSARA_TEST_EQUAL(config.identifiers.size(), 2);
+    APSARA_TEST_EQUAL(config.matchPatterns.size(), 2);
+}
+
+void JournalConfigUnittest::TestValidateAndFixConfigInvalidJournalPaths() {
+    JournalConfig config;
+
+    // 测试无效的journal路径
+    config.journalPaths = {"", "/var/log/journal", std::string(5000, 'a'), "/run/log/journal"};
+
+    int fixedCount = config.ValidateAndFixConfig();
+
+    // 应该移除无效路径
+    APSARA_TEST_TRUE(fixedCount > 0);
+    APSARA_TEST_TRUE(config.journalPaths.size() <= 3); // 至少移除空字符串和超长路径
+}
+
+void JournalConfigUnittest::TestIsValidEdgeCases() {
+    JournalConfig config;
+
+    // 测试无效配置
+    config.cursorFlushPeriodMs = 0;
+    config.maxEntriesPerBatch = 0;
+    config.seekPosition = "";
+    config.cursorSeekFallback = "";
+
+    APSARA_TEST_FALSE(config.IsValid());
+
+    // 测试部分有效配置
+    config.cursorFlushPeriodMs = 5000;
+    config.maxEntriesPerBatch = 1000;
+    config.seekPosition = "tail";
+    config.cursorSeekFallback = "head";
+
+    APSARA_TEST_TRUE(config.IsValid());
+}
+
 // 注册测试用例
 TEST_F(JournalConfigUnittest, TestDefaultValues) {
     TestDefaultValues();
@@ -201,6 +314,34 @@ TEST_F(JournalConfigUnittest, TestFieldSettings) {
 
 TEST_F(JournalConfigUnittest, TestContextAssignment) {
     TestContextAssignment();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigEdgeCases) {
+    TestValidateAndFixConfigEdgeCases();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigBoundaryValues) {
+    TestValidateAndFixConfigBoundaryValues();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigInvalidSeekPosition) {
+    TestValidateAndFixConfigInvalidSeekPosition();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigInvalidCursorSeekFallback) {
+    TestValidateAndFixConfigInvalidCursorSeekFallback();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigEmptyStringArrays) {
+    TestValidateAndFixConfigEmptyStringArrays();
+}
+
+TEST_F(JournalConfigUnittest, TestValidateAndFixConfigInvalidJournalPaths) {
+    TestValidateAndFixConfigInvalidJournalPaths();
+}
+
+TEST_F(JournalConfigUnittest, TestIsValidEdgeCases) {
+    TestIsValidEdgeCases();
 }
 
 } // namespace logtail

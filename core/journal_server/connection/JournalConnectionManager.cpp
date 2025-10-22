@@ -100,7 +100,7 @@ bool JournalConnectionManager::AddConfig(const std::string& configName,
 
     // 创建独立的journal连接（reader）
     auto reader = std::make_shared<SystemdJournalReader>();
-    
+
 #ifdef APSARA_UNIT_TEST_MAIN
     // 在测试环境中，即使Open失败也继续添加配置
     reader->Open(); // 尝试打开，但不检查结果

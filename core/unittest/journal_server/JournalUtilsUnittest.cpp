@@ -39,6 +39,13 @@ public:
     void TestDoEscapeMangle();
     void TestUnitNameMangle();
     void TestConstants();
+    void TestMatchPatternRegexError();
+    void TestUnitNameMangleEmptyName();
+    void TestUnitNameMangleDotPrefix();
+    void TestUnitNameMangleInvalidSuffix();
+    void TestUnitNameMangleDevicePath();
+    void TestUnitNameMangleAbsolutePath();
+    void TestUnitNameMangleValidGlob();
 };
 
 void JournalUtilsUnittest::TestStringIsGlob() {
@@ -228,6 +235,74 @@ void JournalUtilsUnittest::TestConstants() {
     APSARA_TEST_TRUE(JournalUtils::kValidCharsGlob.find('*') != std::string::npos);
 }
 
+void JournalUtilsUnittest::TestMatchPatternRegexError() {
+    // 测试正则表达式错误的情况
+    // 这里主要测试catch块中的错误处理
+    std::string invalidPattern = "["; // 无效的正则表达式
+    std::string testString = "nginx";
+
+    // 应该返回false而不是崩溃
+    bool result = JournalUtils::MatchPattern(invalidPattern, testString);
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleEmptyName() {
+    // 测试空名称的情况
+    try {
+        JournalUtils::UnitNameMangle("", ".service");
+        APSARA_TEST_TRUE(false); // 应该抛出异常
+    } catch (const std::invalid_argument& e) {
+        APSARA_TEST_TRUE(true); // 期望的异常
+    }
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleDotPrefix() {
+    // 测试以点号开头的名称
+    try {
+        JournalUtils::UnitNameMangle(".nginx", ".service");
+        APSARA_TEST_TRUE(false); // 应该抛出异常
+    } catch (const std::invalid_argument& e) {
+        APSARA_TEST_TRUE(true); // 期望的异常
+    }
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleInvalidSuffix() {
+    // 测试无效的后缀
+    try {
+        JournalUtils::UnitNameMangle("nginx", ".invalid");
+        APSARA_TEST_TRUE(false); // 应该抛出异常
+    } catch (const std::invalid_argument& e) {
+        APSARA_TEST_TRUE(true); // 期望的异常
+    }
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleDevicePath() {
+    // 测试设备路径转换
+    std::string devicePath = "/dev/sda1";
+    std::string result = JournalUtils::UnitNameMangle(devicePath, ".service");
+
+    // 应该转换为.device单元
+    APSARA_TEST_EQUAL(result, "sda1.device");
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleAbsolutePath() {
+    // 测试绝对路径转换
+    std::string absolutePath = "/var/log/nginx";
+    std::string result = JournalUtils::UnitNameMangle(absolutePath, ".service");
+
+    // 应该转换为.mount单元
+    APSARA_TEST_TRUE(result.find(".mount") != std::string::npos);
+}
+
+void JournalUtilsUnittest::TestUnitNameMangleValidGlob() {
+    // 测试有效的glob表达式
+    std::string globPattern = "nginx*";
+    std::string result = JournalUtils::UnitNameMangle(globPattern, ".service");
+
+    // 应该保持原样
+    APSARA_TEST_EQUAL(result, globPattern);
+}
+
 // 注册测试用例
 TEST_F(JournalUtilsUnittest, TestStringIsGlob) {
     TestStringIsGlob();
@@ -267,6 +342,34 @@ TEST_F(JournalUtilsUnittest, TestUnitNameMangle) {
 
 TEST_F(JournalUtilsUnittest, TestConstants) {
     TestConstants();
+}
+
+TEST_F(JournalUtilsUnittest, TestMatchPatternRegexError) {
+    TestMatchPatternRegexError();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleEmptyName) {
+    TestUnitNameMangleEmptyName();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleDotPrefix) {
+    TestUnitNameMangleDotPrefix();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleInvalidSuffix) {
+    TestUnitNameMangleInvalidSuffix();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleDevicePath) {
+    TestUnitNameMangleDevicePath();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleAbsolutePath) {
+    TestUnitNameMangleAbsolutePath();
+}
+
+TEST_F(JournalUtilsUnittest, TestUnitNameMangleValidGlob) {
+    TestUnitNameMangleValidGlob();
 }
 
 } // namespace logtail

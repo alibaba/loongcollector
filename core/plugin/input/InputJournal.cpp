@@ -59,9 +59,15 @@ bool InputJournal::Init(const Json::Value& config, Json::Value& optionalGoPipeli
 
 bool InputJournal::Start() {
     if (mShutdown) {
-        LOG_WARNING(
-            sLogger,
-            ("InputJournal already shutdown", "cannot start")("config", mContext->GetConfigName())("idx", mIndex));
+        LOG_WARNING(sLogger,
+                    ("InputJournal already shutdown",
+                     "cannot start")("config", mContext ? mContext->GetConfigName() : "unknown")("idx", mIndex));
+        return false;
+    }
+
+    // 检查mContext是否已初始化
+    if (!mContext) {
+        LOG_ERROR(sLogger, ("InputJournal Start called without context", "cannot start"));
         return false;
     }
 
@@ -111,12 +117,24 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         return true;
     }
 
+    // 检查mContext是否已初始化
+    if (!mContext) {
+        LOG_WARNING(sLogger, ("InputJournal Stop called without context", "skipping cleanup"));
+        mShutdown = true;
+        return true;
+    }
+
     if (isPipelineRemoving) {
         // 配置被删除：完全清理，包括检查点
         JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName(), mIndex);
         LOG_INFO(
             sLogger,
             ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName())("idx", mIndex));
+
+        // 如果没有其他注册的插件，停止JournalServer
+        if (!JournalServer::GetInstance()->HasRegisteredPlugins()) {
+            JournalServer::GetInstance()->Stop();
+        }
     } else {
         // 配置更新：只移除注册，保留检查点
         JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName(), mIndex);

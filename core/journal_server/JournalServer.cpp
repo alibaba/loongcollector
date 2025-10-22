@@ -384,7 +384,9 @@ bool logtail::JournalServer::validateQueueKey(const std::string& configName,
     // 如果配置中已经有queueKey，直接使用（用于测试环境）
     if (config.queueKey != -1) {
         queueKey = config.queueKey;
-        LOG_INFO(sLogger, ("journal server using pre-set queue key", "")("config", configName)("idx", idx)("queue_key", queueKey));
+        LOG_INFO(
+            sLogger,
+            ("journal server using pre-set queue key", "")("config", configName)("idx", idx)("queue_key", queueKey));
         return true;
     }
 
