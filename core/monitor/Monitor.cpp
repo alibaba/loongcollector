@@ -18,6 +18,8 @@
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
+
+#include "host_monitor/HostMonitorInputRunner.h"
 #elif defined(_MSC_VER)
 #include <Psapi.h>
 
@@ -40,7 +42,6 @@
 #include "constants/Constants.h"
 #include "file_server/event_handler/LogInput.h"
 #include "go_pipeline/LogtailPlugin.h"
-#include "host_monitor/HostMonitorInputRunner.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/SelfMonitorServer.h"
@@ -238,11 +239,12 @@ void LogtailMonitor::Monitor() {
                     if (!DumpMonitorInfo(monitorTime))
                         LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
                 }
-
+#if defined(__linux__)
                 if (HostMonitorInputRunner::GetInstance()->ShouldRestart()) {
                     mShouldSuicide.store(true);
                     break;
                 }
+#endif
             }
         }
     }
