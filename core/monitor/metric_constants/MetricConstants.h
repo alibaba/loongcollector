@@ -295,6 +295,7 @@ extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER;
 
 // metric keys
 extern const std::string& METRIC_RUNNER_IN_EVENTS_TOTAL;
@@ -335,6 +336,11 @@ extern const std::string METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIG
 extern const std::string METRIC_RUNNER_FILE_POLLING_MODIFY_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE;
+
+/**********************************************************
+ *   static file server
+ **********************************************************/
+extern const std::string METRIC_RUNNER_STATIC_FILE_SERVER_ACTIVE_INPUTS_COUNT;
 
 /**********************************************************
  *   ebpf server
