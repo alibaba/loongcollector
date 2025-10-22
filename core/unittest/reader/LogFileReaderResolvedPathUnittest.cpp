@@ -68,7 +68,9 @@ public:
 };
 
 UNIT_TEST_CASE(LogFileReaderResolvedPathUnittest, TestResolveHostLogPathNormalFile);
+#ifdef __linux__
 UNIT_TEST_CASE(LogFileReaderResolvedPathUnittest, TestResolveHostLogPathSymbolicLink);
+#endif
 UNIT_TEST_CASE(LogFileReaderResolvedPathUnittest, TestCheckFileSignatureWithZeroSizeAndDifferentPath);
 UNIT_TEST_CASE(LogFileReaderResolvedPathUnittest, TestCheckFileSignatureWithZeroSizeAndSamePath);
 
