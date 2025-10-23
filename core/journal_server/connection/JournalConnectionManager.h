@@ -41,8 +41,6 @@ class SystemdJournalReader;
  */
 class JournalConnectionManager {
 public:
-    using ConfigHandler = std::function<void(const std::string& configName, size_t idx, const JournalEntry& entry)>;
-
     static JournalConnectionManager& GetInstance();
 
     // 初始化管理器
@@ -52,8 +50,7 @@ public:
     void Cleanup();
 
     // 添加配置（创建独立的连接）
-    bool
-    AddConfig(const std::string& configName, size_t idx, const JournalConfig& config, const ConfigHandler& handler);
+    bool AddConfig(const std::string& configName, size_t idx, const JournalConfig& config);
 
     // 移除配置（关闭并删除连接）
     void RemoveConfig(const std::string& configName, size_t idx);
@@ -102,7 +99,6 @@ private:
         std::string configName;
         size_t idx;
         JournalConfig config;
-        ConfigHandler handler;
         std::shared_ptr<SystemdJournalReader> reader; // 每个配置独立的reader/连接
     };
 

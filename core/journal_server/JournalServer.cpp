@@ -92,13 +92,7 @@ void JournalServer::AddJournalInput(const string& configName, size_t idx, const 
     // 使用配置管理器添加配置
     auto connectionManager = &JournalConnectionManager::GetInstance();
 
-    // 创建配置处理器
-    auto handler = [this, configName, idx](const std::string&, size_t, const JournalEntry&) {
-        // 处理 journal 条目
-        processJournal(configName, idx);
-    };
-
-    if (connectionManager->AddConfig(configName, idx, validatedConfig, handler)) {
+    if (connectionManager->AddConfig(configName, idx, validatedConfig)) {
         LOG_INFO(sLogger, ("journal server config added to manager", "")("config", configName)("idx", idx));
 
         // 记录统计信息

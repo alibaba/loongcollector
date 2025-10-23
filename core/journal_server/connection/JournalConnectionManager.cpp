@@ -70,10 +70,7 @@ std::string JournalConnectionManager::makeConfigKey(const std::string& configNam
     return configName + ":" + std::to_string(idx);
 }
 
-bool JournalConnectionManager::AddConfig(const std::string& configName,
-                                         size_t idx,
-                                         const JournalConfig& config,
-                                         const ConfigHandler& handler) {
+bool JournalConnectionManager::AddConfig(const std::string& configName, size_t idx, const JournalConfig& config) {
     std::lock_guard<std::mutex> lock(mMutex);
 
     if (!mInitialized) {
@@ -162,7 +159,6 @@ bool JournalConnectionManager::AddConfig(const std::string& configName,
     configInfo.configName = configName;
     configInfo.idx = idx;
     configInfo.config = config;
-    configInfo.handler = handler;
     configInfo.reader = reader;
 
     mConfigs[configKey] = std::move(configInfo);
