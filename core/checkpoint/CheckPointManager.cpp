@@ -207,11 +207,17 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             uint32_t sigSize = 0;
             uint64_t sigHash = 0;
             string filePath = meta["file_name"].asString();
+            string resolvedFilePath;
             string realFilePath;
             int32_t fileOpenFlag = 0; // default, we close file ptr
             int32_t containerStopped = 0;
             int32_t lastForceRead = 0;
             int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
+            if (meta.isMember("resolved_file_name")) {
+                resolvedFilePath = meta["resolved_file_name"].asString();
+            } else {
+                resolvedFilePath = filePath; // for backward compatibility
+            }
             if (meta.isMember("real_file_name")) {
                 realFilePath = meta["real_file_name"].asString();
             }
@@ -263,6 +269,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                 // No need to check if the config still matches the file here.
                 configName = meta["config_name"].asString();
                 CheckPoint* ptr = new CheckPoint(filePath,
+                                                 resolvedFilePath,
                                                  offset,
                                                  sigSize,
                                                  sigHash,
@@ -296,6 +303,7 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
                 }
                 for (size_t i = 0; i < allConfig.size(); ++i) {
                     CheckPoint* ptr = new CheckPoint(filePath,
+                                                     resolvedFilePath,
                                                      offset,
                                                      sigSize,
                                                      sigHash,
@@ -340,6 +348,7 @@ bool CheckPointManager::DumpCheckPointToLocal() {
             CheckPoint* checkPointPtr = it->second.get();
             Json::Value leaf;
             leaf["file_name"] = Json::Value(checkPointPtr->mFileName);
+            leaf["resolved_file_name"] = Json::Value(checkPointPtr->mResolvedFileName);
             leaf["real_file_name"] = Json::Value(checkPointPtr->mRealFileName);
             leaf["offset"] = Json::Value(ToString(checkPointPtr->mOffset));
             leaf["sig_size"] = Json::Value(Json::UInt(checkPointPtr->mSignatureSize));

@@ -376,6 +376,7 @@ protected:
     inline int64_t GetLastReadPos() const { // pos read but may not consumed, used for read needed
         return mLastFilePos + mCache.size();
     }
+    void ResolveHostLogPath();
 
     static size_t BUFFER_SIZE;
     // std::string mRegion;
@@ -384,6 +385,7 @@ protected:
     std::string mHostLogPath;
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
+    std::string mResolvedHostLogPath; // same as mHostLogPath, but with resolved symbolic link
     std::string mRealLogPath; // real log path
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
@@ -592,6 +594,7 @@ private:
     friend class RemoveLastIncompleteLogMultilineUnittest;
     friend class LogFileReaderCheckpointUnittest;
     friend class GetLastLineUnittest;
+    friend class LogFileReaderResolvedPathUnittest;
 
 protected:
     void UpdateReaderManual();

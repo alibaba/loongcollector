@@ -17,29 +17,31 @@
 #include <unistd.h>
 #endif
 #include <fcntl.h>
-#include <cstdlib>
-#include <string.h>
-#include <thread>
-#include <memory>
-#include <fstream>
 #include <json/json.h>
-#include "event_handler/EventHandler.h"
-#include "config_manager/ConfigManager.h"
-#include "reader/LogFileReader.h"
+#include <string.h>
+
+#include <cstdlib>
+#include <fstream>
+#include <memory>
+#include <thread>
+
 #include "AppConfig.h"
-#include "Monitor.h"
-#include "EventDispatcher.h"
 #include "CheckPointManager.h"
+#include "EventDispatcher.h"
 #include "LogInput.h"
-#include "Sender.h"
-#include "sls_logs.pb.h"
 #include "LogtailAlarm.h"
-#include "common/Flags.h"
-#include "common/Lock.h"
+#include "Monitor.h"
+#include "Sender.h"
 #include "common/Constants.h"
 #include "common/FileSystemUtil.h"
+#include "common/Flags.h"
+#include "common/Lock.h"
+#include "config_manager/ConfigManager.h"
+#include "event_handler/EventHandler.h"
 #include "logger/Logger.h"
+#include "reader/LogFileReader.h"
 #include "sdk/Common.h"
+#include "sls_logs.pb.h"
 
 using namespace std;
 using namespace logtail::sdk;
@@ -613,7 +615,7 @@ void ConfigUpdatorUnittest::TestCheckPointManager() {
     // case 2 : add filecheckpoint
     for (int i = 0; i < 4; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         checkpointManager->AddCheckPoint(checkPointPtr);
     }
     // timeout checkpoint
@@ -1840,7 +1842,7 @@ void ConfigUpdatorUnittest::TestCheckPointSaveInterval() {
 
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
 
@@ -1927,7 +1929,7 @@ void ConfigUpdatorUnittest::TestCheckPointUserDefinedFilePath() {
     }
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
 
@@ -2013,7 +2015,7 @@ void ConfigUpdatorUnittest::TestCheckPointLoadDefaultFile() {
     }
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
     bfs::remove(STRING_FLAG(check_point_filename));
@@ -2680,8 +2682,19 @@ void ConfigUpdatorUnittest::TestWithinMaxDepth() {
     EXPECT_EQ(cfg_4->WithinMaxDepth(PS + "abc" + PS + "de" + PS + "f" + PS + "ghi"), false);
     delete cfg_4;
     // To be compatible with old settings.
-    Config* cfg_5 = new Config(
-        PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz", "x.log", REGEX_LOG, "a", "", "", "", "prj", true, 0, -1, "cat", "");
+    Config* cfg_5 = new Config(PS + "abc" + PS + "de?" + PS + "f*" + PS + "xyz",
+                               "x.log",
+                               REGEX_LOG,
+                               "a",
+                               "",
+                               "",
+                               "",
+                               "prj",
+                               true,
+                               0,
+                               -1,
+                               "cat",
+                               "");
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz"), true);
     EXPECT_EQ(cfg_5->WithinMaxDepth(PS + "abc" + PS + "def" + PS + "fgz" + PS + "xyz0"), true);
