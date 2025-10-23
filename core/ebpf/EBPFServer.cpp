@@ -199,13 +199,13 @@ EBPFServer::EBPFServer()
 
 EBPFServer::~EBPFServer() {
     Stop();
-    cleanupUnifiedEpollMonitoring();
 }
 
 void EBPFServer::Init() {
     if (mInited) {
         return;
     }
+    LOG_DEBUG(sLogger, ("start eBPF server", "begins"));
     if (!mEnvMgr.AbleToLoadDyLib()) {
         return;
     }
@@ -216,12 +216,10 @@ void EBPFServer::Init() {
     mRunning = true;
 
     AsynCurlRunner::GetInstance()->Init();
-    LOG_DEBUG(sLogger, ("begin to start poller", ""));
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
-    LOG_DEBUG(sLogger, ("begin to start handler", ""));
     mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
-
     mEBPFAdapter->Init(); // Idempotent
+    LOG_INFO(sLogger, ("eBPF server", "started"));
 }
 
 void EBPFServer::Stop() {
@@ -230,12 +228,12 @@ void EBPFServer::Stop() {
     }
 
     mRunning = false;
-    LOG_INFO(sLogger, ("begin to stop all plugins", ""));
+    LOG_DEBUG(sLogger, ("stop all plugins", "starts"));
     for (int i = 0; i < int(PluginType::MAX); i++) {
         auto pipelines = mPlugins[i].mPipelines;
         for (const auto& entry : pipelines) {
             bool ret = DisablePlugin(entry.first, static_cast<PluginType>(i));
-            LOG_INFO(sLogger,
+            LOG_DEBUG(sLogger,
                      ("force stop plugin", magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline",
                                                                                               entry.first)("ret", ret));
         }
@@ -270,7 +268,9 @@ void EBPFServer::Stop() {
             alarmOnce = true;
         }
     }
+    cleanupUnifiedEpollMonitoring();
     mInited = false;
+    LOG_INFO(sLogger, ("eBPF server", "stopped"));
 }
 
 void EBPFServer::EventGC() {

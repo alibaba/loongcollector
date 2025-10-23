@@ -30,14 +30,16 @@ struct ConfigDiff {
     std::vector<T> mAdded;
     std::vector<T> mModified;
     std::vector<std::string> mRemoved;
+    std::vector<std::string> mIgnored;
 
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
+    bool HasDiff() { return !mRemoved.empty() || !mAdded.empty() || !mModified.empty(); }
+    bool HasIgnored() { return !mIgnored.empty(); }
 };
 
 using CollectionConfigDiff = ConfigDiff<CollectionConfig>;
 using TaskConfigDiff = ConfigDiff<TaskConfig>;
 using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 
-enum ConfigDiffEnum { Added, Modified, Removed, Unchanged };
+enum ConfigDiffEnum { Added, AppliedModified, IgnoredModified, Removed, AppliedUnchanged, IgnoredUnchanged };
 
 } // namespace logtail

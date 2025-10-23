@@ -59,21 +59,21 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
         APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
-        APSARA_TEST_TRUE(diff.second.IsEmpty());
+        APSARA_TEST_FALSE(diff.second.HasDiff());
 
         { ofstream fout("continuous_pipeline_config"); }
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_TRUE(diff.first.IsEmpty());
-        APSARA_TEST_TRUE(diff.second.IsEmpty());
+        APSARA_TEST_FALSE(diff.first.HasDiff());
+        APSARA_TEST_FALSE(diff.second.HasDiff());
         filesystem::remove_all("continuous_pipeline_config");
     }
     {
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_TRUE(diff.IsEmpty());
+        APSARA_TEST_FALSE(diff.HasDiff());
 
         { ofstream fout("instance_config"); }
         diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_TRUE(diff.IsEmpty());
+        APSARA_TEST_FALSE(diff.HasDiff());
         filesystem::remove_all("instance_config");
     }
 }
@@ -95,7 +95,7 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
         builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
         APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
-        APSARA_TEST_TRUE(diff.second.IsEmpty());
+        APSARA_TEST_FALSE(diff.second.HasDiff());
         filesystem::remove_all(configDir);
     }
     {
@@ -109,7 +109,7 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
             fout << "[}";
         }
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_TRUE(diff.IsEmpty());
+        APSARA_TEST_FALSE(diff.HasDiff());
         filesystem::remove_all(instanceConfigDir);
     }
 }
@@ -147,7 +147,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
 #ifdef __ENTERPRISE__
         builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
 #endif
-        APSARA_TEST_FALSE(diff.first.IsEmpty());
+        APSARA_TEST_TRUE(diff.first.HasDiff());
         APSARA_TEST_EQUAL(1U + builtinPipelineCnt, diff.first.mAdded.size());
 
         filesystem::remove_all("dir1");
@@ -177,7 +177,7 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         }
         { ofstream fout("dir2/config.json"); }
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_FALSE(diff.IsEmpty());
+        APSARA_TEST_TRUE(diff.HasDiff());
         APSARA_TEST_EQUAL(1U, diff.mAdded.size());
 
         filesystem::remove_all("dir1");
