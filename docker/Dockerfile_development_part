@@ -20,8 +20,6 @@ ARG VERSION=0.0.1
 USER root
 WORKDIR /loongcollector
 
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
 RUN mkdir -p /loongcollector/conf/instance_config/local
 RUN mkdir -p /loongcollector/log
 RUN mkdir -p /loongcollector/data

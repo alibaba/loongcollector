@@ -42,7 +42,7 @@
 | `Authentication.Kerberos.ServiceName` | string | 否 | `kafka` | Kafka 服务名，对应 `sasl.kerberos.service.name`。 |
 | `Authentication.Kerberos.Principal` | string | 否 | / | Kerberos 主体（启用 Kerberos 时必填）。 |
 | `Authentication.Kerberos.Keytab` | string | 否 | / | Kerberos keytab（启用 Kerberos 时必填）。 |
-| `Authentication.Kerberos.KinitCmd` | string | 否 | / | 自定义 `kinit` 命令（通常无需配置）。未设置时，librdkafka 将基于 `Principal` 与 `Keytab` 使用其内置流程完成票据获取与续约。 |
+| `Authentication.Kerberos.KinitCmd` | string | 否 | / | 自定义 `kinit` 命令（通常无需配置）。|
 
 ## 样例
 

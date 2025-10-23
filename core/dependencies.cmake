@@ -746,17 +746,10 @@ macro(link_rdkafka target_name)
     elseif (UNIX)
         target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka.a")
         target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka++.a")
-        # Some builds of librdkafka (e.g. 0.11.x) are compiled with Cyrus SASL support
-        # and require linking against libsasl2 for symbols such as sasl_client_new,
-        # sasl_client_step, sasl_dispose, etc. When using static librdkafka.a, these
-        # references must be resolved explicitly here.
-        # Prefer an explicit library if found; otherwise fall back to -lsasl2 to allow
-        # resolution via system paths.
         find_library(SASL2_LIB NAMES sasl2 libsasl2)
         if (SASL2_LIB)
             target_link_libraries(${target_name} "${SASL2_LIB}")
         else()
-            # Fallback: rely on linker default search paths
             target_link_libraries(${target_name} sasl2)
         endif()
     elseif (MSVC)

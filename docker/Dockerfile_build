@@ -16,10 +16,6 @@ FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-communit
 
 USER root
 WORKDIR /src
-
-# Install additional Kerberos dependencies
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
 COPY . .
 
 ARG HOST_OS=Linux

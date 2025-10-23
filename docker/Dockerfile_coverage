@@ -17,6 +17,4 @@ FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-communit
 USER root
 WORKDIR /src
 
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
 CMD ["bash", "-c", "gcovr --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*sdk.*\" -e \".*logger.*\" -e \".*unittest.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*protobuf.*\" -e \".*runner.*\""]

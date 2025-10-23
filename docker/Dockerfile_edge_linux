@@ -15,8 +15,6 @@ USER root
 WORKDIR /src
 COPY . .
 
-RUN yum install -y cyrus-sasl-devel krb5-devel
-
 # build and make dist
 RUN sh ./scripts/build_edge_linux.sh && \
     mkdir -p "dist/loongcollector-edge" && \
