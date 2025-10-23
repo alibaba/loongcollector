@@ -82,6 +82,8 @@ namespace logtail {
 
 size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
 
+const string DELETED_FILE_SUFFIX = "(deleted)";
+
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
                                                   const DevInode& devInode,
@@ -1115,6 +1117,11 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
 }
 
 void LogFileReader::CloseFilePtr() {
+    bool isDeleted = false;
+    CloseFilePtr(isDeleted);
+}
+
+void LogFileReader::CloseFilePtr(bool& isDeleted) {
     if (mLogFileOp.IsOpen()) {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
@@ -1168,6 +1175,14 @@ void LogFileReader::CloseFilePtr() {
         }
         // always call OnFileClose
         GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
+    }
+    if (mRealLogPath.length() > DELETED_FILE_SUFFIX.length()
+        && mRealLogPath.compare(
+               mRealLogPath.length() - DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX)
+            == 0) {
+        isDeleted = true;
+    } else {
+        isDeleted = false;
     }
 }
 
