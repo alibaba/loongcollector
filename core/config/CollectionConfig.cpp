@@ -46,7 +46,7 @@ static string UnescapeDollar(string::const_iterator beginIt, string::const_itera
 
 static bool ReplaceEnvVarRefInStr(const string& inStr, string& outStr) {
     string::const_iterator lastMatchEnd = inStr.begin();
-    static boost::regex reg(R"((?<!\$)\${([\w]+)(:(.*?))?(?<!\$)})");
+    static boost::regex reg(R"((?<!\$)\${([\w]*[a-zA-Z_][\w]*)(:(.*?))?(?<!\$)})");
     boost::regex_iterator<string::const_iterator> it{inStr.begin(), inStr.end(), reg};
     boost::regex_iterator<string::const_iterator> end;
     if (it == end) {
