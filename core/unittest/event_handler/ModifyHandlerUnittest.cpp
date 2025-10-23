@@ -110,6 +110,43 @@ public:
         APSARA_TEST_TRUE_FATAL(mReaderPtr->IsReadToEnd());
         APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
     }
+
+    void TestClearReaderWhenFileDeleted() {
+        LOG_INFO(sLogger, ("TestClearReaderWhenFileDeleted() begin", time(NULL)));
+
+        // Read log to end to ensure IsReadToEnd() returns true
+        Event event1(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf, &event1)); // false means no more data
+        APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+
+        // Verify reader is read to end
+        APSARA_TEST_TRUE_FATAL(mReaderPtr->IsReadToEnd());
+
+        // Actually delete the file while file descriptor is still open
+        // This simulates the real scenario where file is deleted but fd is held
+        std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove(logPath);
+
+        // Verify reader exists before handling event
+        APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);
+        APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 1);
+
+        // Send delete event to trigger close and cleanup
+        Event event2(gRootDir, gLogName, EVENT_DELETE, 0);
+        mHandlerPtr->Handle(event2);
+
+        // Verify file descriptor is closed
+        APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
+
+        // Verify reader has been removed from mDevInodeReaderMap
+        APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 0);
+
+        // Verify reader has been removed from readerArray
+        APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 0);
+
+        LOG_INFO(sLogger, ("TestClearReaderWhenFileDeleted() end", time(NULL)));
+    }
 };
 
 std::string ModifyHandlerUnittest::gRootDir;
@@ -118,6 +155,9 @@ std::string ModifyHandlerUnittest::gLogName;
 APSARA_UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToEnd, 0);
 APSARA_UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd, 0);
 APSARA_UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped, 0);
+#ifndef _MSC_VER
+APSARA_UNIT_TEST_CASE(ModifyHandlerUnittest, TestClearReaderWhenFileDeleted, 0);
+#endif
 } // end of namespace logtail
 
 int main(int argc, char** argv) {

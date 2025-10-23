@@ -233,6 +233,7 @@ public:
     void SetSymbolicLinkFlag(bool flag) { mSymbolicLinkFlag = flag; }
 
     void CloseFilePtr();
+    void CloseFilePtr(bool& isDeleted); // return true if file is deleted (only meaningful on Linux)
 
     // void SetLogstoreKey(uint64_t logstoreKey) { mLogstoreKey = logstoreKey; }
 

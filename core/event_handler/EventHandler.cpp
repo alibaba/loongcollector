@@ -542,7 +542,22 @@ void ModifyHandler::Handle(const Event& event) {
                                 "file inode", readerArray[0]->GetDevInode().inode)("file size",
                                                                                    readerArray[0]->GetFileSize()));
                         // release fd as quick as possible
-                        readerArray[0]->CloseFilePtr();
+                        bool isDeleted = false;
+                        readerArray[0]->CloseFilePtr(isDeleted);
+                        if (isDeleted) {
+                            LOG_INFO(sLogger,
+                                     ("file is really deleted", "will be removed from the log reader queue")(
+                                         "real path", readerArray[0]->GetRealLogPath())(
+                                         "host path",
+                                         readerArray[0]->GetHostLogPath())("dev", readerArray[0]->GetDevInode().dev)(
+                                         "inode", readerArray[0]->GetDevInode().inode));
+                            // When read with closed reader, will only read cache
+                            if (readerArray[0]->HasDataInCache()) {
+                                ForceReadLogAndPush(readerArray[0]);
+                            }
+                            mDevInodeReaderMap.erase(readerArray[0]->GetDevInode());
+                            readerArray.pop_front();
+                        }
                     }
                 }
             }
@@ -766,6 +781,7 @@ void ModifyHandler::Handle(const Event& event) {
                              "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                              "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                              "file size", reader->GetFileSize())("last file position", reader->GetLastFilePos()));
+                // will remove reader later
                 reader->CloseFilePtr();
             }
         }
@@ -803,7 +819,12 @@ void ModifyHandler::Handle(const Event& event) {
                                  "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                                  "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                                  "file size", reader->GetFileSize()));
-                    reader->CloseFilePtr();
+                    bool isDeleted = false;
+                    reader->CloseFilePtr(isDeleted);
+                    if (isDeleted) {
+                        readerArrayPtr->pop_front();
+                        mDevInodeReaderMap.erase(reader->GetDevInode());
+                    }
                 } else if (reader->IsContainerStopped()) {
                     // release fd as quick as possible
                     LOG_INFO(
@@ -814,7 +835,12 @@ void ModifyHandler::Handle(const Event& event) {
                                                                                reader->GetDevInode().dev)(
                             "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
                     ForceReadLogAndPush(reader);
-                    reader->CloseFilePtr();
+                    bool isDeleted = false;
+                    reader->CloseFilePtr(isDeleted);
+                    if (isDeleted) {
+                        readerArrayPtr->pop_front();
+                        mDevInodeReaderMap.erase(reader->GetDevInode());
+                    }
                 }
                 break;
             }
@@ -866,21 +892,25 @@ void ModifyHandler::Handle(const Event& event) {
                          "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                          "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
             ForceReadLogAndPush(reader);
-            reader->CloseFilePtr();
             readerArrayPtr->pop_front();
             mDevInodeReaderMap.erase(reader->GetDevInode());
-            mRotatorReaderMap[reader->GetDevInode()] = reader;
-            // need to push modify event again, but without dev inode
-            // use head dev + inode
-            Event* ev = new Event(event.GetSource(),
-                                  event.GetObject(),
-                                  event.GetType(),
-                                  event.GetWd(),
-                                  event.GetCookie(),
-                                  (*readerArrayPtr)[0]->GetDevInode().dev,
-                                  (*readerArrayPtr)[0]->GetDevInode().inode);
-            ev->SetConfigName(mConfigName);
-            LogInput::GetInstance()->PushEventQueue(ev);
+            // only move reader to rotator reader map when file is not deleted
+            bool isDeleted = false;
+            reader->CloseFilePtr(isDeleted);
+            if (!isDeleted) {
+                mRotatorReaderMap[reader->GetDevInode()] = reader;
+                // need to push modify event again, but without dev inode
+                // use head dev + inode
+                Event* ev = new Event(event.GetSource(),
+                                      event.GetObject(),
+                                      event.GetType(),
+                                      event.GetWd(),
+                                      event.GetCookie(),
+                                      (*readerArrayPtr)[0]->GetDevInode().dev,
+                                      (*readerArrayPtr)[0]->GetDevInode().inode);
+                ev->SetConfigName(mConfigName);
+                LogInput::GetInstance()->PushEventQueue(ev);
+            }
         }
     }
     // if a file is created, and dev inode cannot found(this means it's a new file), create reader for this file, then
