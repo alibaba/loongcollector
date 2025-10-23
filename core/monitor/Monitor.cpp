@@ -18,6 +18,8 @@
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
+
+#include "host_monitor/HostMonitorInputRunner.h"
 #elif defined(_MSC_VER)
 #include <Psapi.h>
 
@@ -237,6 +239,12 @@ void LogtailMonitor::Monitor() {
                     if (!DumpMonitorInfo(monitorTime))
                         LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
                 }
+#if defined(__linux__)
+                if (HostMonitorInputRunner::GetInstance()->ShouldRestart()) {
+                    mShouldSuicide.store(true);
+                    break;
+                }
+#endif
             }
         }
     }
@@ -655,6 +663,7 @@ void LoongCollectorMonitor::Init() {
     mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
     mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    mAgentHostMonitorTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_HOST_MONITOR_TOTAL);
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
