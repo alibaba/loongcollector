@@ -377,7 +377,7 @@ func init() {
 		return &ServiceJournal{
 			SeekPosition:        SeekPositionTail,
 			CursorFlushPeriodMs: 5000,
-			CursorSeekFallback:  SeekPositionHead, // 默认head，参照fluentbit的行为， 此处与go实现不同go实现默认tail
+			CursorSeekFallback:  SeekPositionTail,
 			Kernel:              true,
 			ResetIntervalSecond: defaultResetInterval,
 		}
