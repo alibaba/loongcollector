@@ -481,6 +481,7 @@ protected:
     inline int64_t GetLastReadPos() const { // pos read but may not consumed, used for read needed
         return mLastFilePos + mCache.size();
     }
+    void ResolveHostLogPath();
 
     // std::string mRegion;
     // std::string mCategory;
@@ -488,6 +489,7 @@ protected:
     std::string mHostLogPath;
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
+    std::string mResolvedHostLogPath; // same as mHostLogPath, but with resolved symbolic link
     std::string mRealLogPath; // real log path
     std::string mChineseEncodingPath; // On Windows, Chinese config base path's __path__ will be converted to GBK
     bool mSymbolicLinkFlag = false;
@@ -722,6 +724,7 @@ private:
     friend class FileTagUnittest;
     friend class CreateModifyHandlerUnittest;
     friend class LogFileReaderHoleUnittest;
+    friend class LogFileReaderResolvedPathUnittest;
 
 protected:
     void UpdateReaderManual();
