@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -82,9 +82,9 @@ bool CheckGPUDevice() {
     LOG_INFO(sLogger, ("GPU check successful", "GPU monitoring available"));
     return true;
 #elif defined(_MSC_VER)
-    // Windows平台GPU检测实现
-    // 在Windows上，可以通过WMI或DirectX API来检测GPU
-    // 这里先返回false，表示Windows平台暂不支持GPU监控
+    // GPU detection implementation for Windows platform
+    // On Windows, GPU detection can be implemented via WMI or DirectX API
+    // Currently returns false, indicating GPU monitoring is not supported on Windows yet
     LOG_INFO(sLogger, ("GPU check", "Windows platform GPU monitoring not implemented yet"));
     return false;
 #else
