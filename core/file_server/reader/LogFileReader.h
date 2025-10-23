@@ -724,6 +724,7 @@ private:
     friend class FileTagUnittest;
     friend class CreateModifyHandlerUnittest;
     friend class LogFileReaderHoleUnittest;
+    friend class LogFileReaderResolvedPathUnittest;
 
 protected:
     void UpdateReaderManual();

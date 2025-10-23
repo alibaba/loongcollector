@@ -101,7 +101,7 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathNormalFile() {
 }
 
 void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathSymbolicLink() {
-#ifndef _MSC_VER
+#ifdef __linux__
     // Test that ResolveHostLogPath correctly resolves symbolic links
     const std::string realFileName = "real_file.log";
     const std::string linkName = "link_to_file.log";
