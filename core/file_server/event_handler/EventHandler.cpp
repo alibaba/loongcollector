@@ -534,7 +534,9 @@ void ModifyHandler::Handle(const Event& event) {
                                 "file inode", readerArray[0]->GetDevInode().inode)("file size",
                                                                                    readerArray[0]->GetFileSize()));
                         // release fd as quick as possible
-                        if (readerArray[0]->CloseFilePtr()) {
+                        bool isDeleted = false;
+                        readerArray[0]->CloseFilePtr(isDeleted);
+                        if (isDeleted) {
                             LOG_INFO(sLogger,
                                      ("file is really deleted", "will be removed from the log reader queue")(
                                          "real path", readerArray[0]->GetRealLogPath())(
@@ -841,7 +843,9 @@ void ModifyHandler::Handle(const Event& event) {
                                  "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
                                  "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
                                  "file size", reader->GetFileSize()));
-                    if (reader->CloseFilePtr()) {
+                    bool isDeleted = false;
+                    reader->CloseFilePtr(isDeleted);
+                    if (isDeleted) {
                         readerArrayPtr->pop_front();
                         mDevInodeReaderMap.erase(reader->GetDevInode());
                     }
@@ -864,7 +868,9 @@ void ModifyHandler::Handle(const Event& event) {
                                      "file device", reader->GetDevInode().dev)(
                                      "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize()));
                         ForceReadLogAndPush(reader);
-                        if (reader->CloseFilePtr()) {
+                        bool isDeleted = false;
+                        reader->CloseFilePtr(isDeleted);
+                        if (isDeleted) {
                             readerArrayPtr->pop_front();
                             mDevInodeReaderMap.erase(reader->GetDevInode());
                         }
@@ -923,7 +929,9 @@ void ModifyHandler::Handle(const Event& event) {
             readerArrayPtr->pop_front();
             mDevInodeReaderMap.erase(reader->GetDevInode());
             // only move reader to rotator reader map when file is not deleted
-            if (!reader->CloseFilePtr()) {
+            bool isDeleted = false;
+            reader->CloseFilePtr(isDeleted);
+            if (!isDeleted) {
                 mRotatorReaderMap[reader->GetDevInode()] = reader;
                 // need to push modify event again, but without dev inode
                 // use head dev + inode

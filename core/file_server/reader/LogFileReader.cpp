@@ -1197,7 +1197,12 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
     return false;
 }
 
-bool LogFileReader::CloseFilePtr() {
+void LogFileReader::CloseFilePtr() {
+    bool isDeleted = false;
+    CloseFilePtr(isDeleted);
+}
+
+void LogFileReader::CloseFilePtr(bool& isDeleted) {
     if (mLogFileOp.IsOpen()) {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
@@ -1257,9 +1262,10 @@ bool LogFileReader::CloseFilePtr() {
         && mRealLogPath.compare(
                mRealLogPath.length() - DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX)
             == 0) {
-        return true;
+        isDeleted = true;
+    } else {
+        isDeleted = false;
     }
-    return false;
 }
 
 uint64_t LogFileReader::GetLogstoreKey() const {
