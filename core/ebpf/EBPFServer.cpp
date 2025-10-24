@@ -234,8 +234,8 @@ void EBPFServer::Stop() {
         for (const auto& entry : pipelines) {
             bool ret = DisablePlugin(entry.first, static_cast<PluginType>(i));
             LOG_DEBUG(sLogger,
-                     ("force stop plugin", magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline",
-                                                                                              entry.first)("ret", ret));
+                      ("force stop plugin",
+                       magic_enum::enum_name(static_cast<PluginType>(i)))("pipeline", entry.first)("ret", ret));
         }
     }
     mRetryableEventCache.Clear();

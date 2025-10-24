@@ -32,8 +32,8 @@ struct ConfigDiff {
     std::vector<std::string> mRemoved;
     std::vector<std::string> mIgnored;
 
-    bool HasDiff() { return !mRemoved.empty() || !mAdded.empty() || !mModified.empty(); }
-    bool HasIgnored() { return !mIgnored.empty(); }
+    [[nodiscard]] bool HasDiff() const { return !mRemoved.empty() || !mAdded.empty() || !mModified.empty(); }
+    [[nodiscard]] bool HasIgnored() const { return !mIgnored.empty(); }
 };
 
 using CollectionConfigDiff = ConfigDiff<CollectionConfig>;

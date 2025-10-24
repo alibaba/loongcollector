@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
-#include "collection_pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/CollectionPipelineManager.h"
 #include "config/ConfigDiff.h"
-#include "config/common_provider/CommonConfigProvider.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "unittest/Unittest.h"
+#include "unittest/plugin/PluginMock.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -34,14 +35,27 @@ public:
     void InvalidConfigDirFound() const;
     void InvalidConfigFileFound() const;
     void DuplicateConfigs() const;
+    void IgnoreNewLowerPrioritySingletonConfig() const;
+    void IgnoreModifiedLowerPrioritySingletonConfig() const;
+    void HigherPriorityOverrideLowerPrioritySingletonConfig() const;
 
 protected:
+    static void SetUpTestCase() {
+        PluginRegistry::GetInstance()->LoadPlugins();
+        LoadPluginMock();
+    }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
         PipelineConfigWatcher::GetInstance()->AddSource(configDir.string());
         InstanceConfigWatcher::GetInstance()->AddSource(instanceConfigDir.string());
     }
 
-    void TearDown() override { PipelineConfigWatcher::GetInstance()->ClearEnvironment(); }
+    void TearDown() override {
+        PipelineConfigWatcher::GetInstance()->ClearEnvironment();
+        CollectionPipelineManager::GetInstance()->ClearAllPipelines();
+    }
 
 private:
     static const filesystem::path configDir;
@@ -116,7 +130,6 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
 
 void ConfigWatcherUnittest::DuplicateConfigs() const {
     {
-        PluginRegistry::GetInstance()->LoadPlugins();
         PipelineConfigWatcher::GetInstance()->AddSource("dir1");
         PipelineConfigWatcher::GetInstance()->AddSource("dir2");
 
@@ -153,10 +166,8 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
         filesystem::remove_all("continuous_pipeline_config");
-        PluginRegistry::GetInstance()->UnloadPlugins();
     }
     {
-        PluginRegistry::GetInstance()->LoadPlugins();
         InstanceConfigWatcher::GetInstance()->AddSource("dir1");
         InstanceConfigWatcher::GetInstance()->AddSource("dir2");
 
@@ -183,13 +194,237 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         filesystem::remove_all("dir1");
         filesystem::remove_all("dir2");
         filesystem::remove_all("instance_config");
-        PluginRegistry::GetInstance()->UnloadPlugins();
     }
+}
+
+void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
+    filesystem::create_directories("continuous_pipeline_config");
+
+    // Step 1: add high priority config 'a' (createTime smaller => higher priority)
+    {
+        ofstream fout("continuous_pipeline_config/a.json");
+        fout << R"(
+            {
+                "createTime": 1,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    // a should be added, and not ignored/removed; no modified expected
+    APSARA_TEST_EQUAL(1U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mIgnored.size());
+    APSARA_TEST_TRUE(std::find_if(diff1.first.mAdded.begin(),
+                                  diff1.first.mAdded.end(),
+                                  [](const CollectionConfig& c) { return c.mName == "a"; })
+                     != diff1.first.mAdded.end());
+
+    // Apply the config to manager so it becomes a running pipeline
+    CollectionPipelineManager::GetInstance()->UpdatePipelines(diff1.first);
+
+    // Step 2: add lower priority config 'b'
+    {
+        ofstream fout("continuous_pipeline_config/b.json");
+        fout << R"(
+            {
+                "createTime": 2,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff2 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    // 'b' should be ignored (same singleton type, lower priority)
+    APSARA_TEST_EQUAL(0U, diff2.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff2.first.mModified.size());
+    APSARA_TEST_EQUAL(0U, diff2.first.mRemoved.size());
+    APSARA_TEST_EQUAL(1U, diff2.first.mIgnored.size());
+    APSARA_TEST_TRUE(std::find(diff2.first.mIgnored.begin(), diff2.first.mIgnored.end(), std::string("b"))
+                     != diff2.first.mIgnored.end());
+
+    filesystem::remove_all("continuous_pipeline_config");
+}
+
+void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
+    filesystem::create_directories("continuous_pipeline_config");
+
+    // Step 1: add 'a' (higher priority) and 'b' (lower priority)
+    {
+        ofstream fa("continuous_pipeline_config/a.json");
+        fa << R"(
+            {
+                "createTime": 1,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+        ofstream fb("continuous_pipeline_config/b.json");
+        fb << R"(
+            {
+                "createTime": 2,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    // 'a' selected, 'b' ignored in first scan
+    APSARA_TEST_EQUAL(1U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
+    APSARA_TEST_EQUAL(1U, diff1.first.mIgnored.size());
+    APSARA_TEST_TRUE(std::find_if(diff1.first.mAdded.begin(),
+                                  diff1.first.mAdded.end(),
+                                  [](const CollectionConfig& c) { return c.mName == "a"; })
+                     != diff1.first.mAdded.end());
+    APSARA_TEST_TRUE(std::find(diff1.first.mIgnored.begin(), diff1.first.mIgnored.end(), std::string("b"))
+                     != diff1.first.mIgnored.end());
+
+    // Apply the config to manager so 'a' becomes a running pipeline
+    CollectionPipelineManager::GetInstance()->UpdatePipelines(diff1.first);
+
+    // Step 2: modify 'b' content (size changed) => should still be ignored (IgnoredModified path)
+    {
+        ofstream fb("continuous_pipeline_config/b.json");
+        fb << R"(
+            {
+                "createTime": 2,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "processors": [
+                    { "Type": "processor_inner_mock" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff2 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_EQUAL(0U, diff2.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff2.first.mModified.size());
+    APSARA_TEST_EQUAL(0U, diff2.first.mRemoved.size());
+    APSARA_TEST_EQUAL(1U, diff2.first.mIgnored.size());
+    APSARA_TEST_TRUE(std::find(diff2.first.mIgnored.begin(), diff2.first.mIgnored.end(), std::string("b"))
+                     != diff2.first.mIgnored.end());
+
+    filesystem::remove_all("continuous_pipeline_config");
+}
+
+void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig() const {
+    filesystem::create_directories("continuous_pipeline_config");
+
+    // Step 1: start with running 'b' (mock1) and 'c' (mock2)
+    {
+        ofstream fb("continuous_pipeline_config/b.json");
+        fb << R"(
+            {
+                "createTime": 2,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+        ofstream fc("continuous_pipeline_config/c.json");
+        fc << R"(
+            {
+                "createTime": 2,
+                "inputs": [
+                    { "Type": "input_singleton_mock_2" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    // both types should be added initially
+    APSARA_TEST_EQUAL(2U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
+    APSARA_TEST_EQUAL(0U, diff1.first.mIgnored.size());
+    APSARA_TEST_TRUE(std::find_if(diff1.first.mAdded.begin(),
+                                  diff1.first.mAdded.end(),
+                                  [](const CollectionConfig& c) { return c.mName == "b"; })
+                     != diff1.first.mAdded.end());
+    APSARA_TEST_TRUE(std::find_if(diff1.first.mAdded.begin(),
+                                  diff1.first.mAdded.end(),
+                                  [](const CollectionConfig& c) { return c.mName == "c"; })
+                     != diff1.first.mAdded.end());
+
+    // Apply the configs to manager so they become running pipelines
+    CollectionPipelineManager::GetInstance()->UpdatePipelines(diff1.first);
+
+    // Step 2: add higher priority 'a' (mock1) => 'b' should be removed+ignored; 'c' unaffected
+    {
+        ofstream fa("continuous_pipeline_config/a.json");
+        fa << R"(
+            {
+                "createTime": 1,
+                "inputs": [
+                    { "Type": "input_singleton_mock_1" }
+                ],
+                "flushers": [
+                    { "Type": "flusher_mock" }
+                ]
+            }
+        )";
+    }
+
+    auto diff2 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
+    APSARA_TEST_EQUAL(1U, diff2.first.mAdded.size());
+    APSARA_TEST_EQUAL(0U, diff2.first.mModified.size());
+    APSARA_TEST_EQUAL(1U, diff2.first.mRemoved.size());
+    APSARA_TEST_EQUAL(1U, diff2.first.mIgnored.size());
+    // 'b' becomes low-priority running config => should be removed and ignored
+    APSARA_TEST_TRUE(std::find(diff2.first.mRemoved.begin(), diff2.first.mRemoved.end(), std::string("b"))
+                     != diff2.first.mRemoved.end());
+    APSARA_TEST_TRUE(std::find(diff2.first.mIgnored.begin(), diff2.first.mIgnored.end(), std::string("b"))
+                     != diff2.first.mIgnored.end());
+    // 'a' (new higher priority) should be added
+    APSARA_TEST_TRUE(std::find_if(diff2.first.mAdded.begin(),
+                                  diff2.first.mAdded.end(),
+                                  [](const CollectionConfig& c) { return c.mName == "a"; })
+                     != diff2.first.mAdded.end());
+
+    filesystem::remove_all("continuous_pipeline_config");
 }
 
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigFileFound)
 UNIT_TEST_CASE(ConfigWatcherUnittest, DuplicateConfigs)
+UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreNewLowerPrioritySingletonConfig)
+UNIT_TEST_CASE(ConfigWatcherUnittest, IgnoreModifiedLowerPrioritySingletonConfig)
+UNIT_TEST_CASE(ConfigWatcherUnittest, HigherPriorityOverrideLowerPrioritySingletonConfig)
 
 } // namespace logtail
 
