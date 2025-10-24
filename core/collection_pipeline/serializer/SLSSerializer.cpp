@@ -37,6 +37,9 @@ using namespace std;
 
 namespace logtail {
 
+// Maximum size threshold for thread_local buffer before reallocation
+constexpr size_t kMaxThreadLocalBufferSize = 1024 * 1024;
+
 void SerializeSpanLinksToString(const SpanEvent& event, std::string& result) {
     if (event.GetLinks().empty()) {
         result.clear();
@@ -45,7 +48,7 @@ void SerializeSpanLinksToString(const SpanEvent& event, std::string& result) {
 
     // reuse thread_local buffer to avoid repeated memory allocation
     thread_local rapidjson::StringBuffer buffer;
-    if (buffer.GetSize() > 1024 * 1024) {
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
         buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
     }
     buffer.Clear();
@@ -92,7 +95,7 @@ void SerializeSpanEventsToString(const SpanEvent& event, std::string& result) {
 
     // reuse thread_local buffer to avoid repeated memory allocation
     thread_local rapidjson::StringBuffer buffer;
-    if (buffer.GetSize() > 1024 * 1024) {
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
         buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
     }
     buffer.Clear();
@@ -134,7 +137,7 @@ void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result
 
     // reuse thread_local buffer to avoid repeated memory allocation
     thread_local rapidjson::StringBuffer buffer;
-    if (buffer.GetSize() > 1024 * 1024) {
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
         buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
     }
     buffer.Clear();

@@ -277,7 +277,7 @@ bool ManualPBParser::readBytes(const uint8_t*& data, size_t& length) {
 }
 
 bool ManualPBParser::skipField(uint32_t wireType) {
-    LOG_ERROR(sLogger, ("ManualPBParser meet unknown wire type", std::to_string(wireType)));
+    LOG_ERROR(sLogger, ("ManualPBParser encountered unknown wire type", std::to_string(wireType)));
     switch (wireType) {
         case kVarint: {
             uint64_t dummy = 0;
