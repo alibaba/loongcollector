@@ -1,7 +1,7 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10 AS builder
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3 AS builder
 
 # Build arguments
 ARG VERSION=edge
@@ -51,11 +51,22 @@ ARG TARGETPLATFORM
 WORKDIR /usr/local
 COPY --from=builder --chown=$(whoami) /src/dist/loongcollector-edge loongcollector
 
-# Install iproute2 if HOST_OS is Linux for e2e
+# Install runtime dependencies (iproute2 for e2e, Kerberos/SASL libs for Kafka)
 RUN if [ "$HOST_OS" = "Linux" ]; then \
-        apt-get update && apt-get install -y iproute2 && \
+        apt-get update && apt-get install -y iproute2 \
+            libsasl2-2 \
+            libsasl2-modules \
+            libsasl2-modules-gssapi-mit \
+            libkrb5-3 \
+            libk5crypto3 \
+            libgssapi-krb5-2 && \
         apt-get clean && rm -rf /var/lib/apt/lists/*; \
     fi
+
+# Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
+COPY --from=builder /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
 
 WORKDIR /usr/local/loongcollector
 ENV HTTP_PROBE_PORT=7953 \

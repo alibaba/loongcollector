@@ -746,6 +746,12 @@ macro(link_rdkafka target_name)
     elseif (UNIX)
         target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka.a")
         target_link_libraries(${target_name} "${rdkafka_${LIBRARY_DIR_SUFFIX}}/librdkafka++.a")
+        find_library(SASL2_LIB NAMES sasl2 libsasl2)
+        if (SASL2_LIB)
+            target_link_libraries(${target_name} "${SASL2_LIB}")
+        else()
+            target_link_libraries(${target_name} sasl2)
+        endif()
     elseif (MSVC)
         target_link_libraries(${target_name}
                 debug "rdkafkad"
