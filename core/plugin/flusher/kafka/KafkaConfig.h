@@ -24,6 +24,7 @@
 
 #include "common/ParamExtractor.h"
 #include "common/auth/AuthConfig.h"
+#include "logger/Logger.h"
 #include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
@@ -117,10 +118,12 @@ struct KafkaConfig {
             }
         }
 
+        Headers.clear();
         if (config.isMember("Headers") && config["Headers"].isArray()) {
             const Json::Value& headers = config["Headers"];
             for (const auto& h : headers) {
                 if (!h.isObject()) {
+                    LOG_WARNING(sLogger, ("Invalid header entry: not an object", "skip")("entry", h.toStyledString()));
                     continue;
                 }
                 std::string key;
