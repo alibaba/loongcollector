@@ -105,6 +105,8 @@ public:
     void TestGeneratePartitionKey_NotHash();
     void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
     void TestInitTLSCertKeyMismatch();
+    void TestReInitDestroyPreviousHeadersTemplate();
+    void TestHeadersConfig_SkipNonObject();
 
 protected:
     void SetUp();
@@ -612,6 +614,96 @@ void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
     APSARA_TEST_EQUAL(std::string(""), k2);
 }
 
+void FlusherKafkaUnittest::TestReInitDestroyPreviousHeadersTemplate() {
+    Json::Value optionalGoPipeline;
+    // First init with 2 headers
+    Json::Value config1 = CreateKafkaTestConfig(mTopic);
+    Json::Value headers1(Json::arrayValue);
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "k1";
+        h["value"] = "v1";
+        headers1.append(h);
+    }
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "k2";
+        h["value"] = "v2";
+        headers1.append(h);
+    }
+    config1["Headers"] = headers1;
+    APSARA_TEST_TRUE(mFlusher->Init(config1, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    // Send one message and verify headers count = 2
+    {
+        PipelineEventGroup g(std::make_shared<SourceBuffer>());
+        auto* e = g.AddLogEvent();
+        e->SetContent(StringView("k"), StringView("v"));
+        APSARA_TEST_TRUE(mFlusher->Send(std::move(g)));
+        const auto& completed = mMockProducer->GetCompletedRequests();
+        APSARA_TEST_TRUE(!completed.empty());
+        APSARA_TEST_EQUAL(2U, completed.back().Headers.size());
+    }
+
+    // Re-init with a different single header; this should destroy previous header template
+    Json::Value config2 = CreateKafkaTestConfig(mTopic);
+    Json::Value headers2(Json::arrayValue);
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "newk";
+        h["value"] = "newv";
+        headers2.append(h);
+    }
+    config2["Headers"] = headers2;
+    APSARA_TEST_TRUE(mFlusher->Init(config2, optionalGoPipeline));
+
+    // Send again and verify only the new header is present
+    {
+        PipelineEventGroup g2(std::make_shared<SourceBuffer>());
+        auto* e2 = g2.AddLogEvent();
+        e2->SetContent(StringView("k2"), StringView("v2"));
+        APSARA_TEST_TRUE(mFlusher->Send(std::move(g2)));
+        const auto& completed = mMockProducer->GetCompletedRequests();
+        APSARA_TEST_TRUE(!completed.empty());
+        const auto& hdrs = completed.back().Headers;
+        APSARA_TEST_EQUAL(1U, hdrs.size());
+        APSARA_TEST_EQUAL(std::string("newk"), hdrs[0].first);
+        APSARA_TEST_EQUAL(std::string("newv"), hdrs[0].second);
+    }
+}
+
+void FlusherKafkaUnittest::TestHeadersConfig_SkipNonObject() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+
+    // Headers contains non-object entries which should be skipped
+    Json::Value headers(Json::arrayValue);
+    headers.append("invalid_entry");
+    headers.append(123);
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "only_valid";
+        h["value"] = "hv";
+        headers.append(h);
+    }
+    config["Headers"] = headers;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    PipelineEventGroup g(std::make_shared<SourceBuffer>());
+    auto* e = g.AddLogEvent();
+    e->SetContent(StringView("x"), StringView("y"));
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(g)));
+
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_TRUE(!completed.empty());
+    APSARA_TEST_EQUAL(1U, completed.back().Headers.size());
+    APSARA_TEST_EQUAL(std::string("only_valid"), completed.back().Headers[0].first);
+    APSARA_TEST_EQUAL(std::string("hv"), completed.back().Headers[0].second);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -638,6 +730,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestHeadersConfigured_SendWithHeaders)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestReInitDestroyPreviousHeadersTemplate)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestHeadersConfig_SkipNonObject)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitTLSCertKeyMismatch)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)

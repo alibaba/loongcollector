@@ -55,6 +55,10 @@ public:
     void TestProduceAsyncWithoutInit_Real();
     void TestInitWithTLSMinimal_Real();
     void TestInitWithTLSFull_Real();
+    void TestInitWithValidPartitioner_Real();
+    void TestProduceWithHeaders_Real_NoKey();
+    void TestProduceWithHeaders_Real_WithKey();
+    void TestProduceTooLargeMessageError_Real();
 
 protected:
     void SetUp();
@@ -318,6 +322,93 @@ void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
     APSARA_TEST_FALSE(p.Init(c));
 }
 
+void KafkaProducerUnittest::TestInitWithValidPartitioner_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    // librdkafka valid partitioner value
+    c.Partitioner = "consistent_random";
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestProduceWithHeaders_Real_NoKey() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    // create headers template and produce without key
+    std::vector<std::pair<std::string, std::string>> hdrs{{"h1", "v1"}, {"h2", "v2"}};
+    auto* tpl = p.CreateHeadersTemplate(hdrs);
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        "val_y",
+        [&](bool /*success*/, const KafkaProducer::ErrorInfo& /*info*/) { called.store(true); },
+        std::string(),
+        tpl);
+
+    // Not asserting callback due to async behavior; ensure no crash and cleanup
+    p.DestroyHeadersTemplate(tpl);
+    p.Close();
+}
+
+void KafkaProducerUnittest::TestProduceWithHeaders_Real_WithKey() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::vector<std::pair<std::string, std::string>> hdrs{{"a", "b"}};
+    auto* tpl = p.CreateHeadersTemplate(hdrs);
+
+    std::atomic<bool> produced{false};
+    p.ProduceAsync(
+        "topic_y",
+        "value_z",
+        [&](bool /*success*/, const KafkaProducer::ErrorInfo& /*info*/) { produced.store(true); },
+        std::string("key123"),
+        tpl);
+
+    p.DestroyHeadersTemplate(tpl);
+    p.Close();
+}
+
+void KafkaProducerUnittest::TestProduceTooLargeMessageError_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1; // enforce immediate client-side size check failure
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    std::atomic<bool> success{true};
+    KafkaProducer::ErrorInfo captured;
+    p.ProduceAsync("topic_err", std::string(16, 'x'), [&](bool ok, const KafkaProducer::ErrorInfo& info) {
+        called.store(true, std::memory_order_relaxed);
+        success.store(ok, std::memory_order_relaxed);
+        captured = info;
+    });
+
+    // When message is too large, we expect immediate error callback
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+    APSARA_TEST_FALSE(success.load(std::memory_order_relaxed));
+    APSARA_TEST_TRUE((int)captured.type == (int)KafkaProducer::ErrorType::PARAMS_ERROR
+                     || (int)captured.type == (int)KafkaProducer::ErrorType::OTHER_ERROR);
+    p.Close();
+}
+
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitFailure)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncSuccess)
@@ -338,6 +429,10 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithInvalidPartitioner_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithoutInit_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSMinimal_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSFull_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithValidPartitioner_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceWithHeaders_Real_NoKey)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceWithHeaders_Real_WithKey)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceTooLargeMessageError_Real)
 
 } // namespace logtail
 

@@ -117,7 +117,7 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         mRecordHeaders.reserve(mKafkaConfig.Headers.size());
         for (auto& h : mKafkaConfig.Headers) {
             if (!h.first.empty()) {
-                mRecordHeaders.emplace_back(std::move(h.first), std::move(h.second));
+                mRecordHeaders.emplace_back(h.first, h.second);
             }
         }
         if (!mRecordHeaders.empty()) {

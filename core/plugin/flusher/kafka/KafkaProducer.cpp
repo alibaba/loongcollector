@@ -229,11 +229,22 @@ public:
         if (!headers.empty()) {
             tpl->hdrs = rd_kafka_headers_new(static_cast<int>(headers.size()));
             for (const auto& kv : headers) {
-                rd_kafka_header_add(tpl->hdrs,
-                                    kv.first.c_str(),
-                                    static_cast<int>(kv.first.size()),
-                                    kv.second.data(),
-                                    static_cast<int>(kv.second.size()));
+                rd_kafka_resp_err_t err = rd_kafka_header_add(tpl->hdrs,
+                                                              kv.first.c_str(),
+                                                              static_cast<int>(kv.first.size()),
+                                                              kv.second.data(),
+                                                              static_cast<int>(kv.second.size()));
+                if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+                    LOG_ERROR(sLogger,
+                              ("Kafka header add failed", rd_kafka_err2str(err))("header key", kv.first)("header value",
+                                                                                                         kv.second));
+                    if (tpl->hdrs) {
+                        rd_kafka_headers_destroy(tpl->hdrs);
+                        tpl->hdrs = nullptr;
+                    }
+                    delete tpl;
+                    return nullptr;
+                }
             }
         }
         return tpl;
