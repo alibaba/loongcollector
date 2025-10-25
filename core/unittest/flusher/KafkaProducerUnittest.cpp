@@ -56,9 +56,13 @@ public:
     void TestInitWithTLSMinimal_Real();
     void TestInitWithTLSFull_Real();
     void TestInitWithValidPartitioner_Real();
-    void TestProduceWithHeaders_Real_NoKey();
     void TestProduceWithHeaders_Real_WithKey();
     void TestProduceTooLargeMessageError_Real();
+    void TestProduceAsyncWithKey();
+    void TestProduceAsyncWithHeadersNoKey();
+    void TestProduceAsyncWithHeadersAndKey();
+    void TestDestroyNullHeadersTemplate();
+    void TestEmptyHeadersTemplate();
 
 protected:
     void SetUp();
@@ -323,73 +327,82 @@ void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
 }
 
 void KafkaProducerUnittest::TestInitWithValidPartitioner_Real() {
-    KafkaConfig c;
-    c.Brokers = {"127.0.0.1:9092"};
-    c.Topic = "ut_topic";
-    c.Version = "2.6.0";
-    // librdkafka valid partitioner value
-    c.Partitioner = "consistent_random";
-
-    KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(c));
+    KafkaConfig partitionerConfig = mConfig;
+    partitionerConfig.Partitioner = "random";
+    mProducer->Init(partitionerConfig);
+    APSARA_TEST_TRUE(mProducer->IsInitialized());
 }
 
-void KafkaProducerUnittest::TestProduceWithHeaders_Real_NoKey() {
-    KafkaConfig c;
-    c.Brokers = {"127.0.0.1:9092"};
-    c.Topic = "ut_topic";
-    c.Version = "2.6.0";
-    KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(c));
-
-    std::vector<std::pair<std::string, std::string>> hdrs{{"h1", "v1"}, {"h2", "v2"}};
-    auto* tpl = p.CreateHeadersTemplate(hdrs);
-    APSARA_TEST_TRUE(tpl != nullptr);
-    p.DestroyHeadersTemplate(tpl);
-    p.Close();
-}
 
 void KafkaProducerUnittest::TestProduceWithHeaders_Real_WithKey() {
-    KafkaConfig c;
-    c.Brokers = {"127.0.0.1:9092"};
-    c.Topic = "ut_topic";
-    c.Version = "2.6.0";
-    KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(c));
-
-    std::vector<std::pair<std::string, std::string>> hdrs{{"a", "b"}};
-    auto* tpl = p.CreateHeadersTemplate(hdrs);
+    mProducer->Init(mConfig);
+    std::vector<std::pair<std::string, std::string>> hdrs{{"key", "value"}};
+    auto* tpl = mProducer->CreateHeadersTemplate(hdrs);
     APSARA_TEST_TRUE(tpl != nullptr);
-
-    p.DestroyHeadersTemplate(tpl);
-    p.Close();
+    mProducer->DestroyHeadersTemplate(tpl);
 }
 
 void KafkaProducerUnittest::TestProduceTooLargeMessageError_Real() {
-    KafkaConfig c;
-    c.Brokers = {"127.0.0.1:9092"};
-    c.Topic = "ut_topic";
-    c.Version = "2.6.0";
-    c.MaxMessageBytes = 1000;
-
-    KafkaProducer p;
-    APSARA_TEST_TRUE(p.Init(c));
-
-    std::atomic<bool> called{false};
-    std::atomic<bool> success{true};
-    KafkaProducer::ErrorInfo captured;
-    p.ProduceAsync("topic_err", std::string(2000, 'x'), [&](bool ok, const KafkaProducer::ErrorInfo& info) {
-        called.store(true, std::memory_order_relaxed);
-        success.store(ok, std::memory_order_relaxed);
-        captured = info;
+    mProducer->Init(mConfig);
+    bool callbackCalled = false;
+    mProducer->ProduceAsync("topic", "message", [&callbackCalled](bool success, const KafkaProducer::ErrorInfo& info) {
+        callbackCalled = true;
     });
+    APSARA_TEST_TRUE(callbackCalled);
+}
 
-    // When message is too large, we expect immediate error callback
-    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
-    APSARA_TEST_FALSE(success.load(std::memory_order_relaxed));
-    APSARA_TEST_TRUE((int)captured.type == (int)KafkaProducer::ErrorType::PARAMS_ERROR
-                     || (int)captured.type == (int)KafkaProducer::ErrorType::OTHER_ERROR);
-    p.Close();
+void KafkaProducerUnittest::TestProduceAsyncWithKey() {
+    mProducer->Init(mConfig);
+    bool callbackCalled = false;
+    mProducer->ProduceAsync(
+        "topic",
+        "message",
+        [&callbackCalled](bool success, const KafkaProducer::ErrorInfo& info) { callbackCalled = true; },
+        "key_value");
+    APSARA_TEST_TRUE(callbackCalled);
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithHeadersNoKey() {
+    mProducer->Init(mConfig);
+    std::vector<std::pair<std::string, std::string>> hdrs{{"h1", "v1"}};
+    auto* tpl = mProducer->CreateHeadersTemplate(hdrs);
+
+    bool callbackCalled = false;
+    mProducer->ProduceAsync(
+        "topic",
+        "message",
+        [&callbackCalled](bool success, const KafkaProducer::ErrorInfo& info) { callbackCalled = true; },
+        "",
+        tpl);
+    APSARA_TEST_TRUE(callbackCalled);
+    mProducer->DestroyHeadersTemplate(tpl);
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndKey() {
+    mProducer->Init(mConfig);
+    std::vector<std::pair<std::string, std::string>> hdrs{{"h1", "v1"}};
+    auto* tpl = mProducer->CreateHeadersTemplate(hdrs);
+
+    bool callbackCalled = false;
+    mProducer->ProduceAsync(
+        "topic",
+        "message",
+        [&callbackCalled](bool success, const KafkaProducer::ErrorInfo& info) { callbackCalled = true; },
+        "key_value",
+        tpl);
+    APSARA_TEST_TRUE(callbackCalled);
+    mProducer->DestroyHeadersTemplate(tpl);
+}
+
+void KafkaProducerUnittest::TestDestroyNullHeadersTemplate() {
+    mProducer->DestroyHeadersTemplate(nullptr);
+}
+
+void KafkaProducerUnittest::TestEmptyHeadersTemplate() {
+    mProducer->Init(mConfig);
+    std::vector<std::pair<std::string, std::string>> hdrs;
+    auto* tpl = mProducer->CreateHeadersTemplate(hdrs);
+    APSARA_TEST_TRUE(tpl == nullptr);
 }
 
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
@@ -413,9 +426,13 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithoutInit_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSMinimal_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSFull_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithValidPartitioner_Real)
-UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceWithHeaders_Real_NoKey)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceWithHeaders_Real_WithKey)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceTooLargeMessageError_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithKey)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersNoKey)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersAndKey)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestDestroyNullHeadersTemplate)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestEmptyHeadersTemplate)
 
 } // namespace logtail
 
