@@ -160,12 +160,25 @@ public:
         auto* tpl = new KafkaProducer::HeadersTemplate();
         if (!headers.empty()) {
             tpl->hdrs = rd_kafka_headers_new(static_cast<int>(headers.size()));
+            if (!tpl->hdrs) {
+                LOG_ERROR(sLogger, ("error", "Failed to allocate Kafka headers"));
+                delete tpl;
+                return nullptr;
+            }
             for (const auto& kv : headers) {
-                rd_kafka_header_add(tpl->hdrs,
-                                    kv.first.c_str(),
-                                    static_cast<int>(kv.first.size()),
-                                    kv.second.data(),
-                                    static_cast<int>(kv.second.size()));
+                rd_kafka_resp_err_t err = rd_kafka_header_add(tpl->hdrs,
+                                                              kv.first.c_str(),
+                                                              static_cast<int>(kv.first.size()),
+                                                              kv.second.data(),
+                                                              static_cast<int>(kv.second.size()));
+                if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+                    LOG_ERROR(sLogger,
+                              ("Failed to add Kafka header",
+                               rd_kafka_err2str(err))("header_key", kv.first)("header_value", kv.second));
+                    rd_kafka_headers_destroy(tpl->hdrs);
+                    delete tpl;
+                    return nullptr;
+                }
             }
         }
         return tpl;
@@ -207,46 +220,42 @@ public:
         }
 
         rd_kafka_resp_err_t err;
-        if (rdk_headers) {
-            if (!key.empty()) {
-                err = rd_kafka_producev(producer,
-                                        RD_KAFKA_V_TOPIC(topic.c_str()),
-                                        RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
-                                        RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                        RD_KAFKA_V_KEY(key.data(), key.size()),
-                                        RD_KAFKA_V_VALUE(value.data(), value.size()),
-                                        RD_KAFKA_V_HEADERS(rdk_headers),
-                                        RD_KAFKA_V_OPAQUE(context),
-                                        RD_KAFKA_V_END);
-            } else {
-                err = rd_kafka_producev(producer,
-                                        RD_KAFKA_V_TOPIC(topic.c_str()),
-                                        RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
-                                        RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                        RD_KAFKA_V_VALUE(value.data(), value.size()),
-                                        RD_KAFKA_V_HEADERS(rdk_headers),
-                                        RD_KAFKA_V_OPAQUE(context),
-                                        RD_KAFKA_V_END);
-            }
+        if (rdk_headers && !key.empty()) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_KEY(key.data(), key.size()),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_HEADERS(rdk_headers),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        } else if (rdk_headers) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_HEADERS(rdk_headers),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        } else if (!key.empty()) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_KEY(key.data(), key.size()),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
         } else {
-            if (!key.empty()) {
-                err = rd_kafka_producev(producer,
-                                        RD_KAFKA_V_TOPIC(topic.c_str()),
-                                        RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
-                                        RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                        RD_KAFKA_V_KEY(key.data(), key.size()),
-                                        RD_KAFKA_V_VALUE(value.data(), value.size()),
-                                        RD_KAFKA_V_OPAQUE(context),
-                                        RD_KAFKA_V_END);
-            } else {
-                err = rd_kafka_producev(producer,
-                                        RD_KAFKA_V_TOPIC(topic.c_str()),
-                                        RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
-                                        RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
-                                        RD_KAFKA_V_VALUE(value.data(), value.size()),
-                                        RD_KAFKA_V_OPAQUE(context),
-                                        RD_KAFKA_V_END);
-            }
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
         }
 
         if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
@@ -256,12 +265,14 @@ public:
             if (rdk_headers) {
                 rd_kafka_headers_destroy(rdk_headers);
             }
-            ReleaseContext(context);
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::MapKafkaError(err);
             errorInfo.message = rd_kafka_err2str(err);
             errorInfo.code = static_cast<int>(err);
-            callback(false, errorInfo);
+            if (context->callback) {
+                context->callback(false, errorInfo);
+            }
+            ReleaseContext(context);
         }
     }
 

@@ -93,10 +93,8 @@ struct KafkaConfig {
         GetOptionalUIntParam(config, "MessageTimeoutMs", MessageTimeoutMs, errorMsg);
         GetOptionalUIntParam(config, "MaxRetries", MaxRetries, errorMsg);
         GetOptionalUIntParam(config, "RetryBackoffMs", RetryBackoffMs, errorMsg);
-
         GetOptionalUIntParam(config, "QueueBufferingMaxKbytes", QueueBufferingMaxKbytes, errorMsg);
         GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
-
         GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
         GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
 
@@ -110,27 +108,26 @@ struct KafkaConfig {
             }
         }
 
-        if (config.isMember("Kafka") && config["Kafka"].isObject()) {
-            const Json::Value& kafkaConfig = config["Kafka"];
-            for (const auto& key : kafkaConfig.getMemberNames()) {
-                CustomConfig[key] = kafkaConfig[key].asString();
-            }
-        }
-
         if (config.isMember("Headers") && config["Headers"].isArray()) {
             const Json::Value& headers = config["Headers"];
             for (const auto& h : headers) {
                 if (!h.isObject()) {
+                    LOG_WARNING(sLogger, ("Invalid header entry: not an object", "skip")("entry", h.toStyledString()));
                     continue;
                 }
-                std::string key;
-                std::string val;
-                if (h.isMember("key") && h["key"].isString())
-                    key = h["key"].asString();
-                if (h.isMember("value") && h["value"].isString())
-                    val = h["value"].asString();
-                if (!key.empty())
-                    Headers.emplace_back(std::move(key), std::move(val));
+                if (h.isMember("key") && h["key"].isString() && h.isMember("value") && h["value"].isString()) {
+                    Headers.emplace_back(h["key"].asString(), h["value"].asString());
+                } else {
+                    LOG_WARNING(sLogger,
+                                ("Invalid header entry: missing key or value", "skip")("entry", h.toStyledString()));
+                }
+            }
+        }
+
+        if (config.isMember("Kafka") && config["Kafka"].isObject()) {
+            const Json::Value& kafkaConfig = config["Kafka"];
+            for (const auto& key : kafkaConfig.getMemberNames()) {
+                CustomConfig[key] = kafkaConfig[key].asString();
             }
         }
 

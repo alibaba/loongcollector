@@ -176,9 +176,17 @@ flushers:
 示例：
 
 ```yaml
-Headers:
-  - key: "trace_id"
-    value: "fixed-trace"
-  - key: "source"
-    value: "loongcollector"
+enable: true
+flushers:
+  - Type: flusher_kafka_native
+    Brokers: ["kafka:29092"]
+    Topic: "test-topic"
+    Version: "3.6.0"
+    MaxMessageBytes: 5242880
+    MaxRetries: 2
+    Headers:
+      - key: "trace_id"
+        value: "fixed-trace"
+      - key: "source"
+        value: "loongcollector"
 ```

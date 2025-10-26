@@ -108,16 +108,17 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
         return false;
     }
 
-    mRecordHeaders.clear();
     if (mHeadersTemplate) {
         mProducer->DestroyHeadersTemplate(mHeadersTemplate);
         mHeadersTemplate = nullptr;
     }
+
+    mRecordHeaders.clear();
     if (!mKafkaConfig.Headers.empty()) {
         mRecordHeaders.reserve(mKafkaConfig.Headers.size());
         for (auto& h : mKafkaConfig.Headers) {
             if (!h.first.empty()) {
-                mRecordHeaders.emplace_back(std::move(h.first), std::move(h.second));
+                mRecordHeaders.emplace_back(h.first, h.second);
             }
         }
         if (!mRecordHeaders.empty()) {
@@ -152,12 +153,12 @@ bool FlusherKafka::Start() {
 }
 
 bool FlusherKafka::Stop(bool isPipelineRemoving) {
-    if (mProducer) {
-        mProducer->Close();
-    }
     if (mHeadersTemplate) {
         mProducer->DestroyHeadersTemplate(mHeadersTemplate);
         mHeadersTemplate = nullptr;
+    }
+    if (mProducer) {
+        mProducer->Close();
     }
     return Flusher::Stop(isPipelineRemoving);
 }
