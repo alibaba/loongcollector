@@ -25,7 +25,8 @@
 namespace logtail {
 
 /*========================================================
- *  Impl：Linux 下真正干活；非 Linux 下只留空壳
+ *  Impl：Linux 下的 systemd-journal 实现
+ *  注意：此插件仅在 Linux 平台可用
  *========================================================*/
 class SystemdJournalReader::Impl {
 public:
@@ -41,7 +42,6 @@ public:
 
     /*---------------  打开 / 关闭  ----------------*/
     bool Open() {
-#ifdef __linux__
         if (mIsOpen) {
             return true;
         }
@@ -80,59 +80,34 @@ public:
 
         mIsOpen = true;
         return true;
-#else
-        mIsOpen = true;
-        return true;
-#endif
     }
 
     void Close() {
-#ifdef __linux__
         if (mJournal != nullptr) {
             sd_journal_close(mJournal);
             mJournal = nullptr;
         }
-#endif
         mIsOpen = false;
     }
 
-    [[nodiscard]] bool IsOpen() const {
-#ifdef __linux__
-        return mIsOpen && mJournal != nullptr;
-#else
-        return mIsOpen;
-#endif
-    }
+    [[nodiscard]] bool IsOpen() const { return mIsOpen && mJournal != nullptr; }
 
     /*---------------  遍历  ----------------*/
     bool SeekHead() {
-#ifdef __linux__
         return call([](auto journal) { return sd_journal_seek_head(journal); });
-#else
-        return mIsOpen;
-#endif
     }
     bool SeekTail() {
-#ifdef __linux__
         return call([](auto journal) { return sd_journal_seek_tail(journal); });
-#else
-        return mIsOpen;
-#endif
     }
     bool SeekCursor(const std::string& cursor) {
         // 添加参数验证
         if (cursor.empty()) {
             return false;
         }
-#ifdef __linux__
         return call([&](auto journal) { return sd_journal_seek_cursor(journal, cursor.c_str()); });
-#else
-        return mIsOpen;
-#endif
     }
 
     bool Next() {
-#ifdef __linux__
         if (!IsOpen()) {
             return false;
         }
@@ -144,13 +119,9 @@ public:
             return false;
         }
         return ret > 0;
-#else
-        return mIsOpen;
-#endif
     }
 
     JournalReadStatus NextWithStatus() {
-#ifdef __linux__
         if (!IsOpen()) {
             return JournalReadStatus::kError;
         }
@@ -171,13 +142,9 @@ public:
         // -EINVAL: 参数无效
         // -EBADMSG: 日志文件损坏
         return JournalReadStatus::kError;
-#else
-        return mIsOpen ? JournalReadStatus::kOk : JournalReadStatus::kError;
-#endif
     }
 
     bool Previous() {
-#ifdef __linux__
         if (!IsOpen()) {
             return false;
         }
@@ -189,14 +156,10 @@ public:
             return false;
         }
         return ret > 0;
-#else
-        return mIsOpen;
-#endif
     }
 
     /*---------------  读取单条  ----------------*/
     bool GetEntry(JournalEntry& entry) {
-#ifdef __linux__
         if (!IsOpen()) {
             return false;
         }
@@ -211,7 +174,7 @@ public:
         entry.cursor = cursor.get();
 
         // 读取 realtime 时间戳
-        // 注意：根据 fluentbit 经验，如果这里返回错误，通常意味着 journal 文件已被删除（轮转）
+        // 注意：如果这里返回错误，通常意味着 journal 文件已被删除（轮转）
         // 需要触发错误恢复流程
         uint64_t timestamp = 0;
         int timeRet = sd_journal_get_realtime_usec(mJournal, &timestamp);
@@ -274,18 +237,9 @@ public:
             fieldCount++;
         }
         return true;
-#else
-        entry.cursor = "simulated_cursor";
-        entry.realtimeTimestamp = 0;
-        entry.monotonicTimestamp = 0;
-        entry.fields["MESSAGE"] = "Simulated entry";
-        entry.fields["_SYSTEMD_UNIT"] = "simulated.service";
-        return mIsOpen;
-#endif
     }
 
     std::string GetCursor() {
-#ifdef __linux__
         if (!IsOpen()) {
             return "";
         }
@@ -296,14 +250,10 @@ public:
         std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
         std::string res(cursor.get());
         return res;
-#else
-        return mIsOpen ? "simulated_cursor" : "";
-#endif
     }
 
     /*---------------  过滤 / 等待  ----------------*/
     bool AddMatch(const std::string& field, const std::string& value) {
-#ifdef __linux__
         if (!IsOpen() || field.empty() || value.empty()) {
             return false;
         }
@@ -315,22 +265,12 @@ public:
 
         std::string keyValue = field + "=" + value;
         return sd_journal_add_match(mJournal, keyValue.c_str(), keyValue.size()) == 0;
-#else
-        return mIsOpen;
-#endif
     }
 
-    bool AddDisjunction() {
-#ifdef __linux__
-        return IsOpen() && sd_journal_add_disjunction(mJournal) == 0;
-#else
-        return mIsOpen;
-#endif
-    }
+    bool AddDisjunction() { return IsOpen() && sd_journal_add_disjunction(mJournal) == 0; }
 
     std::vector<std::string> GetUniqueValues(const std::string& field) {
         std::vector<std::string> values;
-#ifdef __linux__
         if (!IsOpen() || field.empty()) {
             return values;
         }
@@ -368,7 +308,6 @@ public:
             }
             count++;
         }
-#endif
         return values;
     }
 
@@ -378,8 +317,6 @@ public:
         mJournalPaths = p;
         return true;
     }
-
-#ifdef __linux__
 
     bool AddToEpoll(int epollFD) {
         if (!IsOpen() || epollFD < 0) {
@@ -439,8 +376,11 @@ public:
 
         if (ret == SD_JOURNAL_INVALIDATE) {
             // Journal 文件被添加、删除或轮转
-            // 根据 fluentbit 经验：打印日志，但继续处理
+            // 文件已经更新，或者被轮转掉，记录日志，但继续处理
             // 后续的 Next() 调用会处理这种情况（通过错误恢复机制）
+            // Note: 这里不直接打印日志，因为 Impl 类无法访问 sLogger
+            // 日志轮转信息会在上层错误处理流程中记录
+
             return true;
         }
 
@@ -456,10 +396,8 @@ public:
         int fd = sd_journal_get_fd(mJournal);
         return fd;
     }
-#endif
 
 private:
-#ifdef __linux__
     sd_journal* mJournal{nullptr};
 
     template <typename F>
@@ -517,7 +455,6 @@ private:
             return -EIO;
         }
     }
-#endif
 
     static constexpr size_t kDefaultDataThreshold = 64 * 1024;
 
@@ -530,9 +467,9 @@ private:
  *  公共接口转发 - Pimpl 模式实现
  *
  *  设计意图：
- *  1. 编译隔离：避免头文件暴露 systemd 依赖
- *  2. 跨平台兼容：Linux/非Linux 统一接口
- *  3. 扩展性：支持抽象接口和多实现
+ *  1. 编译隔离：避免头文件暴露 systemd 依赖，减小头文件依赖
+ *  2. 扩展性：支持抽象接口和多种实现（如测试用的 MockJournalReader）
+ *  3. 接口稳定性：Impl 类实现可修改，不影响公共 API
  *========================================================*/
 SystemdJournalReader::SystemdJournalReader() : mImpl(std::make_unique<Impl>()) {
 }
@@ -585,7 +522,6 @@ bool SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p) {
     FWD(SetJournalPaths(p));
 }
 
-#ifdef __linux__
 bool SystemdJournalReader::AddToEpoll(int epollFD) {
     return mImpl->AddToEpoll(epollFD);
 }
@@ -601,24 +537,6 @@ bool SystemdJournalReader::ProcessJournalEvent() {
 int SystemdJournalReader::GetJournalFD() const {
     return mImpl->GetJournalFD();
 }
-#else
-// Windows平台下的空实现
-bool SystemdJournalReader::AddToEpoll(int epollFD) {
-    return false; // Windows不支持epoll
-}
-
-void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
-    // Windows不支持epoll，空实现
-}
-
-bool SystemdJournalReader::ProcessJournalEvent() {
-    return false; // Windows不支持systemd journal
-}
-
-int SystemdJournalReader::GetJournalFD() const {
-    return -1; // Windows不支持journal FD
-}
-#endif
 #undef FWD
 
 } // namespace logtail

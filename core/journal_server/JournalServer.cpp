@@ -16,13 +16,11 @@
 
 #include "JournalServer.h"
 
-#include <utility>
-
-#ifdef __linux__
 #include <errno.h>
 #include <sys/epoll.h>
 #include <unistd.h>
-#endif
+
+#include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "connection/JournalConnectionManager.h"
@@ -265,11 +263,6 @@ void JournalServer::run() {
         mGlobalEpollFD = -1;
     }
     LOG_INFO(sLogger, ("journal server event-driven thread", "stopped"));
-
-#else
-    // 非Linux平台不支持事件驱动模式
-    LOG_ERROR(sLogger, ("journal server event-driven collection not supported on this platform", ""));
-    return;
 #endif
 }
 

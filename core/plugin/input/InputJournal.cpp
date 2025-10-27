@@ -35,7 +35,7 @@ const std::string InputJournal::kSeekPositionDefault = "none";
 InputJournal::InputJournal()
     : mSeekPosition(kSeekPositionTail),
       mCursorFlushPeriodMs(kDefaultCursorFlushPeriodMs),
-      mCursorSeekFallback(kSeekPositionHead) // 默认head，参照fluentbit的行为
+      mCursorSeekFallback(kSeekPositionHead) // 即如果游标无效，回退到head
       ,
       mKernel(true),
       mParseSyslogFacility(false),
@@ -176,7 +176,7 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
         mCursorFlushPeriodMs = 300000;
     }
 
-    // 获取cursor回退位置（参照fluentbit的行为，默认head， 与go实现不同go实现默认tail）
+    // 获取cursor回退位置（即默认head， 与go实现不同go实现默认tail）
     if (!GetOptionalStringParam(config, "CursorSeekFallback", mCursorSeekFallback, errorMsg)) {
         mCursorSeekFallback = kSeekPositionHead;
     }

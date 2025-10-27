@@ -135,13 +135,11 @@ public:
 
     bool SetJournalPaths(const std::vector<std::string>& paths) override;
 
-#ifdef __linux__
-    // 事件监听相关方法
+    // 事件监听相关方法（仅在 Linux 平台可用）
     bool AddToEpoll(int epollFD);
     void RemoveFromEpoll(int epollFD);
     bool ProcessJournalEvent();
     int GetJournalFD() const;
-#endif
 
 private:
     class Impl;

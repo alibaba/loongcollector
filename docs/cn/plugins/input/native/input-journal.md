@@ -15,30 +15,6 @@ InputJournal是一个高性能的systemd日志收集组件，专为高效可靠�
 - **🎯 或逻辑**: 所有过滤器使用或逻辑，提供最大灵活性
 - **📊 丰富元数据**: 收集全面的日志条目元数据
 
-## 🏗️ 架构概览
-
-```mermaid
-graph TB
-    subgraph "JournalServer架构"
-        JS[JournalServer] --> CM[连接管理器]
-        JS --> JF[日志过滤器]
-        JS --> CP[检查点管理器]
-        
-        CM --> JR[日志读取器]
-        JF --> JR
-        CP --> JR
-        
-        JR --> SJ[Systemd Journal API]
-        JR --> DC[数据收集器]
-    end
-    
-    subgraph "过滤器组件"
-        JF --> UF[单元过滤器]
-        JF --> IF[标识符过滤器]  
-        JF --> KF[内核过滤器]
-        JF --> MF[匹配模式过滤器]
-    end
-```
 
 ### 核心组件
 
@@ -48,7 +24,6 @@ graph TB
 | **连接管理器** | 连接处理 | 管理日志读取器连接和生命周期 |
 | **日志过滤器** | 数据过滤 | 应用配置的或逻辑过滤器 |
 | **日志读取器** | 数据提取 | 与systemd日志API接口 |
-| **检查点管理器** | 状态持久化 | 管理读取位置和恢复 |
 
 ## 🎯 过滤系统
 
@@ -210,7 +185,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 | `JournalPaths` | 数组 | `[]` | 日志文件路径（空=系统日志） |
 | `SeekPosition` | 字符串 | `"tail"` | 初始读取位置: `head`、`tail`、`cursor` |
 | `CursorFlushPeriodMs` | 整数 | `1000` | 检查点保存频率（毫秒） |
-| `CursorSeekFallback` | 字符串 | `"head"` | 游标无效时的回退位置（参照fluentbit的行为，可选值：`head` 或 `tail`） |
+| `CursorSeekFallback` | 字符串 | `"head"` | 游标无效时的回退位置（可选值：`head` 或 `tail`） |
 | `ResetIntervalSecond` | 整数 | `3600` | 检查点重置间隔 |
 | `Units` | 数组 | `[]` | 要监控的Systemd单元 |
 | `Kernel` | 布尔值 | `false` | 启用内核日志收集 |
@@ -343,26 +318,6 @@ make journal_server
 4. **监控检查点文件** 用于位置跟踪
 5. **使用`journalctl --list-fields`** 发现可用字段
 
-## 📊 性能考虑
-
-### 优化指南
-
-1. **过滤器特异性**: 使用特定的单元/标识符而非广泛模式
-2. **检查点频率**: 在`CursorFlushPeriodMs`的性能和可靠性之间平衡
-3. **内核日志**: 仅在必要时启用，因为量大
-4. **日志大小**: 监控日志磁盘使用和轮转策略
-
-
-## 🤝 贡献
-
-1. 遵循现有代码风格和模式
-2. 为新功能添加单元测试
-3. 更新此文档以反映任何更改
-4. 确保与Golang实现的兼容性
-
-## 📄 许可证
-
-此组件是LoongCollector的一部分，遵循相同的Apache 2.0许可证。
 
 ---
 
