@@ -41,8 +41,12 @@ protected:
 private:
     BatchedEvents
     createBatchedLogEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
-    BatchedEvents createBatchedMetricEvents(
-        bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue = false, bool withMetadata = false);
+    BatchedEvents createBatchedMetricEvents(bool enableNanosecond,
+                                            uint32_t nanoTimestamp,
+                                            bool emptyValue,
+                                            bool onlyOneTag,
+                                            bool multiValue = false,
+                                            bool withMetadata = false);
     BatchedEvents
     createBatchedRawEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
     BatchedEvents createBatchedSpanEvents();
@@ -110,11 +114,13 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
         { // with metadata
             string res;
             string errorMsg;
-            APSARA_TEST_TRUE(serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, true, false, true), res, errorMsg));
-            APSARA_TEST_EQUAL("{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
-                              "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
-                              "\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1,\"__apm_metric_type__\":\"app\"}\n",
-                              res);
+            APSARA_TEST_TRUE(
+                serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, true, false, true), res, errorMsg));
+            APSARA_TEST_EQUAL(
+                "{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
+                "\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1,\"__apm_metric_type__\":\"app\"}\n",
+                res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // multi value
@@ -309,8 +315,12 @@ JsonSerializerUnittest::createBatchedLogEvents(bool enableNanosecond, bool withE
     return batch;
 }
 
-BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(
-    bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue, bool withMetadata) {
+BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(bool enableNanosecond,
+                                                                uint32_t nanoTimestamp,
+                                                                bool emptyValue,
+                                                                bool onlyOneTag,
+                                                                bool multiValue,
+                                                                bool withMetadata) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");

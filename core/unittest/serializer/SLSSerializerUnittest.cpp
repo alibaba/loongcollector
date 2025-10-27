@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "collection_pipeline/serializer/SLSSerializer.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
+#include "collection_pipeline/serializer/SLSSerializer.h"
+#include "common/JsonUtil.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
-#include "common/JsonUtil.h"
 
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
@@ -42,9 +42,14 @@ protected:
 private:
     BatchedEvents
     CreateBatchedLogEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
-    BatchedEvents
-    CreateBatchedMetricEvents(bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool noTag = false, bool withMetadata = false);
-    BatchedEvents CreateAPMBatchedMetricEvents(bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool withMetadata = false);
+    BatchedEvents CreateBatchedMetricEvents(bool enableNanosecond,
+                                            uint32_t nanoTimestamp,
+                                            bool emptyValue,
+                                            bool onlyOneTag,
+                                            bool noTag = false,
+                                            bool withMetadata = false);
+    BatchedEvents CreateAPMBatchedMetricEvents(
+        bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool withMetadata = false);
     BatchedEvents CreateBatchedMultiValueMetricEvents(bool enableNanosecond,
                                                       uint32_t nanoTimestamp,
                                                       bool emptyTag,
@@ -133,7 +138,8 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         { // no tag
             // TODO
             string res, errorMsg;
-            APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
+            APSARA_TEST_TRUE(
+                serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
             sls_logs::LogGroup logGroup;
             APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -260,10 +266,10 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_STREQ("source", logGroup.source().c_str());
             APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
         }
-        {  // nano second enabled, exactly 9 digits, with metadata
+        { // nano second enabled, exactly 9 digits, with metadata
             string res, errorMsg;
-            APSARA_TEST_TRUE(
-                serializer.DoSerialize(CreateBatchedMetricEvents(true, 999999999, false, false, false, true), res, errorMsg));
+            APSARA_TEST_TRUE(serializer.DoSerialize(
+                CreateBatchedMetricEvents(true, 999999999, false, false, false, true), res, errorMsg));
             sls_logs::LogGroup logGroup;
             APSARA_TEST_TRUE(logGroup.ParseFromString(res));
 
@@ -288,7 +294,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_STREQ("source", logGroup.source().c_str());
             APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
         }
-        {  // timestamp invalid
+        { // timestamp invalid
             string res, errorMsg;
             auto batch = CreateBatchedMetricEvents(false, 0, false, false);
             batch.mEvents[0]->SetTimestamp(123);
@@ -790,12 +796,8 @@ SLSSerializerUnittest::CreateBatchedLogEvents(bool enableNanosecond, bool withEm
     return batch;
 }
 
-BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(bool enableNanosecond,
-                                                               uint32_t nanoTimestamp,
-                                                               bool emptyValue,
-                                                               bool onlyOneTag,
-                                                               bool noTag,
-                                                               bool withMetadata) {
+BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(
+    bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool noTag, bool withMetadata) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
