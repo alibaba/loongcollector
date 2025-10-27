@@ -115,12 +115,17 @@ struct KafkaConfig {
                     LOG_WARNING(sLogger, ("Invalid header entry: not an object", "skip")("entry", h.toStyledString()));
                     continue;
                 }
-                if (h.isMember("key") && h["key"].isString() && h.isMember("value") && h["value"].isString()) {
-                    Headers.emplace_back(h["key"].asString(), h["value"].asString());
-                } else {
+                if (!(h.isMember("key") && h["key"].isString() && h.isMember("value") && h["value"].isString())) {
                     LOG_WARNING(sLogger,
                                 ("Invalid header entry: missing key or value", "skip")("entry", h.toStyledString()));
+                    continue;
                 }
+                const std::string keyStr = h["key"].asString();
+                if (keyStr.empty()) {
+                    LOG_WARNING(sLogger, ("Invalid header entry: key is empty", "skip")("entry", h.toStyledString()));
+                    continue;
+                }
+                Headers.emplace_back(keyStr, h["value"].asString());
             }
         }
 

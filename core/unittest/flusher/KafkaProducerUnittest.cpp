@@ -33,6 +33,7 @@
 using namespace std;
 
 namespace logtail {
+
 class KafkaProducerUnittest : public ::testing::Test {
 public:
     void TestInitSuccess();
@@ -324,24 +325,36 @@ void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
 
 void KafkaProducerUnittest::TestCreateHeadersTemplate() {
     KafkaProducer p;
-    std::vector<std::pair<std::string, std::string>> headers = {{"key1", "value1"}, {"key2", "value2"}};
-    auto* tpl = p.CreateHeadersTemplate(headers);
-    APSARA_TEST_NOT_EQUAL(nullptr, tpl);
-    p.DestroyHeadersTemplate(tpl);
-    tpl = p.CreateHeadersTemplate({});
-    APSARA_TEST_NOT_EQUAL(nullptr, tpl);
-    p.DestroyHeadersTemplate(tpl);
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1000;
+    c.Headers = {{"key1", "value1"}, {"key2", "value2"}};
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        std::string(1024, 'x'),
+        [&](bool success, const KafkaProducer::ErrorInfo& info) {
+            called.store(true, std::memory_order_relaxed);
+            APSARA_TEST_FALSE(success);
+            APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
+        },
+        std::string());
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
 }
 
 void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndKeys() {
     KafkaProducer p;
-    KafkaProducer::HeadersTemplate* tpl = p.CreateHeadersTemplate({{"header1", "value1"}, {"header2", "value2"}});
-    APSARA_TEST_NOT_EQUAL(nullptr, tpl);
+    std::vector<std::pair<std::string, std::string>> headers = {{"header1", "value1"}, {"header2", "value2"}};
     KafkaConfig c;
     c.Brokers = {"127.0.0.1:9092"};
     c.Topic = "ut_topic";
     c.Version = "2.6.0";
     c.MaxMessageBytes = 1000;
+    c.Headers = headers;
     APSARA_TEST_TRUE(p.Init(c));
 
     std::atomic<bool> called{false};
@@ -353,22 +366,20 @@ void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndKeys() {
             APSARA_TEST_FALSE(success);
             APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
         },
-        "hash-key",
-        tpl);
+        "hash-key");
     APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
-    p.DestroyHeadersTemplate(tpl);
 }
 
 void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndNoKeys() {
     KafkaProducer p;
-    KafkaProducer::HeadersTemplate* tpl = p.CreateHeadersTemplate({{"header1", "value1"}, {"header2", "value2"}});
-    APSARA_TEST_NOT_EQUAL(nullptr, tpl);
+    std::vector<std::pair<std::string, std::string>> headers = {{"header1", "value1"}, {"header2", "value2"}};
 
     KafkaConfig c;
     c.Brokers = {"127.0.0.1:9092"};
     c.Topic = "ut_topic";
     c.Version = "2.6.0";
     c.MaxMessageBytes = 1000;
+    c.Headers = headers;
     APSARA_TEST_TRUE(p.Init(c));
 
     std::atomic<bool> called{false};
@@ -380,10 +391,8 @@ void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndNoKeys() {
             APSARA_TEST_FALSE(success);
             APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
         },
-        std::string(),
-        tpl);
+        std::string());
     APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
-    p.DestroyHeadersTemplate(tpl);
 }
 
 void KafkaProducerUnittest::TestProduceAsyncWithKeyAndNoHeaders() {

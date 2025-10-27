@@ -21,7 +21,6 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
@@ -77,8 +76,6 @@ private:
     CounterPtr mParamsErrorCnt;
     CounterPtr mOtherErrorCnt;
 
-    std::vector<std::pair<std::string, std::string>> mRecordHeaders;
-    KafkaProducer::HeadersTemplate* mHeadersTemplate = nullptr;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherKafkaUnittest;
