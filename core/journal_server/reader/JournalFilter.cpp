@@ -26,70 +26,70 @@ namespace logtail {
 
 bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& config) {
     if (!reader) {
-        LOG_ERROR(
-            sLogger,
-            ("journal filter but journal reader is null", "")("config", config.configName)("idx", config.configIndex));
+        LOG_ERROR(sLogger,
+                  ("journal filter but journal reader is null", "")("config", config.mConfigName)("idx",
+                                                                                                  config.mConfigIndex));
         return false;
     }
 
     LOG_INFO(sLogger,
-             ("journal filter applying journal filters",
-              "")("config", config.configName)("idx", config.configIndex)("description", GetConfigDescription(config)));
+             ("journal filter applying journal filters", "")("config", config.mConfigName)("idx", config.mConfigIndex)(
+                 "description", GetConfigDescription(config)));
 
     // 验证配置
     if (!ValidateConfig(config)) {
-        LOG_ERROR(
-            sLogger,
-            ("journal filter with invalid filter config", "")("config", config.configName)("idx", config.configIndex));
+        LOG_ERROR(sLogger,
+                  ("journal filter with invalid filter config", "")("config", config.mConfigName)("idx",
+                                                                                                  config.mConfigIndex));
         return false;
     }
 
 
     try {
         // 1. 应用units过滤（如果配置了）- 包含glob模式支持
-        if (!AddUnitsFilter(reader, config.units, config.configName, config.configIndex)) {
+        if (!AddUnitsFilter(reader, config.mUnits, config.mConfigName, config.mConfigIndex)) {
             LOG_ERROR(
                 sLogger,
-                ("journal filter units filter failed", "")("config", config.configName)("idx", config.configIndex));
+                ("journal filter units filter failed", "")("config", config.mConfigName)("idx", config.mConfigIndex));
             return false;
         }
 
         // 2. 应用自定义匹配模式（如果配置了）- 与Go版本顺序一致
-        if (!AddMatchPatternsFilter(reader, config.matchPatterns, config.configName, config.configIndex)) {
+        if (!AddMatchPatternsFilter(reader, config.mMatchPatterns, config.mConfigName, config.mConfigIndex)) {
             LOG_ERROR(sLogger,
                       ("journal filter match patterns filter failed",
-                       "")("config", config.configName)("idx", config.configIndex));
+                       "")("config", config.mConfigName)("idx", config.mConfigIndex));
             return false;
         }
 
         // 3. 应用kernel过滤（如果配置了units且启用kernel）
         // 与Golang版本保持一致：只有在配置了units且enableKernel=true时才添加kernel过滤器
-        if (!config.units.empty() && config.enableKernel) {
-            if (!AddKernelFilter(reader, config.configName, config.configIndex)) {
+        if (!config.mUnits.empty() && config.mEnableKernel) {
+            if (!AddKernelFilter(reader, config.mConfigName, config.mConfigIndex)) {
                 LOG_ERROR(sLogger,
-                          ("journal filter kernel filter failed", "")("config", config.configName)("idx",
-                                                                                                   config.configIndex));
+                          ("journal filter kernel filter failed", "")("config",
+                                                                      config.mConfigName)("idx", config.mConfigIndex));
                 return false;
             }
         }
 
         // 4. 应用identifiers过滤（如果配置了）- 与Go版本顺序一致
-        if (!AddIdentifiersFilter(reader, config.identifiers, config.configName, config.configIndex)) {
+        if (!AddIdentifiersFilter(reader, config.mIdentifiers, config.mConfigName, config.mConfigIndex)) {
             LOG_ERROR(sLogger,
                       ("journal filter identifiers filter failed", "")("config",
-                                                                       config.configName)("idx", config.configIndex));
+                                                                       config.mConfigName)("idx", config.mConfigIndex));
             return false;
         }
 
         LOG_INFO(sLogger,
-                 ("journal filter all filters applied successfully", "")("config",
-                                                                         config.configName)("idx", config.configIndex));
+                 ("journal filter all filters applied successfully",
+                  "")("config", config.mConfigName)("idx", config.mConfigIndex));
         return true;
 
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
                   ("journal filter exception during filter application",
-                   e.what())("config", config.configName)("idx", config.configIndex));
+                   e.what())("config", config.mConfigName)("idx", config.mConfigIndex));
         return false;
     }
 }
@@ -330,31 +330,31 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
 
 bool JournalFilter::ValidateConfig(const FilterConfig& config) {
     // 基本验证
-    if (config.configName.empty()) {
+    if (config.mConfigName.empty()) {
         LOG_WARNING(sLogger, ("journal filter config missing configName", ""));
         return false;
     }
 
     // 验证units配置
-    for (const auto& unit : config.units) {
+    for (const auto& unit : config.mUnits) {
         if (unit.empty()) {
-            LOG_WARNING(sLogger, ("journal filter empty unit name in config", "")("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter empty unit name in config", "")("config", config.mConfigName));
             return false;
         }
     }
 
     // 验证identifiers配置
-    for (const auto& identifier : config.identifiers) {
+    for (const auto& identifier : config.mIdentifiers) {
         if (identifier.empty()) {
-            LOG_WARNING(sLogger, ("journal filter empty identifier in config", "")("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter empty identifier in config", "")("config", config.mConfigName));
             return false;
         }
     }
 
     // 验证matchPatterns配置
-    for (const auto& pattern : config.matchPatterns) {
+    for (const auto& pattern : config.mMatchPatterns) {
         if (pattern.empty() || !absl::StrContains(pattern, '=')) {
-            LOG_WARNING(sLogger, ("journal filter invalid match pattern", pattern)("config", config.configName));
+            LOG_WARNING(sLogger, ("journal filter invalid match pattern", pattern)("config", config.mConfigName));
             return false;
         }
     }
@@ -397,23 +397,23 @@ std::string JournalFilter::GetConfigDescription(const FilterConfig& config) {
 
     bool first = true;
 
-    if (!config.units.empty()) {
+    if (!config.mUnits.empty()) {
         if (!first) {
             oss << ", ";
         }
-        oss << "units(" << config.units.size() << ")";
+        oss << "units(" << config.mUnits.size() << ")";
         first = false;
     }
 
-    if (!config.identifiers.empty()) {
+    if (!config.mIdentifiers.empty()) {
         if (!first) {
             oss << ", ";
         }
-        oss << "identifiers(" << config.identifiers.size() << ")";
+        oss << "identifiers(" << config.mIdentifiers.size() << ")";
         first = false;
     }
 
-    if (config.enableKernel) {
+    if (config.mEnableKernel) {
         if (!first) {
             oss << ", ";
         }
@@ -421,11 +421,11 @@ std::string JournalFilter::GetConfigDescription(const FilterConfig& config) {
         first = false;
     }
 
-    if (!config.matchPatterns.empty()) {
+    if (!config.mMatchPatterns.empty()) {
         if (!first) {
             oss << ", ";
         }
-        oss << "patterns(" << config.matchPatterns.size() << ")";
+        oss << "patterns(" << config.mMatchPatterns.size() << ")";
         first = false;
     }
 

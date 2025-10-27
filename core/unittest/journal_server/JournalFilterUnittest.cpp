@@ -77,34 +77,34 @@ void JournalFilterUnittest::TestFilterConfig() {
     JournalFilter::FilterConfig config;
 
     // 测试默认值
-    APSARA_TEST_TRUE(config.units.empty());
-    APSARA_TEST_TRUE(config.identifiers.empty());
-    APSARA_TEST_TRUE(config.matchPatterns.empty());
-    APSARA_TEST_TRUE(config.enableKernel);
-    APSARA_TEST_TRUE(config.configName.empty());
-    APSARA_TEST_TRUE(config.configIndex == 0);
+    APSARA_TEST_TRUE(config.mUnits.empty());
+    APSARA_TEST_TRUE(config.mIdentifiers.empty());
+    APSARA_TEST_TRUE(config.mMatchPatterns.empty());
+    APSARA_TEST_TRUE(config.mEnableKernel);
+    APSARA_TEST_TRUE(config.mConfigName.empty());
+    APSARA_TEST_TRUE(config.mConfigIndex == 0);
 
     // 测试设置值
-    config.units = {"nginx.service", "apache.service"};
-    config.identifiers = {"nginx", "apache"};
-    config.matchPatterns = {"*error*", "*warning*"};
-    config.enableKernel = false;
-    config.configName = "test_config";
-    config.configIndex = 1;
+    config.mUnits = {"nginx.service", "apache.service"};
+    config.mIdentifiers = {"nginx", "apache"};
+    config.mMatchPatterns = {"*error*", "*warning*"};
+    config.mEnableKernel = false;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 1;
 
     // 验证设置值
-    APSARA_TEST_EQUAL(config.units.size(), 2);
-    APSARA_TEST_EQUAL(config.units[0], "nginx.service");
-    APSARA_TEST_EQUAL(config.units[1], "apache.service");
-    APSARA_TEST_EQUAL(config.identifiers.size(), 2);
-    APSARA_TEST_EQUAL(config.identifiers[0], "nginx");
-    APSARA_TEST_EQUAL(config.identifiers[1], "apache");
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 2);
-    APSARA_TEST_EQUAL(config.matchPatterns[0], "*error*");
-    APSARA_TEST_EQUAL(config.matchPatterns[1], "*warning*");
-    APSARA_TEST_FALSE(config.enableKernel);
-    APSARA_TEST_EQUAL(config.configName, "test_config");
-    APSARA_TEST_EQUAL(config.configIndex, 1);
+    APSARA_TEST_EQUAL(config.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(config.mUnits[0], "nginx.service");
+    APSARA_TEST_EQUAL(config.mUnits[1], "apache.service");
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 2);
+    APSARA_TEST_EQUAL(config.mIdentifiers[0], "nginx");
+    APSARA_TEST_EQUAL(config.mIdentifiers[1], "apache");
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 2);
+    APSARA_TEST_EQUAL(config.mMatchPatterns[0], "*error*");
+    APSARA_TEST_EQUAL(config.mMatchPatterns[1], "*warning*");
+    APSARA_TEST_FALSE(config.mEnableKernel);
+    APSARA_TEST_EQUAL(config.mConfigName, "test_config");
+    APSARA_TEST_EQUAL(config.mConfigIndex, 1);
 }
 
 void JournalFilterUnittest::TestFilterCreation() {
@@ -118,75 +118,75 @@ void JournalFilterUnittest::TestFilterCreation() {
 void JournalFilterUnittest::TestUnitsFilter() {
     // 配置units过滤器
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service", "apache.service"};
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service", "apache.service"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置设置（由于接口可能不完整，这里只测试配置对象）
-    APSARA_TEST_EQUAL(config.units.size(), 2);
-    APSARA_TEST_EQUAL(config.units[0], "nginx.service");
-    APSARA_TEST_EQUAL(config.units[1], "apache.service");
-    APSARA_TEST_EQUAL(config.configName, "test_config");
-    APSARA_TEST_EQUAL(config.configIndex, 0);
+    APSARA_TEST_EQUAL(config.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(config.mUnits[0], "nginx.service");
+    APSARA_TEST_EQUAL(config.mUnits[1], "apache.service");
+    APSARA_TEST_EQUAL(config.mConfigName, "test_config");
+    APSARA_TEST_EQUAL(config.mConfigIndex, 0);
 }
 
 void JournalFilterUnittest::TestIdentifiersFilter() {
     // 配置identifiers过滤器
     JournalFilter::FilterConfig config;
-    config.identifiers = {"nginx", "apache"};
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mIdentifiers = {"nginx", "apache"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置设置
-    APSARA_TEST_EQUAL(config.identifiers.size(), 2);
-    APSARA_TEST_EQUAL(config.identifiers[0], "nginx");
-    APSARA_TEST_EQUAL(config.identifiers[1], "apache");
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 2);
+    APSARA_TEST_EQUAL(config.mIdentifiers[0], "nginx");
+    APSARA_TEST_EQUAL(config.mIdentifiers[1], "apache");
 }
 
 void JournalFilterUnittest::TestKernelFilter() {
     // 配置kernel过滤器
     JournalFilter::FilterConfig config;
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置设置
-    APSARA_TEST_TRUE(config.enableKernel);
-    APSARA_TEST_EQUAL(config.configName, "test_config");
-    APSARA_TEST_EQUAL(config.configIndex, 0);
+    APSARA_TEST_TRUE(config.mEnableKernel);
+    APSARA_TEST_EQUAL(config.mConfigName, "test_config");
+    APSARA_TEST_EQUAL(config.mConfigIndex, 0);
 }
 
 void JournalFilterUnittest::TestMatchPatternsFilter() {
     // 配置match patterns过滤器
     JournalFilter::FilterConfig config;
-    config.matchPatterns = {"*error*", "*warning*"};
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mMatchPatterns = {"*error*", "*warning*"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置设置
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 2);
-    APSARA_TEST_EQUAL(config.matchPatterns[0], "*error*");
-    APSARA_TEST_EQUAL(config.matchPatterns[1], "*warning*");
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 2);
+    APSARA_TEST_EQUAL(config.mMatchPatterns[0], "*error*");
+    APSARA_TEST_EQUAL(config.mMatchPatterns[1], "*warning*");
 }
 
 void JournalFilterUnittest::TestCombinedFilters() {
     // 配置组合过滤器
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置设置
-    APSARA_TEST_EQUAL(config.units.size(), 1);
-    APSARA_TEST_EQUAL(config.units[0], "nginx.service");
-    APSARA_TEST_EQUAL(config.identifiers.size(), 1);
-    APSARA_TEST_EQUAL(config.identifiers[0], "nginx");
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 1);
-    APSARA_TEST_EQUAL(config.matchPatterns[0], "*error*");
-    APSARA_TEST_TRUE(config.enableKernel);
+    APSARA_TEST_EQUAL(config.mUnits.size(), 1);
+    APSARA_TEST_EQUAL(config.mUnits[0], "nginx.service");
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 1);
+    APSARA_TEST_EQUAL(config.mIdentifiers[0], "nginx");
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 1);
+    APSARA_TEST_EQUAL(config.mMatchPatterns[0], "*error*");
+    APSARA_TEST_TRUE(config.mEnableKernel);
 }
 
 void JournalFilterUnittest::TestFilterStatistics() {
@@ -208,8 +208,8 @@ void JournalFilterUnittest::TestFilterReset() {
 void JournalFilterUnittest::TestApplyAllFiltersNullReader() {
     // 测试空reader的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试空reader处理
     bool result = JournalFilter::ApplyAllFilters(nullptr, config);
@@ -219,8 +219,8 @@ void JournalFilterUnittest::TestApplyAllFiltersNullReader() {
 void JournalFilterUnittest::TestApplyAllFiltersInvalidConfig() {
     // 测试无效配置的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试无效配置处理
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -229,9 +229,9 @@ void JournalFilterUnittest::TestApplyAllFiltersInvalidConfig() {
 void JournalFilterUnittest::TestApplyAllFiltersUnitsFailure() {
     // 测试units过滤器失败的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.units = {"invalid_unit"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"invalid_unit"};
 
     // 测试units过滤器失败处理
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -240,9 +240,9 @@ void JournalFilterUnittest::TestApplyAllFiltersUnitsFailure() {
 void JournalFilterUnittest::TestApplyAllFiltersMatchPatternsFailure() {
     // 测试match patterns过滤器失败的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.matchPatterns = {"invalid_pattern"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mMatchPatterns = {"invalid_pattern"};
 
     // 测试match patterns过滤器失败处理
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -251,9 +251,9 @@ void JournalFilterUnittest::TestApplyAllFiltersMatchPatternsFailure() {
 void JournalFilterUnittest::TestApplyAllFiltersKernelFailure() {
     // 测试kernel过滤器失败的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.enableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mEnableKernel = true;
 
     // 测试kernel过滤器失败处理
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -262,9 +262,9 @@ void JournalFilterUnittest::TestApplyAllFiltersKernelFailure() {
 void JournalFilterUnittest::TestApplyAllFiltersIdentifiersFailure() {
     // 测试identifiers过滤器失败的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.identifiers = {"invalid_identifier"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mIdentifiers = {"invalid_identifier"};
 
     // 测试identifiers过滤器失败处理
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -273,8 +273,8 @@ void JournalFilterUnittest::TestApplyAllFiltersIdentifiersFailure() {
 void JournalFilterUnittest::TestApplyAllFiltersNoFilters() {
     // 测试没有配置任何过滤器的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
     // 不设置任何过滤器
 
     // 测试无过滤器配置处理
@@ -284,9 +284,9 @@ void JournalFilterUnittest::TestApplyAllFiltersNoFilters() {
 void JournalFilterUnittest::TestApplyAllFiltersKernelOnly() {
     // 测试只有kernel过滤器的情况
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.enableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mEnableKernel = true;
     // 不设置其他过滤器
 
     // 测试kernel-only过滤器处理
@@ -296,9 +296,9 @@ void JournalFilterUnittest::TestApplyAllFiltersKernelOnly() {
 void JournalFilterUnittest::TestAddUnitsFilter() {
     // 测试添加units过滤器
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.units = {"nginx", "apache"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"nginx", "apache"};
 
     // 测试units过滤器添加
     APSARA_TEST_TRUE(true); // 主要测试过滤器添加逻辑
@@ -307,9 +307,9 @@ void JournalFilterUnittest::TestAddUnitsFilter() {
 void JournalFilterUnittest::TestAddMatchPatternsFilter() {
     // 测试添加match patterns过滤器
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.matchPatterns = {"*error*", "*warning*"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mMatchPatterns = {"*error*", "*warning*"};
 
     // 测试match patterns过滤器添加
     APSARA_TEST_TRUE(true); // 主要测试过滤器添加逻辑
@@ -318,9 +318,9 @@ void JournalFilterUnittest::TestAddMatchPatternsFilter() {
 void JournalFilterUnittest::TestAddKernelFilter() {
     // 测试添加kernel过滤器
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.enableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mEnableKernel = true;
 
     // 测试kernel过滤器添加
     APSARA_TEST_TRUE(true); // 主要测试过滤器添加逻辑
@@ -329,9 +329,9 @@ void JournalFilterUnittest::TestAddKernelFilter() {
 void JournalFilterUnittest::TestAddIdentifiersFilter() {
     // 测试添加identifiers过滤器
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.identifiers = {"nginx", "apache"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mIdentifiers = {"nginx", "apache"};
 
     // 测试identifiers过滤器添加
     APSARA_TEST_TRUE(true); // 主要测试过滤器添加逻辑
@@ -340,8 +340,8 @@ void JournalFilterUnittest::TestAddIdentifiersFilter() {
 void JournalFilterUnittest::TestValidateConfig() {
     // 测试配置验证
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     // 测试配置验证
     APSARA_TEST_TRUE(true); // 主要测试配置验证逻辑
@@ -350,12 +350,12 @@ void JournalFilterUnittest::TestValidateConfig() {
 void JournalFilterUnittest::TestGetConfigDescription() {
     // 测试获取配置描述
     JournalFilter::FilterConfig config;
-    config.configName = "test_config";
-    config.configIndex = 0;
-    config.units = {"nginx"};
-    config.identifiers = {"nginx"};
-    config.enableKernel = true;
-    config.matchPatterns = {"*error*"};
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"nginx"};
+    config.mIdentifiers = {"nginx"};
+    config.mEnableKernel = true;
+    config.mMatchPatterns = {"*error*"};
 
     // 测试配置描述生成
     std::string description = JournalFilter::GetConfigDescription(config);
@@ -458,12 +458,12 @@ TEST_F(JournalFilterUnittest, TestGetConfigDescription) {
 void JournalFilterUnittest::TestApplyAllFiltersWithEmptyUnits() {
     // 测试应用所有过滤器（空units）
     JournalFilter::FilterConfig config;
-    config.units = {};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -477,12 +477,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyUnits() {
 void JournalFilterUnittest::TestApplyAllFiltersWithEmptyIdentifiers() {
     // 测试应用所有过滤器（空identifiers）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -496,12 +496,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyIdentifiers() {
 void JournalFilterUnittest::TestApplyAllFiltersWithEmptyMatchPatterns() {
     // 测试应用所有过滤器（空matchPatterns）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -515,12 +515,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyMatchPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithInvalidUnits() {
     // 测试应用所有过滤器（无效units）
     JournalFilter::FilterConfig config;
-    config.units = {"invalid.service", "nonexistent.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"invalid.service", "nonexistent.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -534,12 +534,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidUnits() {
 void JournalFilterUnittest::TestApplyAllFiltersWithInvalidIdentifiers() {
     // 测试应用所有过滤器（无效identifiers）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"invalid", "nonexistent"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"invalid", "nonexistent"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -553,12 +553,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidIdentifiers() {
 void JournalFilterUnittest::TestApplyAllFiltersWithInvalidMatchPatterns() {
     // 测试应用所有过滤器（无效matchPatterns）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"[invalid", "invalid)"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"[invalid", "invalid)"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -572,12 +572,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidMatchPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithKernelDisabled() {
     // 测试应用所有过滤器（kernel禁用）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = false;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = false;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -591,12 +591,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithKernelDisabled() {
 void JournalFilterUnittest::TestApplyAllFiltersWithKernelEnabled() {
     // 测试应用所有过滤器（kernel启用）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -610,12 +610,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithKernelEnabled() {
 void JournalFilterUnittest::TestApplyAllFiltersWithAllFiltersEnabled() {
     // 测试应用所有过滤器（所有过滤器启用）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service", "apache.service"};
-    config.identifiers = {"nginx", "apache"};
-    config.matchPatterns = {"*error*", "*warning*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service", "apache.service"};
+    config.mIdentifiers = {"nginx", "apache"};
+    config.mMatchPatterns = {"*error*", "*warning*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -629,12 +629,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithAllFiltersEnabled() {
 void JournalFilterUnittest::TestApplyAllFiltersWithPartialFilters() {
     // 测试应用所有过滤器（部分过滤器）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {};
-    config.matchPatterns = {"*error*"};
-    config.enableKernel = false;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {};
+    config.mMatchPatterns = {"*error*"};
+    config.mEnableKernel = false;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -648,12 +648,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithPartialFilters() {
 void JournalFilterUnittest::TestApplyAllFiltersWithComplexPatterns() {
     // 测试应用所有过滤器（复杂模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*", "*warning*", "*info*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*", "*warning*", "*info*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -667,12 +667,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithComplexPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithSpecialCharacters() {
     // 测试应用所有过滤器（特殊字符）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*", "*warning*", "*info*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*", "*warning*", "*info*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -686,12 +686,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithSpecialCharacters() {
 void JournalFilterUnittest::TestApplyAllFiltersWithLongPatterns() {
     // 测试应用所有过滤器（长模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*very_long_pattern_that_might_cause_issues*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*very_long_pattern_that_might_cause_issues*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -705,12 +705,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithLongPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithEmptyPatterns() {
     // 测试应用所有过滤器（空模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"", "  ", "\t"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"", "  ", "\t"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -724,12 +724,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithDuplicatePatterns() {
     // 测试应用所有过滤器（重复模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*error*", "*error*", "*warning*"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*error*", "*error*", "*warning*"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -743,12 +743,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithDuplicatePatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithWildcardPatterns() {
     // 测试应用所有过滤器（通配符模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"*", "**", "***"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"*", "**", "***"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 
@@ -762,12 +762,12 @@ void JournalFilterUnittest::TestApplyAllFiltersWithWildcardPatterns() {
 void JournalFilterUnittest::TestApplyAllFiltersWithRegexPatterns() {
     // 测试应用所有过滤器（正则表达式模式）
     JournalFilter::FilterConfig config;
-    config.units = {"nginx.service"};
-    config.identifiers = {"nginx"};
-    config.matchPatterns = {"^.*error.*$", "^.*warning.*$"};
-    config.enableKernel = true;
-    config.configName = "test_config";
-    config.configIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mMatchPatterns = {"^.*error.*$", "^.*warning.*$"};
+    config.mEnableKernel = true;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
 
     auto reader = std::make_shared<SystemdJournalReader>();
 

@@ -225,7 +225,7 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     logEvent->SetContent("_monotonic_timestamp_", std::to_string(entry.monotonicTimestamp));
 
     // 设置时间戳
-    if (config.useJournalEventTime && entry.realtimeTimestamp > 0) {
+    if (config.mUseJournalEventTime && entry.realtimeTimestamp > 0) {
         // journal的realtimeTimestamp是微秒，需要转换为秒和纳秒
         uint64_t seconds = entry.realtimeTimestamp / 1000000;
         uint64_t nanoseconds = (entry.realtimeTimestamp % 1000000) * 1000;
@@ -248,7 +248,7 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
 }
 
 void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
-    if (config.parsePriority) {
+    if (config.mParsePriority) {
         // 查找PRIORITY字段
         auto it = entry.fields.find("PRIORITY");
         if (it != entry.fields.end()) {
@@ -261,7 +261,7 @@ void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& confi
         }
     }
 
-    if (config.parseSyslogFacility) {
+    if (config.mParseSyslogFacility) {
         // 查找SYSLOG_FACILITY字段
         auto it = entry.fields.find("SYSLOG_FACILITY");
         if (it != entry.fields.end()) {
@@ -308,13 +308,13 @@ void ReadJournalEntries(const string& configName,
                         QueueKey queueKey) {
     int entryCount = 0;
     // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
-    const int maxEntriesPerBatch = std::max(1, std::min(config.maxEntriesPerBatch, 10000)); // 公平参数
+    const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // 公平参数
 
     // 如果配置值被修正，记录警告
-    if (config.maxEntriesPerBatch != maxEntriesPerBatch) {
+    if (config.mMaxEntriesPerBatch != maxEntriesPerBatch) {
         LOG_WARNING(sLogger,
                     ("journal processor maxEntriesPerBatch clamped to safe range",
-                     "")("config", configName)("original", config.maxEntriesPerBatch)("clamped", maxEntriesPerBatch));
+                     "")("config", configName)("original", config.mMaxEntriesPerBatch)("clamped", maxEntriesPerBatch));
     }
 
     try {
@@ -322,13 +322,13 @@ void ReadJournalEntries(const string& configName,
             // Step 1: 先移动到下一条（统一处理，无需判断 seekPosition）
             // - head 模式：SeekHead() 后第一次 Next() 移动到第一条
             // - tail 模式：SeekTail() + Previous() 后第一次 Next() 移动到新日志
-            if (!MoveToNextJournalEntry(configName, journalReader, config.cursorSeekFallback, entryCount)) {
+            if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, entryCount)) {
                 break;
             }
 
             // Step 2: 读取和验证entry
             JournalEntry entry;
-            if (!ReadAndValidateEntry(configName, journalReader, config.cursorSeekFallback, entry)) {
+            if (!ReadAndValidateEntry(configName, journalReader, config.mCursorSeekFallback, entry)) {
                 // 如果entry为空，则跳过
                 if (entry.fields.empty() && !entry.cursor.empty()) {
                     entryCount++;
@@ -348,10 +348,10 @@ void ReadJournalEntries(const string& configName,
         }
 
         // 只在没有处理任何条目且可能存在问题时记录警告
-        if (entryCount == 0 && config.seekPosition != "tail") {
+        if (entryCount == 0 && config.mSeekPosition != "tail") {
             LOG_WARNING(sLogger,
                         ("journal processor no journal entries processed", "may indicate configuration issue")(
-                            "config", configName)("seek_position", config.seekPosition));
+                            "config", configName)("seek_position", config.mSeekPosition));
         }
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,

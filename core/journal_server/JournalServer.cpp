@@ -82,11 +82,11 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 
     // 验证成功后，缓存queueKey并添加配置
     JournalConfig validatedConfig = config;
-    validatedConfig.queueKey = queueKey;
+    validatedConfig.mQueueKey = queueKey;
 
     LOG_INFO(sLogger,
              ("journal server input validated",
-              "")("config", configName)("ctx_valid", config.ctx != nullptr)("queue_key", queueKey));
+              "")("config", configName)("ctx_valid", config.mCtx != nullptr)("queue_key", queueKey));
 
     // 使用配置管理器添加配置
     auto connectionManager = &JournalConnectionManager::GetInstance();
@@ -326,7 +326,7 @@ void logtail::JournalServer::processJournal(const std::string& configName) {
     // 从 JournalConnectionManager 获取配置
     JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(configName);
 
-    if (config.queueKey == -1) {
+    if (config.mQueueKey == -1) {
         LOG_ERROR(sLogger, ("journal server invalid config for specific processing", "")("config", configName));
         return;
     }
@@ -345,14 +345,14 @@ void logtail::JournalServer::processJournal(const std::string& configName) {
     }
 
     // 直接读取和处理journal条目
-    ReadJournalEntries(configName, config, reader, config.queueKey);
+    ReadJournalEntries(configName, config, reader, config.mQueueKey);
 }
 
 bool logtail::JournalServer::validateQueueKey(const std::string& configName,
                                               const JournalConfig& config,
                                               QueueKey& queueKey) {
     // 基本验证
-    if (!config.ctx) {
+    if (!config.mCtx) {
         LOG_ERROR(sLogger,
                   ("journal server CRITICAL: no context available for config",
                    "this indicates initialization problem")("config", configName));
@@ -360,14 +360,14 @@ bool logtail::JournalServer::validateQueueKey(const std::string& configName,
     }
 
     // 如果配置中已经有queueKey，直接使用（用于测试环境）
-    if (config.queueKey != -1) {
-        queueKey = config.queueKey;
+    if (config.mQueueKey != -1) {
+        queueKey = config.mQueueKey;
         LOG_INFO(sLogger, ("journal server using pre-set queue key", "")("config", configName)("queue_key", queueKey));
         return true;
     }
 
     // 从pipeline context获取queue key
-    queueKey = config.ctx->GetProcessQueueKey();
+    queueKey = config.mCtx->GetProcessQueueKey();
     if (queueKey == -1) {
         LOG_WARNING(sLogger, ("journal server no queue key available for config", "skip")("config", configName));
         return false;

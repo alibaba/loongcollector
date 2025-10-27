@@ -87,14 +87,14 @@ protected:
 
         // 创建测试用的journal配置
         mTestConfig = std::make_unique<JournalConfig>();
-        mTestConfig->seekPosition = "tail";
-        mTestConfig->cursorFlushPeriodMs = 5000;
-        mTestConfig->maxEntriesPerBatch = 100;
-        mTestConfig->kernel = true;
-        mTestConfig->ctx = mPipelineContext.get();
+        mTestConfig->mSeekPosition = "tail";
+        mTestConfig->mCursorFlushPeriodMs = 5000;
+        mTestConfig->mMaxEntriesPerBatch = 100;
+        mTestConfig->mKernel = true;
+        mTestConfig->mCtx = mPipelineContext.get();
 
         // 设置一个有效的队列键，避免验证失败
-        mTestConfig->queueKey = 1; // 设置一个测试用的队列键
+        mTestConfig->mQueueKey = 1; // 设置一个测试用的队列键
 
         mConfigName = "test_journal_config";
     }
@@ -466,8 +466,8 @@ void JournalServerUnittest::TestAddJournalInputValidationFailure() {
 
     // 创建无效的配置（没有ctx）
     JournalConfig invalidConfig;
-    invalidConfig.seekPosition = "tail";
-    invalidConfig.ctx = nullptr; // 无效的ctx
+    invalidConfig.mSeekPosition = "tail";
+    invalidConfig.mCtx = nullptr; // 无效的ctx
 
     // 添加无效配置
     server->AddJournalInput("invalid_config", invalidConfig);
@@ -487,9 +487,9 @@ void JournalServerUnittest::TestAddJournalInputManagerFailure() {
 
     // 创建有效配置
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.ctx = mPipelineContext.get();
-    config.queueKey = 1;
+    config.mSeekPosition = "tail";
+    config.mCtx = mPipelineContext.get();
+    config.mQueueKey = 1;
 
     // 添加配置（可能会因为连接管理器问题而失败）
     server->AddJournalInput("test_config", config);
@@ -630,12 +630,12 @@ void JournalServerUnittest::TestAddJournalInputWithHandler() {
 
     // 创建有效配置
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 100;
-    config.kernel = true;
-    config.ctx = mPipelineContext.get();
-    config.queueKey = 1;
+    config.mSeekPosition = "tail";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mCtx = mPipelineContext.get();
+    config.mQueueKey = 1;
 
     // 添加配置（这会触发handler的创建和执行）
     server->AddJournalInput("test_config_with_handler", config);
@@ -819,8 +819,8 @@ void JournalServerUnittest::TestValidateQueueKeyNoContext() {
 
     // 创建无效的配置（没有ctx）
     JournalConfig invalidConfig;
-    invalidConfig.seekPosition = "tail";
-    invalidConfig.ctx = nullptr; // 无效的ctx
+    invalidConfig.mSeekPosition = "tail";
+    invalidConfig.mCtx = nullptr; // 无效的ctx
 
     // 添加无效配置
     server->AddJournalInput("invalid_config_no_context", invalidConfig);
@@ -840,12 +840,12 @@ void JournalServerUnittest::TestValidateQueueKeyPreSetKey() {
 
     // 创建有效配置（预设置queueKey）
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 100;
-    config.kernel = true;
-    config.ctx = mPipelineContext.get();
-    config.queueKey = 123; // 预设置的队列键
+    config.mSeekPosition = "tail";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mCtx = mPipelineContext.get();
+    config.mQueueKey = 123; // 预设置的队列键
 
     // 添加配置
     server->AddJournalInput("test_config_preset_key", config);
@@ -865,12 +865,12 @@ void JournalServerUnittest::TestValidateQueueKeyNoQueueKey() {
 
     // 创建配置（没有queueKey）
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 100;
-    config.kernel = true;
-    config.ctx = mPipelineContext.get();
-    config.queueKey = -1; // 没有队列键
+    config.mSeekPosition = "tail";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mCtx = mPipelineContext.get();
+    config.mQueueKey = -1; // 没有队列键
 
     // 添加配置
     server->AddJournalInput("test_config_no_queue_key", config);
@@ -890,12 +890,12 @@ void JournalServerUnittest::TestValidateQueueKeyInvalidQueue() {
 
     // 创建配置（无效的队列）
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 100;
-    config.kernel = true;
-    config.ctx = mPipelineContext.get();
-    config.queueKey = 999999; // 无效的队列键
+    config.mSeekPosition = "tail";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mCtx = mPipelineContext.get();
+    config.mQueueKey = 999999; // 无效的队列键
 
     // 添加配置
     server->AddJournalInput("test_config_invalid_queue", config);

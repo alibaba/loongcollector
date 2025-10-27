@@ -103,12 +103,12 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
 
     // 应用过滤器
     JournalFilter::FilterConfig filterConfig;
-    filterConfig.units = config.units;
-    filterConfig.identifiers = config.identifiers;
-    filterConfig.matchPatterns = config.matchPatterns;
-    filterConfig.enableKernel = config.kernel;
-    filterConfig.configName = configName;
-    filterConfig.configIndex = 0; // Always 0 for singleton journal input
+    filterConfig.mUnits = config.mUnits;
+    filterConfig.mIdentifiers = config.mIdentifiers;
+    filterConfig.mMatchPatterns = config.mMatchPatterns;
+    filterConfig.mEnableKernel = config.mKernel;
+    filterConfig.mConfigName = configName;
+    filterConfig.mConfigIndex = 0; // Always 0 for singleton journal input
 
     if (!JournalFilter::ApplyAllFilters(reader.get(), filterConfig)) {
         LOG_ERROR(sLogger,
@@ -118,9 +118,9 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
     }
 
     // 设置seek位置
-    if (!config.seekPosition.empty()) {
+    if (!config.mSeekPosition.empty()) {
         bool seekSuccess = false;
-        if (config.seekPosition == "tail") {
+        if (config.mSeekPosition == "tail") {
             seekSuccess = reader->SeekTail();
             LOG_INFO(sLogger,
                      ("journal connection manager seek to tail", "")("config", configName)("success", seekSuccess));
@@ -138,13 +138,13 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
         if (!seekSuccess) {
             LOG_WARNING(sLogger,
                         ("journal connection manager failed to seek to position",
-                         "")("config", configName)("position", config.seekPosition));
+                         "")("config", configName)("position", config.mSeekPosition));
         }
     }
 
     // 保存配置信息
     ConfigInfo configInfo;
-    configInfo.configName = configName;
+    configInfo.mConfigName = configName;
     configInfo.config = config;
     configInfo.reader = reader;
 
@@ -232,7 +232,7 @@ std::map<std::string, JournalConfig> JournalConnectionManager::GetAllConfigs() c
 
     std::map<std::string, JournalConfig> result;
     for (const auto& [configKey, configInfo] : mConfigs) {
-        result[configInfo.configName] = configInfo.config;
+        result[configInfo.mConfigName] = configInfo.config;
     }
 
     return result;
@@ -246,7 +246,7 @@ JournalConnectionManager::GetConfigsUsingConnection(const std::shared_ptr<System
     // 由于每个连接只对应一个配置，查找这个连接对应的配置
     for (const auto& [configKey, configInfo] : mConfigs) {
         if (configInfo.reader == reader) {
-            configs.emplace_back(configInfo.configName);
+            configs.emplace_back(configInfo.mConfigName);
             break; // 找到就退出，因为每个连接只对应一个配置
         }
     }

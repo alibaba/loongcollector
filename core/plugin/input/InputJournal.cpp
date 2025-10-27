@@ -97,15 +97,15 @@ bool InputJournal::Start() {
 
     // 创建journal配置对象
     JournalConfig config;
-    config.seekPosition = mSeekPosition; // 设置seek位置
-    // config.cursorFlushPeriodMs = mCursorFlushPeriodMs; // TODO: 暂时不使用，保留未来支持checkpoint后再启用
-    config.cursorSeekFallback = mCursorSeekFallback; // 设置cursor回退位置
-    config.units = mUnits; // 设置units
-    config.kernel = mKernel; // 设置kernel
-    config.identifiers = mIdentifiers; // 设置identifiers
-    config.journalPaths = mJournalPaths; // 设置journal路径
+    config.mSeekPosition = mSeekPosition; // 设置seek位置
+    // config.mCursorFlushPeriodMs = mCursorFlushPeriodMs; // TODO: 暂时不使用，保留未来支持checkpoint后再启用
+    config.mCursorSeekFallback = mCursorSeekFallback; // 设置cursor回退位置
+    config.mUnits = mUnits; // 设置units
+    config.mKernel = mKernel; // 设置kernel
+    config.mIdentifiers = mIdentifiers; // 设置identifiers
+    config.mJournalPaths = mJournalPaths; // 设置journal路径
     // 注意：已移除resetIntervalSecond配置，连接永远不重建
-    config.ctx = mContext; // 设置context
+    config.mCtx = mContext; // 设置context
 
     // 验证和修正配置值
     int fixedCount = config.ValidateAndFixConfig();

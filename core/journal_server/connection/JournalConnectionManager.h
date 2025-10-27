@@ -92,7 +92,7 @@ private:
 
     // 配置信息结构
     struct ConfigInfo {
-        std::string configName;
+        std::string mConfigName;
         JournalConfig config;
         std::shared_ptr<SystemdJournalReader> reader; // 每个配置独立的reader/连接
     };

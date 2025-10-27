@@ -50,59 +50,59 @@ void JournalConfigUnittest::TestDefaultValues() {
     JournalConfig config;
 
     // 测试默认值
-    APSARA_TEST_TRUE(config.seekPosition.empty());
-    APSARA_TEST_EQUAL(config.cursorFlushPeriodMs, 5000);
-    APSARA_TEST_TRUE(config.cursorSeekFallback.empty());
-    APSARA_TEST_TRUE(config.units.empty());
-    APSARA_TEST_TRUE(config.identifiers.empty());
-    APSARA_TEST_TRUE(config.matchPatterns.empty());
-    APSARA_TEST_TRUE(config.kernel);
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 1000);
-    APSARA_TEST_FALSE(config.parsePriority);
-    APSARA_TEST_FALSE(config.parseSyslogFacility);
-    APSARA_TEST_TRUE(config.useJournalEventTime);
-    APSARA_TEST_TRUE(config.journalPaths.empty());
-    APSARA_TEST_TRUE(config.ctx == nullptr);
-    APSARA_TEST_EQUAL(config.queueKey, -1);
+    APSARA_TEST_TRUE(config.mSeekPosition.empty());
+    APSARA_TEST_EQUAL(config.mCursorFlushPeriodMs, 5000);
+    APSARA_TEST_TRUE(config.mCursorSeekFallback.empty());
+    APSARA_TEST_TRUE(config.mUnits.empty());
+    APSARA_TEST_TRUE(config.mIdentifiers.empty());
+    APSARA_TEST_TRUE(config.mMatchPatterns.empty());
+    APSARA_TEST_TRUE(config.mKernel);
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000);
+    APSARA_TEST_FALSE(config.mParsePriority);
+    APSARA_TEST_FALSE(config.mParseSyslogFacility);
+    APSARA_TEST_TRUE(config.mUseJournalEventTime);
+    APSARA_TEST_TRUE(config.mJournalPaths.empty());
+    APSARA_TEST_TRUE(config.mCtx == nullptr);
+    APSARA_TEST_EQUAL(config.mQueueKey, -1);
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfig() {
     JournalConfig config;
 
     // 设置一些无效值
-    config.cursorFlushPeriodMs = -1000; // 无效值
-    config.maxEntriesPerBatch = 0; // 无效值
-    config.seekPosition = "invalid_position"; // 无效值
-    config.cursorSeekFallback = "invalid_fallback"; // 无效值
-    config.units = {"valid_unit", "", "another_valid_unit"}; // 包含空字符串
-    config.identifiers = {"", "valid_id"}; // 包含空字符串
-    config.matchPatterns = {"valid_pattern", ""}; // 包含空字符串
-    config.journalPaths = {"valid_path", "", "another_valid_path"}; // 包含空字符串
+    config.mCursorFlushPeriodMs = -1000; // 无效值
+    config.mMaxEntriesPerBatch = 0; // 无效值
+    config.mSeekPosition = "invalid_position"; // 无效值
+    config.mCursorSeekFallback = "invalid_fallback"; // 无效值
+    config.mUnits = {"valid_unit", "", "another_valid_unit"}; // 包含空字符串
+    config.mIdentifiers = {"", "valid_id"}; // 包含空字符串
+    config.mMatchPatterns = {"valid_pattern", ""}; // 包含空字符串
+    config.mJournalPaths = {"valid_path", "", "another_valid_path"}; // 包含空字符串
 
     // 执行验证和修正
     int fixedCount = config.ValidateAndFixConfig();
 
     // 验证修正结果
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.cursorFlushPeriodMs, 5000); // 修正为默认值
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 1000); // 修正为默认值
-    APSARA_TEST_EQUAL(config.seekPosition, "tail"); // 修正为默认值
-    APSARA_TEST_EQUAL(config.cursorSeekFallback, "head"); // 修正为默认值
+    APSARA_TEST_EQUAL(config.mCursorFlushPeriodMs, 5000); // 修正为默认值
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000); // 修正为默认值
+    APSARA_TEST_EQUAL(config.mSeekPosition, "tail"); // 修正为默认值
+    APSARA_TEST_EQUAL(config.mCursorSeekFallback, "head"); // 修正为默认值
 
     // 验证空字符串被移除
-    APSARA_TEST_EQUAL(config.units.size(), 2);
-    APSARA_TEST_EQUAL(config.units[0], "valid_unit");
-    APSARA_TEST_EQUAL(config.units[1], "another_valid_unit");
+    APSARA_TEST_EQUAL(config.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(config.mUnits[0], "valid_unit");
+    APSARA_TEST_EQUAL(config.mUnits[1], "another_valid_unit");
 
-    APSARA_TEST_EQUAL(config.identifiers.size(), 1);
-    APSARA_TEST_EQUAL(config.identifiers[0], "valid_id");
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 1);
+    APSARA_TEST_EQUAL(config.mIdentifiers[0], "valid_id");
 
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 1);
-    APSARA_TEST_EQUAL(config.matchPatterns[0], "valid_pattern");
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 1);
+    APSARA_TEST_EQUAL(config.mMatchPatterns[0], "valid_pattern");
 
-    APSARA_TEST_EQUAL(config.journalPaths.size(), 2);
-    APSARA_TEST_EQUAL(config.journalPaths[0], "valid_path");
-    APSARA_TEST_EQUAL(config.journalPaths[1], "another_valid_path");
+    APSARA_TEST_EQUAL(config.mJournalPaths.size(), 2);
+    APSARA_TEST_EQUAL(config.mJournalPaths[0], "valid_path");
+    APSARA_TEST_EQUAL(config.mJournalPaths[1], "another_valid_path");
 }
 
 void JournalConfigUnittest::TestIsValid() {
@@ -112,21 +112,21 @@ void JournalConfigUnittest::TestIsValid() {
     APSARA_TEST_FALSE(config.IsValid());
 
     // 设置有效值
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 1000;
-    config.seekPosition = "tail";
-    config.cursorSeekFallback = "head";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 1000;
+    config.mSeekPosition = "tail";
+    config.mCursorSeekFallback = "head";
 
     // 测试有效配置
     APSARA_TEST_TRUE(config.IsValid());
 
     // 测试边界值
-    config.cursorFlushPeriodMs = 1;
-    config.maxEntriesPerBatch = 1;
+    config.mCursorFlushPeriodMs = 1;
+    config.mMaxEntriesPerBatch = 1;
     APSARA_TEST_TRUE(config.IsValid());
 
-    config.cursorFlushPeriodMs = 300000; // 最大值
-    config.maxEntriesPerBatch = 10000; // 最大值
+    config.mCursorFlushPeriodMs = 300000; // 最大值
+    config.mMaxEntriesPerBatch = 10000; // 最大值
     APSARA_TEST_TRUE(config.IsValid());
 }
 
@@ -134,40 +134,40 @@ void JournalConfigUnittest::TestFieldSettings() {
     JournalConfig config;
 
     // 测试字段设置
-    config.seekPosition = "head";
-    config.cursorFlushPeriodMs = 10000;
-    config.cursorSeekFallback = "tail";
-    config.units = {"nginx.service", "apache.service"};
-    config.identifiers = {"nginx", "apache"};
-    config.matchPatterns = {"*error*", "*warning*"};
-    config.kernel = false;
-    config.maxEntriesPerBatch = 500;
-    config.parsePriority = true;
-    config.parseSyslogFacility = true;
-    config.useJournalEventTime = false;
-    config.journalPaths = {"/var/log/journal", "/run/log/journal"};
+    config.mSeekPosition = "head";
+    config.mCursorFlushPeriodMs = 10000;
+    config.mCursorSeekFallback = "tail";
+    config.mUnits = {"nginx.service", "apache.service"};
+    config.mIdentifiers = {"nginx", "apache"};
+    config.mMatchPatterns = {"*error*", "*warning*"};
+    config.mKernel = false;
+    config.mMaxEntriesPerBatch = 500;
+    config.mParsePriority = true;
+    config.mParseSyslogFacility = true;
+    config.mUseJournalEventTime = false;
+    config.mJournalPaths = {"/var/log/journal", "/run/log/journal"};
 
     // 验证字段设置
-    APSARA_TEST_EQUAL(config.seekPosition, "head");
-    APSARA_TEST_EQUAL(config.cursorFlushPeriodMs, 10000);
-    APSARA_TEST_EQUAL(config.cursorSeekFallback, "tail");
-    APSARA_TEST_EQUAL(config.units.size(), 2);
-    APSARA_TEST_EQUAL(config.units[0], "nginx.service");
-    APSARA_TEST_EQUAL(config.units[1], "apache.service");
-    APSARA_TEST_EQUAL(config.identifiers.size(), 2);
-    APSARA_TEST_EQUAL(config.identifiers[0], "nginx");
-    APSARA_TEST_EQUAL(config.identifiers[1], "apache");
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 2);
-    APSARA_TEST_EQUAL(config.matchPatterns[0], "*error*");
-    APSARA_TEST_EQUAL(config.matchPatterns[1], "*warning*");
-    APSARA_TEST_FALSE(config.kernel);
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 500);
-    APSARA_TEST_TRUE(config.parsePriority);
-    APSARA_TEST_TRUE(config.parseSyslogFacility);
-    APSARA_TEST_FALSE(config.useJournalEventTime);
-    APSARA_TEST_EQUAL(config.journalPaths.size(), 2);
-    APSARA_TEST_EQUAL(config.journalPaths[0], "/var/log/journal");
-    APSARA_TEST_EQUAL(config.journalPaths[1], "/run/log/journal");
+    APSARA_TEST_EQUAL(config.mSeekPosition, "head");
+    APSARA_TEST_EQUAL(config.mCursorFlushPeriodMs, 10000);
+    APSARA_TEST_EQUAL(config.mCursorSeekFallback, "tail");
+    APSARA_TEST_EQUAL(config.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(config.mUnits[0], "nginx.service");
+    APSARA_TEST_EQUAL(config.mUnits[1], "apache.service");
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 2);
+    APSARA_TEST_EQUAL(config.mIdentifiers[0], "nginx");
+    APSARA_TEST_EQUAL(config.mIdentifiers[1], "apache");
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 2);
+    APSARA_TEST_EQUAL(config.mMatchPatterns[0], "*error*");
+    APSARA_TEST_EQUAL(config.mMatchPatterns[1], "*warning*");
+    APSARA_TEST_FALSE(config.mKernel);
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 500);
+    APSARA_TEST_TRUE(config.mParsePriority);
+    APSARA_TEST_TRUE(config.mParseSyslogFacility);
+    APSARA_TEST_FALSE(config.mUseJournalEventTime);
+    APSARA_TEST_EQUAL(config.mJournalPaths.size(), 2);
+    APSARA_TEST_EQUAL(config.mJournalPaths[0], "/var/log/journal");
+    APSARA_TEST_EQUAL(config.mJournalPaths[1], "/run/log/journal");
 }
 
 void JournalConfigUnittest::TestContextAssignment() {
@@ -178,119 +178,119 @@ void JournalConfigUnittest::TestContextAssignment() {
     ctx->SetConfigName("test_config");
 
     // 设置context
-    config.ctx = ctx.get();
+    config.mCtx = ctx.get();
 
     // 验证context设置
-    APSARA_TEST_TRUE(config.ctx != nullptr);
-    APSARA_TEST_EQUAL(config.ctx->GetConfigName(), "test_config");
+    APSARA_TEST_TRUE(config.mCtx != nullptr);
+    APSARA_TEST_EQUAL(config.mCtx->GetConfigName(), "test_config");
 
     // 测试queueKey设置
-    config.queueKey = 12345;
-    APSARA_TEST_EQUAL(config.queueKey, 12345);
+    config.mQueueKey = 12345;
+    APSARA_TEST_EQUAL(config.mQueueKey, 12345);
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigEdgeCases() {
     JournalConfig config;
 
     // 测试边界值
-    config.cursorFlushPeriodMs = 0;
-    config.maxEntriesPerBatch = 0;
+    config.mCursorFlushPeriodMs = 0;
+    config.mMaxEntriesPerBatch = 0;
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复这些值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_TRUE(config.cursorFlushPeriodMs > 0);
-    APSARA_TEST_TRUE(config.maxEntriesPerBatch > 0);
+    APSARA_TEST_TRUE(config.mCursorFlushPeriodMs > 0);
+    APSARA_TEST_TRUE(config.mMaxEntriesPerBatch > 0);
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigBoundaryValues() {
     JournalConfig config;
 
     // 测试最大值边界
-    config.cursorFlushPeriodMs = 300001; // 超过最大值
-    config.maxEntriesPerBatch = 10001; // 超过最大值
+    config.mCursorFlushPeriodMs = 300001; // 超过最大值
+    config.mMaxEntriesPerBatch = 10001; // 超过最大值
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复这些值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.cursorFlushPeriodMs, 300000);
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 10000);
+    APSARA_TEST_EQUAL(config.mCursorFlushPeriodMs, 300000);
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10000);
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigInvalidSeekPosition() {
     JournalConfig config;
 
     // 测试无效的seek位置
-    config.seekPosition = "invalid_position";
+    config.mSeekPosition = "invalid_position";
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复为默认值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.seekPosition, "tail");
+    APSARA_TEST_EQUAL(config.mSeekPosition, "tail");
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigInvalidCursorSeekFallback() {
     JournalConfig config;
 
     // 测试无效的cursor seek fallback
-    config.cursorSeekFallback = "invalid_fallback";
+    config.mCursorSeekFallback = "invalid_fallback";
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复为默认值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.cursorSeekFallback, "head");
+    APSARA_TEST_EQUAL(config.mCursorSeekFallback, "head");
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigEmptyStringArrays() {
     JournalConfig config;
 
     // 测试包含空字符串的数组
-    config.units = {"nginx", "", "apache", ""};
-    config.identifiers = {"", "nginx", "", "apache"};
-    config.matchPatterns = {"*error*", "", "*warning*"};
+    config.mUnits = {"nginx", "", "apache", ""};
+    config.mIdentifiers = {"", "nginx", "", "apache"};
+    config.mMatchPatterns = {"*error*", "", "*warning*"};
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该移除空字符串
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.units.size(), 2);
-    APSARA_TEST_EQUAL(config.identifiers.size(), 2);
-    APSARA_TEST_EQUAL(config.matchPatterns.size(), 2);
+    APSARA_TEST_EQUAL(config.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(config.mIdentifiers.size(), 2);
+    APSARA_TEST_EQUAL(config.mMatchPatterns.size(), 2);
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigInvalidJournalPaths() {
     JournalConfig config;
 
     // 测试无效的journal路径
-    config.journalPaths = {"", "/var/log/journal", std::string(5000, 'a'), "/run/log/journal"};
+    config.mJournalPaths = {"", "/var/log/journal", std::string(5000, 'a'), "/run/log/journal"};
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该移除无效路径
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_TRUE(config.journalPaths.size() <= 3); // 至少移除空字符串和超长路径
+    APSARA_TEST_TRUE(config.mJournalPaths.size() <= 3); // 至少移除空字符串和超长路径
 }
 
 void JournalConfigUnittest::TestIsValidEdgeCases() {
     JournalConfig config;
 
     // 测试无效配置
-    config.cursorFlushPeriodMs = 0;
-    config.maxEntriesPerBatch = 0;
-    config.seekPosition = "";
-    config.cursorSeekFallback = "";
+    config.mCursorFlushPeriodMs = 0;
+    config.mMaxEntriesPerBatch = 0;
+    config.mSeekPosition = "";
+    config.mCursorSeekFallback = "";
 
     APSARA_TEST_FALSE(config.IsValid());
 
     // 测试部分有效配置
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 1000;
-    config.seekPosition = "tail";
-    config.cursorSeekFallback = "head";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 1000;
+    config.mSeekPosition = "tail";
+    config.mCursorSeekFallback = "head";
 
     APSARA_TEST_TRUE(config.IsValid());
 }

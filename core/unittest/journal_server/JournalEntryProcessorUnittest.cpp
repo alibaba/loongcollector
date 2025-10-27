@@ -60,18 +60,18 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
 
     // 创建测试配置
     JournalConfig config;
-    config.seekPosition = "tail";
-    config.cursorFlushPeriodMs = 5000;
-    config.maxEntriesPerBatch = 100;
-    config.kernel = true;
-    config.parsePriority = true;
-    config.parseSyslogFacility = true;
-    config.useJournalEventTime = true;
+    config.mSeekPosition = "tail";
+    config.mCursorFlushPeriodMs = 5000;
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mParsePriority = true;
+    config.mParseSyslogFacility = true;
+    config.mUseJournalEventTime = true;
 
     // 创建pipeline context
     auto ctx = std::make_unique<CollectionPipelineContext>();
     ctx->SetConfigName("test_config");
-    config.ctx = ctx.get();
+    config.mCtx = ctx.get();
 
     // 创建mock journal reader
     auto reader = std::make_shared<SystemdJournalReader>();
@@ -293,20 +293,20 @@ void JournalEntryProcessorUnittest::TestTimestampHandling() {
 void JournalEntryProcessorUnittest::TestBatchProcessing() {
     // 测试批处理逻辑
     JournalConfig config;
-    config.maxEntriesPerBatch = 10;
+    config.mMaxEntriesPerBatch = 10;
 
     // 验证批处理配置
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 10);
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10);
 
     // 测试批处理边界值
-    config.maxEntriesPerBatch = 1;
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 1);
+    config.mMaxEntriesPerBatch = 1;
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1);
 
-    config.maxEntriesPerBatch = 1000;
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 1000);
+    config.mMaxEntriesPerBatch = 1000;
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000);
 
-    config.maxEntriesPerBatch = 10000;
-    APSARA_TEST_EQUAL(config.maxEntriesPerBatch, 10000);
+    config.mMaxEntriesPerBatch = 10000;
+    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10000);
 }
 
 void JournalEntryProcessorUnittest::TestErrorHandling() {
@@ -343,7 +343,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalError() {
 
     // 创建测试配置
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试错误恢复逻辑
     APSARA_TEST_TRUE(true); // 主要测试错误恢复逻辑不会崩溃
@@ -352,7 +352,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalError() {
 void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorHead() {
     // 测试journal错误恢复 - head策略
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试head恢复策略
     APSARA_TEST_TRUE(true);
@@ -361,7 +361,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorHead() {
 void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorTail() {
     // 测试journal错误恢复 - tail策略
     JournalConfig config;
-    config.cursorSeekFallback = "tail";
+    config.mCursorSeekFallback = "tail";
 
     // 测试tail恢复策略
     APSARA_TEST_TRUE(true);
@@ -370,7 +370,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorTail() {
 void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorInvalidFallback() {
     // 测试journal错误恢复 - 无效fallback
     JournalConfig config;
-    config.cursorSeekFallback = "invalid_fallback";
+    config.mCursorSeekFallback = "invalid_fallback";
 
     // 测试无效fallback的处理
     APSARA_TEST_TRUE(true);
@@ -379,7 +379,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorInvalidFallback()
 void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorFailure() {
     // 测试journal错误恢复失败
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试恢复失败的情况
     APSARA_TEST_TRUE(true);
@@ -388,7 +388,7 @@ void JournalEntryProcessorUnittest::TestRecoverFromJournalErrorFailure() {
 void JournalEntryProcessorUnittest::TestNavigateToNextEntry() {
     // 测试导航到下一个条目
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试导航逻辑
     APSARA_TEST_TRUE(true);
@@ -397,7 +397,7 @@ void JournalEntryProcessorUnittest::TestNavigateToNextEntry() {
 void JournalEntryProcessorUnittest::TestNavigateToNextEntryEndOfJournal() {
     // 测试导航到journal末尾
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试到达末尾的情况
     APSARA_TEST_TRUE(true);
@@ -406,7 +406,7 @@ void JournalEntryProcessorUnittest::TestNavigateToNextEntryEndOfJournal() {
 void JournalEntryProcessorUnittest::TestNavigateToNextEntryException() {
     // 测试导航时的异常处理
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试异常处理
     APSARA_TEST_TRUE(true);
@@ -415,7 +415,7 @@ void JournalEntryProcessorUnittest::TestNavigateToNextEntryException() {
 void JournalEntryProcessorUnittest::TestNavigateToNextEntryUnknownException() {
     // 测试导航时的未知异常处理
     JournalConfig config;
-    config.cursorSeekFallback = "head";
+    config.mCursorSeekFallback = "head";
 
     // 测试未知异常处理
     APSARA_TEST_TRUE(true);
@@ -424,7 +424,7 @@ void JournalEntryProcessorUnittest::TestNavigateToNextEntryUnknownException() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatch() {
     // 测试处理journal条目批次
     JournalConfig config;
-    config.maxEntriesPerBatch = 100;
+    config.mMaxEntriesPerBatch = 100;
 
     // 测试批次处理逻辑
     APSARA_TEST_TRUE(true);
@@ -433,7 +433,7 @@ void JournalEntryProcessorUnittest::TestProcessJournalEntryBatch() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchEmpty() {
     // 测试处理空批次
     JournalConfig config;
-    config.maxEntriesPerBatch = 0;
+    config.mMaxEntriesPerBatch = 0;
 
     // 测试空批次处理
     APSARA_TEST_TRUE(true);
@@ -442,7 +442,7 @@ void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchEmpty() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchMaxEntries() {
     // 测试处理最大条目数批次
     JournalConfig config;
-    config.maxEntriesPerBatch = 10000;
+    config.mMaxEntriesPerBatch = 10000;
 
     // 测试最大条目数处理
     APSARA_TEST_TRUE(true);

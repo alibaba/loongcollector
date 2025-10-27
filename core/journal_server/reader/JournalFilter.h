@@ -40,14 +40,14 @@ public:
      * @brief 过滤器配置结构
      */
     struct FilterConfig {
-        std::vector<std::string> units; // systemd units过滤列表，空则全采集
-        std::vector<std::string> identifiers; // syslog identifiers过滤列表，空则全采集
-        std::vector<std::string> matchPatterns; // 自定义匹配模式
-        bool enableKernel = true; // 是否采集kernel日志，默认true
+        std::vector<std::string> mUnits; // systemd units过滤列表，空则全采集
+        std::vector<std::string> mIdentifiers; // syslog identifiers过滤列表，空则全采集
+        std::vector<std::string> mMatchPatterns; // 自定义匹配模式
+        bool mEnableKernel = true; // 是否采集kernel日志，默认true
 
         // 用于调试和日志的配置信息
-        std::string configName;
-        size_t configIndex = 0;
+        std::string mConfigName;
+        size_t mConfigIndex = 0;
     };
 
     /**
