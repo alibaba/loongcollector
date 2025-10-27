@@ -79,7 +79,7 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     // 测试函数调用（在测试环境中可能无法实际执行）
     // 但函数接口应该存在且不会崩溃
     try {
-        ReadJournalEntries("test_config", 0, config, reader, 12345);
+        ReadJournalEntries("test_config", config, reader, 12345);
         APSARA_TEST_TRUE(true); // 函数调用成功
     } catch (...) {
         APSARA_TEST_TRUE(true); // 函数存在但可能因为环境问题失败

@@ -35,13 +35,11 @@ using QueueKey = int64_t;
  * 会根据配置的maxEntriesPerBatch限制每批读取的条目数量。
  *
  * @param configName 配置名称
- * @param idx 配置索引
  * @param config journal配置
  * @param journalReader journal reader指针
  * @param queueKey 队列键值，用于推送事件
  */
 void ReadJournalEntries(const std::string& configName,
-                        size_t idx,
                         const JournalConfig& config,
                         const std::shared_ptr<SystemdJournalReader>& journalReader,
                         QueueKey queueKey);

@@ -96,7 +96,7 @@ void JournalConnectionManagerUnittest::TestAddConfig() {
     config.ctx = ctx.get();
 
     // 添加配置
-    bool result = manager.AddConfig("test_config", 0, config);
+    bool result = manager.AddConfig("test_config", config);
 
     // 添加配置应该成功
     APSARA_TEST_TRUE(result);
@@ -124,13 +124,13 @@ void JournalConnectionManagerUnittest::TestRemoveConfig() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 验证配置存在
     APSARA_TEST_TRUE(manager.GetConnectionCount() > 0);
 
     // 移除配置
-    manager.RemoveConfig("test_config", 0);
+    manager.RemoveConfig("test_config");
 
     // 验证配置已移除
     APSARA_TEST_TRUE(manager.GetConnectionCount() == 0);
@@ -155,10 +155,10 @@ void JournalConnectionManagerUnittest::TestGetConfig() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 获取配置
-    JournalConfig retrievedConfig = manager.GetConfig("test_config", 0);
+    JournalConfig retrievedConfig = manager.GetConfig("test_config");
 
     // 验证配置
     APSARA_TEST_EQUAL(retrievedConfig.seekPosition, "tail");
@@ -186,10 +186,10 @@ void JournalConnectionManagerUnittest::TestGetConnection() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 获取连接
-    auto connection = manager.GetConnection("test_config", 0);
+    auto connection = manager.GetConnection("test_config");
 
     // 在测试环境中，连接可能为nullptr（因为没有实际的journal支持）
     // 但方法调用不应该崩溃
@@ -215,9 +215,9 @@ void JournalConnectionManagerUnittest::TestGetAllConfigs() {
     config.ctx = ctx.get();
 
     // 添加多个配置
-    manager.AddConfig("test_config", 0, config);
-    manager.AddConfig("test_config", 1, config);
-    manager.AddConfig("another_config", 0, config);
+    manager.AddConfig("test_config", config);
+    manager.AddConfig("test_config_1", config);
+    manager.AddConfig("another_config", config);
 
     // 获取所有配置
     auto configs = manager.GetAllConfigs();
@@ -225,14 +225,10 @@ void JournalConnectionManagerUnittest::TestGetAllConfigs() {
     // 验证配置数量
     APSARA_TEST_TRUE(configs.size() >= 3);
 
-    // 验证特定配置存在
-    auto key1 = std::make_pair(std::string("test_config"), size_t(0));
-    auto key2 = std::make_pair(std::string("test_config"), size_t(1));
-    auto key3 = std::make_pair(std::string("another_config"), size_t(0));
-
-    APSARA_TEST_TRUE(configs.find(key1) != configs.end());
-    APSARA_TEST_TRUE(configs.find(key2) != configs.end());
-    APSARA_TEST_TRUE(configs.find(key3) != configs.end());
+    // 验证特定配置存在（现在返回类型是 std::map<string, JournalConfig>）
+    APSARA_TEST_TRUE(configs.find("test_config") != configs.end());
+    APSARA_TEST_TRUE(configs.find("test_config_1") != configs.end());
+    APSARA_TEST_TRUE(configs.find("another_config") != configs.end());
 }
 
 void JournalConnectionManagerUnittest::TestGetStats() {
@@ -280,7 +276,7 @@ void JournalConnectionManagerUnittest::TestGetConnectionCount() {
 
 
     // 添加配置
-    bool added = manager.AddConfig("test_config", 0, config);
+    bool added = manager.AddConfig("test_config", config);
 
     if (added) {
         // 验证连接数增加了
@@ -288,7 +284,7 @@ void JournalConnectionManagerUnittest::TestGetConnectionCount() {
         APSARA_TEST_TRUE(count >= initialCount);
 
         // 移除配置
-        manager.RemoveConfig("test_config", 0);
+        manager.RemoveConfig("test_config");
 
         // 验证连接数回到了初始状态
         APSARA_TEST_TRUE(manager.GetConnectionCount() == initialCount);
@@ -317,7 +313,7 @@ void JournalConnectionManagerUnittest::TestCleanup() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 验证配置存在
     APSARA_TEST_TRUE(manager.GetConnectionCount() > 0);
@@ -343,10 +339,10 @@ void JournalConnectionManagerUnittest::TestAddConfigDuplicate() {
     config.kernel = true;
 
     // 添加配置
-    bool result1 = manager.AddConfig("test_config", 0, config);
+    bool result1 = manager.AddConfig("test_config", config);
 
     // 再次添加相同配置（应该替换）
-    bool result2 = manager.AddConfig("test_config", 0, config);
+    bool result2 = manager.AddConfig("test_config", config);
 
     // 验证配置被替换
     APSARA_TEST_TRUE(result1 || result2); // 至少一次成功
@@ -361,7 +357,7 @@ void JournalConnectionManagerUnittest::TestAddConfigNotInitialized() {
     JournalConfig config;
     config.seekPosition = "tail";
 
-    bool result = manager.AddConfig("test_config", 0, config);
+    bool result = manager.AddConfig("test_config", config);
 
     // 应该失败
     APSARA_TEST_FALSE(result);
@@ -381,7 +377,7 @@ void JournalConnectionManagerUnittest::TestAddConfigReaderOpenFailure() {
     config.kernel = true;
 
     // 添加配置（在测试环境中可能失败）
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 无论成功与否都应该有相应的日志记录
     APSARA_TEST_TRUE(true); // 主要测试错误处理路径
@@ -403,7 +399,7 @@ void JournalConnectionManagerUnittest::TestAddConfigFilterFailure() {
     config.kernel = true;
 
     // 添加配置（测试过滤器失败的情况）
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 主要测试过滤器失败的处理路径
     APSARA_TEST_TRUE(true);
@@ -425,7 +421,7 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekFailure() {
     config.kernel = true;
 
     // 添加配置（测试seek失败的情况）
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 主要测试seek失败的处理路径
     APSARA_TEST_TRUE(true);
@@ -437,7 +433,7 @@ void JournalConnectionManagerUnittest::TestRemoveConfigNotInitialized() {
     JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
 
     // 不初始化管理器，直接移除配置
-    manager.RemoveConfig("test_config", 0);
+    manager.RemoveConfig("test_config");
 
     // 应该不会崩溃
     APSARA_TEST_TRUE(true);
@@ -450,7 +446,7 @@ void JournalConnectionManagerUnittest::TestRemoveConfigNotFound() {
     manager.Initialize();
 
     // 移除不存在的配置
-    manager.RemoveConfig("nonexistent_config", 0);
+    manager.RemoveConfig("nonexistent_config");
 
     // 应该不会崩溃
     APSARA_TEST_TRUE(true);
@@ -465,7 +461,7 @@ void JournalConnectionManagerUnittest::TestGetConnectionNotFound() {
     manager.Initialize();
 
     // 获取不存在的连接
-    auto connection = manager.GetConnection("nonexistent_config", 0);
+    auto connection = manager.GetConnection("nonexistent_config");
 
     // 应该返回nullptr
     APSARA_TEST_TRUE(connection == nullptr);
@@ -480,7 +476,7 @@ void JournalConnectionManagerUnittest::TestGetConfigNotFound() {
     manager.Initialize();
 
     // 获取不存在的配置
-    JournalConfig config = manager.GetConfig("nonexistent_config", 0);
+    JournalConfig config = manager.GetConfig("nonexistent_config");
 
     // 应该返回空配置
     APSARA_TEST_TRUE(config.queueKey == -1);
@@ -502,7 +498,7 @@ void JournalConnectionManagerUnittest::TestGetStatsWithInvalidConnections() {
     config.kernel = true;
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 获取统计信息
     auto stats = manager.GetStats();
@@ -537,7 +533,7 @@ void JournalConnectionManagerUnittest::TestAddConfigWithFilters() {
 
 
     // 添加配置
-    bool result = manager.AddConfig("test_config_with_filters", 0, config);
+    bool result = manager.AddConfig("test_config_with_filters", config);
 
     // 添加配置应该成功
     APSARA_TEST_TRUE(result);
@@ -565,7 +561,7 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekHead() {
 
 
     // 添加配置
-    bool result = manager.AddConfig("test_config_seek_head", 0, config);
+    bool result = manager.AddConfig("test_config_seek_head", config);
 
     // 添加配置应该成功
     APSARA_TEST_TRUE(result);
@@ -593,7 +589,7 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekCursor() {
 
 
     // 添加配置
-    bool result = manager.AddConfig("test_config_seek_cursor", 0, config);
+    bool result = manager.AddConfig("test_config_seek_cursor", config);
 
     // 添加配置应该成功
     APSARA_TEST_TRUE(result);
@@ -621,10 +617,10 @@ void JournalConnectionManagerUnittest::TestGetConfigsUsingConnection() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 获取连接
-    auto connection = manager.GetConnection("test_config", 0);
+    auto connection = manager.GetConnection("test_config");
 
     if (connection) {
         // 获取使用该连接的配置
@@ -680,10 +676,10 @@ void JournalConnectionManagerUnittest::TestAddConfigReplaceExisting() {
 
 
     // 添加第一个配置
-    bool result1 = manager.AddConfig("test_config_replace", 0, config1);
+    bool result1 = manager.AddConfig("test_config_replace", config1);
 
     // 添加第二个配置（替换第一个）
-    bool result2 = manager.AddConfig("test_config_replace", 0, config2);
+    bool result2 = manager.AddConfig("test_config_replace", config2);
 
     // 验证配置被替换
     APSARA_TEST_TRUE(result1 || result2); // 至少一次成功
@@ -710,7 +706,7 @@ void JournalConnectionManagerUnittest::TestGetStatsWithActiveConnections() {
     config.ctx = ctx.get();
 
     // 添加配置
-    manager.AddConfig("test_config", 0, config);
+    manager.AddConfig("test_config", config);
 
     // 获取统计信息
     auto stats = manager.GetStats();

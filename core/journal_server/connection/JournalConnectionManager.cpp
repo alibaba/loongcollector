@@ -66,11 +66,7 @@ void JournalConnectionManager::Cleanup() {
     mInitialized = false;
 }
 
-std::string JournalConnectionManager::makeConfigKey(const std::string& configName, size_t idx) const {
-    return configName + ":" + std::to_string(idx);
-}
-
-bool JournalConnectionManager::AddConfig(const std::string& configName, size_t idx, const JournalConfig& config) {
+bool JournalConnectionManager::AddConfig(const std::string& configName, const JournalConfig& config) {
     std::lock_guard<std::mutex> lock(mMutex);
 
     if (!mInitialized) {
@@ -78,22 +74,18 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, size_t i
         return false;
     }
 
-    std::string configKey = makeConfigKey(configName, idx);
-
     // 检查配置是否已存在
-    if (mConfigs.find(configKey) != mConfigs.end()) {
+    if (mConfigs.find(configName) != mConfigs.end()) {
         LOG_WARNING(sLogger,
-                    ("journal connection manager config already exists, will be replaced", "")("config",
-                                                                                               configName)("idx", idx));
+                    ("journal connection manager config already exists, will be replaced", "")("config", configName));
         // 关闭旧的连接
-        if (mConfigs[configKey].reader) {
-            mConfigs[configKey].reader->Close();
+        if (mConfigs[configName].reader) {
+            mConfigs[configName].reader->Close();
         }
     }
 
-    LOG_INFO(
-        sLogger,
-        ("journal connection manager adding config with independent connection", "")("config", configName)("idx", idx));
+    LOG_INFO(sLogger,
+             ("journal connection manager adding config with independent connection", "")("config", configName));
 
     // 创建独立的journal连接（reader）
     auto reader = std::make_shared<SystemdJournalReader>();
@@ -103,9 +95,8 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, size_t i
     reader->Open(); // 尝试打开，但不检查结果
 #else
     if (!reader->Open()) {
-        LOG_ERROR(
-            sLogger,
-            ("journal connection manager failed to create journal connection", "")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger,
+                  ("journal connection manager failed to create journal connection", "")("config", configName));
         return false;
     }
 #endif
@@ -117,12 +108,11 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, size_t i
     filterConfig.matchPatterns = config.matchPatterns;
     filterConfig.enableKernel = config.kernel;
     filterConfig.configName = configName;
-    filterConfig.configIndex = idx;
+    filterConfig.configIndex = 0; // Always 0 for singleton journal input
 
     if (!JournalFilter::ApplyAllFilters(reader.get(), filterConfig)) {
-        LOG_ERROR(
-            sLogger,
-            ("journal connection manager failed to apply filters to connection", "")("config", configName)("idx", idx));
+        LOG_ERROR(sLogger,
+                  ("journal connection manager failed to apply filters to connection", "")("config", configName));
         reader->Close();
         return false;
     }
@@ -133,8 +123,7 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, size_t i
         if (config.seekPosition == "tail") {
             seekSuccess = reader->SeekTail();
             LOG_INFO(sLogger,
-                     ("journal connection manager seek to tail", "")("config", configName)("idx", idx)("success",
-                                                                                                       seekSuccess));
+                     ("journal connection manager seek to tail", "")("config", configName)("success", seekSuccess));
 
             // SeekTail()后需要调用Previous()才能读取到实际的日志条目
             if (seekSuccess) {
@@ -143,45 +132,41 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, size_t i
         } else {
             seekSuccess = reader->SeekHead();
             LOG_INFO(sLogger,
-                     ("journal connection manager seek to head", "")("config", configName)("idx", idx)("success",
-                                                                                                       seekSuccess));
+                     ("journal connection manager seek to head", "")("config", configName)("success", seekSuccess));
         }
 
         if (!seekSuccess) {
             LOG_WARNING(sLogger,
                         ("journal connection manager failed to seek to position",
-                         "")("config", configName)("idx", idx)("position", config.seekPosition));
+                         "")("config", configName)("position", config.seekPosition));
         }
     }
 
     // 保存配置信息
     ConfigInfo configInfo;
     configInfo.configName = configName;
-    configInfo.idx = idx;
     configInfo.config = config;
     configInfo.reader = reader;
 
-    mConfigs[configKey] = std::move(configInfo);
+    mConfigs[configName] = std::move(configInfo);
 
     LOG_INFO(sLogger,
              ("journal connection manager config added with independent connection",
-              "")("config", configName)("idx", idx)("total_configs", mConfigs.size()));
+              "")("config", configName)("total_configs", mConfigs.size()));
 
     return true;
 }
 
-void JournalConnectionManager::RemoveConfig(const std::string& configName, size_t idx) {
+void JournalConnectionManager::RemoveConfig(const std::string& configName) {
     std::lock_guard<std::mutex> lock(mMutex);
 
     if (!mInitialized) {
         return;
     }
 
-    std::string configKey = makeConfigKey(configName, idx);
-
-    auto it = mConfigs.find(configKey);
+    auto it = mConfigs.find(configName);
     if (it != mConfigs.end()) {
-        LOG_INFO(sLogger, ("journal connection manager removing config", "")("config", configName)("idx", idx));
+        LOG_INFO(sLogger, ("journal connection manager removing config", "")("config", configName));
 
         // 关闭连接
         if (it->second.reader) {
@@ -190,11 +175,10 @@ void JournalConnectionManager::RemoveConfig(const std::string& configName, size_
 
         mConfigs.erase(it);
         LOG_INFO(sLogger,
-                 ("journal connection manager config removed",
-                  "")("config", configName)("idx", idx)("remaining_configs", mConfigs.size()));
+                 ("journal connection manager config removed", "")("config", configName)("remaining_configs",
+                                                                                         mConfigs.size()));
     } else {
-        LOG_WARNING(sLogger,
-                    ("journal connection manager config not found for removal", "")("config", configName)("idx", idx));
+        LOG_WARNING(sLogger, ("journal connection manager config not found for removal", "")("config", configName));
     }
 }
 
@@ -220,12 +204,10 @@ JournalConnectionManager::Stats JournalConnectionManager::GetStats() const {
     return stats;
 }
 
-std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetConnection(const std::string& configName,
-                                                                              size_t idx) const {
+std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetConnection(const std::string& configName) const {
     std::lock_guard<std::mutex> lock(mMutex);
 
-    std::string configKey = makeConfigKey(configName, idx);
-    auto it = mConfigs.find(configKey);
+    auto it = mConfigs.find(configName);
     if (it != mConfigs.end()) {
         return it->second.reader;
     }
@@ -233,11 +215,10 @@ std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetConnection(co
     return nullptr;
 }
 
-JournalConfig JournalConnectionManager::GetConfig(const std::string& configName, size_t idx) const {
+JournalConfig JournalConnectionManager::GetConfig(const std::string& configName) const {
     std::lock_guard<std::mutex> lock(mMutex);
 
-    std::string configKey = makeConfigKey(configName, idx);
-    auto it = mConfigs.find(configKey);
+    auto it = mConfigs.find(configName);
     if (it != mConfigs.end()) {
         return it->second.config;
     }
@@ -246,26 +227,26 @@ JournalConfig JournalConnectionManager::GetConfig(const std::string& configName,
     return JournalConfig();
 }
 
-std::map<std::pair<std::string, size_t>, JournalConfig> JournalConnectionManager::GetAllConfigs() const {
+std::map<std::string, JournalConfig> JournalConnectionManager::GetAllConfigs() const {
     std::lock_guard<std::mutex> lock(mMutex);
 
-    std::map<std::pair<std::string, size_t>, JournalConfig> result;
+    std::map<std::string, JournalConfig> result;
     for (const auto& [configKey, configInfo] : mConfigs) {
-        result[{configInfo.configName, configInfo.idx}] = configInfo.config;
+        result[configInfo.configName] = configInfo.config;
     }
 
     return result;
 }
 
-std::vector<std::pair<std::string, size_t>>
+std::vector<std::string>
 JournalConnectionManager::GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const {
     std::lock_guard<std::mutex> lock(mMutex);
-    std::vector<std::pair<std::string, size_t>> configs;
+    std::vector<std::string> configs;
 
     // 由于每个连接只对应一个配置，查找这个连接对应的配置
     for (const auto& [configKey, configInfo] : mConfigs) {
         if (configInfo.reader == reader) {
-            configs.emplace_back(configInfo.configName, configInfo.idx);
+            configs.emplace_back(configInfo.configName);
             break; // 找到就退出，因为每个连接只对应一个配置
         }
     }

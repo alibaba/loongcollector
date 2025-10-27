@@ -50,10 +50,10 @@ public:
     void Cleanup();
 
     // 添加配置（创建独立的连接）
-    bool AddConfig(const std::string& configName, size_t idx, const JournalConfig& config);
+    bool AddConfig(const std::string& configName, const JournalConfig& config);
 
     // 移除配置（关闭并删除连接）
-    void RemoveConfig(const std::string& configName, size_t idx);
+    void RemoveConfig(const std::string& configName);
 
     // 获取统计信息
     struct Stats {
@@ -66,17 +66,16 @@ public:
     Stats GetStats() const;
 
     // 获取指定配置的连接（reader）
-    std::shared_ptr<SystemdJournalReader> GetConnection(const std::string& configName, size_t idx) const;
+    std::shared_ptr<SystemdJournalReader> GetConnection(const std::string& configName) const;
 
     // 获取指定配置
-    JournalConfig GetConfig(const std::string& configName, size_t idx) const;
+    JournalConfig GetConfig(const std::string& configName) const;
 
     // 获取所有配置（用于遍历）
-    std::map<std::pair<std::string, size_t>, JournalConfig> GetAllConfigs() const;
+    std::map<std::string, JournalConfig> GetAllConfigs() const;
 
-    // 获取使用指定连接的配置（每个连接只对应一个配置）
-    std::vector<std::pair<std::string, size_t>>
-    GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const;
+    // 获取使用指定连接的配置名（每个连接只对应一个配置）
+    std::vector<std::string> GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const;
 
     // 获取当前连接数量
     size_t GetConnectionCount() const;
@@ -91,18 +90,14 @@ private:
     JournalConnectionManager(JournalConnectionManager&&) = delete;
     JournalConnectionManager& operator=(JournalConnectionManager&&) = delete;
 
-    // 生成配置的唯一key
-    std::string makeConfigKey(const std::string& configName, size_t idx) const;
-
     // 配置信息结构
     struct ConfigInfo {
         std::string configName;
-        size_t idx;
         JournalConfig config;
         std::shared_ptr<SystemdJournalReader> reader; // 每个配置独立的reader/连接
     };
 
-    std::map<std::string, ConfigInfo> mConfigs; // key: "configName:idx"
+    std::map<std::string, ConfigInfo> mConfigs; // key: configName
     mutable std::mutex mMutex;
     bool mInitialized{false};
 };

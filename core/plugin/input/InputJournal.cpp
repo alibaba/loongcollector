@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/CollectionPipeline.h"
 #include "common/ParamExtractor.h"
 #include "journal_server/JournalServer.h"
 #include "logger/Logger.h"
@@ -71,6 +72,24 @@ bool InputJournal::Start() {
         return false;
     }
 
+    // 检查同一配置中是否已经有其他 InputJournal 实例
+    if (mContext->HasValidPipeline()) {
+        const auto& inputs = mContext->GetPipeline().GetInputs();
+        int inputJournalCount = 0;
+        for (const auto& input : inputs) {
+            if (input && input->GetPlugin() && input->GetPlugin()->Name() == sName) {
+                inputJournalCount++;
+            }
+        }
+        if (inputJournalCount > 1) {
+            LOG_ERROR(sLogger,
+                      ("InputJournal: multiple input_journal instances found in the same config",
+                       "only one input_journal is allowed per config")("config", mContext->GetConfigName())(
+                          "count", inputJournalCount)("idx", mIndex));
+            return false;
+        }
+    }
+
     LOG_INFO(sLogger, ("starting InputJournal", "")("config", mContext->GetConfigName())("idx", mIndex));
 
     // 初始化JournalServer
@@ -104,7 +123,7 @@ bool InputJournal::Start() {
     }
 
     // 注册到JournalServer
-    JournalServer::GetInstance()->AddJournalInput(mContext->GetConfigName(), mIndex, config);
+    JournalServer::GetInstance()->AddJournalInput(mContext->GetConfigName(), config);
 
     LOG_INFO(sLogger,
              ("InputJournal registered with JournalServer", "")("config", mContext->GetConfigName())("idx", mIndex));
@@ -126,10 +145,8 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
 
     if (isPipelineRemoving) {
         // 配置被删除：完全清理，包括检查点
-        JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName(), mIndex);
-        LOG_INFO(
-            sLogger,
-            ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName())("idx", mIndex));
+        JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName());
+        LOG_INFO(sLogger, ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName()));
 
         // 如果没有其他注册的插件，停止JournalServer
         if (!JournalServer::GetInstance()->HasRegisteredPlugins()) {
@@ -137,10 +154,10 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         }
     } else {
         // 配置更新：只移除注册，保留检查点
-        JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName(), mIndex);
-        LOG_INFO(sLogger,
-                 ("InputJournal stopped for config update, checkpoint preserved",
-                  "")("config", mContext->GetConfigName())("idx", mIndex));
+        JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName());
+        LOG_INFO(
+            sLogger,
+            ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
     }
 
     mShutdown = true;

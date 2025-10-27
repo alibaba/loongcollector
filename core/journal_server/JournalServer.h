@@ -41,7 +41,6 @@ inline constexpr int kJournalEpollTimeoutMS = 200;
 struct MonitoredReader {
     std::shared_ptr<SystemdJournalReader> reader;
     std::string configName;
-    size_t idx;
 };
 
 /**
@@ -73,15 +72,15 @@ public:
     bool HasRegisteredPlugins() const override;
 
     // Plugin registration interface
-    void AddJournalInput(const std::string& configName, size_t idx, const JournalConfig& config);
-    void RemoveJournalInput(const std::string& configName, size_t idx);
-    void RemoveConfigOnly(const std::string& configName, size_t idx);
+    void AddJournalInput(const std::string& configName, const JournalConfig& config);
+    void RemoveJournalInput(const std::string& configName);
+    void RemoveConfigOnly(const std::string& configName);
 
     /**
      * @brief 获取所有配置
      * @return 所有配置的映射
      */
-    std::map<std::pair<std::string, size_t>, JournalConfig> GetAllJournalConfigs() const;
+    std::map<std::string, JournalConfig> GetAllJournalConfigs() const;
 
     /**
      * @brief 获取连接池统计信息
@@ -98,10 +97,9 @@ public:
     /**
      * @brief 获取指定配置的连接信息
      * @param configName 配置名称
-     * @param idx 配置索引
      * @return 连接信息，如果不存在返回nullptr
      */
-    std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName, size_t idx) const;
+    std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName) const;
 
     /**
      * @brief 获取当前连接数量
@@ -117,9 +115,8 @@ public:
     /**
      * @brief 清理指定配置的 epoll 监控
      * @param configName 配置名称
-     * @param idx 配置索引
      */
-    void CleanupEpollMonitoring(const std::string& configName, size_t idx);
+    void CleanupEpollMonitoring(const std::string& configName);
 
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -131,8 +128,8 @@ private:
 
     void run();
     void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void processJournal(const std::string& configName, size_t idx);
-    bool validateQueueKey(const std::string& configName, size_t idx, const JournalConfig& config, QueueKey& queueKey);
+    void processJournal(const std::string& configName);
+    bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
     // 线程管理 - Thread Management
     std::future<void> mThreadRes;
