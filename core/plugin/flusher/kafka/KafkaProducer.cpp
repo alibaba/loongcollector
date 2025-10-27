@@ -538,23 +538,12 @@ private:
             return;
         }
 
-        std::vector<std::pair<std::string, std::string>> filtered;
-        filtered.reserve(mConfig.Headers.size());
-        for (const auto& kv : mConfig.Headers) {
-            if (!kv.first.empty()) {
-                filtered.emplace_back(kv.first, kv.second);
-            }
-        }
-        if (filtered.empty()) {
-            return;
-        }
-
-        rd_kafka_headers_t* hdrs = rd_kafka_headers_new(static_cast<int>(filtered.size()));
+        rd_kafka_headers_t* hdrs = rd_kafka_headers_new(static_cast<int>(mConfig.Headers.size()));
         if (!hdrs) {
             LOG_ERROR(sLogger, ("error", "Failed to allocate Kafka headers template"));
             return;
         }
-        for (const auto& kv : filtered) {
+        for (const auto& kv : mConfig.Headers) {
             rd_kafka_resp_err_t err = rd_kafka_header_add(hdrs,
                                                           kv.first.c_str(),
                                                           static_cast<int>(kv.first.size()),

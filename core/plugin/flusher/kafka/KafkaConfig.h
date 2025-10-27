@@ -112,18 +112,18 @@ struct KafkaConfig {
             const Json::Value& headers = config["Headers"];
             for (const auto& h : headers) {
                 if (!h.isObject()) {
-                    LOG_WARNING(sLogger, ("Invalid header entry: not an object", "skip")("entry", h.toStyledString()));
-                    continue;
+                    LOG_ERROR(sLogger, ("Invalid header entry: not an object", "error")("entry", h.toStyledString()));
+                    return false;
                 }
                 if (!(h.isMember("key") && h["key"].isString() && h.isMember("value") && h["value"].isString())) {
-                    LOG_WARNING(sLogger,
-                                ("Invalid header entry: missing key or value", "skip")("entry", h.toStyledString()));
-                    continue;
+                    LOG_ERROR(sLogger,
+                              ("Invalid header entry: missing key or value", "error")("entry", h.toStyledString()));
+                    return false;
                 }
                 const std::string keyStr = h["key"].asString();
                 if (keyStr.empty()) {
-                    LOG_WARNING(sLogger, ("Invalid header entry: key is empty", "skip")("entry", h.toStyledString()));
-                    continue;
+                    LOG_ERROR(sLogger, ("Invalid header entry: key is empty", "error")("entry", h.toStyledString()));
+                    return false;
                 }
                 Headers.emplace_back(keyStr, h["value"].asString());
             }
