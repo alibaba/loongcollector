@@ -590,9 +590,6 @@ private:
     std::vector<ProducerContext*> mContextPool;
     std::mutex mContextPoolMutex;
     static constexpr size_t kMaxContextCache = 65536;
-
-    void SetupHeadersTemplate();
-    void ResetHeadersTemplate();
 };
 
 void KafkaProducer::DeliveryReportCallback(rd_kafka_t* rk, const rd_kafka_message_t* rkmessage, void* opaque) {
