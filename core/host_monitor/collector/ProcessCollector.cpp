@@ -248,9 +248,12 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_MIN,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_PID, std::to_string(pid));
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_NAME, processInfo.name);
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_USER, processInfo.user);
+        const StringBuffer& pidBuffer = groupPtr->GetSourceBuffer()->CopyString(std::to_string(pid));
+        const StringBuffer& nameBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.name);
+        const StringBuffer& userBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.user);
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_PID, StringView(pidBuffer.data, pidBuffer.size));
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_NAME, StringView(nameBuffer.data, nameBuffer.size));
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_USER, StringView(userBuffer.data, userBuffer.size));
         metricEventEachPid->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_PROCESS);
     }
 
