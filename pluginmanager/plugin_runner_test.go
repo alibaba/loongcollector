@@ -16,6 +16,7 @@ package pluginmanager
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -98,4 +99,26 @@ func (s *pluginRunnerTestSuite) TestTimerRunner_WithInitialDelay() {
 	<-time.After(time.Millisecond * 600)
 	cc.WaitCancel()
 	s.Equal(2, len(ch))
+}
+
+func (s *pluginRunnerTestSuite) TestTimerRunner_WithPanicRecover() {
+	runner := &timerRunner{
+		state:           s,
+		initialMaxDelay: time.Second,
+		interval:        time.Millisecond * 1000,
+		rerunIfPanic:    true, context: s.Context,
+	}
+	cc := pipeline.NewAsyncControl()
+	count := int64(0)
+
+	cc.Run(func(cc *pipeline.AsyncControl) {
+		runner.Run(func(state interface{}) error {
+			atomic.AddInt64(&count, 1)
+			panic("test panic")
+		}, cc)
+	})
+
+	time.Sleep(time.Second * 5)
+	cc.WaitCancel()
+	s.GreaterOrEqual(atomic.LoadInt64(&count), int64(5))
 }

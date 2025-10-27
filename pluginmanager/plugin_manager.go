@@ -88,11 +88,17 @@ var containerConfigJSON = `{
 	]
 }`
 
-func panicRecover(pluginType string) {
+func panicRecover(pluginType string, callBacks ...func()) {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
 		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "plugin", pluginType, "panicked", err, "stack", string(trace))
+
+		for _, cb := range callBacks {
+			if cb != nil {
+				cb()
+			}
+		}
 	}
 }
 

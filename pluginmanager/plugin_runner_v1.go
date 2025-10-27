@@ -209,6 +209,7 @@ func (p *pluginv1Runner) runMetricInput(async *pipeline.AsyncControl) {
 		m := metric
 		runner := &timerRunner{
 			initialMaxDelay: time.Duration(p.LogstoreConfig.GlobalConfig.InputMaxFirstCollectDelayMs) * time.Millisecond,
+			rerunIfPanic:    true,
 			state:           m.Input,
 			interval:        m.Interval,
 			context:         m.Config.Context,

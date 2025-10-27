@@ -28,15 +28,31 @@ import (
 type timerRunner struct {
 	initialMaxDelay time.Duration
 	interval        time.Duration
+	rerunIfPanic    bool
 	context         pipeline.Context
 	state           interface{}
 }
 
 func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.AsyncControl) {
 	logger.Info(p.context.GetRuntimeContext(), "task run", "start", "interval", p.interval, "max delay", p.initialMaxDelay, "state", fmt.Sprintf("%T", p.state))
-	defer panicRecover(fmt.Sprint(p.state))
-
 	exitFlag := false
+
+	panicCallback := func() {
+		if exitFlag {
+			logger.Infof(p.context.GetRuntimeContext(), "task exited by async control")
+			return
+		}
+
+		if p.rerunIfPanic {
+			logger.Warningf(p.context.GetRuntimeContext(), "TASK_PANIC_RECOVER", "task run panic, rerun after %v", p.initialMaxDelay)
+			cc.Run(func(cc *pipeline.AsyncControl) {
+				p.Run(task, cc)
+			})
+			return
+		}
+	}
+	defer panicRecover(fmt.Sprint(p.state), panicCallback)
+
 	if p.initialMaxDelay > 0 {
 		if p.initialMaxDelay > p.interval {
 			logger.Infof(p.context.GetRuntimeContext(), "initial collect delay is larger than than interval, use interval %v instead", p.interval)
