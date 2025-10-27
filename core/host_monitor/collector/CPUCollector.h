@@ -16,11 +16,9 @@
 
 #pragma once
 
-#include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
 #include "host_monitor/collector/BaseCollector.h"
 #include "host_monitor/collector/MetricCalculate.h"
-#include "plugin/input/InputHostMonitor.h"
 
 namespace logtail {
 

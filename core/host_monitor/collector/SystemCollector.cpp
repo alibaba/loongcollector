@@ -17,17 +17,13 @@
 #include "host_monitor/collector/SystemCollector.h"
 
 #include <chrono>
-#include <filesystem>
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
-
 #include "MetricValue.h"
-#include "common/StringTools.h"
+#include "common/StringView.h"
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/SystemInterface.h"
-#include "logger/Logger.h"
+#include "host_monitor/collector/CollectorConstants.h"
 
 DEFINE_FLAG_INT32(basic_host_monitor_system_collect_interval, "basic host monitor system collect interval, seconds", 1);
 
@@ -54,43 +50,29 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
     mCalculate.Reset();
 
     // 数据整理
-    std::vector<double> values = {minSys.load1,
-                                  maxSys.load1,
-                                  avgSys.load1,
-                                  minSys.load5,
-                                  maxSys.load5,
-                                  avgSys.load5,
-                                  minSys.load15,
-                                  maxSys.load15,
-                                  avgSys.load15,
-                                  minSys.load1PerCore,
-                                  maxSys.load1PerCore,
-                                  avgSys.load1PerCore,
-                                  minSys.load5PerCore,
-                                  maxSys.load5PerCore,
-                                  avgSys.load5PerCore,
-                                  minSys.load15PerCore,
-                                  maxSys.load15PerCore,
-                                  avgSys.load15PerCore};
-    std::vector<std::string> names = {"load_1m_min",
-                                      "load_1m_max",
-                                      "load_1m_avg",
-                                      "load_5m_min",
-                                      "load_5m_max",
-                                      "load_5m_avg",
-                                      "load_15m_min",
-                                      "load_15m_max",
-                                      "load_15m_avg",
-                                      "load_per_core_1m_min",
-                                      "load_per_core_1m_max",
-                                      "load_per_core_1m_avg",
-                                      "load_per_core_5m_min",
-                                      "load_per_core_5m_max",
-                                      "load_per_core_5m_avg",
-                                      "load_per_core_15m_min",
-                                      "load_per_core_15m_max",
-                                      "load_per_core_15m_avg"};
-
+    struct MetricDef {
+        StringView name;
+        double* value;
+    } metrics[] = {
+        {KEY_LOAD_1M_MIN, &minSys.load1},
+        {KEY_LOAD_1M_MAX, &maxSys.load1},
+        {KEY_LOAD_1M_AVG, &avgSys.load1},
+        {KEY_LOAD_5M_MIN, &minSys.load5},
+        {KEY_LOAD_5M_MAX, &maxSys.load5},
+        {KEY_LOAD_5M_AVG, &avgSys.load5},
+        {KEY_LOAD_15M_MIN, &minSys.load15},
+        {KEY_LOAD_15M_MAX, &maxSys.load15},
+        {KEY_LOAD_15M_AVG, &avgSys.load15},
+        {KEY_LOAD_PER_CORE_1M_MIN, &minSys.load1PerCore},
+        {KEY_LOAD_PER_CORE_1M_MAX, &maxSys.load1PerCore},
+        {KEY_LOAD_PER_CORE_1M_AVG, &avgSys.load1PerCore},
+        {KEY_LOAD_PER_CORE_5M_MIN, &minSys.load5PerCore},
+        {KEY_LOAD_PER_CORE_5M_MAX, &maxSys.load5PerCore},
+        {KEY_LOAD_PER_CORE_5M_AVG, &avgSys.load5PerCore},
+        {KEY_LOAD_PER_CORE_15M_MIN, &minSys.load15PerCore},
+        {KEY_LOAD_PER_CORE_15M_MAX, &maxSys.load15PerCore},
+        {KEY_LOAD_PER_CORE_15M_AVG, &avgSys.load15PerCore},
+    };
 
     MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
     if (!metricEvent) {
@@ -98,11 +80,11 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
     }
     metricEvent->SetTimestamp(load.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
-    metricEvent->SetTag(std::string("m"), std::string("system.load"));
+    metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_LOAD);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-    for (size_t i = 0; i < names.size(); ++i) {
-        multiDoubleValues->SetValue(std::string(names[i]),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, values[i]});
+    for (const auto& def : metrics) {
+        multiDoubleValues->SetValue(def.name,
+                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
     }
 
     return true;

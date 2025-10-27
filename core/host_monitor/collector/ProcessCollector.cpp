@@ -24,17 +24,12 @@
 #include <chrono>
 #include <filesystem>
 #include <string>
-#include <thread>
-
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
 
 #include "MetricValue.h"
-#include "common/StringTools.h"
-#include "common/TimeUtil.h"
+#include "common/StringView.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/common/FastFieldParser.h"
 #include "logger/Logger.h"
 
@@ -193,22 +188,20 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     metricEvent->SetTimestamp(processListInfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-    std::vector<std::string> vmNames = {
-        "vm_process_min",
-        "vm_process_max",
-        "vm_process_avg",
-    };
-    std::vector<double> vmValues = {
-        minVMProcessNum.vmProcessNum,
-        maxVMProcessNum.vmProcessNum,
-        avgVMProcessNum.vmProcessNum,
+    struct MetricDef {
+        StringView name;
+        double value;
+    } vmMetrics[] = {
+        {KEY_VM_PROCESS_MIN, minVMProcessNum.vmProcessNum},
+        {KEY_VM_PROCESS_MAX, maxVMProcessNum.vmProcessNum},
+        {KEY_VM_PROCESS_AVG, avgVMProcessNum.vmProcessNum},
     };
     // vm的系统信息上传
-    for (size_t i = 0; i < vmNames.size(); i++) {
-        multiDoubleValues->SetValue(std::string(vmNames[i]),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
+    for (const auto& def : vmMetrics) {
+        multiDoubleValues->SetValue(def.name,
+                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, def.value});
     }
-    metricEvent->SetTag(std::string("m"), std::string("system.processCount"));
+    metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_PROCESS_COUNT);
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
@@ -232,33 +225,33 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
         // cpu percent
         value = static_cast<double>(avgMetric.cpuPercent);
-        multiDoubleValuesEachPid->SetValue(std::string("process_cpu_avg"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_CPU_AVG,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // mem percent
         value = static_cast<double>(avgMetric.memPercent);
-        multiDoubleValuesEachPid->SetValue(std::string("process_memory_avg"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_MEMORY_AVG,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // open file number
         value = static_cast<double>(avgMetric.fdNum);
-        multiDoubleValuesEachPid->SetValue(std::string("process_openfile_avg"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_OPENFILE_AVG,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // process number
         value = static_cast<double>(avgMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_avg"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_AVG,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(maxMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_max"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_MAX,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(minMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_min"),
+        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_MIN,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
-        metricEventEachPid->SetTag("pid", std::to_string(pid));
-        metricEventEachPid->SetTag("name", processInfo.name);
-        metricEventEachPid->SetTag("user", processInfo.user);
-        metricEventEachPid->SetTag(std::string("m"), std::string("system.process"));
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_PID, std::to_string(pid));
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_NAME, processInfo.name);
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_USER, processInfo.user);
+        metricEventEachPid->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_PROCESS);
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失

@@ -20,9 +20,12 @@
 
 #include <string>
 
-#include "Flags.h"
+#include "common/Flags.h"
+#include "common/StringView.h"
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
+#include "logger/Logger.h"
 
 DEFINE_FLAG_INT32(basic_host_monitor_cpu_collect_interval, "basic host monitor cpu collect interval, seconds", 1);
 namespace logtail {
@@ -70,17 +73,16 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
 
         mCalculate.Reset();
         struct MetricDef {
-            const char* name;
+            StringView name;
             double* value;
         } metrics[] = {
-            {"cpu_system_avg", &avgCPU.sys},  {"cpu_system_min", &minCPU.sys},  {"cpu_system_max", &maxCPU.sys},
-            {"cpu_idle_avg", &avgCPU.idle},   {"cpu_idle_min", &minCPU.idle},   {"cpu_idle_max", &maxCPU.idle},
-            {"cpu_user_avg", &avgCPU.user},   {"cpu_user_min", &minCPU.user},   {"cpu_user_max", &maxCPU.user},
-            {"cpu_wait_avg", &avgCPU.wait},   {"cpu_wait_min", &minCPU.wait},   {"cpu_wait_max", &maxCPU.wait},
-            {"cpu_other_avg", &avgCPU.other}, {"cpu_other_min", &minCPU.other}, {"cpu_other_max", &maxCPU.other},
-            {"cpu_total_avg", &avgCPU.total}, {"cpu_total_min", &minCPU.total}, {"cpu_total_max", &maxCPU.total},
-            {"cpu_cores_value", &cpuCores},
-
+            {KEY_CPU_SYSTEM_AVG, &avgCPU.sys},  {KEY_CPU_SYSTEM_MIN, &minCPU.sys},  {KEY_CPU_SYSTEM_MAX, &maxCPU.sys},
+            {KEY_CPU_IDLE_AVG, &avgCPU.idle},   {KEY_CPU_IDLE_MIN, &minCPU.idle},   {KEY_CPU_IDLE_MAX, &maxCPU.idle},
+            {KEY_CPU_USER_AVG, &avgCPU.user},   {KEY_CPU_USER_MIN, &minCPU.user},   {KEY_CPU_USER_MAX, &maxCPU.user},
+            {KEY_CPU_WAIT_AVG, &avgCPU.wait},   {KEY_CPU_WAIT_MIN, &minCPU.wait},   {KEY_CPU_WAIT_MAX, &maxCPU.wait},
+            {KEY_CPU_OTHER_AVG, &avgCPU.other}, {KEY_CPU_OTHER_MIN, &minCPU.other}, {KEY_CPU_OTHER_MAX, &maxCPU.other},
+            {KEY_CPU_TOTAL_AVG, &avgCPU.total}, {KEY_CPU_TOTAL_MIN, &minCPU.total}, {KEY_CPU_TOTAL_MAX, &maxCPU.total},
+            {KEY_CPU_CORES_VALUE, &cpuCores},
         };
         MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
         if (!metricEvent) {
@@ -88,10 +90,10 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         }
         metricEvent->SetTimestamp(cpuInfo.collectTime, 0);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
-        metricEvent->SetTag(std::string("m"), std::string("system.cpu"));
+        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_CPU);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
         for (const auto& def : metrics) {
-            multiDoubleValues->SetValue(std::string(def.name),
+            multiDoubleValues->SetValue(def.name,
                                         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
         }
     }
