@@ -34,8 +34,8 @@ using namespace std;
 namespace logtail {
 
 void JournalServer::Init() {
-    lock_guard<mutex> lock(mInitMux);
-    if (mIsInitialized) {
+    bool expected = false;
+    if (!mIsInitialized.compare_exchange_strong(expected, true)) {
         LOG_INFO(sLogger, ("journal server already initialized", "skipping duplicate Init() call"));
         return;
     }
@@ -45,24 +45,26 @@ void JournalServer::Init() {
     // 初始化连接管理器
     JournalConnectionManager::GetInstance().Initialize();
 
-    mIsInitialized = true;
     LOG_INFO(sLogger, ("journal server initialized", ""));
 }
 
 void JournalServer::Stop() {
-    lock_guard<mutex> initLock(mInitMux);
-    if (!mIsInitialized || !mThreadRes.valid()) {
+    bool expected = true;
+    if (!mIsInitialized.compare_exchange_strong(expected, false)) {
         return;
     }
-    mIsThreadRunning.store(false);
-    if (mThreadRes.valid()) {
-        mThreadRes.get();
+
+    if (!mThreadRes.valid()) {
+        return;
     }
+    // 设置停止标志·
+    mIsThreadRunning.store(false);
+    // 等待线程退出
+    mThreadRes.get();
 
     // 清理连接管理器
     JournalConnectionManager::GetInstance().Cleanup();
 
-    mIsInitialized = false;
     LOG_INFO(sLogger, ("journal server stopped", ""));
 }
 
@@ -150,6 +152,14 @@ int JournalServer::GetGlobalEpollFD() const {
 }
 
 void JournalServer::CleanupEpollMonitoring(const std::string& configName, size_t idx) {
+    // 检查初始化状态：如果 JournalServer 已经停止，说明 epoll 已在 run() 中统一清理
+    if (!mIsInitialized.load()) {
+        LOG_DEBUG(
+            sLogger,
+            ("journal server epoll monitoring already cleaned up", "server stopped")("config", configName)("idx", idx));
+        return;
+    }
+
     int epollFD = GetGlobalEpollFD();
     if (epollFD < 0) {
         LOG_WARNING(sLogger,
@@ -191,13 +201,11 @@ void JournalServer::run() {
 
     while (mIsThreadRunning.load()) {
         try {
-            int timeoutMs = 100; // 默认100ms超时
-
             // 更新连接监听状态
             refreshMonitors(mGlobalEpollFD, monitoredReaders);
 
             // 等待事件
-            int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, timeoutMs);
+            int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
 
             if (nfds == -1) {
                 if (errno == EINTR) {

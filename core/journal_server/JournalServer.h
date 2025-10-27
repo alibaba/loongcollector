@@ -21,7 +21,6 @@
 #include <map>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 
 #include "common/JournalConfig.h"
 #include "runner/InputRunner.h"
@@ -34,6 +33,9 @@ class JournalConnectionInstance;
 class SystemdJournalReader;
 class PipelineEventGroup;
 struct JournalEntry;
+
+// Epoll timeout constants
+inline constexpr int kJournalEpollTimeoutMS = 200;
 
 // MonitoredReader struct definition
 struct MonitoredReader {
@@ -141,10 +143,7 @@ private:
     mutable std::mutex mEpollMutex;
 
     // 初始化状态管理 - Initialization State Management
-    bool mIsInitialized = false;
-    mutable std::mutex mInitMux;
-
-    mutable std::mutex mUpdateMux;
+    std::atomic<bool> mIsInitialized{false};
 };
 
 } // namespace logtail
