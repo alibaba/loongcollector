@@ -170,6 +170,7 @@ public:
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
     size_t TagsSize() const { return mTags.mInner.size(); }
+    void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };
 
     const std::vector<InnerEvent>& GetEvents() const { return mEvents; }
     InnerEvent* AddEvent();
