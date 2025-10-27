@@ -30,7 +30,8 @@ public:
     void Insert(StringView key, StringView val) {
         auto iter = mInner.find(key);
         if (iter != mInner.end()) {
-            mAllocatedSize += val.size() - iter->second.size();
+            mAllocatedSize -= iter->second.size();
+            mAllocatedSize += val.size();
             iter->second = val;
         } else {
             mAllocatedSize += key.size() + val.size();
@@ -68,7 +69,8 @@ public:
             auto iter
                 = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
             if (iter != mInner.end()) {
-                mAllocatedSize += val.size() - iter->second.size();
+                mAllocatedSize -= iter->second.size();
+                mAllocatedSize += val.size();
                 iter->second = val;
             } else {
                 mAllocatedSize += key.size() + val.size();

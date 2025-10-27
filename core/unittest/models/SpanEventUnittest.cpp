@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <memory>
+#include <vector>
 
 #include "common/JsonUtil.h"
 #include "models/PipelineEventGroup.h"
@@ -38,8 +39,8 @@ public:
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
     }
 
@@ -143,7 +144,7 @@ void SpanEventUnittest::TestTagWithReplace() {
 
     // test replace=false (append behavior)
     {
-        mSpanEvent->Reset();
+        SetUp();
         string key = "key1";
         string value1 = "value1";
         mSpanEvent->SetTag(key, value1, false);
@@ -171,7 +172,7 @@ void SpanEventUnittest::TestTagWithReplace() {
 
     // test SetTagNoCopy with replace parameter
     {
-        mSpanEvent->Reset();
+        SetUp();
         string key = "key1";
         string value1 = "value1";
         mSpanEvent->SetTagNoCopy(
@@ -245,7 +246,7 @@ void SpanEventUnittest::TestScopeTag() {
 void SpanEventUnittest::TestSize() {
     size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(SpanEvent::Kind) + sizeof(uint64_t) + sizeof(uint64_t)
         + sizeof(SpanEvent::StatusCode) + sizeof(vector<SpanEvent::InnerEvent>) + sizeof(vector<SpanEvent::SpanLink>)
-        + sizeof(map<StringView, StringView>) + sizeof(map<StringView, StringView>);
+        + sizeof(vector<pair<StringView, StringView>>) + sizeof(map<StringView, StringView>);
 
     mSpanEvent->SetTraceId("test_trace_id");
     mSpanEvent->SetSpanId("test_span_id");
@@ -285,7 +286,7 @@ void SpanEventUnittest::TestSize() {
     }
     {
         SpanEvent::InnerEvent* e = mSpanEvent->AddEvent();
-        size_t newBasicSize = basicSize + sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+        size_t newBasicSize = basicSize + sizeof(uint64_t) + sizeof(vector<pair<StringView, StringView>>);
 
         e->SetName("test_event");
         newBasicSize += strlen("test_event");
@@ -297,7 +298,7 @@ void SpanEventUnittest::TestSize() {
     }
     {
         SpanEvent::SpanLink* l = mSpanEvent->AddLink();
-        size_t newBasicSize = basicSize + sizeof(map<StringView, StringView>);
+        size_t newBasicSize = basicSize + sizeof(vector<pair<StringView, StringView>>);
 
         l->SetTraceId("other_trace_id");
         l->SetSpanId("other_span_id");
@@ -485,8 +486,8 @@ public:
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
         mInnerEvent = mSpanEvent->AddEvent();
     }
@@ -571,7 +572,6 @@ void InnerEventUnittest::TestTagWithReplace() {
 
     // test replace=false (append behavior)
     {
-        // reset by creating a new event
         mInnerEvent = mSpanEvent->AddEvent();
         string key = "key1";
         string value1 = "value1";
@@ -600,7 +600,7 @@ void InnerEventUnittest::TestTagWithReplace() {
 }
 
 void InnerEventUnittest::TestSize() {
-    size_t basicSize = sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(uint64_t) + sizeof(vector<pair<StringView, StringView>>);
 
     mInnerEvent->SetName("test");
     basicSize += strlen("test");
@@ -674,8 +674,8 @@ public:
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
         mLink = mSpanEvent->AddLink();
     }
@@ -762,7 +762,6 @@ void SpanLinkUnittest::TestTagWithReplace() {
 
     // test replace=false (append behavior)
     {
-        // reset by creating a new link
         mLink = mSpanEvent->AddLink();
         string key = "key1";
         string value1 = "value1";
@@ -791,7 +790,7 @@ void SpanLinkUnittest::TestTagWithReplace() {
 }
 
 void SpanLinkUnittest::TestSize() {
-    size_t basicSize = sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(vector<pair<StringView, StringView>>);
 
     mLink->SetTraceId("test_trace_id");
     mLink->SetSpanId("test_span_id");
