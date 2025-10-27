@@ -170,7 +170,7 @@ void MetricEventUnittest::TestMetadata() {
         string key = "key3";
         string value = "value3";
         mMetricEvent->SetMetadataNoCopy(mMetricEvent->GetSourceBuffer()->CopyString(key),
-                                   mMetricEvent->GetSourceBuffer()->CopyString(value));
+                                        mMetricEvent->GetSourceBuffer()->CopyString(value));
         APSARA_TEST_TRUE(mMetricEvent->HasMetadata(key));
         APSARA_TEST_EQUAL(value, mMetricEvent->GetMetadata(key).to_string());
     }
@@ -198,8 +198,7 @@ void MetricEventUnittest::TestMetadata() {
 
 void MetricEventUnittest::TestUntypedSingleValueSize() {
     size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedSingleValue)
-        + sizeof(vector<std::pair<StringView, StringView>>)
-        + sizeof(map<StringView, StringView>);
+        + sizeof(vector<std::pair<StringView, StringView>>) + sizeof(map<StringView, StringView>);
     mMetricEvent->SetName("test");
     basicSize += 4;
 
@@ -223,8 +222,7 @@ void MetricEventUnittest::TestUntypedMultiDoubleValuesSize() {
     mMetricEvent->SetName("test");
     mMetricEvent->SetValue(map<StringView, UntypedMultiDoubleValue>{});
     size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(UntypedMultiDoubleValues)
-        + sizeof(vector<std::pair<StringView, StringView>>)
-        + sizeof(map<StringView, StringView>);
+        + sizeof(vector<std::pair<StringView, StringView>>) + sizeof(map<StringView, StringView>);
     basicSize += 4;
 
     // add tag, and key not existed
