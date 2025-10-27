@@ -108,6 +108,8 @@ public:
     void TestInitWithKerberosMinimal();
     void TestInitWithKerberosAndTLS();
     void TestInitWithKerberosFull();
+    void TestInitWithCompression();
+    void TestInitWithCompressionAndLevel();
 
 protected:
     void SetUp();
@@ -646,6 +648,28 @@ void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
     APSARA_TEST_EQUAL(std::string(""), k2);
 }
 
+void FlusherKafkaUnittest::TestInitWithCompression() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Compression"] = "gzip";
+    config["CompressionLevel"] = -1;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(std::string("gzip"), mFlusher->mKafkaConfig.Compression);
+    APSARA_TEST_EQUAL(-1, mFlusher->mKafkaConfig.CompressionLevel);
+}
+
+void FlusherKafkaUnittest::TestInitWithCompressionAndLevel() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Compression"] = "lz4";
+    config["CompressionLevel"] = 2;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(std::string("lz4"), mFlusher->mKafkaConfig.Compression);
+    APSARA_TEST_EQUAL(2, mFlusher->mKafkaConfig.CompressionLevel);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -679,6 +703,8 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAnd
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosMinimal)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosAndTLS)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosFull)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithCompression)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithCompressionAndLevel)
 
 } // namespace logtail
 

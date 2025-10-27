@@ -60,6 +60,8 @@ public:
     void TestProduceAsyncWithHeadersAndKeys();
     void TestProduceAsyncWithHeadersAndNoKeys();
     void TestProduceAsyncWithKeyAndNoHeaders();
+    void TestCompressionConfig();
+    void TestCompressionConfigWithLevel();
 
 protected:
     void SetUp();
@@ -417,6 +419,30 @@ void KafkaProducerUnittest::TestProduceAsyncWithKeyAndNoHeaders() {
     APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
 }
 
+void KafkaProducerUnittest::TestCompressionConfig() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Compression = "gzip";
+    c.CompressionLevel = -1;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestCompressionConfigWithLevel() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Compression = "lz4";
+    c.CompressionLevel = 2;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitFailure)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncSuccess)
@@ -441,6 +467,8 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestCreateHeadersTemplate)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersAndKeys)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersAndNoKeys)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithKeyAndNoHeaders)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCompressionConfig)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCompressionConfigWithLevel)
 
 } // namespace logtail
 

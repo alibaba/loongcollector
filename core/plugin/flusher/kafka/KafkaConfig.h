@@ -51,6 +51,9 @@ struct KafkaConfig {
     uint32_t MaxRetries = 3;
     uint32_t RetryBackoffMs = 100;
 
+    std::string Compression;
+    int32_t CompressionLevel = -1;
+
     std::map<std::string, std::string> CustomConfig;
 
     // General Authentication (TLS/SASL/Kerberos)
@@ -97,6 +100,9 @@ struct KafkaConfig {
         GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
         GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
         GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
+
+        GetOptionalStringParam(config, "Compression", Compression, errorMsg);
+        GetOptionalIntParam(config, "CompressionLevel", CompressionLevel, errorMsg);
 
         if (config.isMember("Authentication") && config["Authentication"].isObject()) {
             const Json::Value& auth = config["Authentication"];

@@ -64,4 +64,7 @@ const std::string KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD = "sasl.kerberos.kinit.cm
 const std::string KAFKA_CONFIG_SASL_USERNAME = "sasl.username";
 const std::string KAFKA_CONFIG_SASL_PASSWORD = "sasl.password";
 
+const std::string KAFKA_CONFIG_COMPRESSION_CODEC = "compression.codec";
+const std::string KAFKA_CONFIG_COMPRESSION_LEVEL = "compression.level";
+
 } // namespace logtail
