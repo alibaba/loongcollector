@@ -379,6 +379,9 @@ private:
             rd_kafka_topic_conf_destroy(tconf);
             return false;
         }
+
+        // The topic config object is not usable after this call
+        // as it is owned by the rd_kafka_t instance. tconf should be treated as null afterward.
         rd_kafka_conf_set_default_topic_conf(mConf, tconf);
 
         return true;
@@ -543,6 +546,8 @@ private:
             }
         }
 
+        // The topic config object is not usable after this call
+        // as it is owned by the rd_kafka_t instance. tconf should be treated as null afterward.
         rd_kafka_conf_set_default_topic_conf(mConf, tconf);
 
         return true;
