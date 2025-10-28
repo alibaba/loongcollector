@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	// Import mysql driver for database/sql
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/mitchellh/mapstructure"
 
@@ -96,7 +97,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 	// Test connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
+	if err = db.PingContext(ctx); err != nil {
 		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
 			"failed to ping doris, err: %s", err)
 		db.Close()
@@ -108,7 +109,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 
 	// Create table if needed
 	if d.CreateTable {
-		if err := d.createTable(); err != nil {
+		if err = d.createTable(); err != nil {
 			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
 				"failed to create table, err: %s", err)
 			// Don't return error, table might already exist
