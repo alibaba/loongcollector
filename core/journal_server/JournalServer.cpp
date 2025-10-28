@@ -209,6 +209,31 @@ void JournalServer::run() {
                 LOG_ERROR(sLogger, ("journal server epoll_wait failed", "")("error", strerror(errno)));
                 break;
             }
+            
+            LOG_INFO(sLogger, ("journal server epoll_wait events", nfds));
+
+            // 🔥 关键修复：容器环境的epoll兼容性
+            // 当epoll_wait超时返回0事件时（容器中常见情况），主动轮询所有reader
+            // 这实现了epoll+polling的混合模式，兼顾性能和容器的兼容性
+            if (nfds == 0 && !monitoredReaders.empty()) {
+                // epoll超时，进行轮询读取（用于容器环境）
+                LOG_DEBUG(sLogger,
+                         ("journal server epoll timeout, fallback to polling mode",
+                          "")("monitored_readers", monitoredReaders.size()));
+                for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
+                    auto& monitoredReader = it->second;
+                    if (!monitoredReader.reader) {
+                        continue;
+                    }
+
+                    // 在超时情况下，尝试读取一次（无论hasMoreData状态如何）
+                    // 因为journal可能有新数据，虽然epoll没有通知
+                    bool hasMoreData = false;
+                    processJournal(monitoredReader.configName, &hasMoreData);
+                    monitoredReader.hasMoreData = hasMoreData;
+                }
+                continue; // 继续下一次epoll_wait
+            }
 
             // 处理文件描述符事件
             for (int i = 0; i < nfds; i++) {
