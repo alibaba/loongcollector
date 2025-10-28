@@ -345,9 +345,9 @@ void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEvent() {
     SystemdJournalReader reader;
 
     // 测试ProcessJournalEvent方法
-    bool result = reader.ProcessJournalEvent();
-    // 在未打开状态下应该失败
-    APSARA_TEST_FALSE(result);
+    JournalEventType result = reader.ProcessJournalEvent();
+    // 在未打开状态下应该返回 kError
+    APSARA_TEST_TRUE(result == JournalEventType::kError);
 }
 
 void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventNotOpen() {
@@ -355,8 +355,8 @@ void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventNotOpen()
     SystemdJournalReader reader;
 
     // 测试未打开状态下的ProcessJournalEvent
-    bool result = reader.ProcessJournalEvent();
-    APSARA_TEST_FALSE(result);
+    JournalEventType result = reader.ProcessJournalEvent();
+    APSARA_TEST_TRUE(result == JournalEventType::kError);
 }
 
 void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventError() {
@@ -364,9 +364,9 @@ void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventError() {
     SystemdJournalReader reader;
 
     // 测试ProcessJournalEvent错误处理
-    bool result = reader.ProcessJournalEvent();
+    JournalEventType result = reader.ProcessJournalEvent();
     // 主要测试错误处理逻辑
-    APSARA_TEST_FALSE(result);
+    APSARA_TEST_TRUE(result == JournalEventType::kError);
 }
 
 void JournalReaderUnittest::TestSystemdJournalReaderAddToEpoll() {

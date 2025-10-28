@@ -132,14 +132,16 @@ bool InputJournal::Start() {
 }
 
 bool InputJournal::Stop(bool isPipelineRemoving) {
-    if (mShutdown) {
+    // 使用 CAS 确保幂等性：只有第一个线程能执行清理逻辑
+    bool expected = false;
+    if (!mShutdown.compare_exchange_strong(expected, true)) {
+        // 已经有其他线程在执行或已完成清理，直接返回
         return true;
     }
 
     // 检查mContext是否已初始化
     if (!mContext) {
         LOG_WARNING(sLogger, ("InputJournal Stop called without context", "skipping cleanup"));
-        mShutdown = true;
         return true;
     }
 
@@ -159,8 +161,6 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
             sLogger,
             ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
     }
-
-    mShutdown = true;
 
     return true;
 }
