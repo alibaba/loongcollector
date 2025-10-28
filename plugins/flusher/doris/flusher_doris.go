@@ -23,11 +23,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/selectdb/go-doris-sdk/pkg/load"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
-	"github.com/selectdb/go-doris-sdk/pkg/load"
 )
 
 // FlusherDoris implements a data flusher that sends logs to Apache Doris via Stream Load.

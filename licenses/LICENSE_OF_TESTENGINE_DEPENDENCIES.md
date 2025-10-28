@@ -259,7 +259,7 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/hashicorp/go-cleanhttp](https://pkg.go.dev/github.com/hashicorp/go-cleanhttp?tab=licenses)
 - [github.com/hashicorp/go-version](https://pkg.go.dev/github.com/hashicorp/go-version?tab=licenses)
 - [github.com/r3labs/sse](https://pkg.go.dev/github.com/r3labs/sse?tab=licenses)
-
+- [github.com/go-sql-driver/mysql](https://pkg.go.dev/github.com/go-sql-driver/mysql?tab=licenses)
 
 ## LGPL v3 licenses
 
