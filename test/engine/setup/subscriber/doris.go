@@ -55,9 +55,35 @@ func (d *DorisSubscriber) Description() string {
 }
 
 func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.LogGroup, error) {
+	// Initialize connection if not already done
+	if d.client == nil {
+		if err := d.initConnection(); err != nil {
+			return nil, err
+		}
+		d.lastTimestamp = int64(startTime)
+
+		// Create table if needed
+		if d.CreateTable {
+			if err := d.createTable(); err != nil {
+				logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
+					"failed to create table, err: %s", err)
+				// Don't return error, table might already exist
+			}
+		}
+	}
+
+	logGroup, err := d.queryRecords()
+	if err != nil {
+		logger.Warning(context.Background(), "DORIS_SUBSCRIBER_ALARM", "err", err)
+		return nil, err
+	}
+	return []*protocol.LogGroup{logGroup}, nil
+}
+
+func (d *DorisSubscriber) initConnection() error {
 	host, err := TryReplacePhysicalAddress(d.Address)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Parse address to get host and port
@@ -86,7 +112,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 	if err != nil {
 		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
 			"failed to connect to doris, host: %s, err: %s", host, err)
-		return nil, err
+		return err
 	}
 
 	// Set connection pool parameters
@@ -101,27 +127,12 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
 			"failed to ping doris, err: %s", err)
 		_ = db.Close()
-		return nil, err
+		return err
 	}
 
 	d.client = db
-	d.lastTimestamp = int64(startTime)
-
-	// Create table if needed
-	if d.CreateTable {
-		if err = d.createTable(); err != nil {
-			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-				"failed to create table, err: %s", err)
-			// Don't return error, table might already exist
-		}
-	}
-
-	logGroup, err := d.queryRecords()
-	if err != nil {
-		logger.Warning(context.Background(), "DORIS_SUBSCRIBER_ALARM", "err", err)
-		return nil, err
-	}
-	return []*protocol.LogGroup{logGroup}, nil
+	logger.Infof(context.Background(), "doris subscriber connected to: %s", host)
+	return nil
 }
 
 func (d *DorisSubscriber) FlusherConfig() string {
