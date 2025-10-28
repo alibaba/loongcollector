@@ -325,6 +325,9 @@ public:
 
         int fd = sd_journal_get_fd(mJournal);
         if (fd < 0) {
+            // 🔥 关键错误：sd_journal_get_fd 失败
+            // 当使用 sd_journal_open_files() 时，sd_journal_get_fd() 返回 -1
+            // 需要使用 sd_journal_open_directory() 才能获取有效的 fd
             return false;
         }
 
@@ -391,34 +394,20 @@ private:
 
     int openDir(const std::string& dir) {
         try {
-            std::vector<std::string> fs;
-
             std::error_code ec;
             if (!std::filesystem::exists(dir, ec) || ec) {
                 return -ENOENT;
             }
 
-            for (const auto& e : std::filesystem::recursive_directory_iterator(dir, ec)) {
-                if (ec) {
-                    continue;
-                }
-
-                if (e.is_regular_file() && e.path().extension() == ".journal") {
-                    fs.emplace_back(e.path().string());
-                }
+            // 🔥 关键修改：使用 sd_journal_open_directory 而不是打开文件列表
+            // 这样可以获取有效的 fd 用于 epoll 监听
+            // sd_journal_open_directory 返回值：0 表示成功，负数表示错误
+            int ret = sd_journal_open_directory(&mJournal, dir.c_str(), 0);
+            if (ret < 0) {
+                return ret;
             }
 
-            if (fs.empty()) {
-                return -ENOENT;
-            }
-
-            std::vector<const char*> ptrs;
-            ptrs.reserve(fs.size() + 1);
-            for (auto& s : fs) {
-                ptrs.push_back(s.c_str());
-            }
-            ptrs.push_back(nullptr);
-            return sd_journal_open_files(&mJournal, ptrs.data(), 0);
+            return 0;
 
         } catch (...) {
             return -EIO;
