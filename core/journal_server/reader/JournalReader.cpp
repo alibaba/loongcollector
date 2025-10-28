@@ -351,41 +351,25 @@ public:
         }
     }
 
-    bool ProcessJournalEvent() {
+    JournalEventType ProcessJournalEvent() {
         if (!IsOpen()) {
-            return false;
+            return JournalEventType::kError;
         }
 
         // 调用 sd_journal_process() 来处理 journal 事件
-        // 返回值含义：
-        // - SD_JOURNAL_NOP (0): 没有变化
-        // - SD_JOURNAL_APPEND (1): 新条目被添加
-        // - SD_JOURNAL_INVALIDATE (2): 条目被移除/失效（日志轮转）
-        // - 负值: 错误
         int ret = sd_journal_process(mJournal);
 
+        // 转换为封装的枚举类型
         if (ret == SD_JOURNAL_NOP) {
-            // 没有变化，可以继续处理
-            return true;
+            return JournalEventType::kNop;
         }
-
         if (ret == SD_JOURNAL_APPEND) {
-            // 新条目被添加，可以继续处理
-            return true;
+            return JournalEventType::kAppend;
         }
-
         if (ret == SD_JOURNAL_INVALIDATE) {
-            // Journal 文件被添加、删除或轮转
-            // 文件已经更新，或者被轮转掉，记录日志，但继续处理
-            // 后续的 Next() 调用会处理这种情况（通过错误恢复机制）
-            // Note: 这里不直接打印日志，因为 Impl 类无法访问 sLogger
-            // 日志轮转信息会在上层错误处理流程中记录
-
-            return true;
+            return JournalEventType::kInvalidate;
         }
-
-        // 错误情况（ret < 0）
-        return false;
+        return JournalEventType::kError;
     }
 
     int GetJournalFD() const {
@@ -530,7 +514,7 @@ void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
     mImpl->RemoveFromEpoll(epollFD);
 }
 
-bool SystemdJournalReader::ProcessJournalEvent() {
+JournalEventType SystemdJournalReader::ProcessJournalEvent() {
     return mImpl->ProcessJournalEvent();
 }
 

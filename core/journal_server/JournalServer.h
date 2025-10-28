@@ -41,6 +41,7 @@ inline constexpr int kJournalEpollTimeoutMS = 200;
 struct MonitoredReader {
     std::shared_ptr<SystemdJournalReader> reader;
     std::string configName;
+    bool hasMoreData{true}; // 上次读取是否还有数据，用于优化跳过 NOP 事件时的无效读取
 };
 
 /**
@@ -128,7 +129,7 @@ private:
 
     void run();
     void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void processJournal(const std::string& configName);
+    void processJournal(const std::string& configName, bool* hasMoreDataOut = nullptr);
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
     // 线程管理 - Thread Management

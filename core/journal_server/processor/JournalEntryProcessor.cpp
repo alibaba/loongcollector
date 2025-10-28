@@ -305,7 +305,8 @@ bool CreateAndPushEventGroup(const string& configName,
 void ReadJournalEntries(const string& configName,
                         const JournalConfig& config,
                         const std::shared_ptr<SystemdJournalReader>& journalReader,
-                        QueueKey queueKey) {
+                        QueueKey queueKey,
+                        bool* hasMoreDataOut) {
     int entryCount = 0;
     // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
     const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // 公平参数
@@ -347,6 +348,13 @@ void ReadJournalEntries(const string& configName,
             entryCount++;
         }
 
+        // 优化：判断是否还有更多数据可读
+        // 如果因为批处理限制而退出（entryCount == maxEntriesPerBatch），说明还有数据
+        // 如果正常退出（没有更多数据），说明已读完
+        if (hasMoreDataOut != nullptr) {
+            *hasMoreDataOut = (entryCount == maxEntriesPerBatch);
+        }
+
         // 只在没有处理任何条目且可能存在问题时记录警告
         if (entryCount == 0 && config.mSeekPosition != "tail") {
             LOG_WARNING(sLogger,
@@ -357,10 +365,16 @@ void ReadJournalEntries(const string& configName,
         LOG_ERROR(sLogger,
                   ("journal processor exception during journal entries processing",
                    e.what())("config", configName)("entries_processed", entryCount));
+        if (hasMoreDataOut != nullptr) {
+            *hasMoreDataOut = false; // 异常时保守处理
+        }
     } catch (...) {
         LOG_ERROR(sLogger,
                   ("journal processor unknown exception during journal entries processing",
                    "")("config", configName)("entries_processed", entryCount));
+        if (hasMoreDataOut != nullptr) {
+            *hasMoreDataOut = false; // 异常时保守处理
+        }
     }
 }
 

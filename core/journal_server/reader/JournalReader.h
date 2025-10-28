@@ -54,6 +54,16 @@ enum class JournalReadStatus {
     kError = -1 // Error occurred (e.g., cursor invalidated by log rotation)
 };
 
+/**
+ * @brief Journal event types returned by ProcessJournalEvent()
+ */
+enum class JournalEventType {
+    kNop = 0, // No change (SD_JOURNAL_NOP)
+    kAppend = 1, // New entries added (SD_JOURNAL_APPEND)
+    kInvalidate = 2, // Log rotated or invalidated (SD_JOURNAL_INVALIDATE)
+    kError = -1 // Error occurred
+};
+
 class JournalReader {
 public:
     // Add default constructor
@@ -138,7 +148,12 @@ public:
     // 事件监听相关方法（仅在 Linux 平台可用）
     bool AddToEpoll(int epollFD);
     void RemoveFromEpoll(int epollFD);
-    bool ProcessJournalEvent();
+
+    /**
+     * @brief 处理 journal 事件
+     * @return JournalEventType 指示事件类型
+     */
+    JournalEventType ProcessJournalEvent();
     int GetJournalFD() const;
 
 private:

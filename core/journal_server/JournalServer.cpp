@@ -216,25 +216,33 @@ void JournalServer::run() {
                 // Received epoll event for fd
                 auto it = monitoredReaders.find(fd);
                 if (it != monitoredReaders.end()) {
-                    const auto& monitoredReader = it->second;
-                    // Processing journal event for config: configName[idx]
+                    auto& monitoredReader = it->second;
 
-                    // 调用 ProcessJournalEvent() 处理 epoll 事件
-                    // 返回值含义：
-                    // - true: SD_JOURNAL_NOP, SD_JOURNAL_APPEND, SD_JOURNAL_INVALIDATE（都可以继续处理）
-                    // - false: 错误情况（sd_journal_process 返回负值）
-                    if (monitoredReader.reader && monitoredReader.reader->ProcessJournalEvent()) {
-                        // 处理该配置的journal事件（每个reader对应一个独立的配置）
-                        processJournal(monitoredReader.configName);
+                    if (!monitoredReader.reader) {
+                        continue;
+                    }
+
+                    JournalEventType eventType = monitoredReader.reader->ProcessJournalEvent();
+
+                    // 优化：如果是 NOP 且上次已经读到 EndOfJournal，就跳过读取
+                    if (eventType == JournalEventType::kNop && !monitoredReader.hasMoreData) {
+                        continue; // 跳过无效读取
+                    }
+
+                    if (eventType != JournalEventType::kError) {
+                        // 正常事件（NOP/APPEND/INVALIDATE），处理该配置的journal事件
+                        bool hasMoreData = false;
+                        processJournal(monitoredReader.configName, &hasMoreData);
+
+                        // 更新状态：记录是否还有更多数据可读
+                        monitoredReader.hasMoreData = hasMoreData;
                     } else {
-                        // ProcessJournalEvent 返回 false 表示遇到错误
-                        // 记录警告日志，但不中断循环（继续处理其他配置）
-                        if (monitoredReader.reader) {
-                            LOG_WARNING(sLogger,
-                                        ("journal server ProcessJournalEvent failed",
-                                         "sd_journal_process returned error, skipping this event")(
-                                            "config", monitoredReader.configName)("fd", fd));
-                        }
+                        // 错误情况
+                        LOG_WARNING(sLogger,
+                                    ("journal server ProcessJournalEvent failed",
+                                     "sd_journal_process returned error, skipping this event")(
+                                        "config", monitoredReader.configName)("fd", fd));
+                        monitoredReader.hasMoreData = false;
                     }
                 }
                 // Note: Unknown fd in epoll event (might be already cleaned up)
@@ -322,12 +330,14 @@ void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>&
     }
 }
 
-void logtail::JournalServer::processJournal(const std::string& configName) {
+void logtail::JournalServer::processJournal(const std::string& configName, bool* hasMoreDataOut) {
     // 从 JournalConnectionManager 获取配置
     JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(configName);
 
     if (config.mQueueKey == -1) {
         LOG_ERROR(sLogger, ("journal server invalid config for specific processing", "")("config", configName));
+        if (hasMoreDataOut)
+            *hasMoreDataOut = false;
         return;
     }
 
@@ -335,17 +345,21 @@ void logtail::JournalServer::processJournal(const std::string& configName) {
     auto connection = JournalConnectionManager::GetInstance().GetConnection(configName);
     if (!connection || !connection->IsOpen()) {
         LOG_ERROR(sLogger, ("journal server connection not available for event processing", "")("config", configName));
+        if (hasMoreDataOut)
+            *hasMoreDataOut = false;
         return;
     }
 
     auto reader = connection;
     if (!reader || !reader->IsOpen()) {
         LOG_ERROR(sLogger, ("journal server reader not available for event processing", "")("config", configName));
+        if (hasMoreDataOut)
+            *hasMoreDataOut = false;
         return;
     }
 
-    // 直接读取和处理journal条目
-    ReadJournalEntries(configName, config, reader, config.mQueueKey);
+    // 直接读取和处理journal条目，并输出是否有更多数据
+    ReadJournalEntries(configName, config, reader, config.mQueueKey, hasMoreDataOut);
 }
 
 bool logtail::JournalServer::validateQueueKey(const std::string& configName,
