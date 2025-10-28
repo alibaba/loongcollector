@@ -128,6 +128,8 @@ private:
     JournalServer() = default;
 
     void run();
+    void runInPollingMode(std::map<int, MonitoredReader>& monitoredReaders);
+    bool handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
     void refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void processJournal(const std::string& configName, bool* hasMoreDataOut = nullptr);
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);

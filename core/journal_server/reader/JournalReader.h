@@ -154,6 +154,14 @@ public:
      * @return JournalEventType 指示事件类型
      */
     JournalEventType ProcessJournalEvent();
+
+    /**
+     * @brief 等待新的 journal 事件（用于轮询模式）
+     * @param timeout 超时时间（微秒），-1 表示永远等待
+     * @return JournalEventType 指示事件类型，或 kNop 如果超时
+     */
+    JournalEventType WaitForNewEvent(uint64_t timeout);
+
     int GetJournalFD() const;
 
 private:

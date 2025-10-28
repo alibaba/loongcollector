@@ -357,9 +357,9 @@ void ReadJournalEntries(const string& configName,
 
         // 只在没有处理任何条目且可能存在问题时记录警告
         if (entryCount == 0 && config.mSeekPosition != "tail") {
-            LOG_WARNING(sLogger,
-                        ("journal processor no journal entries processed", "may indicate configuration issue")(
-                            "config", configName)("seek_position", config.mSeekPosition));
+            LOG_DEBUG(sLogger,
+                      ("journal processor no journal entries processed", "may indicate configuration issue")(
+                          "config", configName)("seek_position", config.mSeekPosition));
         }
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,

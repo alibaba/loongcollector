@@ -375,6 +375,34 @@ public:
         return JournalEventType::kError;
     }
 
+    JournalEventType WaitForNewEvent(uint64_t timeout) {
+        if (!IsOpen()) {
+            return JournalEventType::kError;
+        }
+
+        // 调用 sd_journal_wait() 等待新的 journal 事件
+        // timeout 为微秒，如果是 (uint64_t)-1 表示永远等待
+        uint64_t timeout_usec = timeout;
+        if (timeout == (uint64_t)-1) {
+            timeout_usec = UINT64_MAX;
+        }
+
+        int ret = sd_journal_wait(mJournal, timeout_usec);
+
+        // 转换为封装的枚举类型
+        if (ret == SD_JOURNAL_NOP) {
+            return JournalEventType::kNop;
+        }
+        if (ret == SD_JOURNAL_APPEND) {
+            return JournalEventType::kAppend;
+        }
+        if (ret == SD_JOURNAL_INVALIDATE) {
+            return JournalEventType::kInvalidate;
+        }
+        // 错误情况或超时
+        return JournalEventType::kError;
+    }
+
     int GetJournalFD() const {
         if (!IsOpen()) {
             return -1;
@@ -505,6 +533,10 @@ void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
 
 JournalEventType SystemdJournalReader::ProcessJournalEvent() {
     return mImpl->ProcessJournalEvent();
+}
+
+JournalEventType SystemdJournalReader::WaitForNewEvent(uint64_t timeout) {
+    return mImpl->WaitForNewEvent(timeout);
 }
 
 int SystemdJournalReader::GetJournalFD() const {

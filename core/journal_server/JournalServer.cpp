@@ -22,6 +22,7 @@
 
 #include <utility>
 
+#include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "connection/JournalConnectionManager.h"
 #include "logger/Logger.h"
@@ -174,6 +175,23 @@ void JournalServer::run() {
     LOG_INFO(sLogger, ("journal server event-driven thread", "started"));
 
 #ifdef __linux__
+    // 检测是否在容器环境中采集主机的journal
+    bool isContainerMode = AppConfig::GetInstance()->IsPurageContainerMode();
+    LOG_INFO(sLogger, ("journal server container mode", isContainerMode));
+
+    // 存储已监听的 reader 及其对应的配置信息
+    std::map<int, MonitoredReader> monitoredReaders;
+
+    // 如果是在容器环境中采集主机journal，由于inotify绑定到systemd namespace，
+    // epoll会一直返回0，因此直接走轮询模式
+    if (isContainerMode) {
+        LOG_INFO(sLogger, ("journal server using polling mode", "container environment detected"));
+        runInPollingMode(monitoredReaders);
+        LOG_INFO(sLogger, ("journal server polling thread", "stopped"));
+        return;
+    }
+
+    // 非容器环境：使用epoll模式
     // 创建全局 epoll 实例
     {
         std::lock_guard<std::mutex> lock(mEpollMutex);
@@ -191,9 +209,6 @@ void JournalServer::run() {
 
     struct epoll_event events[kMaxEvents];
 
-    // 存储已监听的 reader 及其对应的配置信息
-    std::map<int, MonitoredReader> monitoredReaders;
-
     while (mIsThreadRunning.load()) {
         try {
             // 更新连接监听状态
@@ -209,29 +224,13 @@ void JournalServer::run() {
                 LOG_ERROR(sLogger, ("journal server epoll_wait failed", "")("error", strerror(errno)));
                 break;
             }
-            
+
             LOG_INFO(sLogger, ("journal server epoll_wait events", nfds));
 
-            // 🔥 关键修复：容器环境的epoll兼容性
-            // 当epoll_wait超时返回0事件时（容器中常见情况），主动轮询所有reader
-            // 这实现了epoll+polling的混合模式，兼顾性能和容器的兼容性
-            if (nfds == 0 && !monitoredReaders.empty()) {
-                // epoll超时，进行轮询读取（用于容器环境）
-                LOG_DEBUG(sLogger,
-                         ("journal server epoll timeout, fallback to polling mode",
-                          "")("monitored_readers", monitoredReaders.size()));
-                for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
-                    auto& monitoredReader = it->second;
-                    if (!monitoredReader.reader) {
-                        continue;
-                    }
-
-                    // 在超时情况下，尝试读取一次（无论hasMoreData状态如何）
-                    // 因为journal可能有新数据，虽然epoll没有通知
-                    bool hasMoreData = false;
-                    processJournal(monitoredReader.configName, &hasMoreData);
-                    monitoredReader.hasMoreData = hasMoreData;
-                }
+            // 🔥 兜底逻辑：用于处理hasMoreData且epoll=0的批处理没处理完的场景
+            // 当epoll_wait超时返回0事件，但某些reader仍有hasMoreData标志时，
+            // 说明上次批处理可能还有数据未读完，需要再次尝试读取
+            if (nfds == 0 && handlePendingDataReaders(monitoredReaders)) {
                 continue; // 继续下一次epoll_wait
             }
 
@@ -305,12 +304,13 @@ void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>&
     // 获取当前配置
     auto allConfigs = GetAllJournalConfigs();
 
+    // 判断是否为epoll模式
+    bool isEpollMode = (epollFD >= 0);
+
     // 检查需要添加监听的配置
     for (const auto& [configName, config] : allConfigs) {
         auto connection = JournalConnectionManager::GetInstance().GetConnection(configName);
         if (connection && connection->IsOpen()) {
-            // Checking reader for epoll monitoring: configName[idx]
-
             // 检查是否已经监听
             bool alreadyMonitored = false;
             for (const auto& pair : monitoredReaders) {
@@ -336,19 +336,32 @@ void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>&
                     continue;
                 }
 
-                // 添加 reader 到全局 epoll
-                if (connection->AddToEpoll(epollFD)) {
+                // epoll模式：添加到epoll；轮询模式：直接添加
+                bool success = true;
+                if (isEpollMode) {
+                    success = connection->AddToEpoll(epollFD);
+                    if (!success) {
+                        LOG_WARNING(sLogger,
+                                    ("journal server failed to add reader to epoll",
+                                     "")("config", configName)("fd", journalFD)("epoll_fd", epollFD));
+                    }
+                }
+
+                if (success) {
                     MonitoredReader monitoredReader;
                     monitoredReader.reader = connection;
                     monitoredReader.configName = configName;
                     monitoredReaders[journalFD] = monitoredReader;
-                    LOG_INFO(
-                        sLogger,
-                        ("journal server reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
-                } else {
-                    LOG_WARNING(sLogger,
-                                ("journal server failed to add reader to epoll",
-                                 "")("config", configName)("fd", journalFD)("epoll_fd", epollFD));
+
+                    if (isEpollMode) {
+                        LOG_INFO(sLogger,
+                                 ("journal server reader added to epoll monitoring", "")("config",
+                                                                                         configName)("fd", journalFD));
+                    } else {
+                        LOG_INFO(sLogger,
+                                 ("journal server reader added to monitoring (polling mode)",
+                                  "")("config", configName)("fd", journalFD));
+                    }
                 }
             }
         }
@@ -385,6 +398,98 @@ void logtail::JournalServer::processJournal(const std::string& configName, bool*
 
     // 直接读取和处理journal条目，并输出是否有更多数据
     ReadJournalEntries(configName, config, reader, config.mQueueKey, hasMoreDataOut);
+}
+
+void JournalServer::runInPollingMode(std::map<int, MonitoredReader>& monitoredReaders) {
+    while (mIsThreadRunning.load()) {
+        try {
+            // 更新连接监听状态（轮询模式，传入 -1 表示不使用 epoll）
+            refreshMonitors(-1, monitoredReaders);
+
+            // 轮询所有reader
+            bool hasAnyReaderWithData = false;
+            for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
+                auto& monitoredReader = it->second;
+                if (!monitoredReader.reader) {
+                    continue;
+                }
+
+                // 尝试读取数据
+                bool hasMoreData = false;
+                processJournal(monitoredReader.configName, &hasMoreData);
+                monitoredReader.hasMoreData = hasMoreData;
+                if (hasMoreData) {
+                    hasAnyReaderWithData = true;
+                }
+            }
+
+            // 如果没有数据，等待新的journal事件（类似Golang实现）
+            if (!hasAnyReaderWithData && !monitoredReaders.empty()) {
+                // 等待200ms，如果有新事件则立即返回
+                // 只需要对第一个有效的reader调用WaitForNewEvent
+                uint64_t timeout_usec = kJournalEpollTimeoutMS * 1000; // 转换为微秒
+                JournalEventType eventType = JournalEventType::kNop;
+
+                for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
+                    auto& monitoredReader = it->second;
+                    if (!monitoredReader.reader) {
+                        continue;
+                    }
+                    // 只等待第一个有效的reader
+                    eventType = monitoredReader.reader->WaitForNewEvent(timeout_usec);
+                    break;
+                }
+
+                // 如果超时或没有事件，继续下一次循环
+                if (eventType != JournalEventType::kAppend && eventType != JournalEventType::kInvalidate) {
+                    continue;
+                }
+            }
+
+        } catch (const exception& e) {
+            LOG_ERROR(sLogger, ("journal server exception in polling loop", e.what()));
+            this_thread::sleep_for(chrono::milliseconds(1000));
+        } catch (...) {
+            LOG_ERROR(sLogger, ("journal server unknown exception in polling loop", ""));
+            this_thread::sleep_for(chrono::milliseconds(1000));
+        }
+    }
+}
+
+bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders) {
+    // 检查是否存在有hasMoreData标志的reader
+    bool hasReadersWithMoreData = false;
+    for (const auto& pair : monitoredReaders) {
+        if (pair.second.hasMoreData) {
+            hasReadersWithMoreData = true;
+            break;
+        }
+    }
+
+    // 只有当存在hasMoreData的reader时，才进行兜底读取
+    if (!hasReadersWithMoreData) {
+        return false; // 没有待处理的数据
+    }
+
+    LOG_DEBUG(sLogger,
+              ("journal server epoll timeout with pending data, fallback reading", "")("monitored_readers",
+                                                                                       monitoredReaders.size()));
+
+    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
+        auto& monitoredReader = it->second;
+        if (!monitoredReader.reader) {
+            continue;
+        }
+
+        // 只对有hasMoreData标志的reader进行读取
+        if (monitoredReader.hasMoreData) {
+            bool hasMoreData = false;
+            processJournal(monitoredReader.configName, &hasMoreData);
+            monitoredReader.hasMoreData = hasMoreData;
+        }
+    }
+
+    return true; // 已处理待处理的数据
 }
 
 bool logtail::JournalServer::validateQueueKey(const std::string& configName,

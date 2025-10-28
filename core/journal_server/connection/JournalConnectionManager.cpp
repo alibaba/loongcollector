@@ -90,6 +90,17 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
     // 创建独立的journal连接（reader）
     auto reader = std::make_shared<SystemdJournalReader>();
 
+    // 先设置journal路径（如果配置了）
+    if (!config.mJournalPaths.empty()) {
+        reader->SetJournalPaths(config.mJournalPaths);
+        LOG_INFO(sLogger,
+                 ("journal connection manager setting journal paths",
+                  "")("config", configName)("paths_count", config.mJournalPaths.size()));
+        for (const auto& path : config.mJournalPaths) {
+            LOG_INFO(sLogger, ("journal path", path));
+        }
+    }
+
 #ifdef APSARA_UNIT_TEST_MAIN
     // 在测试环境中，即使Open失败也继续添加配置
     reader->Open(); // 尝试打开，但不检查结果
