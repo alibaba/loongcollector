@@ -100,7 +100,7 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 	if err = db.PingContext(ctx); err != nil {
 		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
 			"failed to ping doris, err: %s", err)
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 
