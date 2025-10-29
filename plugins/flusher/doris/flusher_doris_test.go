@@ -148,15 +148,16 @@ func TestAuthentication_GetUsernamePassword(t *testing.T) {
 			errContains: "username",
 		},
 		{
-			name: "empty password",
+			name: "empty password - allowed for default root user",
 			auth: Authentication{
 				PlainText: &PlainTextConfig{
 					Username: "root",
 					Password: "",
 				},
 			},
-			wantErr:     true,
-			errContains: "password",
+			wantUser: "root",
+			wantPass: "",
+			wantErr:  false, // Empty password is now allowed
 		},
 		{
 			name: "nil plaintext config",
