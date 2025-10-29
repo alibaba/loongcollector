@@ -38,12 +38,12 @@ using QueueKey = int64_t;
  * @param config journal配置
  * @param journalReader journal reader指针
  * @param queueKey 队列键值，用于推送事件
- * @param hasMoreDataOut 输出参数，指示是否还有更多数据可读（可能为 nullptr）
+ * @param hasPendingDataOut 输出参数，指示是否还有待处理数据（可能为 nullptr）
  */
 void ReadJournalEntries(const std::string& configName,
                         const JournalConfig& config,
                         const std::shared_ptr<SystemdJournalReader>& journalReader,
                         QueueKey queueKey,
-                        bool* hasMoreDataOut = nullptr);
+                        bool* hasPendingDataOut = nullptr);
 
 } // namespace logtail

@@ -33,7 +33,6 @@ class CollectionPipelineContext;
 struct JournalConfig {
     // Journal读取配置
     std::string mSeekPosition;
-    int mCursorFlushPeriodMs = 5000;
     std::string mCursorSeekFallback;
 
     // 过滤配置
@@ -70,14 +69,6 @@ struct JournalConfig {
         int fixedCount = 0;
 
         // 验证数值字段的范围
-
-        if (mCursorFlushPeriodMs <= 0) {
-            mCursorFlushPeriodMs = 5000; // 默认5秒
-            fixedCount++;
-        } else if (mCursorFlushPeriodMs > 300000) { // 最大5分钟
-            mCursorFlushPeriodMs = 300000;
-            fixedCount++;
-        }
 
         if (mMaxEntriesPerBatch <= 0) {
             mMaxEntriesPerBatch = 1000; // 默认1000条
@@ -138,10 +129,7 @@ struct JournalConfig {
      * @brief 检查配置是否有效
      * @return true 如果配置有效
      */
-    bool IsValid() const {
-        return mCursorFlushPeriodMs > 0 && mMaxEntriesPerBatch > 0 && !mSeekPosition.empty()
-            && !mCursorSeekFallback.empty();
-    }
+    bool IsValid() const { return mMaxEntriesPerBatch > 0 && !mSeekPosition.empty() && !mCursorSeekFallback.empty(); }
 };
 
 } // namespace logtail

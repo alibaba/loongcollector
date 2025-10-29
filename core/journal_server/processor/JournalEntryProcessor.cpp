@@ -90,20 +90,16 @@ bool MoveToNextJournalEntry(const string& configName,
                             const string& cursorSeekFallback,
                             int& entryCount) {
     try {
-        // 统一处理：每次都先移动到下一条（无论是 head 还是 tail 模式）
-        // head 模式：SeekHead() 后第一次 Next() 会移动到第一条
-        // tail 模式：SeekTail() + Previous() 后第一次 Next() 会移动到新日志
         JournalReadStatus status = journalReader->NextWithStatus();
 
         if (status == JournalReadStatus::kOk) {
-            // 成功移动到下一条
             return true;
         }
         if (status == JournalReadStatus::kEndOfJournal) {
             // 到达末尾，正常结束
             return false;
         }
-        // 错误情况：可能是日志轮转导致cursor失效
+        // 错误情况：例如可能是日志轮转导致cursor失效
         // 尝试错误恢复
         return RecoverFromJournalError(journalReader,
                                        configName,
@@ -114,10 +110,8 @@ bool MoveToNextJournalEntry(const string& configName,
                   ("journal processor exception during journal entry navigation",
                    e.what())("config", configName)("entries_processed", entryCount));
 
-        // 尝试错误恢复
         string errorMsg = string("exception during navigation: ") + e.what();
         if (RecoverFromJournalError(journalReader, configName, cursorSeekFallback, errorMsg)) {
-            // 恢复成功，可以继续处理
             return true;
         }
         return false;
@@ -126,10 +120,8 @@ bool MoveToNextJournalEntry(const string& configName,
                   ("journal processor unknown exception during journal entry navigation",
                    "")("config", configName)("entries_processed", entryCount));
 
-        // 尝试错误恢复
         if (RecoverFromJournalError(
                 journalReader, configName, cursorSeekFallback, "unknown exception during navigation")) {
-            // 恢复成功，可以继续处理
             return true;
         }
         return false;
@@ -179,7 +171,7 @@ bool ReadAndValidateEntry(const string& configName,
             LOG_WARNING(sLogger,
                         ("journal processor journal entry is empty",
                          "no fields found")("config", configName)("cursor", entry.cursor));
-            return false; // Empty entry, special handling needed by caller
+            return false;
         }
         return true;
 
@@ -306,7 +298,7 @@ void ReadJournalEntries(const string& configName,
                         const JournalConfig& config,
                         const std::shared_ptr<SystemdJournalReader>& journalReader,
                         QueueKey queueKey,
-                        bool* hasMoreDataOut) {
+                        bool* hasPendingDataOut) {
     int entryCount = 0;
     // 防御性边界检查：确保maxEntriesPerBatch在合理范围内
     const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // 公平参数
@@ -320,14 +312,10 @@ void ReadJournalEntries(const string& configName,
 
     try {
         while (entryCount < maxEntriesPerBatch) {
-            // Step 1: 先移动到下一条（统一处理，无需判断 seekPosition）
-            // - head 模式：SeekHead() 后第一次 Next() 移动到第一条
-            // - tail 模式：SeekTail() + Previous() 后第一次 Next() 移动到新日志
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, entryCount)) {
                 break;
             }
 
-            // Step 2: 读取和验证entry
             JournalEntry entry;
             if (!ReadAndValidateEntry(configName, journalReader, config.mCursorSeekFallback, entry)) {
                 // 如果entry为空，则跳过
@@ -339,7 +327,6 @@ void ReadJournalEntries(const string& configName,
                 break;
             }
 
-            // Step 3: 处理entry (transform, create event, push)
             if (!CreateAndPushEventGroup(configName, config, entry, queueKey)) {
                 LOG_ERROR(sLogger,
                           ("journal processor failed to process journal entry", "continue")("config", configName));
@@ -348,11 +335,11 @@ void ReadJournalEntries(const string& configName,
             entryCount++;
         }
 
-        // 优化：判断是否还有更多数据可读
+        // 判断是否还有待处理数据：
         // 如果因为批处理限制而退出（entryCount == maxEntriesPerBatch），说明还有数据
         // 如果正常退出（没有更多数据），说明已读完
-        if (hasMoreDataOut != nullptr) {
-            *hasMoreDataOut = (entryCount == maxEntriesPerBatch);
+        if (hasPendingDataOut != nullptr) {
+            *hasPendingDataOut = (entryCount == maxEntriesPerBatch);
         }
 
         // 只在没有处理任何条目且可能存在问题时记录警告
@@ -365,15 +352,15 @@ void ReadJournalEntries(const string& configName,
         LOG_ERROR(sLogger,
                   ("journal processor exception during journal entries processing",
                    e.what())("config", configName)("entries_processed", entryCount));
-        if (hasMoreDataOut != nullptr) {
-            *hasMoreDataOut = false; // 异常时保守处理
+        if (hasPendingDataOut != nullptr) {
+            *hasPendingDataOut = false; // 异常时保守处理
         }
     } catch (...) {
         LOG_ERROR(sLogger,
                   ("journal processor unknown exception during journal entries processing",
                    "")("config", configName)("entries_processed", entryCount));
-        if (hasMoreDataOut != nullptr) {
-            *hasMoreDataOut = false; // 异常时保守处理
+        if (hasPendingDataOut != nullptr) {
+            *hasPendingDataOut = false; // 异常时保守处理
         }
     }
 }

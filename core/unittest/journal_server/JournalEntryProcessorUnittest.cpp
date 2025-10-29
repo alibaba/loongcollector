@@ -61,7 +61,6 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mParsePriority = true;

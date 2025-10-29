@@ -91,7 +91,6 @@ void JournalConnectionManagerUnittest::TestAddConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -119,7 +118,6 @@ void JournalConnectionManagerUnittest::TestRemoveConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -150,7 +148,6 @@ void JournalConnectionManagerUnittest::TestGetConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -167,7 +164,6 @@ void JournalConnectionManagerUnittest::TestGetConfig() {
 
     // 验证配置（检查默认值）
     APSARA_TEST_EQUAL(retrievedConfig.mSeekPosition, "tail");
-    APSARA_TEST_TRUE(retrievedConfig.mCursorFlushPeriodMs >= 5000);
     APSARA_TEST_TRUE(retrievedConfig.mMaxEntriesPerBatch >= 100);
     APSARA_TEST_TRUE(retrievedConfig.mKernel || !retrievedConfig.mKernel); // 可能被验证逻辑修改
 }
@@ -181,7 +177,6 @@ void JournalConnectionManagerUnittest::TestGetConnection() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -210,7 +205,6 @@ void JournalConnectionManagerUnittest::TestGetAllConfigs() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -267,7 +261,6 @@ void JournalConnectionManagerUnittest::TestGetConnectionCount() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -308,7 +301,6 @@ void JournalConnectionManagerUnittest::TestCleanup() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -339,7 +331,6 @@ void JournalConnectionManagerUnittest::TestAddConfigDuplicate() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -377,7 +368,6 @@ void JournalConnectionManagerUnittest::TestAddConfigReaderOpenFailure() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -399,7 +389,6 @@ void JournalConnectionManagerUnittest::TestAddConfigFilterFailure() {
     // 创建测试配置（带可能导致过滤器失败的参数）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mUnits = {"non-existent.service"}; // 使用不存在的服务单元
@@ -427,7 +416,6 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekFailure() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "none"; // 特殊位置
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -509,7 +497,6 @@ void JournalConnectionManagerUnittest::TestGetStatsWithInvalidConnections() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -536,7 +523,6 @@ void JournalConnectionManagerUnittest::TestAddConfigWithFilters() {
     // 创建测试配置（带过滤器）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mUnits = {"test.service"};
@@ -566,7 +552,6 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekHead() {
     // 创建测试配置（seek到head）
     JournalConfig config;
     config.mSeekPosition = "head";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -594,7 +579,6 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekCursor() {
     // 创建测试配置（seek到cursor）
     JournalConfig config;
     config.mSeekPosition = "cursor:test_cursor";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -623,7 +607,6 @@ void JournalConnectionManagerUnittest::TestGetConfigsUsingConnection() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -674,13 +657,11 @@ void JournalConnectionManagerUnittest::TestAddConfigReplaceExisting() {
     // 创建测试配置
     JournalConfig config1;
     config1.mSeekPosition = "tail";
-    config1.mCursorFlushPeriodMs = 5000;
     config1.mMaxEntriesPerBatch = 100;
     config1.mKernel = true;
 
     JournalConfig config2;
     config2.mSeekPosition = "head";
-    config2.mCursorFlushPeriodMs = 3000;
     config2.mMaxEntriesPerBatch = 50;
     config2.mKernel = false;
 
@@ -712,7 +693,6 @@ void JournalConnectionManagerUnittest::TestGetStatsWithActiveConnections() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
 
@@ -845,7 +825,6 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidUnits() {
     // 创建测试配置（无效的units）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mUnits = {""}; // 空字符串会被过滤掉
@@ -875,7 +854,6 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidIdentifiers() {
     // 创建测试配置（无效的identifiers）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mIdentifiers = {""}; // 空字符串会被过滤掉
@@ -905,7 +883,6 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidMatchPatterns() {
     // 创建测试配置（无效的matchPatterns）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mMatchPatterns = {""}; // 空字符串会被过滤掉
@@ -935,7 +912,6 @@ void JournalConnectionManagerUnittest::TestAddConfigWithEmptyContext() {
     // 创建测试配置（空context）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mCtx = nullptr; // 空的ctx
@@ -958,13 +934,11 @@ void JournalConnectionManagerUnittest::TestValidateConfig() {
 
     // 测试无效配置
     config.mSeekPosition = "";
-    config.mCursorFlushPeriodMs = 0;
     config.mMaxEntriesPerBatch = 0;
     APSARA_TEST_TRUE(!config.IsValid());
 
     // 测试有效的配置
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 1000;
     config.mCursorSeekFallback = "head";
     APSARA_TEST_TRUE(config.IsValid());
@@ -976,7 +950,6 @@ void JournalConnectionManagerUnittest::TestValidateConfig() {
     // 测试边界值修正
     JournalConfig config2;
     config2.mSeekPosition = "invalid";
-    config2.mCursorFlushPeriodMs = -100;
     config2.mMaxEntriesPerBatch = 100000;
     config2.mCursorSeekFallback = "invalid";
     int fixedCount2 = config2.ValidateAndFixConfig();

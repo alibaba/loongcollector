@@ -354,30 +354,30 @@ public:
         }
     }
 
-    JournalEventType ProcessJournalEvent() {
+    JournalStatusType CheckJournalStatus() {
         if (!IsOpen()) {
-            return JournalEventType::kError;
+            return JournalStatusType::kError;
         }
 
-        // 调用 sd_journal_process() 来处理 journal 事件
+        // 调用 sd_journal_process() 来检查 journal 状态变化
         int ret = sd_journal_process(mJournal);
 
         // 转换为封装的枚举类型
         if (ret == SD_JOURNAL_NOP) {
-            return JournalEventType::kNop;
+            return JournalStatusType::kNop;
         }
         if (ret == SD_JOURNAL_APPEND) {
-            return JournalEventType::kAppend;
+            return JournalStatusType::kAppend;
         }
         if (ret == SD_JOURNAL_INVALIDATE) {
-            return JournalEventType::kInvalidate;
+            return JournalStatusType::kInvalidate;
         }
-        return JournalEventType::kError;
+        return JournalStatusType::kError;
     }
 
-    JournalEventType WaitForNewEvent(uint64_t timeout) {
+    JournalStatusType WaitForNewEvent(uint64_t timeout) {
         if (!IsOpen()) {
-            return JournalEventType::kError;
+            return JournalStatusType::kError;
         }
 
         // 调用 sd_journal_wait() 等待新的 journal 事件
@@ -391,16 +391,16 @@ public:
 
         // 转换为封装的枚举类型
         if (ret == SD_JOURNAL_NOP) {
-            return JournalEventType::kNop;
+            return JournalStatusType::kNop;
         }
         if (ret == SD_JOURNAL_APPEND) {
-            return JournalEventType::kAppend;
+            return JournalStatusType::kAppend;
         }
         if (ret == SD_JOURNAL_INVALIDATE) {
-            return JournalEventType::kInvalidate;
+            return JournalStatusType::kInvalidate;
         }
         // 错误情况或超时
-        return JournalEventType::kError;
+        return JournalStatusType::kError;
     }
 
     int GetJournalFD() const {
@@ -531,11 +531,11 @@ void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
     mImpl->RemoveFromEpoll(epollFD);
 }
 
-JournalEventType SystemdJournalReader::ProcessJournalEvent() {
-    return mImpl->ProcessJournalEvent();
+JournalStatusType SystemdJournalReader::CheckJournalStatus() {
+    return mImpl->CheckJournalStatus();
 }
 
-JournalEventType SystemdJournalReader::WaitForNewEvent(uint64_t timeout) {
+JournalStatusType SystemdJournalReader::WaitForNewEvent(uint64_t timeout) {
     return mImpl->WaitForNewEvent(timeout);
 }
 

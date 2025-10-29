@@ -55,9 +55,9 @@ enum class JournalReadStatus {
 };
 
 /**
- * @brief Journal event types returned by ProcessJournalEvent()
+ * @brief Journal status types returned by CheckJournalStatus()
  */
-enum class JournalEventType {
+enum class JournalStatusType {
     kNop = 0, // No change (SD_JOURNAL_NOP)
     kAppend = 1, // New entries added (SD_JOURNAL_APPEND)
     kInvalidate = 2, // Log rotated or invalidated (SD_JOURNAL_INVALIDATE)
@@ -150,17 +150,17 @@ public:
     void RemoveFromEpoll(int epollFD);
 
     /**
-     * @brief 处理 journal 事件
-     * @return JournalEventType 指示事件类型
+     * @brief 检查 journal 状态变化
+     * @return JournalStatusType 指示状态类型
      */
-    JournalEventType ProcessJournalEvent();
+    JournalStatusType CheckJournalStatus();
 
     /**
      * @brief 等待新的 journal 事件（用于轮询模式）
      * @param timeout 超时时间（微秒），-1 表示永远等待
-     * @return JournalEventType 指示事件类型，或 kNop 如果超时
+     * @return JournalStatusType 指示状态类型，或 kNop 如果超时
      */
-    JournalEventType WaitForNewEvent(uint64_t timeout);
+    JournalStatusType WaitForNewEvent(uint64_t timeout);
 
     int GetJournalFD() const;
 

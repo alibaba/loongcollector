@@ -53,9 +53,9 @@ public:
     void TestSystemdJournalReaderSeekTailPrevious();
     void TestSystemdJournalReaderClose();
     void TestSystemdJournalReaderIsOpen();
-    void TestSystemdJournalReaderProcessJournalEvent();
-    void TestSystemdJournalReaderProcessJournalEventNotOpen();
-    void TestSystemdJournalReaderProcessJournalEventError();
+    void TestSystemdJournalReaderCheckJournalStatus();
+    void TestSystemdJournalReaderCheckJournalStatusNotOpen();
+    void TestSystemdJournalReaderCheckJournalStatusError();
     void TestSystemdJournalReaderAddToEpoll();
     void TestSystemdJournalReaderRemoveFromEpoll();
     void TestSystemdJournalReaderNextWithStatus();
@@ -143,7 +143,7 @@ void JournalReaderUnittest::TestJournalReaderOperations() {
     // - GetJournalFD()
     // - AddToEpoll()
     // - RemoveFromEpoll()
-    // - ProcessJournalEvent()
+    // - CheckJournalStatus()
 
     APSARA_TEST_TRUE(true); // 接口定义正确
 }
@@ -340,33 +340,33 @@ void JournalReaderUnittest::TestSystemdJournalReaderIsOpen() {
     APSARA_TEST_FALSE(isOpen);
 }
 
-void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEvent() {
-    // 测试SystemdJournalReader的ProcessJournalEvent方法
+void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatus() {
+    // 测试SystemdJournalReader的CheckJournalStatus方法
     SystemdJournalReader reader;
 
-    // 测试ProcessJournalEvent方法
-    JournalEventType result = reader.ProcessJournalEvent();
+    // 测试CheckJournalStatus方法
+    JournalStatusType result = reader.CheckJournalStatus();
     // 在未打开状态下应该返回 kError
-    APSARA_TEST_TRUE(result == JournalEventType::kError);
+    APSARA_TEST_TRUE(result == JournalStatusType::kError);
 }
 
-void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventNotOpen() {
-    // 测试SystemdJournalReader的ProcessJournalEvent方法 - 未打开状态
+void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusNotOpen() {
+    // 测试SystemdJournalReader的CheckJournalStatus方法 - 未打开状态
     SystemdJournalReader reader;
 
-    // 测试未打开状态下的ProcessJournalEvent
-    JournalEventType result = reader.ProcessJournalEvent();
-    APSARA_TEST_TRUE(result == JournalEventType::kError);
+    // 测试未打开状态下的CheckJournalStatus
+    JournalStatusType result = reader.CheckJournalStatus();
+    APSARA_TEST_TRUE(result == JournalStatusType::kError);
 }
 
-void JournalReaderUnittest::TestSystemdJournalReaderProcessJournalEventError() {
-    // 测试SystemdJournalReader的ProcessJournalEvent方法 - 错误情况
+void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusError() {
+    // 测试SystemdJournalReader的CheckJournalStatus方法 - 错误情况
     SystemdJournalReader reader;
 
-    // 测试ProcessJournalEvent错误处理
-    JournalEventType result = reader.ProcessJournalEvent();
+    // 测试CheckJournalStatus错误处理
+    JournalStatusType result = reader.CheckJournalStatus();
     // 主要测试错误处理逻辑
-    APSARA_TEST_TRUE(result == JournalEventType::kError);
+    APSARA_TEST_TRUE(result == JournalStatusType::kError);
 }
 
 void JournalReaderUnittest::TestSystemdJournalReaderAddToEpoll() {
@@ -486,16 +486,16 @@ TEST_F(JournalReaderUnittest, TestSystemdJournalReaderIsOpen) {
     TestSystemdJournalReaderIsOpen();
 }
 
-TEST_F(JournalReaderUnittest, TestSystemdJournalReaderProcessJournalEvent) {
-    TestSystemdJournalReaderProcessJournalEvent();
+TEST_F(JournalReaderUnittest, TestSystemdJournalReaderCheckJournalStatus) {
+    TestSystemdJournalReaderCheckJournalStatus();
 }
 
-TEST_F(JournalReaderUnittest, TestSystemdJournalReaderProcessJournalEventNotOpen) {
-    TestSystemdJournalReaderProcessJournalEventNotOpen();
+TEST_F(JournalReaderUnittest, TestSystemdJournalReaderCheckJournalStatusNotOpen) {
+    TestSystemdJournalReaderCheckJournalStatusNotOpen();
 }
 
-TEST_F(JournalReaderUnittest, TestSystemdJournalReaderProcessJournalEventError) {
-    TestSystemdJournalReaderProcessJournalEventError();
+TEST_F(JournalReaderUnittest, TestSystemdJournalReaderCheckJournalStatusError) {
+    TestSystemdJournalReaderCheckJournalStatusError();
 }
 
 TEST_F(JournalReaderUnittest, TestSystemdJournalReaderAddToEpoll) {

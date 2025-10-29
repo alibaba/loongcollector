@@ -54,7 +54,6 @@ private:
 
     // Configuration options
     std::string mSeekPosition;
-    int mCursorFlushPeriodMs;
     std::string mCursorSeekFallback;
     std::vector<std::string> mUnits;
     bool mKernel;
@@ -65,17 +64,8 @@ private:
     bool mParsePriority;
     bool mUseJournalEventTime;
 
-    // Runtime state
-    // 不再需要 JournalReader，JournalServer 会处理所有数据
-
     // Threading
     std::atomic<bool> mShutdown;
-    // 不再需要线程管理，JournalServer 会处理所有数据
-
-    // Constants
-    static constexpr int kDefaultCursorFlushPeriodMs = 5000; // 5 seconds
-
-    // 不再需要这些辅助方法，JournalServer 会处理所有 journal 操作
 
     // Seek position constants
     static const std::string kSeekPositionCursor;

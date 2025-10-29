@@ -151,7 +151,6 @@ OR
     "Type" : "input_journal",
              "JournalPaths" : ["/var/log/journal"],
                               "SeekPosition" : "tail",
-                                               "CursorFlushPeriodMs" : 1000,
                                                "CursorSeekFallback" : "head",
                                                                       "ResetIntervalSecond" : 3600,
 
@@ -173,7 +172,6 @@ OR
 |-----------|------|---------|-------------|
 | `JournalPaths` | Array | `[]` | Journal file paths (empty = system journal) |
 | `SeekPosition` | String | `"tail"` | Initial read position: `head`, `tail`, `cursor` |
-| `CursorFlushPeriodMs` | Integer | `1000` | Checkpoint save frequency (milliseconds) |
 | `CursorSeekFallback` | String | `"head"` | Fallback position when cursor invalid (options: `head` or `tail`) |
 | `ResetIntervalSecond` | Integer | `3600` | Checkpoint reset interval |
 | `Units` | Array | `[]` | Systemd units to monitor |

@@ -35,7 +35,6 @@ const std::string InputJournal::kSeekPositionDefault = "none";
 
 InputJournal::InputJournal()
     : mSeekPosition(kSeekPositionTail),
-      mCursorFlushPeriodMs(kDefaultCursorFlushPeriodMs),
       mCursorSeekFallback(kSeekPositionHead) // 即如果游标无效，回退到head
       ,
       mKernel(true),
@@ -66,13 +65,12 @@ bool InputJournal::Start() {
         return false;
     }
 
-    // 检查mContext是否已初始化
     if (!mContext) {
         LOG_ERROR(sLogger, ("InputJournal Start called without context", "cannot start"));
         return false;
     }
 
-    // 检查同一配置中是否已经有其他 InputJournal 实例
+    // 同一Config配置中只能有一个 InputJournal 输入
     if (mContext->HasValidPipeline()) {
         const auto& inputs = mContext->GetPipeline().GetInputs();
         int inputJournalCount = 0;
@@ -95,17 +93,14 @@ bool InputJournal::Start() {
     // 初始化JournalServer
     JournalServer::GetInstance()->Init();
 
-    // 创建journal配置对象
     JournalConfig config;
-    config.mSeekPosition = mSeekPosition; // 设置seek位置
-    // config.mCursorFlushPeriodMs = mCursorFlushPeriodMs; // TODO: 暂时不使用，保留未来支持checkpoint后再启用
-    config.mCursorSeekFallback = mCursorSeekFallback; // 设置cursor回退位置
-    config.mUnits = mUnits; // 设置units
-    config.mKernel = mKernel; // 设置kernel
-    config.mIdentifiers = mIdentifiers; // 设置identifiers
-    config.mJournalPaths = mJournalPaths; // 设置journal路径
-    // 注意：已移除resetIntervalSecond配置，连接永远不重建
-    config.mCtx = mContext; // 设置context
+    config.mSeekPosition = mSeekPosition;
+    config.mCursorSeekFallback = mCursorSeekFallback;
+    config.mUnits = mUnits;
+    config.mKernel = mKernel;
+    config.mIdentifiers = mIdentifiers;
+    config.mJournalPaths = mJournalPaths;
+    config.mCtx = mContext;
 
     // 验证和修正配置值
     int fixedCount = config.ValidateAndFixConfig();
@@ -115,7 +110,6 @@ bool InputJournal::Start() {
                         "idx", mIndex)("fixed_count", fixedCount));
     }
 
-    // 最终验证配置有效性
     if (!config.IsValid()) {
         LOG_ERROR(sLogger,
                   ("invalid journal config", "cannot start")("config", mContext->GetConfigName())("idx", mIndex));
@@ -139,23 +133,21 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         return true;
     }
 
-    // 检查mContext是否已初始化
     if (!mContext) {
         LOG_WARNING(sLogger, ("InputJournal Stop called without context", "skipping cleanup"));
         return true;
     }
 
     if (isPipelineRemoving) {
-        // 配置被删除：完全清理，包括检查点
+        // 配置被删除：完全清理
         JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName());
         LOG_INFO(sLogger, ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName()));
 
-        // 如果没有其他注册的插件，停止JournalServer
         if (!JournalServer::GetInstance()->HasRegisteredPlugins()) {
             JournalServer::GetInstance()->Stop();
         }
     } else {
-        // 配置更新：只移除注册，保留检查点
+        // 配置更新：只移除注册
         JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName());
         LOG_INFO(
             sLogger,
@@ -167,7 +159,7 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
 
 void InputJournal::parseBasicParams(const Json::Value& config) {
     std::string errorMsg;
-    // 获取seek位置
+
     if (!GetOptionalStringParam(config, "SeekPosition", mSeekPosition, errorMsg)) {
         mSeekPosition = kSeekPositionTail;
     }
@@ -178,26 +170,10 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
         mSeekPosition = kSeekPositionTail;
     }
 
-    // 获取cursor刷新周期
-    if (!GetOptionalIntParam(config, "CursorFlushPeriodMs", mCursorFlushPeriodMs, errorMsg)) {
-        mCursorFlushPeriodMs = kDefaultCursorFlushPeriodMs;
-    }
-    // 验证cursor刷新周期范围 (1秒到5分钟)
-    if (mCursorFlushPeriodMs <= 0) {
-        LOG_WARNING(sLogger,
-                    ("invalid CursorFlushPeriodMs, using default", mCursorFlushPeriodMs)("default",
-                                                                                         kDefaultCursorFlushPeriodMs));
-        mCursorFlushPeriodMs = kDefaultCursorFlushPeriodMs;
-    } else if (mCursorFlushPeriodMs > 300000) {
-        LOG_WARNING(sLogger, ("CursorFlushPeriodMs too large, capping", mCursorFlushPeriodMs)("max", 300000));
-        mCursorFlushPeriodMs = 300000;
-    }
-
     // 获取cursor回退位置（即默认head， 与go实现不同go实现默认tail）
     if (!GetOptionalStringParam(config, "CursorSeekFallback", mCursorSeekFallback, errorMsg)) {
         mCursorSeekFallback = kSeekPositionHead;
     }
-    // 验证cursor回退位置的有效性
     if (mCursorSeekFallback != "head" && mCursorSeekFallback != "tail") {
         LOG_WARNING(
             sLogger,
@@ -205,28 +181,24 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
         mCursorSeekFallback = kSeekPositionHead;
     }
 
-    // 获取kernel
     if (!GetOptionalBoolParam(config, "Kernel", mKernel, errorMsg)) {
         mKernel = true;
     }
 
-    // 获取parse syslog facility
     if (!GetOptionalBoolParam(config, "ParseSyslogFacility", mParseSyslogFacility, errorMsg)) {
         mParseSyslogFacility = false;
     }
 
-    // 获取parse priority
     if (!GetOptionalBoolParam(config, "ParsePriority", mParsePriority, errorMsg)) {
         mParsePriority = false;
     }
 
-    // 获取use journal event time
     if (!GetOptionalBoolParam(config, "UseJournalEventTime", mUseJournalEventTime, errorMsg)) {
         mUseJournalEventTime = false;
     }
 
     // 获取max entries per batch (如果有这个配置)
-    int maxEntriesPerBatch = 1000; // 默认值
+    int maxEntriesPerBatch = 1000;
     if (GetOptionalIntParam(config, "MaxEntriesPerBatch", maxEntriesPerBatch, errorMsg)) {
         if (maxEntriesPerBatch <= 0) {
             LOG_WARNING(sLogger, ("invalid MaxEntriesPerBatch, using default", maxEntriesPerBatch)("default", 1000));
@@ -235,20 +207,6 @@ void InputJournal::parseBasicParams(const Json::Value& config) {
             LOG_WARNING(sLogger, ("MaxEntriesPerBatch too large, capping", maxEntriesPerBatch)("max", 10000));
             maxEntriesPerBatch = 10000;
         }
-        // 这里可以将值存储到成员变量中，如果需要的话
-    }
-
-    // 获取wait timeout (如果有这个配置)
-    int waitTimeoutMs = 1000; // 默认值
-    if (GetOptionalIntParam(config, "WaitTimeoutMs", waitTimeoutMs, errorMsg)) {
-        if (waitTimeoutMs < 0) {
-            LOG_WARNING(sLogger, ("invalid WaitTimeoutMs, using default", waitTimeoutMs)("default", 1000));
-            waitTimeoutMs = 1000;
-        } else if (waitTimeoutMs > 60000) {
-            LOG_WARNING(sLogger, ("WaitTimeoutMs too large, capping", waitTimeoutMs)("max", 60000));
-            waitTimeoutMs = 60000; // 最大1分钟
-        }
-        // 这里可以将值存储到成员变量中，如果需要的话
     }
 }
 

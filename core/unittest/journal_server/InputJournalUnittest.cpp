@@ -59,7 +59,6 @@ void InputJournalUnittest::TestInit() {
     // 创建测试配置
     Json::Value config;
     config["SeekPosition"] = "tail";
-    config["CursorFlushPeriodMs"] = 5000;
     config["MaxEntriesPerBatch"] = 1000;
     config["Kernel"] = true;
     config["ParsePriority"] = false;
@@ -132,7 +131,6 @@ void InputJournalUnittest::TestParseBasicParams() {
     // 创建测试配置
     Json::Value config;
     config["SeekPosition"] = "head";
-    config["CursorFlushPeriodMs"] = 10000;
     config["CursorSeekFallback"] = "tail";
     config["Kernel"] = false;
     config["ParsePriority"] = true;
@@ -238,7 +236,6 @@ void InputJournalUnittest::TestComplexConfig() {
     // 创建复杂配置
     Json::Value config;
     config["SeekPosition"] = "cursor";
-    config["CursorFlushPeriodMs"] = 3000;
     config["CursorSeekFallback"] = "head";
     config["MaxEntriesPerBatch"] = 500;
     config["Kernel"] = true;

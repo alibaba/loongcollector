@@ -64,7 +64,7 @@ public:
     void TestCleanupEpollMonitoringWithReader();
     void TestEpollCreateFailure();
     void TestEpollEventHandlingWithReader();
-    void TestProcessJournalEventFailure();
+    void TestCheckJournalStatusFailure();
     void TestRefreshMonitorsWithOpenConnections();
     void TestRefreshMonitorsReaderNotOpen();
     void TestRefreshMonitorsInvalidFD();
@@ -88,7 +88,6 @@ protected:
         // 创建测试用的journal配置
         mTestConfig = std::make_unique<JournalConfig>();
         mTestConfig->mSeekPosition = "tail";
-        mTestConfig->mCursorFlushPeriodMs = 5000;
         mTestConfig->mMaxEntriesPerBatch = 100;
         mTestConfig->mKernel = true;
         mTestConfig->mCtx = mPipelineContext.get();
@@ -631,7 +630,6 @@ void JournalServerUnittest::TestAddJournalInputWithHandler() {
     // 创建有效配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
@@ -721,7 +719,7 @@ void JournalServerUnittest::TestEpollEventHandlingWithReader() {
     server->Stop();
 }
 
-void JournalServerUnittest::TestProcessJournalEventFailure() {
+void JournalServerUnittest::TestCheckJournalStatusFailure() {
     JournalServer* server = JournalServer::GetInstance();
 
     // 初始化服务器
@@ -733,7 +731,7 @@ void JournalServerUnittest::TestProcessJournalEventFailure() {
     // 等待配置生效
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // 测试ProcessJournalEvent失败的情况
+    // 测试CheckJournalStatus失败的情况
     // 这里主要测试错误处理逻辑
 
     server->Stop();
@@ -841,7 +839,6 @@ void JournalServerUnittest::TestValidateQueueKeyPreSetKey() {
     // 创建有效配置（预设置queueKey）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
@@ -866,7 +863,6 @@ void JournalServerUnittest::TestValidateQueueKeyNoQueueKey() {
     // 创建配置（没有queueKey）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
@@ -891,7 +887,6 @@ void JournalServerUnittest::TestValidateQueueKeyInvalidQueue() {
     // 创建配置（无效的队列）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mCursorFlushPeriodMs = 5000;
     config.mMaxEntriesPerBatch = 100;
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
@@ -937,7 +932,7 @@ UNIT_TEST_CASE(JournalServerUnittest, TestAddJournalInputWithHandler)
 UNIT_TEST_CASE(JournalServerUnittest, TestCleanupEpollMonitoringWithReader)
 UNIT_TEST_CASE(JournalServerUnittest, TestEpollCreateFailure)
 UNIT_TEST_CASE(JournalServerUnittest, TestEpollEventHandlingWithReader)
-UNIT_TEST_CASE(JournalServerUnittest, TestProcessJournalEventFailure)
+UNIT_TEST_CASE(JournalServerUnittest, TestCheckJournalStatusFailure)
 UNIT_TEST_CASE(JournalServerUnittest, TestRefreshMonitorsWithOpenConnections)
 UNIT_TEST_CASE(JournalServerUnittest, TestRefreshMonitorsReaderNotOpen)
 UNIT_TEST_CASE(JournalServerUnittest, TestRefreshMonitorsInvalidFD)

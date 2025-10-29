@@ -1,4 +1,4 @@
-# InputJournal - 高性能Systemd日志收集器
+#InputJournal - 高性能Systemd日志收集器
 
 ![InputJournal](https://img.shields.io/badge/Component-JournalServer-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-green) ![Language](https://img.shields.io/badge/Language-C%2B%2B-red)
 
@@ -37,7 +37,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 **配置:**
 ```json
 {
-  "units": ["nginx.service", "mysql.service", "redis.service"]
+    "units" : [ "nginx.service", "mysql.service", "redis.service" ]
 }
 ```
 
@@ -54,7 +54,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 **配置:**
 ```json
 {
-  "identifiers": ["sshd", "systemd", "kernel"]
+    "identifiers" : [ "sshd", "systemd", "kernel" ]
 }
 ```
 
@@ -73,8 +73,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 **配置:**
 ```json
 {
-  "units": ["nginx.service"],
-  "kernel": true
+    "units" : ["nginx.service"], "kernel" : true
 }
 ```
 
@@ -90,11 +89,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 **配置:**
 ```json
 {
-  "matchPatterns": [
-    "_SYSTEMD_USER_UNIT=myapp.service",
-    "PRIORITY=3",
-    "_COMM=nginx"
-  ]
+    "matchPatterns" : [ "_SYSTEMD_USER_UNIT=myapp.service", "PRIORITY=3", "_COMM=nginx" ]
 }
 ```
 
@@ -117,9 +112,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 #### 示例1: Web服务器 + 数据库监控
 ```json
 {
-  "units": ["nginx.service", "mysql.service"],
-  "kernel": true,
-  "identifiers": ["sshd"]
+    "units" : [ "nginx.service", "mysql.service" ], "kernel" : true, "identifiers" : ["sshd"]
 }
 ```
 **结果:** 收集nginx、mysql、内核日志和SSH守护进程日志。
@@ -127,9 +120,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 #### 示例2: 系统服务监控  
 ```json
 {
-  "units": ["systemd-networkd.service", "systemd-resolved.service"],
-  "kernel": false,
-  "matchPatterns": ["_UID=0"]
+    "units" : [ "systemd-networkd.service", "systemd-resolved.service" ], "kernel" : false, "matchPatterns" : ["_UID=0"]
 }
 ```
 **结果:** 收集networkd、resolved服务和所有root用户进程。
@@ -137,7 +128,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 #### 示例3: 仅内核收集
 ```json
 {
-  "matchPatterns": ["_TRANSPORT=kernel"]
+    "matchPatterns" : ["_TRANSPORT=kernel"]
 }
 ```
 **结果:** 仅收集内核日志（绕过units+kernel要求）。
@@ -145,11 +136,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 #### 示例4: 高优先级警报
 ```json
 {
-  "matchPatterns": [
-    "PRIORITY=0",
-    "PRIORITY=1", 
-    "PRIORITY=2"
-  ]
+    "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
 }
 ```
 **结果:** 仅收集紧急、警报和关键优先级消息。
@@ -160,21 +147,21 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "input_journal",
-  "JournalPaths": ["/var/log/journal"],
-  "SeekPosition": "tail",
-  "CursorFlushPeriodMs": 1000,
-  "CursorSeekFallback": "head",
-  "ResetIntervalSecond": 3600,
-  
-  "Units": ["nginx.service", "mysql.service"],
-  "Kernel": true,
-  "Identifiers": ["sshd", "systemd"],
-  "MatchPatterns": ["_UID=0"],
-  
-  "ParseSyslogFacility": true,
-  "ParsePriority": true,
-  "UseJournalEventTime": true
+    "Type" : "input_journal",
+             "JournalPaths" : ["/var/log/journal"],
+                              "SeekPosition" : "tail",
+                                               "CursorSeekFallback" : "head",
+                                                                      "ResetIntervalSecond" : 3600,
+
+                                                                      "Units" : [ "nginx.service", "mysql.service" ],
+                                                                                "Kernel" : true,
+                                                                                           "Identifiers"
+        : [ "sshd", "systemd" ],
+          "MatchPatterns" : ["_UID=0"],
+
+                            "ParseSyslogFacility" : true,
+                                                    "ParsePriority" : true,
+                                                                      "UseJournalEventTime" : true
 }
 ```
 
@@ -184,7 +171,6 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 |-----------|------|---------|-------------|
 | `JournalPaths` | 数组 | `[]` | 日志文件路径（空=系统日志） |
 | `SeekPosition` | 字符串 | `"tail"` | 初始读取位置: `head`、`tail`、`cursor` |
-| `CursorFlushPeriodMs` | 整数 | `1000` | 检查点保存频率（毫秒） |
 | `CursorSeekFallback` | 字符串 | `"head"` | 游标无效时的回退位置（可选值：`head` 或 `tail`） |
 | `ResetIntervalSecond` | 整数 | `3600` | 检查点重置间隔 |
 | `Units` | 数组 | `[]` | 要监控的Systemd单元 |
@@ -202,10 +188,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "input_journal",
-  "Units": ["nginx.service", "mysql.service"],
-  "Kernel": true,
-  "SeekPosition": "tail"
+    "Type" : "input_journal", "Units" : [ "nginx.service", "mysql.service" ], "Kernel" : true, "SeekPosition" : "tail"
 }
 ```
 
@@ -214,12 +197,12 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "input_journal",
-  "Units": ["systemd-networkd.service"],
-  "Identifiers": ["kernel", "systemd", "NetworkManager"],
-  "Kernel": true,
-  "MatchPatterns": ["_UID=0"],
-  "ParsePriority": true
+    "Type" : "input_journal",
+             "Units" : ["systemd-networkd.service"],
+                       "Identifiers" : [ "kernel", "systemd", "NetworkManager" ],
+                                       "Kernel" : true,
+                                                  "MatchPatterns" : ["_UID=0"],
+                                                                    "ParsePriority" : true
 }
 ```
 
@@ -228,14 +211,10 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ```json
 {
-  "Type": "service_journal_server",
-  "MatchPatterns": [
-    "PRIORITY=0",
-    "PRIORITY=1",
-    "PRIORITY=2"
-  ],
-  "ParsePriority": true,
-  "UseJournalEventTime": true
+    "Type" : "service_journal_server",
+             "MatchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ],
+                               "ParsePriority" : true,
+                                                 "UseJournalEventTime" : true
 }
 ```
 
@@ -249,7 +228,7 @@ InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些�
 
 ### 构建命令
 ```bash
-# 从项目根目录
+#从项目根目录
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make journal_server
@@ -267,14 +246,14 @@ make journal_server
 **解决方案:**
 ```json
 {
-  "units": ["some.service"],  // 至少添加一个单元
-  "kernel": true
+    "units" : ["some.service"], // 至少添加一个单元
+              "kernel" : true
 }
 ```
 或使用匹配模式:
 ```json
 {
-  "matchPatterns": ["_TRANSPORT=kernel"]
+    "matchPatterns" : ["_TRANSPORT=kernel"]
 }
 ```
 
@@ -284,7 +263,7 @@ make journal_server
 **解决方案:** 记住过滤器使用或逻辑。如果需要与逻辑，使用特定匹配模式:
 ```json
 {
-  "matchPatterns": ["_SYSTEMD_UNIT=nginx.service + PRIORITY=3"]
+    "matchPatterns" : ["_SYSTEMD_UNIT=nginx.service + PRIORITY=3"]
 }
 ```
 
@@ -294,8 +273,7 @@ make journal_server
 **解决方案:** 使用更具体的过滤器:
 ```json
 {
-  "units": ["specific.service"],
-  "matchPatterns": ["PRIORITY=0", "PRIORITY=1", "PRIORITY=2"]
+    "units" : ["specific.service"], "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
 }
 ```
 
@@ -324,4 +302,4 @@ make journal_server
 **📚 相关文档:**
 - [LoongCollector主README](../../README.md)
 - [插件开发指南](../../docs/en/guides/README.md)
-- [性能基准](../../docs/en/concept&designs/README.md) 
+- [性能基准](../../docs/en/concept&designs/README.md)
