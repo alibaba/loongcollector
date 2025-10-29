@@ -18,10 +18,9 @@ version: '3.8'
 
 services:
   doris:
-    image: docker.io/yagagagaga/doris-standalone:2.1.7
+    image: yagagagaga/doris-standalone:2.1.7
     container_name: doris
-    restart: unless-stopped
-    privileged: true
+    hostname: doris
     ports:
       - "8030:8030"
       - "9030:9030"
@@ -34,9 +33,9 @@ services:
       timeout: 5s
       retries: 30
   
-  init-doris:
+  init-test-env:
     image: mysql:8.0
-    container_name: init-doris
+    container_name: init-test-env
     depends_on:
       doris:
         condition: service_healthy

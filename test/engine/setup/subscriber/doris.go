@@ -67,18 +67,15 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 			return nil, err
 		}
 
-		// Parse address to get host and port
-		// Format: http://host:port or https://host:port
-		host = strings.TrimPrefix(host, "http://")
-		host = strings.TrimPrefix(host, "https://")
+		host = strings.ReplaceAll(host, "http://", "")
 
 		// Doris uses MySQL protocol on port 9030 for query
 		parts := strings.Split(host, ":")
-		mysqlHost := parts[0]
-		mysqlPort := "9030" // Default Doris MySQL protocol port
+		dorisHost := parts[0]
+		queryPort := "9030"
 
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&timeout=10s",
-			d.Username, d.Password, mysqlHost, mysqlPort, d.Database)
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+			d.Username, d.Password, dorisHost, queryPort, d.Database)
 
 		db, err := sql.Open("mysql", dsn)
 		if err != nil {
@@ -191,23 +188,23 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 func init() {
 	RegisterCreator(dorisName, func(spec map[string]interface{}) (Subscriber, error) {
-		d := &DorisSubscriber{}
-		if err := mapstructure.Decode(spec, d); err != nil {
+		i := &DorisSubscriber{
+			CreateTable: true,
+		}
+		if err := mapstructure.Decode(spec, i); err != nil {
 			return nil, err
 		}
 
-		if d.Address == "" {
-			return nil, errors.New("address must not be empty")
+		if i.Address == "" {
+			return nil, errors.New("addr must not be empty")
 		}
-		if d.Database == "" {
+		if i.Database == "" {
 			return nil, errors.New("database must not be empty")
 		}
-		if d.Table == "" {
-			return nil, errors.New("table must not be empty")
+		if i.Table == "" {
+			return nil, errors.New("table must no be empty")
 		}
-		// Username and password can be empty for some configurations
-
-		return d, nil
+		return i, nil
 	})
 	doc.Register("subscriber", dorisName, new(DorisSubscriber))
 }

@@ -20,11 +20,9 @@ done
 echo "Waiting for Doris BE to be ready..."
 # Wait for at least one BE to be alive (max 60 seconds)
 for i in {1..60}; do
-    BE_ALIVE=$(mysql -h $DORIS_HOST -P 9030 -u root -e "SHOW BACKENDS" 2>/dev/null | grep -c "true" || echo "0")
+    BE_ALIVE=$(mysql -h $DORIS_HOST -P 9030 -u root -e "SHOW BACKENDS" 2>/dev/null | grep -c "true" | head -n1 || echo "0")
     if [ "$BE_ALIVE" -gt 0 ]; then
-        echo "Doris BE is alive!"
-        echo "Waiting additional 10 seconds to ensure BE is fully ready..."
-        sleep 10
+        echo "Doris BE is alive and ready!"
         break
     fi
     echo "Waiting for BE to be alive... ($i/60)"
@@ -61,3 +59,5 @@ echo "Doris initialization completed!"
 
 # Create marker file for healthcheck
 touch /tmp/init_done
+
+sleep infinity
