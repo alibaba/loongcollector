@@ -88,7 +88,7 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
              ("journal connection manager adding config with independent connection", "")("config", configName));
 
     // 创建独立的journal连接（reader）
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 先设置journal路径（如果配置了）
     if (!config.mJournalPaths.empty()) {
@@ -215,7 +215,7 @@ JournalConnectionManager::Stats JournalConnectionManager::GetStats() const {
     return stats;
 }
 
-std::shared_ptr<SystemdJournalReader> JournalConnectionManager::GetConnection(const std::string& configName) const {
+std::shared_ptr<JournalReader> JournalConnectionManager::GetConnection(const std::string& configName) const {
     std::lock_guard<std::mutex> lock(mMutex);
 
     auto it = mConfigs.find(configName);
@@ -250,7 +250,7 @@ std::map<std::string, JournalConfig> JournalConnectionManager::GetAllConfigs() c
 }
 
 std::vector<std::string>
-JournalConnectionManager::GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const {
+JournalConnectionManager::GetConfigsUsingConnection(const std::shared_ptr<JournalReader>& reader) const {
     std::lock_guard<std::mutex> lock(mMutex);
     std::vector<std::string> configs;
 

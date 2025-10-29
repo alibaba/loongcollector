@@ -73,7 +73,7 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     config.mCtx = ctx.get();
 
     // 创建mock journal reader
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试函数调用（在测试环境中可能无法实际执行）
     // 但函数接口应该存在且不会崩溃

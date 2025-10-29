@@ -150,7 +150,7 @@ void JournalReaderUnittest::TestJournalReaderOperations() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpen() {
     // 测试SystemdJournalReader的Open方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Open方法
     bool result = reader.Open();
@@ -160,7 +160,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpenEmptyPath() {
     // 测试SystemdJournalReader的Open方法 - 空路径
-    SystemdJournalReader reader;
+    JournalReader reader;
     reader.SetJournalPaths({""}); // 设置空路径
 
     // 测试空路径处理
@@ -170,7 +170,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpenEmptyPath() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpenInvalidPath() {
     // 测试SystemdJournalReader的Open方法 - 无效路径
-    SystemdJournalReader reader;
+    JournalReader reader;
     reader.SetJournalPaths({"/nonexistent/path"}); // 设置不存在的路径
 
     // 测试无效路径处理
@@ -180,7 +180,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpenInvalidPath() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpenDirectory() {
     // 测试SystemdJournalReader的Open方法 - 目录路径
-    SystemdJournalReader reader;
+    JournalReader reader;
     reader.SetJournalPaths({"/var/log/journal"}); // 设置目录路径
 
     // 测试目录路径处理
@@ -191,7 +191,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpenDirectory() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpenFile() {
     // 测试SystemdJournalReader的Open方法 - 文件路径
-    SystemdJournalReader reader;
+    JournalReader reader;
     reader.SetJournalPaths({"/var/log/journal/system.journal"}); // 设置文件路径
 
     // 测试文件路径处理
@@ -202,7 +202,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpenFile() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderOpenFailure() {
     // 测试SystemdJournalReader的Open方法 - 失败情况
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Open失败的处理
     bool result = reader.Open();
@@ -212,7 +212,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderOpenFailure() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSeekCursor() {
     // 测试SystemdJournalReader的SeekCursor方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试SeekCursor方法
     bool result = reader.SeekCursor("test_cursor");
@@ -222,7 +222,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSeekCursor() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSeekCursorEmpty() {
     // 测试SystemdJournalReader的SeekCursor方法 - 空cursor
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试空cursor处理
     bool result = reader.SeekCursor("");
@@ -231,7 +231,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSeekCursorEmpty() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNext() {
     // 测试SystemdJournalReader的Next方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Next方法
     bool result = reader.Next();
@@ -241,7 +241,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNext() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextNotOpen() {
     // 测试SystemdJournalReader的Next方法 - 未打开状态
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试未打开状态下的Next
     bool result = reader.Next();
@@ -250,7 +250,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextNotOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextError() {
     // 测试SystemdJournalReader的Next方法 - 错误情况
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Next错误处理
     bool result = reader.Next();
@@ -260,7 +260,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextError() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderPrevious() {
     // 测试SystemdJournalReader的Previous方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Previous方法
     bool result = reader.Previous();
@@ -270,7 +270,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderPrevious() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderPreviousNotOpen() {
     // 测试SystemdJournalReader的Previous方法 - 未打开状态
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试未打开状态下的Previous
     bool result = reader.Previous();
@@ -279,7 +279,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderPreviousNotOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderPreviousError() {
     // 测试SystemdJournalReader的Previous方法 - 错误情况
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Previous错误处理
     bool result = reader.Previous();
@@ -289,7 +289,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderPreviousError() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSeekHead() {
     // 测试SystemdJournalReader的SeekHead方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试SeekHead方法
     bool result = reader.SeekHead();
@@ -299,7 +299,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSeekHead() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSeekTail() {
     // 测试SystemdJournalReader的SeekTail方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试SeekTail方法
     bool result = reader.SeekTail();
@@ -309,7 +309,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSeekTail() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSeekTailPrevious() {
     // 测试SystemdJournalReader的SeekTail后调用Previous
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试SeekTail + Previous组合
     bool seekResult = reader.SeekTail();
@@ -322,7 +322,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSeekTailPrevious() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderClose() {
     // 测试SystemdJournalReader的Close方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试Close方法
     reader.Close();
@@ -332,7 +332,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderClose() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderIsOpen() {
     // 测试SystemdJournalReader的IsOpen方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试IsOpen方法
     bool isOpen = reader.IsOpen();
@@ -342,7 +342,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderIsOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatus() {
     // 测试SystemdJournalReader的CheckJournalStatus方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试CheckJournalStatus方法
     JournalStatusType result = reader.CheckJournalStatus();
@@ -352,7 +352,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatus() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusNotOpen() {
     // 测试SystemdJournalReader的CheckJournalStatus方法 - 未打开状态
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试未打开状态下的CheckJournalStatus
     JournalStatusType result = reader.CheckJournalStatus();
@@ -361,7 +361,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusNotOpen() 
 
 void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusError() {
     // 测试SystemdJournalReader的CheckJournalStatus方法 - 错误情况
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试CheckJournalStatus错误处理
     JournalStatusType result = reader.CheckJournalStatus();
@@ -371,7 +371,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderCheckJournalStatusError() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderAddToEpoll() {
     // 测试SystemdJournalReader的AddToEpoll方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试AddToEpoll方法
     bool result = reader.AddToEpoll(1); // 使用测试用的epoll fd
@@ -381,7 +381,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderAddToEpoll() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderRemoveFromEpoll() {
     // 测试SystemdJournalReader的RemoveFromEpoll方法
-    SystemdJournalReader reader;
+    JournalReader reader;
 
     // 测试RemoveFromEpoll方法
     reader.RemoveFromEpoll(1); // 使用测试用的epoll fd
@@ -509,7 +509,7 @@ TEST_F(JournalReaderUnittest, TestSystemdJournalReaderRemoveFromEpoll) {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatus() {
     // 测试NextWithStatus方法
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 尝试调用NextWithStatus
     JournalReadStatus status = reader->NextWithStatus();
@@ -521,7 +521,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatus() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusNotOpen() {
     // 测试NextWithStatus在未打开状态下的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 不打开reader，直接调用NextWithStatus
     JournalReadStatus status = reader->NextWithStatus();
@@ -532,7 +532,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusNotOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusError() {
     // 测试NextWithStatus错误的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 尝试调用NextWithStatus
     JournalReadStatus status = reader->NextWithStatus();
@@ -544,7 +544,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusError() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusEndOfJournal() {
     // 测试NextWithStatus到达末尾的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 尝试调用NextWithStatus
     JournalReadStatus status = reader->NextWithStatus();
@@ -556,7 +556,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderNextWithStatusEndOfJournal()
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntry() {
     // 测试GetEntry方法
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -567,7 +567,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntry() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryNotOpen() {
     // 测试GetEntry在未打开状态下的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -578,7 +578,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryNotOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryCursorFailure() {
     // 测试GetEntry cursor失败的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -589,7 +589,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryCursorFailure() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryTimestampFailure() {
     // 测试GetEntry时间戳失败的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -600,7 +600,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryTimestampFailure() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryFieldProcessing() {
     // 测试GetEntry字段处理的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -611,7 +611,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryFieldProcessing() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryFieldTooLong() {
     // 测试GetEntry字段过长的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -622,7 +622,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryFieldTooLong() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetEntryMemoryAllocationFailure() {
     // 测试GetEntry内存分配失败的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     JournalEntry entry;
     bool result = reader->GetEntry(entry);
@@ -633,7 +633,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetEntryMemoryAllocationFail
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetJournalFD() {
     // 测试GetJournalFD方法
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     int fd = reader->GetJournalFD();
 
@@ -643,7 +643,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetJournalFD() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderGetJournalFDNotOpen() {
     // 测试GetJournalFD在未打开状态下的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     int fd = reader->GetJournalFD();
 
@@ -653,7 +653,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderGetJournalFDNotOpen() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSetDataThreshold() {
     // 测试SetDataThreshold方法（如果方法存在）
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 由于SetDataThreshold方法可能不存在，这里只测试基本功能
     // 主要测试方法调用不崩溃
@@ -662,7 +662,7 @@ void JournalReaderUnittest::TestSystemdJournalReaderSetDataThreshold() {
 
 void JournalReaderUnittest::TestSystemdJournalReaderSetDataThresholdNotOpen() {
     // 测试SetDataThreshold在未打开状态下的情况
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 由于SetDataThreshold方法可能不存在，这里只测试基本功能
     // 主要测试方法调用不崩溃

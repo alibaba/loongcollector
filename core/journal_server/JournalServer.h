@@ -30,7 +30,7 @@ namespace logtail {
 // Forward declarations
 class JournalConnectionManager;
 class JournalConnectionInstance;
-class SystemdJournalReader;
+class JournalReader;
 class PipelineEventGroup;
 struct JournalEntry;
 
@@ -39,7 +39,7 @@ inline constexpr int kJournalEpollTimeoutMS = 200;
 
 // MonitoredReader struct definition
 struct MonitoredReader {
-    std::shared_ptr<SystemdJournalReader> reader;
+    std::shared_ptr<JournalReader> reader;
     std::string configName;
     bool hasPendingData{true}; // 上次读取是否还有数据，用于优化跳过 NOP 事件时的无效读取
 };
@@ -100,7 +100,7 @@ public:
      * @param configName 配置名称
      * @return 连接信息，如果不存在返回nullptr
      */
-    std::shared_ptr<SystemdJournalReader> GetConnectionInfo(const std::string& configName) const;
+    std::shared_ptr<JournalReader> GetConnectionInfo(const std::string& configName) const;
 
     /**
      * @brief 获取当前连接数量

@@ -25,7 +25,7 @@
 namespace logtail {
 
 struct JournalConfig;
-class SystemdJournalReader;
+class JournalReader;
 using QueueKey = int64_t;
 
 /**
@@ -42,7 +42,7 @@ using QueueKey = int64_t;
  */
 void ReadJournalEntries(const std::string& configName,
                         const JournalConfig& config,
-                        const std::shared_ptr<SystemdJournalReader>& journalReader,
+                        const std::shared_ptr<JournalReader>& journalReader,
                         QueueKey queueKey,
                         bool* hasPendingDataOut = nullptr);
 

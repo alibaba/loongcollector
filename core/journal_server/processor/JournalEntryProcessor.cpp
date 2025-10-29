@@ -42,7 +42,7 @@ namespace {
  * @param errorContext 错误上下文描述
  * @return true 如果恢复成功，false 如果恢复失败
  */
-bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journalReader,
+bool RecoverFromJournalError(const std::shared_ptr<JournalReader>& journalReader,
                              const string& configName,
                              const string& cursorSeekFallback,
                              const string& errorContext) {
@@ -86,7 +86,7 @@ bool RecoverFromJournalError(const std::shared_ptr<SystemdJournalReader>& journa
 }
 
 bool MoveToNextJournalEntry(const string& configName,
-                            const std::shared_ptr<SystemdJournalReader>& journalReader,
+                            const std::shared_ptr<JournalReader>& journalReader,
                             const string& cursorSeekFallback,
                             int& entryCount) {
     try {
@@ -129,7 +129,7 @@ bool MoveToNextJournalEntry(const string& configName,
 }
 
 bool ReadAndValidateEntry(const string& configName,
-                          const std::shared_ptr<SystemdJournalReader>& journalReader,
+                          const std::shared_ptr<JournalReader>& journalReader,
                           const string& cursorSeekFallback,
                           JournalEntry& entry) {
     try {
@@ -296,7 +296,7 @@ bool CreateAndPushEventGroup(const string& configName,
 
 void ReadJournalEntries(const string& configName,
                         const JournalConfig& config,
-                        const std::shared_ptr<SystemdJournalReader>& journalReader,
+                        const std::shared_ptr<JournalReader>& journalReader,
                         QueueKey queueKey,
                         bool* hasPendingDataOut) {
     int entryCount = 0;

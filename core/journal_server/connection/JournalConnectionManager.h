@@ -29,7 +29,7 @@ namespace logtail {
 
 // Forward declarations
 struct JournalEntry;
-class SystemdJournalReader;
+class JournalReader;
 
 /**
  * @brief Journal连接管理器
@@ -66,7 +66,7 @@ public:
     Stats GetStats() const;
 
     // 获取指定配置的连接（reader）
-    std::shared_ptr<SystemdJournalReader> GetConnection(const std::string& configName) const;
+    std::shared_ptr<JournalReader> GetConnection(const std::string& configName) const;
 
     // 获取指定配置
     JournalConfig GetConfig(const std::string& configName) const;
@@ -75,7 +75,7 @@ public:
     std::map<std::string, JournalConfig> GetAllConfigs() const;
 
     // 获取使用指定连接的配置名（每个连接只对应一个配置）
-    std::vector<std::string> GetConfigsUsingConnection(const std::shared_ptr<SystemdJournalReader>& reader) const;
+    std::vector<std::string> GetConfigsUsingConnection(const std::shared_ptr<JournalReader>& reader) const;
 
     // 获取当前连接数量
     size_t GetConnectionCount() const;
@@ -94,7 +94,7 @@ private:
     struct ConfigInfo {
         std::string mConfigName;
         JournalConfig config;
-        std::shared_ptr<SystemdJournalReader> reader; // 每个配置独立的reader/连接
+        std::shared_ptr<JournalReader> reader; // 每个配置独立的reader/连接
     };
 
     std::map<std::string, ConfigInfo> mConfigs; // key: configName

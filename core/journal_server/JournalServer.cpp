@@ -126,7 +126,7 @@ JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const
     return result;
 }
 
-std::shared_ptr<SystemdJournalReader> JournalServer::GetConnectionInfo(const std::string& configName) const {
+std::shared_ptr<JournalReader> JournalServer::GetConnectionInfo(const std::string& configName) const {
     return JournalConnectionManager::GetInstance().GetConnection(configName);
 }
 

@@ -465,7 +465,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyUnits() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -484,7 +484,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyIdentifiers() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -503,7 +503,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyMatchPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -522,7 +522,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidUnits() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -541,7 +541,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidIdentifiers() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -560,7 +560,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithInvalidMatchPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -579,7 +579,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithKernelDisabled() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -598,7 +598,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithKernelEnabled() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -617,7 +617,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithAllFiltersEnabled() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -636,7 +636,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithPartialFilters() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -655,7 +655,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithComplexPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -674,7 +674,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithSpecialCharacters() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -693,7 +693,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithLongPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -712,7 +712,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithEmptyPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -731,7 +731,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithDuplicatePatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -750,7 +750,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithWildcardPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);
@@ -769,7 +769,7 @@ void JournalFilterUnittest::TestApplyAllFiltersWithRegexPatterns() {
     config.mConfigName = "test_config";
     config.mConfigIndex = 0;
 
-    auto reader = std::make_shared<SystemdJournalReader>();
+    auto reader = std::make_shared<JournalReader>();
 
     // 测试应用过滤器
     bool result = JournalFilter::ApplyAllFilters(reader.get(), config);

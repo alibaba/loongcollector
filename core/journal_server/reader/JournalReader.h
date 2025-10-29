@@ -42,10 +42,6 @@ struct JournalEntry {
 };
 
 /**
- * @brief Abstract interface for journal reading operations
- * This allows for different implementations (systemd-journal, mock for testing, etc.)
- */
-/**
  * @brief Journal navigation result status
  */
 enum class JournalReadStatus {
@@ -64,86 +60,51 @@ enum class JournalStatusType {
     kError = -1 // Error occurred
 };
 
+/**
+ * @brief Journal reader implementation using sd-journal
+ */
 class JournalReader {
 public:
-    // Add default constructor
-    JournalReader() = default;
-    virtual ~JournalReader() = default;
+    JournalReader();
+    ~JournalReader();
 
-    // Default copy and move operations for interface
-    JournalReader(const JournalReader&) = default;
-    JournalReader& operator=(const JournalReader&) = default;
-    JournalReader(JournalReader&&) = default;
-    JournalReader& operator=(JournalReader&&) = default;
+    // Delete copy and move operations
+    JournalReader(const JournalReader&) = delete;
+    JournalReader& operator=(const JournalReader&) = delete;
+    JournalReader(JournalReader&&) = delete;
+    JournalReader& operator=(JournalReader&&) = delete;
 
     // Core journal operations
-    virtual bool Open() = 0;
-    virtual void Close() = 0;
-    virtual bool IsOpen() const = 0;
+    bool Open();
+    void Close();
+    bool IsOpen() const;
 
     // Seeking operations
-    virtual bool SeekHead() = 0;
-    virtual bool SeekTail() = 0;
-    virtual bool SeekCursor(const std::string& cursor) = 0;
-    virtual bool Next() = 0;
-    virtual bool Previous() = 0;
+    bool SeekHead();
+    bool SeekTail();
+    bool SeekCursor(const std::string& cursor);
+    bool Next();
+    bool Previous();
 
     /**
      * @brief Move to next entry with detailed status
      * @return JournalReadStatus indicating success, end of journal, or error
      */
-    virtual JournalReadStatus NextWithStatus() = 0;
+    JournalReadStatus NextWithStatus();
 
     // Reading operations
-    virtual bool GetEntry(JournalEntry& entry) = 0;
-    virtual std::string GetCursor() = 0;
+    bool GetEntry(JournalEntry& entry);
+    std::string GetCursor();
 
     // Filtering operations
-    virtual bool AddMatch(const std::string& field, const std::string& value) = 0;
-    virtual bool AddDisjunction() = 0;
+    bool AddMatch(const std::string& field, const std::string& value);
+    bool AddDisjunction();
 
     // Get unique values for a field (for glob pattern matching)
-    virtual std::vector<std::string> GetUniqueValues(const std::string& field) = 0;
+    std::vector<std::string> GetUniqueValues(const std::string& field);
 
     // Journal paths
-    virtual bool SetJournalPaths(const std::vector<std::string>& paths) = 0;
-};
-
-/**
- * @brief Systemd journal implementation using sd-journal
- */
-class SystemdJournalReader : public JournalReader {
-public:
-    SystemdJournalReader();
-    ~SystemdJournalReader() override;
-
-    // Delete copy and move operations
-    SystemdJournalReader(const SystemdJournalReader&) = delete;
-    SystemdJournalReader& operator=(const SystemdJournalReader&) = delete;
-    SystemdJournalReader(SystemdJournalReader&&) = delete;
-    SystemdJournalReader& operator=(SystemdJournalReader&&) = delete;
-
-    // JournalReader interface implementation
-    bool Open() override;
-    void Close() override;
-    bool IsOpen() const override;
-
-    bool SeekHead() override;
-    bool SeekTail() override;
-    bool SeekCursor(const std::string& cursor) override;
-    bool Next() override;
-    bool Previous() override;
-    JournalReadStatus NextWithStatus() override;
-
-    bool GetEntry(JournalEntry& entry) override;
-    std::string GetCursor() override;
-
-    bool AddMatch(const std::string& field, const std::string& value) override;
-    bool AddDisjunction() override;
-
-    std::vector<std::string> GetUniqueValues(const std::string& field) override;
-
-    bool SetJournalPaths(const std::vector<std::string>& paths) override;
+    bool SetJournalPaths(const std::vector<std::string>& paths);
 
     // 事件监听相关方法（仅在 Linux 平台可用）
     bool AddToEpoll(int epollFD);

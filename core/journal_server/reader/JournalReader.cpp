@@ -28,7 +28,7 @@ namespace logtail {
  *  Impl：Linux 下的 systemd-journal 实现
  *  注意：此插件仅在 Linux 平台可用
  *========================================================*/
-class SystemdJournalReader::Impl {
+class JournalReader::Impl {
 public:
     Impl() = default;
 
@@ -469,79 +469,90 @@ private:
  *
  *  设计意图：
  *  1. 编译隔离：避免头文件暴露 systemd 依赖，减小头文件依赖
- *  2. 扩展性：支持抽象接口和多种实现（如测试用的 MockJournalReader）
- *  3. 接口稳定性：Impl 类实现可修改，不影响公共 API
+ *  2. 接口稳定性：Impl 类实现可修改，不影响公共 API
  *========================================================*/
-SystemdJournalReader::SystemdJournalReader() : mImpl(std::make_unique<Impl>()) {
+JournalReader::JournalReader() : mImpl(std::make_unique<Impl>()) {
 }
-SystemdJournalReader::~SystemdJournalReader() = default;
+JournalReader::~JournalReader() = default;
 
-#define FWD(Method) return mImpl->Method
-bool SystemdJournalReader::Open() {
-    FWD(Open());
-}
-void SystemdJournalReader::Close() {
-    FWD(Close());
-}
-bool SystemdJournalReader::IsOpen() const {
-    FWD(IsOpen());
-}
-bool SystemdJournalReader::SeekHead() {
-    FWD(SeekHead());
-}
-bool SystemdJournalReader::SeekTail() {
-    FWD(SeekTail());
-}
-bool SystemdJournalReader::SeekCursor(const std::string& c) {
-    FWD(SeekCursor(c));
-}
-bool SystemdJournalReader::Next() {
-    FWD(Next());
-}
-bool SystemdJournalReader::Previous() {
-    FWD(Previous());
-}
-JournalReadStatus SystemdJournalReader::NextWithStatus() {
-    FWD(NextWithStatus());
-}
-bool SystemdJournalReader::GetEntry(JournalEntry& e) {
-    FWD(GetEntry(e));
-}
-std::string SystemdJournalReader::GetCursor() {
-    FWD(GetCursor());
-}
-bool SystemdJournalReader::AddMatch(const std::string& f, const std::string& v) {
-    FWD(AddMatch(f, v));
-}
-bool SystemdJournalReader::AddDisjunction() {
-    FWD(AddDisjunction());
-}
-std::vector<std::string> SystemdJournalReader::GetUniqueValues(const std::string& field) {
-    FWD(GetUniqueValues(field));
-}
-bool SystemdJournalReader::SetJournalPaths(const std::vector<std::string>& p) {
-    FWD(SetJournalPaths(p));
+bool JournalReader::Open() {
+    return mImpl->Open();
 }
 
-bool SystemdJournalReader::AddToEpoll(int epollFD) {
+void JournalReader::Close() {
+    mImpl->Close();
+}
+
+bool JournalReader::IsOpen() const {
+    return mImpl->IsOpen();
+}
+
+bool JournalReader::SeekHead() {
+    return mImpl->SeekHead();
+}
+
+bool JournalReader::SeekTail() {
+    return mImpl->SeekTail();
+}
+
+bool JournalReader::SeekCursor(const std::string& cursor) {
+    return mImpl->SeekCursor(cursor);
+}
+
+bool JournalReader::Next() {
+    return mImpl->Next();
+}
+
+bool JournalReader::Previous() {
+    return mImpl->Previous();
+}
+
+JournalReadStatus JournalReader::NextWithStatus() {
+    return mImpl->NextWithStatus();
+}
+
+bool JournalReader::GetEntry(JournalEntry& entry) {
+    return mImpl->GetEntry(entry);
+}
+
+std::string JournalReader::GetCursor() {
+    return mImpl->GetCursor();
+}
+
+bool JournalReader::AddMatch(const std::string& field, const std::string& value) {
+    return mImpl->AddMatch(field, value);
+}
+
+bool JournalReader::AddDisjunction() {
+    return mImpl->AddDisjunction();
+}
+
+std::vector<std::string> JournalReader::GetUniqueValues(const std::string& field) {
+    return mImpl->GetUniqueValues(field);
+}
+
+bool JournalReader::SetJournalPaths(const std::vector<std::string>& paths) {
+    return mImpl->SetJournalPaths(paths);
+}
+
+bool JournalReader::AddToEpoll(int epollFD) {
     return mImpl->AddToEpoll(epollFD);
 }
 
-void SystemdJournalReader::RemoveFromEpoll(int epollFD) {
+void JournalReader::RemoveFromEpoll(int epollFD) {
     mImpl->RemoveFromEpoll(epollFD);
 }
 
-JournalStatusType SystemdJournalReader::CheckJournalStatus() {
+JournalStatusType JournalReader::CheckJournalStatus() {
     return mImpl->CheckJournalStatus();
 }
 
-JournalStatusType SystemdJournalReader::WaitForNewEvent(uint64_t timeout) {
+JournalStatusType JournalReader::WaitForNewEvent(uint64_t timeout) {
     return mImpl->WaitForNewEvent(timeout);
 }
 
-int SystemdJournalReader::GetJournalFD() const {
+int JournalReader::GetJournalFD() const {
     return mImpl->GetJournalFD();
 }
-#undef FWD
 
 } // namespace logtail
