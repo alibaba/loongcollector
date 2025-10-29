@@ -36,11 +36,6 @@ mysql -h $DORIS_HOST -P 9030 -u root -e "SHOW BACKENDS\G" 2>/dev/null || echo "W
 
 echo "Creating test user and database..."
 mysql -h $DORIS_HOST -P 9030 -u root <<EOF
--- Create test user with password
-CREATE USER IF NOT EXISTS 'test_user'@'%' IDENTIFIED BY 'test_password';
-
--- Grant privileges (Doris uses *.*.* format: catalog.db.table)
-GRANT ALL ON *.*.* TO 'test_user'@'%';
 
 -- Create test database
 CREATE DATABASE IF NOT EXISTS test_db;
@@ -64,4 +59,5 @@ EOF
 
 echo "Doris initialization completed!"
 
-
+# Create marker file for healthcheck
+touch /tmp/init_done

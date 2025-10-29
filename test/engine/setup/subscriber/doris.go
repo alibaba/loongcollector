@@ -55,21 +55,50 @@ func (d *DorisSubscriber) Description() string {
 }
 
 func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.LogGroup, error) {
-	// Initialize connection if not already done
+	// Set timestamp on first call
+	if d.lastTimestamp == 0 {
+		d.lastTimestamp = int64(startTime)
+	}
+
+	// Connect to Doris only once
 	if d.client == nil {
-		if err := d.initConnection(); err != nil {
+		host, err := TryReplacePhysicalAddress(d.Address)
+		if err != nil {
 			return nil, err
 		}
-		d.lastTimestamp = int64(startTime)
 
-		// Create table if needed
-		if d.CreateTable {
-			if err := d.createTable(); err != nil {
-				logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-					"failed to create table, err: %s", err)
-				// Don't return error, table might already exist
-			}
+		// Parse address to get host and port
+		// Format: http://host:port or https://host:port
+		host = strings.TrimPrefix(host, "http://")
+		host = strings.TrimPrefix(host, "https://")
+
+		// Doris uses MySQL protocol on port 9030 for query
+		parts := strings.Split(host, ":")
+		mysqlHost := parts[0]
+		mysqlPort := "9030" // Default Doris MySQL protocol port
+
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&timeout=10s",
+			d.Username, d.Password, mysqlHost, mysqlPort, d.Database)
+
+		db, err := sql.Open("mysql", dsn)
+		if err != nil {
+			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
+				"failed to open doris connection, host %s, err: %s", host, err)
+			return nil, err
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		if err = db.PingContext(ctx); err != nil {
+			logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
+				"failed to ping doris, host %s, err: %s", host, err)
+			_ = db.Close()
+			return nil, err
+		}
+
+		d.client = db
+		logger.Infof(context.Background(), "doris subscriber connected to: %s", host)
 	}
 
 	logGroup, err := d.queryRecords()
@@ -80,61 +109,6 @@ func (d *DorisSubscriber) GetData(sqlStr string, startTime int32) ([]*protocol.L
 	return []*protocol.LogGroup{logGroup}, nil
 }
 
-func (d *DorisSubscriber) initConnection() error {
-	host, err := TryReplacePhysicalAddress(d.Address)
-	if err != nil {
-		return err
-	}
-
-	// Parse address to get host and port
-	// Format: http://host:port or https://host:port
-	host = strings.TrimPrefix(host, "http://")
-	host = strings.TrimPrefix(host, "https://")
-
-	// Doris uses MySQL protocol on port 9030 for query
-	// But the address provided is typically the HTTP port (8030)
-	// We need to replace the port with 9030 for MySQL protocol connection
-	parts := strings.Split(host, ":")
-	mysqlHost := parts[0]
-	mysqlPort := "9030" // Default Doris MySQL protocol port
-
-	// Create DSN (Data Source Name) for MySQL connection
-	// Format: username:password@tcp(host:port)/database
-	// Use default test password if not specified
-	password := d.Password
-	if password == "" {
-		password = "test_password"
-	}
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&timeout=10s",
-		d.Username, password, mysqlHost, mysqlPort, d.Database)
-
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to connect to doris, host: %s, err: %s", host, err)
-		return err
-	}
-
-	// Set connection pool parameters
-	db.SetMaxOpenConns(5)
-	db.SetMaxIdleConns(2)
-	db.SetConnMaxLifetime(time.Duration(10) * time.Minute)
-
-	// Test connection
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err = db.PingContext(ctx); err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to ping doris, err: %s", err)
-		_ = db.Close()
-		return err
-	}
-
-	d.client = db
-	logger.Infof(context.Background(), "doris subscriber connected to: %s", host)
-	return nil
-}
-
 func (d *DorisSubscriber) FlusherConfig() string {
 	return ""
 }
@@ -143,41 +117,6 @@ func (d *DorisSubscriber) Stop() error {
 	if d.client != nil {
 		return d.client.Close()
 	}
-	return nil
-}
-
-func (d *DorisSubscriber) createTable() error {
-	// Create database if not exists
-	createDB := fmt.Sprintf("CREATE DATABASE IF NOT EXISTS `%s`", d.Database)
-	if _, err := d.client.Exec(createDB); err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to create database, sql: %s, err: %s", createDB, err)
-		return err
-	}
-
-	// Create table for testing with custom_single_flatten protocol
-	// The table will have columns for time and common test fields
-	tableName := fmt.Sprintf("`%s`.`%s`", d.Database, d.Table)
-	createTableSQL := fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			time BIGINT,
-			content STRING,
-			value STRING,
-			__tag__hostip STRING,
-			__tag__hostname STRING
-		) DUPLICATE KEY(time)
-		DISTRIBUTED BY HASH(time) BUCKETS 1
-		PROPERTIES (
-			"replication_num" = "1"
-		)`, tableName)
-
-	if _, err := d.client.Exec(createTableSQL); err != nil {
-		logger.Warningf(context.Background(), "DORIS_SUBSCRIBER_ALARM",
-			"failed to create table, sql: %s, err: %s", createTableSQL, err)
-		return err
-	}
-
-	logger.Infof(context.Background(), "created doris table: %s", tableName)
 	return nil
 }
 
@@ -252,9 +191,7 @@ func (d *DorisSubscriber) queryRecords() (logGroup *protocol.LogGroup, err error
 
 func init() {
 	RegisterCreator(dorisName, func(spec map[string]interface{}) (Subscriber, error) {
-		d := &DorisSubscriber{
-			CreateTable: true,
-		}
+		d := &DorisSubscriber{}
 		if err := mapstructure.Decode(spec, d); err != nil {
 			return nil, err
 		}
@@ -269,6 +206,7 @@ func init() {
 			return nil, errors.New("table must not be empty")
 		}
 		// Username and password can be empty for some configurations
+
 		return d, nil
 	})
 	doc.Register("subscriber", dorisName, new(DorisSubscriber))
