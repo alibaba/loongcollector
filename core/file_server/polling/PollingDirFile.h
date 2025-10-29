@@ -76,7 +76,10 @@ private:
     // PollingWildcardConfigPath polls config with wildcard base path recursively.
     // It will use PollingNormalConfigPath to poll if the path becomes normal.
     // @return true if at least one directory was found during polling.
-    bool PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig, const std::string& dirPath, int depth);
+    bool PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig,
+                                   const BasePathInfo& pathInfo,
+                                   const std::string& dirPath,
+                                   int depth);
 
     // CheckAndUpdateDirMatchCache updates dir cache (add if not existing).
     // The caller of this method should make sure that there is at least one config matches

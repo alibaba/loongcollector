@@ -377,16 +377,24 @@ void ContainerDiscoveryOptions::GenerateContainerMetaFetchingGoPipeline(
             detail[key] = object;
         }
     };
+
+    // 对于文件采集来说，这里只需要传输一个配置到Go端，所以这里只需要传输一个路径信息，具体哪个路径是没有关系的
     if (fileDiscovery) {
-        if (!fileDiscovery->GetWildcardPaths().empty()) {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetWildcardPaths()[0]);
-            detail["MaxDepth"] = Json::Value(static_cast<int32_t>(fileDiscovery->GetWildcardPaths().size())
-                                             + fileDiscovery->mMaxDirSearchDepth - 1);
-        } else {
-            detail["LogPath"] = Json::Value(fileDiscovery->GetBasePath());
-            detail["MaxDepth"] = Json::Value(fileDiscovery->mMaxDirSearchDepth);
+        const auto& pathInfos = fileDiscovery->GetBasePathInfos();
+        if (!pathInfos.empty()) {
+            // Use first path with wildcards, or first path if none have wildcards
+            const auto* selectedPath = &pathInfos[0];
+
+            if (selectedPath->hasWildcard()) {
+                detail["LogPath"] = Json::Value(selectedPath->wildcardPaths[0]);
+                detail["MaxDepth"] = Json::Value(static_cast<int32_t>(selectedPath->wildcardPaths.size())
+                                                 + fileDiscovery->mMaxDirSearchDepth - 1);
+            } else {
+                detail["LogPath"] = Json::Value(selectedPath->basePath);
+                detail["MaxDepth"] = Json::Value(fileDiscovery->mMaxDirSearchDepth);
+            }
+            detail["FilePattern"] = Json::Value(selectedPath->filePattern);
         }
-        detail["FilePattern"] = Json::Value(fileDiscovery->GetFilePattern());
     }
     // 传递给 metric_container_info 的配置
     // 容器过滤

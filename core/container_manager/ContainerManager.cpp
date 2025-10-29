@@ -130,8 +130,27 @@ void ContainerManager::ApplyContainerDiffs() {
             std::vector<std::string> pathNotExistContainerIDs;
             const auto& containerInfos = options->GetContainerInfo();
             if (containerInfos) {
+                const auto& basePathInfos = options->GetBasePathInfos();
                 for (const auto& info : *containerInfos) {
-                    if (CheckExistance(info.mRealBaseDir)) {
+                    // Validate array size consistency
+                    if (info.mRealBaseDirs.size() != basePathInfos.size()) {
+                        LOG_WARNING(
+                            sLogger,
+                            ("mRealBaseDirs size mismatch",
+                             "container may have incomplete path mapping")("container id", info.mRawContainerInfo->mID)(
+                                "expected size", basePathInfos.size())("actual size", info.mRealBaseDirs.size()));
+                    }
+
+                    // 检查该容器的所有真实路径，只要有一个存在就认为容器有效
+                    bool anyExists = false;
+                    for (const auto& realBaseDir : info.mRealBaseDirs) {
+                        if (!realBaseDir.empty() && CheckExistance(realBaseDir)) {
+                            anyExists = true;
+                            break;
+                        }
+                    }
+
+                    if (anyExists) {
                         pathExistContainerIDs.push_back(info.mRawContainerInfo->mID);
                     } else {
                         pathNotExistContainerIDs.push_back(info.mRawContainerInfo->mID);
@@ -473,11 +492,16 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
             }
             for (auto& info : *containerInfos) {
                 if (info.mRawContainerInfo->mID == containerId) {
-                    Event* pStoppedEvent
-                        = new Event(info.mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
-                    pStoppedEvent->SetConfigName(itr->first);
-                    pStoppedEvent->SetContainerID(containerId);
-                    eventVec.push_back(pStoppedEvent);
+                    // 为每个真实路径生成停止事件
+                    for (const auto& realBaseDir : info.mRealBaseDirs) {
+                        if (!realBaseDir.empty()) {
+                            Event* pStoppedEvent
+                                = new Event(realBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
+                            pStoppedEvent->SetConfigName(itr->first);
+                            pStoppedEvent->SetContainerID(containerId);
+                            eventVec.push_back(pStoppedEvent);
+                        }
+                    }
                     info.mRawContainerInfo->mStopped = true;
                     LOG_DEBUG(sLogger, ("generate stop event, containerId", containerId)("configName", itr->first));
                 }

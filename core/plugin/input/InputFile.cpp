@@ -42,8 +42,7 @@ const string InputFile::sName = "input_file";
 bool InputFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
                                              const CollectionPipelineContext*,
                                              const FileDiscoveryOptions* fileDiscovery) {
-    string logPath = GetLogPath(fileDiscovery);
-    return SetContainerBaseDir(containerInfo, logPath);
+    return SetContainerBaseDirs(containerInfo, fileDiscovery);
 }
 
 InputFile::InputFile()
@@ -250,24 +249,58 @@ bool InputFile::CreateInnerProcessors() {
     return true;
 }
 
-string InputFile::GetLogPath(const FileDiscoveryOptions* fileDiscovery) {
-    string logPath;
-    if (!fileDiscovery->GetWildcardPaths().empty()) {
-        logPath = fileDiscovery->GetWildcardPaths()[0];
-    } else {
-        logPath = fileDiscovery->GetBasePath();
+
+// 为 ContainerInfo 设置多个真实路径，与 FileDiscoveryOptions 的多路径对应
+bool InputFile::SetContainerBaseDirs(ContainerInfo& containerInfo, const FileDiscoveryOptions* fileDiscovery) {
+    if (!containerInfo.mRealBaseDirs.empty()) {
+        return true; // 已经设置过
     }
-    return logPath;
+
+    if (!fileDiscovery || containerInfo.mRawContainerInfo == nullptr) {
+        return false;
+    }
+
+    const auto& pathInfos = fileDiscovery->GetBasePathInfos();
+    bool hasSuccess = false;
+
+    // 为每个配置路径计算对应的容器真实路径
+    for (const auto& pathInfo : pathInfos) {
+        string logPath;
+        if (pathInfo.hasWildcard()) {
+            logPath = pathInfo.wildcardPaths[0];
+        } else {
+            logPath = pathInfo.basePath;
+        }
+
+        // 计算该路径在容器中的映射
+        string realBaseDir;
+        if (SetContainerBaseDirForPath(containerInfo, logPath, realBaseDir)) {
+            containerInfo.mRealBaseDirs.push_back(realBaseDir);
+            hasSuccess = true;
+        } else {
+            // 映射失败，存储空字符串以保持索引对应
+            LOG_WARNING(sLogger,
+                        ("failed to map container path", "path mapping failed for this config path")(
+                            "container id", containerInfo.mRawContainerInfo->mID)("log path", logPath));
+            containerInfo.mRealBaseDirs.push_back("");
+        }
+    }
+
+    return hasSuccess;
 }
 
-bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& logPath) {
-    if (!containerInfo.mRealBaseDir.empty()) {
-        return true;
+// 计算单个配置路径在容器中的映射路径（不修改 containerInfo）
+bool InputFile::SetContainerBaseDirForPath(const ContainerInfo& containerInfo,
+                                           const string& logPath,
+                                           string& outRealBaseDir) {
+    if (containerInfo.mRawContainerInfo == nullptr) {
+        return false;
     }
-    size_t pthSize = logPath.size();
 
+    size_t pthSize = logPath.size();
     size_t size = containerInfo.mRawContainerInfo->mMounts.size();
     size_t bestMatchedMountsIndex = size;
+
     // ParseByJSONObj 确保 Destination、Source、mUpperDir 不会以\或者/结尾
     for (size_t i = 0; i < size; ++i) {
         StringView dst = containerInfo.mRawContainerInfo->mMounts[i].mDestination;
@@ -280,17 +313,20 @@ bool InputFile::SetContainerBaseDir(ContainerInfo& containerInfo, const string& 
             bestMatchedMountsIndex = i;
         }
     }
+
     if (bestMatchedMountsIndex < size) {
-        containerInfo.mRealBaseDir = STRING_FLAG(default_container_host_path)
+        outRealBaseDir = STRING_FLAG(default_container_host_path)
             + containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource
             + logPath.substr(containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size());
     } else {
-        containerInfo.mRealBaseDir
+        outRealBaseDir
             = STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mUpperDir + logPath;
     }
-    LOG_INFO(
-        sLogger,
-        ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID));
+
+    LOG_INFO(sLogger,
+             ("set container base dir for path",
+              logPath)("real dir", outRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID));
+
     return true;
 }
 

@@ -21,30 +21,45 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/FileSystemUtil.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/ContainerInfo.h"
 
 namespace logtail {
 
+// Base path information structure
+// Encapsulates all information for a single file discovery path configuration
+struct BasePathInfo {
+    std::string basePath; // Base directory path (e.g., "/var/log" or "/home/*/logs")
+    std::string filePattern; // File name matching pattern (e.g., "*.log", "app.log")
+    std::vector<std::string> wildcardPaths; // Wildcard path hierarchy (split by wildcards, e.g., ["/home", "*/logs"])
+    std::vector<std::string> constWildcardPaths; // Non-wildcard parts from wildcardPaths (e.g., ["", "logs"])
+    uint16_t wildcardDepth = 0; // Number of path separators in basePath (NOT wildcard count!)
+
+    BasePathInfo() = default;
+    explicit BasePathInfo(const std::string& path, const std::string& pattern = "*")
+        : basePath(path), filePattern(pattern), wildcardDepth(0) {}
+
+    // Check if path contains wildcards
+    bool hasWildcard() const { return !wildcardPaths.empty(); }
+
+    // Check if path is empty
+    bool isEmpty() const { return basePath.empty(); }
+};
+
 class FileDiscoveryOptions {
 public:
-    static bool CompareByPathLength(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-                                    std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
-    static bool
-    CompareByDepthAndCreateTime(std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-                                std::pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right);
-
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);
-    const std::string& GetBasePath() const { return mBasePath; }
-    const std::string& GetFilePattern() const { return mFilePattern; }
-    const std::vector<std::string>& GetWildcardPaths() const { return mWildcardPaths; }
-    const std::vector<std::string>& GetConstWildcardPaths() const { return mConstWildcardPaths; }
+
+    // Get all base path information (each path has its own filePattern, wildcardPaths, etc.)
+    const std::vector<BasePathInfo>& GetBasePathInfos() const { return mBasePathInfos; }
     bool IsContainerDiscoveryEnabled() const { return mEnableContainerDiscovery; }
     void SetEnableContainerDiscoveryFlag(bool flag) { mEnableContainerDiscovery = flag; }
     const std::shared_ptr<std::vector<ContainerInfo>>& GetContainerInfo() const { return mContainerInfos; }
@@ -62,11 +77,20 @@ public:
         mDeduceAndSetContainerBaseDirFunc = f;
     }
 
-    bool IsFilenameMatched(const std::string& filename) const;
+    // Check if filename matches the specific pathInfo's filePattern
+    bool IsFilenameMatched(const std::string& filename, const BasePathInfo& pathInfo) const;
     bool IsFilenameInBlacklist(const std::string& filename) const;
     bool IsDirectoryInBlacklist(const std::string& dir) const;
     bool IsFilepathInBlacklist(const std::string& filepath) const;
+
+    // Check if path/name matches this config
     bool IsMatch(const std::string& path, const std::string& name) const;
+
+    // Check if path/name matches this config, and return the depth of matched path
+    // @param outMatchedPathDepth: (optional) output the depth of matched basePath (number of path separators)
+    // @return true if matched, false otherwise
+    bool IsMatch(const std::string& path, const std::string& name, int32_t* outMatchedPathDepth) const;
+
     bool IsTimeout(const std::string& path) const;
     bool WithinMaxDepth(const std::string& path) const;
 
@@ -75,6 +99,10 @@ public:
     bool DeleteRawContainerInfo(const std::string& containerID);
 
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
+
+    // 根据实际文件路径，找到它对应的 mRealBaseDirs 索引
+    size_t GetRealBaseDirIndex(const ContainerInfo* containerInfo, const std::string& logPath) const;
+
     // 过渡使用
     bool IsTailingAllMatchedFiles() const { return mTailingAllMatchedFiles; }
     void SetTailingAllMatchedFiles(bool flag) { mTailingAllMatchedFiles = flag; }
@@ -93,16 +121,13 @@ public:
     bool mAllowingIncludedByMultiConfigs = false;
 
 private:
-    void ParseWildcardPath();
+    void ParseWildcardPath(BasePathInfo& pathInfo);
     std::pair<std::string, std::string> GetDirAndFileNameFromPath(const std::string& filePath);
     bool IsObjectInBlacklist(const std::string& path, const std::string& name) const;
-    bool IsWildcardPathMatch(const std::string& path, const std::string& name = "") const;
+    bool IsWildcardPathMatch(const std::string& path, const std::string& name, const BasePathInfo& pathInfo) const;
 
-    std::string mBasePath;
-    std::string mFilePattern;
-    std::vector<std::string> mConstWildcardPaths;
-    std::vector<std::string> mWildcardPaths;
-    uint16_t mWildcardDepth;
+    // Multiple base path information (including file patterns)
+    std::vector<BasePathInfo> mBasePathInfos;
 
     // Blacklist control.
     bool mHasBlacklist = false;
@@ -148,5 +173,32 @@ private:
 };
 
 using FileDiscoveryConfig = std::pair<FileDiscoveryOptions*, const CollectionPipelineContext*>;
+
+// 路径项结构体（用于路径级别分类和排序）
+// 注意：必须在 FileDiscoveryConfig 定义之后
+struct PathItem {
+    std::string path; // 配置路径（basePath，用于排序）
+    int32_t depth; // 路径深度
+    FileDiscoveryConfig config; // 关联的配置
+    const BasePathInfo* pathInfo; // 路径信息
+    size_t pathInfoIndex; // pathInfo 在 mBasePathInfos 中的索引
+
+    PathItem() = default;
+    PathItem(const std::string& p, int32_t d, const FileDiscoveryConfig& c, const BasePathInfo* pi, size_t idx)
+        : path(p), depth(d), config(c), pathInfo(pi), pathInfoIndex(idx) {}
+};
+
+// 计算路径深度（路径分隔符的数量）
+inline int32_t CalculatePathDepth(const std::string& path) {
+    return static_cast<int32_t>(std::count(path.begin(), path.end(), PATH_SEPARATOR[0]));
+}
+
+// 构建并排序路径项列表（用于路径级别的排序和处理）
+// @param nameConfigMap: 所有配置映射
+// @param outSortedPaths: 输出的精确路径列表（按深度排序）
+// @param outWildcardPaths: 输出的通配符路径列表（不排序）
+void BuildAndSortPathItems(const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap,
+                           std::vector<PathItem>& outSortedPaths,
+                           std::vector<PathItem>& outWildcardPaths);
 
 } // namespace logtail
