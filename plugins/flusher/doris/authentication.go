@@ -63,10 +63,7 @@ func (plainTextConfig *PlainTextConfig) ConfigurePlaintext(headers *http.Header)
 		return nil // Username is optional for Doris
 	}
 
-	if plainTextConfig.Password == "" && plainTextConfig.Username != "" {
-		return fmt.Errorf("password must be set when username is configured")
-	}
-
+	// Allow empty password - Doris default root user has no password
 	return nil
 }
 
@@ -96,9 +93,6 @@ func (config *Authentication) GetUsernamePassword() (string, string, error) {
 		return "", "", fmt.Errorf("username is not configured")
 	}
 
-	if config.PlainText.Password == "" {
-		return "", "", fmt.Errorf("password is not configured")
-	}
-
+	// Allow empty password - Doris default root user has no password
 	return config.PlainText.Username, config.PlainText.Password, nil
 }

@@ -32,9 +32,9 @@ services:
       timeout: 5s
       retries: 30
   
-  doris-init:
+  init-doris:
     image: mysql:8.0
-    container_name: doris-init
+    container_name: init-doris
     depends_on:
       doris:
         condition: service_healthy
@@ -42,3 +42,8 @@ services:
       - ./init.sh:/init.sh
     entrypoint: ["/bin/bash", "/init.sh"]
     restart: "no"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/init_done"]
+      interval: 1s
+      timeout: 1s
+      retries: 1

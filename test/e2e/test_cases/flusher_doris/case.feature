@@ -8,8 +8,8 @@ Feature: flusher doris
     Given subcribe data from {doris} with config
     """
     address: http://doris:9030
-    username: test_user
-    password: test_password
+    username: root
+    password:
     database: test_db
     table: test_table
     """
@@ -29,8 +29,8 @@ Feature: flusher doris
         Table: test_table
         Authentication:
           PlainText:
-            Username: test_user
-            Password: test_password
+            Username: root
+            Password:
         Convert:
           Protocol: "custom_single_flatten"
           Encoding: "json"
