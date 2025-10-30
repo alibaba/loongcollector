@@ -117,7 +117,8 @@ void MetricEvent::DelMetadata(StringView key) {
 }
 
 size_t MetricEvent::DataSize() const {
-    return PipelineEvent::DataSize() + mName.size() + logtail::DataSize(mValue) + mTags.DataSize() + mMetadata.DataSize();
+    return PipelineEvent::DataSize() + mName.size() + logtail::DataSize(mValue) + mTags.DataSize()
+        + mMetadata.DataSize();
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

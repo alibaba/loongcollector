@@ -340,8 +340,8 @@ void SLSEventGroupSerializer::SerializeLogEvent(LogGroupSerializer& serializer,
 //      value1: 123
 //      value2: 456
 // Metric with __apm_metric_type__ in Metadata
-// event: {"labels": {"label1": "value1", "label2": "value2"}, "values": {"value1": 123, "value2": 456}, "metadata": {"__apm_metric_type__": "app"}}
-// result:
+// event: {"labels": {"label1": "value1", "label2": "value2"}, "values": {"value1": 123, "value2": 456}, "metadata":
+// {"__apm_metric_type__": "app"}} result:
 //   __time__: 1234567890
 //   content:
 //      __label__: label1#$#value1|label2#$#value2
