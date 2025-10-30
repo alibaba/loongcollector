@@ -200,9 +200,8 @@ void JournalServer::run() {
                 break;
             }
 
-            LOG_DEBUG(sLogger, ("journal server epoll_wait events", nfds));
 
-            // 🔥 兜底逻辑：用于处理hasPendingData且epoll=0的批处理没处理完的场景
+            // 兜底逻辑：用于处理hasPendingData且epoll=0的批处理没处理完的场景
             // 当epoll_wait超时返回0事件，但某些reader仍有hasPendingData标志时，
             // 说明上次批处理可能还有数据未读完，需要再次尝试读取
             if (nfds == 0 && handlePendingDataReaders(monitoredReaders)) {

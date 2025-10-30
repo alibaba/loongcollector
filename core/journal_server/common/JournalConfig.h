@@ -20,7 +20,10 @@
 #include <string>
 #include <vector>
 
+#include "json/json.h"
+
 #include "collection_pipeline/queue/QueueKey.h"
+#include "common/ParamExtractor.h"
 
 namespace logtail {
 
@@ -60,6 +63,68 @@ struct JournalConfig {
     mutable QueueKey mQueueKey = -1; // 验证后缓存的队列键值（-1 = 未验证）
 
     JournalConfig() = default;
+
+    /**
+     * @brief 从 JSON 配置解析并创建 JournalConfig
+     * @param config JSON 配置对象
+     * @param ctx 集合管道上下文（可为 nullptr）
+     * @return 解析后的 JournalConfig 对象
+     */
+    static JournalConfig ParseFromJson(const Json::Value& config, const CollectionPipelineContext* ctx = nullptr) {
+        JournalConfig journalConfig;
+        journalConfig.mCtx = ctx;
+
+        std::string errorMsg;
+
+        // 解析基本参数
+        if (!GetOptionalStringParam(config, "SeekPosition", journalConfig.mSeekPosition, errorMsg)) {
+            journalConfig.mSeekPosition = "tail"; // 默认值
+        }
+
+        // 解析 CursorSeekFallback（默认head，与go实现不同）
+        if (!GetOptionalStringParam(config, "CursorSeekFallback", journalConfig.mCursorSeekFallback, errorMsg)) {
+            journalConfig.mCursorSeekFallback = "head"; // 默认值
+        }
+
+        // 解析布尔参数
+        if (!GetOptionalBoolParam(config, "Kernel", journalConfig.mKernel, errorMsg)) {
+            journalConfig.mKernel = true; // 默认值
+        }
+        if (!GetOptionalBoolParam(config, "ParseSyslogFacility", journalConfig.mParseSyslogFacility, errorMsg)) {
+            journalConfig.mParseSyslogFacility = false; // 默认值
+        }
+        if (!GetOptionalBoolParam(config, "ParsePriority", journalConfig.mParsePriority, errorMsg)) {
+            journalConfig.mParsePriority = false; // 默认值
+        }
+        if (!GetOptionalBoolParam(config, "UseJournalEventTime", journalConfig.mUseJournalEventTime, errorMsg)) {
+            journalConfig.mUseJournalEventTime = false; // 默认值
+        }
+
+        // 解析整型参数
+        if (!GetOptionalIntParam(config, "MaxEntriesPerBatch", journalConfig.mMaxEntriesPerBatch, errorMsg)) {
+            journalConfig.mMaxEntriesPerBatch = 1000; // 默认值
+        }
+
+        // 解析字符串数组
+        static auto parseStringArray = [](const Json::Value& jsonConfig, const std::string& key) {
+            std::vector<std::string> result;
+            if (jsonConfig.isMember(key) && jsonConfig[key].isArray()) {
+                for (const auto& item : jsonConfig[key]) {
+                    if (item.isString()) {
+                        result.push_back(item.asString());
+                    }
+                }
+            }
+            return result;
+        };
+
+        journalConfig.mUnits = parseStringArray(config, "Units");
+        journalConfig.mIdentifiers = parseStringArray(config, "Identifiers");
+        journalConfig.mJournalPaths = parseStringArray(config, "JournalPaths");
+        journalConfig.mMatchPatterns = parseStringArray(config, "MatchPatterns");
+
+        return journalConfig;
+    }
 
     /**
      * @brief 验证和修正配置值，确保所有字段都在有效范围内

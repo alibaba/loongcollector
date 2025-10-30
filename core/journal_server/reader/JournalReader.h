@@ -116,13 +116,6 @@ public:
      */
     JournalStatusType CheckJournalStatus();
 
-    /**
-     * @brief 等待新的 journal 事件（用于轮询模式）
-     * @param timeout 超时时间（微秒），-1 表示永远等待
-     * @return JournalStatusType 指示状态类型，或 kNop 如果超时
-     */
-    JournalStatusType WaitForNewEvent(uint64_t timeout);
-
     int GetJournalFD() const;
 
 private:

@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "json/json.h"
+
 #include "collection_pipeline/plugin/interface/Input.h"
 
 namespace logtail {
@@ -47,31 +49,11 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
-    // Helper methods for configuration parsing
-    void parseBasicParams(const Json::Value& config);
-    void parseArrayParams(const Json::Value& config);
-    void parseStringArray(const Json::Value& config, const std::string& key, std::vector<std::string>& target);
-
-    // Configuration options
-    std::string mSeekPosition;
-    std::string mCursorSeekFallback;
-    std::vector<std::string> mUnits;
-    bool mKernel;
-    std::vector<std::string> mIdentifiers;
-    std::vector<std::string> mJournalPaths;
-    std::vector<std::string> mMatchPatterns;
-    bool mParseSyslogFacility;
-    bool mParsePriority;
-    bool mUseJournalEventTime;
+    // 原始 JSON 配置（用于在 Start() 时使用 JournalConfig::ParseFromJson() 解析）
+    Json::Value mConfigJson;
 
     // Threading
     std::atomic<bool> mShutdown;
-
-    // Seek position constants
-    static const std::string kSeekPositionCursor;
-    static const std::string kSeekPositionHead;
-    static const std::string kSeekPositionTail;
-    static const std::string kSeekPositionDefault;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputJournalUnittest;

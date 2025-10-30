@@ -43,54 +43,42 @@ class JournalConnectionManager {
 public:
     static JournalConnectionManager& GetInstance();
 
-    // 初始化管理器
     bool Initialize();
 
-    // 清理资源
     void Cleanup();
 
-    // 添加配置（创建独立的连接）
     bool AddConfig(const std::string& configName, const JournalConfig& config);
 
-    // 移除配置（关闭并删除连接）
     void RemoveConfig(const std::string& configName);
 
-    // 获取统计信息
     struct Stats {
         size_t totalConfigs;
         size_t activeConnections;
         size_t invalidConnections;
         std::vector<std::string> connectionKeys;
-        size_t totalConnections; // 总连接数（与totalConfigs相同）
+        size_t totalConnections;
     };
     Stats GetStats() const;
 
-    // 获取指定配置的连接（reader）
     std::shared_ptr<JournalReader> GetConnection(const std::string& configName) const;
 
-    // 获取指定配置
     JournalConfig GetConfig(const std::string& configName) const;
 
-    // 获取所有配置（用于遍历）
     std::map<std::string, JournalConfig> GetAllConfigs() const;
 
-    // 获取使用指定连接的配置名（每个连接只对应一个配置）
     std::vector<std::string> GetConfigsUsingConnection(const std::shared_ptr<JournalReader>& reader) const;
 
-    // 获取当前连接数量
     size_t GetConnectionCount() const;
 
 private:
     JournalConnectionManager() = default;
     ~JournalConnectionManager() = default;
 
-    // 禁用拷贝和移动
     JournalConnectionManager(const JournalConnectionManager&) = delete;
     JournalConnectionManager& operator=(const JournalConnectionManager&) = delete;
     JournalConnectionManager(JournalConnectionManager&&) = delete;
     JournalConnectionManager& operator=(JournalConnectionManager&&) = delete;
 
-    // 配置信息结构
     struct ConfigInfo {
         std::string mConfigName;
         JournalConfig config;

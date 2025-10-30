@@ -24,9 +24,6 @@ using namespace std;
 
 namespace logtail {
 
-//==============================================================================
-// JournalConnectionManager 实现
-//==============================================================================
 
 JournalConnectionManager& JournalConnectionManager::GetInstance() {
     static JournalConnectionManager sInstance;
@@ -74,7 +71,6 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
         return false;
     }
 
-    // 检查配置是否已存在
     if (mConfigs.find(configName) != mConfigs.end()) {
         LOG_WARNING(sLogger,
                     ("journal connection manager config already exists, will be replaced", "")("config", configName));
@@ -87,10 +83,8 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
     LOG_INFO(sLogger,
              ("journal connection manager adding config with independent connection", "")("config", configName));
 
-    // 创建独立的journal连接（reader）
     auto reader = std::make_shared<JournalReader>();
 
-    // 先设置journal路径（如果配置了）
     if (!config.mJournalPaths.empty()) {
         reader->SetJournalPaths(config.mJournalPaths);
         LOG_INFO(sLogger,
@@ -112,7 +106,6 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
     }
 #endif
 
-    // 应用过滤器
     JournalFilter::FilterConfig filterConfig;
     filterConfig.mUnits = config.mUnits;
     filterConfig.mIdentifiers = config.mIdentifiers;
@@ -128,7 +121,6 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
         return false;
     }
 
-    // 设置seek位置
     if (!config.mSeekPosition.empty()) {
         bool seekSuccess = false;
         if (config.mSeekPosition == "tail") {
@@ -153,7 +145,6 @@ bool JournalConnectionManager::AddConfig(const std::string& configName, const Jo
         }
     }
 
-    // 保存配置信息
     ConfigInfo configInfo;
     configInfo.mConfigName = configName;
     configInfo.config = config;
@@ -179,7 +170,6 @@ void JournalConnectionManager::RemoveConfig(const std::string& configName) {
     if (it != mConfigs.end()) {
         LOG_INFO(sLogger, ("journal connection manager removing config", "")("config", configName));
 
-        // 关闭连接
         if (it->second.reader) {
             it->second.reader->Close();
         }
@@ -234,7 +224,6 @@ JournalConfig JournalConnectionManager::GetConfig(const std::string& configName)
         return it->second.config;
     }
 
-    // 返回空配置
     return JournalConfig();
 }
 
@@ -254,7 +243,6 @@ JournalConnectionManager::GetConfigsUsingConnection(const std::shared_ptr<Journa
     std::lock_guard<std::mutex> lock(mMutex);
     std::vector<std::string> configs;
 
-    // 由于每个连接只对应一个配置，查找这个连接对应的配置
     for (const auto& [configKey, configInfo] : mConfigs) {
         if (configInfo.reader == reader) {
             configs.emplace_back(configInfo.mConfigName);
