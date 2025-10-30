@@ -29,7 +29,7 @@ namespace logtail {
 // Journal相关常量定义
 // ============================================================================
 
-// Syslog设施转换映射表（来自Go版本）
+// Syslog设施转换映射表
 const std::map<std::string, std::string> JournalUtils::kSyslogFacilityString = {
     {"0", "kernel"},         {"1", "user"},         {"2", "mail"},         {"3", "daemon"},     {"4", "auth"},
     {"5", "syslog"},         {"6", "line printer"}, {"7", "network news"}, {"8", "uucp"},       {"9", "clock daemon"},
@@ -37,7 +37,7 @@ const std::map<std::string, std::string> JournalUtils::kSyslogFacilityString = {
     {"15", "clock daemon"},  {"16", "local0"},      {"17", "local1"},      {"18", "local2"},    {"19", "local3"},
     {"20", "local4"},        {"21", "local5"},      {"22", "local6"},      {"23", "local7"}};
 
-// 优先级转换映射表（来自Go版本）
+// 优先级转换映射表
 const std::map<std::string, std::string> JournalUtils::kPriorityConversionMap = {{"0", "emergency"},
                                                                                  {"1", "alert"},
                                                                                  {"2", "critical"},
@@ -73,7 +73,7 @@ const std::vector<std::string> JournalUtils::kUnitTypes = {".service",
 // 字符串和路径工具函数实现
 // ============================================================================
 
-bool JournalUtils::StringIsGlob(const std::string& name) {
+bool JournalUtils::IsStringGlob(const std::string& name) {
     return name.find_first_of(kGlobChars) != std::string::npos;
 }
 
@@ -85,7 +85,7 @@ bool JournalUtils::IsDevicePath(const std::string& path) {
     return path.length() >= 5 && (path.substr(0, 5) == "/dev/" || path.substr(0, 5) == "/sys/");
 }
 
-bool JournalUtils::PathIsAbsolute(const std::string& path) {
+bool JournalUtils::IsPathAbsolute(const std::string& path) {
     return !path.empty() && path[0] == '/';
 }
 
@@ -138,7 +138,7 @@ bool JournalUtils::MatchPattern(const std::string& pattern, const std::string& s
 // Systemd单元相关工具函数实现
 // ============================================================================
 
-bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
+bool JournalUtils::IsUnitSuffixValid(const std::string& suffix) {
     if (suffix.empty() || suffix[0] != '.') {
         return false;
     }
@@ -148,7 +148,7 @@ bool JournalUtils::UnitSuffixIsValid(const std::string& suffix) {
     });
 }
 
-bool JournalUtils::UnitNameIsValid(const std::string& name) {
+bool JournalUtils::IsUnitNameValid(const std::string& name) {
     if (name.length() >= kUnitNameMax) {
         return false;
     }
@@ -159,7 +159,7 @@ bool JournalUtils::UnitNameIsValid(const std::string& name) {
     }
 
     std::string suffix = name.substr(dot);
-    if (!UnitSuffixIsValid(suffix)) {
+    if (!IsUnitSuffixValid(suffix)) {
         return false;
     }
 
@@ -204,17 +204,17 @@ std::string JournalUtils::UnitNameMangle(const std::string& name, const std::str
         throw std::invalid_argument("unit name can't be empty or begin with a dot");
     }
 
-    if (!UnitSuffixIsValid(suffix)) {
+    if (!IsUnitSuffixValid(suffix)) {
         throw std::invalid_argument("unit name has an invalid suffix");
     }
 
     // 已经是完全有效的单元名称？
-    if (UnitNameIsValid(name)) {
+    if (IsUnitNameValid(name)) {
         return name;
     }
 
     // 已经是完全有效的glob表达式？如果是，则无需处理...
-    if (StringIsGlob(name) && InCharset(name, kValidCharsGlob)) {
+    if (IsStringGlob(name) && InCharset(name, kValidCharsGlob)) {
         return name;
     }
 
@@ -226,7 +226,7 @@ std::string JournalUtils::UnitNameMangle(const std::string& name, const std::str
     }
 
     // 如果是绝对路径，转换为.mount单元
-    if (PathIsAbsolute(name)) {
+    if (IsPathAbsolute(name)) {
         // 截取路径并在末尾添加.mount
         std::filesystem::path p(name);
         return p.filename().string() + ".mount";
@@ -236,7 +236,7 @@ std::string JournalUtils::UnitNameMangle(const std::string& name, const std::str
 
     // 如果没有后缀则添加后缀，但仅当这不是glob模式时，
     // 这样我们可以允许"foo.*"作为有效的glob模式。
-    if (!StringIsGlob(escaped) && !absl::StrContains(escaped, '.')) {
+    if (!IsStringGlob(escaped) && !absl::StrContains(escaped, '.')) {
         return escaped + suffix;
     }
 

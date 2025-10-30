@@ -66,7 +66,7 @@ public:
      * @param name 待检查的字符串
      * @return 包含glob字符返回true，否则返回false
      */
-    static bool StringIsGlob(const std::string& name);
+    static bool IsStringGlob(const std::string& name);
 
     /**
      * @brief 检查字符串中的所有字符是否都在指定的字符集中
@@ -88,7 +88,7 @@ public:
      * @param path 待检查的路径
      * @return 是绝对路径返回true，否则返回false
      */
-    static bool PathIsAbsolute(const std::string& path);
+    static bool IsPathAbsolute(const std::string& path);
 
     /**
      * @brief 使用glob模式匹配字符串
@@ -107,14 +107,14 @@ public:
      * @param suffix 单元后缀（如".service"、".socket"等）
      * @return 有效返回true，否则返回false
      */
-    static bool UnitSuffixIsValid(const std::string& suffix);
+    static bool IsUnitSuffixValid(const std::string& suffix);
 
     /**
      * @brief 检查单元名称是否有效
      * @param name systemd单元名称
      * @return 有效返回true，否则返回false
      */
-    static bool UnitNameIsValid(const std::string& name);
+    static bool IsUnitNameValid(const std::string& name);
 
     /**
      * @brief 转义单元名称中的无效字符

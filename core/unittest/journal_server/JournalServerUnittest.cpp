@@ -574,7 +574,7 @@ void JournalServerUnittest::TestRefreshMonitors() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 测试刷新监控器
-    // 这里主要测试refreshMonitors方法的逻辑
+    // 这里主要测试syncMonitors方法的逻辑
 
     server->Stop();
 }
@@ -750,7 +750,7 @@ void JournalServerUnittest::TestRefreshMonitorsWithOpenConnections() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 测试刷新监控器（有打开的连接）
-    // 这里主要测试refreshMonitors方法的逻辑
+    // 这里主要测试syncMonitors方法的逻辑
 
     server->Stop();
 }

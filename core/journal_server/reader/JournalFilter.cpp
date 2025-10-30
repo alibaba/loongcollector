@@ -92,7 +92,7 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
         // 将任意字符串转换为有效的systemd单元名称（转换路径、添加后缀等）
         std::string mangledUnit = JournalUtils::UnitNameMangle(unit, ".service");
 
-        if (JournalUtils::StringIsGlob(mangledUnit)) {
+        if (JournalUtils::IsStringGlob(mangledUnit)) {
             // 收集glob模式以备后续处理
             patterns.push_back(mangledUnit);
         } else {

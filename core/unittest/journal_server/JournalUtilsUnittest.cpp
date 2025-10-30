@@ -29,13 +29,13 @@ public:
     JournalUtilsUnittest() = default;
     ~JournalUtilsUnittest() = default;
 
-    void TestStringIsGlob();
+    void TestIsStringGlob();
     void TestInCharset();
     void TestIsDevicePath();
-    void TestPathIsAbsolute();
+    void TestIsPathAbsolute();
     void TestMatchPattern();
-    void TestUnitSuffixIsValid();
-    void TestUnitNameIsValid();
+    void TestIsUnitSuffixValid();
+    void TestIsUnitNameValid();
     void TestDoEscapeMangle();
     void TestUnitNameMangle();
     void TestConstants();
@@ -48,19 +48,19 @@ public:
     void TestUnitNameMangleValidGlob();
 };
 
-void JournalUtilsUnittest::TestStringIsGlob() {
+void JournalUtilsUnittest::TestIsStringGlob() {
     // 测试包含glob字符的字符串
-    APSARA_TEST_TRUE(JournalUtils::StringIsGlob("nginx*"));
-    APSARA_TEST_TRUE(JournalUtils::StringIsGlob("nginx?"));
-    APSARA_TEST_TRUE(JournalUtils::StringIsGlob("nginx[abc]"));
-    APSARA_TEST_TRUE(JournalUtils::StringIsGlob("*nginx*"));
-    APSARA_TEST_TRUE(JournalUtils::StringIsGlob("nginx?*"));
+    APSARA_TEST_TRUE(JournalUtils::IsStringGlob("nginx*"));
+    APSARA_TEST_TRUE(JournalUtils::IsStringGlob("nginx?"));
+    APSARA_TEST_TRUE(JournalUtils::IsStringGlob("nginx[abc]"));
+    APSARA_TEST_TRUE(JournalUtils::IsStringGlob("*nginx*"));
+    APSARA_TEST_TRUE(JournalUtils::IsStringGlob("nginx?*"));
 
     // 测试不包含glob字符的字符串
-    APSARA_TEST_FALSE(JournalUtils::StringIsGlob("nginx"));
-    APSARA_TEST_FALSE(JournalUtils::StringIsGlob("nginx.service"));
-    APSARA_TEST_FALSE(JournalUtils::StringIsGlob(""));
-    APSARA_TEST_FALSE(JournalUtils::StringIsGlob("nginx.service@instance"));
+    APSARA_TEST_FALSE(JournalUtils::IsStringGlob("nginx"));
+    APSARA_TEST_FALSE(JournalUtils::IsStringGlob("nginx.service"));
+    APSARA_TEST_FALSE(JournalUtils::IsStringGlob(""));
+    APSARA_TEST_FALSE(JournalUtils::IsStringGlob("nginx.service@instance"));
 }
 
 void JournalUtilsUnittest::TestInCharset() {
@@ -92,18 +92,18 @@ void JournalUtilsUnittest::TestIsDevicePath() {
     APSARA_TEST_FALSE(JournalUtils::IsDevicePath(""));
 }
 
-void JournalUtilsUnittest::TestPathIsAbsolute() {
+void JournalUtilsUnittest::TestIsPathAbsolute() {
     // 测试绝对路径
-    APSARA_TEST_TRUE(JournalUtils::PathIsAbsolute("/home/user"));
-    APSARA_TEST_TRUE(JournalUtils::PathIsAbsolute("/var/log"));
-    APSARA_TEST_TRUE(JournalUtils::PathIsAbsolute("/dev/sda1"));
-    APSARA_TEST_TRUE(JournalUtils::PathIsAbsolute("/"));
+    APSARA_TEST_TRUE(JournalUtils::IsPathAbsolute("/home/user"));
+    APSARA_TEST_TRUE(JournalUtils::IsPathAbsolute("/var/log"));
+    APSARA_TEST_TRUE(JournalUtils::IsPathAbsolute("/dev/sda1"));
+    APSARA_TEST_TRUE(JournalUtils::IsPathAbsolute("/"));
 
     // 测试相对路径
-    APSARA_TEST_FALSE(JournalUtils::PathIsAbsolute("home/user"));
-    APSARA_TEST_FALSE(JournalUtils::PathIsAbsolute("nginx.service"));
-    APSARA_TEST_FALSE(JournalUtils::PathIsAbsolute(""));
-    APSARA_TEST_FALSE(JournalUtils::PathIsAbsolute("./relative"));
+    APSARA_TEST_FALSE(JournalUtils::IsPathAbsolute("home/user"));
+    APSARA_TEST_FALSE(JournalUtils::IsPathAbsolute("nginx.service"));
+    APSARA_TEST_FALSE(JournalUtils::IsPathAbsolute(""));
+    APSARA_TEST_FALSE(JournalUtils::IsPathAbsolute("./relative"));
 }
 
 void JournalUtilsUnittest::TestMatchPattern() {
@@ -124,47 +124,47 @@ void JournalUtilsUnittest::TestMatchPattern() {
     APSARA_TEST_FALSE(JournalUtils::MatchPattern("nginx[abc]", "nginx"));
 }
 
-void JournalUtilsUnittest::TestUnitSuffixIsValid() {
+void JournalUtilsUnittest::TestIsUnitSuffixValid() {
     // 测试有效的单元后缀
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".socket"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".device"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".mount"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".automount"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".swap"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".target"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".path"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".timer"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".snapshot"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".slice"));
-    APSARA_TEST_TRUE(JournalUtils::UnitSuffixIsValid(".scope"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".socket"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".device"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".mount"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".automount"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".swap"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".target"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".path"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".timer"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".snapshot"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".slice"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitSuffixValid(".scope"));
 
     // 测试无效的单元后缀
-    APSARA_TEST_FALSE(JournalUtils::UnitSuffixIsValid(""));
-    APSARA_TEST_FALSE(JournalUtils::UnitSuffixIsValid("service"));
-    APSARA_TEST_FALSE(JournalUtils::UnitSuffixIsValid(".invalid"));
-    APSARA_TEST_FALSE(JournalUtils::UnitSuffixIsValid("..service"));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitSuffixValid(""));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitSuffixValid("service"));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitSuffixValid(".invalid"));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitSuffixValid("..service"));
 }
 
-void JournalUtilsUnittest::TestUnitNameIsValid() {
+void JournalUtilsUnittest::TestIsUnitNameValid() {
     // 测试有效的单元名称
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid("nginx.service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid("apache2.service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid("mysql.service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid("nginx@.service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid("nginx@instance.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid("nginx.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid("apache2.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid("mysql.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid("nginx@.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid("nginx@instance.service"));
 
     // 测试无效的单元名称
-    APSARA_TEST_FALSE(JournalUtils::UnitNameIsValid(""));
-    APSARA_TEST_FALSE(JournalUtils::UnitNameIsValid("nginx"));
-    APSARA_TEST_FALSE(JournalUtils::UnitNameIsValid("nginx."));
-    APSARA_TEST_FALSE(JournalUtils::UnitNameIsValid("nginx@"));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitNameValid(""));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitNameValid("nginx"));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitNameValid("nginx."));
+    APSARA_TEST_FALSE(JournalUtils::IsUnitNameValid("nginx@"));
 
     // 根据实际实现，*.service 和 .service 的行为：
     // *.service: 包含*字符，不在kValidCharsWithAt中，所以返回false
     // .service: 以点号开头，但实现中没有检查这个条件，所以可能返回true
-    APSARA_TEST_FALSE(JournalUtils::UnitNameIsValid("*.service"));
-    APSARA_TEST_TRUE(JournalUtils::UnitNameIsValid(".service")); // 实际实现允许这种情况
+    APSARA_TEST_FALSE(JournalUtils::IsUnitNameValid("*.service"));
+    APSARA_TEST_TRUE(JournalUtils::IsUnitNameValid(".service")); // 实际实现允许这种情况
 }
 
 void JournalUtilsUnittest::TestDoEscapeMangle() {
@@ -304,8 +304,8 @@ void JournalUtilsUnittest::TestUnitNameMangleValidGlob() {
 }
 
 // 注册测试用例
-TEST_F(JournalUtilsUnittest, TestStringIsGlob) {
-    TestStringIsGlob();
+TEST_F(JournalUtilsUnittest, TestIsStringGlob) {
+    TestIsStringGlob();
 }
 
 TEST_F(JournalUtilsUnittest, TestInCharset) {
@@ -316,20 +316,20 @@ TEST_F(JournalUtilsUnittest, TestIsDevicePath) {
     TestIsDevicePath();
 }
 
-TEST_F(JournalUtilsUnittest, TestPathIsAbsolute) {
-    TestPathIsAbsolute();
+TEST_F(JournalUtilsUnittest, TestIsPathAbsolute) {
+    TestIsPathAbsolute();
 }
 
 TEST_F(JournalUtilsUnittest, TestMatchPattern) {
     TestMatchPattern();
 }
 
-TEST_F(JournalUtilsUnittest, TestUnitSuffixIsValid) {
-    TestUnitSuffixIsValid();
+TEST_F(JournalUtilsUnittest, TestIsUnitSuffixValid) {
+    TestIsUnitSuffixValid();
 }
 
-TEST_F(JournalUtilsUnittest, TestUnitNameIsValid) {
-    TestUnitNameIsValid();
+TEST_F(JournalUtilsUnittest, TestIsUnitNameValid) {
+    TestIsUnitNameValid();
 }
 
 TEST_F(JournalUtilsUnittest, TestDoEscapeMangle) {

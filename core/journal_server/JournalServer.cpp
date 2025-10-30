@@ -42,7 +42,6 @@ void JournalServer::Init() {
 
     mThreadRes = async(launch::async, &JournalServer::run, this);
 
-    // 初始化连接管理器
     JournalConnectionManager::GetInstance().Initialize();
 
     LOG_INFO(sLogger, ("journal server initialized", ""));
@@ -113,7 +112,19 @@ void JournalServer::RemoveConfigOnly(const string& configName) {
 }
 
 std::map<std::string, JournalConfig> JournalServer::GetAllJournalConfigs() const {
-    return JournalConnectionManager::GetInstance().GetAllConfigs();
+    auto allConfigs = JournalConnectionManager::GetInstance().GetAllConfigs();
+
+    // 过滤掉未验证的配置（mQueueKey == -1 表示未通过 validateQueueKey 验证）
+    std::map<std::string, JournalConfig> validatedConfigs;
+    for (const auto& [configName, config] : allConfigs) {
+        if (config.mQueueKey != -1) {
+            validatedConfigs[configName] = config;
+        } else {
+            LOG_DEBUG(sLogger, ("journal server filtering unvalidated config", "")("config", configName));
+        }
+    }
+
+    return validatedConfigs;
 }
 
 JournalServer::ConnectionPoolStats JournalServer::GetConnectionPoolStats() const {
@@ -165,7 +176,6 @@ void JournalServer::run() {
     LOG_INFO(sLogger, ("journal server event-driven thread", "started"));
 
 #ifdef __linux__
-    // 存储已监听的 reader 及其对应的配置信息
     std::map<int, MonitoredReader> monitoredReaders;
 
     // 创建全局 epoll 实例
@@ -187,8 +197,8 @@ void JournalServer::run() {
 
     while (mIsThreadRunning.load()) {
         try {
-            // 更新连接监听状态
-            refreshMonitors(mGlobalEpollFD, monitoredReaders);
+            // 同步监控列表：确保所有已打开的连接都被添加到 epoll 监控
+            syncMonitors(mGlobalEpollFD, monitoredReaders);
 
             int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
 
@@ -271,7 +281,7 @@ void JournalServer::run() {
 #endif
 }
 
-void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
+void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     auto allConfigs = GetAllJournalConfigs();
 
     for (const auto& [configName, config] : allConfigs) {
@@ -321,7 +331,7 @@ void JournalServer::refreshMonitors(int epollFD, std::map<int, MonitoredReader>&
     }
 }
 
-void logtail::JournalServer::processJournal(const std::string& configName, bool* hasPendingDataOut) {
+void JournalServer::processJournal(const std::string& configName, bool* hasPendingDataOut) {
     JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(configName);
 
     if (config.mQueueKey == -1) {
@@ -387,9 +397,7 @@ bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& mon
     return true;
 }
 
-bool logtail::JournalServer::validateQueueKey(const std::string& configName,
-                                              const JournalConfig& config,
-                                              QueueKey& queueKey) {
+bool JournalServer::validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey) {
     if (!config.mCtx) {
         LOG_ERROR(sLogger,
                   ("journal server CRITICAL: no context available for config",

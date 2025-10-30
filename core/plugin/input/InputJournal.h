@@ -49,7 +49,6 @@ public:
     bool SupportAck() const override { return true; }
 
 private:
-    // 原始 JSON 配置（用于在 Start() 时使用 JournalConfig::ParseFromJson() 解析）
     Json::Value mConfigJson;
 
     // Threading
