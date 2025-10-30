@@ -29,9 +29,9 @@
 #include <memory>
 #include <mutex>
 
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
-#include "common/FileSystemUtil.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
 #include "logger/Logger.h"
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -119,7 +119,8 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
             if (!CheckExistance(dirPath)) {
                 if (!Mkdirs(dirPath) && chmod(dirPath.c_str(), 0755) != 0) {
                     // try to create directory and change permission
-                    LOG_ERROR(sLogger,
+                    LOG_ERROR(
+                        sLogger,
                         ("GrpcInputManager", "failed to create unix domain socket directory")("directory", dirPath));
                     return false;
                 }

@@ -136,7 +136,6 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
     } // namespace logtail
     { // metric
         { // no tag
-            // TODO
             string res, errorMsg;
             APSARA_TEST_TRUE(
                 serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
@@ -148,7 +147,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_FALSE(logGroup.logs(0).has_time_ns());
             APSARA_TEST_EQUAL(logGroup.logs(0).contents_size(), 4);
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__labels__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "key1#$#value1");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
