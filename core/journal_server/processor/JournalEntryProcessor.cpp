@@ -209,27 +209,26 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     return logEvent;
 }
 
+// Helper function to transform a field value using a conversion map
+inline void TransformField(std::map<std::string, std::string>& fields,
+                           const char* fieldName,
+                           const std::map<std::string, std::string>& conversionMap) {
+    auto it = fields.find(fieldName);
+    if (it != fields.end()) {
+        auto convertedIt = conversionMap.find(it->second);
+        if (convertedIt != conversionMap.end()) {
+            it->second = convertedIt->second;
+        }
+    }
+}
+
 void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
     if (config.mParsePriority) {
-        // Find PRIORITY field
-        auto it = entry.fields.find("PRIORITY");
-        if (it != entry.fields.end()) {
-            auto priorityIt = JournalUtils::kPriorityConversionMap.find(it->second);
-            if (priorityIt != JournalUtils::kPriorityConversionMap.end()) {
-                it->second = priorityIt->second;
-            }
-        }
+        TransformField(entry.fields, "PRIORITY", JournalUtils::kPriorityConversionMap);
     }
 
     if (config.mParseSyslogFacility) {
-        // Find SYSLOG_FACILITY field
-        auto it = entry.fields.find("SYSLOG_FACILITY");
-        if (it != entry.fields.end()) {
-            auto facilityIt = JournalUtils::kSyslogFacilityString.find(it->second);
-            if (facilityIt != JournalUtils::kSyslogFacilityString.end()) {
-                it->second = facilityIt->second;
-            }
-        }
+        TransformField(entry.fields, "SYSLOG_FACILITY", JournalUtils::kSyslogFacilityString);
     }
 }
 
@@ -253,20 +252,16 @@ bool CreateAndPushEventGroup(const string& configName,
     JournalEntry mutableEntry = entry; // Make a mutable copy
     ApplyJournalFieldTransforms(mutableEntry, config);
 
-    // refer to EventHandler::PushLogToProcessor
-    int32_t pushRetry = 0;
     PipelineEventGroup eventGroup = CreateEventGroupFromJournalEntry(mutableEntry, config);
 
-    while (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroup))) {
-        ++pushRetry;
-        if (pushRetry % 10 == 0) {
-            LOG_WARNING(sLogger,
-                        ("journal processor push queue retrying", "queue may be full, retrying...")(
-                            "config", configName)("input idx", 0)("queue", queueKey)("retry_count", pushRetry));
-        }
-        // Note: PushQueue internally sleeps 10ms, no extra sleep needed here
-        // Recreate eventGroup (it was moved)
-        eventGroup = CreateEventGroupFromJournalEntry(mutableEntry, config);
+    // Use ProcessorRunner's built-in retry mechanism
+    constexpr uint32_t kMaxPushRetries = 100;
+
+    if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroup), kMaxPushRetries)) {
+        LOG_ERROR(sLogger,
+                  ("journal processor failed to push journal data to process queue", "discard data")(
+                      "config", configName)("input idx", 0)("queue", queueKey)("max_retries", kMaxPushRetries));
+        return false;
     }
     return true;
 }
