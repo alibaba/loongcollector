@@ -22,7 +22,9 @@
 #include <optional>
 #include <string>
 
+#include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/DNSCache.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "plugin/flusher/sls/StaticCredentialsProvider.h"
 
@@ -40,6 +42,25 @@ public:
     virtual void Stop() {};
 
     const std::string& GetUserAgent() const { return mUserAgent; }
+
+    void GetCurrentEndpoint(const std::string& project,
+                            const std::string& rawEndpoint,
+                            std::string& domain,
+                            std::string& ip,
+                            bool& realIpFlag) const {
+        domain = project + "." + rawEndpoint;
+        if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
+            static DnsCache* dnsCache = DnsCache::GetInstance();
+            std::string realIP;
+            if (dnsCache->GetIPFromDnsCache(rawEndpoint, ip)) {
+                realIpFlag = true;
+            } else {
+                realIpFlag = false;
+            }
+        } else {
+            realIpFlag = false;
+        }
+    }
 
     virtual bool GetAccessKey(const std::string& aliuid,
                               AuthType& type,
@@ -73,8 +94,9 @@ void PreparePostLogStoreLogsRequest(const std::string& accessKeyId,
                                     const std::string& accessKeySecret,
                                     const std::string& secToken,
                                     AuthType type,
-                                    const std::string& host,
-                                    bool isHostIp,
+                                    const std::string& domain,
+                                    const std::string& ip,
+                                    bool isRealIP,
                                     const std::string& project,
                                     const std::string& logstore,
                                     const std::string& compressType,
@@ -100,8 +122,9 @@ void PreparePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                        const std::string& accessKeySecret,
                                        const std::string& secToken,
                                        AuthType type,
-                                       const std::string& host,
-                                       bool isHostIp,
+                                       const std::string& domain,
+                                       const std::string& ip,
+                                       bool isRealIP,
                                        const std::string& project,
                                        const std::string& logstore,
                                        const std::string& compressType,
@@ -113,8 +136,9 @@ void PreparePostAPMBackendRequest(const std::string& accessKeyId,
                                   const std::string& accessKeySecret,
                                   const std::string& secToken,
                                   AuthType type,
-                                  const std::string& host,
-                                  bool isHostIp,
+                                  const std::string& domain,
+                                  const std::string& ip,
+                                  bool isRealIP,
                                   const std::string& project,
                                   const std::string& compressType,
                                   RawDataType dataType,
@@ -126,7 +150,9 @@ SLSResponse PostLogStoreLogs(const std::string& accessKeyId,
                              const std::string& accessKeySecret,
                              const std::string& secToken,
                              AuthType type,
-                             const std::string& host,
+                             const std::string& domain,
+                             const std::string& ip,
+                             bool isRealIP,
                              bool httpsFlag,
                              const std::string& project,
                              const std::string& logstore,
@@ -139,7 +165,9 @@ SLSResponse PostMetricStoreLogs(const std::string& accessKeyId,
                                 const std::string& accessKeySecret,
                                 const std::string& secToken,
                                 AuthType type,
-                                const std::string& host,
+                                const std::string& domain,
+                                const std::string& ip,
+                                bool isRealIP,
                                 bool httpsFlag,
                                 const std::string& project,
                                 const std::string& logstore,
@@ -150,7 +178,9 @@ SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
                                const std::string& accessKeySecret,
                                const std::string& secToken,
                                AuthType type,
-                               const std::string& host,
+                               const std::string& domain,
+                               const std::string& ip,
+                               bool isRealIP,
                                bool httpsFlag,
                                const std::string& project,
                                const std::string& compressType,
