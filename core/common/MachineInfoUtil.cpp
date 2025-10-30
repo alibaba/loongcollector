@@ -605,8 +605,9 @@ bool InstanceIdentity::UpdateInstanceIdentity(const ECSMeta& meta) {
         updateHostId(meta);
         mEntity.swap();
         std::string oldEcsMeta = mInstanceIdentityJson.toStyledString();
-        Json::Value newEcsMeta;
-        GetEcsMetaJson(newEcsMeta, meta);
+        Json::Value newEcsMetaJson;
+        GetEcsMetaJson(newEcsMetaJson, meta);
+        std::string newEcsMeta = newEcsMetaJson.toStyledString();
         LOG_INFO(sLogger, ("ecs mInstanceID changed, old mInstanceID", oldEcsMeta)("new mInstanceID", newEcsMeta));
         return true;
     }
