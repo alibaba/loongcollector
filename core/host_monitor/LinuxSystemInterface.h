@@ -17,6 +17,8 @@
 #pragma once
 
 #include "common/ProcParser.h"
+#include "host_monitor/Constants.h"
+#include "host_monitor/SystemInformationTools.h"
 #include "host_monitor/SystemInterface.h"
 
 namespace logtail {
@@ -32,7 +34,7 @@ public:
     }
 
 private:
-    explicit LinuxSystemInterface() : mProcParser("") {}
+    explicit LinuxSystemInterface() : mProcParser(""), mDcgmCollector(LIB_DCGM) {}
     ~LinuxSystemInterface() = default;
 
     bool GetSystemInformationOnce(SystemInformation& systemInfo) override;
@@ -52,6 +54,9 @@ private:
     bool GetDiskStateInformationOnce(DiskStateInformation& diskStateInfo) override;
     bool GetFileSystemInformationOnce(std::string dirName, FileSystemInformation& fileSystemInfo) override;
 
+    bool InitGPUCollectorOnce(const FieldMap& fieldMap) override;
+    bool GetGPUInformationOnce(GPUInformation& gpuInfo) override;
+
     uint64_t GetMemoryValue(char unit, uint64_t value);
     bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
     bool GetProcessStatmOnce(pid_t pid, ProcessMemoryInformation& processMemory) override;
@@ -67,5 +72,6 @@ private:
     bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name);
 
     ProcParser mProcParser;
+    DCGMCollector mDcgmCollector;
 };
 } // namespace logtail

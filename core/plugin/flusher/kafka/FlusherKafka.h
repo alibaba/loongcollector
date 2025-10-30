@@ -21,7 +21,6 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <vector>
 
 #include "collection_pipeline/plugin/interface/Flusher.h"
 #include "collection_pipeline/serializer/JsonSerializer.h"
@@ -76,6 +75,7 @@ private:
     CounterPtr mUnauthErrorCnt;
     CounterPtr mParamsErrorCnt;
     CounterPtr mOtherErrorCnt;
+
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FlusherKafkaUnittest;

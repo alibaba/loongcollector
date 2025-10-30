@@ -615,7 +615,7 @@ void ConfigUpdatorUnittest::TestCheckPointManager() {
     // case 2 : add filecheckpoint
     for (int i = 0; i < 4; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         checkpointManager->AddCheckPoint(checkPointPtr);
     }
     // timeout checkpoint
@@ -1842,7 +1842,7 @@ void ConfigUpdatorUnittest::TestCheckPointSaveInterval() {
 
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
 
@@ -1929,7 +1929,7 @@ void ConfigUpdatorUnittest::TestCheckPointUserDefinedFilePath() {
     }
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
 
@@ -2015,7 +2015,7 @@ void ConfigUpdatorUnittest::TestCheckPointLoadDefaultFile() {
     }
     for (int i = 0; i < 3; ++i) {
         CheckPoint* checkPointPtr = new CheckPoint(
-            filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
+            filenames[i], filenames[i], offsets[i], sigSizes[i], sigHashs[i], DevInode(devs[i], inodes[i]), configs[i]);
         CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
     }
     bfs::remove(STRING_FLAG(check_point_filename));

@@ -24,6 +24,7 @@
 #include "common/StringTools.h"
 #include "logger/Logger.h"
 #include "plugin/flusher/kafka/KafkaConfig.h"
+#include "plugin/flusher/kafka/KafkaConstant.h"
 #include "plugin/flusher/kafka/KafkaUtil.h"
 
 namespace logtail {
@@ -72,11 +73,12 @@ KafkaProducer::ErrorType KafkaProducer::MapKafkaError(rd_kafka_resp_err_t err) {
 
 class KafkaProducer::Impl {
 public:
-    Impl() : mProducer(nullptr), mConf(nullptr), mIsRunning(false), mIsClosed(false) {}
+    Impl() : mProducer(nullptr), mConf(nullptr), mHeadersTemplate(nullptr), mIsRunning(false), mIsClosed(false) {}
     ~Impl() {
         if (!mIsClosed) {
             Close();
         }
+        ResetHeadersTemplate();
         for (auto& ctx : mContextPool) {
             delete ctx;
         }
@@ -111,106 +113,51 @@ public:
             return false;
         }
 
-        std::string brokersStr = KafkaUtil::BrokersToString(mConfig.Brokers);
-        if (brokersStr.empty()) {
+        if (!InitBasicConfig()) {
             return false;
         }
 
-        if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
-            return false;
-        }
-        LOG_INFO(sLogger, ("Kafka bootstrap.servers", brokersStr));
-
-        if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.BulkMaxSize))
-            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.BulkFlushFrequency))
-            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES, std::to_string(mConfig.QueueBufferingMaxKbytes))
-            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES, std::to_string(mConfig.QueueBufferingMaxMessages))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.MaxMessageBytes))) {
+        if (!InitDeliveryConfig()) {
             return false;
         }
 
-        std::string acksStr;
-        if (mConfig.RequiredAcks < 0) {
-            acksStr = "all";
-        } else {
-            acksStr = std::to_string(mConfig.RequiredAcks);
-        }
-        if (!SetConfig(KAFKA_CONFIG_ACKS, acksStr)
-            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Timeout))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.MessageTimeoutMs))
-            || !SetConfig(KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES, std::to_string(mConfig.MaxRetries))
-            || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.RetryBackoffMs))) {
+        if (!InitVersionConfig()) {
             return false;
         }
-        LOG_INFO(sLogger,
-                 ("Kafka delivery configs", "")("acks", acksStr)("request.timeout.ms", mConfig.Timeout)(
-                     "message.timeout.ms", mConfig.MessageTimeoutMs)("message.send.max.retries", mConfig.MaxRetries)(
-                     "retry.backoff.ms", mConfig.RetryBackoffMs));
 
-        std::map<std::string, std::string> derivedConfigs;
-        KafkaUtil::DeriveApiVersionConfigs(mConfig.Version, derivedConfigs);
-        if (!derivedConfigs.empty()) {
-            LOG_INFO(sLogger,
-                     ("Apply Version derived configs",
-                      "")(KAFKA_CONFIG_API_VERSION_REQUEST,
-                          derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
-                              ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]
-                              : "<unset>")(KAFKA_CONFIG_BROKER_VERSION_FALLBACK,
-                                           derivedConfigs.count(KAFKA_CONFIG_BROKER_VERSION_FALLBACK)
-                                               ? derivedConfigs[KAFKA_CONFIG_BROKER_VERSION_FALLBACK]
-                                               : "<unset>")(KAFKA_CONFIG_API_VERSION_FALLBACK_MS,
-                                                            derivedConfigs.count(KAFKA_CONFIG_API_VERSION_FALLBACK_MS)
-                                                                ? derivedConfigs[KAFKA_CONFIG_API_VERSION_FALLBACK_MS]
-                                                                : "<unset>"));
-            for (const auto& kv : derivedConfigs) {
-                if (!SetConfig(kv.first, kv.second)) {
-                    return false;
-                }
-            }
-        }
-
-        if (!mConfig.Partitioner.empty()) {
-            rd_kafka_topic_conf_t* tconf = rd_kafka_topic_conf_new();
-            if (!tconf) {
-                return false;
-            }
-            char errstr2[512];
-            if (rd_kafka_topic_conf_set(
-                    tconf, KAFKA_CONFIG_PARTITIONER.c_str(), mConfig.Partitioner.c_str(), errstr2, sizeof(errstr2))
-                != RD_KAFKA_CONF_OK) {
-                LOG_ERROR(sLogger,
-                          ("Failed to set Kafka topic config",
-                           KAFKA_CONFIG_PARTITIONER)("value", mConfig.Partitioner)("error", errstr2));
-                rd_kafka_topic_conf_destroy(tconf);
-                return false;
-            }
-            rd_kafka_conf_set_default_topic_conf(mConf, tconf);
-        }
-
-        for (const auto& kv : mConfig.CustomConfig) {
-            if (!SetConfig(kv.first, kv.second)) {
-                return false;
-            }
-        }
-
-        rd_kafka_conf_set_dr_msg_cb(mConf, KafkaProducer::DeliveryReportCallback);
-        rd_kafka_conf_set_opaque(mConf, this);
-
-        char errstr[512];
-        mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
-        if (!mProducer) {
-            LOG_ERROR(sLogger, ("create rdkafka producer failed", errstr));
+        if (!InitPartitionerConfig()) {
             return false;
         }
-        mConf = nullptr;
 
-        mIsRunning = true;
-        mPollThread = std::thread([this]() {
-            while (mIsRunning.load(std::memory_order_relaxed)) {
-                rd_kafka_poll(mProducer, KAFKA_POLL_INTERVAL_MS);
-            }
-        });
+        if (!InitSecurityProtocol()) {
+            return false;
+        }
 
+        if (!InitTlsConfig()) {
+            return false;
+        }
+
+        if (!InitKerberosConfig()) {
+            return false;
+        }
+
+        if (!InitSaslConfig()) {
+            return false;
+        }
+
+        if (!InitCompressionConfig()) {
+            return false;
+        }
+
+        if (!InitCustomConfig()) {
+            return false;
+        }
+
+        if (!InitProducer()) {
+            return false;
+        }
+
+        SetupHeadersTemplate();
         return true;
     }
 
@@ -218,12 +165,23 @@ public:
                       std::string&& value,
                       KafkaProducer::Callback callback,
                       const std::string& key) {
+        rd_kafka_headers_t* headers = nullptr;
+        if (mHeadersTemplate) {
+            headers = rd_kafka_headers_copy(mHeadersTemplate);
+            if (!headers) {
+                LOG_ERROR(sLogger, ("failed to copy kafka headers template", ""));
+            }
+        }
+
         rd_kafka_t* producer = nullptr;
         {
             std::lock_guard<std::mutex> lock(mProducerMutex);
             producer = mProducer;
         }
         if (!producer) {
+            if (headers) {
+                rd_kafka_headers_destroy(headers);
+            }
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::ErrorType::OTHER_ERROR;
             errorInfo.message = "producer not initialized";
@@ -236,7 +194,26 @@ public:
         context->callback = std::move(callback);
 
         rd_kafka_resp_err_t err;
-        if (!key.empty()) {
+        if (headers && !key.empty()) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_KEY(key.data(), key.size()),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_HEADERS(headers),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        } else if (headers) {
+            err = rd_kafka_producev(producer,
+                                    RD_KAFKA_V_TOPIC(topic.c_str()),
+                                    RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
+                                    RD_KAFKA_V_MSGFLAGS(RD_KAFKA_MSG_F_COPY),
+                                    RD_KAFKA_V_VALUE(value.data(), value.size()),
+                                    RD_KAFKA_V_HEADERS(headers),
+                                    RD_KAFKA_V_OPAQUE(context),
+                                    RD_KAFKA_V_END);
+        } else if (!key.empty()) {
             err = rd_kafka_producev(producer,
                                     RD_KAFKA_V_TOPIC(topic.c_str()),
                                     RD_KAFKA_V_PARTITION(RD_KAFKA_PARTITION_UA),
@@ -259,12 +236,17 @@ public:
             LOG_ERROR(sLogger,
                       ("rd_kafka_producev error", rd_kafka_err2str(err))("code", static_cast<int>(err))("topic", topic)(
                           "value_size", value.size()));
-            ReleaseContext(context);
+            if (headers) {
+                rd_kafka_headers_destroy(headers);
+            }
             KafkaProducer::ErrorInfo errorInfo;
             errorInfo.type = KafkaProducer::MapKafkaError(err);
             errorInfo.message = rd_kafka_err2str(err);
             errorInfo.code = static_cast<int>(err);
-            callback(false, errorInfo);
+            if (context->callback) {
+                context->callback(false, errorInfo);
+            }
+            ReleaseContext(context);
         }
     }
 
@@ -299,6 +281,8 @@ public:
             mConf = nullptr;
         }
 
+        ResetHeadersTemplate();
+
         mIsClosed = true;
     }
 
@@ -312,9 +296,334 @@ private:
         return true;
     }
 
+    bool InitBasicConfig() {
+        std::string brokersStr = KafkaUtil::BrokersToString(mConfig.Brokers);
+        if (brokersStr.empty()) {
+            return false;
+        }
+        if (!SetConfig(KAFKA_CONFIG_BOOTSTRAP_SERVERS, brokersStr)) {
+            return false;
+        }
+        LOG_INFO(sLogger, ("Kafka bootstrap.servers", brokersStr));
+
+        if (!SetConfig(KAFKA_CONFIG_BATCH_NUM_MESSAGES, std::to_string(mConfig.BulkMaxSize))
+            || !SetConfig(KAFKA_CONFIG_LINGER_MS, std::to_string(mConfig.BulkFlushFrequency))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_KBYTES, std::to_string(mConfig.QueueBufferingMaxKbytes))
+            || !SetConfig(KAFKA_CONFIG_QUEUE_BUFFERING_MAX_MESSAGES, std::to_string(mConfig.QueueBufferingMaxMessages))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_MAX_BYTES, std::to_string(mConfig.MaxMessageBytes))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool InitDeliveryConfig() {
+        std::string acksStr = (mConfig.RequiredAcks < 0) ? "all" : std::to_string(mConfig.RequiredAcks);
+        if (!SetConfig(KAFKA_CONFIG_ACKS, acksStr)
+            || !SetConfig(KAFKA_CONFIG_REQUEST_TIMEOUT_MS, std::to_string(mConfig.Timeout))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_TIMEOUT_MS, std::to_string(mConfig.MessageTimeoutMs))
+            || !SetConfig(KAFKA_CONFIG_MESSAGE_SEND_MAX_RETRIES, std::to_string(mConfig.MaxRetries))
+            || !SetConfig(KAFKA_CONFIG_RETRY_BACKOFF_MS, std::to_string(mConfig.RetryBackoffMs))) {
+            return false;
+        }
+        LOG_INFO(sLogger,
+                 ("Kafka delivery configs", "")("acks", acksStr)("request.timeout.ms", mConfig.Timeout)(
+                     "message.timeout.ms", mConfig.MessageTimeoutMs)("message.send.max.retries", mConfig.MaxRetries)(
+                     "retry.backoff.ms", mConfig.RetryBackoffMs));
+
+        return true;
+    }
+
+    bool InitVersionConfig() {
+        std::map<std::string, std::string> derivedConfigs;
+        KafkaUtil::DeriveApiVersionConfigs(mConfig.Version, derivedConfigs);
+        if (!derivedConfigs.empty()) {
+            LOG_INFO(sLogger,
+                     ("Apply Version derived configs",
+                      "")(KAFKA_CONFIG_API_VERSION_REQUEST,
+                          derivedConfigs.count(KAFKA_CONFIG_API_VERSION_REQUEST)
+                              ? derivedConfigs[KAFKA_CONFIG_API_VERSION_REQUEST]
+                              : "<unset>")(KAFKA_CONFIG_BROKER_VERSION_FALLBACK,
+                                           derivedConfigs.count(KAFKA_CONFIG_BROKER_VERSION_FALLBACK)
+                                               ? derivedConfigs[KAFKA_CONFIG_BROKER_VERSION_FALLBACK]
+                                               : "<unset>")(KAFKA_CONFIG_API_VERSION_FALLBACK_MS,
+                                                            derivedConfigs.count(KAFKA_CONFIG_API_VERSION_FALLBACK_MS)
+                                                                ? derivedConfigs[KAFKA_CONFIG_API_VERSION_FALLBACK_MS]
+                                                                : "<unset>"));
+            for (const auto& kv : derivedConfigs) {
+                if (!SetConfig(kv.first, kv.second)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    bool InitPartitionerConfig() {
+        if (mConfig.Partitioner.empty()) {
+            return true;
+        }
+
+        rd_kafka_topic_conf_t* tconf = rd_kafka_topic_conf_new();
+        if (!tconf) {
+            return false;
+        }
+        char errstr2[512];
+        if (rd_kafka_topic_conf_set(
+                tconf, KAFKA_CONFIG_PARTITIONER.c_str(), mConfig.Partitioner.c_str(), errstr2, sizeof(errstr2))
+            != RD_KAFKA_CONF_OK) {
+            LOG_ERROR(sLogger,
+                      ("Failed to set Kafka topic config",
+                       KAFKA_CONFIG_PARTITIONER)("value", mConfig.Partitioner)("error", errstr2));
+            rd_kafka_topic_conf_destroy(tconf);
+            return false;
+        }
+
+        // The topic config object is not usable after this call
+        // as it is owned by the rd_kafka_t instance. tconf should be treated as null afterward.
+        rd_kafka_conf_set_default_topic_conf(mConf, tconf);
+
+        return true;
+    }
+
+    bool InitSecurityProtocol() {
+        const bool enableTLS = mConfig.Authentication.TlsEnabled;
+        const bool enableKerberos = mConfig.Authentication.KerberosEnabled;
+        const bool enableSASL = !mConfig.Authentication.SaslMechanism.empty();
+
+        std::string securityProtocol;
+        if (enableKerberos || enableSASL) {
+            securityProtocol = enableTLS ? "sasl_ssl" : "sasl_plaintext";
+        } else if (enableTLS) {
+            securityProtocol = "ssl";
+        }
+
+        if (!securityProtocol.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SECURITY_PROTOCOL, securityProtocol)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool InitTlsConfig() {
+        if (!mConfig.Authentication.TlsEnabled) {
+            return true;
+        }
+
+        if (!mConfig.Authentication.TlsCaFile.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SSL_CA_LOCATION, mConfig.Authentication.TlsCaFile)) {
+                return false;
+            }
+        }
+
+        const bool hasCert = !mConfig.Authentication.TlsCertFile.empty();
+        const bool hasKey = !mConfig.Authentication.TlsKeyFile.empty();
+        if (hasCert != hasKey) {
+            LOG_ERROR(sLogger,
+                      ("Kafka TLS client auth config error",
+                       "both TLS.CertFile and TLS.KeyFile must be set together, or both unset"));
+            return false;
+        }
+
+        if (hasCert) {
+            if (!SetConfig(KAFKA_CONFIG_SSL_CERTIFICATE_LOCATION, mConfig.Authentication.TlsCertFile)) {
+                return false;
+            }
+            if (!SetConfig(KAFKA_CONFIG_SSL_KEY_LOCATION, mConfig.Authentication.TlsKeyFile)) {
+                return false;
+            }
+            if (!mConfig.Authentication.TlsKeyPassword.empty()) {
+                if (!SetConfig(KAFKA_CONFIG_SSL_KEY_PASSWORD, mConfig.Authentication.TlsKeyPassword)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    bool InitKerberosConfig() {
+        if (!mConfig.Authentication.KerberosEnabled) {
+            return true;
+        }
+
+        const std::string mechanism = mConfig.Authentication.KerberosMechanisms.empty()
+            ? std::string("GSSAPI")
+            : mConfig.Authentication.KerberosMechanisms;
+        if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mechanism)) {
+            return false;
+        }
+
+        if (!mConfig.Authentication.KerberosServiceName.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME, mConfig.Authentication.KerberosServiceName)) {
+                return false;
+            }
+        }
+
+        if (!mConfig.Authentication.KerberosKinitCmd.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD, mConfig.Authentication.KerberosKinitCmd)) {
+                return false;
+            }
+        }
+
+        if (!mConfig.Authentication.KerberosPrincipal.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL, mConfig.Authentication.KerberosPrincipal)) {
+                return false;
+            }
+        }
+
+        if (!mConfig.Authentication.KerberosKeytab.empty()) {
+            if (!SetConfig(KAFKA_CONFIG_SASL_KERBEROS_KEYTAB, mConfig.Authentication.KerberosKeytab)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool InitSaslConfig() {
+        if (mConfig.Authentication.KerberosEnabled) {
+            return true;
+        }
+
+        if (mConfig.Authentication.SaslMechanism.empty()) {
+            return true;
+        }
+
+        if (!SetConfig(KAFKA_CONFIG_SASL_MECHANISMS, mConfig.Authentication.SaslMechanism)) {
+            return false;
+        }
+
+        if (!SetConfig(KAFKA_CONFIG_SASL_USERNAME, mConfig.Authentication.SaslUsername)) {
+            return false;
+        }
+
+        if (!SetConfig(KAFKA_CONFIG_SASL_PASSWORD, mConfig.Authentication.SaslPassword)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    bool InitCompressionConfig() {
+        if (mConfig.Compression.empty() && mConfig.CompressionLevel == -1) {
+            return true;
+        }
+
+        rd_kafka_topic_conf_t* tconf = rd_kafka_topic_conf_new();
+        if (!tconf) {
+            return false;
+        }
+        char errstr[512];
+
+        if (!mConfig.Compression.empty()) {
+            if (rd_kafka_topic_conf_set(
+                    tconf, KAFKA_CONFIG_COMPRESSION_CODEC.c_str(), mConfig.Compression.c_str(), errstr, sizeof(errstr))
+                != RD_KAFKA_CONF_OK) {
+                LOG_ERROR(sLogger,
+                          ("Failed to set Kafka topic config",
+                           KAFKA_CONFIG_COMPRESSION_CODEC)("value", mConfig.Compression)("error", errstr));
+                rd_kafka_topic_conf_destroy(tconf);
+                return false;
+            }
+        }
+
+        if (mConfig.CompressionLevel != -1) {
+            if (rd_kafka_topic_conf_set(tconf,
+                                        KAFKA_CONFIG_COMPRESSION_LEVEL.c_str(),
+                                        std::to_string(mConfig.CompressionLevel).c_str(),
+                                        errstr,
+                                        sizeof(errstr))
+                != RD_KAFKA_CONF_OK) {
+                LOG_ERROR(sLogger,
+                          ("Failed to set Kafka topic config",
+                           KAFKA_CONFIG_COMPRESSION_LEVEL)("value", mConfig.CompressionLevel)("error", errstr));
+                rd_kafka_topic_conf_destroy(tconf);
+                return false;
+            }
+        }
+
+        // The topic config object is not usable after this call
+        // as it is owned by the rd_kafka_t instance. tconf should be treated as null afterward.
+        rd_kafka_conf_set_default_topic_conf(mConf, tconf);
+
+        return true;
+    }
+
+
+    bool InitCustomConfig() {
+        for (const auto& kv : mConfig.CustomConfig) {
+            if (!SetConfig(kv.first, kv.second)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool InitProducer() {
+        rd_kafka_conf_set_dr_msg_cb(mConf, KafkaProducer::DeliveryReportCallback);
+        rd_kafka_conf_set_opaque(mConf, this);
+
+        char errstr[512];
+        mProducer = rd_kafka_new(RD_KAFKA_PRODUCER, mConf, errstr, sizeof(errstr));
+        if (!mProducer) {
+            LOG_ERROR(sLogger, ("create rdkafka producer failed", errstr));
+            return false;
+        }
+        mConf = nullptr;
+
+        mIsRunning = true;
+        mPollThread = std::thread([this]() {
+            while (mIsRunning.load(std::memory_order_relaxed)) {
+                rd_kafka_poll(mProducer, KAFKA_POLL_INTERVAL_MS);
+            }
+        });
+
+        return true;
+    }
+
+    void SetupHeadersTemplate() {
+        ResetHeadersTemplate();
+        if (mConfig.Headers.empty()) {
+            return;
+        }
+
+        rd_kafka_headers_t* hdrs = rd_kafka_headers_new(static_cast<int>(mConfig.Headers.size()));
+        if (!hdrs) {
+            LOG_ERROR(sLogger, ("error", "Failed to allocate Kafka headers template"));
+            return;
+        }
+        for (const auto& kv : mConfig.Headers) {
+            rd_kafka_resp_err_t err = rd_kafka_header_add(hdrs,
+                                                          kv.first.c_str(),
+                                                          static_cast<int>(kv.first.size()),
+                                                          kv.second.data(),
+                                                          static_cast<int>(kv.second.size()));
+            if (err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+                LOG_ERROR(sLogger,
+                          ("Failed to add Kafka header", rd_kafka_err2str(err))("header_key", kv.first)("header_value",
+                                                                                                        kv.second));
+                rd_kafka_headers_destroy(hdrs);
+                return;
+            }
+        }
+        mHeadersTemplate = hdrs;
+    }
+
+    void ResetHeadersTemplate() {
+        if (mHeadersTemplate) {
+            rd_kafka_headers_destroy(mHeadersTemplate);
+            mHeadersTemplate = nullptr;
+        }
+    }
+
     KafkaConfig mConfig;
     rd_kafka_t* mProducer;
     rd_kafka_conf_t* mConf;
+    rd_kafka_headers_t* mHeadersTemplate;
     std::atomic<bool> mIsRunning;
     std::thread mPollThread;
     std::mutex mProducerMutex;

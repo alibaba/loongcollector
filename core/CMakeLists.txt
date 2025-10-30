@@ -139,8 +139,10 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/processor/processor.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/processor/links.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/flusher.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/flusher/links.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/task/task.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/plugin/task/links.cmake)
 
-# Subdirectories (modules). except for common, input, processor, flusher, observer, helper, spl, and provider.
+# Subdirectories (modules). except for common, input, processor, flusher, task, observer, helper, spl, and provider.
 set(SUB_DIRECTORIES_LIST
         application app_config constants container_manager metadata logger go_pipeline models
         config config/watcher
@@ -154,7 +156,7 @@ set(SUB_DIRECTORIES_LIST
         )
 if (LINUX)
     if (ENABLE_ENTERPRISE)
-        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk)
+        set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk apm/forward)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
@@ -260,6 +262,7 @@ endif()
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     input_link(${LOGTAIL_TARGET})
+    task_link(${LOGTAIL_TARGET})
     processor_link(${LOGTAIL_TARGET} ${WITHSPL})
     flusher_link(${LOGTAIL_TARGET})
     all_link(${LOGTAIL_TARGET})

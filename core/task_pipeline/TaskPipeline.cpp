@@ -29,8 +29,12 @@ bool TaskPipeline::Init(TaskConfig&& config) {
     mCreateTime = config.mCreateTime;
     mConfig = std::move(config.mDetail);
 
+    mContext.SetConfigName(mName);
+    mContext.SetCreateTime(mCreateTime);
+
     const auto& detail = (*mConfig)["task"];
     mPlugin = TaskRegistry::GetInstance()->CreateTask(detail["Type"].asString());
+    mPlugin->SetContext(mContext);
     if (!mPlugin->Init(detail)) {
         return false;
     }

@@ -43,6 +43,7 @@ public:
     virtual ~KafkaProducer();
 
     virtual bool Init(const KafkaConfig& config);
+
     virtual void ProduceAsync(const std::string& topic,
                               std::string&& value,
                               Callback callback,

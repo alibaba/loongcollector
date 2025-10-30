@@ -650,6 +650,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
             auto& cptPair = exactlyOnceCpts[idx];
             auto& cpt = cptPair.second;
             auto v1Cpt = make_shared<CheckPoint>(cpt.log_path(),
+                                                 cpt.log_path(),
                                                  0,
                                                  cpt.sig_size(),
                                                  cpt.sig_hash(),

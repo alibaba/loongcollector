@@ -17,6 +17,7 @@
 #include <cstring>
 
 #include "AppConfig.h"
+#include "EcsMetaData.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
 #include "common/FileSystemUtil.h"
@@ -505,6 +506,9 @@ void InstanceIdentity::DumpInstanceIdentity() {
         mInstanceIdentityJson[sInstanceIdKey] = mEntity.getReadBuffer().GetEcsInstanceID().to_string();
         mInstanceIdentityJson[sOwnerAccountIdKey] = mEntity.getReadBuffer().GetEcsUserID().to_string();
         mInstanceIdentityJson[sRegionIdKey] = mEntity.getReadBuffer().GetEcsRegionID().to_string();
+        mInstanceIdentityJson[sZoneIdKey] = mEntity.getReadBuffer().GetEcsZoneID().to_string();
+        mInstanceIdentityJson[sVpcIdKey] = mEntity.getReadBuffer().GetEcsVpcID().to_string();
+        mInstanceIdentityJson[sVswitchIdKey] = mEntity.getReadBuffer().GetEcsVswitchID().to_string();
         dumpInstanceIdentityToFile();
     } else if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::LOCAL && mHasGeneratedLocalHostId) {
         mInstanceIdentityJson.clear();

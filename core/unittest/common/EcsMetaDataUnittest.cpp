@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "common/EcsMetaData.h"
 #include "common/JsonUtil.h"
-#include "common/MachineInfoUtil.h"
 #include "unittest/Unittest.h"
 
 using namespace logtail;
@@ -60,6 +60,31 @@ TEST_F(EcsMetaDataUnittest, TestParseEcsMeta) {
         ECSMeta ecsMeta;
         metaString = "{}";
         APSARA_TEST_FALSE(ParseECSMeta(metaString, ecsMeta));
+    }
+
+    // Test case for local loading with vpc-id and other fields
+    {
+        ECSMeta ecsMeta;
+        metaString = R"({
+            "instance-id": "i-1234567890abcdef0",
+            "owner-account-id": "123456789012345678",
+            "region-id": "cn-hangzhou",
+            "zone-id": "cn-hangzhou-h",
+            "vpc-id": "vpc-12345678",
+            "vswitch-id": "vsw-12345678"
+        })";
+        APSARA_TEST_TRUE(ParseECSMeta(metaString, ecsMeta));
+
+        // Verify all fields are parsed correctly
+        APSARA_TEST_EQUAL(ecsMeta.GetInstanceID().to_string(), "i-1234567890abcdef0");
+        APSARA_TEST_EQUAL(ecsMeta.GetUserID().to_string(), "123456789012345678");
+        APSARA_TEST_EQUAL(ecsMeta.GetRegionID().to_string(), "cn-hangzhou");
+        APSARA_TEST_EQUAL(ecsMeta.GetZoneID().to_string(), "cn-hangzhou-h");
+        APSARA_TEST_EQUAL(ecsMeta.GetVpcID().to_string(), "vpc-12345678");
+        APSARA_TEST_EQUAL(ecsMeta.GetVswitchID().to_string(), "vsw-12345678");
+
+        // Verify IsValid() returns true when all required fields are present
+        APSARA_TEST_TRUE(ecsMeta.IsValid());
     }
 }
 

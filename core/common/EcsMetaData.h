@@ -31,11 +31,14 @@ extern const std::string sAccessKeySecret;
 extern const std::string sSecurityToken;
 extern const std::string sExpiration;
 extern const char* sEcsRamTimeFormat;
+extern const std::string sZoneIdKey;
+extern const std::string sVpcIdKey;
+extern const std::string sVswitchIdKey;
 
 namespace logtail {
 static const size_t ID_MAX_LENGTH = 128;
 
-enum class EcsMetaDataType { META, RAM_CREDENTIALS };
+enum class EcsMetaDataType { META_DOC, RAM_CREDENTIALS, META_VPC, META_VSWITCH };
 
 template <size_t N>
 inline void SetID(const std::string& id, std::array<char, N>& target, size_t& targetLen) {
@@ -63,12 +66,26 @@ struct ECSMeta {
 
     void SetRegionID(const std::string& id) { SetID(id, mRegionID, mRegionIDLen); }
 
+    void SetZoneID(const std::string& id) { SetID(id, mZoneID, mZoneIDLen); }
+
+    void SetVpcID(const std::string& id) { SetID(id, mVpcID, mVpcIDLen); }
+
+    void SetVswitchID(const std::string& id) { SetID(id, mVswitchID, mVswitchIDLen); }
+
     [[nodiscard]] StringView GetInstanceID() const { return StringView(mInstanceID.data(), mInstanceIDLen); }
     [[nodiscard]] StringView GetUserID() const { return StringView(mUserID.data(), mUserIDLen); }
     [[nodiscard]] StringView GetRegionID() const { return StringView(mRegionID.data(), mRegionIDLen); }
+    [[nodiscard]] StringView GetZoneID() const { return StringView(mZoneID.data(), mZoneIDLen); }
+    [[nodiscard]] StringView GetVpcID() const { return StringView(mVpcID.data(), mVpcIDLen); }
+    [[nodiscard]] StringView GetVswitchID() const { return StringView(mVswitchID.data(), mVswitchIDLen); }
 
     [[nodiscard]] bool IsValid() const {
         return !GetInstanceID().empty() && !GetUserID().empty() && !GetRegionID().empty();
+    }
+
+    [[nodiscard]] bool IsAllValid() const {
+        return !GetInstanceID().empty() && !GetUserID().empty() && !GetRegionID().empty() && !GetZoneID().empty()
+            && !GetVpcID().empty() && !GetVswitchID().empty();
     }
 
 private:
@@ -80,6 +97,15 @@ private:
 
     std::array<char, ID_MAX_LENGTH> mRegionID{};
     size_t mRegionIDLen = (size_t)0;
+
+    std::array<char, ID_MAX_LENGTH> mZoneID{};
+    size_t mZoneIDLen = (size_t)0;
+
+    std::array<char, ID_MAX_LENGTH> mVpcID{};
+    size_t mVpcIDLen = (size_t)0;
+
+    std::array<char, ID_MAX_LENGTH> mVswitchID{};
+    size_t mVswitchIDLen = (size_t)0;
 
     friend class InstanceIdentityUnittest;
 };
@@ -93,6 +119,10 @@ bool ParseCredentials(const Json::Value& doc,
                       std::string& accessKeySecret,
                       std::string& secToken,
                       int64_t& expTime);
+
+bool FetchToken(std::string& token, std::string& errorMsg);
+
+bool FetchEcsMetaData(EcsMetaDataType type, const std::string& token, std::string& result, std::string& errorMsg);
 
 bool FetchECSMeta(ECSMeta& metaObj);
 

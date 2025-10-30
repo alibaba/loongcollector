@@ -33,6 +33,7 @@
 using namespace std;
 
 namespace logtail {
+
 class KafkaProducerUnittest : public ::testing::Test {
 public:
     void TestInitSuccess();
@@ -53,6 +54,14 @@ public:
     void TestDeliveryReportCallback();
     void TestInitWithInvalidPartitioner_Real();
     void TestProduceAsyncWithoutInit_Real();
+    void TestInitWithTLSMinimal_Real();
+    void TestInitWithTLSFull_Real();
+    void TestCreateHeadersTemplate();
+    void TestProduceAsyncWithHeadersAndKeys();
+    void TestProduceAsyncWithHeadersAndNoKeys();
+    void TestProduceAsyncWithKeyAndNoHeaders();
+    void TestCompressionConfig();
+    void TestCompressionConfigWithLevel();
 
 protected:
     void SetUp();
@@ -290,6 +299,150 @@ void KafkaProducerUnittest::TestProduceAsyncWithoutInit_Real() {
     APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
 }
 
+void KafkaProducerUnittest::TestInitWithTLSMinimal_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Authentication.TlsEnabled = true;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestInitWithTLSFull_Real() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Authentication.TlsEnabled = true;
+    c.Authentication.TlsCaFile = "/tmp/does-not-need-to-exist.ca";
+    c.Authentication.TlsCertFile = "/tmp/does-not-need-to-exist.crt";
+    c.Authentication.TlsKeyFile = "/tmp/does-not-need-to-exist.key";
+    c.Authentication.TlsKeyPassword = "secret";
+
+    KafkaProducer p;
+    APSARA_TEST_FALSE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestCreateHeadersTemplate() {
+    KafkaProducer p;
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1000;
+    c.Headers = {{"key1", "value1"}, {"key2", "value2"}};
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        std::string(1024, 'x'),
+        [&](bool success, const KafkaProducer::ErrorInfo& info) {
+            called.store(true, std::memory_order_relaxed);
+            APSARA_TEST_FALSE(success);
+            APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
+        },
+        std::string());
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndKeys() {
+    KafkaProducer p;
+    std::vector<std::pair<std::string, std::string>> headers = {{"header1", "value1"}, {"header2", "value2"}};
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1000;
+    c.Headers = headers;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        std::string(1024, 'x'),
+        [&](bool success, const KafkaProducer::ErrorInfo& info) {
+            called.store(true, std::memory_order_relaxed);
+            APSARA_TEST_FALSE(success);
+            APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
+        },
+        "hash-key");
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithHeadersAndNoKeys() {
+    KafkaProducer p;
+    std::vector<std::pair<std::string, std::string>> headers = {{"header1", "value1"}, {"header2", "value2"}};
+
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1000;
+    c.Headers = headers;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        std::string(1024, 'x'),
+        [&](bool success, const KafkaProducer::ErrorInfo& info) {
+            called.store(true, std::memory_order_relaxed);
+            APSARA_TEST_FALSE(success);
+            APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
+        },
+        std::string());
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+}
+
+void KafkaProducerUnittest::TestProduceAsyncWithKeyAndNoHeaders() {
+    KafkaProducer p;
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.MaxMessageBytes = 1000;
+    APSARA_TEST_TRUE(p.Init(c));
+
+    std::atomic<bool> called{false};
+    p.ProduceAsync(
+        "topic_x",
+        std::string(1024, 'x'),
+        [&](bool success, const KafkaProducer::ErrorInfo& info) {
+            called.store(true, std::memory_order_relaxed);
+            APSARA_TEST_FALSE(success);
+            APSARA_TEST_EQUAL((int)KafkaProducer::ErrorType::PARAMS_ERROR, (int)info.type);
+        },
+        "hash-key");
+    APSARA_TEST_TRUE(called.load(std::memory_order_relaxed));
+}
+
+void KafkaProducerUnittest::TestCompressionConfig() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Compression = "gzip";
+    c.CompressionLevel = -1;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
+void KafkaProducerUnittest::TestCompressionConfigWithLevel() {
+    KafkaConfig c;
+    c.Brokers = {"127.0.0.1:9092"};
+    c.Topic = "ut_topic";
+    c.Version = "2.6.0";
+    c.Compression = "lz4";
+    c.CompressionLevel = 2;
+
+    KafkaProducer p;
+    APSARA_TEST_TRUE(p.Init(c));
+}
+
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitSuccess)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitFailure)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncSuccess)
@@ -308,6 +461,14 @@ UNIT_TEST_CASE(KafkaProducerUnittest, TestErrorTypeMapping)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestDeliveryReportCallback)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithInvalidPartitioner_Real)
 UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithoutInit_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSMinimal_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestInitWithTLSFull_Real)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCreateHeadersTemplate)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersAndKeys)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithHeadersAndNoKeys)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestProduceAsyncWithKeyAndNoHeaders)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCompressionConfig)
+UNIT_TEST_CASE(KafkaProducerUnittest, TestCompressionConfigWithLevel)
 
 } // namespace logtail
 

@@ -16,10 +16,13 @@
 
 #include "forward/GrpcInputManager.h"
 
+#include <cerrno>
+#include <cstring>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
+#include <sys/stat.h>
 
 #include <atomic>
 #include <chrono>
@@ -27,6 +30,7 @@
 #include <mutex>
 
 #include "common/Flags.h"
+#include "common/StringTools.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
 #include "logger/Logger.h"
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -121,6 +125,19 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
             mListenAddressToInputMap.erase(result.first);
             return false;
         }
+
+#if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
+        // For Unix domain socket, change the socket file permission to allow non-root users to connect
+        if (StartWith(address, "unix://")) {
+            std::string socketPath = address.substr(7); // Remove "unix://" prefix
+            if (chmod(socketPath.c_str(), 0766) != 0) {
+                LOG_WARNING(sLogger,
+                            ("GrpcInputManager", "failed to change socket file permission")("socket path", socketPath)(
+                                "error", strerror(errno)));
+            }
+        }
+#endif
+
         LOG_INFO(sLogger,
                  ("GrpcInputManager", "new address inserted into listen inputs")("address", address)("service",
                                                                                                      service->Name()));

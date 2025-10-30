@@ -75,6 +75,9 @@ public:
     StringView GetEcsInstanceID() const { return mECSMeta.GetInstanceID(); }
     StringView GetEcsUserID() const { return mECSMeta.GetUserID(); }
     StringView GetEcsRegionID() const { return mECSMeta.GetRegionID(); }
+    StringView GetEcsZoneID() const { return mECSMeta.GetZoneID(); }
+    StringView GetEcsVpcID() const { return mECSMeta.GetVpcID(); }
+    StringView GetEcsVswitchID() const { return mECSMeta.GetVswitchID(); }
     StringView GetHostID() const { return mHostid.GetHostID(); }
     Hostid::Type GetHostIdType() const { return mHostid.GetType(); }
     [[nodiscard]] const ECSMeta& GetECSMeta() const { return mECSMeta; }

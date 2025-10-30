@@ -116,16 +116,25 @@ void LoongSuiteForwardServiceImpl::ProcessForwardRequest(const LoongSuiteForward
         return;
     }
 
-    const std::string& data = request->data();
-    if (data.empty()) {
+    if (request->data_size() == 0) {
         status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "Empty data in forward request");
         return;
     }
 
     auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
-    auto* event = eventGroup.AddRawEvent();
-    event->SetContent(request->data());
-    event->SetTimestamp(time(nullptr), 0);
+    for (const auto& singleData : request->data()) {
+        if (singleData.empty()) {
+            continue;
+        }
+        auto* event = eventGroup.AddRawEvent();
+        event->SetContent(singleData);
+        event->SetTimestamp(time(nullptr), 0);
+    }
+
+    if (eventGroup.GetEvents().empty()) {
+        status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "No raw event in forward request");
+        return;
+    }
 
     bool result = ProcessorRunner::GetInstance()->PushQueue(
         config->queueKey, config->inputIndex, std::move(eventGroup), retryTimes);
