@@ -84,7 +84,7 @@ TEST_F(EcsMetaDataUnittest, TestParseEcsMeta) {
         APSARA_TEST_EQUAL(ecsMeta.GetVswitchID().to_string(), "vsw-12345678");
 
         // Verify IsValid() returns true when all required fields are present
-        APSARA_TEST_TRUE(ecsMeta.IsValid());
+        APSARA_TEST_TRUE(ecsMeta.IsBasicValid());
     }
 }
 

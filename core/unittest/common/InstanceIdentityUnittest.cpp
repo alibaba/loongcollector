@@ -47,7 +47,7 @@ void InstanceIdentityUnittest::TestECSMeta() {
         meta.SetZoneID("cn-hangzhou-h");
         meta.SetVpcID("vpc-12345678");
         meta.SetVswitchID("vsw-12345678");
-        APSARA_TEST_TRUE(meta.IsValid());
+        APSARA_TEST_TRUE(meta.IsBasicValid());
         APSARA_TEST_EQUAL(meta.GetInstanceID().to_string(), "i-1234567890");
         APSARA_TEST_EQUAL(meta.mInstanceIDLen, 12);
         APSARA_TEST_EQUAL(meta.GetUserID().to_string(), "1234567890");
@@ -66,7 +66,7 @@ void InstanceIdentityUnittest::TestECSMeta() {
         meta.SetInstanceID("");
         meta.SetUserID("1234567890");
         meta.SetRegionID("cn-hangzhou");
-        APSARA_TEST_FALSE(meta.IsValid());
+        APSARA_TEST_FALSE(meta.IsBasicValid());
     }
     {
         ECSMeta meta;
@@ -93,7 +93,7 @@ void InstanceIdentityUnittest::TestECSMeta() {
         meta.SetZoneID(testString.data());
         meta.SetVpcID(testString.data());
         meta.SetVswitchID(testString.data());
-        APSARA_TEST_TRUE(meta.IsValid());
+        APSARA_TEST_TRUE(meta.IsBasicValid());
         APSARA_TEST_EQUAL(meta.GetInstanceID().to_string(), StringView(testString.data(), ID_MAX_LENGTH - 1));
         APSARA_TEST_EQUAL(meta.GetUserID().to_string(), StringView(testString.data(), ID_MAX_LENGTH - 1));
         APSARA_TEST_EQUAL(meta.GetRegionID().to_string(), StringView(testString.data(), ID_MAX_LENGTH - 1));

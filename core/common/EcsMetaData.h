@@ -79,7 +79,7 @@ struct ECSMeta {
     [[nodiscard]] StringView GetVpcID() const { return StringView(mVpcID.data(), mVpcIDLen); }
     [[nodiscard]] StringView GetVswitchID() const { return StringView(mVswitchID.data(), mVswitchIDLen); }
 
-    [[nodiscard]] bool IsValid() const {
+    [[nodiscard]] bool IsBasicValid() const {
         return !GetInstanceID().empty() && !GetUserID().empty() && !GetRegionID().empty();
     }
 
