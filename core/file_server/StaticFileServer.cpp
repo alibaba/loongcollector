@@ -26,18 +26,31 @@ using namespace std;
 
 namespace logtail {
 
+StaticFileServer::StaticFileServer() {
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef,
+        MetricCategory::METRIC_CATEGORY_RUNNER,
+        {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER}});
+
+    mLastRunTimeGauge = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
+    mActiveInputsTotalGauge = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_STATIC_FILE_SERVER_ACTIVE_INPUTS_COUNT);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+}
+
 void StaticFileServer::Init() {
     InputStaticFileCheckpointManager::GetInstance()->GetAllCheckpointFileNames();
+    mIsThreadRunning = true;
     mThreadRes = async(launch::async, &StaticFileServer::Run, this);
     mStartTime = time(nullptr);
 }
 
 void StaticFileServer::Stop() {
-    if (!mThreadRes.valid()) {
-        return;
-    }
     {
         lock_guard<mutex> lock(mThreadRunningMux);
+        if (!mIsThreadRunning || !mThreadRes.valid()) {
+            return;
+        }
         mIsThreadRunning = false;
     }
     mStopCV.notify_all();
@@ -84,8 +97,11 @@ void StaticFileServer::AddInput(const string& configName,
                                 const FileTagOptions* fileTagOpts,
                                 const CollectionPipelineContext* ctx) {
     // check if the server is started, if not, start it
-    if (!mThreadRes.valid()) {
-        Init();
+    {
+        lock_guard<mutex> lock(mThreadRunningMux);
+        if (!mIsThreadRunning || !mThreadRes.valid()) {
+            Init();
+        }
     }
 
     // 安全获取Pipeline的时间值，避免空指针解引用
@@ -123,6 +139,7 @@ void StaticFileServer::Run() {
             InputStaticFileCheckpointManager::GetInstance()->DumpAllCheckpointFiles();
             lastDumpCheckpointTime = cur;
         }
+        SET_GAUGE(mLastRunTimeGauge, time(nullptr));
         lock.lock();
         if (mStopCV.wait_for(lock, chrono::milliseconds(10), [this]() { return !mIsThreadRunning; })) {
             return;
@@ -234,6 +251,8 @@ void StaticFileServer::UpdateInputs() {
         mPipelineNameReadersMap.emplace(item.first, make_pair(item.second, LogFileReaderPtr()));
     }
     mAddedInputs.clear();
+
+    SET_GAUGE(mActiveInputsTotalGauge, mPipelineNameReadersMap.size());
 }
 
 FileDiscoveryConfig StaticFileServer::GetFileDiscoveryConfig(const std::string& name, size_t idx) const {

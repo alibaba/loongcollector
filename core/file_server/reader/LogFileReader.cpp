@@ -98,6 +98,8 @@ size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
 
 const int64_t kFirstHashKeySeqID = 1;
 
+const string DELETED_FILE_SUFFIX = "(deleted)";
+
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
                                                   const DevInode& devInode,
@@ -266,6 +268,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
                                                                                      ToString(mLogFileOp.IsOpen())));
     }
     CheckPoint* checkPointPtr = new CheckPoint(mHostLogPath,
+                                               mResolvedHostLogPath,
                                                mLastFilePos,
                                                mLastFileSignatureSize,
                                                mLastFileSignatureHash,
@@ -321,6 +324,7 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mLastFileSignatureHash = checkPointPtr->mSignatureHash;
             mLastFileSignatureSize = checkPointPtr->mSignatureSize;
             mRealLogPath = checkPointPtr->mRealFileName;
+            mResolvedHostLogPath = checkPointPtr->mResolvedFileName;
             mLastEventTime = checkPointPtr->mLastUpdateTime;
             if (checkPointPtr->mContainerID == mContainerID) {
                 mContainerStopped = checkPointPtr->mContainerStopped;
@@ -1112,6 +1116,7 @@ bool LogFileReader::UpdateFilePtr() {
                 OnOpenFileError();
             } else if (CheckDevInode()) {
                 GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+                ResolveHostLogPath();
                 LOG_INFO(sLogger,
                          ("open file succeeded, project", GetProject())("logstore", GetLogstore())(
                              "config", GetConfigName())("log reader queue name", mHostLogPath)(
@@ -1151,6 +1156,7 @@ bool LogFileReader::UpdateFilePtr() {
             // the mHostLogPath's dev inode equal to mDevInode, so real log path is mHostLogPath
             mRealLogPath = mHostLogPath;
             GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+            ResolveHostLogPath();
             LOG_INFO(
                 sLogger,
                 ("open file succeeded, project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
@@ -1196,6 +1202,11 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
 }
 
 void LogFileReader::CloseFilePtr() {
+    bool isDeleted = false;
+    CloseFilePtr(isDeleted);
+}
+
+void LogFileReader::CloseFilePtr(bool& isDeleted) {
     if (mLogFileOp.IsOpen()) {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
@@ -1250,6 +1261,14 @@ void LogFileReader::CloseFilePtr() {
         }
         // always call OnFileClose
         GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
+    }
+    if (mRealLogPath.length() > DELETED_FILE_SUFFIX.length()
+        && mRealLogPath.compare(
+               mRealLogPath.length() - DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX)
+            == 0) {
+        isDeleted = true;
+    } else {
+        isDeleted = false;
     }
 }
 
@@ -1308,7 +1327,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
 
     // If file size is 0 and filename is changed, we cannot judge if the inode is reused by signature,
     // so we just recreate the reader to avoid filename mismatch
-    if (mLastFileSignatureSize == 0 && mRealLogPath != mHostLogPath) {
+    if (mLastFileSignatureSize == 0 && mRealLogPath != mResolvedHostLogPath) {
         return false;
     }
     fsutil::PathStat ps;
@@ -2497,6 +2516,27 @@ bool LogFileReader::UpdateContainerInfo() {
     return false;
 }
 
+void LogFileReader::ResolveHostLogPath() {
+    if (!mResolvedHostLogPath.empty()) {
+        return;
+    }
+    if (mSymbolicLinkFlag) {
+        mResolvedHostLogPath = mHostLogPath;
+        return;
+    }
+    if (mLogFileOp.IsOpen()) {
+        mResolvedHostLogPath = mLogFileOp.GetFilePath();
+    } else {
+        mResolvedHostLogPath = mHostLogPath;
+    }
+    if (mResolvedHostLogPath != mHostLogPath) {
+        LOG_INFO(sLogger,
+                 ("open file", "symbolic link exists in absolute path")("host log path", mHostLogPath)(
+                     "resolved host log path",
+                     mResolvedHostLogPath)("dev", ToString(mDevInode.dev))("inode", ToString(mDevInode.inode)));
+    }
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogFileReader::UpdateReaderManual() {
     if (mLogFileOp.IsOpen()) {
@@ -2505,6 +2545,7 @@ void LogFileReader::UpdateReaderManual() {
     mLogFileOp.Open(mHostLogPath.c_str());
     mDevInode = GetFileDevInode(mHostLogPath);
     mRealLogPath = mHostLogPath;
+    ResolveHostLogPath();
 }
 #endif
 

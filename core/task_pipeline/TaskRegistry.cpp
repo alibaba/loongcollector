@@ -13,6 +13,9 @@
 // limitations under the License.
 
 #include "task_pipeline/TaskRegistry.h"
+#ifdef __ENTERPRISE__
+#include "plugin/task/TaskApmForward.h"
+#endif
 
 using namespace std;
 
@@ -20,6 +23,9 @@ namespace logtail {
 
 void TaskRegistry::LoadPlugins() {
     // RegisterCreator(TaskMock::sName, []() { return make_unique<TaskMock>(); });
+#ifdef __ENTERPRISE__
+    RegisterCreator(TaskApmForward::sName, []() { return make_unique<TaskApmForward>(); });
+#endif
 }
 
 void TaskRegistry::UnloadPlugins() {

@@ -31,6 +31,7 @@ const string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR = "processor_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA = "k8s_metadata_runner";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER = "static_file_server";
 
 // metric keys
 const string& METRIC_RUNNER_IN_EVENTS_TOTAL = METRIC_IN_EVENTS_TOTAL;
@@ -71,6 +72,11 @@ const string METRIC_RUNNER_FILE_ENABLE_FILE_INCLUDED_BY_MULTI_CONFIGS_FLAG = "en
 const string METRIC_RUNNER_FILE_POLLING_MODIFY_CACHE_SIZE = "polling_modify_cache_size";
 const string METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE = "polling_dir_cache_size";
 const string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE = "polling_file_cache_size";
+
+/**********************************************************
+ *   static file server
+ **********************************************************/
+const string METRIC_RUNNER_STATIC_FILE_SERVER_ACTIVE_INPUTS_COUNT = "active_inputs_count";
 
 /**********************************************************
  *   ebpf server

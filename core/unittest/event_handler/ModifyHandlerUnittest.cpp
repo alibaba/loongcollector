@@ -59,6 +59,7 @@ public:
     void TestHandleModifyEventWhenContainerRestartCase5();
     void TestHandleModifyEventWhenContainerRestartCase6();
     void TestHandleModifyEvnetWhenContainerStopTwice();
+    void TestClearReaderWhenFileDeleted();
 
 protected:
     static void SetUpTestCase() {
@@ -235,6 +236,9 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartC
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase5);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerRestartCase6);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEvnetWhenContainerStopTwice);
+#ifndef _MSC_VER
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestClearReaderWhenFileDeleted);
+#endif
 
 void ModifyHandlerUnittest::TestHandleContainerStoppedEventWhenReadToEnd() {
     LOG_INFO(sLogger, ("TestHandleContainerStoppedEventWhenReadToEnd() begin", time(NULL)));
@@ -629,8 +633,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     auto devInode2 = GetFileDevInode(logPath2);
 
     addContainerInfo("1");
-    CheckPoint* checkPointPtr
-        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode, mConfigName, logPath, false, true, "1", false);
+    CheckPoint* checkPointPtr = new CheckPoint(
+        logPath, logPath, 13, sigSize, sigHash, devInode, mConfigName, logPath, false, true, "1", false);
     // use last event time as checkpoint's last update time
     checkPointPtr->mLastUpdateTime = time(NULL);
     checkPointPtr->mCache = "";
@@ -638,8 +642,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
     CheckPointManager::Instance()->AddCheckPoint(checkPointPtr);
 
     // not set container stopped for rotator reader
-    CheckPoint* checkPointPtr1
-        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode1, mConfigName, logPath1, false, false, "1", false);
+    CheckPoint* checkPointPtr1 = new CheckPoint(
+        logPath, logPath, 13, sigSize, sigHash, devInode1, mConfigName, logPath1, false, false, "1", false);
     checkPointPtr1->mLastUpdateTime = time(NULL);
     checkPointPtr1->mCache = "";
     checkPointPtr1->mIdxInReaderArray = -2;
@@ -647,8 +651,8 @@ void ModifyHandlerUnittest::TestRecoverReaderFromCheckpointContainer() {
 
 
     // set container stopped for rotator reader
-    CheckPoint* checkPointPtr2
-        = new CheckPoint(logPath, 13, sigSize, sigHash, devInode2, mConfigName, logPath2, false, true, "1", false);
+    CheckPoint* checkPointPtr2 = new CheckPoint(
+        logPath, logPath, 13, sigSize, sigHash, devInode2, mConfigName, logPath2, false, true, "1", false);
     checkPointPtr2->mLastUpdateTime = time(NULL);
     checkPointPtr2->mCache = "";
     checkPointPtr2->mIdxInReaderArray = -2;
@@ -797,6 +801,43 @@ void ModifyHandlerUnittest::TestHandleModifyEvnetWhenContainerStopTwice() {
     APSARA_TEST_TRUE_FATAL(mReaderPtr->IsContainerStopped());
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
     APSARA_TEST_EQUAL_FATAL(mReaderPtr->mContainerID, "2");
+}
+
+void ModifyHandlerUnittest::TestClearReaderWhenFileDeleted() {
+    LOG_INFO(sLogger, ("TestClearReaderWhenFileDeleted() begin", time(NULL)));
+
+    // Read log to end to ensure IsReadToEnd() returns true
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf, &event1)); // false means no more data
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
+
+    // Verify reader is read to end
+    APSARA_TEST_TRUE_FATAL(mReaderPtr->IsReadToEnd());
+
+    // Actually delete the file while file descriptor is still open
+    // This simulates the real scenario where file is deleted but fd is held
+    std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
+    bfs::remove(logPath);
+
+    // Verify reader exists before handling event
+    APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);
+    APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 1);
+
+    // Send delete event to trigger close and cleanup
+    Event event2(gRootDir, gLogName, EVENT_DELETE, 0);
+    mHandlerPtr->Handle(event2);
+
+    // Verify file descriptor is closed
+    APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
+
+    // Verify reader has been removed from mDevInodeReaderMap
+    APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 0);
+
+    // Verify reader has been removed from readerArray
+    APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 0);
+
+    LOG_INFO(sLogger, ("TestClearReaderWhenFileDeleted() end", time(NULL)));
 }
 
 } // end of namespace logtail

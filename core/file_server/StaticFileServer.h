@@ -32,6 +32,9 @@
 #include "file_server/MultilineOptions.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "file_server/reader/LogFileReader.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
+#include "monitor/metric_models/MetricRecord.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -66,7 +69,7 @@ public:
 #endif
 
 private:
-    StaticFileServer() = default;
+    StaticFileServer();
     ~StaticFileServer() = default;
 
     void Run();
@@ -81,8 +84,12 @@ private:
 
     std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = true;
+    bool mIsThreadRunning = false;
     mutable std::condition_variable mStopCV;
+
+    mutable MetricsRecordRef mMetricsRecordRef;
+    IntGaugePtr mLastRunTimeGauge;
+    IntGaugePtr mActiveInputsTotalGauge;
 
     time_t mStartTime = 0;
     bool mIsUnusedCheckpointsCleared = false;
