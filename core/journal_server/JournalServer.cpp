@@ -20,6 +20,7 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#include <set>
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -98,9 +99,9 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 
 void JournalServer::RemoveJournalInput(const string& configName) {
     CleanupEpollMonitoring(configName);
-
     JournalConnectionManager::GetInstance().RemoveConfig(configName);
-
+    // Note: monitoredReaders cleanup will be done in syncMonitors when it detects
+    // the config no longer exists. CleanupEpollMonitoring above handles immediate epoll cleanup.
     LOG_INFO(sLogger, ("journal server input removed with automatic connection cleanup", "")("config", configName));
 }
 
@@ -148,6 +149,28 @@ size_t JournalServer::GetConnectionCount() const {
 int JournalServer::GetGlobalEpollFD() const {
     std::lock_guard<std::mutex> lock(mEpollMutex);
     return mGlobalEpollFD;
+}
+
+void JournalServer::cleanupInvalidReaders(int epollFD,
+                                          std::map<int, MonitoredReader>& monitoredReaders,
+                                          const std::set<std::string>& validConfigNames) {
+    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end();) {
+        auto& monitoredReader = it->second;
+
+        if (validConfigNames.find(monitoredReader.configName) == validConfigNames.end()) {
+            LOG_DEBUG(sLogger,
+                      ("journal server removing reader from monitoring",
+                       "config no longer exists")("config", monitoredReader.configName)("fd", it->first));
+
+            // Remove from epoll before erasing
+            if (monitoredReader.reader) {
+                monitoredReader.reader->RemoveFromEpoll(epollFD);
+            }
+            it = monitoredReaders.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void JournalServer::CleanupEpollMonitoring(const std::string& configName) {
@@ -284,10 +307,23 @@ void JournalServer::run() {
 void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     auto allConfigs = GetAllJournalConfigs();
 
+    // Collect valid config names for cleanup check
+    std::set<std::string> validConfigNames;
+    for (const auto& [configName, config] : allConfigs) {
+        validConfigNames.insert(configName);
+    }
+
+    static int cleanupCounter = 0;
+    if (++cleanupCounter >= 100) {
+        cleanupCounter = 0;
+        cleanupInvalidReaders(epollFD, monitoredReaders, validConfigNames);
+    }
+
+    // Add new readers
     for (const auto& [configName, config] : allConfigs) {
         auto connection = JournalConnectionManager::GetInstance().GetConnection(configName);
         if (connection && connection->IsOpen()) {
-            // 检查是否已经监听
+            // Check if already monitored by iterating through monitoredReaders
             bool alreadyMonitored = false;
             for (const auto& pair : monitoredReaders) {
                 if (pair.second.reader == connection) {

@@ -133,6 +133,11 @@ private:
     void processJournal(const std::string& configName, bool* hasPendingDataOut = nullptr);
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
+    // Cleanup helper functions
+    void cleanupInvalidReaders(int epollFD,
+                               std::map<int, MonitoredReader>& monitoredReaders,
+                               const std::set<std::string>& validConfigNames);
+
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
 

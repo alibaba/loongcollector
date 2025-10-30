@@ -177,9 +177,25 @@ LogEvent*
 CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, PipelineEventGroup& eventGroup) {
     LogEvent* logEvent = eventGroup.AddLogEvent();
 
-    // Set all journal fields to LogEvent
     for (const auto& field : entry.fields) {
-        logEvent->SetContent(field.first, field.second);
+        std::string fieldValue = field.second;
+
+        // Apply field transformations if configured
+        if (field.first == "PRIORITY" && config.mParsePriority) {
+            const auto& conversionMap = JournalUtils::kPriorityConversionMap;
+            auto it = conversionMap.find(field.second);
+            if (it != conversionMap.end()) {
+                fieldValue = it->second;
+            }
+        } else if (field.first == "SYSLOG_FACILITY" && config.mParseSyslogFacility) {
+            const auto& conversionMap = JournalUtils::kSyslogFacilityString;
+            auto it = conversionMap.find(field.second);
+            if (it != conversionMap.end()) {
+                fieldValue = it->second;
+            }
+        }
+
+        logEvent->SetContent(field.first, fieldValue);
     }
 
     // Add timestamp fields (always exposed)
@@ -209,35 +225,6 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     return logEvent;
 }
 
-// Helper function to transform a field value using a conversion map
-inline void TransformField(std::map<std::string, std::string>& fields,
-                           const char* fieldName,
-                           const std::map<std::string, std::string>& conversionMap) {
-    auto it = fields.find(fieldName);
-    if (it != fields.end()) {
-        auto convertedIt = conversionMap.find(it->second);
-        if (convertedIt != conversionMap.end()) {
-            it->second = convertedIt->second;
-        }
-    }
-}
-
-void ApplyJournalFieldTransforms(JournalEntry& entry, const JournalConfig& config) {
-    if (config.mParsePriority) {
-        TransformField(entry.fields, "PRIORITY", JournalUtils::kPriorityConversionMap);
-    }
-
-    if (config.mParseSyslogFacility) {
-        TransformField(entry.fields, "SYSLOG_FACILITY", JournalUtils::kSyslogFacilityString);
-    }
-}
-
-/**
- * @brief Create PipelineEventGroup from JournalEntry
- * @param entry converted journal entry
- * @param config journal config
- * @return created PipelineEventGroup
- */
 PipelineEventGroup CreateEventGroupFromJournalEntry(const JournalEntry& entry, const JournalConfig& config) {
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
@@ -249,10 +236,7 @@ bool CreateAndPushEventGroup(const string& configName,
                              const JournalConfig& config,
                              const JournalEntry& entry,
                              QueueKey queueKey) {
-    JournalEntry mutableEntry = entry; // Make a mutable copy
-    ApplyJournalFieldTransforms(mutableEntry, config);
-
-    PipelineEventGroup eventGroup = CreateEventGroupFromJournalEntry(mutableEntry, config);
+    PipelineEventGroup eventGroup = CreateEventGroupFromJournalEntry(entry, config);
 
     // Use ProcessorRunner's built-in retry mechanism
     constexpr uint32_t kMaxPushRetries = 100;
