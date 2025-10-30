@@ -130,7 +130,6 @@ private:
     void run();
     bool handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
     void syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void processJournal(const std::string& configName, bool* hasPendingDataOut = nullptr);
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
     // Cleanup helper functions

@@ -263,7 +263,13 @@ void JournalServer::run() {
                         // 正常状态（NOP/APPEND/INVALIDATE），处理该配置的journal事件
                         bool hasPendingData = false;
 
-                        processJournal(monitoredReader.configName, &hasPendingData);
+                        JournalConfig config
+                            = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
+                        ReadJournalEntries(monitoredReader.configName,
+                                           config,
+                                           monitoredReader.reader,
+                                           config.mQueueKey,
+                                           &hasPendingData);
 
                         monitoredReader.hasPendingData = hasPendingData;
                     } else {
@@ -333,11 +339,6 @@ void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& mo
             }
 
             if (!alreadyMonitored) {
-                if (!connection->IsOpen()) {
-                    LOG_WARNING(sLogger, ("journal server reader is not open", "")("config", configName));
-                    continue;
-                }
-
                 int journalFD = connection->GetJournalFD();
                 if (journalFD < 0) {
                     LOG_WARNING(
@@ -365,36 +366,6 @@ void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& mo
             }
         }
     }
-}
-
-void JournalServer::processJournal(const std::string& configName, bool* hasPendingDataOut) {
-    JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(configName);
-
-    if (config.mQueueKey == -1) {
-        LOG_ERROR(sLogger, ("journal server invalid config for specific processing", "")("config", configName));
-        if (hasPendingDataOut)
-            *hasPendingDataOut = false;
-        return;
-    }
-
-    auto connection = JournalConnectionManager::GetInstance().GetConnection(configName);
-    if (!connection || !connection->IsOpen()) {
-        LOG_ERROR(sLogger, ("journal server connection not available for event processing", "")("config", configName));
-        if (hasPendingDataOut)
-            *hasPendingDataOut = false;
-        return;
-    }
-
-    auto reader = connection;
-    if (!reader || !reader->IsOpen()) {
-        LOG_ERROR(sLogger, ("journal server reader not available for event processing", "")("config", configName));
-        if (hasPendingDataOut)
-            *hasPendingDataOut = false;
-        return;
-    }
-
-    // 核心处理：直接读取和处理journal条目，并输出是否有待处理数据
-    ReadJournalEntries(configName, config, reader, config.mQueueKey, hasPendingDataOut);
 }
 
 bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders) {
@@ -425,7 +396,9 @@ bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& mon
         // 只对有hasPendingData标志的reader进行读取
         if (monitoredReader.hasPendingData) {
             bool hasPendingData = false;
-            processJournal(monitoredReader.configName, &hasPendingData);
+            JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
+            ReadJournalEntries(
+                monitoredReader.configName, config, monitoredReader.reader, config.mQueueKey, &hasPendingData);
             monitoredReader.hasPendingData = hasPendingData;
         }
     }
