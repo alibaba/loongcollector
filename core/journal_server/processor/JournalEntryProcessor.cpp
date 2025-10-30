@@ -269,6 +269,7 @@ void ReadJournalEntries(const string& configName,
     }
 
     try {
+        bool pushFailed = false;
         while (entryCount < maxEntriesPerBatch) {
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, entryCount)) {
                 break;
@@ -286,18 +287,27 @@ void ReadJournalEntries(const string& configName,
             }
 
             if (!CreateAndPushEventGroup(configName, config, entry, queueKey)) {
-                LOG_ERROR(sLogger,
-                          ("journal processor failed to process journal entry", "continue")("config", configName));
+                LOG_ERROR(
+                    sLogger,
+                    ("journal processor failed to push journal entry to queue",
+                     "queue may be full, will retry on next cycle")("config", configName)("cursor", entry.cursor));
+                if (!entry.cursor.empty()) { // sendfail and seek to previous entry and later retry
+                    journalReader->SeekCursor(entry.cursor);
+                    journalReader->Previous();
+                }
+                pushFailed = true;
+                break;
             }
 
             entryCount++;
         }
 
         // Determine if there is pending data:
-        // If exited due to batch limit (entryCount == maxEntriesPerBatch), there is more data
-        // If exited normally (no more data), reading is complete
+        // If exited due to batch limit (entryCount == maxEntriesPerBatch), there is pending data
+        // If exited due to push failure (pushFailed == true), there is pending data to retry
+        // If exited normally (no pending data), reading is complete
         if (hasPendingDataOut != nullptr) {
-            *hasPendingDataOut = (entryCount == maxEntriesPerBatch);
+            *hasPendingDataOut = pushFailed || (entryCount == maxEntriesPerBatch);
         }
 
         // Only log warning when no entries processed and there might be a problem
