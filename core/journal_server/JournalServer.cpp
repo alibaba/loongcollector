@@ -265,11 +265,11 @@ void JournalServer::run() {
 
                         JournalConfig config
                             = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
-                        ReadJournalEntries(monitoredReader.configName,
-                                           config,
-                                           monitoredReader.reader,
-                                           config.mQueueKey,
-                                           &hasPendingData);
+                        HandleJournalEntries(monitoredReader.configName,
+                                             config,
+                                             monitoredReader.reader,
+                                             config.mQueueKey,
+                                             &hasPendingData);
 
                         monitoredReader.hasPendingData = hasPendingData;
                     } else {
@@ -397,7 +397,7 @@ bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& mon
         if (monitoredReader.hasPendingData) {
             bool hasPendingData = false;
             JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
-            ReadJournalEntries(
+            HandleJournalEntries(
                 monitoredReader.configName, config, monitoredReader.reader, config.mQueueKey, &hasPendingData);
             monitoredReader.hasPendingData = hasPendingData;
         }

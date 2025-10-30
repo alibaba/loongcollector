@@ -252,11 +252,11 @@ bool CreateAndPushEventGroup(const string& configName,
 
 } // anonymous namespace
 
-void ReadJournalEntries(const string& configName,
-                        const JournalConfig& config,
-                        const std::shared_ptr<JournalReader>& journalReader,
-                        QueueKey queueKey,
-                        bool* hasPendingDataOut) {
+void HandleJournalEntries(const string& configName,
+                          const JournalConfig& config,
+                          const std::shared_ptr<JournalReader>& journalReader,
+                          QueueKey queueKey,
+                          bool* hasPendingDataOut) {
     int entryCount = 0;
     // Defensive bounds check: ensure maxEntriesPerBatch is in reasonable range
     const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // Fair parameter
