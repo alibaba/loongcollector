@@ -495,16 +495,6 @@ bool IsDigitsDotsHostname(const char* hostname) {
     return false;
 }
 
-void GetEcsMetaJson(Json::Value& json, const ECSMeta& meta) {
-    json.clear();
-    json[sInstanceIdKey] = meta.GetInstanceID().to_string();
-    json[sOwnerAccountIdKey] = meta.GetUserID().to_string();
-    json[sRegionIdKey] = meta.GetRegionID().to_string();
-    json[sZoneIdKey] = meta.GetZoneID().to_string();
-    json[sVpcIdKey] = meta.GetVpcID().to_string();
-    json[sVswitchIdKey] = meta.GetVswitchID().to_string();
-}
-
 InstanceIdentity::InstanceIdentity() {
     mEntity.getWriteBuffer().SetHostID({STRING_FLAG(agent_host_id), Hostid::Type::CUSTOM});
     mEntity.swap();
@@ -512,7 +502,13 @@ InstanceIdentity::InstanceIdentity() {
 
 void InstanceIdentity::DumpInstanceIdentity() {
     if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::ECS) {
-        GetEcsMetaJson(mInstanceIdentityJson, mEntity.getReadBuffer().GetECSMeta());
+        mInstanceIdentityJson.clear();
+        mInstanceIdentityJson[sInstanceIdKey] = mEntity.getReadBuffer().GetEcsInstanceID().to_string();
+        mInstanceIdentityJson[sOwnerAccountIdKey] = mEntity.getReadBuffer().GetEcsUserID().to_string();
+        mInstanceIdentityJson[sRegionIdKey] = mEntity.getReadBuffer().GetEcsRegionID().to_string();
+        mInstanceIdentityJson[sZoneIdKey] = mEntity.getReadBuffer().GetEcsZoneID().to_string();
+        mInstanceIdentityJson[sVpcIdKey] = mEntity.getReadBuffer().GetEcsVpcID().to_string();
+        mInstanceIdentityJson[sVswitchIdKey] = mEntity.getReadBuffer().GetEcsVswitchID().to_string();
         dumpInstanceIdentityToFile();
     } else if (mEntity.getReadBuffer().GetHostIdType() == Hostid::Type::LOCAL && mHasGeneratedLocalHostId) {
         mInstanceIdentityJson.clear();
@@ -601,14 +597,12 @@ bool InstanceIdentity::UpdateInstanceIdentity(const ECSMeta& meta) {
             && (mEntity.getReadBuffer().GetEcsVpcID() != meta.GetVpcID()
                 || mEntity.getReadBuffer().GetEcsVswitchID() != meta.GetVswitchID()
                 || mEntity.getReadBuffer().GetEcsZoneID() != meta.GetZoneID()))) {
+        LOG_INFO(sLogger,
+                 ("ecs mInstanceID changed, old mInstanceID",
+                  mEntity.getReadBuffer().GetECSMeta().ToString())("new mInstanceID", meta.ToString()));
         mEntity.getWriteBuffer().SetECSMeta(meta);
         updateHostId(meta);
         mEntity.swap();
-        std::string oldEcsMeta = mInstanceIdentityJson.toStyledString();
-        Json::Value newEcsMetaJson;
-        GetEcsMetaJson(newEcsMetaJson, meta);
-        std::string newEcsMeta = newEcsMetaJson.toStyledString();
-        LOG_INFO(sLogger, ("ecs mInstanceID changed, old mInstanceID", oldEcsMeta)("new mInstanceID", newEcsMeta));
         return true;
     }
     return false;
