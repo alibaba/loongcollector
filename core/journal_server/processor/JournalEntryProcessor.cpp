@@ -225,31 +225,6 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     return logEvent;
 }
 
-PipelineEventGroup CreateEventGroupFromJournalEntry(const JournalEntry& entry, const JournalConfig& config) {
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
-    CreateLogEventFromJournal(entry, config, eventGroup);
-    return eventGroup;
-}
-
-bool CreateAndPushEventGroup(const string& configName,
-                             const JournalConfig& config,
-                             const JournalEntry& entry,
-                             QueueKey queueKey) {
-    PipelineEventGroup eventGroup = CreateEventGroupFromJournalEntry(entry, config);
-
-    // Use ProcessorRunner's built-in retry mechanism
-    constexpr uint32_t kMaxPushRetries = 100;
-
-    if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroup), kMaxPushRetries)) {
-        LOG_ERROR(sLogger,
-                  ("journal processor failed to push journal data to process queue", "discard data")(
-                      "config", configName)("input idx", 0)("queue", queueKey)("max_retries", kMaxPushRetries));
-        return false;
-    }
-    return true;
-}
-
 } // anonymous namespace
 
 void HandleJournalEntries(const string& configName,
@@ -269,7 +244,14 @@ void HandleJournalEntries(const string& configName,
     }
 
     try {
+        // Create a single event group for batch processing
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+
+        // Store first entry cursor for error recovery
+        std::string firstEntryCursor;
         bool pushFailed = false;
+
         while (entryCount < maxEntriesPerBatch) {
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, entryCount)) {
                 break;
@@ -286,20 +268,32 @@ void HandleJournalEntries(const string& configName,
                 break;
             }
 
-            if (!CreateAndPushEventGroup(configName, config, entry, queueKey)) {
+            // Store first entry cursor for potential rollback
+            if (entryCount == 0 && !entry.cursor.empty()) {
+                firstEntryCursor = entry.cursor;
+            }
+
+            // Add log event to the batch event group
+            CreateLogEventFromJournal(entry, config, eventGroup);
+            entryCount++;
+        }
+
+        // Push the batch event group if it contains any events
+        if (entryCount > 0) {
+            // Use ProcessorRunner's built-in retry mechanism
+            constexpr uint32_t kMaxPushRetries = 100;
+
+            if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroup), kMaxPushRetries)) {
                 LOG_ERROR(
                     sLogger,
-                    ("journal processor failed to push journal entry to queue",
-                     "queue may be full, will retry on next cycle")("config", configName)("cursor", entry.cursor));
-                if (!entry.cursor.empty()) { // sendfail and seek to previous entry and later retry
-                    journalReader->SeekCursor(entry.cursor);
+                    ("journal processor failed to push journal entry batch to queue",
+                     "queue may be full, will retry on next cycle")("config", configName)("entry_count", entryCount));
+                if (!firstEntryCursor.empty()) { // seek to first entry and later retry
+                    journalReader->SeekCursor(firstEntryCursor);
                     journalReader->Previous();
                 }
                 pushFailed = true;
-                break;
             }
-
-            entryCount++;
         }
 
         // Determine if there is pending data:
