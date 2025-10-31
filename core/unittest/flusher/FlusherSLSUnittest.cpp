@@ -935,9 +935,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_traces telemetry type
@@ -996,9 +996,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_metrics telemetry type
@@ -1057,9 +1057,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_agentinfo telemetry type
@@ -1118,9 +1118,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_LOGS;
@@ -1182,9 +1182,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     {
@@ -1246,9 +1246,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     {
@@ -1315,9 +1315,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // metric telemtery type
@@ -1373,9 +1373,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     flusher.mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
@@ -1428,7 +1428,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_TRUE(item.mRealIpFlag);
-        APSARA_TEST_EQUAL("192.168.0.1", item.mCurrentHost);
+        APSARA_TEST_EQUAL("192.168.0.1", item.mCurrentDomain);
     }
     {
         // ip empty
@@ -1455,7 +1455,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
         APSARA_TEST_FALSE(item.mRealIpFlag);
-        APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, item.mCurrentDomain);
     }
     {
         // ip empty, and region mode changed

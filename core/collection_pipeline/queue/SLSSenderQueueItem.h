@@ -32,7 +32,8 @@ struct SLSSenderQueueItem : public SenderQueueItem {
     std::string mLogstore;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
 
-    std::string mCurrentHost;
+    std::string mCurrentDomain;
+    std::string mCurrentIP;
     bool mRealIpFlag = false;
     int32_t mLastLogWarningTime = 0; // temporaily used
 
