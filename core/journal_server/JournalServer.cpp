@@ -234,51 +234,43 @@ void JournalServer::run() {
             }
 
 
-            // 兜底逻辑：用于处理hasPendingData且epoll=0的批处理没处理完的场景
-            // 当epoll_wait超时返回0事件，但某些reader仍有hasPendingData标志时，
-            // 说明上次批处理可能还有数据未读完，需要再次尝试读取
+            // 兜底逻辑：用于无事件更新，但是有pending data没处理完的场景
             if (nfds == 0 && handlePendingDataReaders(monitoredReaders)) {
-                continue; // 继续下一次epoll_wait
+                continue;
             }
 
-            for (int i = 0; i < nfds; i++) {
-                int fd = events[i].data.fd;
-                // Received epoll event for fd
-                auto it = monitoredReaders.find(fd);
-                if (it != monitoredReaders.end()) {
-                    auto& monitoredReader = it->second;
+            // 如果有epoll事件（nfds > 0）
+            for (auto& pair : monitoredReaders) {
+                int fd = pair.first;
+                auto& monitoredReader = pair.second;
 
-                    if (!monitoredReader.reader) {
-                        continue;
-                    }
+                if (!monitoredReader.reader) {
+                    continue;
+                }
+                // 每个reader都检查一次journal状态，确保所有reader都收到事件更新
+                JournalStatusType status = monitoredReader.reader->CheckJournalStatus();
 
-                    JournalStatusType status = monitoredReader.reader->CheckJournalStatus();
+                if (status == JournalStatusType::kNop && !monitoredReader.hasPendingData && nfds == 0) {
+                    continue; // 跳过无效读取
+                }
 
-                    // 如果是 NOP 且上次已经读到 EndOfJournal，就跳过读取
-                    if (status == JournalStatusType::kNop && !monitoredReader.hasPendingData) {
-                        continue; // 跳过无效读取
-                    }
+                if (status != JournalStatusType::kError) {
+                    // 正常状态（NOP/APPEND/INVALIDATE），处理该配置的journal事件
+                    bool hasPendingData = false;
 
-                    if (status != JournalStatusType::kError) {
-                        // 正常状态（NOP/APPEND/INVALIDATE），处理该配置的journal事件
-                        bool hasPendingData = false;
+                    JournalConfig config
+                        = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
 
-                        JournalConfig config
-                            = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
-                        HandleJournalEntries(monitoredReader.configName,
-                                             config,
-                                             monitoredReader.reader,
-                                             config.mQueueKey,
-                                             &hasPendingData);
+                    HandleJournalEntries(
+                        monitoredReader.configName, config, monitoredReader.reader, config.mQueueKey, &hasPendingData);
 
-                        monitoredReader.hasPendingData = hasPendingData;
-                    } else {
-                        LOG_WARNING(sLogger,
-                                    ("journal server CheckJournalStatus failed",
-                                     "sd_journal_process returned error, skipping this event")(
-                                        "config", monitoredReader.configName)("fd", fd));
-                        monitoredReader.hasPendingData = false;
-                    }
+                    monitoredReader.hasPendingData = hasPendingData;
+                } else {
+                    LOG_WARNING(sLogger,
+                                ("journal server CheckJournalStatus failed",
+                                 "sd_journal_process returned error, skipping this event")(
+                                    "config", monitoredReader.configName)("fd", fd));
+                    monitoredReader.hasPendingData = false;
                 }
             }
 

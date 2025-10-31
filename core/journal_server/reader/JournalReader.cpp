@@ -325,19 +325,23 @@ public:
 
         int fd = sd_journal_get_fd(mJournal);
         if (fd < 0) {
-            // 🔥 关键错误：sd_journal_get_fd 失败
-            // 当使用 sd_journal_open_files() 时，sd_journal_get_fd() 返回 -1
-            // 需要使用 sd_journal_open_directory() 才能获取有效的 fd
             return false;
         }
 
         struct epoll_event event = {};
-        event.events = EPOLLIN | EPOLLET;
+        event.events = EPOLLIN;
         event.data.fd = fd;
 
+        // 先尝试ADD，如果fd已存在则使用MOD
         int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
         if (result != 0) {
-            return false;
+            if (errno == EEXIST) {
+                // fd已存在，使用MOD来修改事件设置
+                result = epoll_ctl(epollFD, EPOLL_CTL_MOD, fd, &event);
+            }
+            if (result != 0) {
+                return false;
+            }
         }
 
         return true;
