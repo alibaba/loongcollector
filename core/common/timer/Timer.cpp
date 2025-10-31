@@ -14,7 +14,13 @@
 
 #include "common/timer/Timer.h"
 
+#include <chrono>
+
+#include "MetricTypes.h"
+#include "application/Application.h"
 #include "logger/Logger.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 
@@ -30,6 +36,7 @@ void Timer::Init() {
             return;
         }
     }
+    InitMetrics();
     mThreadRes = async(launch::async, &Timer::Run, this);
 }
 
@@ -59,6 +66,8 @@ void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
     } else {
         mQueue.push(std::move(e));
     }
+    ADD_COUNTER(mInItemsTotal, 1);
+    SET_GAUGE(mQueueItemsTotal, mQueue.size());
 }
 
 void Timer::Run() {
@@ -77,18 +86,40 @@ void Timer::Run() {
                     break;
                 } else {
                     auto e = std::move(const_cast<unique_ptr<TimerEvent>&>(mQueue.top()));
+                    auto execTime = e->GetExecTime();
                     mQueue.pop();
                     queueLock.unlock();
+
+                    if (mLatencyTimeMs) {
+                        auto latency = chrono::duration_cast<chrono::nanoseconds>(now - execTime);
+                        ADD_COUNTER(mLatencyTimeMs, latency);
+                    }
                     if (!e->IsValid()) {
                         LOG_INFO(sLogger, ("invalid timer event", "task is cancelled"));
                     } else {
                         e->Execute();
+                        ADD_COUNTER(mOutItemsTotal, 1);
                     }
                     queueLock.lock();
+                    SET_GAUGE(mQueueItemsTotal, mQueue.size());
                 }
             }
         }
     }
+}
+
+void Timer::InitMetrics() {
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "timer");
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
+
+    mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_TIMER_IN_ITEMS_TOTAL);
+    mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_TIMER_OUT_ITEMS_TOTAL);
+    mQueueItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_TIMER_QUEUE_ITEMS_TOTAL);
+    mLatencyTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_TIMER_LATENCY_TIME_MS);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

@@ -115,12 +115,21 @@ void PollingDirFile::CheckConfigPollingStatCount(const int32_t lastStatCount,
         msgBase += "docker ";
     msgBase += "config has exceeded limit";
 
-    LOG_WARNING(sLogger,
-                (msgBase, diffCount)(config.first->GetBasePath(), mStatCount)(config.second->GetProjectName(),
-                                                                              config.second->GetLogstoreName()));
+    // Get representative path(s) for logging
+    std::string pathsStr;
+    const auto& pathInfos = config.first->GetBasePathInfos();
+    for (size_t i = 0; i < pathInfos.size(); ++i) {
+        if (i > 0)
+            pathsStr += ", ";
+        pathsStr += pathInfos[i].basePath;
+    }
+
+    LOG_WARNING(
+        sLogger,
+        (msgBase, diffCount)(pathsStr, mStatCount)(config.second->GetProjectName(), config.second->GetLogstoreName()));
     AlarmManager::GetInstance()->SendAlarmError(STAT_LIMIT_ALARM,
-                                                msgBase + ", current count: " + ToString(diffCount) + " total count:"
-                                                    + ToString(mStatCount) + " path: " + config.first->GetBasePath(),
+                                                msgBase + ", current count: " + ToString(diffCount)
+                                                    + " total count:" + ToString(mStatCount) + " paths: " + pathsStr,
                                                 config.second->GetRegion(),
                                                 config.second->GetProjectName(),
                                                 config.second->GetConfigName(),
@@ -148,18 +157,11 @@ void PollingDirFile::PollingIteration() {
     mNewFileVec.clear();
     ++mCurrentRound;
 
-    // Get a copy of config list from ConfigManager.
-    // PollingDirFile has to be held on at first because raw pointers are used here.
-    vector<FileDiscoveryConfig> sortedConfigs;
-    vector<FileDiscoveryConfig> wildcardConfigs;
+    // Get a copy of config list from ConfigManager and build sorted path items.
+    vector<PathItem> sortedPaths; // 所有精确路径（按原始 basePath 排序）
+    vector<PathItem> wildcardPaths; // 所有通配符路径
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-        if (itr->second.first->GetWildcardPaths().empty())
-            sortedConfigs.push_back(itr->second);
-        else
-            wildcardConfigs.push_back(itr->second);
-    }
-    sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
+    BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
 
     LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(nameConfigMap.size());
     {
@@ -168,80 +170,109 @@ void PollingDirFile::PollingIteration() {
         SET_GAUGE(mPollingFileCacheSize, mFileCacheMap.size());
     }
 
-    // Iterate all normal configs, make sure stat count will not exceed limit.
-    for (auto itr = sortedConfigs.begin();
-         itr != sortedConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
-         ++itr) {
+    // 处理所有精确路径（已按 basePath 深度排序）
+    for (auto& pathItem : sortedPaths) {
         if (!mRuningFlag || mHoldOnFlag)
             break;
+        if (mStatCount > INT32_FLAG(polling_max_stat_count))
+            break;
 
-        const FileDiscoveryOptions* config = itr->first;
-        const CollectionPipelineContext* ctx = itr->second;
+        const CollectionPipelineContext* ctx = pathItem.config.second;
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
         if (!config->IsContainerDiscoveryEnabled()) {
+            // 非容器：直接使用 basePath
             fsutil::PathStat baseDirStat;
-            if (!fsutil::PathStat::stat(config->GetBasePath(), baseDirStat)) {
+            if (!fsutil::PathStat::stat(pathItem.path, baseDirStat)) {
                 LOG_DEBUG(sLogger,
-                          ("get base dir info error: ", config->GetBasePath())(ctx->GetProjectName(),
-                                                                               ctx->GetLogstoreName()));
+                          ("get base dir info error: ", pathItem.path)(ctx->GetProjectName(), ctx->GetLogstoreName()));
                 continue;
             }
 
             int32_t lastConfigStatCount = mStatCount;
-            if (!PollingNormalConfigPath(*itr, config->GetBasePath(), string(), baseDirStat, 0)) {
-                LOG_DEBUG(sLogger,
-                          ("logPath in config not exist", config->GetBasePath())(ctx->GetProjectName(),
-                                                                                 ctx->GetLogstoreName()));
+            if (!PollingNormalConfigPath(pathItem.config, pathItem.path, string(), baseDirStat, 0)) {
+                LOG_DEBUG(
+                    sLogger,
+                    ("logPath in config not exist", pathItem.path)(ctx->GetProjectName(), ctx->GetLogstoreName()));
             }
-            CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
+            CheckConfigPollingStatCount(lastConfigStatCount, pathItem.config, false);
         } else {
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                const string& basePath = (*config->GetContainerInfo())[i].mRealBaseDir;
-                fsutil::PathStat baseDirStat;
-                if (!fsutil::PathStat::stat(basePath, baseDirStat)) {
-                    LOG_DEBUG(
-                        sLogger,
-                        ("get docker base dir info error: ", basePath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
-                    continue;
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (realBaseDir.empty())
+                        continue;
+
+                    fsutil::PathStat baseDirStat;
+                    if (!fsutil::PathStat::stat(realBaseDir, baseDirStat)) {
+                        LOG_DEBUG(sLogger,
+                                  ("get docker base dir info error: ", realBaseDir)(ctx->GetProjectName(),
+                                                                                    ctx->GetLogstoreName()));
+                        continue;
+                    }
+                    int32_t lastConfigStatCount = mStatCount;
+                    if (!PollingNormalConfigPath(pathItem.config, realBaseDir, string(), baseDirStat, 0)) {
+                        LOG_DEBUG(sLogger,
+                                  ("docker logPath in config not exist", realBaseDir)(ctx->GetProjectName(),
+                                                                                      ctx->GetLogstoreName()));
+                    }
+                    CheckConfigPollingStatCount(lastConfigStatCount, pathItem.config, true);
                 }
-                int32_t lastConfigStatCount = mStatCount;
-                if (!PollingNormalConfigPath(*itr, basePath, string(), baseDirStat, 0)) {
-                    LOG_DEBUG(sLogger,
-                              ("docker logPath in config not exist", basePath)(ctx->GetProjectName(),
-                                                                               ctx->GetLogstoreName()));
-                }
-                CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
             }
         }
     }
 
-    // Iterate all wildcard configs, make sure stat count will not exceed limit.
-    for (auto itr = wildcardConfigs.begin();
-         itr != wildcardConfigs.end() && mStatCount <= INT32_FLAG(polling_max_stat_count);
-         ++itr) {
+    // 处理所有通配符路径（不排序）
+    for (auto& pathItem : wildcardPaths) {
         if (!mRuningFlag || mHoldOnFlag)
             break;
+        if (mStatCount > INT32_FLAG(polling_max_stat_count))
+            break;
 
-        const FileDiscoveryOptions* config = itr->first;
-        const CollectionPipelineContext* ctx = itr->second;
+        const CollectionPipelineContext* ctx = pathItem.config.second;
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
         if (!config->IsContainerDiscoveryEnabled()) {
+            // 非容器：直接使用 basePath
             int32_t lastConfigStatCount = mStatCount;
-            if (!PollingWildcardConfigPath(*itr, config->GetWildcardPaths()[0], 0)) {
+            const string& startPath = pathItem.pathInfo->wildcardPaths[0];
+            if (!PollingWildcardConfigPath(pathItem.config, *pathItem.pathInfo, startPath, 0)) {
                 LOG_DEBUG(sLogger,
                           ("can not find matched path in config, Wildcard begin logPath",
-                           config->GetBasePath())(ctx->GetProjectName(), ctx->GetLogstoreName()));
+                           startPath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
             }
-            CheckConfigPollingStatCount(lastConfigStatCount, *itr, false);
+            CheckConfigPollingStatCount(lastConfigStatCount, pathItem.config, false);
         } else {
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                const string& baseWildcardPath = (*config->GetContainerInfo())[i].mRealBaseDir;
-                int32_t lastConfigStatCount = mStatCount;
-                if (!PollingWildcardConfigPath(*itr, baseWildcardPath, 0)) {
-                    LOG_DEBUG(sLogger,
-                              ("can not find matched path in config, "
-                               "Wildcard begin logPath ",
-                               baseWildcardPath)(ctx->GetProjectName(), ctx->GetLogstoreName()));
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (realBaseDir.empty())
+                        continue;
+
+                    int32_t lastConfigStatCount = mStatCount;
+                    if (!PollingWildcardConfigPath(pathItem.config, *pathItem.pathInfo, realBaseDir, 0)) {
+                        LOG_DEBUG(sLogger,
+                                  ("can not find matched path in config, Wildcard begin logPath ",
+                                   realBaseDir)(ctx->GetProjectName(), ctx->GetLogstoreName()));
+                    }
+                    CheckConfigPollingStatCount(lastConfigStatCount, pathItem.config, true);
                 }
-                CheckConfigPollingStatCount(lastConfigStatCount, *itr, true);
             }
         }
     }
@@ -507,15 +538,18 @@ bool PollingDirFile::PollingNormalConfigPath(const FileDiscoveryConfig& pConfig,
     return true;
 }
 
-// PollingWildcardConfigPath will iterate mWildcardPaths one by one, and according to
-// corresponding value in mConstWildcardPaths, call PollingNormalConfigPath or call
+// PollingWildcardConfigPath will iterate wildcardPaths one by one, and according to
+// corresponding value in constWildcardPaths, call PollingNormalConfigPath or call
 // PollingWildcardConfigPath recursively.
-bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig, const string& dirPath, int depth) {
+bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfig,
+                                               const BasePathInfo& pathInfo,
+                                               const string& dirPath,
+                                               int depth) {
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(dirPath)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", dirPath));
         return false;
     }
-    auto const wildcardPathSize = static_cast<int>(pConfig.first->GetWildcardPaths().size());
+    auto const wildcardPathSize = static_cast<int>(pathInfo.wildcardPaths.size());
     if (depth - wildcardPathSize > pConfig.first->mMaxDirSearchDepth)
         return false;
 
@@ -534,14 +568,14 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
 
     // if sub path is const, we do not need to scan whole dir
     // Current part is constant, check if it is existing directly.
-    if (!pConfig.first->GetConstWildcardPaths()[depth].empty()) {
+    if (!pathInfo.constWildcardPaths[depth].empty()) {
         // Stat directly, stat failure means that the directory is not existing or we have no
         // permission to access it, just return true to stop polling.
-        string item = PathJoin(dirPath, pConfig.first->GetConstWildcardPaths()[depth]);
+        string item = PathJoin(dirPath, pathInfo.constWildcardPaths[depth]);
         fsutil::PathStat baseDirStat;
         if (!fsutil::PathStat::stat(item, baseDirStat)) {
             LOG_DEBUG(sLogger,
-                      ("get wildcard dir info error: ", pConfig.first->GetBasePath())("stat path", item)(
+                      ("get wildcard dir info error: ", pathInfo.basePath)("stat path", item)(
                           pConfig.second->GetProjectName(),
                           pConfig.second->GetLogstoreName())("error", ErrnoToString(GetErrno())));
             return true;
@@ -555,7 +589,7 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
         if (finish) {
             PollingNormalConfigPath(pConfig, item, string(), baseDirStat, 0);
         } else {
-            PollingWildcardConfigPath(pConfig, item, depth + 1);
+            PollingWildcardConfigPath(pConfig, pathInfo, item, depth + 1);
         }
         return true;
     }
@@ -587,13 +621,13 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             break;
 
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
-            LOG_WARNING(sLogger,
-                        ("too many sub directoried for path",
-                         dirPath)("dirCount", dirCount)("basePath", pConfig.first->GetBasePath()));
+            LOG_WARNING(
+                sLogger,
+                ("too many sub directoried for path", dirPath)("dirCount", dirCount)("basePath", pathInfo.basePath));
             AlarmManager::GetInstance()->SendAlarmError(STAT_LIMIT_ALARM,
                                                         string("too many sub directoried for path:" + dirPath
                                                                + " dirCount: " + ToString(dirCount) + " basePath"
-                                                               + pConfig.first->GetBasePath()),
+                                                               + pathInfo.basePath),
                                                         pConfig.second->GetRegion(),
                                                         pConfig.second->GetProjectName(),
                                                         pConfig.second->GetConfigName(),
@@ -634,25 +668,24 @@ bool PollingDirFile::PollingWildcardConfigPath(const FileDiscoveryConfig& pConfi
             size_t dirIndex = 0;
             if (!BOOL_FLAG(enable_root_path_collection)) {
                 // Handle special path /.
-                dirIndex = pConfig.first->GetWildcardPaths()[depth].size() + 1;
+                dirIndex = pathInfo.wildcardPaths[depth].size() + 1;
                 if (dirIndex == (size_t)2) {
                     dirIndex = 1;
                 }
             } else {
                 // A better logic, but only enabled when flag enable_root_path_collection
                 //   is set for backward compatibility.
-                dirIndex = pConfig.first->GetWildcardPaths()[depth].size();
-                if (PATH_SEPARATOR[0] == pConfig.first->GetWildcardPaths()[depth + 1][dirIndex]) {
+                dirIndex = pathInfo.wildcardPaths[depth].size();
+                if (PATH_SEPARATOR[0] == pathInfo.wildcardPaths[depth + 1][dirIndex]) {
                     ++dirIndex;
                 }
             }
-            if (fnmatch(&(pConfig.first->GetWildcardPaths()[depth + 1].at(dirIndex)), entName.c_str(), FNM_PATHNAME)
-                == 0) {
+            if (fnmatch(&(pathInfo.wildcardPaths[depth + 1].at(dirIndex)), entName.c_str(), FNM_PATHNAME) == 0) {
                 if (finish) {
                     hasMatchFlag = true;
                     PollingNormalConfigPath(pConfig, item, string(), buf, 0);
                 } else {
-                    hasMatchFlag |= PollingWildcardConfigPath(pConfig, item, depth + 1);
+                    hasMatchFlag |= PollingWildcardConfigPath(pConfig, pathInfo, item, depth + 1);
                 }
             }
         }

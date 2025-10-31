@@ -25,6 +25,7 @@
 #include "AppConfig.h"
 #include "SelfMonitorMetricEvent.h"
 #include "common/JsonUtil.h"
+#include "common/MachineInfoUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/http/Constant.h"
@@ -90,6 +91,24 @@ void TargetSubscriberScheduler::OnSubscription(HttpResponse& response, uint64_t 
     ADD_COUNTER(mTotalDelayMs, GetCurrentTimeInMilliSeconds() - timestampMilliSec);
 }
 
+
+void TargetSubscriberScheduler::ScheduleHostOnlyTargets() {
+    mSelfMonitor->AddCounter(METRIC_PLUGIN_PROM_SUBSCRIBE_TOTAL, 200);
+
+    vector<PromTargetInfo> targetGroup;
+    BuildHostOnlyScrapeSchedulerGroup(targetGroup);
+    LOG_INFO(sLogger, ("TargetSubscriberScheduler", "ScheduleHostOnlyTargets")("targetGroup", targetGroup.size()));
+
+    std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>> newScrapeSchedulerSet
+        = BuildScrapeSchedulerSet(targetGroup);
+    LOG_INFO(sLogger,
+             ("TargetSubscriberScheduler", "BuildScrapeSchedulerSet")("newScrapeSchedulerSet",
+                                                                      newScrapeSchedulerSet.size()));
+    UpdateScrapeScheduler(newScrapeSchedulerSet);
+
+    SET_GAUGE(mPromSubscriberTargets, mScrapeSchedulerMap.size());
+}
+
 void TargetSubscriberScheduler::UpdateScrapeScheduler(
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>& newScrapeSchedulerMap) {
     {
@@ -142,6 +161,38 @@ void TargetSubscriberScheduler::UpdateScrapeScheduler(
     }
 }
 
+void TargetSubscriberScheduler::BuildHostOnlyScrapeSchedulerGroup(std::vector<PromTargetInfo>& scrapeSchedulerGroup) {
+    for (const auto& hostOnlyConfig : mScrapeConfigPtr->mHostOnlyConfigs) {
+        for (const auto& target : hostOnlyConfig.mTargets) {
+            LOG_INFO(
+                sLogger,
+                ("TargetSubscriberScheduler", "BuildHostOnlyScrapeSchedulerGroup")("job", mJobName)("target", target));
+            PromTargetInfo targetInfo;
+            // Parse labels https://www.robustperception.io/life-of-a-label/
+            Labels labels = hostOnlyConfig.mLabels;
+            labels.Set(prometheus::ADDRESS_LABEL_NAME, target);
+
+            if (!BuildPromTargetInfo(target, labels, targetInfo)) {
+                continue;
+            }
+
+            // add meta labels
+            const auto* entity = InstanceIdentity::Instance()->GetEntity();
+            targetInfo.mLabels.Set(prometheus::HOST_HOSTNAME, GetHostName());
+            targetInfo.mLabels.Set(prometheus::HOST_IP, GetHostIp());
+            if (entity->IsECSValid()) {
+                targetInfo.mLabels.Set(prometheus::ECS_META_INSTANCE_ID, entity->GetEcsInstanceID().to_string());
+                targetInfo.mLabels.Set(prometheus::ECS_META_REGION_ID, entity->GetEcsRegionID().to_string());
+                targetInfo.mLabels.Set(prometheus::ECS_META_ZONE_ID, entity->GetEcsZoneID().to_string());
+                targetInfo.mLabels.Set(prometheus::ECS_META_USER_ID, entity->GetEcsUserID().to_string());
+                targetInfo.mLabels.Set(prometheus::ECS_META_VPC_ID, entity->GetEcsVpcID().to_string());
+                targetInfo.mLabels.Set(prometheus::ECS_META_VSWITCH_ID, entity->GetEcsVswitchID().to_string());
+            }
+            scrapeSchedulerGroup.push_back(targetInfo);
+        }
+    }
+}
+
 bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& content,
                                                           std::vector<PromTargetInfo>& scrapeSchedulerGroup) {
     string errs;
@@ -184,39 +235,44 @@ bool TargetSubscriberScheduler::ParseScrapeSchedulerGroup(const std::string& con
                 labels.Set(labelKey, element[prometheus::LABELS][labelKey].asString());
             }
         }
-        std::ostringstream rawHashStream;
-        rawHashStream << std::setw(16) << std::setfill('0') << std::hex << labels.Hash();
-        string rawAddress = labels.Get(prometheus::ADDRESS_LABEL_NAME);
-        targetInfo.mHash = mScrapeConfigPtr->mJobName + rawAddress + rawHashStream.str();
-        targetInfo.mInstance = targets[0];
-
-        for (const auto& pair : mScrapeConfigPtr->mParams) {
-            if (!pair.second.empty()) {
-                labels.Set(prometheus::PARAM_LABEL_NAME + pair.first, pair.second[0]);
-            }
-        }
-
-        if (element.isMember(prometheus::LABELS) && element[prometheus::LABELS].isObject()) {
-            for (const string& labelKey : element[prometheus::LABELS].getMemberNames()) {
-                labels.Set(labelKey, element[prometheus::LABELS][labelKey].asString());
-            }
-        }
-        if (labels.Get(prometheus::JOB).empty()) {
-            labels.Set(prometheus::JOB, mJobName);
-        }
-        if (labels.Get(prometheus::SCHEME_LABEL_NAME).empty()) {
-            labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
-        }
-        if (labels.Get(prometheus::METRICS_PATH_LABEL_NAME).empty()) {
-            labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
-        }
-        if (labels.Get(prometheus::ADDRESS_LABEL_NAME).empty()) {
+        if (!BuildPromTargetInfo(targets[0], labels, targetInfo)) {
             continue;
         }
 
-        targetInfo.mLabels = labels;
         scrapeSchedulerGroup.push_back(targetInfo);
     }
+    return true;
+}
+
+bool TargetSubscriberScheduler::BuildPromTargetInfo(const std::string& target,
+                                                    Labels& labels,
+                                                    PromTargetInfo& targetInfo) {
+    std::ostringstream rawHashStream;
+    rawHashStream << std::setw(16) << std::setfill('0') << std::hex << labels.Hash();
+    string rawAddress = labels.Get(prometheus::ADDRESS_LABEL_NAME);
+    targetInfo.mHash = mScrapeConfigPtr->mJobName + rawAddress + rawHashStream.str();
+    targetInfo.mInstance = target;
+
+    for (const auto& pair : mScrapeConfigPtr->mParams) {
+        if (!pair.second.empty()) {
+            labels.Set(prometheus::PARAM_LABEL_NAME + pair.first, pair.second[0]);
+        }
+    }
+
+    if (labels.Get(prometheus::JOB).empty()) {
+        labels.Set(prometheus::JOB, mJobName);
+    }
+    if (labels.Get(prometheus::SCHEME_LABEL_NAME).empty()) {
+        labels.Set(prometheus::SCHEME_LABEL_NAME, mScrapeConfigPtr->mScheme);
+    }
+    if (labels.Get(prometheus::METRICS_PATH_LABEL_NAME).empty()) {
+        labels.Set(prometheus::METRICS_PATH_LABEL_NAME, mScrapeConfigPtr->mMetricsPath);
+    }
+    if (labels.Get(prometheus::ADDRESS_LABEL_NAME).empty()) {
+        return false;
+    }
+    targetInfo.mLabels = labels;
+
     return true;
 }
 
@@ -366,7 +422,9 @@ void TargetSubscriberScheduler::ScheduleNext() {
 }
 
 void TargetSubscriberScheduler::Cancel() {
-    mFuture->Cancel();
+    if (mFuture != nullptr) {
+        mFuture->Cancel();
+    }
     {
         WriteLock lock(mLock);
         mValidState = false;
@@ -477,5 +535,10 @@ void TargetSubscriberScheduler::InitSelfMonitor(const MetricLabels& defaultLabel
     mTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
+
+bool TargetSubscriberScheduler::IsHostOnlyMode() const {
+    return mScrapeConfigPtr->mHostOnlyMode;
+}
+
 
 } // namespace logtail

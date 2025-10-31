@@ -117,7 +117,7 @@ void LoongSuiteForwardServiceIntegrationUnittest::TestRealGrpcCall() {
 
             // Create request
             LoongSuiteForwardRequest request;
-            request.set_data("integration test data");
+            request.add_data("integration test data");
             LoongSuiteForwardResponse response;
 
             grpc::ClientContext context;
@@ -199,7 +199,7 @@ void LoongSuiteForwardServiceIntegrationUnittest::TestConcurrentRequests() {
                     auto stub = LoongSuiteForwardService::NewStub(channel);
 
                     LoongSuiteForwardRequest request;
-                    request.set_data("concurrent test data");
+                    request.add_data("concurrent test data");
                     LoongSuiteForwardResponse response;
 
                     grpc::ClientContext context;

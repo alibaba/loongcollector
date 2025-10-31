@@ -2295,6 +2295,72 @@ void CollectionConfigUnittest::TestReplaceEnvVarRef() const {
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
     APSARA_TEST_TRUE(config->ReplaceEnvVar());
     APSARA_TEST_TRUE(*config->mDetail == resJson);
+
+    // invalid env var name
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/${__path4ut}/${__file4ut}",
+                        "/${1}"
+                    ]
+                }
+            ]
+        }
+    )";
+    resStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/_home/$work/!transaction/~un-do.log",
+                        "/${1}"
+                    ]
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(resStr, resJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->ReplaceEnvVar());
+    APSARA_TEST_TRUE(*config->mDetail == resJson);
+
+    // special env var name
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/${123abc}"
+                    ]
+                }
+            ]
+        }
+    )";
+    resStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/"
+                    ]
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    APSARA_TEST_TRUE(ParseJsonTable(resStr, resJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->ReplaceEnvVar());
+    APSARA_TEST_TRUE(*config->mDetail == resJson);
 }
 
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)

@@ -65,6 +65,7 @@ private:
     uint32_t mExpireTime = 0;
     uint32_t mFinishTime = 0; // 记录状态变为 FINISHED 或 ABORT 的时间
     mutable size_t mLastSentIndex = 0; // 跟踪上次发送到的位置
+    mutable std::vector<bool> mWaitingSentFlags; // 跟踪每个文件是否已发送过 waiting 状态
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputStaticFileCheckpointManagerUnittest;

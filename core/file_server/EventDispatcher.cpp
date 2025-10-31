@@ -318,8 +318,15 @@ bool EventDispatcher::RegisterEventHandler(const string& path,
     AddExistedFileEvents(path, wd);
     if (dirTimeOutFlag) {
         AddTimeoutWatch(path);
+        // Log all base paths
+        std::string allPaths;
+        for (size_t i = 0; i < config.first->GetBasePathInfos().size(); ++i) {
+            if (i > 0)
+                allPaths += ", ";
+            allPaths += config.first->GetBasePathInfos()[i].basePath;
+        }
         LOG_DEBUG(sLogger,
-                  ("AddTimeoutWatch, source", path)("config, basepath", config.first->GetBasePath())(
+                  ("AddTimeoutWatch, source", path)("config, basepaths", allPaths)(
                       "preseveDepth", config.first->mPreservedDirDepth)("maxDepth", config.first->mMaxDirSearchDepth));
     }
 
@@ -381,7 +388,15 @@ void EventDispatcher::AddExistedFileEvents(const string& path, int wd) {
         bool isMatch = false;
         bool tailExisted = false;
         for (auto iter = configs.begin(); iter != configs.end(); ++iter) {
-            if (fnmatch((*iter).first->GetFilePattern().c_str(), entName.c_str(), 0) == 0) {
+            // Check if filename matches any of the file patterns
+            bool matched = false;
+            for (const auto& pathInfo : (*iter).first->GetBasePathInfos()) {
+                if (fnmatch(pathInfo.filePattern.c_str(), entName.c_str(), 0) == 0) {
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
                 isMatch = true;
                 if ((*iter).first->IsTailingAllMatchedFiles()) {
                     tailExisted = true;
@@ -650,6 +665,7 @@ void EventDispatcher::AddExistedCheckPointFileEvents() {
             auto& cptPair = exactlyOnceCpts[idx];
             auto& cpt = cptPair.second;
             auto v1Cpt = make_shared<CheckPoint>(cpt.log_path(),
+                                                 cpt.log_path(),
                                                  0,
                                                  cpt.sig_size(),
                                                  cpt.sig_hash(),

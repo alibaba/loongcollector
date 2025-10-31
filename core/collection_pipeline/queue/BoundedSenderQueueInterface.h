@@ -78,6 +78,7 @@ protected:
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
     CounterPtr mFetchRejectedByRateLimiterTimesCnt;
+    std::map<std::string, CounterPtr> mConcurrencyLimiterCounterMap;
 
 private:
     virtual void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) = 0;

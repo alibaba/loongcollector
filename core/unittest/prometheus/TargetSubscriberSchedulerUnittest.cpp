@@ -36,6 +36,7 @@ public:
     void OnInitScrapeJobEvent();
     void TestProcess();
     void TestParseTargetGroups();
+    void TestBuildHostOnlyScrapeSchedulerGroup();
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
     void TestTargetsInfoToString();
@@ -304,6 +305,41 @@ void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
     APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
 }
 
+void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroup() {
+    std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    Json::Value config;
+    string errorMsg;
+    string configStr = R"JSON(
+    {
+        "job_name": "test_job",
+        "scheme": "http",
+        "metrics_path": "/metrics",
+        "scrape_interval": "30s",
+        "scrape_timeout": "30s",
+        "host_only_mode": true,
+        "static_configs": [
+            {
+                "targets": ["localhost:9090", "127.0.0.1:9091"],
+                "labels": {
+                    "test_label": "test_value"
+                }
+            }
+        ]
+    }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(targetSubscriber->Init(config));
+    std::vector<PromTargetInfo> targetGroup;
+    targetSubscriber->BuildHostOnlyScrapeSchedulerGroup(targetGroup);
+    APSARA_TEST_EQUAL(2UL, targetGroup.size());
+    APSARA_TEST_EQUAL(targetGroup[0].mInstance, "127.0.0.1:9091");
+    APSARA_TEST_EQUAL(targetGroup[0].mLabels.Get("test_label"), "test_value");
+    APSARA_TEST_EQUAL(targetGroup[1].mInstance, "localhost:9090");
+    APSARA_TEST_EQUAL(targetGroup[1].mLabels.Get("test_label"), "test_value");
+    APSARA_TEST_TRUE(targetGroup[0].mHash != targetGroup[1].mHash);
+}
+
+
 void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     // prepare data
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
@@ -324,6 +360,8 @@ void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[1].second);
     APSARA_TEST_NOT_EQUAL(startTimeList[1].second, startTimeList[2].second);
     APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[2].second);
+
+    APSARA_TEST_EQUAL(result.size(), 3UL);
 
     APSARA_TEST_EQUAL(1UL, result.count("loong-collector/demo-podmonitor-500/010.0.2.81:808093796c8e4493906d"));
 }
@@ -600,6 +638,7 @@ UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, OnInitScrapeJobEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestParseTargetGroups)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroup)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
 

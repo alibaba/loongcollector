@@ -17,6 +17,7 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 
 #include "common/StringView.h"
 
@@ -56,5 +57,8 @@ inline constexpr StringView DEFAULT_USER_ID_LABEL = "user_id";
 #else
 inline constexpr StringView DEFAULT_HOST_IP_LABEL = "host_ip";
 #endif
+const extern std::string NVSMI;
+const extern std::string LIB_DCGM;
+const extern std::filesystem::path NVIDIACTL;
 
 } // namespace logtail

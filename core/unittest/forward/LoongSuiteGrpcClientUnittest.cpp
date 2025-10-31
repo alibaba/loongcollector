@@ -227,7 +227,7 @@ bool LoongSuiteGrpcClientUnittest::SendRawData(const std::string& data, const st
     try {
         // 创建请求
         LoongSuiteForwardRequest request;
-        request.set_data(data);
+        request.add_data(data);
         // 创建响应
         LoongSuiteForwardResponse response;
 

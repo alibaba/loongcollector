@@ -31,6 +31,9 @@ using namespace std;
 
 namespace logtail {
 
+
+DEFINE_FLAG_INT32(max_file_paths_per_input_config, "", 10);
+
 // basePath must not stop with '/'
 inline bool _IsSubPath(const string& basePath, const string& subPath) {
     size_t pathSize = subPath.size();
@@ -92,46 +95,36 @@ static bool isNotSubPath(const string& basePath, const string& path) {
     return basePathSize > 1 && pathSize > basePathSize && path[checkPos] != PATH_SEPARATOR[0];
 }
 
-bool FileDiscoveryOptions::CompareByPathLength(
-    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
-    int32_t leftDepth = 0;
-    int32_t rightDepth = 0;
-    for (size_t i = 0; i < (left.first->mBasePath).size(); ++i) {
-        if (PATH_SEPARATOR[0] == (left.first->mBasePath)[i]) {
-            leftDepth++;
-        }
-    }
-    for (size_t i = 0; i < (right.first->mBasePath).size(); ++i) {
-        if (PATH_SEPARATOR[0] == (right.first->mBasePath)[i]) {
-            rightDepth++;
-        }
-    }
-    return leftDepth > rightDepth;
-}
+void BuildAndSortPathItems(const unordered_map<string, FileDiscoveryConfig>& nameConfigMap,
+                           vector<PathItem>& outSortedPaths,
+                           vector<PathItem>& outWildcardPaths) {
+    outSortedPaths.clear();
+    outWildcardPaths.clear();
 
-bool FileDiscoveryOptions::CompareByDepthAndCreateTime(
-    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> left,
-    pair<const FileDiscoveryOptions*, const CollectionPipelineContext*> right) {
-    int32_t leftDepth = 0;
-    int32_t rightDepth = 0;
-    for (size_t i = 0; i < (left.first->mBasePath).size(); ++i) {
-        if (PATH_SEPARATOR[0] == (left.first->mBasePath)[i]) {
-            leftDepth++;
+    for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
+        const FileDiscoveryOptions* config = itr->second.first;
+        const auto& pathInfos = config->GetBasePathInfos();
+
+        // 按路径类型分类（使用原始 basePath）
+        for (size_t i = 0; i < pathInfos.size(); ++i) {
+            const auto& pathInfo = pathInfos[i];
+            int32_t depth = CalculatePathDepth(pathInfo.basePath);
+            if (pathInfo.hasWildcard()) {
+                outWildcardPaths.emplace_back(pathInfo.basePath, depth, itr->second, &pathInfo, i);
+            } else {
+                outSortedPaths.emplace_back(pathInfo.basePath, depth, itr->second, &pathInfo, i);
+            }
         }
     }
-    for (size_t i = 0; i < (right.first->mBasePath).size(); ++i) {
-        if (PATH_SEPARATOR[0] == (right.first->mBasePath)[i]) {
-            rightDepth++;
+
+    // 对所有精确路径按深度排序（深度降序，保证深路径优先）
+    sort(outSortedPaths.begin(), outSortedPaths.end(), [](const PathItem& left, const PathItem& right) {
+        if (left.depth != right.depth) {
+            return left.depth > right.depth;
         }
-    }
-    if (leftDepth > rightDepth) {
-        return true;
-    }
-    if (leftDepth == rightDepth) {
-        return left.second->GetCreateTime() < right.second->GetCreateTime();
-    }
-    return false;
+        // 深度相同时，按创建时间排序
+        return left.config.second->GetCreateTime() < right.config.second->GetCreateTime();
+    });
 }
 
 bool FileDiscoveryOptions::Init(const Json::Value& config,
@@ -150,55 +143,76 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                            ctx.GetLogstoreName(),
                            ctx.GetRegion());
     }
-    if (mFilePaths.size() != 1) {
+    if (mFilePaths.size() == 0) {
         PARAM_ERROR_RETURN(ctx.GetLogger(),
                            ctx.GetAlarm(),
-                           "list param FilePaths has more than 1 element",
+                           "list param FilePaths is empty",
+                           pluginType,
+                           ctx.GetConfigName(),
+                           ctx.GetProjectName(),
+                           ctx.GetLogstoreName(),
+                           ctx.GetRegion());
+    } else if (mFilePaths.size() > static_cast<size_t>(INT32_FLAG(max_file_paths_per_input_config))) {
+        PARAM_ERROR_RETURN(ctx.GetLogger(),
+                           ctx.GetAlarm(),
+                           "list param FilePaths has more than " + ToString(INT32_FLAG(max_file_paths_per_input_config))
+                               + " elements",
                            pluginType,
                            ctx.GetConfigName(),
                            ctx.GetProjectName(),
                            ctx.GetLogstoreName(),
                            ctx.GetRegion());
     }
-    auto dirAndFile = GetDirAndFileNameFromPath(mFilePaths[0]);
-    mBasePath = dirAndFile.first, mFilePattern = dirAndFile.second;
-    if (mBasePath.empty() || mFilePattern.empty()) {
-        PARAM_ERROR_RETURN(ctx.GetLogger(),
-                           ctx.GetAlarm(),
-                           "string param FilePaths[0] is invalid",
-                           pluginType,
-                           ctx.GetConfigName(),
-                           ctx.GetProjectName(),
-                           ctx.GetLogstoreName(),
-                           ctx.GetRegion());
-    }
+    // Support multiple paths now
+    for (size_t i = 0; i < mFilePaths.size(); ++i) {
+        auto dirAndFile = GetDirAndFileNameFromPath(mFilePaths[i]);
+        string basePath = ConvertAndNormalizeNativePath(dirAndFile.first);
+        string filePattern = ConvertAndNormalizeNativePath(dirAndFile.second);
+
+        BasePathInfo pathInfo(basePath, filePattern);
+
+        if (pathInfo.basePath.empty() || pathInfo.filePattern.empty()) {
+            PARAM_ERROR_RETURN(ctx.GetLogger(),
+                               ctx.GetAlarm(),
+                               "string param FilePaths[" + ToString(i) + "] is invalid",
+                               pluginType,
+                               ctx.GetConfigName(),
+                               ctx.GetProjectName(),
+                               ctx.GetLogstoreName(),
+                               ctx.GetRegion());
+        }
+        size_t len = pathInfo.basePath.size();
+        if (len > 2 && pathInfo.basePath[len - 1] == '*' && pathInfo.basePath[len - 2] == '*'
+            && pathInfo.basePath[len - 3] == filesystem::path::preferred_separator) {
+            if (len == 3) {
+                // for parent path like /**, we should maintain root dir, i.e., /
+                pathInfo.basePath = pathInfo.basePath.substr(0, len - 2);
+            } else {
+                pathInfo.basePath = pathInfo.basePath.substr(0, len - 3);
 #if defined(_MSC_VER)
-    mBasePath = EncodingConverter::GetInstance()->FromUTF8ToACP(mBasePath);
-    mFilePattern = EncodingConverter::GetInstance()->FromUTF8ToACP(mFilePattern);
+                // For Windows, if the result is a drive letter (e.g., "C:"), append backslash
+                // to make it a proper root path (e.g., "C:\\")
+                if (pathInfo.basePath.size() == 2 && pathInfo.basePath[1] == ':') {
+                    pathInfo.basePath += filesystem::path::preferred_separator;
+                }
 #endif
-    size_t len = mBasePath.size();
-    if (len > 2 && mBasePath[len - 1] == '*' && mBasePath[len - 2] == '*'
-        && mBasePath[len - 3] == filesystem::path::preferred_separator) {
-        if (len == 3) {
-            // for parent path like /**, we should maintain root dir, i.e., /
-            mBasePath = mBasePath.substr(0, len - 2);
-        } else {
-            mBasePath = mBasePath.substr(0, len - 3);
+            }
+            // MaxDirSearchDepth is only valid when parent path ends with **
+            if (!GetOptionalIntParam(config, "MaxDirSearchDepth", mMaxDirSearchDepth, errorMsg)) {
+                PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                                      ctx.GetAlarm(),
+                                      errorMsg,
+                                      mMaxDirSearchDepth,
+                                      pluginType,
+                                      ctx.GetConfigName(),
+                                      ctx.GetProjectName(),
+                                      ctx.GetLogstoreName(),
+                                      ctx.GetRegion());
+            }
         }
-        // MaxDirSearchDepth is only valid when parent path ends with **
-        if (!GetOptionalIntParam(config, "MaxDirSearchDepth", mMaxDirSearchDepth, errorMsg)) {
-            PARAM_WARNING_DEFAULT(ctx.GetLogger(),
-                                  ctx.GetAlarm(),
-                                  errorMsg,
-                                  mMaxDirSearchDepth,
-                                  pluginType,
-                                  ctx.GetConfigName(),
-                                  ctx.GetProjectName(),
-                                  ctx.GetLogstoreName(),
-                                  ctx.GetRegion());
-        }
+        ParseWildcardPath(pathInfo);
+        mBasePathInfos.push_back(std::move(pathInfo));
     }
-    ParseWildcardPath();
 
     // PreservedDirDepth
     if (!GetOptionalIntParam(config, "PreservedDirDepth", mPreservedDirDepth, errorMsg)) {
@@ -225,7 +239,8 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeFilePaths.size(); ++i) {
-            if (!filesystem::path(mExcludeFilePaths[i]).is_absolute()) {
+            string excludeFilePath = ConvertAndNormalizeNativePath(mExcludeFilePaths[i]);
+            if (!filesystem::path(excludeFilePath).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeFilePaths[" + ToString(i) + "] is not absolute",
@@ -238,9 +253,9 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeFilePaths[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLFilePathBlacklist.push_back(mExcludeFilePaths[i]);
+                mMLFilePathBlacklist.push_back(excludeFilePath);
             } else {
-                mFilePathBlacklist.push_back(mExcludeFilePaths[i]);
+                mFilePathBlacklist.push_back(excludeFilePath);
             }
         }
     }
@@ -268,7 +283,7 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                                      ctx.GetRegion());
                 continue;
             }
-            mFileNameBlacklist.push_back(mExcludeFiles[i]);
+            mFileNameBlacklist.push_back(ConvertAndNormalizeNativePath(mExcludeFiles[i]));
         }
     }
 
@@ -284,7 +299,9 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
                              ctx.GetRegion());
     } else {
         for (size_t i = 0; i < mExcludeDirs.size(); ++i) {
-            if (!filesystem::path(mExcludeDirs[i]).is_absolute()) {
+            string excludeDir = ConvertAndNormalizeNativePath(mExcludeDirs[i]);
+
+            if (!filesystem::path(excludeDir).is_absolute()) {
                 PARAM_WARNING_IGNORE(ctx.GetLogger(),
                                      ctx.GetAlarm(),
                                      "string param ExcludeDirs[" + ToString(i) + "] is not absolute",
@@ -297,15 +314,15 @@ bool FileDiscoveryOptions::Init(const Json::Value& config,
             }
             bool isMultipleLevelWildcard = mExcludeDirs[i].find("**") != string::npos;
             if (isMultipleLevelWildcard) {
-                mMLWildcardDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mMLWildcardDirPathBlacklist.push_back(excludeDir);
                 continue;
             }
             bool isWildcardPath
                 = mExcludeDirs[i].find("*") != string::npos || mExcludeDirs[i].find("?") != string::npos;
             if (isWildcardPath) {
-                mWildcardDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mWildcardDirPathBlacklist.push_back(excludeDir);
             } else {
-                mDirPathBlacklist.push_back(mExcludeDirs[i]);
+                mDirPathBlacklist.push_back(excludeDir);
             }
         }
     }
@@ -355,14 +372,14 @@ pair<string, string> FileDiscoveryOptions::GetDirAndFileNameFromPath(const strin
     return make_pair(path.parent_path().string(), path.filename().string());
 }
 
-void FileDiscoveryOptions::ParseWildcardPath() {
-    mWildcardPaths.clear();
-    mConstWildcardPaths.clear();
-    mWildcardDepth = 0;
-    if (mBasePath.size() == 0)
+void FileDiscoveryOptions::ParseWildcardPath(BasePathInfo& pathInfo) {
+    pathInfo.wildcardPaths.clear();
+    pathInfo.constWildcardPaths.clear();
+    pathInfo.wildcardDepth = 0;
+    if (pathInfo.basePath.size() == 0)
         return;
-    size_t posA = mBasePath.find('*', 0);
-    size_t posB = mBasePath.find('?', 0);
+    size_t posA = pathInfo.basePath.find('*', 0);
+    size_t posB = pathInfo.basePath.find('?', 0);
     size_t pos;
     if (posA == string::npos) {
         if (posB == string::npos)
@@ -377,7 +394,7 @@ void FileDiscoveryOptions::ParseWildcardPath() {
     }
     if (pos == 0)
         return;
-    pos = mBasePath.rfind(filesystem::path::preferred_separator, pos);
+    pos = pathInfo.basePath.rfind(filesystem::path::preferred_separator, pos);
     if (pos == string::npos)
         return;
 
@@ -386,43 +403,45 @@ void FileDiscoveryOptions::ParseWildcardPath() {
 #if defined(__linux__)
     if (pos == 0)
 #elif defined(_MSC_VER)
-    if (pos - 1 == mBasePath.find(':'))
+    if (pos - 1 == pathInfo.basePath.find(':'))
 #endif
     {
-        mWildcardPaths.push_back(mBasePath.substr(0, pos + 1));
+        pathInfo.wildcardPaths.push_back(pathInfo.basePath.substr(0, pos + 1));
     } else
-        mWildcardPaths.push_back(mBasePath.substr(0, pos));
+        pathInfo.wildcardPaths.push_back(pathInfo.basePath.substr(0, pos));
     while (true) {
-        size_t nextPos = mBasePath.find(filesystem::path::preferred_separator, pos + 1);
+        size_t nextPos = pathInfo.basePath.find(filesystem::path::preferred_separator, pos + 1);
         if (nextPos == string::npos)
             break;
-        mWildcardPaths.push_back(mBasePath.substr(0, nextPos));
-        string dirName = mBasePath.substr(pos + 1, nextPos - pos - 1);
+        pathInfo.wildcardPaths.push_back(pathInfo.basePath.substr(0, nextPos));
+        string dirName = pathInfo.basePath.substr(pos + 1, nextPos - pos - 1);
         if (dirName.find('?') == string::npos && dirName.find('*') == string::npos) {
-            mConstWildcardPaths.push_back(dirName);
+            pathInfo.constWildcardPaths.push_back(dirName);
         } else {
-            mConstWildcardPaths.push_back("");
+            pathInfo.constWildcardPaths.push_back("");
         }
         pos = nextPos;
     }
-    mWildcardPaths.push_back(mBasePath);
-    if (pos < mBasePath.size()) {
-        string dirName = mBasePath.substr(pos + 1);
+    pathInfo.wildcardPaths.push_back(pathInfo.basePath);
+    if (pos < pathInfo.basePath.size()) {
+        string dirName = pathInfo.basePath.substr(pos + 1);
         if (dirName.find('?') == string::npos && dirName.find('*') == string::npos) {
-            mConstWildcardPaths.push_back(dirName);
+            pathInfo.constWildcardPaths.push_back(dirName);
         } else {
-            mConstWildcardPaths.push_back("");
+            pathInfo.constWildcardPaths.push_back("");
         }
     }
 
-    for (size_t i = 0; i < mBasePath.size(); ++i) {
-        if (filesystem::path::preferred_separator == mBasePath[i])
-            ++mWildcardDepth;
+    for (size_t i = 0; i < pathInfo.basePath.size(); ++i) {
+        if (filesystem::path::preferred_separator == pathInfo.basePath[i])
+            ++pathInfo.wildcardDepth;
     }
 }
 
-bool FileDiscoveryOptions::IsFilenameMatched(const std::string& filename) const {
-    return fnmatch(mFilePattern.c_str(), filename.c_str(), 0) == 0;
+
+bool FileDiscoveryOptions::IsFilenameMatched(const std::string& filename, const BasePathInfo& pathInfo) const {
+    // Check if filename matches the specific pathInfo's filePattern
+    return fnmatch(pathInfo.filePattern.c_str(), filename.c_str(), 0) == 0;
 }
 
 bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
@@ -430,18 +449,20 @@ bool FileDiscoveryOptions::IsDirectoryInBlacklist(const string& dir) const {
         return false;
     }
 
+    const string nativeDir = NormalizeNativePath(dir);
+
     for (auto& dp : mDirPathBlacklist) {
-        if (_IsSubPath(dp, dir)) {
+        if (_IsSubPath(dp, nativeDir)) {
             return true;
         }
     }
     for (auto& dp : mWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dir.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(dp.c_str(), nativeDir.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& dp : mMLWildcardDirPathBlacklist) {
-        if (0 == fnmatch(dp.c_str(), dir.c_str(), 0)) {
+        if (0 == fnmatch(dp.c_str(), nativeDir.c_str(), 0)) {
             return true;
         }
     }
@@ -453,13 +474,15 @@ bool FileDiscoveryOptions::IsFilepathInBlacklist(const std::string& filepath) co
         return false;
     }
 
+    const string nativePath = NormalizeNativePath(filepath);
+
     for (const auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filepath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (const auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filepath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), 0)) {
             return true;
         }
     }
@@ -479,13 +502,15 @@ bool FileDiscoveryOptions::IsObjectInBlacklist(const string& path, const string&
     }
 
     auto const filePath = PathJoin(path, name);
+    const string nativePath = NormalizeNativePath(filePath);
+
     for (auto& fp : mFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filePath.c_str(), FNM_PATHNAME)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), FNM_PATHNAME)) {
             return true;
         }
     }
     for (auto& fp : mMLFilePathBlacklist) {
-        if (0 == fnmatch(fp.c_str(), filePath.c_str(), 0)) {
+        if (0 == fnmatch(fp.c_str(), nativePath.c_str(), 0)) {
             return true;
         }
     }
@@ -510,74 +535,133 @@ bool FileDiscoveryOptions::IsFilenameInBlacklist(const string& fileName) const {
 // @path: absolute path of location in where the object stores in.
 // @name: the name of the object. If the object is directory, this parameter will be empty.
 bool FileDiscoveryOptions::IsMatch(const string& path, const string& name) const {
-    // Check if the file name is matched or blacklisted.
-    if (!name.empty()) {
-        if (fnmatch(mFilePattern.c_str(), name.c_str(), 0) != 0)
-            return false;
-        if (IsFilenameInBlacklist(name)) {
-            return false;
-        }
-    }
-
-    // File in docker.
-    if (mEnableContainerDiscovery) {
-        if (mWildcardPaths.size() > (size_t)0) {
-            ContainerInfo* containerPath = GetContainerPathByLogPath(path);
-            if (containerPath == NULL) {
-                return false;
-            }
-            // convert Logtail's real path to config path. eg /host_all/var/lib/xxx/home/admin/logs -> /home/admin/logs
-            if (mWildcardPaths[0].size() == (size_t)1) {
-                // if mWildcardPaths[0] is root path, do not add mWildcardPaths[0]
-                return IsWildcardPathMatch(path.substr(containerPath->mRealBaseDir.size()), name);
-            } else {
-                string convertPath = mWildcardPaths[0] + path.substr(containerPath->mRealBaseDir.size());
-                return IsWildcardPathMatch(convertPath, name);
-            }
-        }
-
-        // Normal base path.
-        for (size_t i = 0; i < mContainerInfos->size(); ++i) {
-            const string& containerBasePath = (*mContainerInfos)[i].mRealBaseDir;
-            if (_IsPathMatched(containerBasePath, path, mMaxDirSearchDepth)) {
-                if (!mHasBlacklist) {
-                    return true;
-                }
-
-                // ContainerBasePath contains base path, remove it.
-                auto pathInContainer = mBasePath + path.substr(containerBasePath.size());
-                if (!IsObjectInBlacklist(pathInContainer, name))
-                    return true;
-            }
-        }
-        return false;
-    }
-
-    // File not in docker: wildcard or non-wildcard.
-    if (mWildcardPaths.empty()) {
-        return _IsPathMatched(mBasePath, path, mMaxDirSearchDepth) && !IsObjectInBlacklist(path, name);
-    } else
-        return IsWildcardPathMatch(path, name);
+    return IsMatch(path, name, nullptr);
 }
 
-bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string& name) const {
+// IsMatch with match info output
+bool FileDiscoveryOptions::IsMatch(const string& path, const string& name, int32_t* outMatchedPathDepth) const {
+    // Iterate through all path configurations with index
+    for (size_t pathInfoIdx = 0; pathInfoIdx < mBasePathInfos.size(); ++pathInfoIdx) {
+        const auto& pathInfo = mBasePathInfos[pathInfoIdx];
+        // Check if the file name is matched with this path's pattern
+        if (!name.empty()) {
+            if (fnmatch(pathInfo.filePattern.c_str(), name.c_str(), 0) != 0)
+                continue; // Not matched, try next path
+            if (IsFilenameInBlacklist(name)) {
+                continue; // In blacklist, try next path
+            }
+        }
+
+        // File in docker.
+        if (mEnableContainerDiscovery) {
+            if (pathInfo.wildcardPaths.size() > (size_t)0) {
+                ContainerInfo* containerPath = GetContainerPathByLogPath(path);
+                if (containerPath == NULL) {
+                    continue; // Try next path
+                }
+
+                // 找到该 path 对应的 mRealBaseDirs 索引
+                size_t realBaseDirIndex = GetRealBaseDirIndex(containerPath, path);
+                if (realBaseDirIndex >= containerPath->mRealBaseDirs.size()
+                    || containerPath->mRealBaseDirs[realBaseDirIndex].empty()) {
+                    continue; // 该路径未映射或索引越界
+                }
+
+                const string& realBaseDir = containerPath->mRealBaseDirs[realBaseDirIndex];
+
+                // convert Logtail's real path to config path. eg /host_all/var/lib/xxx/home/admin/logs ->
+                // /home/admin/logs
+                if (pathInfo.wildcardPaths[0].size() == (size_t)1) {
+                    // if wildcardPaths[0] is root path, do not add wildcardPaths[0]
+                    if (IsWildcardPathMatch(path.substr(realBaseDir.size()), name, pathInfo)) {
+                        if (outMatchedPathDepth)
+                            *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                        return true;
+                    }
+                } else {
+                    string convertPath = pathInfo.wildcardPaths[0] + path.substr(realBaseDir.size());
+                    if (IsWildcardPathMatch(convertPath, name, pathInfo)) {
+                        if (outMatchedPathDepth)
+                            *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                        return true;
+                    }
+                }
+                continue; // Try next path
+            }
+
+            // Normal base path.
+            for (size_t i = 0; i < mContainerInfos->size(); ++i) {
+                // 只检查当前 pathInfo 对应的 mRealBaseDirs 索引
+                if (pathInfoIdx >= (*mContainerInfos)[i].mRealBaseDirs.size()) {
+                    continue; // 索引越界，跳过该容器
+                }
+
+                const string& containerBasePath = (*mContainerInfos)[i].mRealBaseDirs[pathInfoIdx];
+                if (containerBasePath.empty()) {
+                    continue; // 跳过空路径
+                }
+
+                if (_IsPathMatched(containerBasePath, path, mMaxDirSearchDepth)) {
+                    if (!mHasBlacklist) {
+                        if (outMatchedPathDepth)
+                            *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                        return true;
+                    }
+
+                    // ContainerBasePath contains base path, remove it.
+                    auto pathInContainer = pathInfo.basePath + path.substr(containerBasePath.size());
+                    LOG_DEBUG(sLogger, ("pathInContainer", pathInContainer)("name", name));
+                    if (!IsObjectInBlacklist(pathInContainer, name)) {
+                        if (outMatchedPathDepth)
+                            *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                        return true;
+                    }
+                }
+            }
+            continue; // Try next path
+        }
+
+        // File not in docker: wildcard or non-wildcard.
+        if (pathInfo.wildcardPaths.empty()) {
+            if (_IsPathMatched(pathInfo.basePath, path, mMaxDirSearchDepth) && !IsObjectInBlacklist(path, name)) {
+                if (outMatchedPathDepth)
+                    *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                return true; // Matched!
+            }
+        } else {
+            if (IsWildcardPathMatch(path, name, pathInfo)) {
+                if (outMatchedPathDepth)
+                    *outMatchedPathDepth = CalculatePathDepth(pathInfo.basePath);
+                return true; // Matched!
+            }
+        }
+    }
+
+    return false; // No path matched
+}
+
+bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path,
+                                               const string& name,
+                                               const BasePathInfo& pathInfo) const {
+    const string nativePath = NormalizeNativePath(path);
     size_t pos = 0;
     int16_t d = 0;
-    int16_t maxWildcardDepth = mWildcardDepth + 1;
+    int16_t maxWildcardDepth = pathInfo.wildcardDepth + 1;
     while (d < maxWildcardDepth) {
-        pos = path.find(PATH_SEPARATOR[0], pos);
+        pos = nativePath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             break;
         ++d;
         ++pos;
     }
 
-    if (d < mWildcardDepth)
+    if (d < pathInfo.wildcardDepth)
         return false;
-    else if (d == mWildcardDepth) {
-        return fnmatch(mBasePath.c_str(), path.c_str(), FNM_PATHNAME) == 0 && !IsObjectInBlacklist(path, name);
+    else if (d == pathInfo.wildcardDepth) {
+        return fnmatch(pathInfo.basePath.c_str(), nativePath.c_str(), FNM_PATHNAME) == 0
+            && !IsObjectInBlacklist(path, name);
     } else if (pos > 0) {
-        if (!(fnmatch(mBasePath.c_str(), path.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
+        if (!(fnmatch(pathInfo.basePath.c_str(), nativePath.substr(0, pos - 1).c_str(), FNM_PATHNAME) == 0
               && !IsObjectInBlacklist(path, name))) {
             return false;
         }
@@ -590,7 +674,7 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
         return true;
     int depth = 1;
     while (depth < mMaxDirSearchDepth + 1) {
-        pos = path.find(PATH_SEPARATOR[0], pos);
+        pos = nativePath.find(PATH_SEPARATOR[0], pos);
         if (pos == string::npos)
             return true;
         ++depth;
@@ -599,19 +683,22 @@ bool FileDiscoveryOptions::IsWildcardPathMatch(const string& path, const string&
     return false;
 }
 
-// XXX: assume path is a subdir under mBasePath
+// XXX: assume path is a subdir under one of the base paths
 bool FileDiscoveryOptions::IsTimeout(const string& path) const {
     if (mPreservedDirDepth < 0)
         return false;
 
-    // we do not check if (path.find(mBasePath) == 0)
-    size_t pos = mBasePath.size();
-    int depthCount = 0;
-    while ((pos = path.find(PATH_SEPARATOR[0], pos)) != string::npos) {
-        ++depthCount;
-        ++pos;
-        if (depthCount > mPreservedDirDepth)
-            return true;
+    // Check against all base paths
+    for (const auto& pathInfo : mBasePathInfos) {
+        // we do not check if (path.find(basePath) == 0)
+        size_t pos = pathInfo.basePath.size();
+        int depthCount = 0;
+        while ((pos = path.find(PATH_SEPARATOR[0], pos)) != string::npos) {
+            ++depthCount;
+            ++pos;
+            if (depthCount > mPreservedDirDepth)
+                return true;
+        }
     }
     return false;
 }
@@ -625,46 +712,48 @@ bool FileDiscoveryOptions::WithinMaxDepth(const string& path) const {
         return IsMatch(path, "");
     }
 
-    {
-        const auto& base = mWildcardPaths.empty() ? mBasePath : mWildcardPaths[0];
+    // Check against all base paths
+    for (const auto& pathInfo : mBasePathInfos) {
+        const auto& base = pathInfo.wildcardPaths.empty() ? pathInfo.basePath : pathInfo.wildcardPaths[0];
         if (isNotSubPath(base, path)) {
-            LOG_ERROR(sLogger, ("path is not child of basePath, path", path)("basePath", base));
-            return false;
+            continue; // Try next path
         }
-    }
 
-    if (mWildcardPaths.size() == 0) {
-        size_t pos = mBasePath.size();
-        int depthCount = 0;
-        while ((pos = path.find(PATH_SEPARATOR, pos)) != string::npos) {
-            ++depthCount;
-            ++pos;
-            if (depthCount > mMaxDirSearchDepth)
-                return false;
-        }
-    } else {
-        int32_t depth = 0 - mWildcardDepth;
-        for (size_t i = 0; i < path.size(); ++i) {
-            if (path[i] == PATH_SEPARATOR[0])
-                ++depth;
-        }
-        if (depth < 0) {
-            LOG_ERROR(sLogger, ("invalid sub dir", path)("basePath", mBasePath));
-            return false;
-        } else if (depth > mMaxDirSearchDepth)
-            return false;
-        else {
-            // Windows doesn't support double *, so we have to check this.
-            auto basePath = mBasePath;
-            if (basePath.empty() || basePath.back() != '*')
-                basePath += '*';
-            if (fnmatch(basePath.c_str(), path.c_str(), 0) != 0) {
-                LOG_ERROR(sLogger, ("invalid sub dir", path)("basePath", mBasePath));
-                return false;
+        if (pathInfo.wildcardPaths.size() == 0) {
+            size_t pos = pathInfo.basePath.size();
+            int depthCount = 0;
+            while ((pos = path.find(PATH_SEPARATOR, pos)) != string::npos) {
+                ++depthCount;
+                ++pos;
+                if (depthCount > mMaxDirSearchDepth)
+                    return false;
+            }
+            return true; // Within depth for this path
+        } else {
+            int32_t depth = 0 - pathInfo.wildcardDepth;
+            for (size_t i = 0; i < path.size(); ++i) {
+                if (path[i] == PATH_SEPARATOR[0])
+                    ++depth;
+            }
+            if (depth < 0) {
+                LOG_ERROR(sLogger, ("invalid sub dir", path)("basePath", pathInfo.basePath));
+                continue; // Try next path
+            } else if (depth > mMaxDirSearchDepth) {
+                continue; // Try next path
+            } else {
+                // Windows doesn't support double *, so we have to check this.
+                auto basePath = pathInfo.basePath;
+                if (basePath.empty() || basePath.back() != '*')
+                    basePath += '*';
+                if (fnmatch(basePath.c_str(), path.c_str(), 0) != 0) {
+                    LOG_ERROR(sLogger, ("invalid sub dir", path)("basePath", pathInfo.basePath));
+                    continue; // Try next path
+                }
+                return true; // Matched this path
             }
         }
     }
-    return true;
+    return false; // No path matched
 }
 
 ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& logPath) const {
@@ -673,11 +762,37 @@ ContainerInfo* FileDiscoveryOptions::GetContainerPathByLogPath(const string& log
     }
     // reverse order to find the latest container
     for (int i = mContainerInfos->size() - 1; i >= 0; --i) {
-        if (_IsSubPath((*mContainerInfos)[i].mRealBaseDir, logPath)) {
-            return &(*mContainerInfos)[i];
+        // 检查该容器的所有真实路径
+        for (const auto& realBaseDir : (*mContainerInfos)[i].mRealBaseDirs) {
+            if (!realBaseDir.empty() && _IsSubPath(realBaseDir, logPath)) {
+                return &(*mContainerInfos)[i];
+            }
         }
     }
     return NULL;
+}
+
+// 根据实际文件路径，找到它对应的 mRealBaseDirs 索引
+size_t FileDiscoveryOptions::GetRealBaseDirIndex(const ContainerInfo* containerInfo, const string& logPath) const {
+    if (!containerInfo) {
+        return 0;
+    }
+
+    // 找到最长匹配的路径索引
+    size_t bestMatchIndex = 0;
+    size_t longestMatchLength = 0;
+
+    for (size_t i = 0; i < containerInfo->mRealBaseDirs.size(); ++i) {
+        const string& realBaseDir = containerInfo->mRealBaseDirs[i];
+        if (!realBaseDir.empty() && _IsSubPath(realBaseDir, logPath)) {
+            if (realBaseDir.size() > longestMatchLength) {
+                longestMatchLength = realBaseDir.size();
+                bestMatchIndex = i;
+            }
+        }
+    }
+
+    return bestMatchIndex;
 }
 
 

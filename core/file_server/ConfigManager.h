@@ -251,7 +251,10 @@ public:
     // 废弃
     // const std::unordered_map<std::string, Config*>& GetAllConfig() { return mNameConfigMap; }
 
-    void RegisterWildcardPath(const FileDiscoveryConfig& config, const std::string& path, int32_t depth);
+    void RegisterWildcardPath(const FileDiscoveryConfig& config,
+                              const BasePathInfo& pathInfo,
+                              const std::string& path,
+                              int32_t depth);
     bool RegisterHandlers(const std::string& basePath, const FileDiscoveryConfig& config);
     bool RegisterHandlers();
     bool RegisterHandlersRecursively(const std::string& dir, const FileDiscoveryConfig& config, bool checkTimeout);

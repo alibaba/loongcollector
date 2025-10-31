@@ -248,7 +248,7 @@ std::string InputContainerStdio::TryGetRealPath(const std::string& path) {
 bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
                                                        const CollectionPipelineContext* ctx,
                                                        const FileDiscoveryOptions*) {
-    if (!containerInfo.mRealBaseDir.empty()) {
+    if (!containerInfo.mRealBaseDirs.empty()) {
         return true;
     }
 
@@ -272,17 +272,22 @@ bool InputContainerStdio::DeduceAndSetContainerBaseDir(ContainerInfo& containerI
             ctx->GetLogstoreName());
         return false;
     }
+
+    std::string realBaseDir;
     size_t pos = realPath.find_last_of('/');
     if (pos != std::string::npos) {
-        containerInfo.mRealBaseDir = realPath.substr(0, pos);
+        realBaseDir = realPath.substr(0, pos);
     }
-    if (containerInfo.mRealBaseDir.length() > 1 && containerInfo.mRealBaseDir.back() == '/') {
-        containerInfo.mRealBaseDir.pop_back();
+    if (realBaseDir.length() > 1 && realBaseDir.back() == '/') {
+        realBaseDir.pop_back();
     }
-    LOG_INFO(
-        sLogger,
-        ("set container base dir", containerInfo.mRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID)(
-            "raw log path", containerInfo.mRawContainerInfo->mLogPath)("config", ctx->GetPipeline().Name()));
+
+    // 标准输入输出场景只需要一个路径
+    containerInfo.mRealBaseDirs.push_back(realBaseDir);
+
+    LOG_INFO(sLogger,
+             ("set container base dir", realBaseDir)("container id", containerInfo.mRawContainerInfo->mID)(
+                 "raw log path", containerInfo.mRawContainerInfo->mLogPath)("config", ctx->GetPipeline().Name()));
     return true;
 }
 

@@ -16,6 +16,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/StaticFileServer.h"
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
@@ -77,6 +78,7 @@ void InputStaticFileUnittest::OnSuccessfulInit() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
     configStr = R"(
@@ -144,6 +146,7 @@ void InputStaticFileUnittest::OnFailedInit() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
 
     // file path not existed
     input.reset(new InputStaticFile());
@@ -190,6 +193,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("*.log");
+    filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
         configStr = R"(
@@ -398,6 +402,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
     filesystem::path filePath = filesystem::absolute("./test_logs/*.log");
+    filePath = NormalizeNativePath(filePath.string());
     {
         // new config
         configStr = R"(
@@ -513,6 +518,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         filesystem::create_directories("invalid_dir");
 
         filesystem::path filePath = filesystem::absolute("test_logs/*/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -529,6 +535,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         filesystem::create_directories("test_logs/dir");
 
         filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -546,6 +553,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         { ofstream fout("test_logs/dir/invalid_dir"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -567,6 +575,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         { ofstream fout("test_logs/dir2/dir/valid_dir/test2.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/dir*/dir/valid_dir/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -588,6 +597,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         { ofstream fout("test_logs/dir2/test2.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/dir*/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -605,6 +615,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         filesystem::create_directories("invalid_dir");
 
         filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -621,6 +632,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         { ofstream fout("test_logs"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
@@ -646,6 +658,9 @@ void InputStaticFileUnittest::TestGetFiles() {
         filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
         filesystem::path excludeFilePath = filesystem::absolute("test_logs/dir*/exlcude_filepath.log");
         filesystem::path excludeDir = filesystem::absolute("test_logs/exclude*");
+        filePath = NormalizeNativePath(filePath.string());
+        excludeFilePath = NormalizeNativePath(excludeFilePath.string());
+        excludeDir = NormalizeNativePath(excludeDir.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         configJson["MaxDirSearchDepth"] = Json::Value(1);
@@ -664,10 +679,13 @@ void InputStaticFileUnittest::TestGetFiles() {
     {
         // loop caused by symlink
         filesystem::create_directories("test_logs/dir1/dir2");
-        filesystem::create_directory_symlink(filesystem::absolute("test_logs/dir1"), "test_logs/dir1/dir2/dir3");
+        filesystem::path symlinkTarget = filesystem::absolute("test_logs/dir1");
+        symlinkTarget = NormalizeNativePath(symlinkTarget.string());
+        filesystem::create_directory_symlink(symlinkTarget, "test_logs/dir1/dir2/dir3");
         { ofstream fout("test_logs/dir1/test.log"); }
 
         filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         configJson["MaxDirSearchDepth"] = Json::Value(100);

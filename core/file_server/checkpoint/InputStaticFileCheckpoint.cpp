@@ -14,6 +14,7 @@
 
 #include "file_server/checkpoint/InputStaticFileCheckpoint.h"
 
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/ParamExtractor.h"
 #include "common/TimeUtil.h"
@@ -72,7 +73,8 @@ InputStaticFileCheckpoint::InputStaticFileCheckpoint(const string& configName,
       mInputIdx(idx),
       mFileCheckpoints(std::move(fileCpts)),
       mStartTime(startTime),
-      mExpireTime(expireTime) {
+      mExpireTime(expireTime),
+      mWaitingSentFlags(mFileCheckpoints.size(), false) {
 }
 
 bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump) {
@@ -301,7 +303,7 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".filepath", filepath, *errMsg)) {
             return false;
         }
-        cpt.mFilePath = filepath;
+        cpt.mFilePath = ConvertAndNormalizeNativePath(filepath);
 
         string statusStr;
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
@@ -372,6 +374,10 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         }
         mFileCheckpoints.emplace_back(std::move(cpt));
     }
+
+    // 初始化等待发送标志数组
+    mWaitingSentFlags.resize(mFileCheckpoints.size(), false);
+
     return true;
 }
 
@@ -443,6 +449,16 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
     // 从上次发送位置开始发送，避免重复处理已发送的文件
     for (size_t i = startIndex; i < mFileCheckpoints.size(); ++i) {
         const auto& cpt = mFileCheckpoints[i];
+
+        // 对于 WAITING 状态的文件，检查是否已经发送过
+        if (cpt.mStatus == FileStatus::WAITING) {
+            if (mWaitingSentFlags[i]) {
+                // 已经发送过，跳过
+                continue;
+            }
+            // 标记为已发送
+            mWaitingSentFlags[i] = true;
+        }
 
         LogEvent* logEvent = SelfMonitorServer::GetInstance()->AddTaskStatus(region);
         if (!logEvent) {

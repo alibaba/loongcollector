@@ -45,6 +45,7 @@ extern const std::string METRIC_AGENT_MEMORY;
 extern const std::string METRIC_AGENT_MEMORY_GO;
 extern const std::string METRIC_AGENT_OPEN_FD_TOTAL;
 extern const std::string METRIC_AGENT_PIPELINE_CONFIG_TOTAL;
+extern const std::string METRIC_AGENT_HOST_MONITOR_TOTAL;
 
 //////////////////////////////////////////////////////////////////////////
 // pipeline
@@ -295,6 +296,7 @@ extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_K8S_METADATA;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_STATIC_FILE_SERVER;
 
 // metric keys
 extern const std::string& METRIC_RUNNER_IN_EVENTS_TOTAL;
@@ -337,6 +339,11 @@ extern const std::string METRIC_RUNNER_FILE_POLLING_DIR_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_FILE_POLLING_FILE_CACHE_SIZE;
 
 /**********************************************************
+ *   static file server
+ **********************************************************/
+extern const std::string METRIC_RUNNER_STATIC_FILE_SERVER_ACTIVE_INPUTS_COUNT;
+
+/**********************************************************
  *   ebpf server
  **********************************************************/
 extern const std::string METRIC_RUNNER_EBPF_POLL_PROCESS_EVENTS_TOTAL;
@@ -358,5 +365,39 @@ extern const std::string METRIC_RUNNER_METADATA_IP_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_METADATA_EXTERNAL_IP_CACHE_SIZE;
 extern const std::string METRIC_RUNNER_METADATA_REQUEST_REMOTE_TOTAL;
 extern const std::string METRIC_RUNNER_METADATA_REQUEST_REMOTE_FAILED_TOTAL;
+
+/**********************************************************
+ *   timer
+ **********************************************************/
+extern const std::string METRIC_RUNNER_TIMER_OUT_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_TIMER_IN_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_TIMER_LATENCY_TIME_MS;
+extern const std::string METRIC_RUNNER_TIMER_QUEUE_ITEMS_TOTAL;
+
+/**********************************************************
+ *   host monitor runner
+ **********************************************************/
+extern const std::string METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_SIZE;
+extern const std::string METRIC_RUNNER_HOST_MONITOR_DROP_ITEMS_TOTAL;
+extern const std::string METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS;
+
+/**********************************************************
+ *   system interface
+ **********************************************************/
+extern const std::string METRIC_RUNNER_SYSTEM_OP_TOTAL;
+extern const std::string METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL;
+extern const std::string METRIC_RUNNER_SYSTEM_CACHE_HIT_TOTAL;
+extern const std::string METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE;
+
+/**********************************************************
+ *   collector fail metrics
+ **********************************************************/
+extern const std::string METRIC_PLUGIN_CPU_FAIL_TOTAL;
+extern const std::string METRIC_PLUGIN_SYSTEM_FAIL_TOTAL;
+extern const std::string METRIC_PLUGIN_MEM_FAIL_TOTAL;
+extern const std::string METRIC_PLUGIN_NET_FAIL_TOTAL;
+extern const std::string METRIC_PLUGIN_PROCESS_FAIL_TOTAL;
+extern const std::string METRIC_PLUGIN_DISK_FAIL_TOTAL;
 
 } // namespace logtail

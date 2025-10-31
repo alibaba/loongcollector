@@ -54,12 +54,14 @@ private:
     PluginMetricManagerPtr mPluginMetricManager;
     IntGaugePtr mMonitorFileTotal;
 
-    void GetValidBaseDirs(const std::filesystem::path& dir,
+    void GetValidBaseDirs(const BasePathInfo& pathInfo,
+                          const std::filesystem::path& dir,
                           uint32_t depth,
                           std::vector<std::filesystem::path>& filepaths) const;
     std::vector<std::filesystem::path> GetFiles() const;
     void GetFiles(const std::filesystem::path& dir,
                   uint32_t depth,
+                  const BasePathInfo* pathInfo,
                   const std::string* containerBaseDir,
                   std::set<DevInode>& visitedDir,
                   std::vector<std::filesystem::path>& files) const;

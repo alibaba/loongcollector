@@ -115,6 +115,34 @@ bool MinidumpCallbackFunc(const wchar_t* dump_path,
 
     auto srcFilePathW = std::wstring(dump_path) + minidump_id + L".dmp";
     std::string srcFilePath(srcFilePathW.begin(), srcFilePathW.end());
+
+    // Backup the dump file to the execution directory with a fixed name
+    auto backupFilePath = AppConfig::GetInstance()->GetProcessExecutionDir() + "crash_dump.dmp";
+    // Remove old backup if exists
+    if (0 == _access(backupFilePath.c_str(), 0)) {
+        remove(backupFilePath.c_str());
+    }
+    // Copy the dump file to backup location
+    FILE* srcFile = fopen(srcFilePath.c_str(), "rb");
+    if (srcFile != NULL) {
+        fseek(srcFile, 0, SEEK_END);
+        long fileSize = ftell(srcFile);
+        fseek(srcFile, 0, SEEK_SET);
+
+        std::vector<char> buffer(fileSize);
+        if (fread(buffer.data(), 1, fileSize, srcFile) == fileSize) {
+            FILE* backupFile = fopen(backupFilePath.c_str(), "wb");
+            if (backupFile != NULL) {
+                fwrite(buffer.data(), 1, fileSize, backupFile);
+                fclose(backupFile);
+                printf("Backup dump file created at %s\n", backupFilePath.c_str());
+            } else {
+                printf("Failed to create backup dump file at %s: %d\n", backupFilePath.c_str(), errno);
+            }
+        }
+        fclose(srcFile);
+    }
+
     if (rename(srcFilePath.c_str(), trgFilePath.c_str())) {
         printf("Rename %s to %s failed: %d", srcFilePath.c_str(), trgFilePath.c_str(), errno);
         return false;
@@ -154,34 +182,27 @@ std::string GetCrashBackTrace() {
     }
 
 #if defined(_MSC_VER)
-    const int MAX_FILE_SIZE = 1024 * 1024;
-    // Windows needs to check the dump size.
-    struct stat fileStat;
-    if (fstat(_fileno(pStackFile), &fileStat) != 0) {
-        LOG_WARNING(sLogger, ("fstat failed", stackFilePath)("errno", errno));
-        fflush(pStackFile);
-        fclose(pStackFile);
-        return "";
-    }
-    if (fileStat.st_size > MAX_FILE_SIZE) {
-        LOG_WARNING(sLogger, ("A dump larger than 1MB", fileStat.st_size));
-        fflush(pStackFile);
-        fclose(pStackFile);
-        return "";
-    }
-    std::vector<char> bufVec(MAX_FILE_SIZE + 1, '\0');
-    char* buf = bufVec.data();
+    // For Windows, don't read the dump content, just return a hint message
+    fclose(pStackFile);
+    remove(stackFilePath.c_str());
+
+    // Return a message with the backup dump file path
+    auto backupFilePath = AppConfig::GetInstance()->GetProcessExecutionDir() + "crash_dump.dmp";
+    std::string hint = "Crash dump file has been saved. Please use debugging tools (e.g., WinDbg, Visual Studio) to "
+                       "analyze the dump file at: "
+        + backupFilePath;
+    return hint;
 #elif defined(__linux__)
     const int MAX_FILE_SIZE = 1024 * 10;
     char buf[MAX_FILE_SIZE + 1];
     memset(buf, 0, MAX_FILE_SIZE + 1);
-#endif
 
     auto len = fread(buf, 1, MAX_FILE_SIZE, pStackFile);
     fflush(pStackFile);
     fclose(pStackFile);
     remove(stackFilePath.c_str());
     return std::string(buf, len);
+#endif
 }
 
 } // namespace logtail

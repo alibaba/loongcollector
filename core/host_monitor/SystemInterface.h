@@ -39,6 +39,7 @@
 #include "collector/MetricCalculate.h"
 #include "common/Flags.h"
 #include "common/ProcParser.h"
+#include "monitor/metric_models/MetricRecord.h"
 
 DECLARE_FLAG_INT32(system_interface_cache_queue_size);
 DECLARE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size);
@@ -614,6 +615,37 @@ struct DiskStateInformation : public BaseInformation {
     std::vector<DiskState> diskStats;
 };
 
+struct GPUStat {
+    std::string gpuId;
+    int64_t decoderUtilization;
+    int64_t encoderUtilization;
+    int64_t gpuUtilization;
+    int64_t memoryTotal;
+    int64_t memoryFree;
+    int64_t memoryUsed;
+    int64_t memoryReserved;
+    int64_t gpuTemperature;
+    double powerUsage;
+};
+
+struct GPUInformation : public BaseInformation {
+    std::vector<GPUStat> stats;
+};
+
+using Int64FieldMap = std::unordered_map<unsigned short, int64_t GPUStat::*>;
+using StringFieldMap = std::unordered_map<unsigned short, std::string GPUStat::*>;
+using DoubleFieldMap = std::unordered_map<unsigned short, double GPUStat::*>;
+// using TimestampFieldMap = ... ; // Placeholder for future expansion
+// using BinaryFieldMap = ... ; // Placeholder for future expansion
+
+struct FieldMap {
+    Int64FieldMap int64Fields;
+    StringFieldMap stringFields;
+    DoubleFieldMap doubleFields;
+    // TimestampFieldMap timestampFields;
+    // BinaryFieldMap binaryFields;
+};
+
 class SystemInterface {
 public:
     template <typename InfoT, typename... Args>
@@ -644,6 +676,7 @@ public:
         mutable std::mutex mMutex;
         std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
         std::chrono::steady_clock::time_point mLastCleanupTime;
         int32_t mMaxCleanupCount;
         std::chrono::seconds mCleanupInterval;
@@ -660,11 +693,13 @@ public:
         SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
         bool Get(time_t targetTime, InfoT& info);
         bool Set(InfoT& info);
+        size_t GetCacheSize() const;
 
     private:
         mutable std::mutex mMutex;
         std::deque<InfoT> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -698,6 +733,8 @@ public:
 
     bool GetTCPStatInformation(time_t now, TCPStatInformation& tcpStatInfo);
     bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
+    bool InitGPUCollector(const FieldMap& fieldMap);
+    bool GetGPUInformation(time_t now, GPUInformation& gpuInfo);
     explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
           mCPUInformationCache(cacheSize),
@@ -717,8 +754,15 @@ public:
           mProcessFdCache(cacheSize),
           mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
-          mNetInterfaceInformationCache(cacheSize) {}
+          mNetInterfaceInformationCache(cacheSize),
+          mGPUInformationCache(cacheSize) {
+        InitMetrics();
+    }
     virtual ~SystemInterface() = default;
+
+    void InitMetrics();
+    void UpdateSystemOpMetrics(bool success);
+    void UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter);
 
 private:
     template <typename F, typename InfoT, typename... Args>
@@ -748,6 +792,8 @@ private:
     virtual bool GetProcessOpenFilesOnce(pid_t pid, ProcessFd& processFd) = 0;
     virtual bool GetTCPStatInformationOnce(TCPStatInformation& tcpStatInfo) = 0;
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
+    virtual bool InitGPUCollectorOnce(const FieldMap& fieldMap) = 0;
+    virtual bool GetGPUInformationOnce(GPUInformation& gpuInfo) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;
@@ -768,6 +814,14 @@ private:
     SystemInformationCache<ProcessExecutePath, pid_t> mExecutePathCache;
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
+    SystemInformationCache<GPUInformation> mGPUInformationCache;
+
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mSystemOpTotal;
+    CounterPtr mSystemOpFailTotal;
+    CounterPtr mCacheHitTotal;
+    IntGaugePtr mCacheItemsSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

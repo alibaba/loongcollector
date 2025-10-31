@@ -98,6 +98,8 @@ size_t LogFileReader::BUFFER_SIZE = 1024 * 512; // 512KB
 
 const int64_t kFirstHashKeySeqID = 1;
 
+const string DELETED_FILE_SUFFIX = "(deleted)";
+
 LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
                                                   const string& hostLogPathFile,
                                                   const DevInode& devInode,
@@ -123,14 +125,32 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
             ContainerInfo* containerPath = discoveryConfig.first->GetContainerPathByLogPath(hostLogPathDir);
             if (containerPath == nullptr) {
                 LOG_ERROR(sLogger,
-                          ("can not get container path by log path, base path",
-                           discoveryConfig.first->GetBasePath())("host path", hostLogPathDir + "/" + hostLogPathFile));
+                          ("can not get container path by log path", "")("host path",
+                                                                         hostLogPathDir + "/" + hostLogPathFile));
             } else {
-                // if config have wildcard path, use mWildcardPaths[0] as base path
-                reader->SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty()
-                                          ? discoveryConfig.first->GetWildcardPaths()[0]
-                                          : discoveryConfig.first->GetBasePath(),
-                                      containerPath->mRealBaseDir.size());
+                // if config have wildcard path, use wildcardPaths[0] as base path
+                std::string dockerPath;
+                size_t realBaseDirSize = 0;
+
+                const auto& pathInfos = discoveryConfig.first->GetBasePathInfos();
+                if (!pathInfos.empty()) {
+                    // 找到该路径对应的索引
+                    size_t realBaseDirIndex = discoveryConfig.first->GetRealBaseDirIndex(containerPath, hostLogPathDir);
+                    realBaseDirSize = containerPath->mRealBaseDirs[realBaseDirIndex].size();
+
+                    if (realBaseDirIndex < pathInfos.size()) {
+                        if (pathInfos[realBaseDirIndex].hasWildcard()) {
+                            dockerPath = pathInfos[realBaseDirIndex].wildcardPaths[0];
+                        } else {
+                            dockerPath = pathInfos[realBaseDirIndex].basePath;
+                        }
+                    } else {
+                        LOG_ERROR(sLogger,
+                                  ("can not get real base dir index by log path",
+                                   "")("host path", hostLogPathDir + "/" + hostLogPathFile));
+                    }
+                }
+                reader->SetDockerPath(dockerPath, realBaseDirSize);
                 reader->SetContainerID(containerPath->mRawContainerInfo->mID);
                 reader->SetContainerMetadatas(containerPath->mRawContainerInfo->mMetadatas);
                 reader->SetContainerCustomMetadatas(containerPath->mRawContainerInfo->mCustomMetadatas);
@@ -266,6 +286,7 @@ void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray
                                                                                      ToString(mLogFileOp.IsOpen())));
     }
     CheckPoint* checkPointPtr = new CheckPoint(mHostLogPath,
+                                               mResolvedHostLogPath,
                                                mLastFilePos,
                                                mLastFileSignatureSize,
                                                mLastFileSignatureHash,
@@ -321,6 +342,7 @@ void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t
             mLastFileSignatureHash = checkPointPtr->mSignatureHash;
             mLastFileSignatureSize = checkPointPtr->mSignatureSize;
             mRealLogPath = checkPointPtr->mRealFileName;
+            mResolvedHostLogPath = checkPointPtr->mResolvedFileName;
             mLastEventTime = checkPointPtr->mLastUpdateTime;
             if (checkPointPtr->mContainerID == mContainerID) {
                 mContainerStopped = checkPointPtr->mContainerStopped;
@@ -1112,6 +1134,7 @@ bool LogFileReader::UpdateFilePtr() {
                 OnOpenFileError();
             } else if (CheckDevInode()) {
                 GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+                ResolveHostLogPath();
                 LOG_INFO(sLogger,
                          ("open file succeeded, project", GetProject())("logstore", GetLogstore())(
                              "config", GetConfigName())("log reader queue name", mHostLogPath)(
@@ -1151,6 +1174,7 @@ bool LogFileReader::UpdateFilePtr() {
             // the mHostLogPath's dev inode equal to mDevInode, so real log path is mHostLogPath
             mRealLogPath = mHostLogPath;
             GloablFileDescriptorManager::GetInstance()->OnFileOpen(this);
+            ResolveHostLogPath();
             LOG_INFO(
                 sLogger,
                 ("open file succeeded, project", GetProject())("logstore", GetLogstore())("config", GetConfigName())(
@@ -1196,6 +1220,11 @@ bool LogFileReader::CloseTimeoutFilePtr(int32_t curTime) {
 }
 
 void LogFileReader::CloseFilePtr() {
+    bool isDeleted = false;
+    CloseFilePtr(isDeleted);
+}
+
+void LogFileReader::CloseFilePtr(bool& isDeleted) {
     if (mLogFileOp.IsOpen()) {
         mCache.shrink_to_fit();
         LOG_DEBUG(sLogger, ("start close LogFileReader", mHostLogPath));
@@ -1250,6 +1279,14 @@ void LogFileReader::CloseFilePtr() {
         }
         // always call OnFileClose
         GloablFileDescriptorManager::GetInstance()->OnFileClose(this);
+    }
+    if (mRealLogPath.length() > DELETED_FILE_SUFFIX.length()
+        && mRealLogPath.compare(
+               mRealLogPath.length() - DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX.length(), DELETED_FILE_SUFFIX)
+            == 0) {
+        isDeleted = true;
+    } else {
+        isDeleted = false;
     }
 }
 
@@ -1308,7 +1345,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
 
     // If file size is 0 and filename is changed, we cannot judge if the inode is reused by signature,
     // so we just recreate the reader to avoid filename mismatch
-    if (mLastFileSignatureSize == 0 && mRealLogPath != mHostLogPath) {
+    if (mLastFileSignatureSize == 0 && mRealLogPath != mResolvedHostLogPath) {
         return false;
     }
     fsutil::PathStat ps;
@@ -2482,10 +2519,27 @@ bool LogFileReader::UpdateContainerInfo() {
                  ("container info of file reader changed", "may be because container restart")(
                      "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
                      "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
-        // if config have wildcard path, use mWildcardPaths[0] as base path
-        SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
-                                                                         : discoveryConfig.first->GetBasePath(),
-                      containerInfo->mRealBaseDir.size());
+        // if config have wildcard path, use wildcardPaths[0] as base path
+        std::string dockerPath;
+        size_t realBaseDirSize = 0;
+
+        const auto& pathInfos = discoveryConfig.first->GetBasePathInfos();
+        if (!pathInfos.empty()) {
+            // 找到该路径对应的索引
+            size_t realBaseDirIndex = discoveryConfig.first->GetRealBaseDirIndex(containerInfo, mHostLogPathDir);
+            realBaseDirSize = containerInfo->mRealBaseDirs[realBaseDirIndex].size();
+
+            if (realBaseDirIndex < pathInfos.size()) {
+                if (pathInfos[realBaseDirIndex].hasWildcard()) {
+                    dockerPath = pathInfos[realBaseDirIndex].wildcardPaths[0];
+                } else {
+                    dockerPath = pathInfos[realBaseDirIndex].basePath;
+                }
+            } else {
+                LOG_ERROR(sLogger, ("can not get real base dir index by log path", "")("host path", mHostLogPathDir));
+            }
+        }
+        SetDockerPath(dockerPath, realBaseDirSize);
         SetContainerID(containerInfo->mRawContainerInfo->mID);
         mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
         mContainerMetadatas.clear();
@@ -2497,6 +2551,27 @@ bool LogFileReader::UpdateContainerInfo() {
     return false;
 }
 
+void LogFileReader::ResolveHostLogPath() {
+    if (!mResolvedHostLogPath.empty()) {
+        return;
+    }
+    if (mSymbolicLinkFlag) {
+        mResolvedHostLogPath = mHostLogPath;
+        return;
+    }
+    if (mLogFileOp.IsOpen()) {
+        mResolvedHostLogPath = mLogFileOp.GetFilePath();
+    } else {
+        mResolvedHostLogPath = mHostLogPath;
+    }
+    if (mResolvedHostLogPath != mHostLogPath) {
+        LOG_INFO(sLogger,
+                 ("open file", "symbolic link exists in absolute path")("host log path", mHostLogPath)(
+                     "resolved host log path",
+                     mResolvedHostLogPath)("dev", ToString(mDevInode.dev))("inode", ToString(mDevInode.inode)));
+    }
+}
+
 #ifdef APSARA_UNIT_TEST_MAIN
 void LogFileReader::UpdateReaderManual() {
     if (mLogFileOp.IsOpen()) {
@@ -2505,6 +2580,7 @@ void LogFileReader::UpdateReaderManual() {
     mLogFileOp.Open(mHostLogPath.c_str());
     mDevInode = GetFileDevInode(mHostLogPath);
     mRealLogPath = mHostLogPath;
+    ResolveHostLogPath();
 }
 #endif
 

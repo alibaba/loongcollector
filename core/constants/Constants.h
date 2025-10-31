@@ -35,4 +35,7 @@ extern const std::string USER_CONFIG_NODE;
 extern const std::string AGENT_NAME;
 extern const std::string LOONGCOLLECTOR_CONFIG;
 
+extern const std::string REGION_CONFIG;
+extern const std::string READABLE_REGION_CONFIG;
+
 } // namespace logtail
