@@ -18,16 +18,12 @@
 
 #include <boost/lexical_cast.hpp>
 #include <chrono>
-#include <filesystem>
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
-
-#include "MetricValue.h"
-#include "common/StringTools.h"
+#include "common/StringView.h"
 #include "host_monitor/HostMonitorContext.h"
-#include "logger/Logger.h"
+#include "host_monitor/collector/CollectorConstants.h"
+#include "models/MetricValue.h"
 
 DEFINE_FLAG_INT32(basic_host_monitor_net_collect_interval, "basic host monitor net collect interval, seconds", 1);
 
@@ -163,56 +159,51 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         }
 
         metricEvent->SetTimestamp(netInterfaces.collectTime, 0);
-        metricEvent->SetTag(std::string("hostname"), hostname);
-        metricEvent->SetTag(std::string("device"), curname);
-        metricEvent->SetTag(std::string("IP"), mDevIp[curname]);
-        metricEvent->SetTag(std::string("m"), std::string("system.net_original"));
+        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, hostname);
+        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, curname);
+        metricEvent->SetTagNoCopy(TAG_KEY_IP, mDevIp[curname]);
+        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_NET_ORIGINAL);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-
-        std::vector<std::string> packRateNames = {};
-
-        std::vector<double> packRateValues = {};
 
         auto& rateCalculator = mRatePerSecCalMap[curname];
         ResNetRatePerSec minRatePerSec, maxRatePerSec, avgRatePerSec;
         rateCalculator.Stat(maxRatePerSec, minRatePerSec, avgRatePerSec);
         rateCalculator.Reset();
-        std::vector<std::pair<std::string, double>> rateEntries = {
-            {"networkout_packages_min", minRatePerSec.txPackRate},
-            {"networkout_packages_max", maxRatePerSec.txPackRate},
-            {"networkout_packages_avg", avgRatePerSec.txPackRate},
-            {"networkin_packages_min", minRatePerSec.rxPackRate},
-            {"networkin_packages_max", maxRatePerSec.rxPackRate},
-            {"networkin_packages_avg", avgRatePerSec.rxPackRate},
-            {"networkout_errorpackages_min", minRatePerSec.txErrorRate},
-            {"networkout_errorpackages_max", maxRatePerSec.txErrorRate},
-            {"networkout_errorpackages_avg", avgRatePerSec.txErrorRate},
-            {"networkin_errorpackages_min", minRatePerSec.rxErrorRate},
-            {"networkin_errorpackages_max", maxRatePerSec.rxErrorRate},
-            {"networkin_errorpackages_avg", avgRatePerSec.rxErrorRate},
-            {"networkout_rate_min", minRatePerSec.txByteRate},
-            {"networkout_rate_max", maxRatePerSec.txByteRate},
-            {"networkout_rate_avg", avgRatePerSec.txByteRate},
-            {"networkin_rate_min", minRatePerSec.rxByteRate},
-            {"networkin_rate_max", maxRatePerSec.rxByteRate},
-            {"networkin_rate_avg", avgRatePerSec.rxByteRate},
-            {"networkout_droppackages_min", minRatePerSec.txDropRate},
-            {"networkout_droppackages_max", maxRatePerSec.txDropRate},
-            {"networkout_droppackages_avg", avgRatePerSec.txDropRate},
-            {"networkin_droppackages_min", minRatePerSec.rxDropRate},
-            {"networkin_droppackages_max", maxRatePerSec.rxDropRate},
-            {"networkin_droppackages_avg", avgRatePerSec.rxDropRate},
+
+        struct MetricDef {
+            StringView name;
+            double value;
+        } rateMetrics[] = {
+            {KEY_NETWORKOUT_PACKAGES_MIN, minRatePerSec.txPackRate},
+            {KEY_NETWORKOUT_PACKAGES_MAX, maxRatePerSec.txPackRate},
+            {KEY_NETWORKOUT_PACKAGES_AVG, avgRatePerSec.txPackRate},
+            {KEY_NETWORKIN_PACKAGES_MIN, minRatePerSec.rxPackRate},
+            {KEY_NETWORKIN_PACKAGES_MAX, maxRatePerSec.rxPackRate},
+            {KEY_NETWORKIN_PACKAGES_AVG, avgRatePerSec.rxPackRate},
+            {KEY_NETWORKOUT_ERRORPACKAGES_MIN, minRatePerSec.txErrorRate},
+            {KEY_NETWORKOUT_ERRORPACKAGES_MAX, maxRatePerSec.txErrorRate},
+            {KEY_NETWORKOUT_ERRORPACKAGES_AVG, avgRatePerSec.txErrorRate},
+            {KEY_NETWORKIN_ERRORPACKAGES_MIN, minRatePerSec.rxErrorRate},
+            {KEY_NETWORKIN_ERRORPACKAGES_MAX, maxRatePerSec.rxErrorRate},
+            {KEY_NETWORKIN_ERRORPACKAGES_AVG, avgRatePerSec.rxErrorRate},
+            {KEY_NETWORKOUT_RATE_MIN, minRatePerSec.txByteRate},
+            {KEY_NETWORKOUT_RATE_MAX, maxRatePerSec.txByteRate},
+            {KEY_NETWORKOUT_RATE_AVG, avgRatePerSec.txByteRate},
+            {KEY_NETWORKIN_RATE_MIN, minRatePerSec.rxByteRate},
+            {KEY_NETWORKIN_RATE_MAX, maxRatePerSec.rxByteRate},
+            {KEY_NETWORKIN_RATE_AVG, avgRatePerSec.rxByteRate},
+            {KEY_NETWORKOUT_DROPPACKAGES_MIN, minRatePerSec.txDropRate},
+            {KEY_NETWORKOUT_DROPPACKAGES_MAX, maxRatePerSec.txDropRate},
+            {KEY_NETWORKOUT_DROPPACKAGES_AVG, avgRatePerSec.txDropRate},
+            {KEY_NETWORKIN_DROPPACKAGES_MIN, minRatePerSec.rxDropRate},
+            {KEY_NETWORKIN_DROPPACKAGES_MAX, maxRatePerSec.rxDropRate},
+            {KEY_NETWORKIN_DROPPACKAGES_AVG, avgRatePerSec.rxDropRate},
         };
-        for (auto& entry : rateEntries) {
-            packRateNames.push_back(entry.first);
-            packRateValues.push_back(entry.second);
-        }
 
-
-        for (size_t i = 0; i < packRateNames.size(); i++) {
-            multiDoubleValues->SetValue(
-                packRateNames[i], UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, packRateValues[i]});
+        for (const auto& def : rateMetrics) {
+            multiDoubleValues->SetValue(def.name,
+                                        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, def.value});
         }
     }
 
@@ -228,20 +219,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     listenEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    listenEvent->SetTag(std::string("state"), std::string("LISTEN"));
-    listenEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    listenEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_LISTEN);
+    listenEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
     listenEvent->SetValue<UntypedMultiDoubleValues>(listenEvent);
     auto* listenMultiDoubleValues = listenEvent->MutableValue<UntypedMultiDoubleValues>();
     listenMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_min"),
+        KEY_NET_TCP_CONNECTION_MIN,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpListen)});
 
     listenMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_max"),
+        KEY_NET_TCP_CONNECTION_MAX,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpListen)});
 
     listenMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_avg"),
+        KEY_NET_TCP_CONNECTION_AVG,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpListen)});
 
     MetricEvent* establishedEvent = groupPtr->AddMetricEvent(true);
@@ -250,20 +241,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     establishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    establishedEvent->SetTag(std::string("state"), std::string("ESTABLISHED"));
-    establishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    establishedEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_ESTABLISHED);
+    establishedEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
     establishedEvent->SetValue<UntypedMultiDoubleValues>(establishedEvent);
     auto* establishedMultiDoubleValues = establishedEvent->MutableValue<UntypedMultiDoubleValues>();
     establishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_min"),
+        KEY_NET_TCP_CONNECTION_MIN,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpEstablished)});
 
     establishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_max"),
+        KEY_NET_TCP_CONNECTION_MAX,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpEstablished)});
 
     establishedMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_avg"),
+        KEY_NET_TCP_CONNECTION_AVG,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpEstablished)});
 
     MetricEvent* nonestablishedEvent = groupPtr->AddMetricEvent(true);
@@ -272,19 +263,19 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     nonestablishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    nonestablishedEvent->SetTag(std::string("state"), std::string("NON_ESTABLISHED"));
-    nonestablishedEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    nonestablishedEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_NON_ESTABLISHED);
+    nonestablishedEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
     auto* nonestablishedMultiDoubleValues = nonestablishedEvent->MutableValue<UntypedMultiDoubleValues>();
-    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_min"),
+    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_MIN,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(minTCP.tcpNonEstablished)});
 
-    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_max"),
+    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_MAX,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(maxTCP.tcpNonEstablished)});
 
-    nonestablishedMultiDoubleValues->SetValue(std::string("net_tcpconnection_avg"),
+    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_AVG,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(avgTCP.tcpNonEstablished)});
 
@@ -294,20 +285,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     totalEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    totalEvent->SetTag(std::string("state"), std::string("TCP_TOTAL"));
-    totalEvent->SetTag(std::string("m"), std::string("system.tcp"));
+    totalEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_TOTAL);
+    totalEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
     totalEvent->SetValue<UntypedMultiDoubleValues>(totalEvent);
     auto* totalMultiDoubleValues = totalEvent->MutableValue<UntypedMultiDoubleValues>();
     totalMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_min"),
+        KEY_NET_TCP_CONNECTION_MIN,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpTotal)});
 
     totalMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_max"),
+        KEY_NET_TCP_CONNECTION_MAX,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpTotal)});
 
     totalMultiDoubleValues->SetValue(
-        std::string("net_tcpconnection_avg"),
+        KEY_NET_TCP_CONNECTION_AVG,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
 
     mLastTime = start;

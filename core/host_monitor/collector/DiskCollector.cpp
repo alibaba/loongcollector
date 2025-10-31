@@ -23,15 +23,12 @@
 
 #include <string>
 
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
-
 #include "BaseCollector.h"
 #include "MetricValue.h"
-#include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
-#include "host_monitor/Constants.h"
+#include "common/StringView.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 
@@ -163,11 +160,11 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
         }
 
         metricEvent->SetTimestamp(diskSerialIdInfo.collectTime, 0);
-        metricEvent->SetTag(std::string("hostname"), hostname);
-        metricEvent->SetTag(std::string("device"), devName);
-        metricEvent->SetTag(std::string("id_serial"), diskSerialId);
-        metricEvent->SetTag(std::string("diskname"), dirName);
-        metricEvent->SetTag(std::string("m"), std::string("system.disk"));
+        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, hostname);
+        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, devName);
+        metricEvent->SetTagNoCopy(TAG_KEY_ID_SERIAL, diskSerialId);
+        metricEvent->SetTagNoCopy(TAG_KEY_DISKNAME, dirName);
+        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_DISK);
 
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
@@ -177,45 +174,45 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
         mDeviceCal.second.Reset();
 
         struct MetricDef {
-            const char* name;
+            StringView name;
             double* value;
         } metrics[] = {
-            {"diskusage_total_avg", &avgDeviceMetric.total},
-            {"diskusage_total_min", &minDeviceMetric.total},
-            {"diskusage_total_max", &maxDeviceMetric.total},
-            {"diskusage_used_avg", &avgDeviceMetric.used},
-            {"diskusage_used_min", &minDeviceMetric.used},
-            {"diskusage_used_max", &maxDeviceMetric.used},
-            {"diskusage_free_avg", &avgDeviceMetric.free},
-            {"diskusage_free_min", &minDeviceMetric.free},
-            {"diskusage_free_max", &maxDeviceMetric.free},
-            {"diskusage_avail_avg", &avgDeviceMetric.avail},
-            {"diskusage_avail_min", &minDeviceMetric.avail},
-            {"diskusage_avail_max", &maxDeviceMetric.avail},
-            {"diskusage_utilization_avg", &avgDeviceMetric.usePercent},
-            {"diskusage_utilization_min", &minDeviceMetric.usePercent},
-            {"diskusage_utilization_max", &maxDeviceMetric.usePercent},
-            {"disk_readiops_avg", &avgDeviceMetric.reads},
-            {"disk_readiops_min", &minDeviceMetric.reads},
-            {"disk_readiops_max", &maxDeviceMetric.reads},
-            {"disk_writeiops_avg", &avgDeviceMetric.writes},
-            {"disk_writeiops_min", &minDeviceMetric.writes},
-            {"disk_writeiops_max", &maxDeviceMetric.writes},
-            {"disk_writebytes_avg", &avgDeviceMetric.writeBytes},
-            {"disk_writebytes_min", &minDeviceMetric.writeBytes},
-            {"disk_writebytes_max", &maxDeviceMetric.writeBytes},
-            {"disk_readbytes_avg", &avgDeviceMetric.readBytes},
-            {"disk_readbytes_min", &minDeviceMetric.readBytes},
-            {"disk_readbytes_max", &maxDeviceMetric.readBytes},
-            {"fs_inodeutilization_avg", &avgDeviceMetric.inodePercent},
-            {"fs_inodeutilization_min", &minDeviceMetric.inodePercent},
-            {"fs_inodeutilization_max", &maxDeviceMetric.inodePercent},
-            {"DiskIOQueueSize_avg", &avgDeviceMetric.avgqu_sz},
-            {"DiskIOQueueSize_min", &minDeviceMetric.avgqu_sz},
-            {"DiskIOQueueSize_max", &maxDeviceMetric.avgqu_sz},
+            {KEY_DISKUSAGE_TOTAL_AVG, &avgDeviceMetric.total},
+            {KEY_DISKUSAGE_TOTAL_MIN, &minDeviceMetric.total},
+            {KEY_DISKUSAGE_TOTAL_MAX, &maxDeviceMetric.total},
+            {KEY_DISKUSAGE_USED_AVG, &avgDeviceMetric.used},
+            {KEY_DISKUSAGE_USED_MIN, &minDeviceMetric.used},
+            {KEY_DISKUSAGE_USED_MAX, &maxDeviceMetric.used},
+            {KEY_DISKUSAGE_FREE_AVG, &avgDeviceMetric.free},
+            {KEY_DISKUSAGE_FREE_MIN, &minDeviceMetric.free},
+            {KEY_DISKUSAGE_FREE_MAX, &maxDeviceMetric.free},
+            {KEY_DISKUSAGE_AVAIL_AVG, &avgDeviceMetric.avail},
+            {KEY_DISKUSAGE_AVAIL_MIN, &minDeviceMetric.avail},
+            {KEY_DISKUSAGE_AVAIL_MAX, &maxDeviceMetric.avail},
+            {KEY_DISKUSAGE_UTILIZATION_AVG, &avgDeviceMetric.usePercent},
+            {KEY_DISKUSAGE_UTILIZATION_MIN, &minDeviceMetric.usePercent},
+            {KEY_DISKUSAGE_UTILIZATION_MAX, &maxDeviceMetric.usePercent},
+            {KEY_DISK_READIOPS_AVG, &avgDeviceMetric.reads},
+            {KEY_DISK_READIOPS_MIN, &minDeviceMetric.reads},
+            {KEY_DISK_READIOPS_MAX, &maxDeviceMetric.reads},
+            {KEY_DISK_WRITEIOPS_AVG, &avgDeviceMetric.writes},
+            {KEY_DISK_WRITEIOPS_MIN, &minDeviceMetric.writes},
+            {KEY_DISK_WRITEIOPS_MAX, &maxDeviceMetric.writes},
+            {KEY_DISK_WRITEBYTES_AVG, &avgDeviceMetric.writeBytes},
+            {KEY_DISK_WRITEBYTES_MIN, &minDeviceMetric.writeBytes},
+            {KEY_DISK_WRITEBYTES_MAX, &maxDeviceMetric.writeBytes},
+            {KEY_DISK_READBYTES_AVG, &avgDeviceMetric.readBytes},
+            {KEY_DISK_READBYTES_MIN, &minDeviceMetric.readBytes},
+            {KEY_DISK_READBYTES_MAX, &maxDeviceMetric.readBytes},
+            {KEY_FS_INODEUTILIZATION_AVG, &avgDeviceMetric.inodePercent},
+            {KEY_FS_INODEUTILIZATION_MIN, &minDeviceMetric.inodePercent},
+            {KEY_FS_INODEUTILIZATION_MAX, &maxDeviceMetric.inodePercent},
+            {KEY_DISKIOQUEUESIZE_AVG, &avgDeviceMetric.avgqu_sz},
+            {KEY_DISKIOQUEUESIZE_MIN, &minDeviceMetric.avgqu_sz},
+            {KEY_DISKIOQUEUESIZE_MAX, &maxDeviceMetric.avgqu_sz},
         };
         for (const auto& def : metrics) {
-            multiDoubleValues->SetValue(std::string(def.name),
+            multiDoubleValues->SetValue(def.name,
                                         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, *def.value});
         }
     }
