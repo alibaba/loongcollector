@@ -158,7 +158,7 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
         mFileInfoMap.erase(key);
     }
 
-    if (!diff.IsEmpty()) {
+    if (diff.HasDiff()) {
         LOG_INFO(sLogger,
                  ("config files scan done", "got updates, begin to update instanceConfigs")(
                      "added", diff.mAdded.size())("modified", diff.mModified.size())("removed", diff.mRemoved.size()));

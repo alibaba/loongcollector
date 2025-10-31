@@ -40,7 +40,7 @@ namespace logtail {
 
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
-void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
+void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     // 过渡使用
     static bool isFileServerStarted = false;
     bool isFileServerInputChanged = CheckIfFileServerUpdated(diff);

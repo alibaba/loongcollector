@@ -683,7 +683,7 @@ void AppConfig::LoadLocalInstanceConfig() {
     }
     InstanceConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
     InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-    if (!instanceConfigDiff.IsEmpty()) {
+    if (instanceConfigDiff.HasDiff()) {
         InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
     }
 }
