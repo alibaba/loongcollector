@@ -45,6 +45,7 @@ struct SenderQueueItem {
     std::atomic<SendingStatus> mStatus;
     std::chrono::system_clock::time_point mFirstEnqueTime;
     std::chrono::system_clock::time_point mLastSendTime;
+    std::chrono::system_clock::time_point mNextRetryTime;
     uint32_t mTryCnt = 1;
 
     SenderQueueItem(std::string&& data,
@@ -74,6 +75,7 @@ struct SenderQueueItem {
           mStatus(item.mStatus.load()),
           mFirstEnqueTime(item.mFirstEnqueTime),
           mLastSendTime(item.mLastSendTime),
+          mNextRetryTime(item.mNextRetryTime),
           mTryCnt(item.mTryCnt) {}
 
     virtual SenderQueueItem* Clone() { return new SenderQueueItem(*this); }

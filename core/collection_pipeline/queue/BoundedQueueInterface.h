@@ -27,6 +27,7 @@ public:
         : QueueInterface<T>(key, cap, ctx), mLowWatermark(low), mHighWatermark(high) {
         this->mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"}});
         mValidToPushFlag = this->mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_VALID_TO_PUSH_FLAG);
+        SET_GAUGE(mValidToPushFlag, mValidToPush);
     }
     virtual ~BoundedQueueInterface() = default;
 

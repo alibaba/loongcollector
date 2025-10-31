@@ -81,7 +81,7 @@ DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
-DECLARE_FLAG_STRING(loongcollector_daemon_startup_hints);
+DEFINE_FLAG_STRING(loongcollector_daemon_startup_hints, "hints passed from daemon during startup", "");
 #endif
 
 using namespace std;
