@@ -350,6 +350,7 @@ void LogInput::UpdateCriticalMetric(int32_t curTime) {
         GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize());
     SET_GAUGE(mRegisterdHandlersTotal, EventDispatcher::GetInstance()->GetHandlerCount());
     SET_GAUGE(mActiveReadersTotal, CheckPointManager::Instance()->GetReaderCount());
+    SET_GAUGE(mEnableFileIncludedByMultiConfigs, AppConfig::GetInstance()->IsAcceptMultiConfig());
     mEventProcessCount = 0;
 }
 
