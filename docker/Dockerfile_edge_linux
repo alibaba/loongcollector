@@ -1,7 +1,7 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3 AS builder
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.11 AS builder
 
 # Build arguments
 ARG VERSION=edge

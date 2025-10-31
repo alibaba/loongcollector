@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -97,6 +98,7 @@ public:
 
     // TODO: temporarily public for profile
     std::unique_ptr<Compressor> mCompressor;
+    std::unordered_map<std::string, std::string> mExtraHeaders;
 
 private:
     static void IncreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);

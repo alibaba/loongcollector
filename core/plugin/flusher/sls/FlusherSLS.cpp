@@ -383,6 +383,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetRegion());
     }
 
+    // ExtraHeaders
+    if (!GetOptionalMapParam(config, "ExtraHeaders", mExtraHeaders, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
 #ifdef __ENTERPRISE__
     // Aliuid
     if (!GetOptionalStringParam(config, "Aliuid", mAliuid, errorMsg)) {
@@ -1213,6 +1225,9 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
     }
     string path, query;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostLogStoreLogsRequest(accessKeyId,
                                    accessKeySecret,
                                    secToken,
@@ -1252,6 +1267,9 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
                                                                      SLSSenderQueueItem* item) const {
     string path, query;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostHostMetricsRequest(accessKeyId,
                                   accessKeySecret,
                                   secToken,
@@ -1284,6 +1302,9 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                                                          SLSSenderQueueItem* item) const {
     string path;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostMetricStoreLogsRequest(accessKeyId,
                                       accessKeySecret,
                                       secToken,
@@ -1321,6 +1342,9 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
     map<string, string> header;
     header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
     header.insert({APM_HEADER_PROJECT, mProject});
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  secToken,

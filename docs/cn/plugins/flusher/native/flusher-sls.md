@@ -29,6 +29,7 @@
 |  Batch  |  object  |  否  |  /  |  批处理选项（包含历史的 `Batch.ShardHashKeys` 已废弃）。 |
 |  CompressType  |  enum  |  否  |  `lz4`  |  是否开启压缩及压缩算法。 |
 |  MaxSendRate  |  uint  |  否  |  不限速  |  单队列最大发送速率（字节/秒），仅开启 Exactly Once 时生效。 |
+|  ExtraHeaders  |  map[string]string  |  否  |  /  |  发送请求时额外携带的 HTTP Header。 |
 
 ## 路由与安全性
 
