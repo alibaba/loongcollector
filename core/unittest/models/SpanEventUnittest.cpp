@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <memory>
+#include <vector>
 
 #include "common/JsonUtil.h"
 #include "models/PipelineEventGroup.h"
@@ -27,6 +28,7 @@ class SpanEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
+    void TestTagWithReplace();
     void TestLink();
     void TestEvent();
     void TestScopeTag();
@@ -37,8 +39,8 @@ public:
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
     }
 
@@ -122,6 +124,68 @@ void SpanEventUnittest::TestTag() {
     }
 }
 
+void SpanEventUnittest::TestTagWithReplace() {
+    // test replace=true (default behavior)
+    {
+        string key = "key1";
+        string value1 = "value1";
+        mSpanEvent->SetTag(key, value1, true);
+        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
+
+        // set the same key with replace=true should replace the value
+        string value2 = "value2";
+        mSpanEvent->SetTag(key, value2, true);
+        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value2, mSpanEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
+    }
+
+    // test replace=false (append behavior)
+    {
+        SetUp();
+        string key = "key1";
+        string value1 = "value1";
+        mSpanEvent->SetTag(key, value1, false);
+        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
+
+        // set the same key with replace=false should append
+        string value2 = "value2";
+        mSpanEvent->SetTag(key, value2, false);
+        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
+        // GetTag returns the first match
+        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(2U, mSpanEvent->TagsSize());
+
+        // verify both entries exist
+        int count = 0;
+        for (auto it = mSpanEvent->TagsBegin(); it != mSpanEvent->TagsEnd(); ++it) {
+            if (it->first == key) {
+                count++;
+            }
+        }
+        APSARA_TEST_EQUAL_FATAL(2, count);
+    }
+
+    // test SetTagNoCopy with replace parameter
+    {
+        SetUp();
+        string key = "key1";
+        string value1 = "value1";
+        mSpanEvent->SetTagNoCopy(
+            mSpanEvent->GetSourceBuffer()->CopyString(key), mSpanEvent->GetSourceBuffer()->CopyString(value1), true);
+        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
+
+        string value2 = "value2";
+        mSpanEvent->SetTagNoCopy(
+            mSpanEvent->GetSourceBuffer()->CopyString(key), mSpanEvent->GetSourceBuffer()->CopyString(value2), false);
+        APSARA_TEST_EQUAL_FATAL(2U, mSpanEvent->TagsSize());
+    }
+}
+
 void SpanEventUnittest::TestLink() {
     SpanEvent::SpanLink* l = mSpanEvent->AddLink();
     APSARA_TEST_EQUAL(1U, mSpanEvent->GetLinks().size());
@@ -182,7 +246,7 @@ void SpanEventUnittest::TestScopeTag() {
 void SpanEventUnittest::TestSize() {
     size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(SpanEvent::Kind) + sizeof(uint64_t) + sizeof(uint64_t)
         + sizeof(SpanEvent::StatusCode) + sizeof(vector<SpanEvent::InnerEvent>) + sizeof(vector<SpanEvent::SpanLink>)
-        + sizeof(map<StringView, StringView>) + sizeof(map<StringView, StringView>);
+        + sizeof(vector<pair<StringView, StringView>>) + sizeof(map<StringView, StringView>);
 
     mSpanEvent->SetTraceId("test_trace_id");
     mSpanEvent->SetSpanId("test_span_id");
@@ -222,7 +286,7 @@ void SpanEventUnittest::TestSize() {
     }
     {
         SpanEvent::InnerEvent* e = mSpanEvent->AddEvent();
-        size_t newBasicSize = basicSize + sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+        size_t newBasicSize = basicSize + sizeof(uint64_t) + sizeof(vector<pair<StringView, StringView>>);
 
         e->SetName("test_event");
         newBasicSize += strlen("test_event");
@@ -234,7 +298,7 @@ void SpanEventUnittest::TestSize() {
     }
     {
         SpanEvent::SpanLink* l = mSpanEvent->AddLink();
-        size_t newBasicSize = basicSize + sizeof(map<StringView, StringView>);
+        size_t newBasicSize = basicSize + sizeof(vector<pair<StringView, StringView>>);
 
         l->SetTraceId("other_trace_id");
         l->SetSpanId("other_span_id");
@@ -402,6 +466,7 @@ void SpanEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanEventUnittest, TestTag)
+UNIT_TEST_CASE(SpanEventUnittest, TestTagWithReplace)
 UNIT_TEST_CASE(SpanEventUnittest, TestLink)
 UNIT_TEST_CASE(SpanEventUnittest, TestEvent)
 UNIT_TEST_CASE(SpanEventUnittest, TestScopeTag)
@@ -414,14 +479,15 @@ class InnerEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
+    void TestTagWithReplace();
     void TestSize();
     void TestToJson();
     void TestFromJson();
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
         mInnerEvent = mSpanEvent->AddEvent();
     }
@@ -486,8 +552,55 @@ void InnerEventUnittest::TestTag() {
     }
 }
 
+void InnerEventUnittest::TestTagWithReplace() {
+    // test replace=true (default behavior)
+    {
+        string key = "key1";
+        string value1 = "value1";
+        mInnerEvent->SetTag(key, value1, true);
+        APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
+
+        // set the same key with replace=true should replace the value
+        string value2 = "value2";
+        mInnerEvent->SetTag(key, value2, true);
+        APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value2, mInnerEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
+    }
+
+    // test replace=false (append behavior)
+    {
+        mInnerEvent = mSpanEvent->AddEvent();
+        string key = "key1";
+        string value1 = "value1";
+        mInnerEvent->SetTag(key, value1, false);
+        APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
+
+        // set the same key with replace=false should append
+        string value2 = "value2";
+        mInnerEvent->SetTag(key, value2, false);
+        APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
+        // GetTag returns the first match
+        APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(2U, mInnerEvent->TagsSize());
+
+        // verify both entries exist
+        int count = 0;
+        for (auto it = mInnerEvent->TagsBegin(); it != mInnerEvent->TagsEnd(); ++it) {
+            if (it->first == key) {
+                count++;
+            }
+        }
+        APSARA_TEST_EQUAL_FATAL(2, count);
+    }
+}
+
 void InnerEventUnittest::TestSize() {
-    size_t basicSize = sizeof(uint64_t) + sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(uint64_t) + sizeof(vector<pair<StringView, StringView>>);
 
     mInnerEvent->SetName("test");
     basicSize += strlen("test");
@@ -545,6 +658,7 @@ void InnerEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(InnerEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(InnerEventUnittest, TestTag)
+UNIT_TEST_CASE(InnerEventUnittest, TestTagWithReplace)
 UNIT_TEST_CASE(InnerEventUnittest, TestSize)
 UNIT_TEST_CASE(InnerEventUnittest, TestToJson)
 UNIT_TEST_CASE(InnerEventUnittest, TestFromJson)
@@ -553,14 +667,15 @@ class SpanLinkUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
+    void TestTagWithReplace();
     void TestSize();
     void TestToJson();
     void TestFromJson();
 
 protected:
     void SetUp() override {
-        mSourceBuffer.reset(new SourceBuffer);
-        mEventGroup.reset(new PipelineEventGroup(mSourceBuffer));
+        mSourceBuffer = make_shared<SourceBuffer>();
+        mEventGroup = make_unique<PipelineEventGroup>(mSourceBuffer);
         mSpanEvent = mEventGroup->CreateSpanEvent();
         mLink = mSpanEvent->AddLink();
     }
@@ -627,8 +742,55 @@ void SpanLinkUnittest::TestTag() {
     }
 }
 
+void SpanLinkUnittest::TestTagWithReplace() {
+    // test replace=true (default behavior)
+    {
+        string key = "key1";
+        string value1 = "value1";
+        mLink->SetTag(key, value1, true);
+        APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
+
+        // set the same key with replace=true should replace the value
+        string value2 = "value2";
+        mLink->SetTag(key, value2, true);
+        APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value2, mLink->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
+    }
+
+    // test replace=false (append behavior)
+    {
+        mLink = mSpanEvent->AddLink();
+        string key = "key1";
+        string value1 = "value1";
+        mLink->SetTag(key, value1, false);
+        APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
+        APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
+
+        // set the same key with replace=false should append
+        string value2 = "value2";
+        mLink->SetTag(key, value2, false);
+        APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
+        // GetTag returns the first match
+        APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());
+        APSARA_TEST_EQUAL_FATAL(2U, mLink->TagsSize());
+
+        // verify both entries exist
+        int count = 0;
+        for (auto it = mLink->TagsBegin(); it != mLink->TagsEnd(); ++it) {
+            if (it->first == key) {
+                count++;
+            }
+        }
+        APSARA_TEST_EQUAL_FATAL(2, count);
+    }
+}
+
 void SpanLinkUnittest::TestSize() {
-    size_t basicSize = sizeof(map<StringView, StringView>);
+    size_t basicSize = sizeof(vector<pair<StringView, StringView>>);
 
     mLink->SetTraceId("test_trace_id");
     mLink->SetSpanId("test_span_id");
@@ -692,6 +854,7 @@ void SpanLinkUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanLinkUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanLinkUnittest, TestTag)
+UNIT_TEST_CASE(SpanLinkUnittest, TestTagWithReplace)
 UNIT_TEST_CASE(SpanLinkUnittest, TestSize)
 UNIT_TEST_CASE(SpanLinkUnittest, TestToJson)
 UNIT_TEST_CASE(SpanLinkUnittest, TestFromJson)

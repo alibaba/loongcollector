@@ -16,12 +16,15 @@
 
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 
+#include <chrono>
+
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "models/RawEvent.h"
 #include "monitor/metric_models/MetricTypes.h"
+#include "protobuf/models/ManualPBParser.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
 
@@ -88,17 +91,26 @@ void ProcessorParseFromPBNative::Process(std::vector<PipelineEventGroup>& eventG
             const auto& sourceEvent = e.Cast<RawEvent>();
 
             std::string errMsg;
-            models::PipelineEventGroup pbGroup;
             auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
 
             // parse event group from raw event
             const auto& content = sourceEvent.GetContent();
-            if (!pbGroup.ParseFromArray(content.data(), content.size())
-                || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
-                LOG_WARNING(sLogger,
-                            ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
-                ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
-                continue;
+
+            ManualPBParser parser(reinterpret_cast<const uint8_t*>(content.data()), content.size(), false);
+            if (!parser.ParsePipelineEventGroup(eventGroup, errMsg)) {
+                LOG_WARNING(
+                    sLogger,
+                    ("error parsing PipelineEventGroup with manual parser", errMsg)("content size", content.size()));
+
+                // Fallback to original protobuf parser
+                models::PipelineEventGroup pbGroup;
+                if (!pbGroup.ParseFromArray(content.data(), content.size())
+                    || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+                    LOG_WARNING(sLogger,
+                                ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
+                    ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+                    continue;
+                }
             }
 
             // inherit metadata from original event group
