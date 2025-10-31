@@ -30,6 +30,7 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/extension/request_breaker"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/checker"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/clickhouse"
+    - import: "github.com/alibaba/ilogtail/plugins/flusher/doris"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/elasticsearch"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/grpc"
     - import: "github.com/alibaba/ilogtail/plugins/flusher/http"

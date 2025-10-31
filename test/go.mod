@@ -14,6 +14,7 @@ require (
 	github.com/docker/docker v20.10.27+incompatible
 	github.com/docker/go-connections v0.4.0
 	github.com/elastic/go-elasticsearch/v8 v8.6.0
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/cadvisor v0.49.1
 	github.com/influxdata/influxdb1-client v0.0.0-20220302092344-a9ab5670611c
 	github.com/melbahja/goph v1.4.0
