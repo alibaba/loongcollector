@@ -933,7 +933,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -994,7 +994,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1055,7 +1055,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1116,7 +1116,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1244,7 +1244,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1313,7 +1313,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1371,7 +1371,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
@@ -1427,7 +1427,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_TRUE(item.mRealIpFlag);
+        APSARA_TEST_TRUE(item.mUseIpFlag);
         APSARA_TEST_EQUAL("192.168.0.1", item.mCurrentDomain);
     }
     {
@@ -1454,7 +1454,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIpFlag);
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, item.mCurrentDomain);
     }
     {

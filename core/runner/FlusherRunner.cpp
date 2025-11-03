@@ -132,6 +132,7 @@ bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
                 ("failed to build request", "retry later")("item address", item)(
                     "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+            
         } else {
             LOG_WARNING(
                 sLogger,
