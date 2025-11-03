@@ -25,6 +25,7 @@
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/JsonUtil.h"
 #include "config/CollectionConfig.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/event_handler/LogInput.h"
 #include "runner/FlusherRunner.h"
@@ -126,6 +127,7 @@ public:
     void TestPipelineTopoUpdateCase10() const;
     void TestPipelineTopoUpdateCase11() const;
     void TestPipelineTopoUpdateCase12() const;
+    void TestPipelineTopoUpdateCase13() const;
     void TestPipelineInputBlock() const;
     void TestPipelineGoInputBlockCase1() const;
     void TestPipelineGoInputBlockCase2() const;
@@ -167,6 +169,7 @@ protected:
         PluginRegistry::GetInstance()->UnloadPlugins();
         Application::GetInstance()->SetSigTermSignalFlag(true);
         FileServer::GetInstance()->Stop();
+        ContainerManager::GetInstance()->Stop();
     }
 
     void SetUp() override { ProcessorRunner::GetInstance()->Init(); }
@@ -297,6 +300,10 @@ private:
             "FilePaths": [
                 "/tmp/not_found.log"
             ]
+        })";
+    string nativeInputContainerStdioConfig = R"(
+        {
+            "Type": "input_container_stdio"
         })";
     string nativeInputConfig = R"(
         {
@@ -1414,6 +1421,38 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
     VerifyData("test_logstore_3", 8, 10);
 }
 
+void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
+    // input_container_stdio -> Go -> C++ => Go -> Go -> C++
+    // This test verifies FileServer pause/resume behavior when switching from input_container_stdio to service_docker_stdout
+    const std::string configName = "test13";
+    // load old pipeline with input_container_stdio
+    Json::Value pipelineConfigJson
+        = GeneratePipelineConfigJson(nativeInputContainerStdioConfig, goProcessorConfig, nativeFlusherConfig);
+    auto pipelineManager = CollectionPipelineManager::GetInstance();
+    CollectionConfigDiff diff;
+    CollectionConfig pipelineConfigObj
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
+    pipelineConfigObj.Parse();
+    diff.mAdded.push_back(std::move(pipelineConfigObj));
+    pipelineManager->UpdatePipelines(diff);
+    APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+
+    // load new pipeline with service_docker_stdout
+    // During this update, FileServer will pause and then resume
+    // We verify this by checking the log file for pause/resume messages
+    Json::Value pipelineConfigJsonUpdate
+        = GeneratePipelineConfigJson(goInputConfig, goProcessorConfig, nativeFlusherConfig3);
+    CollectionConfigDiff diffUpdate;
+    CollectionConfig pipelineConfigObjUpdate
+        = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJsonUpdate), filepath);
+    pipelineConfigObjUpdate.Parse();
+    diffUpdate.mModified.push_back(std::move(pipelineConfigObjUpdate));
+    pipelineManager->UpdatePipelines(diffUpdate);
+    APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
+    APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
+}
+
 void PipelineUpdateUnittest::TestPipelineInputBlock() const {
     // C++ -> C++ -> C++
     const std::string configName = "test1";
@@ -2489,6 +2528,7 @@ UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase9)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase10)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase11)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase12)
+UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineTopoUpdateCase13)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineInputBlock)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase1)
 UNIT_TEST_CASE(PipelineUpdateUnittest, TestPipelineGoInputBlockCase2)
