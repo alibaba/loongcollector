@@ -34,7 +34,7 @@ struct SLSSenderQueueItem : public SenderQueueItem {
 
     std::string mCurrentDomain;
     std::string mCurrentIP;
-    bool mUseIpFlag = false;
+    bool mUseIPFlag = false;
     int32_t mLastLogWarningTime = 0; // temporaily used
 
     SLSSenderQueueItem(std::string&& data,

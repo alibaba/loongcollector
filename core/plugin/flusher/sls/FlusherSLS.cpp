@@ -654,9 +654,9 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
                 mCandidateHostsInfo = info;
             }
             data->mCurrentDomain = mCandidateHostsInfo->GetCurrentHost();
-            data->mUseIpFlag = false;
+            data->mUseIPFlag = false;
         } else {
-            data->mUseIpFlag = true;
+            data->mUseIPFlag = true;
         }
     } else {
         // in case local region endpoint mode is changed, we should always check before sending
@@ -684,7 +684,7 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
     }
 #else
     SLSClientManager::GetInstance()->GetCurrentEndpoint(
-        mProject, mEndpoint, data->mCurrentDomain, data->mCurrentIP, data->mUseIpFlag);
+        mProject, mEndpoint, data->mCurrentDomain, data->mCurrentIP, data->mUseIPFlag);
 #endif
 
     switch (mTelemetryType) {
@@ -736,7 +736,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                 "total send time",
                 ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
                     + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentDomain)("real ip", data->mCurrentIP)(
-                "real ip flag", data->mUseIpFlag)("is profile data", isProfileData));
+                "real ip flag", data->mUseIPFlag)("is profile data", isProfileData));
         GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
         GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
         GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
@@ -757,7 +757,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             }
             suggestion << "check network connection to endpoint";
 #ifdef __ENTERPRISE__
-            if (data->mUseIpFlag) {
+            if (data->mUseIPFlag) {
                 // connect refused, use vip directly
                 failDetail << ", real ip may be stale, force update";
                 EnterpriseSLSClientManager::GetInstance()->UpdateOutdatedRealIpRegions(mRegion);
@@ -1219,7 +1219,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                    type,
                                    item->mCurrentDomain,
                                    item->mCurrentIP,
-                                   item->mUseIpFlag,
+                                   item->mUseIPFlag,
                                    mProject,
                                    item->mLogstore,
                                    CompressTypeToString(mCompressor->GetCompressType()),
@@ -1233,7 +1233,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                    header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIpFlag) {
+    if (item->mUseIPFlag) {
         endpoint = item->mCurrentIP;
     }
     return make_unique<HttpSinkRequest>(HTTP_POST,
@@ -1269,7 +1269,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
                                   header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIpFlag) {
+    if (item->mUseIPFlag) {
         endpoint = item->mCurrentIP;
     }
     return make_unique<HttpSinkRequest>(HTTP_POST,
@@ -1299,7 +1299,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                       type,
                                       item->mCurrentDomain,
                                       item->mCurrentIP,
-                                      item->mUseIpFlag,
+                                      item->mUseIPFlag,
                                       mProject,
                                       item->mLogstore,
                                       CompressTypeToString(mCompressor->GetCompressType()),
@@ -1309,7 +1309,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                       header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIpFlag) {
+    if (item->mUseIPFlag) {
         endpoint = item->mCurrentIP;
     }
     return make_unique<HttpSinkRequest>(HTTP_POST,
@@ -1341,7 +1341,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  type,
                                  item->mCurrentDomain,
                                  item->mCurrentIP,
-                                 item->mUseIpFlag,
+                                 item->mUseIPFlag,
                                  mProject,
                                  CompressTypeToString(mCompressor->GetCompressType()),
                                  item->mType,
@@ -1351,7 +1351,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
     std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIpFlag) {
+    if (item->mUseIPFlag) {
         endpoint = item->mCurrentIP;
     }
     return make_unique<HttpSinkRequest>(HTTP_POST,
