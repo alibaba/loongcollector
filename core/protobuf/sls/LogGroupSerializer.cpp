@@ -25,8 +25,6 @@ const string METRIC_RESERVED_KEY_LABELS = "__labels__";
 const string METRIC_RESERVED_KEY_VALUE = "__value__";
 const string METRIC_RESERVED_KEY_TIME_NANO = "__time_nano__";
 
-const string METRIC_RESERVED_KEY_APM_METRIC_TYPE = "__apm_metric_type__";
-
 const string METRIC_LABELS_SEPARATOR = "|";
 const string METRIC_LABELS_KEY_VALUE_SEPARATOR = "#$#";
 

@@ -29,8 +29,6 @@ extern const std::string METRIC_RESERVED_KEY_NAME;
 extern const std::string METRIC_RESERVED_KEY_LABELS;
 extern const std::string METRIC_RESERVED_KEY_VALUE;
 extern const std::string METRIC_RESERVED_KEY_TIME_NANO;
-// Metadata extra key
-extern const std::string METRIC_RESERVED_KEY_APM_METRIC_TYPE;
 
 extern const std::string METRIC_LABELS_SEPARATOR;
 extern const std::string METRIC_LABELS_KEY_VALUE_SEPARATOR;

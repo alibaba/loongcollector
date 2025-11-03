@@ -84,11 +84,7 @@ go install ...
 
 ```json
 {
-<<<<<<< HEAD
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.10.3",
-=======
   "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.11",
->>>>>>> 33b5250f (update dev container image version)
   "customizations": {
     "vscode": {
       "extensions": [

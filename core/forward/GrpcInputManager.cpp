@@ -117,8 +117,8 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
             std::string socketPath = address.substr(7); // Remove "unix://" prefix
             std::string dirPath = ParentPath(socketPath);
             if (!CheckExistance(dirPath)) {
-                if (!Mkdirs(dirPath) && chmod(dirPath.c_str(), 0755) != 0) {
-                    // try to create directory and change permission
+                if (!Mkdirs(dirPath) || chmod(dirPath.c_str(), 0755) != 0) {
+                    // failed to create directory or change permission
                     LOG_ERROR(
                         sLogger,
                         ("GrpcInputManager", "failed to create unix domain socket directory")("directory", dirPath));

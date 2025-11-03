@@ -105,6 +105,7 @@ bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::M
         dst.SetTag(tagPair.first, tagPair.second);
     }
     // metadata
+    // the key and value of metadata will be appended as log content during serialization
     for (auto& metaPair : src.metadata()) {
         dst.SetMetadata(metaPair.first, metaPair.second);
     }

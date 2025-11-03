@@ -354,7 +354,7 @@ BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(bool enableNanos
     }
     e->SetName("test_gauge");
     if (withMetadata) {
-        e->SetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE, string("app"));
+        e->SetMetadata("__apm_metric_type__", string("app"));
     }
     BatchedEvents batch(std::move(group.MutableEvents()),
                         std::move(group.GetSizedTags()),

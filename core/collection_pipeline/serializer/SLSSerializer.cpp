@@ -206,9 +206,8 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
                 += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(), e.GetTimestampNanosecond() ? 19U : 10U);
             contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].mLabelSize);
             // Add metadata
-            auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
-            if (!type.empty()) {
-                contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_APM_METRIC_TYPE.size(), type.size());
+            for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                contentSZ += GetLogContentSize(it->first.size(), it->second.size());
             }
             logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
         } else if (e.Is<UntypedMultiDoubleValues>()) {
@@ -372,9 +371,8 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             serializer.AddLogContentMetricTimeNano(e);
             serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].mMetricEventContentCache[0]);
             serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
-            auto type = e.GetMetadata(METRIC_RESERVED_KEY_APM_METRIC_TYPE);
-            if (!type.empty()) {
-                serializer.AddLogContent(METRIC_RESERVED_KEY_APM_METRIC_TYPE, type);
+            for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                serializer.AddLogContent(it->first, it->second);
             }
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
