@@ -40,6 +40,7 @@ using CollectionConfigDiff = ConfigDiff<CollectionConfig>;
 using TaskConfigDiff = ConfigDiff<TaskConfig>;
 using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 
-enum ConfigDiffEnum { Added, AppliedModified, IgnoredModified, Removed, AppliedUnchanged, IgnoredUnchanged };
+// 命名的前面表示配置状态，后面表示配置变化
+enum ConfigDiffEnum { Added /*新增*/ , AppliedModified /*已应用有修改*/ , IgnoredModified /*已忽略有修改*/ , Removed /*删除*/ , AppliedUnchanged /*已应用无修改*/ , IgnoredUnchanged /*已忽略无修改*/ };
 
 } // namespace logtail
