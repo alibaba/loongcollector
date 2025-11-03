@@ -16,6 +16,8 @@
 
 #include "host_monitor/LinuxSystemInterface.h"
 
+#include <unistd.h>
+
 #include <chrono>
 #include <string>
 
@@ -452,25 +454,49 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
     }
 
     std::error_code ec;
-    for (auto it = std::filesystem::directory_iterator(
-             PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
-         it != std::filesystem::directory_iterator();
-         ++it) {
-        if (ec) {
-            LOG_ERROR(sLogger, ("failed to iterate process directory", PROCESS_DIR)("error", ec.message()));
-            return false;
-        }
-        const auto& dirEntry = *it;
-        std::string dirName = dirEntry.path().filename().string();
-        if (IsInt(dirName)) {
-            pid_t pid{};
-            if (!StringTo(dirName, pid)) {
-                LOG_ERROR(sLogger, ("failed to parse pid", dirName));
-            } else {
-                processListInfo.pids.push_back(pid);
+    try {
+        auto it = std::filesystem::directory_iterator(
+            PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
+        while (it != std::filesystem::directory_iterator()) {
+#ifdef APSARA_UNIT_TEST_MAIN
+            sleep(2);
+#endif
+            if (ec) {
+                LOG_WARNING(sLogger,
+                            ("failed to iterate process directory", PROCESS_DIR)("skipping invalid directory entry",
+                                                                                 ec.message()));
+                ec.clear(); // 重置错误码继续遍历
+                it.increment(ec); // 尝试移动到下一项
+                continue;
             }
+
+            const auto& dirEntry = *it;
+            std::string dirName;
+            try {
+                dirName = dirEntry.path().filename().string();
+            } catch (const std::exception& e) {
+                LOG_WARNING(sLogger, ("failed to process: ", e.what()));
+            }
+
+            if (IsInt(dirName)) {
+                pid_t pid{};
+                if (!StringTo(dirName, pid)) {
+                    LOG_WARNING(sLogger, ("failed to parse pid", dirName));
+                } else {
+                    processListInfo.pids.push_back(pid);
+                }
+            }
+            // 使用increment替代++it实现安全递增
+            it.increment(ec);
         }
+    } catch (const std::filesystem::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("filesystem error occurred", e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        LOG_WARNING(sLogger, ("unexpected exception during process directory iteration", e.what()));
+        return false;
     }
+
     return true;
 }
 
@@ -1133,15 +1159,54 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
     // 检查目录是否存在，进程可能已经被杀死
 
     if (!CheckExistance(procFdPath)) {
-        LOG_ERROR(sLogger, ("file does not exist", procFdPath.string()));
+        LOG_WARNING(sLogger, ("file does not exist", procFdPath.string()));
         return false;
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    sleep(2);
+#endif
+
     int count = 0;
-    for (const auto& dirEntry :
-         std::filesystem::directory_iterator{procFdPath, std::filesystem::directory_options::skip_permission_denied}) {
-        std::string filename = dirEntry.path().filename().string();
-        count++;
+
+    std::error_code ec; // 用于捕获错误码
+    try {
+        auto it = std::filesystem::directory_iterator(
+            procFdPath, std::filesystem::directory_options::skip_permission_denied, ec);
+        while (it != std::filesystem::directory_iterator()) {
+#ifdef APSARA_UNIT_TEST_MAIN
+            sleep(2);
+#endif
+
+            if (ec) {
+                if (ec == std::errc::permission_denied) {
+                    LOG_WARNING(sLogger, ("skipping fd due to permissions", procFdPath.string()));
+                } else if (ec == std::errc::no_such_file_or_directory) {
+                    LOG_INFO(sLogger, ("process exited during fd collection", pid));
+                    break; // 进程退出，停止遍历
+                } else {
+                    LOG_WARNING(sLogger, ("temporary fd error", ec.message())("path", procFdPath.string()));
+                }
+                ec.clear();
+                it.increment(ec);
+                continue;
+            }
+            // 处理当前文件描述符
+            try {
+                std::string filename = it->path().filename().string();
+                count++;
+            } catch (const std::exception& e) {
+                LOG_WARNING(sLogger, ("failed to process fd entry", it->path().string())("error", e.what()));
+            }
+
+            it.increment(ec);
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("filesystem error occurred", e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        LOG_WARNING(sLogger, ("unexpected error occurred", e.what()));
+        return false;
     }
 
     processFd.total = count;
