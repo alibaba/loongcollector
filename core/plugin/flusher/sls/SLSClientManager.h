@@ -52,7 +52,7 @@ public:
         if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
             static DnsCache* dnsCache = DnsCache::GetInstance();
             std::string realIP;
-            if (dnsCache->GetIPFromDnsCache(rawEndpoint, ip)) {
+            if (dnsCache->GetIPFromDnsCache(domain, ip)) {
                 useIPFlag = true;
             } else {
                 useIPFlag = false;
