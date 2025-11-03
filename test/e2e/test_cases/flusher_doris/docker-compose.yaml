@@ -45,6 +45,7 @@ services:
     restart: "no"
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/init_done"]
-      interval: 1s
-      timeout: 1s
-      retries: 1
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
