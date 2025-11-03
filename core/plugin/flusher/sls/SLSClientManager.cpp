@@ -146,7 +146,7 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
                                     AuthType type,
                                     const string& domain,
                                     const string& ip,
-                                    bool isRealIP,
+                                    bool useIP,
                                     const string& project,
                                     const string& logstore,
                                     const string& compressType,
@@ -166,7 +166,7 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
         path.append("/shards/route");
     }
 
-    if (isRealIP) {
+    if (useIP) {
         header[HOST] = project + "." + ip;
     } else {
         header[HOST] = domain;
@@ -251,7 +251,7 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
                                        AuthType type,
                                        const string& domain,
                                        const string& ip,
-                                       bool isRealIP,
+                                       bool useIP,
                                        const string& project,
                                        const string& logstore,
                                        const string& compressType,
@@ -262,7 +262,7 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
     path = METRICSTORES;
     path.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
 
-    if (isRealIP) {
+    if (useIP) {
         header[HOST] = project + "." + ip;
     } else {
         header[HOST] = domain;
@@ -295,7 +295,7 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   AuthType type,
                                   const string& domain,
                                   const string& ip,
-                                  bool isRealIP,
+                                  bool useIP,
                                   const string& project,
                                   const string& compressType,
                                   RawDataType dataType,
@@ -303,7 +303,7 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   size_t rawSize,
                                   const string& path,
                                   map<string, string>& header) {
-    if (isRealIP) {
+    if (useIP) {
         header[HOST] = project + "." + ip;
     } else {
         header[HOST] = domain;
@@ -341,7 +341,7 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                              AuthType type,
                              const string& domain,
                              const string& ip,
-                             bool isRealIP,
+                             bool useIP,
                              bool httpsFlag,
                              const string& project,
                              const string& logstore,
@@ -358,7 +358,7 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                                    type,
                                    domain,
                                    ip,
-                                   isRealIP,
+                                   useIP,
                                    project,
                                    logstore,
                                    compressType,
@@ -372,7 +372,7 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                                    header);
     HttpResponse response;
     std::string endpoint = domain;
-    if (isRealIP) {
+    if (useIP) {
         endpoint = ip;
     }
     SendHttpRequest(
@@ -387,7 +387,7 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                 AuthType type,
                                 const string& domain,
                                 const string& ip,
-                                bool isRealIP,
+                                bool useIP,
                                 bool httpsFlag,
                                 const string& project,
                                 const string& logstore,
@@ -402,7 +402,7 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       type,
                                       domain,
                                       ip,
-                                      isRealIP,
+                                      useIP,
                                       project,
                                       logstore,
                                       compressType,
@@ -412,7 +412,7 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       header);
     HttpResponse response;
     std::string endpoint = domain;
-    if (isRealIP) {
+    if (useIP) {
         endpoint = ip;
     }
     SendHttpRequest(
@@ -427,7 +427,7 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                AuthType type,
                                const string& domain,
                                const string& ip,
-                               bool isRealIP,
+                               bool useIP,
                                bool httpsFlag,
                                const string& project,
                                const string& compressType,
@@ -442,7 +442,7 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  type,
                                  domain,
                                  ip,
-                                 isRealIP,
+                                 useIP,
                                  project,
                                  compressType,
                                  dataType,
@@ -452,7 +452,7 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  header);
     HttpResponse response;
     std::string endpoint = domain;
-    if (isRealIP) {
+    if (useIP) {
         endpoint = ip;
     }
     SendHttpRequest(

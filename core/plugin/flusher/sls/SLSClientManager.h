@@ -47,18 +47,18 @@ public:
                             const std::string& rawEndpoint,
                             std::string& domain,
                             std::string& ip,
-                            bool& realIpFlag) const {
+                            bool& useIPFlag) const {
         domain = project + "." + rawEndpoint;
         if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
             static DnsCache* dnsCache = DnsCache::GetInstance();
             std::string realIP;
             if (dnsCache->GetIPFromDnsCache(rawEndpoint, ip)) {
-                realIpFlag = true;
+                useIPFlag = true;
             } else {
-                realIpFlag = false;
+                useIPFlag = false;
             }
         } else {
-            realIpFlag = false;
+            useIPFlag = false;
         }
     }
 
@@ -96,7 +96,7 @@ void PreparePostLogStoreLogsRequest(const std::string& accessKeyId,
                                     AuthType type,
                                     const std::string& domain,
                                     const std::string& ip,
-                                    bool isRealIP,
+                                    bool useIP,
                                     const std::string& project,
                                     const std::string& logstore,
                                     const std::string& compressType,
@@ -124,7 +124,7 @@ void PreparePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                        AuthType type,
                                        const std::string& domain,
                                        const std::string& ip,
-                                       bool isRealIP,
+                                       bool useIP,
                                        const std::string& project,
                                        const std::string& logstore,
                                        const std::string& compressType,
@@ -138,7 +138,7 @@ void PreparePostAPMBackendRequest(const std::string& accessKeyId,
                                   AuthType type,
                                   const std::string& domain,
                                   const std::string& ip,
-                                  bool isRealIP,
+                                  bool useIP,
                                   const std::string& project,
                                   const std::string& compressType,
                                   RawDataType dataType,
@@ -152,7 +152,7 @@ SLSResponse PostLogStoreLogs(const std::string& accessKeyId,
                              AuthType type,
                              const std::string& domain,
                              const std::string& ip,
-                             bool isRealIP,
+                             bool useIP,
                              bool httpsFlag,
                              const std::string& project,
                              const std::string& logstore,
@@ -167,7 +167,7 @@ SLSResponse PostMetricStoreLogs(const std::string& accessKeyId,
                                 AuthType type,
                                 const std::string& domain,
                                 const std::string& ip,
-                                bool isRealIP,
+                                bool useIP,
                                 bool httpsFlag,
                                 const std::string& project,
                                 const std::string& logstore,
@@ -180,7 +180,7 @@ SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
                                AuthType type,
                                const std::string& domain,
                                const std::string& ip,
-                               bool isRealIP,
+                               bool useIP,
                                bool httpsFlag,
                                const std::string& project,
                                const std::string& compressType,
