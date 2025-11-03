@@ -188,7 +188,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         sConfigManager->LoadCheckpointFile();
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_FALSE(diff.first.IsEmpty());
+        APSARA_TEST_TRUE(diff.first.HasDiff());
         CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         sConfigManager->DumpCheckpointFile();
 
@@ -281,7 +281,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         }
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-        APSARA_TEST_FALSE(diff.first.IsEmpty());
+        APSARA_TEST_TRUE(diff.first.HasDiff());
         CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         sConfigManager->DumpCheckpointFile();
 

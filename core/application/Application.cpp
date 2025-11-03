@@ -298,18 +298,22 @@ void Application::Start() { // GCOVR_EXCL_START
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (!configDiff.first.IsEmpty()) {
+            if (configDiff.first.HasDiff()) {
                 CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
             }
-            if (!configDiff.second.IsEmpty()) {
+            // feedback ignored configs after config update ensures ignored configs are set to FAILED status
+            if (configDiff.first.HasIgnored()) {
+                PipelineConfigWatcher::GetInstance()->FeedbackIgnoredConfigs(configDiff.first);
+            }
+            if (configDiff.second.HasDiff()) {
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
             }
-            if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
+            if (configDiff.first.HasDiff() || configDiff.second.HasDiff()) {
                 OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
 
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (!instanceConfigDiff.IsEmpty()) {
+            if (instanceConfigDiff.HasDiff()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
             }
             lastConfigCheckTime = curTime;
