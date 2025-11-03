@@ -47,5 +47,5 @@ services:
       test: ["CMD", "test", "-f", "/tmp/init_done"]
       interval: 5s
       timeout: 3s
-      retries: 30
+      retries: 10
       start_period: 10s

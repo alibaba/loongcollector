@@ -24,7 +24,7 @@ Feature: flusher doris
           value: "log contents"
     flushers:
       - Type: flusher_doris
-        Addresses: ["http://doris:8030"]
+        Addresses: ["http://doris:8040"]
         Database: test_db
         Table: test_table
         Authentication:
