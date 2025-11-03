@@ -57,6 +57,7 @@ public:
     void TestSystemdJournalReaderCheckJournalStatusNotOpen();
     void TestSystemdJournalReaderCheckJournalStatusError();
     void TestSystemdJournalReaderAddToEpoll();
+    void TestSystemdJournalReaderAddToEpollAndGetFD();
     void TestSystemdJournalReaderRemoveFromEpoll();
     void TestSystemdJournalReaderNextWithStatus();
     void TestSystemdJournalReaderNextWithStatusNotOpen();
@@ -379,6 +380,19 @@ void JournalReaderUnittest::TestSystemdJournalReaderAddToEpoll() {
     APSARA_TEST_FALSE(result);
 }
 
+void JournalReaderUnittest::TestSystemdJournalReaderAddToEpollAndGetFD() {
+    // 测试SystemdJournalReader的AddToEpollAndGetFD方法
+    JournalReader reader;
+
+    // 测试AddToEpollAndGetFD方法（未打开状态）
+    int fd = reader.AddToEpollAndGetFD(1); // 使用测试用的epoll fd
+    // 在未打开状态下应该返回-1
+    APSARA_TEST_TRUE(fd < 0);
+
+    // 注意：在测试环境中，即使打开journal也可能失败
+    // 所以这里主要测试接口的调用和返回值
+}
+
 void JournalReaderUnittest::TestSystemdJournalReaderRemoveFromEpoll() {
     // 测试SystemdJournalReader的RemoveFromEpoll方法
     JournalReader reader;
@@ -500,6 +514,10 @@ TEST_F(JournalReaderUnittest, TestSystemdJournalReaderCheckJournalStatusError) {
 
 TEST_F(JournalReaderUnittest, TestSystemdJournalReaderAddToEpoll) {
     TestSystemdJournalReaderAddToEpoll();
+}
+
+TEST_F(JournalReaderUnittest, TestSystemdJournalReaderAddToEpollAndGetFD) {
+    TestSystemdJournalReaderAddToEpollAndGetFD();
 }
 
 TEST_F(JournalReaderUnittest, TestSystemdJournalReaderRemoveFromEpoll) {

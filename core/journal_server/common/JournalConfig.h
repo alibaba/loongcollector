@@ -41,7 +41,8 @@ struct JournalConfig {
     std::vector<std::string> mMatchPatterns;
     bool mKernel = true;
 
-    // 注意：与Go插件不同已移除resetIntervalSecond配置，连接永远不重建
+    // 定时刷新间隔（秒），默认3600秒，用于定期关闭并重新打开journal连接以释放内存映射
+    int mResetIntervalSecond = 3600;
     int mMaxEntriesPerBatch = 1000;
 
     bool mParsePriority = false;
@@ -85,6 +86,10 @@ struct JournalConfig {
             journalConfig.mUseJournalEventTime = false;
         }
 
+        if (!GetOptionalIntParam(config, "ResetIntervalSecond", journalConfig.mResetIntervalSecond, errorMsg)) {
+            journalConfig.mResetIntervalSecond = 3600;
+        }
+
         if (!GetOptionalIntParam(config, "MaxEntriesPerBatch", journalConfig.mMaxEntriesPerBatch, errorMsg)) {
             journalConfig.mMaxEntriesPerBatch = 1000;
         }
@@ -113,6 +118,14 @@ struct JournalConfig {
     int ValidateAndFixConfig() {
         int fixedCount = 0;
 
+        if (mResetIntervalSecond <= 0) {
+            mResetIntervalSecond = 3600;
+            fixedCount++;
+        } else if (mResetIntervalSecond > 86400) {
+            // 限制最大值为24小时
+            mResetIntervalSecond = 86400;
+            fixedCount++;
+        }
 
         if (mMaxEntriesPerBatch <= 0) {
             mMaxEntriesPerBatch = 1000;

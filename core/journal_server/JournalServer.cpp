@@ -98,15 +98,14 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 }
 
 void JournalServer::RemoveJournalInput(const string& configName) {
-    CleanupEpollMonitoring(configName);
-    JournalConnectionManager::GetInstance().RemoveConfig(configName);
-    // Note: monitoredReaders cleanup will be done in syncMonitors when it detects
-    // the config no longer exists. CleanupEpollMonitoring above handles immediate epoll cleanup.
+    int epollFD = GetGlobalEpollFD();
+    // remove config with epoll cleanup
+    JournalConnectionManager::GetInstance().RemoveConfigWithEpollCleanup(configName, epollFD);
     LOG_INFO(sLogger, ("journal server input removed with automatic connection cleanup", "")("config", configName));
 }
 
 void JournalServer::RemoveConfigOnly(const string& configName) {
-    // 移除config对应的连接（不清理 epoll）
+    // remove config withour epoll cleanup
     JournalConnectionManager::GetInstance().RemoveConfig(configName);
 
     LOG_INFO(sLogger, ("journal server input removed without cleanup", "")("config", configName));
@@ -151,57 +150,12 @@ int JournalServer::GetGlobalEpollFD() const {
     return mGlobalEpollFD;
 }
 
-void JournalServer::cleanupInvalidReaders(int epollFD,
-                                          std::map<int, MonitoredReader>& monitoredReaders,
-                                          const std::set<std::string>& validConfigNames) {
-    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end();) {
-        auto& monitoredReader = it->second;
-
-        if (validConfigNames.find(monitoredReader.configName) == validConfigNames.end()) {
-            LOG_DEBUG(sLogger,
-                      ("journal server removing reader from monitoring",
-                       "config no longer exists")("config", monitoredReader.configName)("fd", it->first));
-
-            // Remove from epoll before erasing
-            if (monitoredReader.reader) {
-                monitoredReader.reader->RemoveFromEpoll(epollFD);
-            }
-            it = monitoredReaders.erase(it);
-        } else {
-            ++it;
-        }
-    }
-}
-
-void JournalServer::CleanupEpollMonitoring(const std::string& configName) {
-    // 检查初始化状态：如果 JournalServer 已经停止，说明 epoll 已在 run() 中统一清理
-    if (!mIsInitialized.load()) {
-        LOG_DEBUG(sLogger,
-                  ("journal server epoll monitoring already cleaned up", "server stopped")("config", configName));
-        return;
-    }
-
-    int epollFD = GetGlobalEpollFD();
-    if (epollFD < 0) {
-        LOG_WARNING(sLogger,
-                    ("journal server cannot cleanup epoll monitoring", "epoll not initialized")("config", configName));
-        return;
-    }
-
-    auto reader = JournalConnectionManager::GetInstance().GetConnection(configName);
-    if (reader && reader->IsOpen()) {
-        // Cleaning up epoll monitoring for config: configName[idx]
-        reader->RemoveFromEpoll(epollFD);
-    }
-}
-
 void JournalServer::run() {
     LOG_INFO(sLogger, ("journal server event-driven thread", "started"));
 
 #ifdef __linux__
     std::map<int, MonitoredReader> monitoredReaders;
 
-    // 创建全局 epoll 实例
     {
         std::lock_guard<std::mutex> lock(mEpollMutex);
         mGlobalEpollFD = epoll_create1(EPOLL_CLOEXEC);
@@ -220,7 +174,7 @@ void JournalServer::run() {
 
     while (mIsThreadRunning.load()) {
         try {
-            // 同步监控列表：确保所有已打开的连接都被添加到 epoll 监控
+           
             syncMonitors(mGlobalEpollFD, monitoredReaders);
 
             int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
@@ -245,6 +199,10 @@ void JournalServer::run() {
                 auto& monitoredReader = pair.second;
 
                 if (!monitoredReader.reader) {
+                    continue;
+                }
+                // 防止refresh connection期间使用已关闭的reader
+                if (!monitoredReader.reader->IsOpen()) {
                     continue;
                 }
                 // 每个reader都检查一次journal状态，确保所有reader都收到事件更新
@@ -303,65 +261,102 @@ void JournalServer::run() {
 }
 
 void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
-    auto allConfigs = GetAllJournalConfigs();
+    cleanupStaleReaders(epollFD, monitoredReaders);
+    refreshConnections(epollFD, monitoredReaders);
+    addNewReaders(epollFD, monitoredReaders);
+}
 
-    // Collect valid config names for cleanup check
-    std::set<std::string> validConfigNames;
-    for (const auto& [configName, config] : allConfigs) {
-        validConfigNames.insert(configName);
-    }
-
+void JournalServer::cleanupStaleReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     static int cleanupCounter = 0;
     if (++cleanupCounter >= 100) {
         cleanupCounter = 0;
-        cleanupInvalidReaders(epollFD, monitoredReaders, validConfigNames);
+        auto connectionManager = &JournalConnectionManager::GetInstance();
+        connectionManager->CleanupInvalidMonitoredReaders(epollFD, monitoredReaders);
     }
+}
 
-    // Add new readers
+void JournalServer::refreshConnections(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
+    auto connectionManager = &JournalConnectionManager::GetInstance();
+    auto allConfigs = GetAllJournalConfigs();
+
     for (const auto& [configName, config] : allConfigs) {
-        auto connection = JournalConnectionManager::GetInstance().GetConnection(configName);
-        if (connection && connection->IsOpen()) {
-            // Check if already monitored by iterating through monitoredReaders
-            bool alreadyMonitored = false;
-            for (const auto& pair : monitoredReaders) {
-                if (pair.second.reader == connection) {
-                    alreadyMonitored = true;
-                    break;
-                }
-            }
+        if (connectionManager->ShouldRefreshConnection(configName)) {
 
-            if (!alreadyMonitored) {
-                int journalFD = connection->GetJournalFD();
-                if (journalFD < 0) {
-                    LOG_WARNING(
-                        sLogger,
-                        ("journal server fd is invalid", "")("config", configName)("fd", journalFD)("errno", errno));
-                    continue;
-                }
-
-                bool success = connection->AddToEpoll(epollFD);
-                if (!success) {
-                    LOG_WARNING(sLogger,
-                                ("journal server failed to add reader to epoll",
-                                 "")("config", configName)("fd", journalFD)("epoll_fd", epollFD));
-                    continue;
-                }
-
-                MonitoredReader monitoredReader;
-                monitoredReader.reader = connection;
-                monitoredReader.configName = configName;
-                monitoredReaders[journalFD] = monitoredReader;
-
-                LOG_INFO(
-                    sLogger,
-                    ("journal server reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
+            if (connectionManager->RefreshConnection(configName, epollFD)) {
+                LOG_INFO(sLogger,
+                         ("journal server connection refreshed successfully", "")("config", configName));
+                syncReaderAfterRefresh(configName, monitoredReaders);
+            } else {
+                LOG_ERROR(sLogger, ("journal server connection refresh failed", "")("config", configName));
             }
         }
     }
 }
 
+void JournalServer::syncReaderAfterRefresh(const std::string& configName,
+                                            std::map<int, MonitoredReader>& monitoredReaders) {
+    auto connectionManager = &JournalConnectionManager::GetInstance();
+    auto connection = connectionManager->GetConnection(configName);
+
+    if (!connection || !connection->IsOpen()) {
+        return;
+    }
+
+    int newJournalFD = connection->GetJournalFD();
+    if (newJournalFD < 0) {
+        return;
+    }
+
+    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
+        if (it->second.configName == configName) {
+            // 如果fd变化了，需要更新key
+            if (it->first != newJournalFD) {
+                MonitoredReader mr = it->second;
+                monitoredReaders.erase(it);
+                monitoredReaders[newJournalFD] = mr;
+            } else {
+                // FD 没变化，确保 reader 指针正确
+                it->second.reader = connection;
+            }
+            return;
+        }
+    }
+}
+
+void JournalServer::addNewReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
+    auto connectionManager = &JournalConnectionManager::GetInstance();
+    auto openConnections = connectionManager->GetOpenConnections();
+
+    for (const auto& [configName, reader] : openConnections) {
+        bool alreadyMonitored = false;
+        for (const auto& pair : monitoredReaders) {
+            if (pair.second.reader == reader) {
+                alreadyMonitored = true;
+                break;
+            }
+        }
+
+        if (!alreadyMonitored) {
+            int journalFD = reader->AddToEpollAndGetFD(epollFD);
+            if (journalFD < 0) {
+                LOG_WARNING(sLogger,
+                            ("journal server failed to add reader to epoll",
+                             "")("config", configName)("epoll_fd", epollFD));
+                continue;
+            }
+
+            MonitoredReader monitoredReader;
+            monitoredReader.reader = reader;
+            monitoredReader.configName = configName;
+            monitoredReaders[journalFD] = monitoredReader;
+
+            LOG_INFO(sLogger,
+                     ("journal server reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
+        }
+    }
+}
+
 bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders) {
-    // 检查是否存在有hasPendingData标志的reader
     bool hasReadersWithPendingData = false;
     for (const auto& pair : monitoredReaders) {
         if (pair.second.hasPendingData) {
@@ -382,6 +377,11 @@ bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& mon
     for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
         auto& monitoredReader = it->second;
         if (!monitoredReader.reader) {
+            continue;
+        }
+        // 防止在RefreshConnection期间使用已关闭的reader
+        if (!monitoredReader.reader->IsOpen()) {
+            monitoredReader.hasPendingData = false;
             continue;
         }
 

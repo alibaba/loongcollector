@@ -340,11 +340,15 @@ void JournalServerUnittest::TestCleanupEpollMonitoring() {
     // 添加配置
     server->AddJournalInput(mConfigName, *mTestConfig);
 
-    // 清理epoll监控（应该不崩溃）
-    server->CleanupEpollMonitoring(mConfigName);
+    // 等待配置生效
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // 验证方法调用成功
-    APSARA_TEST_TRUE(true);
+    // RemoveJournalInput 内部会调用 RemoveConfigWithEpollCleanup 来清理epoll监控
+    server->RemoveJournalInput(mConfigName);
+
+    // 验证配置已移除
+    auto configs = server->GetAllJournalConfigs();
+    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
 
     server->Stop();
 }
@@ -502,8 +506,9 @@ void JournalServerUnittest::TestAddJournalInputManagerFailure() {
 void JournalServerUnittest::TestCleanupEpollMonitoringNoEpoll() {
     JournalServer* server = JournalServer::GetInstance();
 
-    // 在未初始化状态下测试清理epoll监控
-    server->CleanupEpollMonitoring("test_config");
+    // 在未初始化状态下调用 RemoveJournalInput（应该不会崩溃）
+    // RemoveJournalInput 会获取 epollFD（可能是 -1），但仍然可以安全调用
+    server->RemoveJournalInput("test_config");
 
     // 应该不会崩溃
     APSARA_TEST_TRUE(!server->HasRegisteredPlugins());
@@ -515,8 +520,10 @@ void JournalServerUnittest::TestCleanupEpollMonitoringNoReader() {
     // 初始化服务器
     server->Init();
 
-    // 清理不存在的reader的epoll监控
-    server->CleanupEpollMonitoring("nonexistent_config");
+    // 移除不存在的配置（应该不会崩溃）
+    // RemoveJournalInput 内部会调用 RemoveConfigWithEpollCleanup
+    // 即使配置不存在，也应该安全处理
+    server->RemoveJournalInput("nonexistent_config");
 
     // 应该不会崩溃
     APSARA_TEST_TRUE(!server->HasRegisteredPlugins());
@@ -661,11 +668,20 @@ void JournalServerUnittest::TestCleanupEpollMonitoringWithReader() {
     // 等待配置生效
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    // 清理epoll监控（测试有reader的情况）
-    server->CleanupEpollMonitoring(mConfigName);
+    // 验证配置已添加
+    auto configs = server->GetAllJournalConfigs();
+    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
 
-    // 验证方法调用成功
-    APSARA_TEST_TRUE(true);
+    // RemoveJournalInput 内部会调用 RemoveConfigWithEpollCleanup 来清理epoll监控
+    // 这会移除 epoll 监控并删除配置（测试有reader的情况）
+    server->RemoveJournalInput(mConfigName);
+
+    // 等待移除生效
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // 验证配置已移除
+    configs = server->GetAllJournalConfigs();
+    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
 
     server->Stop();
 }

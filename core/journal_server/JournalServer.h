@@ -113,12 +113,6 @@ public:
      */
     int GetGlobalEpollFD() const;
 
-    /**
-     * @brief 清理指定配置的 epoll 监控
-     * @param configName 配置名称
-     */
-    void CleanupEpollMonitoring(const std::string& configName);
-
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -130,12 +124,15 @@ private:
     void run();
     bool handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
     void syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    
+    // 同步监控的辅助方法
+    void cleanupStaleReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void refreshConnections(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void addNewReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void syncReaderAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
+    
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
-    // Cleanup helper functions
-    void cleanupInvalidReaders(int epollFD,
-                               std::map<int, MonitoredReader>& monitoredReaders,
-                               const std::set<std::string>& validConfigNames);
 
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};

@@ -108,6 +108,14 @@ public:
 
     // 事件监听相关方法（仅在 Linux 平台可用）
     bool AddToEpoll(int epollFD);
+    
+    /**
+     * @brief 将journal添加到epoll监控并返回文件描述符（原子操作）
+     * @param epollFD epoll文件描述符
+     * @return 成功返回journal FD（>=0），失败返回-1
+     */
+    int AddToEpollAndGetFD(int epollFD);
+    
     void RemoveFromEpoll(int epollFD);
 
     /**

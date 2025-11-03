@@ -347,6 +347,35 @@ public:
         return true;
     }
 
+    int AddToEpollAndGetFD(int epollFD) {
+        if (!IsOpen() || epollFD < 0) {
+            return -1;
+        }
+
+        int fd = sd_journal_get_fd(mJournal);
+        if (fd < 0) {
+            return -1;
+        }
+
+        struct epoll_event event = {};
+        event.events = EPOLLIN;
+        event.data.fd = fd;
+
+        // 先尝试ADD，如果fd已存在则使用MOD
+        int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
+        if (result != 0) {
+            if (errno == EEXIST) {
+                // fd已存在，使用MOD来修改事件设置
+                result = epoll_ctl(epollFD, EPOLL_CTL_MOD, fd, &event);
+            }
+            if (result != 0) {
+                return -1;
+            }
+        }
+
+        return fd;
+    }
+
     void RemoveFromEpoll(int epollFD) {
         if (!IsOpen() || epollFD < 0) {
             return;
@@ -513,6 +542,10 @@ bool JournalReader::SetJournalPaths(const std::vector<std::string>& paths) {
 
 bool JournalReader::AddToEpoll(int epollFD) {
     return mImpl->AddToEpoll(epollFD);
+}
+
+int JournalReader::AddToEpollAndGetFD(int epollFD) {
+    return mImpl->AddToEpollAndGetFD(epollFD);
 }
 
 void JournalReader::RemoveFromEpoll(int epollFD) {
