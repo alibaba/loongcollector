@@ -24,7 +24,11 @@ target_link_libraries(modify_handler_unittest ${UT_BASE_TARGET})
 add_executable(log_input_unittest LogInputUnittest.cpp)
 target_link_libraries(log_input_unittest ${UT_BASE_TARGET})
 
+add_executable(log_input_reader_unittest LogInputReaderUnittest.cpp)
+target_link_libraries(log_input_reader_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(create_modify_handler_unittest)
 gtest_discover_tests(modify_handler_unittest)
 gtest_discover_tests(log_input_unittest)
+gtest_discover_tests(log_input_reader_unittest)

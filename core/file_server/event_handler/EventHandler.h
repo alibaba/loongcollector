@@ -122,6 +122,7 @@ public:
     friend class ModifyHandlerUnittest;
     friend class ForceReadUnittest;
     friend class CreateModifyHandlerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 
@@ -179,6 +180,7 @@ public:
     friend class EventDispatcherTest;
     friend class SenderUnittest;
     friend class EventDispatcherContainerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 
