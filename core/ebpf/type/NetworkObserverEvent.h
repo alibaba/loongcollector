@@ -134,17 +134,17 @@ class MysqlRecord : public L7Record {
 public:
     MysqlRecord(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail)
         : L7Record(conn, appDetail) {}
-    
+
     [[nodiscard]] virtual bool IsError() const override { return mErrorCode != 0; }
     [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
     void SetStatusCode(int code) { mCode = code; }
     [[nodiscard]] virtual int GetStatusCode() const override { return mErrorCode; }
-    
+
     // 2025-08-07 spanName use real query ...
     // metric use command type
     [[nodiscard]] virtual const std::string& GetSpanName() { return mRealQuery; }
     [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandType; }
-    
+
     void SetErrorCode(int errorCode) { mErrorCode = errorCode; }
     void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
     void SetCommandType(const std::string& commandType) { mCommandType = commandType; }
@@ -152,7 +152,7 @@ public:
     void SetRealQuery(const std::string& query) { mRealQuery = query; }
     void SetDatabaseName(const std::string& dbName) { mDatabaseName = dbName; }
     void SetTableName(const std::string& tableName) { mTableName = tableName; }
-    
+
     int GetErrorCode() const { return mErrorCode; }
     const std::string& GetErrorMessage() const { return mErrorMsg; }
     const std::string& GetCommandType() const { return mCommandType; }
@@ -160,7 +160,7 @@ public:
     const std::string& GetRealQuery() const { return mRealQuery; }
     const std::string& GetDatabaseName() const { return mDatabaseName; }
     const std::string& GetTableName() const { return mTableName; }
-    
+
     void SetRowsAffected(uint64_t rows) { mRowsAffected = rows; }
     void SetRowsExamined(uint64_t rows) { mRowsExamined = rows; }
     uint64_t GetRowsAffected() const { return mRowsAffected; }
@@ -168,7 +168,7 @@ public:
     void SetSql(const std::string& sql) { mSql = sql; }
     const std::string& GetSql() const { return mSql; }
 
-// private:
+    // private:
     int mCode = 0;
     int mErrorCode = 0;
     std::string mErrorMsg;

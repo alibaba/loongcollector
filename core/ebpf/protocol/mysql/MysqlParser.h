@@ -75,7 +75,8 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& res
 
 ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<MysqlRecord>& result);
 
-ParseState ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool closed, bool forceSample = false);
+ParseState
+ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool closed, bool forceSample = false);
 
 // 解析MySQL包头
 bool ParsePacketHeader(std::string_view& buf, uint32_t& packetLen, uint8_t& seqId);
