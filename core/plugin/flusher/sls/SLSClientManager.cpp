@@ -371,10 +371,7 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                                    query,
                                    header);
     HttpResponse response;
-    std::string endpoint = domain;
-    if (useIP) {
-        endpoint = ip;
-    }
+    std::string endpoint = useIP ? ip : domain;
     SendHttpRequest(
         make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, path, query, header, body),
         response);
@@ -411,10 +408,7 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       path,
                                       header);
     HttpResponse response;
-    std::string endpoint = domain;
-    if (useIP) {
-        endpoint = ip;
-    }
+    std::string endpoint = useIP ? ip : domain;
     SendHttpRequest(
         make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, path, "", header, body),
         response);
@@ -451,10 +445,7 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  subpath,
                                  header);
     HttpResponse response;
-    std::string endpoint = domain;
-    if (useIP) {
-        endpoint = ip;
-    }
+    std::string endpoint = useIP ? ip : domain;
     SendHttpRequest(
         make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, subpath, "", header, body),
         response);

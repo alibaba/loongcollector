@@ -44,11 +44,15 @@ public:
     const std::string& GetUserAgent() const { return mUserAgent; }
 
     void GetCurrentEndpoint(const std::string& project,
-                            const std::string& rawEndpoint,
+                            const std::string& rawDomain,
                             std::string& domain,
                             std::string& ip,
                             bool& useIPFlag) const {
-        domain = project + "." + rawEndpoint;
+        domain = project + "." + rawDomain;
+        GetCurrentEndpoint(domain, ip, useIPFlag);
+    }
+
+    void GetCurrentEndpoint(const std::string& domain, std::string& ip, bool& useIPFlag) const {
         if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
             static DnsCache* dnsCache = DnsCache::GetInstance();
             std::string realIP;
