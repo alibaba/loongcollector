@@ -1423,7 +1423,6 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase12() const {
 
 void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
     // input_container_stdio -> Go -> C++ => Go -> Go -> C++
-    // This test verifies FileServer pause/resume behavior when switching from input_container_stdio to service_docker_stdout
     const std::string configName = "test13";
     // load old pipeline with input_container_stdio
     Json::Value pipelineConfigJson
