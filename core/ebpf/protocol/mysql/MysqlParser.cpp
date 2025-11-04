@@ -87,7 +87,7 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& res
     }
     
     // 包序号（1字节）
-    uint8_t seqId = buf[3];
+    // uint8_t seqId = buf[3];
     
     // 命令类型（1字节）
     uint8_t command = buf[4];
@@ -136,7 +136,7 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& re
     }
     
     // 包序号（1字节）
-    uint8_t seqId = buf[3];
+    // uint8_t seqId = buf[3];
     
     // 根据响应内容设置状态码等信息
     if (packetLen > 0) {
