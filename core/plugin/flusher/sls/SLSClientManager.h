@@ -24,7 +24,7 @@
 
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
-#include "common/DNSCache.h"
+#include "common/dns/DNSCache.h"
 #include "plugin/flusher/sls/SLSResponse.h"
 #include "plugin/flusher/sls/StaticCredentialsProvider.h"
 

@@ -52,7 +52,7 @@ public:
                 mDnsCacheData[host] = std::make_pair(address, currentTime);
             } else {
                 if (itr == mDnsCacheData.end()) {
-                    mDnsCacheData[host] = std::make_pair(host, currentTime);
+                    status = false;
                 } else {
                     mDnsCacheData[host] = std::make_pair((itr->second).first, currentTime);
                 }

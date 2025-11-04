@@ -52,6 +52,8 @@ struct SLSSenderQueueItem : public SenderQueueItem {
           mExactlyOnceCheckpoint(std::move(exactlyOnceCheckpoint)) {}
 
     SenderQueueItem* Clone() override { return new SLSSenderQueueItem(*this); }
+
+    std::string GetEndpoint() const { return mUseIPFlag ? mCurrentIP : mCurrentDomain; }
 };
 
 } // namespace logtail

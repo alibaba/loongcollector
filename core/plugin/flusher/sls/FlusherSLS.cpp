@@ -685,6 +685,10 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 #else
     SLSClientManager::GetInstance()->GetCurrentEndpoint(
         mProject, mEndpoint, data->mCurrentDomain, data->mCurrentIP, data->mUseIPFlag);
+    LOG_INFO(sLogger,
+             ("get current endpoint, project", mProject)("endpoint", mEndpoint)("current domain", data->mCurrentDomain)(
+                 "current ip", data->mCurrentIP)("use ip flag", data->mUseIPFlag));
+
 #endif
 
     switch (mTelemetryType) {
@@ -1232,10 +1236,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                    query,
                                    header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIPFlag) {
-        endpoint = item->mCurrentIP;
-    }
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         endpoint,
@@ -1268,10 +1269,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
                                   path,
                                   header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIPFlag) {
-        endpoint = item->mCurrentIP;
-    }
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         endpoint,
@@ -1308,10 +1306,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                       path,
                                       header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIPFlag) {
-        endpoint = item->mCurrentIP;
-    }
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         endpoint,
@@ -1350,10 +1345,7 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  mSubpath,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
-    std::string endpoint = item->mCurrentDomain;
-    if (item->mUseIPFlag) {
-        endpoint = item->mCurrentIP;
-    }
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
                                         endpoint,
