@@ -129,23 +129,16 @@ bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
             item->mStatus = SendingStatus::IDLE;
-            ++item->mTryCnt; // 递增重试计数，用于计算回退延迟
+            ++item->mTryCnt;
             // 计算指数回退延迟：初始100ms，最大10秒，每次重试延迟翻倍
             // 第一次失败(mTryCnt=2)：延迟100ms；第二次失败(mTryCnt=3)：延迟200ms；以此类推
+            // 限制最大位移为7（即最大延迟约12.8秒，但会被限制到10秒）
             const int64_t kInitialBackoffMs = 100;
             const int64_t kMaxBackoffMs = 10000;
-            // mTryCnt已经递增，计算失败次数（失败次数 = mTryCnt - 1）
-            int failureCount = item->mTryCnt - 1;
-            int shift = std::min(failureCount - 1, 7); // 限制最大位移为7（即最大延迟约12.8秒，但会被限制到10秒）
-            int64_t backoffMs = kInitialBackoffMs;
-            if (shift >= 0) {
-                backoffMs = kInitialBackoffMs * (1LL << shift);
-                if (backoffMs > kMaxBackoffMs) {
-                    backoffMs = kMaxBackoffMs;
-                }
-            }
+            int64_t shift = std::max(0U, std::min(item->mTryCnt - 2, 7U));
+            int64_t backoffMs = std::min(kInitialBackoffMs * (1 << shift), kMaxBackoffMs);
             auto now = chrono::system_clock::now();
-            item->mNextRetryTime = now + chrono::milliseconds(backoffMs);
+            item->mQuickFailNextRetryTime = now + chrono::milliseconds(backoffMs);
             LOG_DEBUG(sLogger,
                       ("failed to build request", "retry later")("item address", item)(
                           "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(

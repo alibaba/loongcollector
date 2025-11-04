@@ -148,7 +148,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
             if (item->mStatus.load() == SendingStatus::IDLE) {
                 // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
                 auto now = chrono::system_clock::now();
-                if (item->mNextRetryTime > item->mFirstEnqueTime && now < item->mNextRetryTime) {
+                if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
                     continue;
                 }
                 item->mStatus = SendingStatus::SENDING;
@@ -167,7 +167,7 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
             }
             // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
             auto now = chrono::system_clock::now();
-            if (item->mNextRetryTime > item->mFirstEnqueTime && now < item->mNextRetryTime) {
+            if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
                 continue;
             }
             hasAvailableItem = true;

@@ -144,6 +144,7 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
     if (Empty()) {
         return;
     }
+    auto now = chrono::system_clock::now();
     if (limit < 0) {
         for (size_t index = 0; index < mCapacity; ++index) {
             SenderQueueItem* item = mQueue[index].get();
@@ -152,8 +153,7 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
             }
             if (item->mStatus.load() == SendingStatus::IDLE) {
                 // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
-                auto now = chrono::system_clock::now();
-                if (item->mNextRetryTime > item->mFirstEnqueTime && now < item->mNextRetryTime) {
+                if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
                     continue;
                 }
                 item->mStatus = SendingStatus::SENDING;
@@ -179,8 +179,7 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
         }
         if (item->mStatus.load() == SendingStatus::IDLE) {
             // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
-            auto now = chrono::system_clock::now();
-            if (item->mNextRetryTime > item->mFirstEnqueTime && now < item->mNextRetryTime) {
+            if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
                 continue;
             }
             --limit;
