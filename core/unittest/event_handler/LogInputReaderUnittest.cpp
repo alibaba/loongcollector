@@ -15,7 +15,9 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#ifndef _MSC_VER
 #include <unistd.h>
+#endif
 
 #include <boost/filesystem/operations.hpp>
 #include <filesystem>
@@ -81,6 +83,7 @@ public:
     void ModifyNonEmpty_Close_Change_Modify_DiffSignature();
     void ModifyNonEmpty_Close_Modify();
 
+#ifndef _MSC_VER
     // Symbolic link test cases
     void SymlinkCreateEmpty_Modify_Modify();
     void SymlinkCreateNonEmpty_Modify_Modify();
@@ -113,10 +116,10 @@ public:
     void SymlinkModifyNonEmpty_Change_Close_Modify_DiffSignature();
     void SymlinkModifyNonEmpty_Close_Change_Modify_DiffSignature();
     void SymlinkModifyNonEmpty_Close_Modify();
+#endif
 
 protected:
     static void SetUpTestCase() {
-        srand(time(NULL));
         gRootDir = GetProcessExecutionDir();
         gLogName = "test.log";
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
@@ -141,9 +144,9 @@ protected:
         // Force cleanup: ensure path is completely unregistered before setting up
         // Always cleanup regardless of registration status to ensure clean state
         EventHandler* oldHandler = EventDispatcher::GetInstance()->GetHandler(gRootDir.c_str());
-        if (oldHandler != NULL) {
+        if (oldHandler != nullptr) {
             CreateModifyHandler* createModifyHandler = dynamic_cast<CreateModifyHandler*>(oldHandler);
-            if (createModifyHandler != NULL) {
+            if (createModifyHandler != nullptr) {
                 // Delete all ModifyHandlers to avoid holding stale references
                 for (auto iter = createModifyHandler->mModifyHandlerPtrMap.begin();
                      iter != createModifyHandler->mModifyHandlerPtrMap.end();
@@ -233,7 +236,7 @@ protected:
         if (registeredHandler != handler) {
             // Old handler was reused - clean up its ModifyHandlers to avoid stale references
             CreateModifyHandler* reusedHandler = dynamic_cast<CreateModifyHandler*>(registeredHandler);
-            if (reusedHandler != NULL) {
+            if (reusedHandler != nullptr) {
                 // Delete all ModifyHandlers in the reused handler to avoid holding stale references
                 for (auto iter = reusedHandler->mModifyHandlerPtrMap.begin();
                      iter != reusedHandler->mModifyHandlerPtrMap.end();
@@ -257,7 +260,7 @@ protected:
         APSARA_TEST_TRUE_FATAL(linkRegistered);
         if (registeredLinkHandler != linkHandler) {
             CreateModifyHandler* reusedHandler = dynamic_cast<CreateModifyHandler*>(registeredLinkHandler);
-            if (reusedHandler != NULL) {
+            if (reusedHandler != nullptr) {
                 for (auto iter = reusedHandler->mModifyHandlerPtrMap.begin();
                      iter != reusedHandler->mModifyHandlerPtrMap.end();
                      ++iter) {
@@ -281,9 +284,9 @@ protected:
 
         // Clean up handler and all ModifyHandlers before cleaning other resources
         EventHandler* handler = EventDispatcher::GetInstance()->GetHandler(gRootDir.c_str());
-        if (handler != NULL) {
+        if (handler != nullptr) {
             CreateModifyHandler* createModifyHandler = dynamic_cast<CreateModifyHandler*>(handler);
-            if (createModifyHandler != NULL) {
+            if (createModifyHandler != nullptr) {
                 // Delete all ModifyHandlers to avoid holding stale references
                 for (auto iter = createModifyHandler->mModifyHandlerPtrMap.begin();
                      iter != createModifyHandler->mModifyHandlerPtrMap.end();
@@ -292,16 +295,16 @@ protected:
                 }
                 createModifyHandler->mModifyHandlerPtrMap.clear();
                 delete createModifyHandler->mCreateHandlerPtr;
-                createModifyHandler->mCreateHandlerPtr = NULL;
+                createModifyHandler->mCreateHandlerPtr = nullptr;
             }
         }
 
         // Also clean up linkDir handler if it exists (for symlink tests)
         std::string linkDir = getLinkDir();
         EventHandler* linkHandler = EventDispatcher::GetInstance()->GetHandler(linkDir.c_str());
-        if (linkHandler != NULL) {
+        if (linkHandler != nullptr) {
             CreateModifyHandler* createModifyHandler = dynamic_cast<CreateModifyHandler*>(linkHandler);
-            if (createModifyHandler != NULL) {
+            if (createModifyHandler != nullptr) {
                 for (auto iter = createModifyHandler->mModifyHandlerPtrMap.begin();
                      iter != createModifyHandler->mModifyHandlerPtrMap.end();
                      ++iter) {
@@ -309,7 +312,7 @@ protected:
                 }
                 createModifyHandler->mModifyHandlerPtrMap.clear();
                 delete createModifyHandler->mCreateHandlerPtr;
-                createModifyHandler->mCreateHandlerPtr = NULL;
+                createModifyHandler->mCreateHandlerPtr = nullptr;
             }
         }
 
@@ -330,7 +333,7 @@ protected:
         EventDispatcher::GetInstance()->UnregisterEventHandler(linkDir);
         ConfigManager::GetInstance()->RemoveHandler(linkDir);
 
-        LOG_INFO(sLogger, ("TearDown() end", time(NULL)));
+        LOG_INFO(sLogger, ("TearDown() end", time(nullptr)));
     }
 
     static std::string gRootDir;
@@ -358,8 +361,8 @@ private:
     }
 
     void createSymlink(const std::string& target, const std::string& linkPath) {
-        unlink(linkPath.c_str());
-        symlink(target.c_str(), linkPath.c_str());
+        boost::filesystem::remove(linkPath);
+        boost::filesystem::create_symlink(target, linkPath);
     }
 
     // Helper function to setup symlink test environment
@@ -405,7 +408,7 @@ private:
 
         for (size_t i = 0; i < events.size(); ++i) {
             Event* ev = logInput->PopEventQueue();
-            if (ev != NULL) {
+            if (ev != nullptr) {
                 logInput->ProcessEvent(dispatcher, ev);
             }
         }
@@ -419,7 +422,7 @@ private:
         // to avoid interference with manually created test events
         while (logInput->mInotifyEventQueue.size() != 0) {
             Event* autoEv = logInput->PopEventQueue();
-            if (autoEv != NULL) {
+            if (autoEv != nullptr) {
                 delete autoEv;
             }
         }
@@ -431,7 +434,7 @@ private:
         while (logInput->mInotifyEventQueue.size() != 0) {
             Event* ev2 = logInput->PopEventQueue();
             LOG_INFO(sLogger, ("Processing event", ToString(ev2->GetType())));
-            if (ev2 != NULL) {
+            if (ev2 != nullptr) {
                 logInput->ProcessEvent(dispatcher, ev2);
             }
         }
@@ -444,13 +447,13 @@ private:
     // Overload for specifying custom directory (e.g., symlink directories)
     void VerifyReaderExists(const DevInode& devInode, bool shouldExist, const std::string& dir) {
         EventHandler* handler = EventDispatcher::GetInstance()->GetHandler(dir.c_str());
-        APSARA_TEST_TRUE_FATAL(handler != NULL);
+        APSARA_TEST_TRUE_FATAL(handler != nullptr);
         CreateModifyHandler* createModifyHandler = dynamic_cast<CreateModifyHandler*>(handler);
-        APSARA_TEST_TRUE_FATAL(createModifyHandler != NULL);
+        APSARA_TEST_TRUE_FATAL(createModifyHandler != nullptr);
 
         // Get or create modify handler - it will be created when processing events
         ModifyHandler* modifyHandler = createModifyHandler->GetOrCreateModifyHandler(mConfigName, mConfig);
-        APSARA_TEST_TRUE_FATAL(modifyHandler != NULL);
+        APSARA_TEST_TRUE_FATAL(modifyHandler != nullptr);
 
         bool exists = modifyHandler->mDevInodeReaderMap.find(devInode) != modifyHandler->mDevInodeReaderMap.end();
         APSARA_TEST_EQUAL_FATAL(exists, shouldExist);
@@ -461,16 +464,16 @@ private:
     // Overload for specifying custom directory (e.g., symlink directories)
     LogFileReaderPtr GetReader(const DevInode& devInode, const std::string& dir) {
         EventHandler* handler = EventDispatcher::GetInstance()->GetHandler(dir.c_str());
-        if (handler == NULL) {
+        if (handler == nullptr) {
             return LogFileReaderPtr();
         }
         CreateModifyHandler* createModifyHandler = dynamic_cast<CreateModifyHandler*>(handler);
-        if (createModifyHandler == NULL) {
+        if (createModifyHandler == nullptr) {
             return LogFileReaderPtr();
         }
 
         ModifyHandler* modifyHandler = createModifyHandler->GetOrCreateModifyHandler(mConfigName, mConfig);
-        if (modifyHandler == NULL) {
+        if (modifyHandler == nullptr) {
             return LogFileReaderPtr();
         }
 
@@ -493,12 +496,12 @@ private:
         LogFileReaderPtr reader = GetReader(devInode, dir);
         if (!sameReader) {
             // Reader should be recreated (file empty and changed)
-            APSARA_TEST_TRUE_FATAL(reader.get() != NULL);
+            APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
             // New reader should be a different pointer
             APSARA_TEST_TRUE_FATAL(reader.get() != originalReader.get());
         } else {
             // Reader should NOT be recreated (same reader)
-            APSARA_TEST_TRUE_FATAL(reader.get() != NULL);
+            APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
             // Reader should be the same pointer
             APSARA_TEST_EQUAL_FATAL(reader.get(), originalReader.get());
         }
@@ -512,7 +515,7 @@ std::string LogInputReaderUnittest::gLogName;
 
 // Normal file test cases
 void LogInputReaderUnittest::CreateEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyModify_EmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -535,12 +538,11 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyModify_NonEmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "test content\n");
@@ -563,12 +565,11 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -586,7 +587,6 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Change_Close_Modify() {
     Event* modifyEv1 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv1);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -599,12 +599,11 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -626,7 +625,6 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Close_Change_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -635,12 +633,11 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Close_Change_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_EmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -662,18 +659,16 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_SameSignature() {
     LOG_INFO(sLogger,
-             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -692,7 +687,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_SameSigna
     Event* modifyEv1 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv1);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -710,7 +704,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_SameSigna
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_SameSignature() {
     LOG_INFO(sLogger,
-             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -733,7 +727,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_SameSigna
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -747,7 +740,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_SameSigna
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_DiffSignature() {
     LOG_INFO(sLogger,
-             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -765,7 +758,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_DiffSigna
     Event* modifyEv1 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv1);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -779,13 +771,12 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_DiffSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_DiffSignature() {
     LOG_INFO(sLogger,
-             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+             ("TestNormal_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -807,7 +798,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_DiffSigna
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -817,12 +807,11 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_DiffSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateModifyCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "test content\n");
@@ -844,17 +833,15 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -868,7 +855,6 @@ void LogInputReaderUnittest::CreateEmpty_Change_Close_Modify() {
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -881,12 +867,11 @@ void LogInputReaderUnittest::CreateEmpty_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -904,7 +889,6 @@ void LogInputReaderUnittest::CreateEmpty_Close_Change_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -913,12 +897,11 @@ void LogInputReaderUnittest::CreateEmpty_Close_Change_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_EmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -936,17 +919,16 @@ void LogInputReaderUnittest::CreateEmpty_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestNormal_CreateCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -961,7 +943,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_SameSignature() 
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -978,7 +959,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_SameSignature() 
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -997,7 +978,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_SameSignature() 
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -1010,7 +990,8 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_SameSignature() 
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestNormal_CreateCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -1024,7 +1005,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_DiffSignature() 
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -1042,7 +1022,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_DiffSignature() 
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -1060,7 +1040,6 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_DiffSignature() 
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -1074,7 +1053,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_DiffSignature() 
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_CreateCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "test content\n");
@@ -1092,18 +1071,17 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
+#ifndef _MSC_VER
 // Symbolic link test cases
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyModify_EmptyUnchanged() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
@@ -1129,12 +1107,11 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyModify_NonEmptyUnchanged() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("test content\n");
@@ -1160,12 +1137,11 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
@@ -1199,12 +1175,11 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Change_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
@@ -1238,12 +1213,11 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Change_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_EmptyUnchanged() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
@@ -1267,19 +1241,17 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_SameSignature() {
     LOG_INFO(sLogger,
-             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     std::string signature = "test content\n";
@@ -1319,7 +1291,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_Sa
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_SameSignature() {
     LOG_INFO(sLogger,
-             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     std::string signature = "test content\n";
@@ -1359,7 +1331,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_Sa
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_DiffSignature() {
     LOG_INFO(sLogger,
-             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
@@ -1395,13 +1367,12 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_Di
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_DiffSignature() {
     LOG_INFO(sLogger,
-             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+             ("TestSymlink_CreateModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
@@ -1437,12 +1408,11 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_Di
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateModifyCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     auto [realPath, linkPath] = setupSymlinkEnvironment("test content\n");
@@ -1466,18 +1436,16 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -1510,7 +1478,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Change_Close_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -1540,12 +1508,11 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Change_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and changed (renamed to new file), reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_EmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -1564,18 +1531,17 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv);
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_CreateCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
 
     // Setup symlink environment: real/real/test.log with link -> real/real
     std::string signature = "test content\n";
@@ -1610,7 +1576,8 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_SameSigna
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_CreateCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
 
     std::string signature = "test content\n";
     auto [realPath, linkPath] = setupSymlinkEnvironment(signature);
@@ -1645,7 +1612,8 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_SameSigna
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_CreateCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
     std::string linkDir = getLinkDir();
@@ -1674,12 +1642,12 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_DiffSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File non-empty and changed with different signature, reader should be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_CreateCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
     std::string linkDir = getLinkDir();
@@ -1714,7 +1682,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_DiffSigna
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("test content\n");
     std::string linkDir = getLinkDir();
@@ -1733,18 +1701,16 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv);
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    // File non-empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_ModifyWrite_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModifyChangeCloseModify_Empty() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_CreateCloseModifyChangeCloseModify_Empty() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -1785,10 +1751,11 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_ModifyWrite_Change_Close_M
     VerifyReaderExists(devInode, true, linkDir);
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
+#endif
 
 // Normal file test cases - reader created by modify event
 void LogInputReaderUnittest::ModifyEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyModifyModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyModifyModify_EmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -1815,7 +1782,7 @@ void LogInputReaderUnittest::ModifyEmpty_Modify_Modify() {
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyModifyModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyModifyModify_NonEmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "test content\n");
@@ -1842,7 +1809,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Modify_Modify() {
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -1856,7 +1823,6 @@ void LogInputReaderUnittest::ModifyEmpty_Change_Close_Modify() {
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -1873,7 +1839,7 @@ void LogInputReaderUnittest::ModifyEmpty_Change_Close_Modify() {
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -1891,7 +1857,6 @@ void LogInputReaderUnittest::ModifyEmpty_Close_Change_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -1904,7 +1869,7 @@ void LogInputReaderUnittest::ModifyEmpty_Close_Change_Modify() {
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_EmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "");
@@ -1922,17 +1887,16 @@ void LogInputReaderUnittest::ModifyEmpty_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    // File empty and unchanged, reader should NOT be recreated
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestNormal_ModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -1947,7 +1911,6 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_SameSignature() 
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -1964,7 +1927,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_SameSignature() 
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     std::string signature = "test content\n";
@@ -1983,7 +1946,6 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_SameSignature() 
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
 
@@ -1996,7 +1958,8 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_SameSignature() 
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestNormal_ModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -2010,7 +1973,6 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_DiffSignature() 
     // Get reader pointer after creation
     LogFileReaderPtr originalReader = GetReader(devInode);
 
-    // File is renamed to a new file - this happens BEFORE close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -2028,7 +1990,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_DiffSignature() 
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "old content\n");
@@ -2046,7 +2008,6 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_DiffSignature() 
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File is renamed to a new file - this happens AFTER close
     std::string newLogPath = gRootDir + PATH_SEPARATOR + "new.log";
     bfs::rename(logPath, newLogPath);
     overwriteLog(newLogPath, "new content\n");
@@ -2060,7 +2021,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_DiffSignature() 
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestNormal_ModifyCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
     writeLog(logPath, "test content\n");
@@ -2078,7 +2039,6 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Modify() {
     Event* closeEv = new Event(gRootDir, gLogName, EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
@@ -2086,10 +2046,10 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Modify() {
     VerifyReaderNotRecreated(devInode, originalReader, true);
 }
 
-
+#ifndef _MSC_VER
 // Symbolic link test cases - reader created by modify event
 void LogInputReaderUnittest::SymlinkModifyEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyModifyModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyModifyModify_EmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -2118,7 +2078,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Modify_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Modify_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyModifyModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyModifyModify_NonEmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("test content\n");
     std::string linkDir = getLinkDir();
@@ -2147,7 +2107,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Modify_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Change_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyChanged_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyChanged_BeforeClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -2181,7 +2141,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Change_Close_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Change_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyChanged_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyChanged_AfterClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -2216,7 +2176,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Change_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_EmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("");
     std::string linkDir = getLinkDir();
@@ -2235,7 +2195,6 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
@@ -2245,7 +2204,8 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Modify() {
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_ModifyCloseModify_NonEmptyChanged_SameSignature_BeforeClose() begin", time(nullptr)));
 
     std::string signature = "test content\n";
     auto [realPath, linkPath] = setupSymlinkEnvironment(signature);
@@ -2279,7 +2239,8 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_SameSigna
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_SameSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_ModifyCloseModify_NonEmptyChanged_SameSignature_AfterClose() begin", time(nullptr)));
 
     std::string signature = "test content\n";
     auto [realPath, linkPath] = setupSymlinkEnvironment(signature);
@@ -2314,7 +2275,8 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_SameSigna
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_ModifyCloseModify_NonEmptyChanged_DiffSignature_BeforeClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
     std::string linkDir = getLinkDir();
@@ -2349,7 +2311,8 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_DiffSigna
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_DiffSignature() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(NULL)));
+    LOG_INFO(sLogger,
+             ("TestSymlink_ModifyCloseModify_NonEmptyChanged_DiffSignature_AfterClose() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("old content\n");
     std::string linkDir = getLinkDir();
@@ -2383,7 +2346,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_DiffSigna
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Modify() {
-    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyUnchanged() begin", time(NULL)));
+    LOG_INFO(sLogger, ("TestSymlink_ModifyCloseModify_NonEmptyUnchanged() begin", time(nullptr)));
 
     auto [realPath, linkPath] = setupSymlinkEnvironment("test content\n");
     std::string linkDir = getLinkDir();
@@ -2402,7 +2365,6 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Modify() {
     Event* closeEv = new Event(linkDir, "test.log", EVENT_DELETE, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(closeEv);
 
-    // File unchanged - process modify event with same dev/inode
     Event* modifyEv2 = new Event(linkDir, "test.log", EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     ProcessSingleEvent(modifyEv2);
 
@@ -2410,7 +2372,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Modify() {
     VerifyReaderExists(devInode, true, linkDir);
     VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
 }
-
+#endif
 
 // Register all test cases
 UNIT_TEST_CASE(LogInputReaderUnittest, CreateEmpty_Modify_Modify);
