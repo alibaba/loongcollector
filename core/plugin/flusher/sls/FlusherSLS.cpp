@@ -685,9 +685,10 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 #else
     SLSClientManager::GetInstance()->GetCurrentEndpoint(
         mProject, mEndpoint, data->mCurrentDomain, data->mCurrentIP, data->mUseIPFlag);
-    LOG_INFO(sLogger,
-             ("get current endpoint, project", mProject)("endpoint", mEndpoint)("current domain", data->mCurrentDomain)(
-                 "current ip", data->mCurrentIP)("use ip flag", data->mUseIPFlag));
+    LOG_DEBUG(
+        sLogger,
+        ("get current endpoint, project", mProject)("endpoint", mEndpoint)("current domain", data->mCurrentDomain)(
+            "current ip", data->mCurrentIP)("use ip flag", data->mUseIPFlag));
 
 #endif
 
