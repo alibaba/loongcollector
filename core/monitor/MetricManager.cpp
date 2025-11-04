@@ -165,6 +165,8 @@ void ReadMetrics::ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEve
 }
 
 void ReadMetrics::UpdateMetrics() {
+// Todo: windows 上的 cgo 内存有问题，调用 GetGoMetrics 函数时可能会 crash，需要修复
+#ifndef _MSC_VER
     // go指标在Cpp指标前获取，是为了在 Cpp 部分指标做 SnapShot
     // 前（即调用 ReadMetrics::GetInstance()->UpdateMetrics() 函数），把go部分的进程级指标填写到 Cpp
     // 的进程级指标中去，随Cpp的进程级指标一起输出
@@ -179,6 +181,7 @@ void ReadMetrics::UpdateMetrics() {
             LogtailPlugin::GetInstance()->GetGoMetrics(mGoMetrics, METRIC_EXPORT_TYPE_GO);
         }
     }
+#endif
     // 获取c++指标
     MetricsRecord* snapshot = WriteMetrics::GetInstance()->DoSnapshot();
     MetricsRecord* toDelete;
