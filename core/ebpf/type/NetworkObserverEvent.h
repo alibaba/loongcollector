@@ -138,7 +138,7 @@ public:
     [[nodiscard]] virtual bool IsError() const override { return mErrorCode != 0; }
     [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
     void SetStatusCode(int code) { mCode = code; }
-    [[nodiscard]] virtual int GetStatusCode() const override { return mErrorCode; }
+    [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
 
     // 2025-08-07 spanName use real query ...
     // metric use command type
@@ -180,6 +180,9 @@ public:
     std::string mSql;
     uint64_t mRowsAffected = 0;
     uint64_t mRowsExamined = 0;
+    int mSeqId = 0;
+    uint32_t mPacketLen = 0;
+    uint32_t mCommand = 0;
 };
 
 class ConnStatsRecord : public CommonEvent {

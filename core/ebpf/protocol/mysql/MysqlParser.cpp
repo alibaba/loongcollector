@@ -71,32 +71,27 @@ namespace mysql {
 
 // MySQL协议解析相关函数实现
 ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool forceSample) {
-    // 实现MySQL请求解析逻辑
-    // 这里需要根据MySQL协议规范解析数据包
-
-    // 示例实现（需要根据实际MySQL协议完善）
     if (buf.size() < 5) { // MySQL包头至少5字节
         return ParseState::kNeedsMoreData;
     }
 
     // 解析MySQL包长度（3字节）
-    uint32_t packetLen = buf[0] | (buf[1] << 8) | (buf[2] << 16);
-
-    if (buf.size() < 5 + packetLen) {
-        return ParseState::kNeedsMoreData;
-    }
-
+    uint32_t packetLen = (uint8_t)buf[0] | ((uint8_t)buf[1] << 8) | ((uint8_t)buf[2] << 16);
     // 包序号（1字节）
-    // uint8_t seqId = buf[3];
-
+    uint8_t seqId = buf[3];
     // 命令类型（1字节）
     uint8_t command = buf[4];
+    result->mSeqId = seqId;
+    result->mPacketLen = packetLen;
+    result->mCommand = command;
 
     // 根据命令类型解析具体内容
     switch (command) {
         case 0x03: // COM_QUERY
             if (packetLen > 1) {
-                std::string sql(buf.data() + 5, packetLen - 1);
+                // size_t sqlLen = std::min(static_cast<size_t>(packetLen - 1), static_cast<size_t>(128));
+                size_t sqlLen = packetLen - 1;
+                std::string sql(buf.data() + 5, sqlLen);
                 result->SetSql(sql);
             }
             break;
@@ -109,7 +104,7 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& res
             break;
     }
 
-    buf.remove_prefix(5 + packetLen);
+    // buf.remove_prefix(5 + packetLen);
 
     if (result->ShouldSample() || forceSample) {
         // 解析详细信息
@@ -120,23 +115,15 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& res
 }
 
 ParseState ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool closed, bool forceSample) {
-    // 实现MySQL响应解析逻辑
-    // 这里需要根据MySQL协议规范解析响应数据包
-
-    // 示例实现（需要根据实际MySQL协议完善）
     if (buf.size() < 4) {
         return ParseState::kNeedsMoreData;
     }
 
     // 解析MySQL包长度（3字节）
-    uint32_t packetLen = buf[0] | (buf[1] << 8) | (buf[2] << 16);
+    uint32_t packetLen = (uint8_t)buf[0] | (uint8_t)(buf[1] << 8) | (uint8_t)(buf[2] << 16);
 
-    if (buf.size() < 4 + packetLen) {
-        return ParseState::kNeedsMoreData;
-    }
-
-    // 包序号（1字节）
-    // uint8_t seqId = buf[3];
+    uint8_t seqId = buf[3];
+    result->mSeqId = seqId;
 
     // 根据响应内容设置状态码等信息
     if (packetLen > 0) {
