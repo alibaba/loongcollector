@@ -205,8 +205,13 @@ void JournalServer::run() {
                 if (!monitoredReader.reader->IsOpen()) {
                     continue;
                 }
-                // 每个reader都检查一次journal状态，确保所有reader都收到事件更新
-                JournalStatusType status = monitoredReader.reader->CheckJournalStatus();
+                
+                std::shared_ptr<JournalReader> currentReader;
+                if (!validateAndGetCurrentReader(monitoredReader, currentReader)) {
+                    continue;
+                }
+                
+                JournalStatusType status = currentReader->CheckJournalStatus();
 
                 if (status == JournalStatusType::kNop && !monitoredReader.hasPendingData && nfds == 0) {
                     continue; // 跳过无效读取
@@ -216,11 +221,11 @@ void JournalServer::run() {
                     // 正常状态（NOP/APPEND/INVALIDATE），处理该配置的journal事件
                     bool hasPendingData = false;
 
-                    JournalConfig config
-                        = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
+                    auto connectionManager = &JournalConnectionManager::GetInstance();
+                    JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
 
                     HandleJournalEntries(
-                        monitoredReader.configName, config, monitoredReader.reader, config.mQueueKey, &hasPendingData);
+                        monitoredReader.configName, config, currentReader, config.mQueueKey, &hasPendingData);
 
                     monitoredReader.hasPendingData = hasPendingData;
                 } else {
@@ -268,7 +273,7 @@ void JournalServer::syncMonitors(int epollFD, std::map<int, MonitoredReader>& mo
 
 void JournalServer::cleanupStaleReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
     static int cleanupCounter = 0;
-    if (++cleanupCounter >= 100) {
+    if (++cleanupCounter >= 50) {
         cleanupCounter = 0;
         auto connectionManager = &JournalConnectionManager::GetInstance();
         connectionManager->CleanupInvalidMonitoredReaders(epollFD, monitoredReaders);
@@ -387,14 +392,42 @@ bool JournalServer::handlePendingDataReaders(std::map<int, MonitoredReader>& mon
 
         // 只对有hasPendingData标志的reader进行读取
         if (monitoredReader.hasPendingData) {
+            std::shared_ptr<JournalReader> currentReader;
+            if (!validateAndGetCurrentReader(monitoredReader, currentReader)) {
+                monitoredReader.hasPendingData = false;
+                continue;
+            }
+            
             bool hasPendingData = false;
-            JournalConfig config = JournalConnectionManager::GetInstance().GetConfig(monitoredReader.configName);
+            auto connectionManager = &JournalConnectionManager::GetInstance();
+            JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
+            
             HandleJournalEntries(
-                monitoredReader.configName, config, monitoredReader.reader, config.mQueueKey, &hasPendingData);
+                monitoredReader.configName, config, currentReader, config.mQueueKey, &hasPendingData);
             monitoredReader.hasPendingData = hasPendingData;
         }
     }
 
+    return true;
+}
+
+bool JournalServer::validateAndGetCurrentReader(const MonitoredReader& monitoredReader,
+                                                 std::shared_ptr<JournalReader>& currentReaderOut) const {
+    auto connectionManager = &JournalConnectionManager::GetInstance();
+    auto currentReader = connectionManager->GetConnection(monitoredReader.configName);
+    
+    if (!currentReader || currentReader != monitoredReader.reader) {
+        LOG_DEBUG(sLogger,
+                  ("journal server reader changed during processing, skipping",
+                   "will sync on next iteration")("config", monitoredReader.configName));
+        return false;
+    }
+    
+    if (!currentReader->IsOpen()) {
+        return false;
+    }
+    
+    currentReaderOut = currentReader;
     return true;
 }
 

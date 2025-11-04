@@ -131,6 +131,9 @@ private:
     void addNewReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void syncReaderAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
     
+    bool validateAndGetCurrentReader(const MonitoredReader& monitoredReader,
+                                      std::shared_ptr<JournalReader>& currentReaderOut) const;
+    
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
 

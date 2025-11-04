@@ -232,6 +232,16 @@ void HandleJournalEntries(const string& configName,
                           const std::shared_ptr<JournalReader>& journalReader,
                           QueueKey queueKey,
                           bool* hasPendingDataOut) {
+    if (!journalReader || !journalReader->IsOpen()) {
+        LOG_WARNING(sLogger,
+                    ("journal processor reader is invalid or closed, skipping processing",
+                     "")("config", configName));
+        if (hasPendingDataOut != nullptr) {
+            *hasPendingDataOut = false;
+        }
+        return;
+    }
+    
     int entryCount = 0;
     // Defensive bounds check: ensure maxEntriesPerBatch is in reasonable range
     const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // Fair parameter
