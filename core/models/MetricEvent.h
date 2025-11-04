@@ -112,7 +112,10 @@ private:
 
     StringView mName;
     MetricValue mValue;
+    // Tags corresponding to the metric labels, which should be part of the labels during serialization.
     SizedVectorTags mTags;
+    // Additional metadata for the metric, which should be flattened as sibling fields of name, value, labels, etc.
+    // during serialization.
     SizedMap mMetadata;
 };
 
