@@ -26,6 +26,9 @@ else ()
     file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.c ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.h)
 endif ()
 list(APPEND THIS_SOURCE_FILES_LIST ${XX_HASH_SOURCE_FILES})
+# dns
+file(GLOB DNS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/dns/*.cpp ${CMAKE_SOURCE_DIR}/common/dns/*.h)
+list(APPEND THIS_SOURCE_FILES_LIST ${DNS_SOURCE_FILES})
 # add memory in common
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/memory/SourceBuffer.h)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/http/AsynCurlRunner.cpp ${CMAKE_SOURCE_DIR}/common/http/Curl.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpResponse.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpRequest.cpp ${CMAKE_SOURCE_DIR}/common/http/Constant.cpp)
