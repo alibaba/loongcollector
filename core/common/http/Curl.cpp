@@ -389,9 +389,7 @@ void SendAsynRequests(CURLM* multiCurl) {
                 sLogger,
                 ("failed to call curl_multi_timeout", "use default timeout 1s")("errMsg", curl_multi_strerror(mc)));
         }
-        struct timeval timeout {
-            1, 0
-        };
+        struct timeval timeout{1, 0};
         if (curlTimeout >= 0) {
             timeout.tv_sec = curlTimeout / 1000;
             timeout.tv_usec = (curlTimeout % 1000) * 1000;

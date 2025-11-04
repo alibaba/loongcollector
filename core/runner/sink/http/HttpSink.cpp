@@ -210,9 +210,7 @@ void HttpSink::DoRun() {
             continue;
         }
 
-        struct timeval timeout {
-            1, 0
-        };
+        struct timeval timeout{1, 0};
         long curlTimeout = -1;
         if ((mc = curl_multi_timeout(mClient, &curlTimeout)) != CURLM_OK) {
             LOG_WARNING(
