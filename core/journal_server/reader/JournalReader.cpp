@@ -264,7 +264,7 @@ public:
         }
 
         std::string keyValue = field + "=" + value;
-        return sd_journal_add_match(mJournal, keyValue.c_str(), keyValue.size()) == 0;
+        return sd_journal_add_match(mJournal, keyValue.c_str(), 0) == 0;
     }
 
     bool AddDisjunction() { return IsOpen() && sd_journal_add_disjunction(mJournal) == 0; }
