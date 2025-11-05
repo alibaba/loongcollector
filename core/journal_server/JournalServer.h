@@ -17,12 +17,15 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <future>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 
 #include "common/JournalConfig.h"
+#include "models/PipelineEventGroup.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -41,7 +44,12 @@ inline constexpr int kJournalEpollTimeoutMS = 200;
 struct MonitoredReader {
     std::shared_ptr<JournalReader> reader;
     std::string configName;
-    bool hasPendingData{true}; // 上次读取是否还有数据，用于优化跳过 NOP 事件时的无效读取
+    bool hasPendingData{true};
+    // 批处理累积缓冲区
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup{nullptr}; // 累积的eventGroup
+    std::chrono::steady_clock::time_point lastBatchTime{}; // 上次批处理时间，初始化为epoch
+    int accumulatedEntryCount{0}; // 累积的entry数量
+    std::string accumulatedFirstCursor; // 累积的第一个entry的cursor，用于错误恢复
 };
 
 /**
@@ -124,17 +132,20 @@ private:
     void run();
     bool handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
     void syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    
+
     // 同步监控的辅助方法
     void cleanupStaleReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void refreshConnections(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void addNewReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
     void syncReaderAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
-    
+
     bool validateAndGetCurrentReader(const MonitoredReader& monitoredReader,
-                                      std::shared_ptr<JournalReader>& currentReaderOut) const;
-    
+                                     std::shared_ptr<JournalReader>& currentReaderOut) const;
+
     bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
+
+    // 检查是否超时触发强制发送
+    bool checkTimeoutTrigger(const MonitoredReader& monitoredReader, const JournalConfig& config) const;
 
 
     std::future<void> mThreadRes;

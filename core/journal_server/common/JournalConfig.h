@@ -44,6 +44,8 @@ struct JournalConfig {
     // 定时刷新间隔（秒），默认3600秒，用于定期关闭并重新打开journal连接以释放内存映射
     int mResetIntervalSecond = 3600;
     int mMaxEntriesPerBatch = 1000;
+    // 批处理超时（毫秒），默认1000毫秒，累积的数据超过该时间也会发送
+    int mBatchTimeoutMs = 1000;
 
     bool mParsePriority = false;
     bool mParseSyslogFacility = false;
@@ -94,6 +96,10 @@ struct JournalConfig {
             journalConfig.mMaxEntriesPerBatch = 1000;
         }
 
+        if (!GetOptionalIntParam(config, "BatchTimeoutMs", journalConfig.mBatchTimeoutMs, errorMsg)) {
+            journalConfig.mBatchTimeoutMs = 1000;
+        }
+
         static auto parseStringArray = [](const Json::Value& jsonConfig, const std::string& key) {
             std::vector<std::string> result;
             if (jsonConfig.isMember(key) && jsonConfig[key].isArray()) {
@@ -132,6 +138,14 @@ struct JournalConfig {
             fixedCount++;
         } else if (mMaxEntriesPerBatch > 10000) {
             mMaxEntriesPerBatch = 10000;
+            fixedCount++;
+        }
+
+        if (mBatchTimeoutMs <= 0) {
+            mBatchTimeoutMs = 1000;
+            fixedCount++;
+        } else if (mBatchTimeoutMs > 60000) {
+            mBatchTimeoutMs = 60000; // 最大60秒
             fixedCount++;
         }
 

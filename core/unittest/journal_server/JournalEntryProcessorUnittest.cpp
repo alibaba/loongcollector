@@ -21,6 +21,7 @@
 #include "journal_server/common/JournalConfig.h"
 #include "journal_server/processor/JournalEntryProcessor.h"
 #include "journal_server/reader/JournalReader.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -75,10 +76,24 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     // 创建mock journal reader
     auto reader = std::make_shared<JournalReader>();
 
+    // 创建累积 EventGroup（函数要求必须传入）
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    std::string accumulatedFirstCursor;
+
     // 测试函数调用（在测试环境中可能无法实际执行）
     // 但函数接口应该存在且不会崩溃
     try {
-        HandleJournalEntries("test_config", config, reader, 12345);
+        HandleJournalEntries("test_config",
+                             config,
+                             reader,
+                             12345,
+                             nullptr,
+                             &accumulatedEventGroup,
+                             &accumulatedEntryCount,
+                             &accumulatedFirstCursor,
+                             false,
+                             nullptr);
         APSARA_TEST_TRUE(true); // 函数调用成功
     } catch (...) {
         APSARA_TEST_TRUE(true); // 函数存在但可能因为环境问题失败

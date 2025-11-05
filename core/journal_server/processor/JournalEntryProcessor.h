@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <memory>
 #include <string>
 
@@ -31,19 +32,27 @@ using QueueKey = int64_t;
 /**
  * @brief 读取并处理journal条目
  *
- * 从journal reader中读取条目，应用字段转换，创建日志事件并推送到处理队列。
- * 会根据配置的maxEntriesPerBatch限制每批读取的条目数量。
- *
  * @param configName 配置名称
  * @param config journal配置
  * @param journalReader journal reader指针
  * @param queueKey 队列键值，用于推送事件
  * @param hasPendingDataOut 输出参数，指示是否还有待处理数据（可能为 nullptr）
+ * @param accumulatedEventGroup 输入输出参数，累积的eventGroup（可能为 nullptr）
+ * @param accumulatedEntryCount 输入输出参数，累积的entry数量（可能为 nullptr）
+ * @param accumulatedFirstCursor 输入输出参数，累积的第一个entry的cursor（可能为 nullptr）
+ * @param timeoutTrigger 是否超时触发强制发送
+ * @param lastBatchTimeOut 输入输出参数，上次批处理时间（可能为 nullptr）
+ * @return 是否发送了eventGroup（true=已发送，false=累积到缓冲区）
  */
-void HandleJournalEntries(const std::string& configName,
+bool HandleJournalEntries(const std::string& configName,
                           const JournalConfig& config,
                           const std::shared_ptr<JournalReader>& journalReader,
                           QueueKey queueKey,
-                          bool* hasPendingDataOut = nullptr);
+                          bool* hasPendingDataOut = nullptr,
+                          std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup = nullptr,
+                          int* accumulatedEntryCount = nullptr,
+                          std::string* accumulatedFirstCursor = nullptr,
+                          bool timeoutTrigger = false,
+                          std::chrono::steady_clock::time_point* lastBatchTimeOut = nullptr);
 
 } // namespace logtail

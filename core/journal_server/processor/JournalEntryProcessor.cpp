@@ -15,9 +15,11 @@
  */
 
 #include <algorithm>
+#include <chrono>
 #include <memory>
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/JournalConfig.h"
 #include "common/JournalUtils.h" // IWYU pragma: keep
 #include "common/TimeUtil.h"
@@ -33,14 +35,6 @@ namespace logtail {
 
 namespace {
 
-/**
- * @brief Attempt to recover from journal errors (e.g., cursor invalidation due to log rotation)
- * @param journalReader journal reader pointer
- * @param configName config name
- * @param cursorSeekFallback cursor fallback position ("head" or "tail")
- * @param errorContext error context description
- * @return true if recovery succeeded, false if recovery failed
- */
 bool RecoverFromJournalError(const std::shared_ptr<JournalReader>& journalReader,
                              const string& configName,
                              const string& cursorSeekFallback,
@@ -225,116 +219,229 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     return logEvent;
 }
 
+void ClearAccumulatedData(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
+                          int* accumulatedEntryCount,
+                          std::string* accumulatedFirstCursor) {
+    if (accumulatedEventGroup != nullptr) {
+        *accumulatedEventGroup = nullptr;
+    }
+    if (accumulatedEntryCount != nullptr) {
+        *accumulatedEntryCount = 0;
+    }
+    if (accumulatedFirstCursor != nullptr) {
+        accumulatedFirstCursor->clear();
+    }
+}
+
+bool PushEventGroupToQueue(QueueKey queueKey,
+                           PipelineEventGroup* eventGroup,
+                           int totalEntryCount,
+                           const std::string& firstEntryCursor,
+                           const std::shared_ptr<JournalReader>& journalReader,
+                           const std::string& configName,
+                           std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
+                           int* accumulatedEntryCount,
+                           std::string* accumulatedFirstCursor,
+                           bool& pushFailed,
+                           bool& eventGroupSent) {
+    constexpr uint32_t kMaxPushRetries = 100;
+    PipelineEventGroup eventGroupToPush = eventGroup->Copy();
+    size_t eventCount = eventGroupToPush.GetEvents().size();
+
+    if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroupToPush), kMaxPushRetries)) {
+        LOG_ERROR(sLogger,
+                  ("journal processor failed to push journal entry batch to queue",
+                   "queue may be full, will retry on next cycle")("config", configName)("entry_count", totalEntryCount)(
+                      "event_count", eventCount));
+        if (!firstEntryCursor.empty()) {
+            journalReader->SeekCursor(firstEntryCursor);
+            journalReader->Previous();
+        }
+        pushFailed = true;
+        return false;
+    }
+    eventGroupSent = true;
+    ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+    return true;
+}
+
 } // anonymous namespace
 
-void HandleJournalEntries(const string& configName,
+bool HandleJournalEntries(const string& configName,
                           const JournalConfig& config,
                           const std::shared_ptr<JournalReader>& journalReader,
                           QueueKey queueKey,
-                          bool* hasPendingDataOut) {
+                          bool* hasPendingDataOut,
+                          std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
+                          int* accumulatedEntryCount,
+                          std::string* accumulatedFirstCursor,
+                          bool timeoutTrigger,
+                          std::chrono::steady_clock::time_point* lastBatchTimeOut) {
     if (!journalReader || !journalReader->IsOpen()) {
         LOG_WARNING(sLogger,
-                    ("journal processor reader is invalid or closed, skipping processing",
-                     "")("config", configName));
+                    ("journal processor reader is invalid or closed, skipping processing", "")("config", configName));
         if (hasPendingDataOut != nullptr) {
             *hasPendingDataOut = false;
         }
-        return;
+        return false;
     }
-    
-    int entryCount = 0;
-    // Defensive bounds check: ensure maxEntriesPerBatch is in reasonable range
-    const int maxEntriesPerBatch = std::max(1, std::min(config.mMaxEntriesPerBatch, 10000)); // Fair parameter
 
-    // Log warning if config value was clamped
-    if (config.mMaxEntriesPerBatch != maxEntriesPerBatch) {
-        LOG_WARNING(sLogger,
-                    ("journal processor maxEntriesPerBatch clamped to safe range",
-                     "")("config", configName)("original", config.mMaxEntriesPerBatch)("clamped", maxEntriesPerBatch));
-    }
+    const int maxEntriesPerBatch = config.mMaxEntriesPerBatch;
+    int newEntryCount = 0;
+    bool pushFailed = false;
+    bool eventGroupSent = false;
 
     try {
-        // Create a single event group for batch processing
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup eventGroup(sourceBuffer);
-
-        // Store first entry cursor for error recovery
+        PipelineEventGroup* eventGroup = nullptr;
         std::string firstEntryCursor;
-        bool pushFailed = false;
+        int totalEntryCount = 0;
 
-        while (entryCount < maxEntriesPerBatch) {
-            if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, entryCount)) {
+        if (accumulatedEventGroup == nullptr) {
+            LOG_ERROR(sLogger,
+                      ("journal processor accumulatedEventGroup is required",
+                       "cannot process without accumulation support")("config", configName));
+            if (hasPendingDataOut != nullptr) {
+                *hasPendingDataOut = false;
+            }
+            return false;
+        }
+
+        int originalAccumulatedCount = (accumulatedEntryCount != nullptr) ? *accumulatedEntryCount : 0;
+
+        if (*accumulatedEventGroup != nullptr) {
+            eventGroup = accumulatedEventGroup->get();
+            totalEntryCount = originalAccumulatedCount;
+            if (accumulatedFirstCursor != nullptr && !accumulatedFirstCursor->empty()) {
+                firstEntryCursor = *accumulatedFirstCursor;
+            }
+        } else {
+            auto sourceBuffer = std::make_shared<SourceBuffer>();
+            *accumulatedEventGroup = std::make_shared<PipelineEventGroup>(sourceBuffer);
+            eventGroup = accumulatedEventGroup->get();
+            totalEntryCount = 0;
+        }
+
+        while (totalEntryCount + newEntryCount < maxEntriesPerBatch) {
+            if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, newEntryCount)) {
                 break;
             }
 
             JournalEntry entry;
             if (!ReadAndValidateEntry(configName, journalReader, config.mCursorSeekFallback, entry)) {
-                // Skip if entry is empty
                 if (entry.fields.empty() && !entry.cursor.empty()) {
-                    entryCount++;
+                    newEntryCount++;
                     continue;
                 }
-                // Connection error or read failure
                 break;
             }
 
-            // Store first entry cursor for potential rollback
-            if (entryCount == 0 && !entry.cursor.empty()) {
+            if (totalEntryCount == 0 && newEntryCount == 0 && !entry.cursor.empty()) {
                 firstEntryCursor = entry.cursor;
-            }
-
-            // Add log event to the batch event group
-            CreateLogEventFromJournal(entry, config, eventGroup);
-            entryCount++;
-        }
-
-        // Push the batch event group if it contains any events
-        if (entryCount > 0) {
-            // Use ProcessorRunner's built-in retry mechanism
-            constexpr uint32_t kMaxPushRetries = 100;
-
-            if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroup), kMaxPushRetries)) {
-                LOG_ERROR(
-                    sLogger,
-                    ("journal processor failed to push journal entry batch to queue",
-                     "queue may be full, will retry on next cycle")("config", configName)("entry_count", entryCount));
-                if (!firstEntryCursor.empty()) { // seek to first entry and later retry
-                    journalReader->SeekCursor(firstEntryCursor);
-                    journalReader->Previous();
+                if (accumulatedFirstCursor != nullptr) {
+                    *accumulatedFirstCursor = firstEntryCursor;
                 }
-                pushFailed = true;
+            }
+
+            CreateLogEventFromJournal(entry, config, *eventGroup);
+            newEntryCount++;
+        }
+
+        totalEntryCount += newEntryCount;
+        bool noNewData = newEntryCount == 0 && totalEntryCount > 0;
+        bool reachedMaxBatch = totalEntryCount >= maxEntriesPerBatch;
+
+        if (totalEntryCount == 0) {
+            if (hasPendingDataOut != nullptr) {
+                *hasPendingDataOut = false;
+            }
+            return false;
+        }
+
+        if ((timeoutTrigger && totalEntryCount > 0) || reachedMaxBatch) {
+            // (1) 必须推送（超时触发或达到最大批处理数量）
+            PushEventGroupToQueue(queueKey,
+                                  eventGroup,
+                                  totalEntryCount,
+                                  firstEntryCursor,
+                                  journalReader,
+                                  configName,
+                                  accumulatedEventGroup,
+                                  accumulatedEntryCount,
+                                  accumulatedFirstCursor,
+                                  pushFailed,
+                                  eventGroupSent);
+        } else if (noNewData) {
+            // (2) 应该发送，检查队列状态（没有新数据但有累积数据）
+            if (ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
+                PushEventGroupToQueue(queueKey,
+                                      eventGroup,
+                                      totalEntryCount,
+                                      firstEntryCursor,
+                                      journalReader,
+                                      configName,
+                                      accumulatedEventGroup,
+                                      accumulatedEntryCount,
+                                      accumulatedFirstCursor,
+                                      pushFailed,
+                                      eventGroupSent);
+            } else {
+                // 队列状态不合适，累积到下一轮
+                if (accumulatedEntryCount != nullptr) {
+                    *accumulatedEntryCount = totalEntryCount;
+                }
+                if (hasPendingDataOut != nullptr) {
+                    *hasPendingDataOut = true;
+                }
+                return false;
+            }
+        } else {
+            // (3) 不推送，继续累积
+            if (accumulatedEntryCount != nullptr) {
+                *accumulatedEntryCount = totalEntryCount;
+            }
+            LOG_DEBUG(sLogger,
+                      ("journal processor accumulating event group", "")("config", configName)("entry_count",
+                                                                                               totalEntryCount));
+        }
+
+        if (hasPendingDataOut != nullptr) {
+            // hasPendingDataOut: 是否有待处理数据
+            // - pushFailed: 推送失败，数据仍然存在（累积缓冲区中）
+            // - totalEntryCount > 0 && !eventGroupSent: 有数据但没有发送（继续累积）
+            // - reachedMaxBatch: 达到最大批处理数量，while循环退出，但journal中可能还有更多entries需要处理
+            *hasPendingDataOut = pushFailed || (totalEntryCount > 0 && !eventGroupSent) || reachedMaxBatch;
+        }
+
+        if (lastBatchTimeOut != nullptr) {
+            auto now = std::chrono::steady_clock::now();
+            bool shouldInitializeTime = accumulatedEntryCount != nullptr && *accumulatedEntryCount > 0
+                && lastBatchTimeOut->time_since_epoch().count() == 0;
+            if (eventGroupSent || shouldInitializeTime) {
+                *lastBatchTimeOut = now;
             }
         }
 
-        // Determine if there is pending data:
-        // If exited due to batch limit (entryCount == maxEntriesPerBatch), there is pending data
-        // If exited due to push failure (pushFailed == true), there is pending data to retry
-        // If exited normally (no pending data), reading is complete
-        if (hasPendingDataOut != nullptr) {
-            *hasPendingDataOut = pushFailed || (entryCount == maxEntriesPerBatch);
-        }
-
-        // Only log warning when no entries processed and there might be a problem
-        if (entryCount == 0 && config.mSeekPosition != "tail") {
-            LOG_DEBUG(sLogger,
-                      ("journal processor no journal entries processed", "may indicate configuration issue")(
-                          "config", configName)("seek_position", config.mSeekPosition));
-        }
     } catch (const std::exception& e) {
         LOG_ERROR(sLogger,
                   ("journal processor exception during journal entries processing",
-                   e.what())("config", configName)("entries_processed", entryCount));
+                   e.what())("config", configName)("new_entries_processed", newEntryCount));
         if (hasPendingDataOut != nullptr) {
             *hasPendingDataOut = false; // Conservative handling on exception
         }
+        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+        return false;
     } catch (...) {
         LOG_ERROR(sLogger,
                   ("journal processor unknown exception during journal entries processing",
-                   "")("config", configName)("entries_processed", entryCount));
+                   "")("config", configName)("new_entries_processed", newEntryCount));
         if (hasPendingDataOut != nullptr) {
             *hasPendingDataOut = false; // Conservative handling on exception
         }
+        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+        return false;
     }
+
+    return eventGroupSent;
 }
 
 } // namespace logtail
