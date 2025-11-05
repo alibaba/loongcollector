@@ -52,6 +52,7 @@ public:
     std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff();
 
     void FeedbackIgnoredConfigs(const CollectionConfigDiff& pDiff);
+    size_t GetBuiltInPipelineCount() const { return mBuiltInPipelineCount; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }
@@ -92,6 +93,7 @@ private:
 
     const CollectionPipelineManager* mCollectionPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
+    size_t mBuiltInPipelineCount = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SingletonInputCollectionConfigUpdateUnittest;

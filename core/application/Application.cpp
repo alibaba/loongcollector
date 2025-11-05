@@ -330,6 +330,11 @@ void Application::Start() { // GCOVR_EXCL_START
             if (configDiff.first.HasDiff() || configDiff.second.HasDiff()) {
                 OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
+            LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(
+                CollectionPipelineManager::GetInstance()->GetPipelineCount()
+                + TaskPipelineManager::GetInstance()->GetPipelineCount()
+                + OnetimeConfigInfoManager::GetInstance()->GetConfigCount()
+                - PipelineConfigWatcher::GetInstance()->GetBuiltInPipelineCount());
 
             // after every config loaded, set the flag to true
             if (lastConfigCheckTime == 0) {

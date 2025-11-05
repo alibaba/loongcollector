@@ -26,9 +26,12 @@ static unique_ptr<TaskPipeline> sEmptyTask;
 
 void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
     for (const auto& name : diff.mRemoved) {
-        auto iter = mPipelineNameEntityMap.find(name);
-        iter->second->Stop(true);
-        mPipelineNameEntityMap.erase(iter);
+        {
+            shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            auto iter = mPipelineNameEntityMap.find(name);
+            iter->second->Stop(true);
+            mPipelineNameEntityMap.erase(iter);
+        }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
                                                                                      ConfigFeedbackStatus::DELETED);
     }
@@ -48,12 +51,15 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         LOG_INFO(sLogger,
                  ("task building for existing config succeeded",
                   "stop the old task and start the new one")("config", config.mName));
-        auto iter = mPipelineNameEntityMap.find(config.mName);
-        // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one should
-        // be considered as deleted
-        iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
-        mPipelineNameEntityMap[config.mName] = std::move(p);
-        mPipelineNameEntityMap[config.mName]->Start();
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            auto iter = mPipelineNameEntityMap.find(config.mName);
+            // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one
+            // should be considered as deleted
+            iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
+            mPipelineNameEntityMap[config.mName] = std::move(p);
+            mPipelineNameEntityMap[config.mName]->Start();
+        }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
@@ -70,14 +76,18 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
             continue;
         }
         LOG_INFO(sLogger, ("task building for new config succeeded", "begin to start task")("config", config.mName));
-        mPipelineNameEntityMap[config.mName] = std::move(p);
-        mPipelineNameEntityMap[config.mName]->Start();
+        {
+            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+            mPipelineNameEntityMap[config.mName] = std::move(p);
+            mPipelineNameEntityMap[config.mName]->Start();
+        }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 }
 
 void TaskPipelineManager::StopAllPipelines() {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     for (auto& item : mPipelineNameEntityMap) {
         item.second->Stop(true);
     }
@@ -85,6 +95,7 @@ void TaskPipelineManager::StopAllPipelines() {
 }
 
 const unique_ptr<TaskPipeline>& TaskPipelineManager::FindPipelineByName(const string& configName) const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     auto it = mPipelineNameEntityMap.find(configName);
     if (it != mPipelineNameEntityMap.end()) {
         return it->second;
@@ -93,11 +104,17 @@ const unique_ptr<TaskPipeline>& TaskPipelineManager::FindPipelineByName(const st
 }
 
 vector<string> TaskPipelineManager::GetAllPipelineNames() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     vector<string> res;
     for (const auto& item : mPipelineNameEntityMap) {
         res.push_back(item.first);
     }
     return res;
+}
+
+size_t TaskPipelineManager::GetPipelineCount() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    return mPipelineNameEntityMap.size();
 }
 
 unique_ptr<TaskPipeline> TaskPipelineManager::BuildPipeline(TaskConfig&& config) {

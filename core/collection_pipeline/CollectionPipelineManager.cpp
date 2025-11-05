@@ -189,6 +189,11 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
     return res;
 }
 
+size_t CollectionPipelineManager::GetPipelineCount() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    return mPipelineNameEntityMap.size();
+}
+
 void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
     for (auto& item : mInputRunners) {
         item->ClearUnusedCheckpoints();

@@ -163,7 +163,6 @@ void PollingDirFile::PollingIteration() {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
 
-    LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(nameConfigMap.size());
     {
         ScopedSpinLock lock(mCacheLock);
         SET_GAUGE(mPollingDirCacheSize, mDirCacheMap.size());
