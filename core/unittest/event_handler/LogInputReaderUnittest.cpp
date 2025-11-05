@@ -176,6 +176,7 @@ protected:
         unique_ptr<CollectionPipeline> pipeline;
 
         std::string jsonLogPath = UnitTestHelper::JsonEscapeDirPath(logPath);
+        std::string jsonRealDir = UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + "real");
         // new pipeline
         configStr = R"(
             {
@@ -189,7 +190,7 @@ protected:
                         "MaxDirSearchDepth": 10,
                         "ExcludeDirs": [
                             ")"
-            + gRootDir + PATH_SEPARATOR + "real" + R"("
+            + jsonRealDir + R"("
                         ]
                     }
                 ],
