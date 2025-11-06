@@ -48,11 +48,11 @@ bool HandleJournalEntries(const std::string& configName,
                           const JournalConfig& config,
                           const std::shared_ptr<JournalReader>& journalReader,
                           QueueKey queueKey,
-                          bool timeoutTrigger = false,
-                          std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup = nullptr,
-                          int* accumulatedEntryCount = nullptr,
-                          std::string* accumulatedFirstCursor = nullptr,
-                          bool* hasPendingDataOut = nullptr,
-                          std::chrono::steady_clock::time_point* lastBatchTimeOut = nullptr);
+                          bool timeoutTrigger,
+                          std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
+                          int* accumulatedEntryCount,
+                          std::string* accumulatedFirstCursor,
+                          bool* hasPendingDataOut,
+                          std::chrono::steady_clock::time_point* lastBatchTimeOut);
 
 } // namespace logtail

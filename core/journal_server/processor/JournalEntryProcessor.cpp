@@ -265,6 +265,26 @@ bool PushEventGroupToQueue(QueueKey queueKey,
     return true;
 }
 
+void InitializeOrRestoreAccumulatedEventGroup(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
+                                               int* accumulatedEntryCount,
+                                               std::string* accumulatedFirstCursor,
+                                               PipelineEventGroup*& eventGroup,
+                                               int& totalEntryCount,
+                                               std::string& firstEntryCursor) {
+    if (*accumulatedEventGroup != nullptr) {
+        eventGroup = accumulatedEventGroup->get();
+        totalEntryCount = (accumulatedEntryCount != nullptr) ? *accumulatedEntryCount : 0;
+        if (accumulatedFirstCursor != nullptr && !accumulatedFirstCursor->empty()) {
+            firstEntryCursor = *accumulatedFirstCursor;
+        }
+    } else {
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        *accumulatedEventGroup = std::make_shared<PipelineEventGroup>(sourceBuffer);
+        eventGroup = accumulatedEventGroup->get();
+        totalEntryCount = 0;
+    }
+}
+
 } // anonymous namespace
 
 bool HandleJournalEntries(const string& configName,
@@ -296,30 +316,12 @@ bool HandleJournalEntries(const string& configName,
         std::string firstEntryCursor;
         int totalEntryCount = 0;
 
-        if (accumulatedEventGroup == nullptr) {
-            LOG_ERROR(sLogger,
-                      ("journal processor accumulatedEventGroup is required",
-                       "cannot process without accumulation support")("config", configName));
-            if (hasPendingDataOut != nullptr) {
-                *hasPendingDataOut = false;
-            }
-            return false;
-        }
-
-        int originalAccumulatedCount = (accumulatedEntryCount != nullptr) ? *accumulatedEntryCount : 0;
-
-        if (*accumulatedEventGroup != nullptr) {
-            eventGroup = accumulatedEventGroup->get();
-            totalEntryCount = originalAccumulatedCount;
-            if (accumulatedFirstCursor != nullptr && !accumulatedFirstCursor->empty()) {
-                firstEntryCursor = *accumulatedFirstCursor;
-            }
-        } else {
-            auto sourceBuffer = std::make_shared<SourceBuffer>();
-            *accumulatedEventGroup = std::make_shared<PipelineEventGroup>(sourceBuffer);
-            eventGroup = accumulatedEventGroup->get();
-            totalEntryCount = 0;
-        }
+        InitializeOrRestoreAccumulatedEventGroup(accumulatedEventGroup,
+                                                  accumulatedEntryCount,
+                                                  accumulatedFirstCursor,
+                                                  eventGroup,
+                                                  totalEntryCount,
+                                                  firstEntryCursor);
 
         while (totalEntryCount + newEntryCount < maxEntriesPerBatch) {
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, newEntryCount)) {
@@ -335,7 +337,9 @@ bool HandleJournalEntries(const string& configName,
                 break;
             }
 
-            if (totalEntryCount == 0 && newEntryCount == 0 && !entry.cursor.empty()) {
+            // Set firstEntryCursor for error recovery: record the cursor of the first entry in this batch
+            // This is used to seek back to the beginning of the batch if push fails
+            if (firstEntryCursor.empty() && !entry.cursor.empty()) {
                 firstEntryCursor = entry.cursor;
                 if (accumulatedFirstCursor != nullptr) {
                     *accumulatedFirstCursor = firstEntryCursor;
