@@ -63,11 +63,6 @@ public:
         return nullptr;
     }
 
-    int Update([[maybe_unused]] const PluginOptions &options) override {
-        assert(false);
-        return 0;
-    }
-
     int Suspend() override;
 
     void HandleCpuProfilingEvent(uint32_t pid, const char *comm,
@@ -77,6 +72,12 @@ public:
 
     void SetMetrics(CounterPtr pollEventsTotal) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
+    }
+
+protected:
+    int update([[maybe_unused]] const PluginOptions &options) override {
+        assert(false);
+        return 0;
     }
 
 private:
