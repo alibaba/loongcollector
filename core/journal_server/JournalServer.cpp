@@ -20,12 +20,15 @@
 #include <sys/epoll.h>
 #include <unistd.h>
 
+#include <memory>
 #include <set>
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "reader/JournalConnection.h"
+#include "common/JournalCommon.h"
 #include "logger/Logger.h"
+#include "manager/JournalConnection.h"
+#include "manager/JournalEpollMonitor.h"
 #include "processor/JournalEntryProcessor.h"
 #include "reader/JournalReader.h"
 
@@ -41,9 +44,16 @@ void JournalServer::Init() {
         return;
     }
 
-    mThreadRes = async(launch::async, &JournalServer::run, this);
-
     JournalConnection::GetInstance().Initialize();
+
+    mReaderMonitor = std::make_unique<JournalEpollMonitor>();
+    if (!mReaderMonitor->Initialize()) {
+        LOG_ERROR(sLogger, ("journal server failed to initialize reader monitor", ""));
+        mIsInitialized.store(false);
+        return;
+    }
+
+    mThreadRes = async(launch::async, &JournalServer::run, this);
 
     LOG_INFO(sLogger, ("journal server initialized", ""));
 }
@@ -57,10 +67,16 @@ void JournalServer::Stop() {
     if (!mThreadRes.valid()) {
         return;
     }
-    // 设置停止标志·
+
+    // Set stop flag
     mIsThreadRunning.store(false);
-    // 等待线程退出
+    // Wait for thread to exit
     mThreadRes.get();
+
+    if (mReaderMonitor) {
+        mReaderMonitor->Cleanup();
+        mReaderMonitor.reset();
+    }
 
     JournalConnection::GetInstance().Cleanup();
 
@@ -98,9 +114,27 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 }
 
 void JournalServer::RemoveJournalInput(const string& configName) {
-    int epollFD = GetGlobalEpollFD();
-    JournalConnection::GetInstance().RemoveConfigWithEpollCleanup(configName, epollFD);
-    LOG_INFO(sLogger, ("journal server input removed with automatic connection cleanup", "")("config", configName));
+    // Remove reader from epoll monitoring first
+    if (mReaderMonitor) {
+        mReaderMonitor->RemoveReaderFromEpoll(configName);
+    }
+
+    // Remove configuration (reader will be closed)
+    JournalConnection::GetInstance().RemoveConfig(configName);
+
+    // Cleanup from monitored readers map
+    if (mReaderMonitor) {
+        auto& monitoredReaders = mReaderMonitor->GetMonitoredReaders();
+        for (auto it = monitoredReaders.begin(); it != monitoredReaders.end();) {
+            if (it->second.configName == configName) {
+                it = monitoredReaders.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    LOG_INFO(sLogger, ("journal server input removed", "")("config", configName));
 }
 
 void JournalServer::RemoveConfigOnly(const string& configName) {
@@ -112,7 +146,7 @@ void JournalServer::RemoveConfigOnly(const string& configName) {
 std::map<std::string, JournalConfig> JournalServer::GetAllJournalConfigs() const {
     auto allConfigs = JournalConnection::GetInstance().GetAllConfigs();
 
-    // 过滤掉未验证的配置（mQueueKey == -1 表示未通过 validateQueueKey 验证）
+    // Filter out unvalidated configs (mQueueKey == -1 means failed validateQueueKey validation)
     std::map<std::string, JournalConfig> validatedConfigs;
     for (const auto& [configName, config] : allConfigs) {
         if (config.mQueueKey != -1) {
@@ -125,73 +159,79 @@ std::map<std::string, JournalConfig> JournalServer::GetAllJournalConfigs() const
     return validatedConfigs;
 }
 
-int JournalServer::GetGlobalEpollFD() const {
-    std::lock_guard<std::mutex> lock(mEpollMutex);
-    return mGlobalEpollFD;
-}
-
 void JournalServer::run() {
     LOG_INFO(sLogger, ("journal server event-driven thread", "started"));
 
-#ifdef __linux__
-    std::map<int, MonitoredReader> monitoredReaders;
-
-    {
-        std::lock_guard<std::mutex> lock(mEpollMutex);
-        mGlobalEpollFD = epoll_create1(EPOLL_CLOEXEC);
-        if (mGlobalEpollFD == -1) {
-            LOG_ERROR(sLogger, ("journal server failed to create epoll", "")("error", strerror(errno))("errno", errno));
-            return;
-        }
+    if (!mReaderMonitor) {
+        LOG_ERROR(sLogger, ("journal server reader monitor not initialized", ""));
+        return;
     }
 
-    constexpr int kMaxEvents = 64;
-    LOG_INFO(
-        sLogger,
-        ("journal server global epoll instance created", "")("epoll_fd", mGlobalEpollFD)("max_events", kMaxEvents));
+#ifdef __linux__
+    auto& monitoredReaders = mReaderMonitor->GetMonitoredReaders();
+    int epollFD = mReaderMonitor->GetEpollFD();
 
+    constexpr int kMaxEvents = 64;
     struct epoll_event events[kMaxEvents];
 
     while (mIsThreadRunning.load()) {
         try {
-            syncMonitoredReaders(mGlobalEpollFD, monitoredReaders);
+            mReaderMonitor->SyncMonitoredReaders();
 
-            int nfds = epoll_wait(mGlobalEpollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
+            int nfds = epoll_wait(epollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
 
             if (nfds == -1) {
                 if (errno == EINTR) {
-                    continue; // 被信号中断，继续等待
+                    continue; // Interrupted by signal, continue waiting
                 }
                 LOG_ERROR(sLogger, ("journal server epoll_wait failed", "")("error", strerror(errno)));
                 break;
             }
 
+            // Build set of FDs that have events (when nfds > 0)
+            std::set<int> activeFDs;
+            if (nfds > 0) {
+                for (int i = 0; i < nfds; ++i) {
+                    activeFDs.insert(events[i].data.fd);
+                }
+            }
 
-            // 兜底逻辑：用于无事件更新，但是有pending data没处理完的场景
-            if (nfds == 0 && processPendingDataReaders(monitoredReaders)) {
+            // Fallback: process pending data when no events (nfds == 0)
+            // Note: When there are events (nfds > 0), pending data is processed in the main loop below
+            if (nfds == 0 && processPendingDataWhenNoEvents(monitoredReaders)) {
                 continue;
             }
 
             for (auto& pair : monitoredReaders) {
                 auto& monitoredReader = pair.second;
+                int readerFD = pair.first;
+
+                // Skip if no event and no pending data (when there are events)
+                if (nfds > 0 && activeFDs.find(readerFD) == activeFDs.end() && !monitoredReader.hasPendingData) {
+                    continue;
+                }
 
                 std::shared_ptr<JournalReader> currentReader;
-                if (!getValidatedCurrentReader(monitoredReader, currentReader)) {
+                if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
                     continue;
                 }
 
                 JournalStatusType status = currentReader->CheckJournalStatus();
 
+                // Skip if no new data and no pending data (when no events)
                 if (status == JournalStatusType::kNop && !monitoredReader.hasPendingData && nfds == 0) {
                     continue;
                 }
 
                 if (status != JournalStatusType::kError) {
-                    // 正常状态（NOP/APPEND/INVALIDATE），处理该配置的journal事件
+                    // Normal status (NOP/APPEND/INVALIDATE), process journal events for this config
+                    // Note: HandleJournalEntries merges accumulated data (pendingData) with new entries
                     auto connectionManager = &JournalConnection::GetInstance();
                     JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
 
-                    bool timeoutTrigger = isBatchTimeoutExceeded(monitoredReader, config);
+                    bool timeoutTrigger
+                        = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
+
 
                     HandleJournalEntries(monitoredReader.configName,
                                          config,
@@ -210,123 +250,19 @@ void JournalServer::run() {
 
         } catch (const exception& e) {
             LOG_ERROR(sLogger, ("journal server exception in event loop", e.what()));
-            this_thread::sleep_for(chrono::milliseconds(1000)); // 异常时等待1秒
+            this_thread::sleep_for(chrono::milliseconds(1000)); // Wait 1 second on exception
         } catch (...) {
             LOG_ERROR(sLogger, ("journal server unknown exception in event loop", ""));
-            this_thread::sleep_for(chrono::milliseconds(1000)); // 异常时等待1秒
+            this_thread::sleep_for(chrono::milliseconds(1000)); // Wait 1 second on exception
         }
     }
 
-    LOG_INFO(sLogger,
-             ("journal server cleaning up epoll monitoring", "")("monitored_readers", monitoredReaders.size()));
-    for (auto& pair : monitoredReaders) {
-        if (pair.second.reader) {
-            pair.second.reader->RemoveFromEpoll(mGlobalEpollFD);
-        }
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mEpollMutex);
-        close(mGlobalEpollFD);
-        mGlobalEpollFD = -1;
-    }
     LOG_INFO(sLogger, ("journal server event-driven thread", "stopped"));
 #endif
 }
 
-void JournalServer::syncMonitoredReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
-    lazyCleanupRemovedReadersFromEpoll(epollFD, monitoredReaders);
-    refreshReaderConnectionsByInterval(epollFD, monitoredReaders);
-    addReadersToEpollMonitoring(epollFD, monitoredReaders);
-}
 
-void JournalServer::lazyCleanupRemovedReadersFromEpoll(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
-    static int cleanupCounter = 0;
-    if (++cleanupCounter >= 50) {
-        cleanupCounter = 0;
-        auto connectionManager = &JournalConnection::GetInstance();
-        connectionManager->CleanupRemovedReadersFromEpoll(epollFD, monitoredReaders);
-    }
-}
-
-void JournalServer::refreshReaderConnectionsByInterval(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
-    auto connectionManager = &JournalConnection::GetInstance();
-    auto allConfigs = GetAllJournalConfigs();
-
-    for (const auto& [configName, config] : allConfigs) {
-        if (connectionManager->ShouldRefreshConnection(configName)) {
-            if (connectionManager->RefreshConnection(configName, epollFD)) {
-                syncReaderFDMappingAfterRefresh(configName, monitoredReaders);
-            } else {
-                LOG_ERROR(sLogger, ("journal server connection refresh failed", "")("config", configName));
-            }
-        }
-    }
-}
-
-void JournalServer::syncReaderFDMappingAfterRefresh(const std::string& configName,
-                                                     std::map<int, MonitoredReader>& monitoredReaders) {
-    auto connectionManager = &JournalConnection::GetInstance();
-    auto connection = connectionManager->GetConnection(configName);
-
-    if (!connection || !connection->IsOpen()) {
-        return;
-    }
-
-    int newJournalFD = connection->GetJournalFD();
-    if (newJournalFD < 0) {
-        return;
-    }
-    // Reader object does not change; it's just reopened after close, but the FD may change
-    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
-        if (it->second.configName == configName) {
-            if (it->first != newJournalFD) {
-                // Preserve state (pendingData, accumulatedEventGroup) when moving entry to new FD
-                MonitoredReader mr = it->second;
-                monitoredReaders.erase(it);
-                monitoredReaders[newJournalFD] = mr;
-            } else {
-                it->second.reader = connection;
-            }
-            return;
-        }
-    }
-}
-
-void JournalServer::addReadersToEpollMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders) {
-    auto connectionManager = &JournalConnection::GetInstance();
-    auto openConnections = connectionManager->GetOpenConnections();
-
-    for (const auto& [configName, reader] : openConnections) {
-        bool alreadyMonitored = false;
-        for (const auto& pair : monitoredReaders) {
-            if (pair.second.reader == reader) {
-                alreadyMonitored = true;
-                break;
-            }
-        }
-
-        if (!alreadyMonitored) {
-            int journalFD = reader->AddToEpollAndGetFD(epollFD);
-            if (journalFD < 0) {
-                LOG_WARNING(
-                    sLogger,
-                    ("journal server failed to add reader to epoll", "")("config", configName)("epoll_fd", epollFD));
-                continue;
-            }
-
-            MonitoredReader monitoredReader;
-            monitoredReader.reader = reader;
-            monitoredReader.configName = configName;
-            monitoredReaders[journalFD] = monitoredReader;
-
-            LOG_INFO(sLogger,
-                     ("journal server reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
-        }
-    }
-}
-
-bool JournalServer::processPendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders) {
+bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader>& monitoredReaders) {
     bool hasReadersWithPendingData = false;
     for (const auto& pair : monitoredReaders) {
         if (pair.second.hasPendingData) {
@@ -344,14 +280,17 @@ bool JournalServer::processPendingDataReaders(std::map<int, MonitoredReader>& mo
 
         if (monitoredReader.hasPendingData) {
             std::shared_ptr<JournalReader> currentReader;
-            if (!getValidatedCurrentReader(monitoredReader, currentReader)) {
+            if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
                 continue;
             }
 
             auto connectionManager = &JournalConnection::GetInstance();
             JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
 
-            bool timeoutTrigger = isBatchTimeoutExceeded(monitoredReader, config);
+            bool timeoutTrigger = false;
+            if (mReaderMonitor) {
+                timeoutTrigger = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
+            }
 
             HandleJournalEntries(monitoredReader.configName,
                                  config,
@@ -369,69 +308,10 @@ bool JournalServer::processPendingDataReaders(std::map<int, MonitoredReader>& mo
     return true;
 }
 
-bool JournalServer::getValidatedCurrentReader(MonitoredReader& monitoredReader,
-                                              std::shared_ptr<JournalReader>& currentReaderOut) const {
-    // Validate reader to prevent using a closed reader during connection refresh
-    if (!monitoredReader.reader) {
-        return false;
-    }
 
-    if (!monitoredReader.reader->IsOpen()) {
-        clearPendingDataForInvalidReader(monitoredReader);
-        return false;
-    }
-
-    auto connectionManager = &JournalConnection::GetInstance();
-    auto currentReader = connectionManager->GetConnection(monitoredReader.configName);
-
-    if (!currentReader || currentReader != monitoredReader.reader) {
-        LOG_DEBUG(sLogger,
-                  ("journal server reader changed during processing, skipping",
-                   "will sync on next iteration")("config", monitoredReader.configName));
-        clearPendingDataForInvalidReader(monitoredReader);
-        return false;
-    }
-
-    if (!currentReader->IsOpen()) {
-        clearPendingDataForInvalidReader(monitoredReader);
-        return false;
-    }
-
-    currentReaderOut = currentReader;
-    return true;
-}
-
-void JournalServer::clearPendingDataForInvalidReader(MonitoredReader& monitoredReader) const {
-    // Clear pending data and accumulated state when reader validation fails (unavailable, closed, or replaced)
-    if (monitoredReader.hasPendingData) {
-        monitoredReader.hasPendingData = false;
-        monitoredReader.accumulatedEventGroup = nullptr;
-        monitoredReader.accumulatedEntryCount = 0;
-        monitoredReader.accumulatedFirstCursor.clear();
-    }
-}
-
-bool JournalServer::isBatchTimeoutExceeded(const MonitoredReader& monitoredReader, const JournalConfig& config) const {
-    if (monitoredReader.accumulatedEventGroup == nullptr || monitoredReader.accumulatedEntryCount == 0) {
-        return false;
-    }
-
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - monitoredReader.lastBatchTime).count();
-    bool timeoutTrigger = elapsed >= config.mBatchTimeoutMs;
-
-    if (timeoutTrigger) {
-        LOG_DEBUG(sLogger,
-                  ("journal server forcing flush accumulated batch due to timeout",
-                   "")("config", monitoredReader.configName)("elapsed_ms", elapsed)(
-                      "batch_timeout_ms", config.mBatchTimeoutMs)("accumulated_count",
-                                                                  monitoredReader.accumulatedEntryCount));
-    }
-
-    return timeoutTrigger;
-}
-
-bool JournalServer::getOrValidateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey) {
+bool JournalServer::getOrValidateQueueKey(const std::string& configName,
+                                          const JournalConfig& config,
+                                          QueueKey& queueKey) {
     if (!config.mCtx) {
         LOG_ERROR(sLogger,
                   ("journal server CRITICAL: no context available for config",
@@ -439,7 +319,7 @@ bool JournalServer::getOrValidateQueueKey(const std::string& configName, const J
         return false;
     }
 
-    // 如果配置中已经有queueKey，直接使用（用于测试环境）
+    // If config already has queueKey, use it directly (for test environment)
     if (config.mQueueKey != -1) {
         queueKey = config.mQueueKey;
         LOG_INFO(sLogger, ("journal server using pre-set queue key", "")("config", configName)("queue_key", queueKey));
@@ -456,12 +336,12 @@ bool JournalServer::getOrValidateQueueKey(const std::string& configName, const J
 }
 
 // =============================================================================
-// 测试和调试支持 - Test and Debug Support
+// Test and Debug Support
 // =============================================================================
 
 #ifdef APSARA_UNIT_TEST_MAIN
 void JournalServer::Clear() {
-    // 配置已移至 JournalConnection，通过 Cleanup() 清理
+    // Configs have been moved to JournalConnection, cleaned up via Cleanup()
     JournalConnection::GetInstance().Cleanup();
 }
 #endif

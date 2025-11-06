@@ -19,7 +19,7 @@
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "journal_server/common/JournalConfig.h"
-#include "journal_server/reader/JournalConnection.h"
+#include "journal_server/manager/JournalConnection.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -596,8 +596,6 @@ void JournalConnectionUnittest::TestAddConfigSeekCursor() {
 }
 
 
-
-
 void JournalConnectionUnittest::TestAddConfigReplaceExisting() {
     JournalConnection& manager = JournalConnection::GetInstance();
 
@@ -747,8 +745,6 @@ TEST_F(JournalConnectionUnittest, TestAddConfigSeekHead) {
 TEST_F(JournalConnectionUnittest, TestAddConfigSeekCursor) {
     TestAddConfigSeekCursor();
 }
-
-
 
 
 TEST_F(JournalConnectionUnittest, TestAddConfigReplaceExisting) {

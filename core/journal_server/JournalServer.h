@@ -26,7 +26,7 @@
 
 #include "common/JournalCommon.h"
 #include "common/JournalConfig.h"
-#include "models/PipelineEventGroup.h"
+#include "manager/JournalEpollMonitor.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
@@ -70,7 +70,6 @@ public:
 
     // Query Interfaces
     std::map<std::string, JournalConfig> GetAllJournalConfigs() const;
-    int GetGlobalEpollFD() const;
 
     // Test Support
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -84,31 +83,18 @@ private:
     void run();
 
     // Handle Pending Data
-    bool processPendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
-    void clearPendingDataForInvalidReader(MonitoredReader& monitoredReader) const;
-
-    // Refresh Connection
-    void refreshReaderConnectionsByInterval(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void addReadersToEpollMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void syncReaderFDMappingAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
-
-    // Monitor Management
-    void syncMonitoredReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void lazyCleanupRemovedReadersFromEpoll(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    // Note: Pending data is also processed in the main event loop when there are events.
+    // This function is only called as a fallback when there are no events (nfds == 0).
+    bool processPendingDataWhenNoEvents(std::map<int, MonitoredReader>& monitoredReaders);
 
     // Validation/Helper Methods
-    bool getValidatedCurrentReader(MonitoredReader& monitoredReader,
-                                   std::shared_ptr<JournalReader>& currentReaderOut) const;
     bool getOrValidateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
-    bool isBatchTimeoutExceeded(const MonitoredReader& monitoredReader, const JournalConfig& config) const;
 
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
-
-    int mGlobalEpollFD{-1};
-    mutable std::mutex mEpollMutex;
-
     std::atomic<bool> mIsInitialized{false};
+
+    std::unique_ptr<JournalEpollMonitor> mReaderMonitor;
 };
 
 } // namespace logtail
