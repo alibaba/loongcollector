@@ -490,9 +490,8 @@ private:
     }
 
     // Overload for specifying custom directory (e.g., symlink directories)
-    void VerifyReaderRecreated(const DevInode& devInode,
-                               const LogFileReaderPtr& originalReader,
-                               const std::string& dir) {
+    void
+    VerifyReaderRecreated(const DevInode& devInode, const LogFileReaderPtr& originalReader, const std::string& dir) {
         LogFileReaderPtr reader = GetReader(devInode, dir);
         // Reader should be recreated (file empty and changed)
         APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
@@ -505,9 +504,8 @@ private:
     }
 
     // Overload for specifying custom directory (e.g., symlink directories)
-    void VerifyReaderNotRecreated(const DevInode& devInode,
-                                  const LogFileReaderPtr& originalReader,
-                                  const std::string& dir) {
+    void
+    VerifyReaderNotRecreated(const DevInode& devInode, const LogFileReaderPtr& originalReader, const std::string& dir) {
         LogFileReaderPtr reader = GetReader(devInode, dir);
         // Reader should NOT be recreated (same reader)
         APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
