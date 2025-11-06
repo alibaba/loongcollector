@@ -142,11 +142,52 @@ jobs:
       - name: Import Image from Tar
         run: docker load -i ./image.tar
 
+      - name: Check Disk Space Before Test
+        run: |
+          echo "========================================="
+          echo "Disk Space Information"
+          echo "========================================="
+          df -h
+          echo ""
+          echo "Disk Usage Summary:"
+          df -h / | tail -n 1
+          echo ""
+          echo "Available disk space:"
+          df -h / | awk 'NR==2 {print "Total: "$2", Used: "$3", Available: "$4", Use%: "$5}'
+          echo "========================================="
+
       - name: E2E Behavior Test Case ${{ matrix.test_case }}
         env:
           TEST_CASE: ${{ matrix.test_case }}
         run: |
+          # Start background monitor for Doris
+          if [ "$TEST_CASE" = "flusher_doris" ]; then
+            (
+              # Wait for doris container to be created
+              for j in {1..60}; do
+                docker ps -a | grep -q doris && break
+                sleep 1
+              done
+              
+              # Monitor doris startup
+              for i in {1..36}; do
+                echo "[DIAGNOSTIC-$i] $(date) | Runner: $(df -h / | awk 'NR==2 {print $4" avail"}')"
+                docker exec doris df -h / 2>/dev/null | awk 'NR==2 {print "[DIAGNOSTIC-'$i'] Doris disk: "$4" avail, "$5" used"}' || true
+                HEALTH=$(docker inspect --format='{{.State.Health.Status}}' doris 2>/dev/null || echo "unknown")
+                echo "[DIAGNOSTIC-$i] Health: $HEALTH"
+                if [ "$HEALTH" = "healthy" ]; then
+                  exit 0
+                fi
+                docker exec doris tail -100 /root/fe/log/fe.log 2>/dev/null | sed "s/^/[FE-LOG] /" || true
+                sleep 10
+              done
+            ) &
+            echo $! > /tmp/doris_monitor.pid
+          fi
+          
           ./scripts/e2e.sh e2e
+          
+          [ -f /tmp/doris_monitor.pid ] && kill $(cat /tmp/doris_monitor.pid) 2>/dev/null || true
 
   # E2E测试 - Docker Engine版本兼容性测试
   E2EWithDockerEngineVersions:
