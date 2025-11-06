@@ -27,10 +27,15 @@ static unique_ptr<TaskPipeline> sEmptyTask;
 void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
     for (const auto& name : diff.mRemoved) {
         {
-            shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             auto iter = mPipelineNameEntityMap.find(name);
+            if (iter == mPipelineNameEntityMap.end()) {
+                continue;
+            }
             iter->second->Stop(true);
-            mPipelineNameEntityMap.erase(iter);
+            {
+                unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+                mPipelineNameEntityMap.erase(iter);
+            }
         }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
                                                                                      ConfigFeedbackStatus::DELETED);
@@ -52,12 +57,17 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
                  ("task building for existing config succeeded",
                   "stop the old task and start the new one")("config", config.mName));
         {
-            unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             auto iter = mPipelineNameEntityMap.find(config.mName);
             // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one
             // should be considered as deleted
+            if (iter == mPipelineNameEntityMap.end()) {
+                continue;
+            }
             iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
-            mPipelineNameEntityMap[config.mName] = std::move(p);
+            {
+                unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+                mPipelineNameEntityMap[config.mName] = std::move(p);
+            }
             mPipelineNameEntityMap[config.mName]->Start();
         }
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
@@ -79,15 +89,15 @@ void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap[config.mName] = std::move(p);
-            mPipelineNameEntityMap[config.mName]->Start();
         }
+        mPipelineNameEntityMap[config.mName]->Start();
         ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 }
 
 void TaskPipelineManager::StopAllPipelines() {
-    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
     for (auto& item : mPipelineNameEntityMap) {
         item.second->Stop(true);
     }
