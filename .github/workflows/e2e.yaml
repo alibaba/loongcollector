@@ -172,13 +172,24 @@ jobs:
               # Monitor doris startup
               for i in {1..36}; do
                 echo "[DIAGNOSTIC-$i] $(date) | Runner: $(df -h / | awk 'NR==2 {print $4" avail"}')"
-                docker exec doris df -h / 2>/dev/null | awk 'NR==2 {print "[DIAGNOSTIC-'$i'] Doris disk: "$4" avail, "$5" used"}' || true
+                
+                # Container status
+                CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' doris 2>/dev/null || echo "unknown")
                 HEALTH=$(docker inspect --format='{{.State.Health.Status}}' doris 2>/dev/null || echo "unknown")
-                echo "[DIAGNOSTIC-$i] Health: $HEALTH"
+                echo "[DIAGNOSTIC-$i] Container: $CONTAINER_STATUS | Health: $HEALTH"
+                
                 if [ "$HEALTH" = "healthy" ]; then
                   exit 0
                 fi
-                docker exec doris tail -100 /root/fe/log/fe.log 2>/dev/null | sed "s/^/[FE-LOG] /" || true
+                
+                # Try to get disk info
+                if docker exec doris df -h / 2>&1 | head -2; then
+                  :
+                else
+                  echo "[DIAGNOSTIC-$i] Cannot exec in container, checking logs..."
+                  docker logs doris 2>&1 | tail -50 | sed "s/^/[CONTAINER-LOG] /"
+                fi
+                
                 sleep 10
               done
             ) &
