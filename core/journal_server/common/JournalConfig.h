@@ -30,7 +30,7 @@ namespace logtail {
 class CollectionPipelineContext;
 
 /**
- * @brief journal输入插件的配置
+ * @brief Configuration for journal input plugin
  */
 struct JournalConfig {
     std::string mSeekPosition;
@@ -41,10 +41,8 @@ struct JournalConfig {
     std::vector<std::string> mMatchPatterns;
     bool mKernel = true;
 
-    // 定时刷新间隔（秒），默认3600秒，用于定期关闭并重新打开journal连接以释放内存映射
     int mResetIntervalSecond = 3600;
     int mMaxEntriesPerBatch = 1000;
-    // 批处理超时（毫秒），默认1000毫秒，累积的数据超过该时间也会发送
     int mBatchTimeoutMs = 1000;
 
     bool mParsePriority = false;
@@ -55,7 +53,7 @@ struct JournalConfig {
 
     const CollectionPipelineContext* mCtx = nullptr;
 
-    mutable QueueKey mQueueKey = -1; // 验证后缓存的队列键值（-1 = 未验证）
+    mutable QueueKey mQueueKey = -1; // Cached queue key after validation (-1 = not validated)
 
     JournalConfig() = default;
 
@@ -70,7 +68,7 @@ struct JournalConfig {
             journalConfig.mSeekPosition = "tail";
         }
 
-        // （默认head，与go实现不同）
+        // (default head, different from Go implementation)
         if (!GetOptionalStringParam(config, "CursorSeekFallback", journalConfig.mCursorSeekFallback, errorMsg)) {
             journalConfig.mCursorSeekFallback = "head";
         }
@@ -128,7 +126,7 @@ struct JournalConfig {
             mResetIntervalSecond = 3600;
             fixedCount++;
         } else if (mResetIntervalSecond > 86400) {
-            // 限制最大值为24小时
+            // Limit maximum to 24 hours
             mResetIntervalSecond = 86400;
             fixedCount++;
         }
@@ -145,7 +143,7 @@ struct JournalConfig {
             mBatchTimeoutMs = 1000;
             fixedCount++;
         } else if (mBatchTimeoutMs > 60000) {
-            mBatchTimeoutMs = 60000; // 最大60秒
+            mBatchTimeoutMs = 60000; // Maximum 60 seconds
             fixedCount++;
         }
 

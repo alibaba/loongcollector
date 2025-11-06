@@ -271,11 +271,11 @@ bool HandleJournalEntries(const string& configName,
                           const JournalConfig& config,
                           const std::shared_ptr<JournalReader>& journalReader,
                           QueueKey queueKey,
-                          bool* hasPendingDataOut,
+                          bool timeoutTrigger,
                           std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                           int* accumulatedEntryCount,
                           std::string* accumulatedFirstCursor,
-                          bool timeoutTrigger,
+                          bool* hasPendingDataOut,
                           std::chrono::steady_clock::time_point* lastBatchTimeOut) {
     if (!journalReader || !journalReader->IsOpen()) {
         LOG_WARNING(sLogger,
@@ -358,10 +358,10 @@ bool HandleJournalEntries(const string& configName,
         }
 
         if ((timeoutTrigger && totalEntryCount > 0) || reachedMaxBatch) {
-            // (1) 必须推送（超时触发或达到最大批处理数量）
+            // must push when timeout triggered or reached max batch size
             PushEventGroupToQueue(queueKey,
                                   eventGroup,
-                                  totalEntryCount,
+                                  totalEntryCount,  
                                   firstEntryCursor,
                                   journalReader,
                                   configName,
@@ -371,7 +371,7 @@ bool HandleJournalEntries(const string& configName,
                                   pushFailed,
                                   eventGroupSent);
         } else if (noNewData) {
-            // (2) 应该发送，检查队列状态（没有新数据但有累积数据）
+            // No new data but has accumulated data: push if process queue is available
             if (ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
                 PushEventGroupToQueue(queueKey,
                                       eventGroup,
@@ -385,7 +385,7 @@ bool HandleJournalEntries(const string& configName,
                                       pushFailed,
                                       eventGroupSent);
             } else {
-                // 队列状态不合适，累积到下一轮
+                // Process queue not available, keep accumulating for next cycle
                 if (accumulatedEntryCount != nullptr) {
                     *accumulatedEntryCount = totalEntryCount;
                 }
@@ -395,7 +395,7 @@ bool HandleJournalEntries(const string& configName,
                 return false;
             }
         } else {
-            // (3) 不推送，继续累积
+            // continue accumulating
             if (accumulatedEntryCount != nullptr) {
                 *accumulatedEntryCount = totalEntryCount;
             }
@@ -405,10 +405,10 @@ bool HandleJournalEntries(const string& configName,
         }
 
         if (hasPendingDataOut != nullptr) {
-            // hasPendingDataOut: 是否有待处理数据
-            // - pushFailed: 推送失败，数据仍然存在（累积缓冲区中）
-            // - totalEntryCount > 0 && !eventGroupSent: 有数据但没有发送（继续累积）
-            // - reachedMaxBatch: 达到最大批处理数量，while循环退出，但journal中可能还有更多entries需要处理
+            // hasPendingDataOut: indicates whether there is pending data to process
+            // - totalEntryCount > 0 && !eventGroupSent: has data but not sent (continue accumulating)
+            // - reachedMaxBatch: reached max batch size, while loop exits, but journal may have more entries to process
+            // - pushFailed: push failed, data still exists (in accumulated buffer)
             *hasPendingDataOut = pushFailed || (totalEntryCount > 0 && !eventGroupSent) || reachedMaxBatch;
         }
 

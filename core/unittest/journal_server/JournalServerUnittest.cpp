@@ -39,9 +39,6 @@ public:
     void TestRemoveJournalInput();
     void TestRemoveConfigOnly();
     void TestGetAllJournalConfigs();
-    void TestGetConnectionPoolStats();
-    void TestGetConnectionInfo();
-    void TestGetConnectionCount();
     void TestGetGlobalEpollFD();
     void TestCleanupEpollMonitoring();
     void TestHasRegisteredPlugins();
@@ -152,10 +149,6 @@ void JournalServerUnittest::TestAddJournalInput() {
     auto configs = server->GetAllJournalConfigs();
     APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
 
-    // 验证连接统计
-    auto stats = server->GetConnectionPoolStats();
-    APSARA_TEST_TRUE(stats.totalConnections >= 0);
-
     server->Stop();
 }
 
@@ -239,64 +232,6 @@ void JournalServerUnittest::TestGetAllJournalConfigs() {
     // 验证特定配置存在
     APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
     APSARA_TEST_TRUE(configs.find("another_config") != configs.end());
-
-    server->Stop();
-}
-
-void JournalServerUnittest::TestGetConnectionPoolStats() {
-    JournalServer* server = JournalServer::GetInstance();
-
-    // 初始化服务器
-    server->Init();
-
-    // 添加配置
-    server->AddJournalInput(mConfigName, *mTestConfig);
-
-    // 获取连接池统计
-    auto stats = server->GetConnectionPoolStats();
-
-    // 验证统计信息
-    APSARA_TEST_TRUE(stats.totalConnections >= 0);
-    APSARA_TEST_TRUE(stats.activeConnections >= 0);
-    APSARA_TEST_TRUE(stats.invalidConnections >= 0);
-
-    server->Stop();
-}
-
-void JournalServerUnittest::TestGetConnectionInfo() {
-    JournalServer* server = JournalServer::GetInstance();
-
-    // 初始化服务器
-    server->Init();
-
-    // 添加配置
-    server->AddJournalInput(mConfigName, *mTestConfig);
-
-    // 获取连接信息
-    auto connection = server->GetConnectionInfo(mConfigName);
-
-    // 验证连接信息（可能为nullptr，取决于系统环境）
-    // 在测试环境中，journal可能不可用，所以这里只验证方法调用不崩溃
-    APSARA_TEST_TRUE(true); // 方法调用成功
-
-    server->Stop();
-}
-
-void JournalServerUnittest::TestGetConnectionCount() {
-    JournalServer* server = JournalServer::GetInstance();
-
-    // 初始化服务器
-    server->Init();
-
-    // 初始连接数应该为0
-    APSARA_TEST_TRUE(server->GetConnectionCount() == 0);
-
-    // 添加配置
-    server->AddJournalInput(mConfigName, *mTestConfig);
-
-    // 验证连接数
-    auto count = server->GetConnectionCount();
-    APSARA_TEST_TRUE(count >= 0);
 
     server->Stop();
 }
@@ -928,9 +863,6 @@ UNIT_TEST_CASE(JournalServerUnittest, TestAddJournalInput)
 UNIT_TEST_CASE(JournalServerUnittest, TestRemoveJournalInput)
 UNIT_TEST_CASE(JournalServerUnittest, TestRemoveConfigOnly)
 UNIT_TEST_CASE(JournalServerUnittest, TestGetAllJournalConfigs)
-UNIT_TEST_CASE(JournalServerUnittest, TestGetConnectionPoolStats)
-UNIT_TEST_CASE(JournalServerUnittest, TestGetConnectionInfo)
-UNIT_TEST_CASE(JournalServerUnittest, TestGetConnectionCount)
 UNIT_TEST_CASE(JournalServerUnittest, TestGetGlobalEpollFD)
 UNIT_TEST_CASE(JournalServerUnittest, TestCleanupEpollMonitoring)
 UNIT_TEST_CASE(JournalServerUnittest, TestHasRegisteredPlugins)

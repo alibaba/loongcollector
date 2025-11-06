@@ -24,6 +24,7 @@
 #include <mutex>
 #include <string>
 
+#include "common/JournalCommon.h"
 #include "common/JournalConfig.h"
 #include "models/PipelineEventGroup.h"
 #include "runner/InputRunner.h"
@@ -31,7 +32,7 @@
 namespace logtail {
 
 // Forward declarations
-class JournalConnectionManager;
+class JournalConnection;
 class JournalConnectionInstance;
 class JournalReader;
 class PipelineEventGroup;
@@ -40,29 +41,11 @@ struct JournalEntry;
 // Epoll timeout constants
 inline constexpr int kJournalEpollTimeoutMS = 200;
 
-// MonitoredReader struct definition
-struct MonitoredReader {
-    std::shared_ptr<JournalReader> reader;
-    std::string configName;
-    bool hasPendingData{true};
-    // 批处理累积缓冲区
-    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup{nullptr}; // 累积的eventGroup
-    std::chrono::steady_clock::time_point lastBatchTime{}; // 上次批处理时间，初始化为epoch
-    int accumulatedEntryCount{0}; // 累积的entry数量
-    std::string accumulatedFirstCursor; // 累积的第一个entry的cursor，用于错误恢复
-};
-
-/**
- * @brief JournalServer manages all journal input plugins
- *
- * It follows the same pattern as FileServer and StaticFileServer:
- * 1. Manages journal configurations from registered plugins
- * 2. Runs in a separate thread to process journal entries
- * 3. Sends data to processing queues
- * 4. Provides registration/unregistration interface for plugins
- */
 class JournalServer : public InputRunner {
 public:
+    // ============================================================================
+    // Constructor/Destructor/Singleton
+    // ============================================================================
     JournalServer(const JournalServer&) = delete;
     JournalServer& operator=(const JournalServer&) = delete;
     JournalServer(JournalServer&&) = delete;
@@ -75,53 +58,21 @@ public:
 
     ~JournalServer() = default;
 
-    // InputRunner interface implementation
+    // Lifecycle Management (InputRunner interface)
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
 
-    // Plugin registration interface
+    // Configuration Management
     void AddJournalInput(const std::string& configName, const JournalConfig& config);
     void RemoveJournalInput(const std::string& configName);
     void RemoveConfigOnly(const std::string& configName);
 
-    /**
-     * @brief 获取所有配置
-     * @return 所有配置的映射
-     */
+    // Query Interfaces
     std::map<std::string, JournalConfig> GetAllJournalConfigs() const;
-
-    /**
-     * @brief 获取连接池统计信息
-     * @return 连接池统计信息
-     */
-    struct ConnectionPoolStats {
-        size_t totalConnections;
-        size_t activeConnections;
-        size_t invalidConnections;
-        std::vector<std::string> connectionKeys;
-    };
-    ConnectionPoolStats GetConnectionPoolStats() const;
-
-    /**
-     * @brief 获取指定配置的连接信息
-     * @param configName 配置名称
-     * @return 连接信息，如果不存在返回nullptr
-     */
-    std::shared_ptr<JournalReader> GetConnectionInfo(const std::string& configName) const;
-
-    /**
-     * @brief 获取当前连接数量
-     */
-
-    size_t GetConnectionCount() const;
-    /**
-     * @brief 获取全局 epoll FD
-     * @return 全局 epoll FD，如果未初始化返回 -1
-     */
     int GetGlobalEpollFD() const;
 
-
+    // Test Support
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif
@@ -129,29 +80,31 @@ public:
 private:
     JournalServer() = default;
 
+    // Main Execution Flow
     void run();
-    bool handlePendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
-    void syncMonitors(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
 
-    // 同步监控的辅助方法
-    void cleanupStaleReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void refreshConnections(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void addNewReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
-    void syncReaderAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
+    // Handle Pending Data
+    bool processPendingDataReaders(std::map<int, MonitoredReader>& monitoredReaders);
+    void clearPendingDataForInvalidReader(MonitoredReader& monitoredReader) const;
 
-    bool validateAndGetCurrentReader(const MonitoredReader& monitoredReader,
-                                     std::shared_ptr<JournalReader>& currentReaderOut) const;
+    // Refresh Connection
+    void refreshReaderConnectionsByInterval(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void addReadersToEpollMonitoring(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void syncReaderFDMappingAfterRefresh(const std::string& configName, std::map<int, MonitoredReader>& monitoredReaders);
 
-    bool validateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
+    // Monitor Management
+    void syncMonitoredReaders(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
+    void lazyCleanupRemovedReadersFromEpoll(int epollFD, std::map<int, MonitoredReader>& monitoredReaders);
 
-    // 检查是否超时触发强制发送
-    bool checkTimeoutTrigger(const MonitoredReader& monitoredReader, const JournalConfig& config) const;
-
+    // Validation/Helper Methods
+    bool getValidatedCurrentReader(MonitoredReader& monitoredReader,
+                                   std::shared_ptr<JournalReader>& currentReaderOut) const;
+    bool getOrValidateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
+    bool isBatchTimeoutExceeded(const MonitoredReader& monitoredReader, const JournalConfig& config) const;
 
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
 
-    // 全局 epoll FD 管理 - Global Epoll FD Management
     int mGlobalEpollFD{-1};
     mutable std::mutex mEpollMutex;
 

@@ -25,7 +25,7 @@ if (LINUX)
     add_executable(journal_reader_unittest JournalReaderUnittest.cpp)
     target_link_libraries(journal_reader_unittest ${UT_BASE_TARGET})
 
-    # JournalConnectionManager测试
+    # JournalConnection测试
     add_executable(journal_connection_manager_unittest JournalConnectionManagerUnittest.cpp)
     target_link_libraries(journal_connection_manager_unittest ${UT_BASE_TARGET})
 

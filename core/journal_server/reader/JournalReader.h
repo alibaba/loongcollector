@@ -26,49 +26,29 @@
 
 namespace logtail {
 
-/**
- * @brief Represents a single journal entry with all its fields and metadata
- */
 struct JournalEntry {
     JournalEntry() = default;
-
-    // Fields map (key-value pairs from journal)
     std::map<std::string, std::string> fields;
-
-    // Journal metadata
     std::string cursor;
     uint64_t realtimeTimestamp = 0;
     uint64_t monotonicTimestamp = 0;
 };
 
-/**
- * @brief Journal navigation result status
- */
 enum class JournalReadStatus {
     kOk = 1, // Successfully moved to next entry with data
     kEndOfJournal = 0, // No more entries (reached end)
     kError = -1 // Error occurred (e.g., cursor invalidated by log rotation)
 };
-
-/**
- * @brief Journal status types returned by CheckJournalStatus()
- */
 enum class JournalStatusType {
     kNop = 0, // No change (SD_JOURNAL_NOP)
     kAppend = 1, // New entries added (SD_JOURNAL_APPEND)
     kInvalidate = 2, // Log rotated or invalidated (SD_JOURNAL_INVALIDATE)
     kError = -1 // Error occurred
 };
-
-/**
- * @brief Journal reader implementation using sd-journal
- */
 class JournalReader {
 public:
     JournalReader();
     ~JournalReader();
-
-    // Delete copy and move operations
     JournalReader(const JournalReader&) = delete;
     JournalReader& operator=(const JournalReader&) = delete;
     JournalReader(JournalReader&&) = delete;
@@ -85,11 +65,6 @@ public:
     bool SeekCursor(const std::string& cursor);
     bool Next();
     bool Previous();
-
-    /**
-     * @brief Move to next entry with detailed status
-     * @return JournalReadStatus indicating success, end of journal, or error
-     */
     JournalReadStatus NextWithStatus();
 
     // Reading operations
@@ -106,22 +81,10 @@ public:
     // Journal paths
     bool SetJournalPaths(const std::vector<std::string>& paths);
 
-    // 事件监听相关方法（仅在 Linux 平台可用）
+    // Event monitoring methods
     bool AddToEpoll(int epollFD);
-    
-    /**
-     * @brief 将journal添加到epoll监控并返回文件描述符（原子操作）
-     * @param epollFD epoll文件描述符
-     * @return 成功返回journal FD（>=0），失败返回-1
-     */
     int AddToEpollAndGetFD(int epollFD);
-    
     void RemoveFromEpoll(int epollFD);
-
-    /**
-     * @brief 检查 journal 状态变化
-     * @return JournalStatusType 指示状态类型
-     */
     JournalStatusType CheckJournalStatus();
 
     int GetJournalFD() const;

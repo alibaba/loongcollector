@@ -19,17 +19,17 @@
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "journal_server/common/JournalConfig.h"
-#include "journal_server/connection/JournalConnectionManager.h"
+#include "journal_server/reader/JournalConnection.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
 
 namespace logtail {
 
-class JournalConnectionManagerUnittest : public testing::Test {
+class JournalConnectionUnittest : public testing::Test {
 public:
-    JournalConnectionManagerUnittest() = default;
-    ~JournalConnectionManagerUnittest() = default;
+    JournalConnectionUnittest() = default;
+    ~JournalConnectionUnittest() = default;
 
     void TestSingleton();
     void TestInitialize();
@@ -54,8 +54,6 @@ public:
     void TestAddConfigWithFilters();
     void TestAddConfigSeekHead();
     void TestAddConfigSeekCursor();
-    void TestGetConfigsUsingConnection();
-    void TestGetConfigsUsingConnectionNotFound();
     void TestAddConfigReplaceExisting();
     void TestGetStatsWithActiveConnections();
     void TestAddConfigWithInvalidUnits();
@@ -65,15 +63,15 @@ public:
     void TestValidateConfig();
 };
 
-void JournalConnectionManagerUnittest::TestSingleton() {
-    JournalConnectionManager& instance1 = JournalConnectionManager::GetInstance();
-    JournalConnectionManager& instance2 = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestSingleton() {
+    JournalConnection& instance1 = JournalConnection::GetInstance();
+    JournalConnection& instance2 = JournalConnection::GetInstance();
 
     APSARA_TEST_TRUE(&instance1 == &instance2);
 }
 
-void JournalConnectionManagerUnittest::TestInitialize() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestInitialize() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 测试初始化
     bool result = manager.Initialize();
@@ -82,8 +80,8 @@ void JournalConnectionManagerUnittest::TestInitialize() {
     APSARA_TEST_TRUE(result);
 }
 
-void JournalConnectionManagerUnittest::TestAddConfig() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfig() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -109,8 +107,8 @@ void JournalConnectionManagerUnittest::TestAddConfig() {
     APSARA_TEST_TRUE(manager.GetConnectionCount() > 0);
 }
 
-void JournalConnectionManagerUnittest::TestRemoveConfig() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestRemoveConfig() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -139,8 +137,8 @@ void JournalConnectionManagerUnittest::TestRemoveConfig() {
     APSARA_TEST_TRUE(manager.GetConnectionCount() == 0);
 }
 
-void JournalConnectionManagerUnittest::TestGetConfig() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetConfig() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -168,8 +166,8 @@ void JournalConnectionManagerUnittest::TestGetConfig() {
     APSARA_TEST_TRUE(retrievedConfig.mKernel || !retrievedConfig.mKernel); // 可能被验证逻辑修改
 }
 
-void JournalConnectionManagerUnittest::TestGetConnection() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetConnection() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -196,8 +194,8 @@ void JournalConnectionManagerUnittest::TestGetConnection() {
     APSARA_TEST_TRUE(true); // 方法调用成功
 }
 
-void JournalConnectionManagerUnittest::TestGetAllConfigs() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetAllConfigs() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -230,8 +228,8 @@ void JournalConnectionManagerUnittest::TestGetAllConfigs() {
     APSARA_TEST_TRUE(configs.find("another_config") != configs.end());
 }
 
-void JournalConnectionManagerUnittest::TestGetStats() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetStats() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -246,8 +244,8 @@ void JournalConnectionManagerUnittest::TestGetStats() {
     APSARA_TEST_TRUE(stats.invalidConnections >= 0);
 }
 
-void JournalConnectionManagerUnittest::TestGetConnectionCount() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetConnectionCount() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 先清理之前的状态
     manager.Cleanup();
@@ -292,8 +290,8 @@ void JournalConnectionManagerUnittest::TestGetConnectionCount() {
     }
 }
 
-void JournalConnectionManagerUnittest::TestCleanup() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestCleanup() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -322,8 +320,8 @@ void JournalConnectionManagerUnittest::TestCleanup() {
     APSARA_TEST_TRUE(manager.GetConnectionCount() == 0);
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigDuplicate() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigDuplicate() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -346,8 +344,8 @@ void JournalConnectionManagerUnittest::TestAddConfigDuplicate() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigNotInitialized() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigNotInitialized() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 不初始化管理器，直接添加配置
     JournalConfig config;
@@ -359,8 +357,8 @@ void JournalConnectionManagerUnittest::TestAddConfigNotInitialized() {
     APSARA_TEST_FALSE(result);
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigReaderOpenFailure() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigReaderOpenFailure() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -380,8 +378,8 @@ void JournalConnectionManagerUnittest::TestAddConfigReaderOpenFailure() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigFilterFailure() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigFilterFailure() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -407,8 +405,8 @@ void JournalConnectionManagerUnittest::TestAddConfigFilterFailure() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigSeekFailure() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigSeekFailure() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -433,8 +431,8 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekFailure() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestRemoveConfigNotInitialized() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestRemoveConfigNotInitialized() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 不初始化管理器，直接移除配置
     manager.RemoveConfig("test_config");
@@ -443,8 +441,8 @@ void JournalConnectionManagerUnittest::TestRemoveConfigNotInitialized() {
     APSARA_TEST_TRUE(true);
 }
 
-void JournalConnectionManagerUnittest::TestRemoveConfigNotFound() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestRemoveConfigNotFound() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -458,8 +456,8 @@ void JournalConnectionManagerUnittest::TestRemoveConfigNotFound() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestGetConnectionNotFound() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetConnectionNotFound() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -473,8 +471,8 @@ void JournalConnectionManagerUnittest::TestGetConnectionNotFound() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestGetConfigNotFound() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetConfigNotFound() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -488,8 +486,8 @@ void JournalConnectionManagerUnittest::TestGetConfigNotFound() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestGetStatsWithInvalidConnections() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetStatsWithInvalidConnections() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -514,8 +512,8 @@ void JournalConnectionManagerUnittest::TestGetStatsWithInvalidConnections() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigWithFilters() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigWithFilters() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -543,8 +541,8 @@ void JournalConnectionManagerUnittest::TestAddConfigWithFilters() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigSeekHead() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigSeekHead() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -570,8 +568,8 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekHead() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigSeekCursor() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigSeekCursor() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -598,58 +596,10 @@ void JournalConnectionManagerUnittest::TestAddConfigSeekCursor() {
 }
 
 
-void JournalConnectionManagerUnittest::TestGetConfigsUsingConnection() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
-
-    // 初始化管理器
-    manager.Initialize();
-
-    // 创建测试配置
-    JournalConfig config;
-    config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
-    config.mKernel = true;
-
-    // 创建pipeline context
-    auto ctx = std::make_unique<CollectionPipelineContext>();
-    ctx->SetConfigName("test_config");
-    config.mCtx = ctx.get();
-
-    // 添加配置
-    manager.AddConfig("test_config", config);
-
-    // 获取连接
-    auto connection = manager.GetConnection("test_config");
-
-    if (connection) {
-        // 获取使用该连接的配置
-        auto configs = manager.GetConfigsUsingConnection(connection);
-
-        // 验证配置
-        APSARA_TEST_TRUE(configs.size() >= 0);
-    }
-
-    manager.Cleanup();
-}
-
-void JournalConnectionManagerUnittest::TestGetConfigsUsingConnectionNotFound() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
-
-    // 初始化管理器
-    manager.Initialize();
-
-    // 获取不存在的连接对应的配置
-    auto configs = manager.GetConfigsUsingConnection(nullptr);
-
-    // 应该返回空列表
-    APSARA_TEST_TRUE(configs.empty());
-
-    manager.Cleanup();
-}
 
 
-void JournalConnectionManagerUnittest::TestAddConfigReplaceExisting() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigReplaceExisting() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -684,8 +634,8 @@ void JournalConnectionManagerUnittest::TestAddConfigReplaceExisting() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestGetStatsWithActiveConnections() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestGetStatsWithActiveConnections() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -717,107 +667,100 @@ void JournalConnectionManagerUnittest::TestGetStatsWithActiveConnections() {
 }
 
 // 注册测试用例
-TEST_F(JournalConnectionManagerUnittest, TestSingleton) {
+TEST_F(JournalConnectionUnittest, TestSingleton) {
     TestSingleton();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestInitialize) {
+TEST_F(JournalConnectionUnittest, TestInitialize) {
     TestInitialize();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfig) {
+TEST_F(JournalConnectionUnittest, TestAddConfig) {
     TestAddConfig();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestRemoveConfig) {
+TEST_F(JournalConnectionUnittest, TestRemoveConfig) {
     TestRemoveConfig();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConfig) {
+TEST_F(JournalConnectionUnittest, TestGetConfig) {
     TestGetConfig();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConnection) {
+TEST_F(JournalConnectionUnittest, TestGetConnection) {
     TestGetConnection();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetAllConfigs) {
+TEST_F(JournalConnectionUnittest, TestGetAllConfigs) {
     TestGetAllConfigs();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetStats) {
+TEST_F(JournalConnectionUnittest, TestGetStats) {
     TestGetStats();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConnectionCount) {
+TEST_F(JournalConnectionUnittest, TestGetConnectionCount) {
     TestGetConnectionCount();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestCleanup) {
+TEST_F(JournalConnectionUnittest, TestCleanup) {
     TestCleanup();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigDuplicate) {
+TEST_F(JournalConnectionUnittest, TestAddConfigDuplicate) {
     TestAddConfigDuplicate();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigNotInitialized) {
+TEST_F(JournalConnectionUnittest, TestAddConfigNotInitialized) {
     TestAddConfigNotInitialized();
 }
 
 
-TEST_F(JournalConnectionManagerUnittest, TestRemoveConfigNotInitialized) {
+TEST_F(JournalConnectionUnittest, TestRemoveConfigNotInitialized) {
     TestRemoveConfigNotInitialized();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestRemoveConfigNotFound) {
+TEST_F(JournalConnectionUnittest, TestRemoveConfigNotFound) {
     TestRemoveConfigNotFound();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConnectionNotFound) {
+TEST_F(JournalConnectionUnittest, TestGetConnectionNotFound) {
     TestGetConnectionNotFound();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConfigNotFound) {
+TEST_F(JournalConnectionUnittest, TestGetConfigNotFound) {
     TestGetConfigNotFound();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetStatsWithInvalidConnections) {
+TEST_F(JournalConnectionUnittest, TestGetStatsWithInvalidConnections) {
     TestGetStatsWithInvalidConnections();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithFilters) {
+TEST_F(JournalConnectionUnittest, TestAddConfigWithFilters) {
     TestAddConfigWithFilters();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigSeekHead) {
+TEST_F(JournalConnectionUnittest, TestAddConfigSeekHead) {
     TestAddConfigSeekHead();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigSeekCursor) {
+TEST_F(JournalConnectionUnittest, TestAddConfigSeekCursor) {
     TestAddConfigSeekCursor();
 }
 
 
-TEST_F(JournalConnectionManagerUnittest, TestGetConfigsUsingConnection) {
-    TestGetConfigsUsingConnection();
-}
-
-TEST_F(JournalConnectionManagerUnittest, TestGetConfigsUsingConnectionNotFound) {
-    TestGetConfigsUsingConnectionNotFound();
-}
 
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigReplaceExisting) {
+TEST_F(JournalConnectionUnittest, TestAddConfigReplaceExisting) {
     TestAddConfigReplaceExisting();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestGetStatsWithActiveConnections) {
+TEST_F(JournalConnectionUnittest, TestGetStatsWithActiveConnections) {
     TestGetStatsWithActiveConnections();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigWithInvalidUnits() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigWithInvalidUnits() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -845,8 +788,8 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidUnits() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigWithInvalidIdentifiers() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigWithInvalidIdentifiers() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -874,8 +817,8 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidIdentifiers() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigWithInvalidMatchPatterns() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigWithInvalidMatchPatterns() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -903,8 +846,8 @@ void JournalConnectionManagerUnittest::TestAddConfigWithInvalidMatchPatterns() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestAddConfigWithEmptyContext() {
-    JournalConnectionManager& manager = JournalConnectionManager::GetInstance();
+void JournalConnectionUnittest::TestAddConfigWithEmptyContext() {
+    JournalConnection& manager = JournalConnection::GetInstance();
 
     // 初始化管理器
     manager.Initialize();
@@ -929,7 +872,7 @@ void JournalConnectionManagerUnittest::TestAddConfigWithEmptyContext() {
     manager.Cleanup();
 }
 
-void JournalConnectionManagerUnittest::TestValidateConfig() {
+void JournalConnectionUnittest::TestValidateConfig() {
     JournalConfig config;
 
     // 测试无效配置
@@ -957,23 +900,23 @@ void JournalConnectionManagerUnittest::TestValidateConfig() {
     APSARA_TEST_TRUE(config2.IsValid());
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithInvalidUnits) {
+TEST_F(JournalConnectionUnittest, TestAddConfigWithInvalidUnits) {
     TestAddConfigWithInvalidUnits();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithInvalidIdentifiers) {
+TEST_F(JournalConnectionUnittest, TestAddConfigWithInvalidIdentifiers) {
     TestAddConfigWithInvalidIdentifiers();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithInvalidMatchPatterns) {
+TEST_F(JournalConnectionUnittest, TestAddConfigWithInvalidMatchPatterns) {
     TestAddConfigWithInvalidMatchPatterns();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestAddConfigWithEmptyContext) {
+TEST_F(JournalConnectionUnittest, TestAddConfigWithEmptyContext) {
     TestAddConfigWithEmptyContext();
 }
 
-TEST_F(JournalConnectionManagerUnittest, TestValidateConfig) {
+TEST_F(JournalConnectionUnittest, TestValidateConfig) {
     TestValidateConfig();
 }
 
