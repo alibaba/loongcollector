@@ -485,27 +485,34 @@ private:
         return LogFileReaderPtr();
     }
 
-    void VerifyReaderNotRecreated(const DevInode& devInode, const LogFileReaderPtr& originalReader, bool sameReader) {
-        VerifyReaderNotRecreated(devInode, originalReader, sameReader, gRootDir);
+    void VerifyReaderRecreated(const DevInode& devInode, const LogFileReaderPtr& originalReader) {
+        VerifyReaderRecreated(devInode, originalReader, gRootDir);
+    }
+
+    // Overload for specifying custom directory (e.g., symlink directories)
+    void VerifyReaderRecreated(const DevInode& devInode,
+                               const LogFileReaderPtr& originalReader,
+                               const std::string& dir) {
+        LogFileReaderPtr reader = GetReader(devInode, dir);
+        // Reader should be recreated (file empty and changed)
+        APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
+        // New reader should be a different pointer
+        APSARA_TEST_TRUE_FATAL(reader.get() != originalReader.get());
+    }
+
+    void VerifyReaderNotRecreated(const DevInode& devInode, const LogFileReaderPtr& originalReader) {
+        VerifyReaderNotRecreated(devInode, originalReader, gRootDir);
     }
 
     // Overload for specifying custom directory (e.g., symlink directories)
     void VerifyReaderNotRecreated(const DevInode& devInode,
                                   const LogFileReaderPtr& originalReader,
-                                  bool sameReader,
                                   const std::string& dir) {
         LogFileReaderPtr reader = GetReader(devInode, dir);
-        if (!sameReader) {
-            // Reader should be recreated (file empty and changed)
-            APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
-            // New reader should be a different pointer
-            APSARA_TEST_TRUE_FATAL(reader.get() != originalReader.get());
-        } else {
-            // Reader should NOT be recreated (same reader)
-            APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
-            // Reader should be the same pointer
-            APSARA_TEST_EQUAL_FATAL(reader.get(), originalReader.get());
-        }
+        // Reader should NOT be recreated (same reader)
+        APSARA_TEST_TRUE_FATAL(reader.get() != nullptr);
+        // Reader should be the same pointer
+        APSARA_TEST_EQUAL_FATAL(reader.get(), originalReader.get());
     }
 
     DevInode GetFileDevInode(const std::string& path) { return logtail::GetFileDevInode(path); }
@@ -539,7 +546,7 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Modify() {
@@ -566,7 +573,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Change_Close_Modify() {
@@ -600,7 +607,7 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Close_Change_Modify() {
@@ -634,7 +641,7 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Close_Change_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Modify_Close_Modify() {
@@ -664,7 +671,7 @@ void LogInputReaderUnittest::CreateEmpty_Modify_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_SameSignature() {
@@ -700,7 +707,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_SameSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_SameSignature() {
@@ -736,7 +743,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_SameSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_DiffSignature() {
@@ -772,7 +779,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Change_Close_Modify_DiffSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_DiffSignature() {
@@ -808,7 +815,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Change_Modify_DiffSigna
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Modify() {
@@ -838,7 +845,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Modify_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Change_Close_Modify() {
@@ -868,7 +875,7 @@ void LogInputReaderUnittest::CreateEmpty_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Close_Change_Modify() {
@@ -898,7 +905,7 @@ void LogInputReaderUnittest::CreateEmpty_Close_Change_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateEmpty_Close_Modify() {
@@ -924,7 +931,7 @@ void LogInputReaderUnittest::CreateEmpty_Close_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_SameSignature() {
@@ -956,7 +963,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_SameSignature() 
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_SameSignature() {
@@ -987,7 +994,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_SameSignature() 
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_DiffSignature() {
@@ -1019,7 +1026,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Change_Close_Modify_DiffSignature() 
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_DiffSignature() {
@@ -1050,7 +1057,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Change_Modify_DiffSignature() 
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::CreateNonEmpty_Close_Modify() {
@@ -1076,7 +1083,7 @@ void LogInputReaderUnittest::CreateNonEmpty_Close_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 #ifndef _MSC_VER
@@ -1108,7 +1115,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Modify() {
@@ -1138,7 +1145,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Change_Close_Modify() {
@@ -1176,7 +1183,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Change_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Change_Modify() {
@@ -1214,7 +1221,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Change_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Modify() {
@@ -1247,7 +1254,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Modify_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_SameSignature() {
@@ -1287,7 +1294,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_Sa
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_SameSignature() {
@@ -1327,7 +1334,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_Sa
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_DiffSignature() {
@@ -1368,7 +1375,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Change_Close_Modify_Di
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_DiffSignature() {
@@ -1409,7 +1416,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Change_Modify_Di
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Modify() {
@@ -1442,7 +1449,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Modify_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Change_Close_Modify() {
@@ -1475,7 +1482,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv);
 
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Change_Modify() {
@@ -1509,7 +1516,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Change_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Modify() {
@@ -1537,7 +1544,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_SameSignature() {
@@ -1573,7 +1580,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_SameSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_SameSignature() {
@@ -1609,7 +1616,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_SameSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_DiffSignature() {
@@ -1643,7 +1650,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Change_Close_Modify_DiffSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_DiffSignature() {
@@ -1679,7 +1686,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Change_Modify_DiffSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Modify() {
@@ -1707,7 +1714,7 @@ void LogInputReaderUnittest::SymlinkCreateNonEmpty_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkCreateEmpty_Close_ModifyWrite_Change_Close_Modify() {
@@ -1750,7 +1757,7 @@ void LogInputReaderUnittest::SymlinkCreateEmpty_Close_ModifyWrite_Change_Close_M
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 #endif
 
@@ -1779,7 +1786,7 @@ void LogInputReaderUnittest::ModifyEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv3);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Modify_Modify() {
@@ -1806,7 +1813,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Modify_Modify() {
     ProcessSingleEvent(modifyEv3);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Change_Close_Modify() {
@@ -1836,7 +1843,7 @@ void LogInputReaderUnittest::ModifyEmpty_Change_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Close_Change_Modify() {
@@ -1866,7 +1873,7 @@ void LogInputReaderUnittest::ModifyEmpty_Close_Change_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyEmpty_Close_Modify() {
@@ -1892,7 +1899,7 @@ void LogInputReaderUnittest::ModifyEmpty_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_SameSignature() {
@@ -1924,7 +1931,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_SameSignature() 
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_SameSignature() {
@@ -1955,7 +1962,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_SameSignature() 
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_DiffSignature() {
@@ -1987,7 +1994,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Change_Close_Modify_DiffSignature() 
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_DiffSignature() {
@@ -2018,7 +2025,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Change_Modify_DiffSignature() 
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, false);
+    VerifyReaderRecreated(devInode, originalReader);
 }
 
 void LogInputReaderUnittest::ModifyNonEmpty_Close_Modify() {
@@ -2044,7 +2051,7 @@ void LogInputReaderUnittest::ModifyNonEmpty_Close_Modify() {
     ProcessSingleEvent(modifyEv2);
 
     VerifyReaderExists(devInode, true);
-    VerifyReaderNotRecreated(devInode, originalReader, true);
+    VerifyReaderNotRecreated(devInode, originalReader);
 }
 
 #ifndef _MSC_VER
@@ -2075,7 +2082,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Modify_Modify() {
@@ -2104,7 +2111,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Modify_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Change_Close_Modify() {
@@ -2138,7 +2145,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Change_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Change_Modify() {
@@ -2173,7 +2180,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Change_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Modify() {
@@ -2201,7 +2208,7 @@ void LogInputReaderUnittest::SymlinkModifyEmpty_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_SameSignature() {
@@ -2236,7 +2243,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_SameSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_SameSignature() {
@@ -2272,7 +2279,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_SameSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_DiffSignature() {
@@ -2308,7 +2315,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Change_Close_Modify_DiffSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_DiffSignature() {
@@ -2343,7 +2350,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Change_Modify_DiffSigna
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, false, linkDir);
+    VerifyReaderRecreated(devInode, originalReader, linkDir);
 }
 
 void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Modify() {
@@ -2371,7 +2378,7 @@ void LogInputReaderUnittest::SymlinkModifyNonEmpty_Close_Modify() {
 
     // Verify reader exists and was not recreated - search in linkDir's handler
     VerifyReaderExists(devInode, true, linkDir);
-    VerifyReaderNotRecreated(devInode, originalReader, true, linkDir);
+    VerifyReaderNotRecreated(devInode, originalReader, linkDir);
 }
 #endif
 
