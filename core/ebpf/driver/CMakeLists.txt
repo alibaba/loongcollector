@@ -35,11 +35,6 @@ if (LINUX)
     set(CMAKE_C_FLAGS ${ORIGINAL_CMAKE_C_FLAGS})
     
     add_custom_target(
-        install_coolbpf ALL
-        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
-        DEPENDS coolbpf coolbpf_static
-    )
-    add_custom_target(
         build_libprofiler ALL
         COMMAND CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/profiler cargo build -r
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf/src/profiler
@@ -50,6 +45,11 @@ if (LINUX)
         IMPORTED_NO_SONAME TRUE
     )
     add_dependencies(profiler build_libprofiler)
+    add_custom_target(
+        install_coolbpf ALL
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
+        DEPENDS coolbpf coolbpf_static build_libprofiler
+    )
 
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
 
