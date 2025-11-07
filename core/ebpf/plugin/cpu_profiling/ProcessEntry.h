@@ -14,8 +14,8 @@
 
 #pragma once
 
-#include <string>
 #include <fstream>
+#include <string>
 
 #include "common/ProcParser.h"
 
@@ -31,7 +31,7 @@ struct ProcessEntry {
         : mPid(pid), mCmdline(std::move(cmdline)), mContainerId(containerId) {}
 };
 
-inline void ListAllProcesses(ProcParser &procParser, std::vector<ProcessEntry> &proc_out) {
+inline void ListAllProcesses(ProcParser& procParser, std::vector<ProcessEntry>& proc_out) {
     assert(proc_out.empty());
 
     auto pids = procParser.GetAllPids();

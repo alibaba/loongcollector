@@ -21,61 +21,53 @@ namespace logtail::ebpf {
 
 class CpuProfilingManager : public AbstractManager {
 public:
-    CpuProfilingManager(
-        const std::shared_ptr<ProcessCacheManager> &processCacheManager,
-        const std::shared_ptr<EBPFAdapter> &eBPFAdapter,
-        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> &queue,
-        EventPool* pool);
+    CpuProfilingManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                        const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                        moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                        EventPool* pool);
     ~CpuProfilingManager() override = default;
 
     static std::shared_ptr<CpuProfilingManager>
-    Create(const std::shared_ptr<ProcessCacheManager> &processCacheManager,
-           const std::shared_ptr<EBPFAdapter> &eBPFAdapter,
-           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>> &queue,
-            EventPool* pool) {
-        return std::make_shared<CpuProfilingManager>(processCacheManager,
-                                                     eBPFAdapter, queue, pool);
+    Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+           const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+           moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+           EventPool* pool) {
+        return std::make_shared<CpuProfilingManager>(processCacheManager, eBPFAdapter, queue, pool);
     }
 
     int Init() override;
     int Destroy() override;
 
-    int HandleEvent(const std::shared_ptr<CommonEvent> &event) override {
-        return 0;
-    }
+    int HandleEvent(const std::shared_ptr<CommonEvent>& event) override { return 0; }
 
     int SendEvents() override { return 0; }
 
     int RegisteredConfigCount() override { return mConfigNameToKey.size(); }
 
-    int AddOrUpdateConfig(const CollectionPipelineContext *context,
+    int AddOrUpdateConfig(const CollectionPipelineContext* context,
                           uint32_t configId,
-                          const PluginMetricManagerPtr &metricManager,
-                          const PluginOptions &options) override;
+                          const PluginMetricManagerPtr& metricManager,
+                          const PluginOptions& options) override;
 
-    int RemoveConfig(const std::string &configName) override;
+    int RemoveConfig(const std::string& configName) override;
 
     PluginType GetPluginType() override { return PluginType::CPU_PROFILING; }
 
-    std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const PluginOptions &options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
         assert(false);
         return nullptr;
     }
 
     int Suspend() override;
 
-    void HandleCpuProfilingEvent(uint32_t pid, const char *comm,
-                                 const char *stack, uint32_t cnt);
+    void HandleCpuProfilingEvent(uint32_t pid, const char* comm, const char* stack, uint32_t cnt);
 
     void HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result);
 
-    void SetMetrics(CounterPtr pollEventsTotal) {
-        mRecvKernelEventsTotal = std::move(pollEventsTotal);
-    }
+    void SetMetrics(CounterPtr pollEventsTotal) { mRecvKernelEventsTotal = std::move(pollEventsTotal); }
 
 protected:
-    int update([[maybe_unused]] const PluginOptions &options) override {
+    int update([[maybe_unused]] const PluginOptions& options) override {
         assert(false);
         return 0;
     }
@@ -85,7 +77,7 @@ private:
 
     using ConfigKey = size_t;
     struct ConfigInfo {
-        const CollectionPipelineContext *mPipelineCtx{nullptr};
+        const CollectionPipelineContext* mPipelineCtx{nullptr};
         logtail::QueueKey mQueueKey = 0;
         uint32_t mPluginIndex{0};
     };

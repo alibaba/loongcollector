@@ -53,10 +53,8 @@ public:
 
 class CpuProfilingOption {
 public:
-    bool Init(const Json::Value& config,
-              const CollectionPipelineContext* mContext,
-              const std::string& sName);
-    
+    bool Init(const Json::Value& config, const CollectionPipelineContext* mContext, const std::string& sName);
+
     std::vector<std::string> mCmdlines;
     ContainerDiscoveryOptions mContainerDiscovery;
 };
