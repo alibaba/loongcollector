@@ -17,14 +17,15 @@
 #include <atomic>
 #include <functional>
 #include <future>
+#include <optional>
 #include <string>
 #include <vector>
-#include <optional>
+
+#include "boost/regex.hpp"
 
 #include "app_config/AppConfig.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
-#include "boost/regex.hpp"
 
 namespace logtail {
 namespace ebpf {
@@ -77,14 +78,14 @@ public:
         : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()),
           mProcParser(GetContainerHostPath().value_or("/")) {}
 
-    ProcessDiscoveryManager(const ProcessDiscoveryManager &) = delete;
-    ProcessDiscoveryManager &operator=(const ProcessDiscoveryManager &) = delete;
-    ProcessDiscoveryManager(ProcessDiscoveryManager &&) = delete;
-    ProcessDiscoveryManager &operator=(ProcessDiscoveryManager &&) = delete;
+    ProcessDiscoveryManager(const ProcessDiscoveryManager&) = delete;
+    ProcessDiscoveryManager& operator=(const ProcessDiscoveryManager&) = delete;
+    ProcessDiscoveryManager(ProcessDiscoveryManager&&) = delete;
+    ProcessDiscoveryManager& operator=(ProcessDiscoveryManager&&) = delete;
 
     ~ProcessDiscoveryManager() { Stop(); }
 
-    static ProcessDiscoveryManager *GetInstance() {
+    static ProcessDiscoveryManager* GetInstance() {
         static ProcessDiscoveryManager instance;
         return &instance;
     }
@@ -92,13 +93,13 @@ public:
     void Start(NotifyFn fn);
     void Stop();
 
-    void AddDiscovery(const std::string &configName, ProcessDiscoveryConfig config);
+    void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
 
-    bool UpdateDiscovery(const std::string &configName, UpdateFn updater);
+    bool UpdateDiscovery(const std::string& configName, UpdateFn updater);
 
-    void RemoveDiscovery(const std::string &configName);
+    void RemoveDiscovery(const std::string& configName);
 
-    bool CheckDiscoveryExist(const std::string &configName);
+    bool CheckDiscoveryExist(const std::string& configName);
 
 private:
     void run();
@@ -113,7 +114,7 @@ private:
     std::mutex mLock;
     std::unordered_map<std::string, InnerState> mStates;
     NotifyFn mCallback;
-    
+
     bool mIsContainerMode;
     ProcParser mProcParser;
 };

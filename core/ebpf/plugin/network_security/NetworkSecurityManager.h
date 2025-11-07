@@ -74,8 +74,7 @@ public:
 
     int RemoveConfig(const std::string&) override;
 
-    std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const PluginOptions& options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::NETWORK_SECURITY;
         NetworkSecurityConfig config;
