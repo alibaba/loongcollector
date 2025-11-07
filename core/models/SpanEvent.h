@@ -60,6 +60,10 @@ public:
         void SetTag(const std::string& key, const std::string& val);
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
+        void IngestTag(StringView key, StringView val);
+        void IngestTag(const std::string& key, const std::string& val);
+        void IngestTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void IngestTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
         std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
             return mTags.mInner.begin();
@@ -102,6 +106,10 @@ public:
         void SetTag(const std::string& key, const std::string& val);
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
+        void IngestTag(StringView key, StringView val);
+        void IngestTag(const std::string& key, const std::string& val);
+        void IngestTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void IngestTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
         std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
             return mTags.mInner.begin();
@@ -166,6 +174,10 @@ public:
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
+    void IngestTag(StringView key, StringView val);
+    void IngestTag(const std::string& key, const std::string& val);
+    void IngestTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+    void IngestTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }

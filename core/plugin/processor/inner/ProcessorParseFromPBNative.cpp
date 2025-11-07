@@ -106,19 +106,24 @@ void ProcessorParseFromPBNative::Process(std::vector<PipelineEventGroup>& eventG
                     ("error parsing PipelineEventGroup with manual parser", errMsg)("content size", content.size()));
 
                 if (BOOL_FLAG(debug_sls_serializer)) {
-                    LOG_WARNING(sLogger,
-                                ("failed to parse pipeline event group", std::string(content.data(), content.size())));
                     models::PipelineEventGroup pbGroup;
                     if (!pbGroup.ParseFromArray(content.data(), content.size())
                         || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
                         LOG_WARNING(sLogger,
                                     ("error transfer PB to PipelineEventGroup with native parser",
                                      errMsg)("content size", content.size()));
+                        ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+                        continue;
+                    } else {
+                        LOG_ERROR(
+                            sLogger,
+                            ("failed to parse pipeline event group with manual parser, but success with native parser",
+                             std::string(content.data(), content.size())));
                     }
+                } else {
+                    ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+                    continue;
                 }
-
-                ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
-                continue;
             }
 
             // inherit metadata from original event group
