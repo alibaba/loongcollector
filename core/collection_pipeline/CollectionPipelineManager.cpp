@@ -250,31 +250,32 @@ bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& d
                 }
             }
         }
-        for (const auto& config : diff.mModified) {
-            string inputType = (*config.mInputs[0])["Type"].asString();
-            if (inputType == "input_file" || inputType == "input_container_stdio") {
-                return true;
-            }
-            auto oldPipeline = mPipelineNameEntityMap[config.mName];
-            if (oldPipeline) {
-                const Json::Value& oldInputs = oldPipeline->GetConfig()["inputs"];
-                for (const auto& oldInput : oldInputs) {
-                    string oldInputType = oldInput["Type"].asString();
-                    if (oldInputType == "input_file" || oldInputType == "input_container_stdio") {
-                        return true;
-                    }
-                }
-            }
+    }
+    for (const auto& config : diff.mModified) {
+        string inputType = (*config.mInputs[0])["Type"].asString();
+        if (inputType == "input_file" || inputType == "input_container_stdio") {
+            return true;
         }
-        for (const auto& config : diff.mAdded) {
-            for (const auto& input : config.mInputs) {
-                string inputType = (*input)["Type"].asString();
-                if (inputType == "input_file" || inputType == "input_container_stdio") {
+        auto oldPipeline = mPipelineNameEntityMap[config.mName];
+        if (oldPipeline) {
+            const Json::Value& oldInputs = oldPipeline->GetConfig()["inputs"];
+            for (const auto& oldInput : oldInputs) {
+                string oldInputType = oldInput["Type"].asString();
+                if (oldInputType == "input_file" || oldInputType == "input_container_stdio") {
                     return true;
                 }
             }
         }
-        return false;
     }
+    for (const auto& config : diff.mAdded) {
+        for (const auto& input : config.mInputs) {
+            string inputType = (*input)["Type"].asString();
+            if (inputType == "input_file" || inputType == "input_container_stdio") {
+                return true;
+            }
+        }
+    }
+    return false;
+}
 
 } // namespace logtail
