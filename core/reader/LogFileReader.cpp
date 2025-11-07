@@ -1240,7 +1240,7 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
 
     // If file size is 0 and filename is changed, we cannot judge if the inode is reused by signature,
     // so we just recreate the reader to avoid filename mismatch
-    if (mLastFileSignatureSize == 0 && mRealLogPath != mResolvedHostLogPath) {
+    if (mLastFileSignatureSize == 0 && mRealLogPath != mHostLogPath && mRealLogPath != mResolvedHostLogPath) {
         return false;
     }
     fsutil::PathStat ps;
