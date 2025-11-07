@@ -83,8 +83,7 @@ public:
 
     PluginType GetPluginType() override { return PluginType::FILE_SECURITY; }
 
-    std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const PluginOptions& options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;

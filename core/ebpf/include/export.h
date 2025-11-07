@@ -4,11 +4,11 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
+#include <unordered_set>
 #include <variant>
 #include <vector>
-#include <unordered_set>
-#include <optional>
 
 extern "C" {
 #include <coolbpf/net.h>
@@ -157,13 +157,13 @@ struct FileSecurityConfig {
     bool operator==(const FileSecurityConfig& other) const { return mOptions == other.mOptions; }
 };
 
-using CpuProfilingHandler = void (*)(uint32_t pid, const char *comm, const char *stack, uint32_t cnt, void *ctx);
+using CpuProfilingHandler = void (*)(uint32_t pid, const char* comm, const char* stack, uint32_t cnt, void* ctx);
 
 struct CpuProfilingConfig {
     std::unordered_set<uint32_t> mPids;
     std::optional<std::string> mHostRootPath;
     CpuProfilingHandler mHandler;
-    void *mCtx;
+    void* mCtx;
 };
 
 enum class eBPFLogType {
@@ -175,7 +175,8 @@ enum class eBPFLogType {
 struct PluginConfig {
     PluginType mPluginType;
     // log control
-    std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig, CpuProfilingConfig> mConfig;
+    std::variant<NetworkObserveConfig, ProcessConfig, NetworkSecurityConfig, FileSecurityConfig, CpuProfilingConfig>
+        mConfig;
 };
 
 } // namespace logtail::ebpf
