@@ -48,11 +48,14 @@ struct ProcessDiscoveryConfig {
             return false;
         };
 
-        if (isContainerMode) {
-            return mContainerIds.find(containerId) != mContainerIds.end() && checkCmdlines();
-        } else {
-            return checkCmdlines();
-        }
+        // TODO: check container after adapted with container discovery
+        // if (isContainerMode) {
+        //     return mContainerIds.find(containerId) != mContainerIds.end() && checkCmdlines();
+        // } else {
+        //     return checkCmdlines();
+        // }
+
+        return checkCmdlines();
     }
 };
 
