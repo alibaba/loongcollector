@@ -46,7 +46,9 @@ static string UnescapeDollar(string::const_iterator beginIt, string::const_itera
 
 static bool ReplaceEnvVarRefInStr(const string& inStr, string& outStr) {
     string::const_iterator lastMatchEnd = inStr.begin();
-    static boost::regex reg(R"((?<!\$)\${([\w]+)(:(.*?))?(?<!\$)})");
+    // Prometheus 使用 $1, $2, ${1}, ${2} ... 作为采集配置 relabel replacement
+    // 的占位符，所以在进行环境变量替换时，需要排除这些占位符。 因此不再匹配纯数字作为环境变量名。
+    static boost::regex reg(R"((?<!\$)\${([\w]*[a-zA-Z_][\w]*)(:(.*?))?(?<!\$)})");
     boost::regex_iterator<string::const_iterator> it{inStr.begin(), inStr.end(), reg};
     boost::regex_iterator<string::const_iterator> end;
     if (it == end) {

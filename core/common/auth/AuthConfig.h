@@ -22,8 +22,9 @@
 
 namespace logtail {
 
-// A general authentication config holder with TLS support only for now.
-// Future extensions (SASL/Kerberos) can be added here without changing callers.
+// A general authentication config holder.
+// Currently supports TLS and SASL(PLAIN/SCRAM). Kerberos parameters
+// are temporarily kept in KafkaConfig for backward compatibility.
 class AuthConfig {
 public:
     // TLS/SSL
@@ -33,10 +34,24 @@ public:
     std::string TlsKeyFile;
     std::string TlsKeyPassword;
 
-    // Load authentication (TLS-only for this phase) from a JSON object.
+    // SASL (PLAIN/SCRAM)
+    std::string SaslMechanism;
+    std::string SaslUsername;
+    std::string SaslPassword;
+
+    // Kerberos (GSSAPI)
+    bool KerberosEnabled = false;
+    std::string KerberosMechanisms = "GSSAPI";
+    std::string KerberosServiceName = "kafka";
+    std::string KerberosPrincipal;
+    std::string KerberosKeytab;
+    std::string KerberosKinitCmd;
+
+    // Load authentication (TLS & SASL) from a JSON object.
     // The input should be the value of config["Authentication"].
     bool Load(const Json::Value& auth, std::string& errorMsg);
     // Validate the loaded config. TLS cert/key must be paired when provided.
+    // For SASL, username/password are required when mechanism is set.
     bool Validate(std::string& errorMsg) const;
 };
 

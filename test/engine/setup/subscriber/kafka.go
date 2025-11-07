@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/IBM/sarama"
@@ -35,6 +36,12 @@ import (
 )
 
 const kafkaName = "kafka"
+
+// Pre-compiled regular expressions to avoid performance issues
+var (
+	reContent = regexp.MustCompile(`"content"\s*:\s*"((?:\\.|[^"\\])*)"`)
+	reMsg     = regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
+)
 
 type KafkaSubscriber struct {
 	Brokers []string `mapstructure:"brokers" comment:"list of kafka brokers"`
@@ -139,17 +146,43 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 	logger.Infof(context.Background(), "Starting to consume messages from topic: %s", k.Topic)
 
 	out := make(chan *sarama.ConsumerMessage, 1024)
+	var wg sync.WaitGroup
 	for _, pc := range partitionConsumers {
+		wg.Add(1)
 		go func(c sarama.PartitionConsumer) {
-			for msg := range c.Messages() {
-				out <- msg
+			defer func() {
+				logger.Debugf(context.Background(), "Partition consumer goroutine exiting")
+				wg.Done()
+			}()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg, ok := <-c.Messages():
+					if !ok {
+						return
+					}
+					select {
+					case out <- msg:
+					case <-ctx.Done():
+						return
+					}
+				}
 			}
 		}(pc)
 	}
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
 
+LOOP:
 	for messageCount < maxMessages {
 		select {
-		case msg := <-out:
+		case msg, ok := <-out:
+			if !ok {
+				break LOOP
+			}
 			if msg == nil || len(msg.Value) == 0 {
 				continue
 			}
@@ -197,6 +230,14 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 					{Key: "topic", Value: k.Topic},
 					{Key: "partition", Value: fmt.Sprintf("%d", msg.Partition)},
 				}
+				if len(msg.Headers) > 0 {
+					for _, h := range msg.Headers {
+						if h == nil || len(h.Key) == 0 {
+							continue
+						}
+						contents = append(contents, &protocol.Log_Content{Key: fmt.Sprintf("header.%s", string(h.Key)), Value: string(h.Value)})
+					}
+				}
 				if msgVal != "" {
 					contents = append(contents, &protocol.Log_Content{Key: "msg", Value: msgVal})
 				}
@@ -214,6 +255,10 @@ func (k *KafkaSubscriber) GetData(sql string, startTime int32) ([]*protocol.LogG
 			}
 			return []*protocol.LogGroup{logGroup}, nil
 		}
+	}
+
+	if messageCount == 0 {
+		return nil, fmt.Errorf("no messages received from kafka topic %s", k.Topic)
 	}
 
 	logger.Infof(context.Background(), "Successfully collected %d messages from topic %s", messageCount, k.Topic)
@@ -275,7 +320,6 @@ func init() {
 
 func extractMsgFromRaw(raw string) string {
 	// match content:"<escaped json string>"
-	reContent := regexp.MustCompile(`"content"\s*:\s*"((?:\\.|[^"\\])*)"`)
 	m := reContent.FindStringSubmatch(raw)
 	if len(m) < 2 {
 		return ""
@@ -294,7 +338,6 @@ func extractMsgFromRaw(raw string) string {
 			}
 		}
 	}
-	reMsg := regexp.MustCompile(`"msg"\s*:\s*"([^"]*)"`)
 	mm2 := reMsg.FindStringSubmatch(unescaped)
 	if len(mm2) >= 2 {
 		return mm2[1]

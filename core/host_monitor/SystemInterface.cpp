@@ -31,6 +31,8 @@
 
 #include "common/Flags.h"
 #include "logger/Logger.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #ifdef __linux__
 #include "host_monitor/LinuxSystemInterface.h"
 #endif
@@ -38,7 +40,7 @@
 #include "unittest/host_monitor/MockSystemInterface.h"
 #endif
 
-DEFINE_FLAG_INT32(system_interface_cache_queue_size, "system interface default cache size", 15);
+DEFINE_FLAG_INT32(system_interface_cache_queue_size, "system interface default cache size", 5);
 DEFINE_FLAG_INT32(system_interface_cache_entry_expire_seconds, "cache entry expire time in seconds", 60);
 DEFINE_FLAG_INT32(system_interface_cache_cleanup_interval_seconds, "cache cleanup interval in seconds", 300);
 DEFINE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size, "max entries to cleanup in one batch", 50);
@@ -311,16 +313,31 @@ bool SystemInterface::MemoizedCall(SystemInformationCache<InfoT, Args...>& cache
                                    InfoT& info,
                                    const std::string& errorType,
                                    Args... args) {
+    auto cacheSizeBefore = cache.GetCacheSize();
     if (cache.Get(now, info, args...)) {
+        auto cacheSizeAfter = cache.GetCacheSize();
+        UpdateCacheMetrics(cacheSizeBefore, cacheSizeAfter);
         return true;
     }
+
+    // Cache miss - need to call system API
     bool status = std::forward<F>(func)(info, args...);
     // We should use real time here, because input time may be delayed
     info.collectTime = time(nullptr);
+
+    // Update system operation metrics
+    UpdateSystemOpMetrics(status);
+
     if (status) {
         cache.Set(info, args...);
     } else {
         LOG_ERROR(sLogger, ("failed to get system information", errorType));
+    }
+    auto cacheSizeAfter = cache.GetCacheSize();
+    if (cacheSizeAfter > cacheSizeBefore) {
+        ADD_GAUGE(mCacheItemsSize, cacheSizeAfter - cacheSizeBefore);
+    } else {
+        SUB_GAUGE(mCacheItemsSize, cacheSizeBefore - cacheSizeAfter);
     }
     return status;
 }
@@ -368,11 +385,13 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::Set(InfoT& info, A
         info = *insertPos;
     } else {
         deque.insert(insertPos, info);
+        ++mCurrentSize;
     }
 
     // Remove oldest entries if size exceeds limit
     if (deque.size() > mCacheDequeSize) {
         deque.pop_front();
+        --mCurrentSize;
     }
 
     // Update access time
@@ -419,11 +438,13 @@ bool SystemInterface::SystemInformationCache<InfoT>::Set(InfoT& info) {
         info = *insertPos;
     } else {
         mCache.insert(insertPos, info);
+        ++mCurrentSize;
     }
 
     // Remove oldest entries if size exceeds limit
     if (mCache.size() > mCacheDequeSize) {
         mCache.pop_front();
+        --mCurrentSize;
     }
     return true;
 }
@@ -492,6 +513,7 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::ClearExpiredEntrie
 
     for (auto it = mCache.begin(); it != mCache.end() && cleanedCount < maxCleanupCount;) {
         if (now - it->second.lastAccessTime > maxAge) {
+            mCurrentSize -= it->second.data.size();
             it = mCache.erase(it);
             ++cleanedCount;
         } else {
@@ -510,7 +532,43 @@ bool SystemInterface::SystemInformationCache<InfoT, Args...>::ShouldPerformClean
 template <typename InfoT, typename... Args>
 size_t SystemInterface::SystemInformationCache<InfoT, Args...>::GetCacheSize() const {
     std::lock_guard<std::mutex> lock(mMutex);
-    return mCache.size();
+    return mCurrentSize;
+}
+
+template <typename InfoT>
+size_t SystemInterface::SystemInformationCache<InfoT>::GetCacheSize() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    return mCurrentSize;
+}
+
+void SystemInterface::InitMetrics() {
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "system_interface");
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
+
+    mSystemOpTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_TOTAL);
+    mSystemOpFailTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_OP_FAIL_TOTAL);
+    mCacheHitTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_SYSTEM_CACHE_HIT_TOTAL);
+    mCacheItemsSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SYSTEM_CACHE_ITEMS_SIZE);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+}
+
+void SystemInterface::UpdateSystemOpMetrics(bool success) {
+    ADD_COUNTER(mSystemOpTotal, 1);
+    if (!success) {
+        ADD_COUNTER(mSystemOpFailTotal, 1);
+    }
+}
+
+void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter) {
+    if (cacheSizeAfter > cacheSizeBefore) {
+        ADD_GAUGE(mCacheItemsSize, cacheSizeAfter - cacheSizeBefore);
+    } else {
+        SUB_GAUGE(mCacheItemsSize, cacheSizeBefore - cacheSizeAfter);
+    }
+    ADD_COUNTER(mCacheHitTotal, 1);
 }
 
 } // namespace logtail

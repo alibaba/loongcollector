@@ -127,7 +127,7 @@ protected:
         discoveryOpts.SetEnableContainerDiscoveryFlag(true);
         discoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
             [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
-                containerInfo.mRealBaseDir = containerInfo.mRawContainerInfo->mUpperDir;
+                containerInfo.mRealBaseDirs.push_back(containerInfo.mRawContainerInfo->mUpperDir);
                 return true;
             });
         mConfig = std::make_pair(&discoveryOpts, &ctx);

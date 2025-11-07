@@ -42,6 +42,7 @@ class PipelineConfigWatcher : public ConfigWatcher {
 public:
     PipelineConfigWatcher(const PipelineConfigWatcher&) = delete;
     PipelineConfigWatcher& operator=(const PipelineConfigWatcher&) = delete;
+    ~PipelineConfigWatcher() = default;
 
     static PipelineConfigWatcher* GetInstance() {
         static PipelineConfigWatcher instance;
@@ -50,13 +51,15 @@ public:
 
     std::pair<CollectionConfigDiff, TaskConfigDiff> CheckConfigDiff();
 
+    void FeedbackIgnoredConfigs(const CollectionConfigDiff& pDiff);
+    size_t GetBuiltInPipelineCount() const { return mBuiltInPipelineCount; }
+
 #ifdef APSARA_UNIT_TEST_MAIN
     void SetPipelineManager(const CollectionPipelineManager* pm) { mCollectionPipelineManager = pm; }
 #endif
 
 private:
     PipelineConfigWatcher();
-    ~PipelineConfigWatcher() = default;
 
     void InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
                                 TaskConfigDiff& tDiff,
@@ -90,6 +93,7 @@ private:
 
     const CollectionPipelineManager* mCollectionPipelineManager = nullptr;
     const TaskPipelineManager* mTaskPipelineManager = nullptr;
+    size_t mBuiltInPipelineCount = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SingletonInputCollectionConfigUpdateUnittest;

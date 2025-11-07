@@ -1,0 +1,132 @@
+version: '3.8'
+
+volumes:
+  kerberos_data:
+
+services:
+  kerberos-server:
+    image: ubuntu:20.04
+    hostname: kerberos-server
+    volumes:
+      - kerberos_data:/var/kerberos
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+      - KRB5_REALM=EXAMPLE.COM
+    # No host port exposure needed; services communicate within network
+    command: |
+      bash -c '
+        set -ex
+        apt-get update &&
+        apt-get install -y krb5-kdc krb5-admin-server krb5-user netcat &&
+        cp /etc/krb5.conf /etc/krb5.conf.bak &&
+        echo "[libdefaults]" > /etc/krb5.conf &&
+        echo "    default_realm = EXAMPLE.COM" >> /etc/krb5.conf &&
+        echo "    dns_lookup_realm = false" >> /etc/krb5.conf &&
+        echo "    dns_lookup_kdc = false" >> /etc/krb5.conf &&
+        echo "    rdns = false" >> /etc/krb5.conf &&
+        echo "    forwardable = true" >> /etc/krb5.conf &&
+        echo "[realms]" >> /etc/krb5.conf &&
+        echo "    EXAMPLE.COM = {" >> /etc/krb5.conf &&
+        echo "        kdc = kerberos-server:88" >> /etc/krb5.conf &&
+        echo "        admin_server = kerberos-server:749" >> /etc/krb5.conf &&
+        echo "    }" >> /etc/krb5.conf &&
+        if [ ! -f /etc/krb5kdc/kdc.conf ]; then 
+          echo "[kdcdefaults]" > /etc/krb5kdc/kdc.conf; 
+          echo " kdc_ports = 88" >> /etc/krb5kdc/kdc.conf; 
+          echo "[realms]" >> /etc/krb5kdc/kdc.conf; 
+          echo " EXAMPLE.COM = {" >> /etc/krb5kdc/kdc.conf; 
+          echo "  database_name = /var/lib/krb5kdc/principal" >> /etc/krb5kdc/kdc.conf; 
+          echo "  admin_keytab = FILE:/etc/krb5kdc/kadm5.keytab" >> /etc/krb5kdc/kdc.conf; 
+          echo "  acl_file = /etc/krb5kdc/kadm5.acl" >> /etc/krb5kdc/kdc.conf; 
+          echo "  key_stash_file = /etc/krb5kdc/stash" >> /etc/krb5kdc/kdc.conf; 
+          echo "  max_life = 10h 0m 0s" >> /etc/krb5kdc/kdc.conf; 
+          echo "  max_renewable_life = 7d 0h 0m 0s" >> /etc/krb5kdc/kdc.conf; 
+          echo " }" >> /etc/krb5kdc/kdc.conf; 
+        fi &&
+        echo "*/admin@EXAMPLE.COM *" > /etc/krb5kdc/kadm5.acl &&
+        if [ ! -f /var/lib/krb5kdc/principal ]; then echo "admin" | kdb5_util create -s -P admin; fi &&
+        service krb5-kdc start &&
+        service krb5-admin-server start &&
+        set +e
+        kadmin.local -q "addprinc -randkey admin/admin@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "delete_principal -force kafka/kafka@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "addprinc -randkey kafka/kafka@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "delete_principal -force client@EXAMPLE.COM" 2>/dev/null || true &&
+        kadmin.local -q "addprinc -randkey client@EXAMPLE.COM" 2>/dev/null || true &&
+        rm -f /var/kerberos/kafka.keytab /var/kerberos/client.keytab /var/kerberos/krb5cc &&
+        kadmin.local -q "ktadd -k /var/kerberos/kafka.keytab -norandkey kafka/kafka@EXAMPLE.COM" &&
+        kadmin.local -q "ktadd -k /var/kerberos/client.keytab -norandkey client@EXAMPLE.COM" &&
+        chmod 644 /var/kerberos/client.keytab /var/kerberos/kafka.keytab 2>/dev/null || true &&
+        # prepare shared client ccache for other containers (loongcollector, kafka client etc.)
+        export KRB5CCNAME=FILE:/var/kerberos/krb5cc && \
+        for i in $$(seq 1 6); do kinit -c /var/kerberos/krb5cc -k -t /var/kerberos/client.keytab client@EXAMPLE.COM && break; sleep 2; done && \
+        klist -c /var/kerberos/krb5cc || true && \
+        set -e
+        tail -f /dev/null
+      '
+    healthcheck:
+      test: ["CMD", "sh", "-c", "test -f /var/kerberos/kafka.keytab && test -f /var/kerberos/client.keytab && test -f /var/kerberos/krb5cc && nc -z localhost 88"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  container:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    hostname: container
+    volumes:
+      - .:/root
+      - kerberos_data:/var/kerberos:ro
+      - ./krb5.conf:/etc/krb5.conf:ro
+    environment:
+      - STDOUT_SWITCH=true
+    depends_on:
+      kerberos-server:
+        condition: service_healthy
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    hostname: zookeeper
+    expose:
+      - "2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:6.2.0
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    command: ["bash", "/usr/local/bin/kafka-entrypoint.sh"]
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_MESSAGE_MAX_BYTES: '5242880'
+      KAFKA_REPLICA_FETCH_MAX_BYTES: '6291456'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_NUM_PARTITIONS: 1
+      KAFKA_OPTS: "-Djava.security.krb5.conf=/etc/krb5.conf -Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf -Dsun.security.krb5.debug=true -Dzookeeper.sasl.client=false"
+    volumes:
+      - kerberos_data:/var/kerberos:ro
+      - ./krb5.conf:/etc/krb5.conf:ro
+      - ./kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf:ro
+      - ./kafka-entrypoint.sh:/usr/local/bin/kafka-entrypoint.sh:ro
+    depends_on:
+      kerberos-server:
+        condition: service_healthy
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

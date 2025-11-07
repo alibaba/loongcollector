@@ -578,7 +578,7 @@ bool InstanceIdentity::InitFromFile() {
         }
     }
     // 计算hostid
-    if (meta.IsValid()) {
+    if (meta.IsBasicValid()) {
         mEntity.getWriteBuffer().SetECSMeta(meta);
     }
     updateHostId(meta);
@@ -587,11 +587,19 @@ bool InstanceIdentity::InitFromFile() {
 }
 
 bool InstanceIdentity::UpdateInstanceIdentity(const ECSMeta& meta) {
-    // 如果 meta合法 且 mInstanceID 发生变化，则更新ecs元数据
-    if (meta.IsValid() && mEntity.getReadBuffer().GetEcsInstanceID() != meta.GetInstanceID()) {
+    // 如果 meta合法 且 meta的某些字段发生变化(1.克隆机器时instanceid、 vswitchid等发生变化；
+    // 2.版本升级时，如果meta接口读到了vswitchid、vpcid等信息，但本地加载的meta字段不全也会比较失败)，则更新ecs元数据
+    if ((meta.IsBasicValid()
+         && (mEntity.getReadBuffer().GetEcsInstanceID() != meta.GetInstanceID()
+             || mEntity.getReadBuffer().GetEcsUserID() != meta.GetUserID()
+             || mEntity.getReadBuffer().GetEcsRegionID() != meta.GetRegionID()))
+        || (meta.IsAllValid()
+            && (mEntity.getReadBuffer().GetEcsVpcID() != meta.GetVpcID()
+                || mEntity.getReadBuffer().GetEcsVswitchID() != meta.GetVswitchID()
+                || mEntity.getReadBuffer().GetEcsZoneID() != meta.GetZoneID()))) {
         LOG_INFO(sLogger,
                  ("ecs mInstanceID changed, old mInstanceID",
-                  mEntity.getReadBuffer().GetEcsInstanceID())("new mInstanceID", meta.GetInstanceID()));
+                  mEntity.getReadBuffer().GetECSMeta().ToString())("new mInstanceID", meta.ToString()));
         mEntity.getWriteBuffer().SetECSMeta(meta);
         updateHostId(meta);
         mEntity.swap();
@@ -626,7 +634,7 @@ void InstanceIdentity::dumpInstanceIdentityToFile() {
 
 void InstanceIdentity::updateHostId(const ECSMeta& meta) {
     Hostid newId;
-    if (meta.IsValid()) {
+    if (meta.IsBasicValid()) {
         newId = {meta.GetInstanceID().to_string(), Hostid::Type::ECS};
     } else {
         getSerialNumberFromEcsAssist();

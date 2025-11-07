@@ -55,6 +55,7 @@ public:
     bool LoadCheckpointFile();
     void DumpCheckpointFile() const;
     void ClearUnusedCheckpoints();
+    size_t GetConfigCount() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();

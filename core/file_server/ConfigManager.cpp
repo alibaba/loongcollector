@@ -240,37 +240,82 @@ bool ConfigManager::RegisterHandlers() {
     if (mSharedHandler == NULL) {
         mSharedHandler = new NormalEventHandler();
     }
-    vector<FileDiscoveryConfig> sortedConfigs;
-    vector<FileDiscoveryConfig> wildcardConfigs;
+
+    // Build and sort path items from all configs.
+    vector<PathItem> sortedPaths; // 所有精确路径（按原始 basePath 排序）
+    vector<PathItem> wildcardPaths; // 所有通配符路径
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-        if (itr->second.first->GetWildcardPaths().empty())
-            sortedConfigs.push_back(itr->second);
-        else
-            wildcardConfigs.push_back(itr->second);
-    }
-    sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
-    bool result = true;
+    BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+
+    // Check if has container config
     bool hasContainerConfig = false;
-    for (auto itr = sortedConfigs.begin(); itr != sortedConfigs.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->first;
-        if (!config->IsContainerDiscoveryEnabled()) {
-            result &= RegisterHandlers(config->GetBasePath(), *itr);
-        } else {
+    for (auto& pathItem : sortedPaths) {
+        if (pathItem.config.first->IsContainerDiscoveryEnabled()) {
             hasContainerConfig = true;
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                result &= RegisterHandlers((*config->GetContainerInfo())[i].mRealBaseDir, *itr);
+            break;
+        }
+    }
+    if (!hasContainerConfig) {
+        for (auto& pathItem : wildcardPaths) {
+            if (pathItem.config.first->IsContainerDiscoveryEnabled()) {
+                hasContainerConfig = true;
+                break;
             }
         }
     }
-    for (auto itr = wildcardConfigs.begin(); itr != wildcardConfigs.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->first;
+
+    bool result = true;
+
+    // 注册所有精确路径（已按 basePath 深度排序）
+    for (auto& pathItem : sortedPaths) {
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
         if (!config->IsContainerDiscoveryEnabled()) {
-            RegisterWildcardPath(*itr, config->GetWildcardPaths()[0], 0);
+            // 非容器：直接使用 basePath
+            result &= RegisterHandlers(pathItem.path, pathItem.config);
         } else {
-            hasContainerConfig = true;
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                RegisterWildcardPath(*itr, (*config->GetContainerInfo())[i].mRealBaseDir, 0);
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (!realBaseDir.empty()) {
+                        result &= RegisterHandlers(realBaseDir, pathItem.config);
+                    }
+                }
+            }
+        }
+    }
+
+    // 注册所有通配符路径（不排序）
+    for (auto& pathItem : wildcardPaths) {
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
+        if (!config->IsContainerDiscoveryEnabled()) {
+            // 非容器：直接使用 basePath
+            RegisterWildcardPath(pathItem.config, *pathItem.pathInfo, pathItem.pathInfo->wildcardPaths[0], 0);
+        } else {
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (!realBaseDir.empty()) {
+                        RegisterWildcardPath(pathItem.config, *pathItem.pathInfo, realBaseDir, 0);
+                    }
+                }
             }
         }
     }
@@ -280,23 +325,26 @@ bool ConfigManager::RegisterHandlers() {
     return result;
 }
 
-void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, const std::string& path, int32_t depth) {
+void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config,
+                                         const BasePathInfo& pathInfo,
+                                         const std::string& path,
+                                         int32_t depth) {
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(path)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", path));
         return;
     }
     bool finish;
-    if ((depth + 1) == ((int)config.first->GetWildcardPaths().size() - 1))
+    if ((depth + 1) == ((int)pathInfo.wildcardPaths.size() - 1))
         finish = true;
-    else if ((depth + 1) < ((int)config.first->GetWildcardPaths().size() - 1))
+    else if ((depth + 1) < ((int)pathInfo.wildcardPaths.size() - 1))
         finish = false;
     else
         return;
 
     // const path
-    if (!config.first->GetConstWildcardPaths()[depth].empty()) {
+    if (!pathInfo.constWildcardPaths[depth].empty()) {
         // stat directly
-        string item = PathJoin(path, config.first->GetConstWildcardPaths()[depth]);
+        string item = PathJoin(path, pathInfo.constWildcardPaths[depth]);
         fsutil::PathStat baseDirStat;
         if (!fsutil::PathStat::stat(item, baseDirStat)) {
             LOG_DEBUG(sLogger,
@@ -324,7 +372,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
                                                                                  : config.first->mMaxDirSearchDepth);
             }
         } else {
-            RegisterWildcardPath(config, item, depth + 1);
+            RegisterWildcardPath(config, pathInfo, item, depth + 1);
         }
         return;
     }
@@ -346,13 +394,13 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     int32_t dirCount = 0;
     while ((ent = dir.ReadNext())) {
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
-            LOG_WARNING(sLogger,
-                        ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
-                                                                                          config.first->GetBasePath()));
+            LOG_WARNING(
+                sLogger,
+                ("too many sub directoried for path", path)("dirCount", dirCount)("basePath", pathInfo.basePath));
             AlarmManager::GetInstance()->SendAlarmError(STAT_LIMIT_ALARM,
                                                         string("too many sub directoried for path:" + path
                                                                + " dirCount: " + ToString(dirCount) + " basePath"
-                                                               + config.first->GetBasePath()),
+                                                               + pathInfo.basePath),
                                                         config.second->GetRegion(),
                                                         config.second->GetProjectName(),
                                                         config.second->GetConfigName(),
@@ -366,7 +414,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         string item = PathJoin(path, ent.Name());
 
         // we should check match and then check finsh
-        size_t dirIndex = config.first->GetWildcardPaths()[depth].size() + 1;
+        size_t dirIndex = pathInfo.wildcardPaths[depth].size() + 1;
 #if defined(_MSC_VER)
         // Backward compatibility: the inner condition never happen.
         if (!BOOL_FLAG(enable_root_path_collection)) {
@@ -377,7 +425,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         // For wildcard Windows path C:\*, mWildcardPaths[0] will be C:\,
         //   so dirIndex should be adjusted by minus 1.
         else if (0 == depth) {
-            const auto& firstWildcardPath = config.first->GetWildcardPaths()[0];
+            const auto& firstWildcardPath = pathInfo.wildcardPaths[0];
             const auto pathSize = firstWildcardPath.size();
             if (pathSize >= 2 && firstWildcardPath[pathSize - 1] == PATH_SEPARATOR[0]
                 && firstWildcardPath[pathSize - 2] == ':') {
@@ -391,8 +439,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         }
 #endif
 
-        if (fnmatch(&(config.first->GetWildcardPaths()[depth + 1].at(dirIndex)), ent.Name().c_str(), FNM_PATHNAME)
-            == 0) {
+        if (fnmatch(&(pathInfo.wildcardPaths[depth + 1].at(dirIndex)), ent.Name().c_str(), FNM_PATHNAME) == 0) {
             if (finish) {
                 DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(item);
                 if (registerStatus == GET_REGISTER_STATUS_ERROR) {
@@ -410,7 +457,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
                         config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
                 }
             } else {
-                RegisterWildcardPath(config, item, depth + 1);
+                RegisterWildcardPath(config, pathInfo, item, depth + 1);
             }
         }
     }
@@ -633,7 +680,8 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
         //     continue;
         // }
 
-        bool match = config->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config->IsMatch(path, name, &matchedPathDepth);
         if (match) {
             // if force multi config, do not send alarm
             if (!name.empty() && !config->mAllowingIncludedByMultiConfigs) {
@@ -646,8 +694,9 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
                 multiConfigs.push_back(itr->second);
             }
 
-            // note: best config is the one which length is longest and create time is nearest
-            curLen = config->GetBasePath().size();
+            // note: best config is the one which depth is greatest and create time is nearest
+            // Use the actual matched path depth
+            curLen = matchedPathDepth;
             if (prevLen < curLen) {
                 prevMatch = itr->second;
                 prevLen = curLen;
@@ -710,6 +759,10 @@ int32_t ConfigManager::FindAllMatch(vector<FileDiscoveryConfig>& allConfig,
     bool alarmFlag = false;
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     auto itr = nameConfigMap.begin();
+
+    // Store matched configs with their matched path depth
+    vector<pair<FileDiscoveryConfig, int32_t>> matchedConfigsWithDepth;
+
     for (; itr != nameConfigMap.end(); ++itr) {
         const FileDiscoveryOptions* config = itr->second.first;
         // // exclude __FUSE_CONFIG__
@@ -717,18 +770,37 @@ int32_t ConfigManager::FindAllMatch(vector<FileDiscoveryConfig>& allConfig,
         //     continue;
         // }
 
-        bool match = config->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config->IsMatch(path, name, &matchedPathDepth);
         if (match) {
-            allConfig.push_back(itr->second);
+            matchedConfigsWithDepth.emplace_back(itr->second, matchedPathDepth);
         }
     }
 
-    if (!name.empty() && allConfig.size() > static_cast<size_t>(maxMultiConfigSize)) {
+    if (!name.empty() && matchedConfigsWithDepth.size() > static_cast<size_t>(maxMultiConfigSize)) {
         // only report log file alarm
         alarmFlag = true;
-        sort(allConfig.begin(), allConfig.end(), FileDiscoveryOptions::CompareByDepthAndCreateTime);
+        // Sort by matched path depth (desc) and create time (asc)
+        sort(matchedConfigsWithDepth.begin(),
+             matchedConfigsWithDepth.end(),
+             [](const pair<FileDiscoveryConfig, int32_t>& left, const pair<FileDiscoveryConfig, int32_t>& right) {
+                 if (left.second != right.second) {
+                     return left.second > right.second; // Deeper path first
+                 }
+                 return left.first.second->GetCreateTime() < right.first.second->GetCreateTime(); // Older first
+             });
+
+        // Extract configs for alarm and result
+        for (const auto& item : matchedConfigsWithDepth) {
+            allConfig.push_back(item.first);
+        }
         SendAllMatchAlarm(path, name, allConfig, maxMultiConfigSize);
         allConfig.resize(maxMultiConfigSize);
+    } else {
+        // No need to sort, just extract configs
+        for (const auto& item : matchedConfigsWithDepth) {
+            allConfig.push_back(item.first);
+        }
     }
     {
         ScopedSpinLock cachedLock(mCacheFileAllConfigMapLock);
@@ -771,7 +843,8 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
         //     continue;
         // }
 
-        bool match = config.first->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config.first->IsMatch(path, name, &matchedPathDepth);
         if (match) {
             // if force multi config, do not send alarm
             if (!name.empty() && !config.first->mAllowingIncludedByMultiConfigs) {
@@ -785,8 +858,9 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
             }
             if (!config.first->mAllowingIncludedByMultiConfigs) {
                 // if not ForceMultiConfig, find best match in normal cofigs
-                // note: best config is the one which length is longest and create time is nearest
-                curLen = config.first->GetBasePath().size();
+                // note: best config is the one which depth is greatest and create time is nearest
+                // Use the actual matched path depth
+                curLen = matchedPathDepth;
                 if (prevLen < curLen) {
                     prevMatch = config;
                     prevLen = curLen;

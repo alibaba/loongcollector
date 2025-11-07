@@ -123,7 +123,6 @@ void RelabelConfigUnittest::TestReplace() {
     configStr = configStr + R"JSON(
         [{
                 "action": "replace",
-                "regex": "(.*)",
                 "replacement": "${1}:9100",
                 "separator": ";",
                 "source_labels": [
@@ -137,7 +136,7 @@ void RelabelConfigUnittest::TestReplace() {
     APSARA_TEST_TRUE(configList.Init(configJson));
 
     Labels result = labels;
-    configList.Process(result);
+    APSARA_TEST_TRUE(configList.Process(result));
 
     APSARA_TEST_EQUAL((size_t)3, result.Size());
     APSARA_TEST_EQUAL("172.17.0.3:9100", result.Get("__address__"));

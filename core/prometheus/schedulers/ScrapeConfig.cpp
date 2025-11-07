@@ -24,6 +24,7 @@ ScrapeConfig::ScrapeConfig()
       mHonorLabels(false),
       mHonorTimestamps(true),
       mScheme("http"),
+      mHostOnlyMode(false),
       mFollowRedirects(true),
       mEnableTLS(false),
       mMaxScrapeSizeBytes(0),
@@ -192,6 +193,23 @@ bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
             return false;
         }
     }
+
+    if (scrapeConfig.isMember(prometheus::HOST_ONLY_MODE) && scrapeConfig[prometheus::HOST_ONLY_MODE].isBool()) {
+        mHostOnlyMode = scrapeConfig[prometheus::HOST_ONLY_MODE].asBool();
+    }
+
+    if (mHostOnlyMode) {
+        if (scrapeConfig.isMember(prometheus::STATIC_CONFIGS) && scrapeConfig[prometheus::STATIC_CONFIGS].isArray()) {
+            if (!InitHostOnlyMode(scrapeConfig[prometheus::STATIC_CONFIGS]) || mHostOnlyConfigs.empty()) {
+                LOG_ERROR(sLogger, ("init host only mode failed", ""));
+                return false;
+            }
+        } else {
+            LOG_ERROR(sLogger, ("static configs is not set or invalid", ""));
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -487,6 +505,42 @@ bool ScrapeConfig::InitExternalLabels(const Json::Value& externalLabels) {
     std::sort(mExternalLabels.begin(), mExternalLabels.end(), [](const auto& lhs, const auto& rhs) {
         return lhs.first < rhs.first;
     });
+    return true;
+}
+
+
+bool ScrapeConfig::InitHostOnlyMode(const Json::Value& hostOnlyConfigs) {
+    for (const auto& tmp : hostOnlyConfigs) {
+        auto tmpHostOnlyConfig = HostOnlyConfig();
+        if (tmp.isMember(prometheus::TARGETS) && tmp[prometheus::TARGETS].isArray()) {
+            for (const auto& target : tmp[prometheus::TARGETS]) {
+                if (target.isString()) {
+                    tmpHostOnlyConfig.mTargets.emplace(target.asString());
+                } else {
+                    LOG_ERROR(sLogger, ("target config error", ""));
+                    return false;
+                }
+            }
+        }
+        if (tmp.isMember(prometheus::LABELS) && tmp[prometheus::LABELS].isObject()) {
+            set<string> dups;
+            const auto& tmpLabels = tmp[prometheus::LABELS];
+            for (auto& key : tmpLabels.getMemberNames()) {
+                if (tmpLabels[key].isString()) {
+                    if (dups.find(key) != dups.end()) {
+                        LOG_ERROR(sLogger, ("duplicated key in static labels", key));
+                        return false;
+                    }
+                    dups.insert(key);
+                    tmpHostOnlyConfig.mLabels.Set(key, tmpLabels[key].asString());
+                } else {
+                    LOG_ERROR(sLogger, ("static labels config error", ""));
+                    return false;
+                }
+            }
+        }
+        mHostOnlyConfigs.emplace_back(std::move(tmpHostOnlyConfig));
+    }
     return true;
 }
 

@@ -81,7 +81,7 @@ DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
 DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
-DECLARE_FLAG_STRING(loongcollector_daemon_startup_hints);
+DEFINE_FLAG_STRING(loongcollector_daemon_startup_hints, "hints passed from daemon during startup", "");
 #endif
 
 using namespace std;
@@ -317,22 +317,31 @@ void Application::Start() { // GCOVR_EXCL_START
         }
         if (curTime - lastConfigCheckTime >= INT32_FLAG(config_scan_interval)) {
             auto configDiff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (!configDiff.first.IsEmpty()) {
+            if (configDiff.first.HasDiff()) {
                 CollectionPipelineManager::GetInstance()->UpdatePipelines(configDiff.first);
             }
-            if (!configDiff.second.IsEmpty()) {
+            // feedback ignored configs after config update ensures ignored configs are set to FAILED status
+            if (configDiff.first.HasIgnored()) {
+                PipelineConfigWatcher::GetInstance()->FeedbackIgnoredConfigs(configDiff.first);
+            }
+            if (configDiff.second.HasDiff()) {
                 TaskPipelineManager::GetInstance()->UpdatePipelines(configDiff.second);
             }
-            if (!configDiff.first.IsEmpty() || !configDiff.second.IsEmpty()) {
+            if (configDiff.first.HasDiff() || configDiff.second.HasDiff()) {
                 OnetimeConfigInfoManager::GetInstance()->DumpCheckpointFile();
             }
+            LoongCollectorMonitor::GetInstance()->SetAgentConfigTotal(
+                CollectionPipelineManager::GetInstance()->GetPipelineCount()
+                + TaskPipelineManager::GetInstance()->GetPipelineCount()
+                + OnetimeConfigInfoManager::GetInstance()->GetConfigCount()
+                - PipelineConfigWatcher::GetInstance()->GetBuiltInPipelineCount());
 
             // after every config loaded, set the flag to true
             if (lastConfigCheckTime == 0) {
                 TaskPipelineManager::GetInstance()->SetFirstCheckConfigExecuted(true);
             }
             InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-            if (!instanceConfigDiff.IsEmpty()) {
+            if (instanceConfigDiff.HasDiff()) {
                 InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
             }
             lastConfigCheckTime = curTime;

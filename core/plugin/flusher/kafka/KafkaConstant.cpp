@@ -56,4 +56,15 @@ const std::string KAFKA_CONFIG_SSL_KEY_LOCATION = "ssl.key.location";
 const std::string KAFKA_CONFIG_SSL_KEY_PASSWORD = "ssl.key.password";
 const std::string KAFKA_SECURITY_PROTOCOL_SSL = "ssl";
 
+const std::string KAFKA_CONFIG_SASL_MECHANISMS = "sasl.mechanisms";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_SERVICE_NAME = "sasl.kerberos.service.name";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_PRINCIPAL = "sasl.kerberos.principal";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_KEYTAB = "sasl.kerberos.keytab";
+const std::string KAFKA_CONFIG_SASL_KERBEROS_KINIT_CMD = "sasl.kerberos.kinit.cmd";
+const std::string KAFKA_CONFIG_SASL_USERNAME = "sasl.username";
+const std::string KAFKA_CONFIG_SASL_PASSWORD = "sasl.password";
+
+const std::string KAFKA_CONFIG_COMPRESSION_CODEC = "compression.codec";
+const std::string KAFKA_CONFIG_COMPRESSION_LEVEL = "compression.level";
+
 } // namespace logtail

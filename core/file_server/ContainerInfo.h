@@ -139,9 +139,11 @@ struct ContainerInfo {
     // 原始容器信息
     std::shared_ptr<RawContainerInfo> mRawContainerInfo;
 
-    // container path for this config's path. eg, config path '/home/admin', container path
-    // '/host_all/var/lib/xxxxxx/upper/home/admin' if config is wildcard, this will mapping to config->mWildcardPaths[0]
-    std::string mRealBaseDir;
+    // 支持多路径，与 FileDiscoveryOptions::mBasePathInfos 一一对应
+    // mRealBaseDirs[i] 是 mBasePathInfos[i] 在容器中的实际映射路径
+    // 例如：配置路径 '/home/admin'，容器路径 '/host_all/var/lib/xxxxxx/upper/home/admin'
+    // 如果某个路径映射失败，该位置存储空字符串以保持索引对应
+    std::vector<std::string> mRealBaseDirs;
 
     std::vector<std::pair<std::string, std::string>> mExtraTags; // ExternalEnvTag and ExternalK8sLabelTag.
 

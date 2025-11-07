@@ -16,9 +16,15 @@
 
 #include <iostream>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
+#include "common/Flags.h"
 #include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+
+DECLARE_FLAG_INT32(process_thread_count);
 
 using namespace std;
 
@@ -85,6 +91,22 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         }
         if (!eo->IsComplete()) {
             item->mFirstEnqueTime = chrono::system_clock::now();
+            if (mExtraBuffer.size() >= size_t(INT32_FLAG(process_thread_count) * 10)) {
+                LOG_ERROR(sLogger,
+                          ("exactly once sender queue extra buffer size is too large", "discard item")(
+                              "config-flusher-dst",
+                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("size", mExtraBuffer.size()));
+                AlarmManager::GetInstance()->SendAlarmCritical(
+                    DISCARD_DATA_ALARM,
+                    "exactly once sender queue extra buffer size is too large: discard item, config-flusher-dst: "
+                        + QueueKeyManager::GetInstance()->GetName(item->mQueueKey)
+                        + ", size: " + to_string(mExtraBuffer.size()),
+                    item->mPipeline->GetContext().GetRegion(),
+                    item->mPipeline->GetContext().GetProjectName(),
+                    item->mPipeline->GetContext().GetConfigName(),
+                    item->mPipeline->GetContext().GetLogstoreName());
+                return false;
+            }
             mExtraBuffer.push_back(std::move(item));
             return true;
         }
@@ -122,6 +144,7 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
     if (Empty()) {
         return;
     }
+    auto now = chrono::system_clock::now();
     if (limit < 0) {
         for (size_t index = 0; index < mCapacity; ++index) {
             SenderQueueItem* item = mQueue[index].get();
@@ -129,6 +152,10 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
                 continue;
             }
             if (item->mStatus.load() == SendingStatus::IDLE) {
+                // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+                if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
+                    continue;
+                }
                 item->mStatus = SendingStatus::SENDING;
                 items.emplace_back(item);
             }
@@ -151,6 +178,10 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
             }
         }
         if (item->mStatus.load() == SendingStatus::IDLE) {
+            // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+            if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
+                continue;
+            }
             --limit;
             item->mStatus = SendingStatus::SENDING;
             items.emplace_back(item);

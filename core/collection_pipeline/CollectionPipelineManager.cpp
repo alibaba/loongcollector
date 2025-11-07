@@ -40,7 +40,7 @@ namespace logtail {
 
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
-void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
+void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     // 过渡使用
     static bool isFileServerStarted = false;
     bool isFileServerInputChanged = CheckIfFileServerUpdated(diff);
@@ -187,6 +187,11 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
         res.push_back(item.first);
     }
     return res;
+}
+
+size_t CollectionPipelineManager::GetPipelineCount() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    return mPipelineNameEntityMap.size();
 }
 
 void CollectionPipelineManager::ClearInputUnusedCheckpoints() {

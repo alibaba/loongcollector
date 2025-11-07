@@ -125,14 +125,32 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
             ContainerInfo* containerPath = discoveryConfig.first->GetContainerPathByLogPath(hostLogPathDir);
             if (containerPath == nullptr) {
                 LOG_ERROR(sLogger,
-                          ("can not get container path by log path, base path",
-                           discoveryConfig.first->GetBasePath())("host path", hostLogPathDir + "/" + hostLogPathFile));
+                          ("can not get container path by log path", "")("host path",
+                                                                         hostLogPathDir + "/" + hostLogPathFile));
             } else {
-                // if config have wildcard path, use mWildcardPaths[0] as base path
-                reader->SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty()
-                                          ? discoveryConfig.first->GetWildcardPaths()[0]
-                                          : discoveryConfig.first->GetBasePath(),
-                                      containerPath->mRealBaseDir.size());
+                // if config have wildcard path, use wildcardPaths[0] as base path
+                std::string dockerPath;
+                size_t realBaseDirSize = 0;
+
+                const auto& pathInfos = discoveryConfig.first->GetBasePathInfos();
+                if (!pathInfos.empty()) {
+                    // 找到该路径对应的索引
+                    size_t realBaseDirIndex = discoveryConfig.first->GetRealBaseDirIndex(containerPath, hostLogPathDir);
+                    realBaseDirSize = containerPath->mRealBaseDirs[realBaseDirIndex].size();
+
+                    if (realBaseDirIndex < pathInfos.size()) {
+                        if (pathInfos[realBaseDirIndex].hasWildcard()) {
+                            dockerPath = pathInfos[realBaseDirIndex].wildcardPaths[0];
+                        } else {
+                            dockerPath = pathInfos[realBaseDirIndex].basePath;
+                        }
+                    } else {
+                        LOG_ERROR(sLogger,
+                                  ("can not get real base dir index by log path",
+                                   "")("host path", hostLogPathDir + "/" + hostLogPathFile));
+                    }
+                }
+                reader->SetDockerPath(dockerPath, realBaseDirSize);
                 reader->SetContainerID(containerPath->mRawContainerInfo->mID);
                 reader->SetContainerMetadatas(containerPath->mRawContainerInfo->mMetadatas);
                 reader->SetContainerCustomMetadatas(containerPath->mRawContainerInfo->mCustomMetadatas);
@@ -2501,10 +2519,27 @@ bool LogFileReader::UpdateContainerInfo() {
                  ("container info of file reader changed", "may be because container restart")(
                      "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
                      "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
-        // if config have wildcard path, use mWildcardPaths[0] as base path
-        SetDockerPath(!discoveryConfig.first->GetWildcardPaths().empty() ? discoveryConfig.first->GetWildcardPaths()[0]
-                                                                         : discoveryConfig.first->GetBasePath(),
-                      containerInfo->mRealBaseDir.size());
+        // if config have wildcard path, use wildcardPaths[0] as base path
+        std::string dockerPath;
+        size_t realBaseDirSize = 0;
+
+        const auto& pathInfos = discoveryConfig.first->GetBasePathInfos();
+        if (!pathInfos.empty()) {
+            // 找到该路径对应的索引
+            size_t realBaseDirIndex = discoveryConfig.first->GetRealBaseDirIndex(containerInfo, mHostLogPathDir);
+            realBaseDirSize = containerInfo->mRealBaseDirs[realBaseDirIndex].size();
+
+            if (realBaseDirIndex < pathInfos.size()) {
+                if (pathInfos[realBaseDirIndex].hasWildcard()) {
+                    dockerPath = pathInfos[realBaseDirIndex].wildcardPaths[0];
+                } else {
+                    dockerPath = pathInfos[realBaseDirIndex].basePath;
+                }
+            } else {
+                LOG_ERROR(sLogger, ("can not get real base dir index by log path", "")("host path", mHostLogPathDir));
+            }
+        }
+        SetDockerPath(dockerPath, realBaseDirSize);
         SetContainerID(containerInfo->mRawContainerInfo->mID);
         mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
         mContainerMetadatas.clear();

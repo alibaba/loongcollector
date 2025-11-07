@@ -47,13 +47,27 @@ func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.Async
 	}
 
 	for {
+		startTime := time.Now()
 		p.execTask(task) // execute task at least once.
+		executeTime := time.Since(startTime)
 		if exitFlag {
 			logger.Info(p.context.GetRuntimeContext(), "task run", "exit", "state", fmt.Sprintf("%T", p.state))
 			return
 		}
-		exitFlag = util.RandomSleep(p.interval, 0, cc.CancelToken())
+		timeToSleep := GetNextDelay(p.interval, executeTime)
+		if timeToSleep == 0 {
+			logger.Warningf(p.context.GetRuntimeContext(), "TASK_EXECUTE_SLOW",
+				"task execute time %v is larger than interval %v, skip sleep", executeTime, p.interval)
+		}
+		exitFlag = util.RandomSleep(timeToSleep, 0, cc.CancelToken())
 	}
+}
+
+func GetNextDelay(expectedInterval time.Duration, executeTime time.Duration) time.Duration {
+	if executeTime > expectedInterval {
+		return 0
+	}
+	return expectedInterval - executeTime
 }
 
 func (p *timerRunner) execTask(task func(state interface{}) error) {

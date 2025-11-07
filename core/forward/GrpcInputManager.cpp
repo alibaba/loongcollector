@@ -29,6 +29,7 @@
 #include <memory>
 #include <mutex>
 
+#include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
@@ -109,6 +110,24 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
                       ("GrpcInputManager", "failed to insert new address into listen inputs")("address", address));
             return false;
         }
+
+#if defined(__unix__) || defined(__linux__) || defined(__APPLE__)
+        // For Unix domain socket, check if the directory exists and is writable
+        if (StartWith(address, "unix://")) {
+            std::string socketPath = address.substr(7); // Remove "unix://" prefix
+            std::string dirPath = ParentPath(socketPath);
+            if (!CheckExistance(dirPath)) {
+                if (!Mkdirs(dirPath) || chmod(dirPath.c_str(), 0755) != 0) {
+                    // failed to create directory or change permission
+                    LOG_ERROR(
+                        sLogger,
+                        ("GrpcInputManager", "failed to create unix domain socket directory")("directory", dirPath));
+                    return false;
+                }
+            }
+        }
+#endif
+
         it = result.first;
         grpc::ServerBuilder builder;
         std::vector<std::unique_ptr<grpc::experimental::ServerInterceptorFactoryInterface>> factories;

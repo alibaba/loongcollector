@@ -71,7 +71,7 @@ private:
 };
 class Entity {
 public:
-    bool IsECSValid() const { return mECSMeta.IsValid(); }
+    bool IsECSValid() const { return mECSMeta.IsBasicValid(); }
     StringView GetEcsInstanceID() const { return mECSMeta.GetInstanceID(); }
     StringView GetEcsUserID() const { return mECSMeta.GetUserID(); }
     StringView GetEcsRegionID() const { return mECSMeta.GetRegionID(); }

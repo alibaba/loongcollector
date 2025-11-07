@@ -51,10 +51,16 @@ struct KafkaConfig {
     uint32_t MaxRetries = 3;
     uint32_t RetryBackoffMs = 100;
 
+    std::string Compression;
+    int32_t CompressionLevel = -1;
+
     std::map<std::string, std::string> CustomConfig;
 
-    // General Authentication (TLS for now)
+    // General Authentication (TLS/SASL/Kerberos)
     AuthConfig Authentication;
+
+    using HeaderEntry = std::pair<std::string, std::string>;
+    std::vector<HeaderEntry> Headers;
 
     bool Load(const Json::Value& config, std::string& errorMsg) {
         if (!GetMandatoryListParam<std::string>(config, "Brokers", Brokers, errorMsg)) {
@@ -90,12 +96,13 @@ struct KafkaConfig {
         GetOptionalUIntParam(config, "MessageTimeoutMs", MessageTimeoutMs, errorMsg);
         GetOptionalUIntParam(config, "MaxRetries", MaxRetries, errorMsg);
         GetOptionalUIntParam(config, "RetryBackoffMs", RetryBackoffMs, errorMsg);
-
         GetOptionalUIntParam(config, "QueueBufferingMaxKbytes", QueueBufferingMaxKbytes, errorMsg);
         GetOptionalUIntParam(config, "QueueBufferingMaxMessages", QueueBufferingMaxMessages, errorMsg);
-
         GetOptionalStringParam(config, "PartitionerType", PartitionerType, errorMsg);
         GetOptionalListParam<std::string>(config, "HashKeys", HashKeys, errorMsg);
+
+        GetOptionalStringParam(config, "Compression", Compression, errorMsg);
+        GetOptionalIntParam(config, "CompressionLevel", CompressionLevel, errorMsg);
 
         if (config.isMember("Authentication") && config["Authentication"].isObject()) {
             const Json::Value& auth = config["Authentication"];
@@ -104,6 +111,27 @@ struct KafkaConfig {
             }
             if (!Authentication.Validate(errorMsg)) {
                 return false;
+            }
+        }
+
+        if (config.isMember("Headers") && config["Headers"].isArray()) {
+            const Json::Value& headers = config["Headers"];
+            for (const auto& h : headers) {
+                if (!h.isObject()) {
+                    LOG_ERROR(sLogger, ("Invalid header entry: not an object", "error")("entry", h.toStyledString()));
+                    return false;
+                }
+                if (!(h.isMember("key") && h["key"].isString() && h.isMember("value") && h["value"].isString())) {
+                    LOG_ERROR(sLogger,
+                              ("Invalid header entry: missing key or value", "error")("entry", h.toStyledString()));
+                    return false;
+                }
+                const std::string keyStr = h["key"].asString();
+                if (keyStr.empty()) {
+                    LOG_ERROR(sLogger, ("Invalid header entry: key is empty", "error")("entry", h.toStyledString()));
+                    return false;
+                }
+                Headers.emplace_back(keyStr, h["value"].asString());
             }
         }
 

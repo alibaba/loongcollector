@@ -39,6 +39,7 @@
 #include "collector/MetricCalculate.h"
 #include "common/Flags.h"
 #include "common/ProcParser.h"
+#include "monitor/metric_models/MetricRecord.h"
 
 DECLARE_FLAG_INT32(system_interface_cache_queue_size);
 DECLARE_FLAG_INT32(system_interface_cache_max_cleanup_batch_size);
@@ -675,6 +676,7 @@ public:
         mutable std::mutex mMutex;
         std::unordered_map<std::tuple<Args...>, CacheEntry, TupleHash> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
         std::chrono::steady_clock::time_point mLastCleanupTime;
         int32_t mMaxCleanupCount;
         std::chrono::seconds mCleanupInterval;
@@ -691,11 +693,13 @@ public:
         SystemInformationCache(size_t cacheSize) : mCacheDequeSize(cacheSize) {}
         bool Get(time_t targetTime, InfoT& info);
         bool Set(InfoT& info);
+        size_t GetCacheSize() const;
 
     private:
         mutable std::mutex mMutex;
         std::deque<InfoT> mCache;
         size_t mCacheDequeSize;
+        size_t mCurrentSize = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
         friend class SystemInterfaceUnittest;
@@ -751,8 +755,14 @@ public:
           mExecutePathCache(cacheSize),
           mTCPStatInformationCache(cacheSize),
           mNetInterfaceInformationCache(cacheSize),
-          mGPUInformationCache(cacheSize) {}
+          mGPUInformationCache(cacheSize) {
+        InitMetrics();
+    }
     virtual ~SystemInterface() = default;
+
+    void InitMetrics();
+    void UpdateSystemOpMetrics(bool success);
+    void UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSizeAfter);
 
 private:
     template <typename F, typename InfoT, typename... Args>
@@ -805,6 +815,13 @@ private:
     SystemInformationCache<TCPStatInformation> mTCPStatInformationCache;
     SystemInformationCache<NetInterfaceInformation> mNetInterfaceInformationCache;
     SystemInformationCache<GPUInformation> mGPUInformationCache;
+
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mSystemOpTotal;
+    CounterPtr mSystemOpFailTotal;
+    CounterPtr mCacheHitTotal;
+    IntGaugePtr mCacheItemsSize;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SystemInterfaceUnittest;

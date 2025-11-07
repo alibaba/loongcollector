@@ -14,6 +14,8 @@
 
 #include "runner/FlusherRunner.h"
 
+#include <algorithm>
+
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "collection_pipeline/plugin/interface/HttpFlusher.h"
@@ -127,10 +129,20 @@ bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
             item->mStatus = SendingStatus::IDLE;
-            LOG_TRACE(
-                sLogger,
-                ("failed to build request", "retry later")("item address", item)(
-                    "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
+            ++item->mTryCnt;
+            // 计算指数回退延迟：初始100ms，最大10秒，每次重试延迟翻倍
+            // 第一次失败(mTryCnt=2)：延迟100ms；第二次失败(mTryCnt=3)：延迟200ms；以此类推
+            // 限制最大位移为7（即最大延迟约12.8秒，但会被限制到10秒）
+            const int64_t kInitialBackoffMs = 100;
+            const int64_t kMaxBackoffMs = 10000;
+            int64_t shift = std::max(0U, std::min(item->mTryCnt - 2, 7U));
+            int64_t backoffMs = std::min(kInitialBackoffMs * (1 << shift), kMaxBackoffMs);
+            auto now = chrono::system_clock::now();
+            item->mQuickFailNextRetryTime = now + chrono::milliseconds(backoffMs);
+            LOG_DEBUG(sLogger,
+                      ("failed to build request", "retry later")("item address", item)(
+                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
+                          "errMsg", errMsg)("tryCnt", item->mTryCnt)("backoffMs", backoffMs));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         } else {
             LOG_WARNING(
@@ -194,7 +206,6 @@ void FlusherRunner::Run() {
                 ADD_COUNTER(mOutItemDataSizeBytes, dataSize);
                 ADD_COUNTER(mOutItemRawDataSizeBytes, rawSize);
             }
-
             SUB_GAUGE(mWaitingItemsTotal, 1);
             ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - curTime);
         }

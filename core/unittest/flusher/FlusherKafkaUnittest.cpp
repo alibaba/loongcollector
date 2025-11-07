@@ -97,6 +97,7 @@ public:
     void TestDynamicTopic_FromTags();
     void TestPartitionerHashConfigValidation();
     void TestPartitionerHashKeySend();
+    void TestHeadersConfigured_SendWithHeaders();
     void TestInitWithTLSMinimal();
     void TestInitWithTLSFullPaths();
     void TestPartitionerHashKeyInvalidPrefix();
@@ -104,6 +105,11 @@ public:
     void TestGeneratePartitionKey_NotHash();
     void TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog();
     void TestInitTLSCertKeyMismatch();
+    void TestInitWithKerberosMinimal();
+    void TestInitWithKerberosAndTLS();
+    void TestInitWithKerberosFull();
+    void TestInitWithCompression();
+    void TestInitWithCompressionAndLevel();
 
 protected:
     void SetUp();
@@ -483,7 +489,42 @@ void FlusherKafkaUnittest::TestPartitionerHashKeySend() {
     APSARA_TEST_TRUE(keys.find("serviceA") != keys.end());
     APSARA_TEST_TRUE(keys.find("serviceB") != keys.end());
 }
+void FlusherKafkaUnittest::TestHeadersConfigured_SendWithHeaders() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    Json::Value headers(Json::arrayValue);
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "hk1";
+        h["value"] = "hv1";
+        headers.append(h);
+    }
+    {
+        Json::Value h(Json::objectValue);
+        h["key"] = "hk2";
+        h["value"] = "hv2";
+        headers.append(h);
+    }
+    config["Headers"] = headers;
 
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_TRUE(mFlusher->Start());
+
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    auto* event = group.AddLogEvent();
+    event->SetContent(StringView("k"), StringView("v"));
+
+    APSARA_TEST_TRUE(mFlusher->Send(std::move(group)));
+
+    const auto& completed = mMockProducer->GetCompletedRequests();
+    APSARA_TEST_EQUAL(1U, completed.size());
+    const auto& hdrs = completed.back().Headers;
+    APSARA_TEST_EQUAL(2U, hdrs.size());
+    APSARA_TEST_EQUAL(std::string("hk1"), hdrs[0].first);
+    APSARA_TEST_EQUAL(std::string("hv1"), hdrs[0].second);
+    APSARA_TEST_EQUAL(std::string("hk2"), hdrs[1].first);
+    APSARA_TEST_EQUAL(std::string("hv2"), hdrs[1].second);
+}
 void FlusherKafkaUnittest::TestInitWithTLSMinimal() {
     Json::Value optionalGoPipeline;
     Json::Value config = CreateKafkaTestConfig("tls-test");
@@ -500,6 +541,37 @@ void FlusherKafkaUnittest::TestInitWithTLSFullPaths() {
     config["Authentication"]["TLS"]["CertFile"] = "/tmp/does-not-need-to-exist.crt";
     config["Authentication"]["TLS"]["KeyFile"] = "/tmp/does-not-need-to-exist.key";
     config["Authentication"]["TLS"]["KeyPassword"] = "secret";
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosMinimal() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosAndTLS() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["Enabled"] = true;
+    config["Authentication"]["TLS"]["CAFile"] = "/tmp/ca.pem";
+
+    APSARA_TEST_FALSE(mFlusher->Init(config, optionalGoPipeline));
+}
+
+void FlusherKafkaUnittest::TestInitWithKerberosFull() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig("krb-test");
+    config["Authentication"]["Kerberos"]["Enabled"] = true;
+    config["Authentication"]["Kerberos"]["Mechanism"] = "GSSAPI";
+    config["Authentication"]["Kerberos"]["ServiceName"] = "kafka";
+    config["Authentication"]["Kerberos"]["Principal"] = "kafka/test@EXAMPLE.COM";
+    config["Authentication"]["Kerberos"]["Keytab"] = "/tmp/test.keytab";
+    config["Authentication"]["Kerberos"]["KinitCmd"] = "kinit -k -t %{sasl.kerberos.keytab} %{sasl.kerberos.principal}";
 
     APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
 }
@@ -576,6 +648,28 @@ void FlusherKafkaUnittest::TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog() {
     APSARA_TEST_EQUAL(std::string(""), k2);
 }
 
+void FlusherKafkaUnittest::TestInitWithCompression() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Compression"] = "gzip";
+    config["CompressionLevel"] = -1;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(std::string("gzip"), mFlusher->mKafkaConfig.Compression);
+    APSARA_TEST_EQUAL(-1, mFlusher->mKafkaConfig.CompressionLevel);
+}
+
+void FlusherKafkaUnittest::TestInitWithCompressionAndLevel() {
+    Json::Value optionalGoPipeline;
+    Json::Value config = CreateKafkaTestConfig(mTopic);
+    config["Compression"] = "lz4";
+    config["CompressionLevel"] = 2;
+
+    APSARA_TEST_TRUE(mFlusher->Init(config, optionalGoPipeline));
+    APSARA_TEST_EQUAL(std::string("lz4"), mFlusher->mKafkaConfig.Compression);
+    APSARA_TEST_EQUAL(2, mFlusher->mKafkaConfig.CompressionLevel);
+}
+
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitSuccess)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingBrokers)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitMissingTopic)
@@ -598,6 +692,7 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FallbackToStatic)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestDynamicTopic_FromTags)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashConfigValidation)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeySend)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestHeadersConfigured_SendWithHeaders)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestPartitionerHashKeyInvalidPrefix)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSMinimal)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithTLSFullPaths)
@@ -605,6 +700,11 @@ UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitTLSCertKeyMismatch)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestUnknownPartitionerType)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_NotHash)
 UNIT_TEST_CASE(FlusherKafkaUnittest, TestGeneratePartitionKey_ShortKeyAndJoinAndNonLog)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosMinimal)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosAndTLS)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithKerberosFull)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithCompression)
+UNIT_TEST_CASE(FlusherKafkaUnittest, TestInitWithCompressionAndLevel)
 
 } // namespace logtail
 

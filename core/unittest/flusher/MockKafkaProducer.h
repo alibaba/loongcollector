@@ -33,6 +33,7 @@ struct ProduceRequest {
     std::string Key;
     std::string Value;
     KafkaProducer::Callback Callback;
+    std::vector<std::pair<std::string, std::string>> Headers;
 };
 
 class MockKafkaProducer : public KafkaProducer {
@@ -43,6 +44,15 @@ public:
     bool Init(const KafkaConfig& config) override {
         mInitialized = true;
         mConfig = config;
+        mDefaultHeaders.clear();
+        if (!config.Headers.empty()) {
+            mDefaultHeaders.reserve(config.Headers.size());
+            for (const auto& kv : config.Headers) {
+                if (!kv.first.empty()) {
+                    mDefaultHeaders.emplace_back(kv);
+                }
+            }
+        }
         return mInitSuccess;
     }
 
@@ -50,7 +60,8 @@ public:
                       std::string&& value,
                       Callback callback,
                       const std::string& key = std::string()) override {
-        ProduceRequest request{topic, key, std::move(value), std::move(callback)};
+        ProduceRequest request{topic, key, std::move(value), std::move(callback), {}};
+        request.Headers = mDefaultHeaders;
         mRequests.emplace_back(std::move(request));
 
         if (mAutoComplete) {
@@ -114,6 +125,7 @@ public:
     size_t GetRequestCount() const { return mRequests.size() + mCompletedRequests.size(); }
 
 private:
+    std::vector<std::pair<std::string, std::string>> mDefaultHeaders;
     bool mInitialized = false;
     bool mClosed = false;
     bool mFlushCalled = false;

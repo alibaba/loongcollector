@@ -76,7 +76,21 @@ bool ParseECSMeta(const std::string& meta, ECSMeta& metaObj) {
     if (doc.isMember(sVswitchIdKey) && doc[sVswitchIdKey].isString()) {
         metaObj.SetVswitchID(doc[sVswitchIdKey].asString());
     }
-    return metaObj.IsValid();
+    return metaObj.IsBasicValid();
+}
+
+std::string ECSMeta::ToString() const {
+    Json::Value json;
+    json[sInstanceIdKey] = GetInstanceID().to_string();
+    json[sOwnerAccountIdKey] = GetUserID().to_string();
+    json[sRegionIdKey] = GetRegionID().to_string();
+    json[sZoneIdKey] = GetZoneID().to_string();
+    json[sVpcIdKey] = GetVpcID().to_string();
+    json[sVswitchIdKey] = GetVswitchID().to_string();
+
+    Json::StreamWriterBuilder writerBuilder;
+    writerBuilder["indentation"] = "";
+    return Json::writeString(writerBuilder, json);
 }
 
 bool ParseCredentials(const Json::Value& doc,
