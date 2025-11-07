@@ -240,9 +240,12 @@ void CollectionPipelineManager::FlushAllBatch() {
 bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& diff) {
     // private method, no need to lock mPipelineNameEntityMapMutex
     for (const auto& name : diff.mRemoved) {
-        string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        auto inputs = mPipelineNameEntityMap[name]->GetConfig()["inputs"];
+        for (const auto& input : inputs) {
+            string inputType = input["Type"].asString();
+            if (inputType == "input_file" || inputType == "input_container_stdio") {
+                return true;
+            }
         }
     }
     for (const auto& config : diff.mModified) {
@@ -262,9 +265,11 @@ bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& d
         }
     }
     for (const auto& config : diff.mAdded) {
-        string inputType = (*config.mInputs[0])["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        for (const auto& input : config.mInputs) {
+            string inputType = (*input)["Type"].asString();
+            if (inputType == "input_file" || inputType == "input_container_stdio") {
+                return true;
+            }
         }
     }
     return false;
