@@ -18,6 +18,7 @@
 
 #include <chrono>
 
+#include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -27,6 +28,8 @@
 #include "protobuf/models/ManualPBParser.h"
 #include "protobuf/models/ProtocolConversion.h"
 #include "protobuf/models/pipeline_event_group.pb.h"
+
+DEFINE_FLAG_BOOL(debug_sls_serializer, "", false);
 
 using namespace std;
 
@@ -102,15 +105,20 @@ void ProcessorParseFromPBNative::Process(std::vector<PipelineEventGroup>& eventG
                     sLogger,
                     ("error parsing PipelineEventGroup with manual parser", errMsg)("content size", content.size()));
 
-                // Fallback to original protobuf parser
-                models::PipelineEventGroup pbGroup;
-                if (!pbGroup.ParseFromArray(content.data(), content.size())
-                    || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+                if (BOOL_FLAG(debug_sls_serializer)) {
                     LOG_WARNING(sLogger,
-                                ("error transfer PB to PipelineEventGroup", errMsg)("content size", content.size()));
-                    ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
-                    continue;
+                                ("failed to parse pipeline event group", std::string(content.data(), content.size())));
+                    models::PipelineEventGroup pbGroup;
+                    if (!pbGroup.ParseFromArray(content.data(), content.size())
+                        || !TransferPBToPipelineEventGroup(pbGroup, eventGroup, errMsg)) {
+                        LOG_WARNING(sLogger,
+                                    ("error transfer PB to PipelineEventGroup with native parser",
+                                     errMsg)("content size", content.size()));
+                    }
                 }
+
+                ADD_COUNTER(mOutFailedEventGroupsTotal, 1);
+                continue;
             }
 
             // inherit metadata from original event group

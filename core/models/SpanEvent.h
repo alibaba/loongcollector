@@ -56,10 +56,10 @@ public:
 
         StringView GetTag(StringView key) const;
         bool HasTag(StringView key) const;
-        void SetTag(StringView key, StringView val, bool replace = true);
-        void SetTag(const std::string& key, const std::string& val, bool replace = true);
-        void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace = true);
-        void SetTagNoCopy(StringView key, StringView val, bool replace = true);
+        void SetTag(StringView key, StringView val);
+        void SetTag(const std::string& key, const std::string& val);
+        void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void SetTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
         std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
             return mTags.mInner.begin();
@@ -98,10 +98,10 @@ public:
 
         StringView GetTag(StringView key) const;
         bool HasTag(StringView key) const;
-        void SetTag(StringView key, StringView val, bool replace = true);
-        void SetTag(const std::string& key, const std::string& val, bool replace = true);
-        void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace = true);
-        void SetTagNoCopy(StringView key, StringView val, bool replace = true);
+        void SetTag(StringView key, StringView val);
+        void SetTag(const std::string& key, const std::string& val);
+        void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void SetTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
         std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
             return mTags.mInner.begin();
@@ -162,10 +162,10 @@ public:
 
     StringView GetTag(StringView key) const;
     bool HasTag(StringView key) const;
-    void SetTag(StringView key, StringView val, bool replace = true);
-    void SetTag(const std::string& key, const std::string& val, bool replace = true);
-    void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace = true);
-    void SetTagNoCopy(StringView key, StringView val, bool replace = true);
+    void SetTag(StringView key, StringView val);
+    void SetTag(const std::string& key, const std::string& val);
+    void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+    void SetTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
     std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }

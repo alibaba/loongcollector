@@ -28,7 +28,6 @@ class SpanEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
-    void TestTagWithReplace();
     void TestLink();
     void TestEvent();
     void TestScopeTag();
@@ -121,68 +120,6 @@ void SpanEventUnittest::TestTag() {
         mSpanEvent->DelTag(key);
         APSARA_TEST_FALSE(mSpanEvent->HasTag(key));
         APSARA_TEST_EQUAL("", mSpanEvent->GetTag(key).to_string());
-    }
-}
-
-void SpanEventUnittest::TestTagWithReplace() {
-    // test replace=true (default behavior)
-    {
-        string key = "key1";
-        string value1 = "value1";
-        mSpanEvent->SetTag(key, value1, true);
-        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
-        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
-        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
-
-        // set the same key with replace=true should replace the value
-        string value2 = "value2";
-        mSpanEvent->SetTag(key, value2, true);
-        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
-        APSARA_TEST_EQUAL_FATAL(value2, mSpanEvent->GetTag(key).to_string());
-        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
-    }
-
-    // test replace=false (append behavior)
-    {
-        SetUp();
-        string key = "key1";
-        string value1 = "value1";
-        mSpanEvent->SetTag(key, value1, false);
-        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
-        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
-        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
-
-        // set the same key with replace=false should append
-        string value2 = "value2";
-        mSpanEvent->SetTag(key, value2, false);
-        APSARA_TEST_TRUE_FATAL(mSpanEvent->HasTag(key));
-        // GetTag returns the first match
-        APSARA_TEST_EQUAL_FATAL(value1, mSpanEvent->GetTag(key).to_string());
-        APSARA_TEST_EQUAL_FATAL(2U, mSpanEvent->TagsSize());
-
-        // verify both entries exist
-        int count = 0;
-        for (auto it = mSpanEvent->TagsBegin(); it != mSpanEvent->TagsEnd(); ++it) {
-            if (it->first == key) {
-                count++;
-            }
-        }
-        APSARA_TEST_EQUAL_FATAL(2, count);
-    }
-
-    // test SetTagNoCopy with replace parameter
-    {
-        SetUp();
-        string key = "key1";
-        string value1 = "value1";
-        mSpanEvent->SetTagNoCopy(
-            mSpanEvent->GetSourceBuffer()->CopyString(key), mSpanEvent->GetSourceBuffer()->CopyString(value1), true);
-        APSARA_TEST_EQUAL_FATAL(1U, mSpanEvent->TagsSize());
-
-        string value2 = "value2";
-        mSpanEvent->SetTagNoCopy(
-            mSpanEvent->GetSourceBuffer()->CopyString(key), mSpanEvent->GetSourceBuffer()->CopyString(value2), false);
-        APSARA_TEST_EQUAL_FATAL(2U, mSpanEvent->TagsSize());
     }
 }
 
@@ -466,7 +403,6 @@ void SpanEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanEventUnittest, TestTag)
-UNIT_TEST_CASE(SpanEventUnittest, TestTagWithReplace)
 UNIT_TEST_CASE(SpanEventUnittest, TestLink)
 UNIT_TEST_CASE(SpanEventUnittest, TestEvent)
 UNIT_TEST_CASE(SpanEventUnittest, TestScopeTag)
@@ -557,14 +493,14 @@ void InnerEventUnittest::TestTagWithReplace() {
     {
         string key = "key1";
         string value1 = "value1";
-        mInnerEvent->SetTag(key, value1, true);
+        mInnerEvent->SetTag(key, value1);
         APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
 
         // set the same key with replace=true should replace the value
         string value2 = "value2";
-        mInnerEvent->SetTag(key, value2, true);
+        mInnerEvent->SetTag(key, value2);
         APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value2, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
@@ -575,14 +511,14 @@ void InnerEventUnittest::TestTagWithReplace() {
         mInnerEvent = mSpanEvent->AddEvent();
         string key = "key1";
         string value1 = "value1";
-        mInnerEvent->SetTag(key, value1, false);
+        mInnerEvent->SetTag(key, value1);
         APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mInnerEvent->TagsSize());
 
         // set the same key with replace=false should append
         string value2 = "value2";
-        mInnerEvent->SetTag(key, value2, false);
+        mInnerEvent->SetTag(key, value2);
         APSARA_TEST_TRUE_FATAL(mInnerEvent->HasTag(key));
         // GetTag returns the first match
         APSARA_TEST_EQUAL_FATAL(value1, mInnerEvent->GetTag(key).to_string());
@@ -747,14 +683,14 @@ void SpanLinkUnittest::TestTagWithReplace() {
     {
         string key = "key1";
         string value1 = "value1";
-        mLink->SetTag(key, value1, true);
+        mLink->SetTag(key, value1);
         APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
 
         // set the same key with replace=true should replace the value
         string value2 = "value2";
-        mLink->SetTag(key, value2, true);
+        mLink->SetTag(key, value2);
         APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value2, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
@@ -765,14 +701,14 @@ void SpanLinkUnittest::TestTagWithReplace() {
         mLink = mSpanEvent->AddLink();
         string key = "key1";
         string value1 = "value1";
-        mLink->SetTag(key, value1, false);
+        mLink->SetTag(key, value1);
         APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
         APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL_FATAL(1U, mLink->TagsSize());
 
         // set the same key with replace=false should append
         string value2 = "value2";
-        mLink->SetTag(key, value2, false);
+        mLink->SetTag(key, value2);
         APSARA_TEST_TRUE_FATAL(mLink->HasTag(key));
         // GetTag returns the first match
         APSARA_TEST_EQUAL_FATAL(value1, mLink->GetTag(key).to_string());

@@ -1107,6 +1107,7 @@ bool ManualPBParser::parseSpanEvent(PipelineEventGroup& eventGroup) {
     mPos = eventData + eventLength;
 
     // Set parsed values
+    spanEvent->SetTimestamp(timestamp);
     spanEvent->SetStartTimeNs(startTime);
     spanEvent->SetEndTimeNs(endTime);
 
@@ -1373,7 +1374,7 @@ bool ManualPBParser::parseSpanTags(PipelineEventGroup& /* eventGroup */, SpanEve
 
     // Set tag if both key and value are present
     if (hasKey && hasValue) {
-        spanEvent->SetTag(key, value, false);
+        spanEvent->SetTag(key, value);
     }
 
     return true;

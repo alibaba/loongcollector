@@ -29,8 +29,6 @@
 #include "models/MetricValue.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
-DEFINE_FLAG_BOOL(debug_sls_serializer, "", false);
-
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
@@ -249,19 +247,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         }
     }
     res = std::move(serializer.GetResult());
-
-    // when function stablize, remove the following logic
-    if (BOOL_FLAG(debug_sls_serializer)) {
-        sls_logs::LogGroup logGroup;
-        if (!logGroup.ParseFromString(res)) {
-            JsonEventGroupSerializer ser(const_cast<Flusher*>(mFlusher));
-            string jsonStr;
-            ser.DoSerialize(std::move(group), jsonStr, errorMsg);
-            LOG_ERROR(sLogger,
-                      ("failed to parse log group", jsonStr)("config", mFlusher->GetContext().GetConfigName()));
-            return false;
-        }
-    }
     return true;
 }
 

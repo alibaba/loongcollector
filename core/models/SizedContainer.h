@@ -64,22 +64,21 @@ class SizedVectorTags {
     friend class ProcessorPromRelabelMetricNative;
 
 public:
-    void Insert(StringView key, StringView val, bool replace = true) {
-        if (replace) {
-            auto iter
-                = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
-            if (iter != mInner.end()) {
-                mAllocatedSize -= iter->second.size();
-                mAllocatedSize += val.size();
-                iter->second = val;
-            } else {
-                mAllocatedSize += key.size() + val.size();
-                mInner.emplace_back(key, val);
-            }
+    void Insert(StringView key, StringView val) {
+        auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
+        if (iter != mInner.end()) {
+            mAllocatedSize -= iter->second.size();
+            mAllocatedSize += val.size();
+            iter->second = val;
         } else {
             mAllocatedSize += key.size() + val.size();
             mInner.emplace_back(key, val);
         }
+    }
+
+    void Ingest(StringView key, StringView val) {
+        mAllocatedSize += key.size() + val.size();
+        mInner.emplace_back(key, val);
     }
 
     void Erase(StringView key) {

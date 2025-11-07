@@ -53,20 +53,20 @@ bool SpanEvent::SpanLink::HasTag(StringView key) const {
         != mTags.mInner.end();
 }
 
-void SpanEvent::SpanLink::SetTag(StringView key, StringView val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::SpanLink::SetTag(StringView key, StringView val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::SpanLink::SetTag(const string& key, const string& val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::SpanLink::SetTag(const string& key, const string& val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::SpanLink::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace) {
-    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size), replace);
+void SpanEvent::SpanLink::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val) {
+    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }
 
-void SpanEvent::SpanLink::SetTagNoCopy(StringView key, StringView val, bool replace) {
-    mTags.Insert(key, val, replace);
+void SpanEvent::SpanLink::SetTagNoCopy(StringView key, StringView val) {
+    mTags.Ingest(key, val);
 }
 
 void SpanEvent::SpanLink::DelTag(StringView key) {
@@ -135,20 +135,20 @@ bool SpanEvent::InnerEvent::HasTag(StringView key) const {
         != mTags.mInner.end();
 }
 
-void SpanEvent::InnerEvent::SetTag(StringView key, StringView val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::InnerEvent::SetTag(StringView key, StringView val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::InnerEvent::SetTag(const string& key, const string& val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::InnerEvent::SetTag(const string& key, const string& val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::InnerEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace) {
-    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size), replace);
+void SpanEvent::InnerEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val) {
+    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }
 
-void SpanEvent::InnerEvent::SetTagNoCopy(StringView key, StringView val, bool replace) {
-    mTags.Insert(key, val, replace);
+void SpanEvent::InnerEvent::SetTagNoCopy(StringView key, StringView val) {
+    mTags.Ingest(key, val);
 }
 
 void SpanEvent::InnerEvent::DelTag(StringView key) {
@@ -255,20 +255,20 @@ bool SpanEvent::HasTag(StringView key) const {
         != mTags.mInner.end();
 }
 
-void SpanEvent::SetTag(StringView key, StringView val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::SetTag(StringView key, StringView val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::SetTag(const string& key, const string& val, bool replace) {
-    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val), replace);
+void SpanEvent::SetTag(const string& key, const string& val) {
+    SetTagNoCopy(GetSourceBuffer()->CopyString(key), GetSourceBuffer()->CopyString(val));
 }
 
-void SpanEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val, bool replace) {
-    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size), replace);
+void SpanEvent::SetTagNoCopy(const StringBuffer& key, const StringBuffer& val) {
+    SetTagNoCopy(StringView(key.data, key.size), StringView(val.data, val.size));
 }
 
-void SpanEvent::SetTagNoCopy(StringView key, StringView val, bool replace) {
-    mTags.Insert(key, val, replace);
+void SpanEvent::SetTagNoCopy(StringView key, StringView val) {
+    mTags.Ingest(key, val);
 }
 
 void SpanEvent::DelTag(StringView key) {
