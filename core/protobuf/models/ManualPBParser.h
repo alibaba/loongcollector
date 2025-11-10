@@ -109,6 +109,11 @@ private:
     size_t mSize;
     std::string mLastError;
     bool mReplaceSpanTags = true;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class ManualPBParserUnittest;
+#endif
+
 };
 
 } // namespace logtail
