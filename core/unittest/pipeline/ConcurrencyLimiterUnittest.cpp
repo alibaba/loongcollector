@@ -22,6 +22,7 @@ namespace logtail {
 class ConcurrencyLimiterUnittest : public testing::Test {
 public:
     void TestLimiter() const;
+    void TestTimeFallback() const;
 };
 
 void ConcurrencyLimiterUnittest::TestLimiter() const {
@@ -140,7 +141,89 @@ void ConcurrencyLimiterUnittest::TestLimiter() const {
     APSARA_TEST_EQUAL(expect, sConcurrencyLimiter->GetCurrentLimit());
 }
 
+void ConcurrencyLimiterUnittest::TestTimeFallback() const {
+    auto curSystemTime = chrono::system_clock::now();
+    int maxConcurrency = 80;
+    int minConcurrency = 1;
+
+    // Create limiter with time fallback enabled
+    shared_ptr<ConcurrencyLimiter> limiter
+        = make_shared<ConcurrencyLimiter>("test_time_fallback", maxConcurrency, minConcurrency, true);
+
+    // Test 1: Decrease to minimum should enter time fallback state
+    for (int i = 0; i < 10; i++) {
+        for (uint32_t j = 0; j < limiter->GetStatisticThreshold(); j++) {
+            limiter->PostPop();
+            curSystemTime = chrono::system_clock::now();
+            limiter->OnFail(curSystemTime);
+            limiter->OnSendDone();
+        }
+    }
+    APSARA_TEST_EQUAL(minConcurrency, limiter->GetCurrentLimit());
+    APSARA_TEST_TRUE(limiter->IsInTimeFallback());
+
+    // Test 2: During fallback period (< 3s), IsValidToPop should return false
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+    sleep(1);
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+    sleep(1);
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+
+    // Test 3: After 3 seconds, IsValidToPop should return true (allow one request)
+    sleep(2);
+    APSARA_TEST_TRUE(limiter->IsValidToPop());
+    limiter->PostPop();
+    APSARA_TEST_EQUAL(1U, limiter->GetInSendingCount());
+    APSARA_TEST_TRUE(limiter->IsInTimeFallback());
+
+    // Test 4: After allowing one request, timer resets, should block again for 3s
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+    sleep(2);
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+
+    // Test 5: OnSuccess should clear time fallback state
+    curSystemTime = chrono::system_clock::now();
+    limiter->OnSuccess(curSystemTime);
+    limiter->OnSendDone();
+    APSARA_TEST_FALSE(limiter->IsInTimeFallback());
+
+    // Test 6: After clearing fallback, should work normally
+    APSARA_TEST_TRUE(limiter->IsValidToPop());
+    limiter->PostPop();
+    APSARA_TEST_EQUAL(1U, limiter->GetInSendingCount());
+    limiter->OnSendDone();
+
+    // Test 7: Test multiple fallback cycles (continuous failure scenario)
+    limiter->SetCurrentLimit(minConcurrency);
+    limiter->SetInTimeFallback(true);
+    limiter->SetInSendingCount(0);
+
+    // First cycle: wait 3s, allow one request, reset timer
+    sleep(3);
+    APSARA_TEST_TRUE(limiter->IsValidToPop());
+    limiter->PostPop();
+    limiter->OnSendDone();
+
+    // Should block again immediately after the request
+    APSARA_TEST_FALSE(limiter->IsValidToPop());
+
+    // Second cycle: wait another 3s, allow one request
+    sleep(3);
+    APSARA_TEST_TRUE(limiter->IsValidToPop());
+    limiter->PostPop();
+    limiter->OnSendDone();
+
+    // Still in fallback state
+    APSARA_TEST_TRUE(limiter->IsInTimeFallback());
+
+    // Test 8: Success should immediately exit fallback
+    curSystemTime = chrono::system_clock::now();
+    limiter->OnSuccess(curSystemTime);
+    APSARA_TEST_FALSE(limiter->IsInTimeFallback());
+}
+
 UNIT_TEST_CASE(ConcurrencyLimiterUnittest, TestLimiter)
+UNIT_TEST_CASE(ConcurrencyLimiterUnittest, TestTimeFallback)
 
 } // namespace logtail
 

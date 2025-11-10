@@ -42,6 +42,19 @@ uint32_t ConcurrencyLimiter::GetStatisticThreshold() const {
     return CONCURRENCY_STATISTIC_THRESHOLD;
 }
 
+bool ConcurrencyLimiter::IsInTimeFallback() const {
+    lock_guard<mutex> lock(mLimiterMux);
+    return mInTimeFallback;
+}
+
+void ConcurrencyLimiter::SetInTimeFallback(bool inFallback) {
+    lock_guard<mutex> lock(mLimiterMux);
+    mInTimeFallback = inFallback;
+    if (inFallback) {
+        mTimeFallbackStartTime = std::chrono::system_clock::now();
+    }
+}
+
 #endif
 
 bool ConcurrencyLimiter::IsValidToPop() {
