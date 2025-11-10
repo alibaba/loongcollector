@@ -159,9 +159,13 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         }
 
         metricEvent->SetTimestamp(netInterfaces.collectTime, 0);
-        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, hostname);
-        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, curname);
-        metricEvent->SetTagNoCopy(TAG_KEY_IP, mDevIp[curname]);
+        const StringBuffer& hostnameBuffer = metricEvent->GetSourceBuffer()->CopyString(hostname);
+        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, StringView(hostnameBuffer.data, hostnameBuffer.size));
+        const StringBuffer& curnameBuffer = metricEvent->GetSourceBuffer()->CopyString(curname);
+        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, StringView(curnameBuffer.data, curnameBuffer.size));
+        const StringBuffer& ipBuffer = metricEvent->GetSourceBuffer()->CopyString(mDevIp[curname]);
+        metricEvent->SetTagNoCopy(TAG_KEY_IP, StringView(ipBuffer.data, ipBuffer.size));
+
         metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_NET_ORIGINAL);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();

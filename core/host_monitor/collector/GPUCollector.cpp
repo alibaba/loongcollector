@@ -143,7 +143,9 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             return false;
         }
         metricEvent->SetTimestamp(gpuInfo.collectTime, 0);
-        metricEvent->SetTagNoCopy(TAG_KEY_GPU_ID, mCalculate.first);
+        const StringBuffer& gpuIdBuffer = metricEvent->GetSourceBuffer()->CopyString(mCalculate.first);
+        metricEvent->SetTagNoCopy(TAG_KEY_GPU_ID, StringView(gpuIdBuffer.data, gpuIdBuffer.size));
+
         metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_GPU);
 
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);

@@ -160,10 +160,15 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
         }
 
         metricEvent->SetTimestamp(diskSerialIdInfo.collectTime, 0);
-        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, hostname);
-        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, devName);
-        metricEvent->SetTagNoCopy(TAG_KEY_ID_SERIAL, diskSerialId);
-        metricEvent->SetTagNoCopy(TAG_KEY_DISKNAME, dirName);
+        const StringBuffer& hostnameBuffer = metricEvent->GetSourceBuffer()->CopyString(hostname);
+        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, StringView(hostnameBuffer.data, hostnameBuffer.size));
+        const StringBuffer& devNameBuffer = metricEvent->GetSourceBuffer()->CopyString(devName);
+        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, StringView(devNameBuffer.data, devNameBuffer.size));
+        const StringBuffer& diskSerialIdBuffer = metricEvent->GetSourceBuffer()->CopyString(diskSerialId);
+        metricEvent->SetTagNoCopy(TAG_KEY_ID_SERIAL, StringView(diskSerialIdBuffer.data, diskSerialIdBuffer.size));
+        const StringBuffer& dirNameBuffer = metricEvent->GetSourceBuffer()->CopyString(dirName);
+        metricEvent->SetTagNoCopy(TAG_KEY_DISKNAME, StringView(dirNameBuffer.data, dirNameBuffer.size));
+
         metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_DISK);
 
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
