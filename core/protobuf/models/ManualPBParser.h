@@ -113,7 +113,6 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ManualPBParserUnittest;
 #endif
-
 };
 
 } // namespace logtail
