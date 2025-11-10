@@ -1133,10 +1133,8 @@ void ManualPBParserUnittest::TestReadVarint32Success() {
         ManualPBParser parser(data, testCase.second.size(), false);
         uint32_t value = 0;
 
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint32(parser, value),
-                              "Should successfully read varint32");
-        APSARA_TEST_EQUAL_DESC(
-            testCase.first, value, std::string("Value should match expected: ") + std::to_string(testCase.first));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadVarint32(parser, value));
+        APSARA_TEST_EQUAL_FATAL(testCase.first, value);
     }
 }
 
@@ -1198,10 +1196,8 @@ void ManualPBParserUnittest::TestReadVarint64Success() {
         ManualPBParser parser(data, testCase.second.size(), false);
         uint64_t value = 0;
 
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint64(parser, value),
-                              "Should successfully read varint64");
-        APSARA_TEST_EQUAL_DESC(
-            testCase.first, value, std::string("Value should match expected: ") + std::to_string(testCase.first));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadVarint64(parser, value));
+        APSARA_TEST_EQUAL_FATAL(testCase.first, value);
     }
 }
 
@@ -1225,10 +1221,8 @@ void ManualPBParserUnittest::TestReadFixed32Success() {
         ManualPBParser parser(encoded.data(), encoded.size(), false);
         uint32_t value = 0;
 
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadFixed32(parser, value),
-                              "Should successfully read fixed32");
-        APSARA_TEST_EQUAL_DESC(
-            expectedValue, value, std::string("Value should match expected: 0x") + std::to_string(expectedValue));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadFixed32(parser, value));
+        APSARA_TEST_EQUAL_FATAL(expectedValue, value);
     }
 }
 
@@ -1272,10 +1266,8 @@ void ManualPBParserUnittest::TestReadFixed64Success() {
         ManualPBParser parser(encoded.data(), encoded.size(), false);
         uint64_t value = 0;
 
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadFixed64(parser, value),
-                              "Should successfully read fixed64");
-        APSARA_TEST_EQUAL_DESC(
-            expectedValue, value, std::string("Value should match expected: 0x") + std::to_string(expectedValue));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadFixed64(parser, value));
+        APSARA_TEST_EQUAL_FATAL(expectedValue, value);
     }
 }
 
@@ -1297,14 +1289,12 @@ void ManualPBParserUnittest::TestReadLengthDelimitedSuccess() {
         const uint8_t* data = nullptr;
         size_t length = 0;
 
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadLengthDelimited(parser, data, length),
-                              "Should successfully read length-delimited data");
-        APSARA_TEST_EQUAL_DESC(
-            testStr.length(), length, std::string("Length should match: ") + std::to_string(testStr.length()));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadLengthDelimited(parser, data, length));
+        APSARA_TEST_EQUAL_FATAL(testStr.length(), length);
 
         if (length > 0 && data != nullptr) {
             std::string result(static_cast<const char*>(static_cast<const void*>(data)), length);
-            APSARA_TEST_EQUAL_DESC(testStr, result, std::string("Data content should match"));
+            APSARA_TEST_EQUAL_FATAL(testStr, result);
         }
     }
 }
@@ -1360,8 +1350,8 @@ void ManualPBParserUnittest::TestParsePipelineEventGroupNullData() {
     string errMsg;
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should fail with null data");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Empty or null") != string::npos, "Error message should mention empty or null");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Empty or null") != string::npos);
 }
 
 // Test case 12: ParsePipelineEventGroup_EmptyData - empty data
@@ -1373,7 +1363,7 @@ void ManualPBParserUnittest::TestParsePipelineEventGroupEmptyData() {
     string errMsg;
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should fail with empty data");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
 }
 
 // Test case 13: ParsePipelineEventGroup_InvalidTag - invalid tag
@@ -1386,9 +1376,8 @@ void ManualPBParserUnittest::TestParsePipelineEventGroupInvalidTag() {
     string errMsg;
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should fail with invalid tag");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Failed to read field tag") != string::npos,
-                          "Error message should mention failed to read field tag");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Failed to read field tag") != string::npos);
 }
 
 // Test case 14: ParsePipelineEventGroup_InvalidWireType - wrong wire type for unknown field
@@ -1405,7 +1394,7 @@ void ManualPBParserUnittest::TestParsePipelineEventGroupInvalidWireType() {
     string errMsg;
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should fail with unknown wire type");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
 }
 
 // Test case 15: ParseMetadata_InvalidWireType - Metadata field with wrong wire type
@@ -1425,9 +1414,8 @@ void ManualPBParserUnittest::TestParseMetadataInvalidWireType() {
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
                            "Should fail with invalid wire type for Metadata");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Invalid wire type for Metadata") != string::npos,
-                          "Error message should mention Metadata wire type");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Invalid wire type for Metadata") != string::npos);
 }
 
 // Test case 16: ParseTags_InvalidWireType - Tags field with wrong wire type
@@ -1448,9 +1436,8 @@ void ManualPBParserUnittest::TestParseTagsInvalidWireType() {
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
                            "Should fail with invalid wire type for Tags");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Invalid wire type for Tags") != string::npos,
-                          "Error message should mention Tags wire type");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Invalid wire type for Tags") != string::npos);
 }
 
 // Test case 17: ParseLogEvents_InvalidWireType - Logs field with wrong wire type
@@ -1471,9 +1458,8 @@ void ManualPBParserUnittest::TestParseLogEventsInvalidWireType() {
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
                            "Should fail with invalid wire type for Logs");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Invalid wire type for Logs") != string::npos,
-                          "Error message should mention Logs wire type");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Invalid wire type for Logs") != string::npos);
 }
 
 // Test case 18: ParseMetricEvents_InvalidWireType - Metrics field with wrong wire type
@@ -1493,9 +1479,8 @@ void ManualPBParserUnittest::TestParseMetricEventsInvalidWireType() {
 
     APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
                            "Should fail with invalid wire type for Metrics");
-    APSARA_TEST_TRUE_DESC(!errMsg.empty(), "Error message should not be empty");
-    APSARA_TEST_TRUE_DESC(errMsg.find("Invalid wire type for Metrics") != string::npos,
-                          "Error message should mention Metrics wire type");
+    APSARA_TEST_TRUE_FATAL(!errMsg.empty());
+    APSARA_TEST_TRUE_FATAL(errMsg.find("Invalid wire type for Metrics") != string::npos);
 }
 
 // ============================================================================
@@ -1516,9 +1501,8 @@ void ManualPBParserUnittest::TestParseLogEventComplete() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse complete LogEvent");
-    APSARA_TEST_EQUAL_DESC(1U, eventGroup.GetEvents().size(), std::string("Should have 1 event"));
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
+    APSARA_TEST_EQUAL_FATAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
     APSARA_TEST_EQUAL(1234567890ULL, logEvent.GetTimestamp());
@@ -1547,8 +1531,7 @@ void ManualPBParserUnittest::TestParseLogEventMinimalFields() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse minimal LogEvent");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -1606,7 +1589,7 @@ void ManualPBParserUnittest::TestParseLogEventWithLevel() {
         APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
         const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_EQUAL_DESC(level, logEvent.GetLevel().to_string(), std::string("Level should match: ") + level);
+        APSARA_TEST_EQUAL_FATAL(level, logEvent.GetLevel().to_string());
     }
 }
 
@@ -1705,7 +1688,7 @@ void ManualPBParserUnittest::TestParseLogEventMultipleEvents() {
     string errMsg;
 
     APSARA_TEST_TRUE(parser.ParsePipelineEventGroup(eventGroup, errMsg));
-    APSARA_TEST_EQUAL_DESC(3U, eventGroup.GetEvents().size(), std::string("Should have 3 events"));
+    APSARA_TEST_EQUAL_FATAL(3U, eventGroup.GetEvents().size());
 
     // Verify first event
     const auto& logEvent1 = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -1744,8 +1727,7 @@ void ManualPBParserUnittest::TestParseMetricEventComplete() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse complete MetricEvent");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
@@ -1859,9 +1841,7 @@ void ManualPBParserUnittest::TestParseMetricEventDoubleValue() {
         APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
         const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
-        APSARA_TEST_EQUAL_DESC(expectedValue,
-                               metricEvent.GetValue<UntypedSingleValue>()->mValue,
-                               std::string("Value should match: ") + std::to_string(expectedValue));
+        APSARA_TEST_EQUAL_FATAL(expectedValue, metricEvent.GetValue<UntypedSingleValue>()->mValue);
     }
 }
 
@@ -2010,8 +1990,7 @@ void ManualPBParserUnittest::TestParseSpanEventComplete() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse complete SpanEvent");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -2300,8 +2279,7 @@ void ManualPBParserUnittest::TestParseMapFieldEmpty() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse without metadata/tags fields");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     // No metadata/tags fields should result in empty tags
     APSARA_TEST_TRUE(eventGroup.GetTags().empty());
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
@@ -2448,8 +2426,7 @@ void ManualPBParserUnittest::TestParseMapFieldUnknownFieldNumber() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse map entry with unknown field (skip it)");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("api-server", eventGroup.GetTag("service").to_string());
 }
@@ -2481,8 +2458,7 @@ void ManualPBParserUnittest::TestSkipFieldVarint() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip unknown varint field and parse valid data");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("value", eventGroup.GetTag("test").to_string());
 }
@@ -2510,8 +2486,7 @@ void ManualPBParserUnittest::TestSkipFieldFixed32() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip unknown fixed32 field and parse valid data");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("prod", eventGroup.GetTag("env").to_string());
 }
@@ -2539,8 +2514,7 @@ void ManualPBParserUnittest::TestSkipFieldFixed64() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip unknown fixed64 field and parse valid data");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("us-east-1", eventGroup.GetTag("region").to_string());
 }
@@ -2568,8 +2542,7 @@ void ManualPBParserUnittest::TestSkipFieldLengthDelimited() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip unknown length-delimited field and parse valid data");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("web-api", eventGroup.GetTag("service").to_string());
 }
@@ -2631,8 +2604,7 @@ void ManualPBParserUnittest::TestUnknownFieldInPipelineEventGroup() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip all unknown fields and parse all valid fields");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(3U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL("value1", eventGroup.GetTag("key1").to_string());
     APSARA_TEST_EQUAL("value2", eventGroup.GetTag("key2").to_string());
@@ -2679,8 +2651,7 @@ void ManualPBParserUnittest::TestMixedEventTypes() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse mixed event types");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(3U, eventGroup.GetEvents().size());
 
     // Verify LogEvent
@@ -2785,8 +2756,7 @@ void ManualPBParserUnittest::TestMixedEventsWithUnknownFields() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should parse mixed events and skip unknown fields");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(2U, eventGroup.GetEvents().size());
 }
 
@@ -2847,8 +2817,7 @@ void ManualPBParserUnittest::TestComplexNestedStructure() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse complex nested structure");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(2U, eventGroup.GetEvents().size());
     APSARA_TEST_EQUAL(2U, eventGroup.GetTags().size());
 
@@ -2891,8 +2860,7 @@ void ManualPBParserUnittest::TestLargeScaleMixedData() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse large scale mixed data");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(20U, eventGroup.GetEvents().size());
 
     // Verify first and last events
@@ -2926,8 +2894,7 @@ void ManualPBParserUnittest::TestEmptyStrings() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse empty strings");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -2955,8 +2922,7 @@ void ManualPBParserUnittest::TestVeryLargeVarint() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse very large varint");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -3003,8 +2969,7 @@ void ManualPBParserUnittest::TestMaximumNesting() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse maximum nesting");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -3051,7 +3016,7 @@ void ManualPBParserUnittest::TestZeroValues() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should successfully parse zero values");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(3U, eventGroup.GetEvents().size());
 
     // Verify zero values
@@ -3097,8 +3062,7 @@ void ManualPBParserUnittest::TestLargeNumberOfFields() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse large number of fields");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(50U, eventGroup.GetTags().size());
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
@@ -3137,8 +3101,7 @@ void ManualPBParserUnittest::TestParseSpanLinkComplete() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse SpanEvent with complete SpanLink");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -3237,7 +3200,7 @@ void ManualPBParserUnittest::TestParseSpanLinkMultipleLinks() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg), "Should parse multiple SpanLinks");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -3442,8 +3405,7 @@ void ManualPBParserUnittest::TestParseSpanLinkWithUnknownFields() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should skip unknown field and parse SpanLink successfully");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -3770,8 +3732,7 @@ void ManualPBParserUnittest::TestVarint64MaxValueParsing() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse maximum varint64 value");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -3817,8 +3778,7 @@ void ManualPBParserUnittest::TestLengthDelimitedZeroLength() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse zero-length strings");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -3846,8 +3806,7 @@ void ManualPBParserUnittest::TestLengthDelimitedVeryLarge() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse very large string (1MB)");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -3884,8 +3843,7 @@ void ManualPBParserUnittest::TestSpanEventAllFieldsMaxValues() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse SpanEvent with max values");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -3916,8 +3874,7 @@ void ManualPBParserUnittest::TestMetricEventNegativeDoubleValue() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse negative double value");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
@@ -3946,8 +3903,7 @@ void ManualPBParserUnittest::TestLogEventTimestampZeroValue() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse zero timestamp");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -4007,8 +3963,7 @@ void ManualPBParserUnittest::TestDeepNestedSpanEventStructure() {
     PipelineEventGroup eventGroup(sourceBuffer);
     string errMsg;
 
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse deeply nested SpanEvent structure");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
@@ -4098,8 +4053,7 @@ void ManualPBParserUnittest::TestSkipFieldNestedLengthDelimited() {
     string errMsg;
 
     // Should successfully parse and skip the nested unknown field
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse with nested unknown field");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 }
 
@@ -4148,8 +4102,7 @@ void ManualPBParserUnittest::TestSkipFieldMultipleConsecutive() {
     string errMsg;
 
     // Should successfully skip all unknown fields and parse the LogEvent
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip multiple consecutive unknown fields");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -4197,8 +4150,7 @@ void ManualPBParserUnittest::TestSkipFieldAfterPartialParse() {
     string errMsg;
 
     // Should successfully parse first LogEvent, skip unknowns, and parse second LogEvent
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully parse with unknown fields in the middle");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(2U, eventGroup.GetEvents().size());
 
     const auto& logEvent1 = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -4240,8 +4192,7 @@ void ManualPBParserUnittest::TestSkipFieldLargeVarint() {
     string errMsg;
 
     // Should successfully skip large varints and parse the LogEvent
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should successfully skip large varint values");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -4891,9 +4842,7 @@ void ManualPBParserUnittest::TestSpanEventKindEnum() {
         APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
         const SpanEvent& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
-        APSARA_TEST_EQUAL_DESC(static_cast<uint32_t>(expectedKinds[i]),
-                               static_cast<uint32_t>(spanEvent.GetKind()),
-                               "SpanEvent Kind should match");
+        APSARA_TEST_EQUAL_FATAL(static_cast<uint32_t>(expectedKinds[i]), static_cast<uint32_t>(spanEvent.GetKind()));
     }
 }
 
@@ -4917,9 +4866,8 @@ void ManualPBParserUnittest::TestSpanEventStatusEnum() {
         APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
         const SpanEvent& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
-        APSARA_TEST_EQUAL_DESC(static_cast<uint32_t>(expectedStatuses[i]),
-                               static_cast<uint32_t>(spanEvent.GetStatus()),
-                               "SpanEvent Status should match");
+        APSARA_TEST_EQUAL_FATAL(static_cast<uint32_t>(expectedStatuses[i]),
+                                static_cast<uint32_t>(spanEvent.GetStatus()));
     }
 }
 
@@ -4974,8 +4922,7 @@ void ManualPBParserUnittest::TestMetricEventFixed32Value() {
 
     // Note: The current parser only handles Fixed64 for UntypedSingleValue
     // This test verifies that Fixed32 is properly skipped (not causing errors)
-    APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
-                          "Should parse MetricEvent even with Fixed32 value field");
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 }
 
@@ -5459,9 +5406,8 @@ void ManualPBParserUnittest::TestVarint32MultiByteEncoding() {
         ManualPBParser parser(encoded.data(), encoded.size(), false);
 
         uint32_t decoded = 0;
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint32(parser, decoded),
-                              "Should decode varint32 value: " + std::to_string(value));
-        APSARA_TEST_EQUAL_DESC(value, decoded, "Decoded value should match: " + std::to_string(value));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadVarint32(parser, decoded));
+        APSARA_TEST_EQUAL_FATAL(value, decoded);
     }
 }
 
@@ -5492,9 +5438,8 @@ void ManualPBParserUnittest::TestVarint64MultiByteEncoding() {
         ManualPBParser parser(encoded.data(), encoded.size(), false);
 
         uint64_t decoded = 0;
-        APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint64(parser, decoded),
-                              "Should decode varint64 value: " + std::to_string(value));
-        APSARA_TEST_EQUAL_DESC(value, decoded, "Decoded value should match: " + std::to_string(value));
+        APSARA_TEST_TRUE_FATAL(ManualPBParserTestHelper::TestReadVarint64(parser, decoded));
+        APSARA_TEST_EQUAL_FATAL(value, decoded);
     }
 }
 
