@@ -1374,7 +1374,7 @@ bool ManualPBParser::parseSpanTags(PipelineEventGroup& /* eventGroup */, SpanEve
 
     // Set tag if both key and value are present
     if (hasKey && hasValue) {
-        spanEvent->IngestTag(key, value);
+        spanEvent->AppendTag(key, value);
     }
 
     return true;
@@ -1726,7 +1726,7 @@ bool ManualPBParser::parseSpanInnerEventTags(PipelineEventGroup& /* eventGroup *
 
     // Set tag if both key and value are present
     if (hasKey && hasValue) {
-        innerEvent->IngestTag(key, value);
+        innerEvent->AppendTag(key, value);
     }
 
     return true;
@@ -1803,7 +1803,7 @@ bool ManualPBParser::parseSpanLinkTags(PipelineEventGroup& /* eventGroup */,
 
     // Set tag if both key and value are present
     if (hasKey && hasValue) {
-        spanLink->IngestTag(key, value);
+        spanLink->AppendTag(key, value);
     }
 
     return true;

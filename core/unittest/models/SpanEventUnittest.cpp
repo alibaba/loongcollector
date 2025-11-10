@@ -28,7 +28,7 @@ class SpanEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
-    void TestIngestTag();
+    void TestAppendTag();
     void TestLink();
     void TestEvent();
     void TestScopeTag();
@@ -124,51 +124,51 @@ void SpanEventUnittest::TestTag() {
     }
 }
 
-void SpanEventUnittest::TestIngestTag() {
+void SpanEventUnittest::TestAppendTag() {
     {
-        // Test IngestTag with string
+        // Test AppendTag with string
         string key = "key1";
         string value = "value1";
-        mSpanEvent->IngestTag(key, value);
+        mSpanEvent->AppendTag(key, value);
         APSARA_TEST_TRUE(mSpanEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mSpanEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(1U, mSpanEvent->TagsSize());
     }
     {
-        // Test IngestTag with StringView
+        // Test AppendTag with StringView
         string key = "key2";
         string value = "value2";
-        mSpanEvent->IngestTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
+        mSpanEvent->AppendTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
         APSARA_TEST_TRUE(mSpanEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mSpanEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(2U, mSpanEvent->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringBuffer
+        // Test AppendTagNoCopy with StringBuffer
         string key = "key3";
         string value = "value3";
-        mSpanEvent->IngestTagNoCopy(mSpanEvent->GetSourceBuffer()->CopyString(key),
+        mSpanEvent->AppendTagNoCopy(mSpanEvent->GetSourceBuffer()->CopyString(key),
                                     mSpanEvent->GetSourceBuffer()->CopyString(value));
         APSARA_TEST_TRUE(mSpanEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mSpanEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(3U, mSpanEvent->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringView
+        // Test AppendTagNoCopy with StringView
         string key = "key4";
         string value = "value4";
         const StringBuffer& kb = mSpanEvent->GetSourceBuffer()->CopyString(key);
         const StringBuffer& vb = mSpanEvent->GetSourceBuffer()->CopyString(value);
-        mSpanEvent->IngestTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
+        mSpanEvent->AppendTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
         APSARA_TEST_TRUE(mSpanEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mSpanEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(4U, mSpanEvent->TagsSize());
     }
     {
-        // Test IngestTag allows duplicates - add same key multiple times
+        // Test AppendTag allows duplicates - add same key multiple times
         string key = "key1";
         string value2 = "value1_duplicate";
-        mSpanEvent->IngestTag(key, value2);
+        mSpanEvent->AppendTag(key, value2);
         APSARA_TEST_EQUAL(5U, mSpanEvent->TagsSize());
         // GetTag returns the first match
         APSARA_TEST_EQUAL("value1", mSpanEvent->GetTag(key).to_string());
@@ -464,7 +464,7 @@ void SpanEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanEventUnittest, TestTag)
-UNIT_TEST_CASE(SpanEventUnittest, TestIngestTag)
+UNIT_TEST_CASE(SpanEventUnittest, TestAppendTag)
 UNIT_TEST_CASE(SpanEventUnittest, TestLink)
 UNIT_TEST_CASE(SpanEventUnittest, TestEvent)
 UNIT_TEST_CASE(SpanEventUnittest, TestScopeTag)
@@ -477,7 +477,7 @@ class InnerEventUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
-    void TestIngestTag();
+    void TestAppendTag();
     void TestSize();
     void TestToJson();
     void TestFromJson();
@@ -550,51 +550,51 @@ void InnerEventUnittest::TestTag() {
     }
 }
 
-void InnerEventUnittest::TestIngestTag() {
+void InnerEventUnittest::TestAppendTag() {
     {
-        // Test IngestTag with string
+        // Test AppendTag with string
         string key = "key1";
         string value = "value1";
-        mInnerEvent->IngestTag(key, value);
+        mInnerEvent->AppendTag(key, value);
         APSARA_TEST_TRUE(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(1U, mInnerEvent->TagsSize());
     }
     {
-        // Test IngestTag with StringView
+        // Test AppendTag with StringView
         string key = "key2";
         string value = "value2";
-        mInnerEvent->IngestTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
+        mInnerEvent->AppendTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
         APSARA_TEST_TRUE(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(2U, mInnerEvent->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringBuffer
+        // Test AppendTagNoCopy with StringBuffer
         string key = "key3";
         string value = "value3";
-        mInnerEvent->IngestTagNoCopy(mInnerEvent->GetSourceBuffer()->CopyString(key),
+        mInnerEvent->AppendTagNoCopy(mInnerEvent->GetSourceBuffer()->CopyString(key),
                                      mInnerEvent->GetSourceBuffer()->CopyString(value));
         APSARA_TEST_TRUE(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(3U, mInnerEvent->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringView
+        // Test AppendTagNoCopy with StringView
         string key = "key4";
         string value = "value4";
         const StringBuffer& kb = mInnerEvent->GetSourceBuffer()->CopyString(key);
         const StringBuffer& vb = mInnerEvent->GetSourceBuffer()->CopyString(value);
-        mInnerEvent->IngestTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
+        mInnerEvent->AppendTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
         APSARA_TEST_TRUE(mInnerEvent->HasTag(key));
         APSARA_TEST_EQUAL(value, mInnerEvent->GetTag(key).to_string());
         APSARA_TEST_EQUAL(4U, mInnerEvent->TagsSize());
     }
     {
-        // Test IngestTag allows duplicates - add same key multiple times
+        // Test AppendTag allows duplicates - add same key multiple times
         string key = "key1";
         string value2 = "value1_duplicate";
-        mInnerEvent->IngestTag(key, value2);
+        mInnerEvent->AppendTag(key, value2);
         APSARA_TEST_EQUAL(5U, mInnerEvent->TagsSize());
         // GetTag returns the first match
         APSARA_TEST_EQUAL("value1", mInnerEvent->GetTag(key).to_string());
@@ -669,7 +669,7 @@ void InnerEventUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(InnerEventUnittest, TestSimpleFields)
 UNIT_TEST_CASE(InnerEventUnittest, TestTag)
-UNIT_TEST_CASE(InnerEventUnittest, TestIngestTag)
+UNIT_TEST_CASE(InnerEventUnittest, TestAppendTag)
 UNIT_TEST_CASE(InnerEventUnittest, TestSize)
 UNIT_TEST_CASE(InnerEventUnittest, TestToJson)
 UNIT_TEST_CASE(InnerEventUnittest, TestFromJson)
@@ -678,7 +678,7 @@ class SpanLinkUnittest : public ::testing::Test {
 public:
     void TestSimpleFields();
     void TestTag();
-    void TestIngestTag();
+    void TestAppendTag();
     void TestSize();
     void TestToJson();
     void TestFromJson();
@@ -753,50 +753,50 @@ void SpanLinkUnittest::TestTag() {
     }
 }
 
-void SpanLinkUnittest::TestIngestTag() {
+void SpanLinkUnittest::TestAppendTag() {
     {
-        // Test IngestTag with string
+        // Test AppendTag with string
         string key = "key1";
         string value = "value1";
-        mLink->IngestTag(key, value);
+        mLink->AppendTag(key, value);
         APSARA_TEST_TRUE(mLink->HasTag(key));
         APSARA_TEST_EQUAL(value, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL(1U, mLink->TagsSize());
     }
     {
-        // Test IngestTag with StringView
+        // Test AppendTag with StringView
         string key = "key2";
         string value = "value2";
-        mLink->IngestTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
+        mLink->AppendTag(StringView(key.data(), key.size()), StringView(value.data(), value.size()));
         APSARA_TEST_TRUE(mLink->HasTag(key));
         APSARA_TEST_EQUAL(value, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL(2U, mLink->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringBuffer
+        // Test AppendTagNoCopy with StringBuffer
         string key = "key3";
         string value = "value3";
-        mLink->IngestTagNoCopy(mLink->GetSourceBuffer()->CopyString(key), mLink->GetSourceBuffer()->CopyString(value));
+        mLink->AppendTagNoCopy(mLink->GetSourceBuffer()->CopyString(key), mLink->GetSourceBuffer()->CopyString(value));
         APSARA_TEST_TRUE(mLink->HasTag(key));
         APSARA_TEST_EQUAL(value, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL(3U, mLink->TagsSize());
     }
     {
-        // Test IngestTagNoCopy with StringView
+        // Test AppendTagNoCopy with StringView
         string key = "key4";
         string value = "value4";
         const StringBuffer& kb = mLink->GetSourceBuffer()->CopyString(key);
         const StringBuffer& vb = mLink->GetSourceBuffer()->CopyString(value);
-        mLink->IngestTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
+        mLink->AppendTagNoCopy(StringView(kb.data, kb.size), StringView(vb.data, vb.size));
         APSARA_TEST_TRUE(mLink->HasTag(key));
         APSARA_TEST_EQUAL(value, mLink->GetTag(key).to_string());
         APSARA_TEST_EQUAL(4U, mLink->TagsSize());
     }
     {
-        // Test IngestTag allows duplicates - add same key multiple times
+        // Test AppendTag allows duplicates - add same key multiple times
         string key = "key1";
         string value2 = "value1_duplicate";
-        mLink->IngestTag(key, value2);
+        mLink->AppendTag(key, value2);
         APSARA_TEST_EQUAL(5U, mLink->TagsSize());
         // GetTag returns the first match
         APSARA_TEST_EQUAL("value1", mLink->GetTag(key).to_string());
@@ -877,7 +877,7 @@ void SpanLinkUnittest::TestFromJson() {
 
 UNIT_TEST_CASE(SpanLinkUnittest, TestSimpleFields)
 UNIT_TEST_CASE(SpanLinkUnittest, TestTag)
-UNIT_TEST_CASE(SpanLinkUnittest, TestIngestTag)
+UNIT_TEST_CASE(SpanLinkUnittest, TestAppendTag)
 UNIT_TEST_CASE(SpanLinkUnittest, TestSize)
 UNIT_TEST_CASE(SpanLinkUnittest, TestToJson)
 UNIT_TEST_CASE(SpanLinkUnittest, TestFromJson)

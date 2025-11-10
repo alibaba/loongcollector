@@ -76,7 +76,8 @@ public:
         }
     }
 
-    void Ingest(StringView key, StringView val) {
+    void Append(StringView key, StringView val) {
+        // directly append to the end of the vector, without checking if the key already exists
         mAllocatedSize += key.size() + val.size();
         mInner.emplace_back(key, val);
     }
