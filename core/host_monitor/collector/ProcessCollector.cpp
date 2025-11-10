@@ -192,16 +192,16 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         StringView name;
         double value;
     } vmMetrics[] = {
-        {KEY_VM_PROCESS_MIN, minVMProcessNum.vmProcessNum},
-        {KEY_VM_PROCESS_MAX, maxVMProcessNum.vmProcessNum},
-        {KEY_VM_PROCESS_AVG, avgVMProcessNum.vmProcessNum},
+        {kVmProcessMin, minVMProcessNum.vmProcessNum},
+        {kVmProcessMax, maxVMProcessNum.vmProcessNum},
+        {kVmProcessAvg, avgVMProcessNum.vmProcessNum},
     };
     // vm的系统信息上传
     for (const auto& def : vmMetrics) {
         multiDoubleValues->SetValue(def.name,
                                     UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, def.value});
     }
-    metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_PROCESS_COUNT);
+    metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemProcessCount);
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
@@ -225,36 +225,36 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
         // cpu percent
         value = static_cast<double>(avgMetric.cpuPercent);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_CPU_AVG,
+        multiDoubleValuesEachPid->SetValue(kProcessCpuAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // mem percent
         value = static_cast<double>(avgMetric.memPercent);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_MEMORY_AVG,
+        multiDoubleValuesEachPid->SetValue(kProcessMemoryAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // open file number
         value = static_cast<double>(avgMetric.fdNum);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_OPENFILE_AVG,
+        multiDoubleValuesEachPid->SetValue(kProcessOpenfileAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // process number
         value = static_cast<double>(avgMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_AVG,
+        multiDoubleValuesEachPid->SetValue(kProcessNumberAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(maxMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_MAX,
+        multiDoubleValuesEachPid->SetValue(kProcessNumberMax,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(minMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(KEY_PROCESS_NUMBER_MIN,
+        multiDoubleValuesEachPid->SetValue(kProcessNumberMin,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         const StringBuffer& pidBuffer = groupPtr->GetSourceBuffer()->CopyString(std::to_string(pid));
         const StringBuffer& nameBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.name);
         const StringBuffer& userBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.user);
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_PID, StringView(pidBuffer.data, pidBuffer.size));
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_NAME, StringView(nameBuffer.data, nameBuffer.size));
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_USER, StringView(userBuffer.data, userBuffer.size));
-        metricEventEachPid->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_PROCESS);
+        metricEventEachPid->SetTagNoCopy(kTagKeyPid, StringView(pidBuffer.data, pidBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyName, StringView(nameBuffer.data, nameBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyUser, StringView(userBuffer.data, userBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyM, kMetricSystemProcess);
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失

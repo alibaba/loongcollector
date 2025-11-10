@@ -62,43 +62,43 @@ bool MemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
     metricEvent->SetTimestamp(meminfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDUTILIZATION_MIN,
+    multiDoubleValues->SetValue(kMemoryUsedutilizationMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.usedPercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDUTILIZATION_MAX,
+    multiDoubleValues->SetValue(kMemoryUsedutilizationMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.usedPercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDUTILIZATION_AVG,
+    multiDoubleValues->SetValue(kMemoryUsedutilizationAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.usedPercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREEUTILIZATION_MIN,
+    multiDoubleValues->SetValue(kMemoryFreeutilizationMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.freePercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREEUTILIZATION_MAX,
+    multiDoubleValues->SetValue(kMemoryFreeutilizationMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.freePercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREEUTILIZATION_AVG,
+    multiDoubleValues->SetValue(kMemoryFreeutilizationAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.freePercent});
-    multiDoubleValues->SetValue(KEY_MEMORY_ACTUALUSEDSPACE_MIN,
+    multiDoubleValues->SetValue(kMemoryActualusedspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.actualUsed});
-    multiDoubleValues->SetValue(KEY_MEMORY_ACTUALUSEDSPACE_MAX,
+    multiDoubleValues->SetValue(kMemoryActualusedspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.actualUsed});
-    multiDoubleValues->SetValue(KEY_MEMORY_ACTUALUSEDSPACE_AVG,
+    multiDoubleValues->SetValue(kMemoryActualusedspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.actualUsed});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREESPACE_MIN,
+    multiDoubleValues->SetValue(kMemoryFreespaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.free});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREESPACE_MAX,
+    multiDoubleValues->SetValue(kMemoryFreespaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.free});
-    multiDoubleValues->SetValue(KEY_MEMORY_FREESPACE_AVG,
+    multiDoubleValues->SetValue(kMemoryFreespaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.free});
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDSPACE_MIN,
+    multiDoubleValues->SetValue(kMemoryUsedspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.used});
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDSPACE_MAX,
+    multiDoubleValues->SetValue(kMemoryUsedspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.used});
-    multiDoubleValues->SetValue(KEY_MEMORY_USEDSPACE_AVG,
+    multiDoubleValues->SetValue(kMemoryUsedspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.used});
-    multiDoubleValues->SetValue(KEY_MEMORY_TOTALSPACE_MIN,
+    multiDoubleValues->SetValue(kMemoryTotalspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.total});
-    multiDoubleValues->SetValue(KEY_MEMORY_TOTALSPACE_MAX,
+    multiDoubleValues->SetValue(kMemoryTotalspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.total});
-    multiDoubleValues->SetValue(KEY_MEMORY_TOTALSPACE_AVG,
+    multiDoubleValues->SetValue(kMemoryTotalspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
-    metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_MEMORY);
+    metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemMemory);
     return true;
 }
 

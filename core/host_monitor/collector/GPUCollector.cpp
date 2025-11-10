@@ -109,33 +109,33 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             StringView name;
             double* value;
         } metrics[] = {
-            {KEY_GPU_DECODER_UTILIZATION_MAX, &maxMetric.decoderUtilization},
-            {KEY_GPU_DECODER_UTILIZATION_MIN, &minMetric.decoderUtilization},
-            {KEY_GPU_DECODER_UTILIZATION_AVG, &avgMetric.decoderUtilization},
-            {KEY_GPU_ENCODER_UTILIZATION_MAX, &maxMetric.encoderUtilization},
-            {KEY_GPU_ENCODER_UTILIZATION_MIN, &minMetric.encoderUtilization},
-            {KEY_GPU_ENCODER_UTILIZATION_AVG, &avgMetric.encoderUtilization},
-            {KEY_GPU_GPU_USEDUTILIZATION_MAX, &maxMetric.gpuUsedUtilization},
-            {KEY_GPU_GPU_USEDUTILIZATION_MIN, &minMetric.gpuUsedUtilization},
-            {KEY_GPU_GPU_USEDUTILIZATION_AVG, &avgMetric.gpuUsedUtilization},
-            {KEY_GPU_MEMORY_FREESPACE_MAX, &maxMetric.memoryFreeSpace},
-            {KEY_GPU_MEMORY_FREESPACE_MIN, &minMetric.memoryFreeSpace},
-            {KEY_GPU_MEMORY_FREESPACE_AVG, &avgMetric.memoryFreeSpace},
-            {KEY_GPU_MEMORY_FREEUTILIZATION_MAX, &maxMetric.memoryFreeUtilization},
-            {KEY_GPU_MEMORY_FREEUTILIZATION_MIN, &minMetric.memoryFreeUtilization},
-            {KEY_GPU_MEMORY_FREEUTILIZATION_AVG, &avgMetric.memoryFreeUtilization},
-            {KEY_GPU_MEMORY_USEDSPACE_MAX, &maxMetric.memoryUsedSpace},
-            {KEY_GPU_MEMORY_USEDSPACE_MIN, &minMetric.memoryUsedSpace},
-            {KEY_GPU_MEMORY_USEDSPACE_AVG, &maxMetric.memoryUsedSpace},
-            {KEY_GPU_MEMORY_USEDUTILIZATION_MAX, &maxMetric.memoryUsedUtilization},
-            {KEY_GPU_MEMORY_USEDUTILIZATION_MIN, &minMetric.memoryUsedUtilization},
-            {KEY_GPU_MEMORY_USEDUTILIZATION_AVG, &avgMetric.memoryUsedUtilization},
-            {KEY_GPU_GPU_TEMPERATURE_MAX, &maxMetric.gpuTemperature},
-            {KEY_GPU_GPU_TEMPERATURE_MIN, &minMetric.gpuTemperature},
-            {KEY_GPU_GPU_TEMPERATURE_AVG, &avgMetric.gpuTemperature},
-            {KEY_GPU_POWER_READINGS_POWER_DRAW_MAX, &maxMetric.powerReadingsPowerDraw},
-            {KEY_GPU_POWER_READINGS_POWER_DRAW_MIN, &minMetric.powerReadingsPowerDraw},
-            {KEY_GPU_POWER_READINGS_POWER_DRAW_AVG, &avgMetric.powerReadingsPowerDraw},
+            {kGpuDecoderUtilizationMax, &maxMetric.decoderUtilization},
+            {kGpuDecoderUtilizationMin, &minMetric.decoderUtilization},
+            {kGpuDecoderUtilizationAvg, &avgMetric.decoderUtilization},
+            {kGpuEncoderUtilizationMax, &maxMetric.encoderUtilization},
+            {kGpuEncoderUtilizationMin, &minMetric.encoderUtilization},
+            {kGpuEncoderUtilizationAvg, &avgMetric.encoderUtilization},
+            {kGpuGpuUsedutilizationMax, &maxMetric.gpuUsedUtilization},
+            {kGpuGpuUsedutilizationMin, &minMetric.gpuUsedUtilization},
+            {kGpuGpuUsedutilizationAvg, &avgMetric.gpuUsedUtilization},
+            {kGpuMemoryFreespaceMax, &maxMetric.memoryFreeSpace},
+            {kGpuMemoryFreespaceMin, &minMetric.memoryFreeSpace},
+            {kGpuMemoryFreespaceAvg, &avgMetric.memoryFreeSpace},
+            {kGpuMemoryFreeutilizationMax, &maxMetric.memoryFreeUtilization},
+            {kGpuMemoryFreeutilizationMin, &minMetric.memoryFreeUtilization},
+            {kGpuMemoryFreeutilizationAvg, &avgMetric.memoryFreeUtilization},
+            {kGpuMemoryUsedspaceMax, &maxMetric.memoryUsedSpace},
+            {kGpuMemoryUsedspaceMin, &minMetric.memoryUsedSpace},
+            {kGpuMemoryUsedspaceAvg, &maxMetric.memoryUsedSpace},
+            {kGpuMemoryUsedutilizationMax, &maxMetric.memoryUsedUtilization},
+            {kGpuMemoryUsedutilizationMin, &minMetric.memoryUsedUtilization},
+            {kGpuMemoryUsedutilizationAvg, &avgMetric.memoryUsedUtilization},
+            {kGpuGpuTemperatureMax, &maxMetric.gpuTemperature},
+            {kGpuGpuTemperatureMin, &minMetric.gpuTemperature},
+            {kGpuGpuTemperatureAvg, &avgMetric.gpuTemperature},
+            {kGpuPowerReadingsPowerDrawMax, &maxMetric.powerReadingsPowerDraw},
+            {kGpuPowerReadingsPowerDrawMin, &minMetric.powerReadingsPowerDraw},
+            {kGpuPowerReadingsPowerDrawAvg, &avgMetric.powerReadingsPowerDraw},
         };
 
         MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
@@ -144,9 +144,9 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         }
         metricEvent->SetTimestamp(gpuInfo.collectTime, 0);
         const StringBuffer& gpuIdBuffer = metricEvent->GetSourceBuffer()->CopyString(mCalculate.first);
-        metricEvent->SetTagNoCopy(TAG_KEY_GPU_ID, StringView(gpuIdBuffer.data, gpuIdBuffer.size));
+        metricEvent->SetTagNoCopy(kTagKeyGpuId, StringView(gpuIdBuffer.data, gpuIdBuffer.size));
 
-        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_GPU);
+        metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemGpu);
 
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();

@@ -54,24 +54,24 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
         StringView name;
         double* value;
     } metrics[] = {
-        {KEY_LOAD_1M_MIN, &minSys.load1},
-        {KEY_LOAD_1M_MAX, &maxSys.load1},
-        {KEY_LOAD_1M_AVG, &avgSys.load1},
-        {KEY_LOAD_5M_MIN, &minSys.load5},
-        {KEY_LOAD_5M_MAX, &maxSys.load5},
-        {KEY_LOAD_5M_AVG, &avgSys.load5},
-        {KEY_LOAD_15M_MIN, &minSys.load15},
-        {KEY_LOAD_15M_MAX, &maxSys.load15},
-        {KEY_LOAD_15M_AVG, &avgSys.load15},
-        {KEY_LOAD_PER_CORE_1M_MIN, &minSys.load1PerCore},
-        {KEY_LOAD_PER_CORE_1M_MAX, &maxSys.load1PerCore},
-        {KEY_LOAD_PER_CORE_1M_AVG, &avgSys.load1PerCore},
-        {KEY_LOAD_PER_CORE_5M_MIN, &minSys.load5PerCore},
-        {KEY_LOAD_PER_CORE_5M_MAX, &maxSys.load5PerCore},
-        {KEY_LOAD_PER_CORE_5M_AVG, &avgSys.load5PerCore},
-        {KEY_LOAD_PER_CORE_15M_MIN, &minSys.load15PerCore},
-        {KEY_LOAD_PER_CORE_15M_MAX, &maxSys.load15PerCore},
-        {KEY_LOAD_PER_CORE_15M_AVG, &avgSys.load15PerCore},
+        {kLoad1mMin, &minSys.load1},
+        {kLoad1mMax, &maxSys.load1},
+        {kLoad1mAvg, &avgSys.load1},
+        {kLoad5mMin, &minSys.load5},
+        {kLoad5mMax, &maxSys.load5},
+        {kLoad5mAvg, &avgSys.load5},
+        {kLoad15mMin, &minSys.load15},
+        {kLoad15mMax, &maxSys.load15},
+        {kLoad15mAvg, &avgSys.load15},
+        {kLoadPerCore1mMin, &minSys.load1PerCore},
+        {kLoadPerCore1mMax, &maxSys.load1PerCore},
+        {kLoadPerCore1mAvg, &avgSys.load1PerCore},
+        {kLoadPerCore5mMin, &minSys.load5PerCore},
+        {kLoadPerCore5mMax, &maxSys.load5PerCore},
+        {kLoadPerCore5mAvg, &avgSys.load5PerCore},
+        {kLoadPerCore15mMin, &minSys.load15PerCore},
+        {kLoadPerCore15mMax, &maxSys.load15PerCore},
+        {kLoadPerCore15mAvg, &avgSys.load15PerCore},
     };
 
     MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
@@ -80,7 +80,7 @@ bool SystemCollector::Collect(HostMonitorContext& collectContext, PipelineEventG
     }
     metricEvent->SetTimestamp(load.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
-    metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_LOAD);
+    metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemLoad);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
     for (const auto& def : metrics) {
         multiDoubleValues->SetValue(def.name,

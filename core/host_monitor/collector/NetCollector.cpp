@@ -160,13 +160,13 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
 
         metricEvent->SetTimestamp(netInterfaces.collectTime, 0);
         const StringBuffer& hostnameBuffer = metricEvent->GetSourceBuffer()->CopyString(hostname);
-        metricEvent->SetTagNoCopy(TAG_KEY_HOSTNAME, StringView(hostnameBuffer.data, hostnameBuffer.size));
+        metricEvent->SetTagNoCopy(kTagKeyHostname, StringView(hostnameBuffer.data, hostnameBuffer.size));
         const StringBuffer& curnameBuffer = metricEvent->GetSourceBuffer()->CopyString(curname);
-        metricEvent->SetTagNoCopy(TAG_KEY_DEVICE, StringView(curnameBuffer.data, curnameBuffer.size));
+        metricEvent->SetTagNoCopy(kTagKeyDevice, StringView(curnameBuffer.data, curnameBuffer.size));
         const StringBuffer& ipBuffer = metricEvent->GetSourceBuffer()->CopyString(mDevIp[curname]);
-        metricEvent->SetTagNoCopy(TAG_KEY_IP, StringView(ipBuffer.data, ipBuffer.size));
+        metricEvent->SetTagNoCopy(kTagKeyIp, StringView(ipBuffer.data, ipBuffer.size));
 
-        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_NET_ORIGINAL);
+        metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemNetOriginal);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
 
@@ -179,30 +179,30 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             StringView name;
             double value;
         } rateMetrics[] = {
-            {KEY_NETWORKOUT_PACKAGES_MIN, minRatePerSec.txPackRate},
-            {KEY_NETWORKOUT_PACKAGES_MAX, maxRatePerSec.txPackRate},
-            {KEY_NETWORKOUT_PACKAGES_AVG, avgRatePerSec.txPackRate},
-            {KEY_NETWORKIN_PACKAGES_MIN, minRatePerSec.rxPackRate},
-            {KEY_NETWORKIN_PACKAGES_MAX, maxRatePerSec.rxPackRate},
-            {KEY_NETWORKIN_PACKAGES_AVG, avgRatePerSec.rxPackRate},
-            {KEY_NETWORKOUT_ERRORPACKAGES_MIN, minRatePerSec.txErrorRate},
-            {KEY_NETWORKOUT_ERRORPACKAGES_MAX, maxRatePerSec.txErrorRate},
-            {KEY_NETWORKOUT_ERRORPACKAGES_AVG, avgRatePerSec.txErrorRate},
-            {KEY_NETWORKIN_ERRORPACKAGES_MIN, minRatePerSec.rxErrorRate},
-            {KEY_NETWORKIN_ERRORPACKAGES_MAX, maxRatePerSec.rxErrorRate},
-            {KEY_NETWORKIN_ERRORPACKAGES_AVG, avgRatePerSec.rxErrorRate},
-            {KEY_NETWORKOUT_RATE_MIN, minRatePerSec.txByteRate},
-            {KEY_NETWORKOUT_RATE_MAX, maxRatePerSec.txByteRate},
-            {KEY_NETWORKOUT_RATE_AVG, avgRatePerSec.txByteRate},
-            {KEY_NETWORKIN_RATE_MIN, minRatePerSec.rxByteRate},
-            {KEY_NETWORKIN_RATE_MAX, maxRatePerSec.rxByteRate},
-            {KEY_NETWORKIN_RATE_AVG, avgRatePerSec.rxByteRate},
-            {KEY_NETWORKOUT_DROPPACKAGES_MIN, minRatePerSec.txDropRate},
-            {KEY_NETWORKOUT_DROPPACKAGES_MAX, maxRatePerSec.txDropRate},
-            {KEY_NETWORKOUT_DROPPACKAGES_AVG, avgRatePerSec.txDropRate},
-            {KEY_NETWORKIN_DROPPACKAGES_MIN, minRatePerSec.rxDropRate},
-            {KEY_NETWORKIN_DROPPACKAGES_MAX, maxRatePerSec.rxDropRate},
-            {KEY_NETWORKIN_DROPPACKAGES_AVG, avgRatePerSec.rxDropRate},
+            {kNetworkoutPackagesMin, minRatePerSec.txPackRate},
+            {kNetworkoutPackagesMax, maxRatePerSec.txPackRate},
+            {kNetworkoutPackagesAvg, avgRatePerSec.txPackRate},
+            {kNetworkinPackagesMin, minRatePerSec.rxPackRate},
+            {kNetworkinPackagesMax, maxRatePerSec.rxPackRate},
+            {kNetworkinPackagesAvg, avgRatePerSec.rxPackRate},
+            {kNetworkoutErrorpackagesMin, minRatePerSec.txErrorRate},
+            {kNetworkoutErrorpackagesMax, maxRatePerSec.txErrorRate},
+            {kNetworkoutErrorpackagesAvg, avgRatePerSec.txErrorRate},
+            {kNetworkinErrorpackagesMin, minRatePerSec.rxErrorRate},
+            {kNetworkinErrorpackagesMax, maxRatePerSec.rxErrorRate},
+            {kNetworkinErrorpackagesAvg, avgRatePerSec.rxErrorRate},
+            {kNetworkoutRateMin, minRatePerSec.txByteRate},
+            {kNetworkoutRateMax, maxRatePerSec.txByteRate},
+            {kNetworkoutRateAvg, avgRatePerSec.txByteRate},
+            {kNetworkinRateMin, minRatePerSec.rxByteRate},
+            {kNetworkinRateMax, maxRatePerSec.rxByteRate},
+            {kNetworkinRateAvg, avgRatePerSec.rxByteRate},
+            {kNetworkoutDroppackagesMin, minRatePerSec.txDropRate},
+            {kNetworkoutDroppackagesMax, maxRatePerSec.txDropRate},
+            {kNetworkoutDroppackagesAvg, avgRatePerSec.txDropRate},
+            {kNetworkinDroppackagesMin, minRatePerSec.rxDropRate},
+            {kNetworkinDroppackagesMax, maxRatePerSec.rxDropRate},
+            {kNetworkinDroppackagesAvg, avgRatePerSec.rxDropRate},
         };
 
         for (const auto& def : rateMetrics) {
@@ -223,20 +223,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     listenEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    listenEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_LISTEN);
-    listenEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
+    listenEvent->SetTagNoCopy(kTagKeyState, kTcpStateListen);
+    listenEvent->SetTagNoCopy(kTagKeyM, kMetricSystemTcp);
     listenEvent->SetValue<UntypedMultiDoubleValues>(listenEvent);
     auto* listenMultiDoubleValues = listenEvent->MutableValue<UntypedMultiDoubleValues>();
     listenMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MIN,
+        kNetTcpConnectionMin,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpListen)});
 
     listenMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MAX,
+        kNetTcpConnectionMax,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpListen)});
 
     listenMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_AVG,
+        kNetTcpConnectionAvg,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpListen)});
 
     MetricEvent* establishedEvent = groupPtr->AddMetricEvent(true);
@@ -245,20 +245,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     establishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    establishedEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_ESTABLISHED);
-    establishedEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
+    establishedEvent->SetTagNoCopy(kTagKeyState, kTcpStateEstablished);
+    establishedEvent->SetTagNoCopy(kTagKeyM, kMetricSystemTcp);
     establishedEvent->SetValue<UntypedMultiDoubleValues>(establishedEvent);
     auto* establishedMultiDoubleValues = establishedEvent->MutableValue<UntypedMultiDoubleValues>();
     establishedMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MIN,
+        kNetTcpConnectionMin,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpEstablished)});
 
     establishedMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MAX,
+        kNetTcpConnectionMax,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpEstablished)});
 
     establishedMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_AVG,
+        kNetTcpConnectionAvg,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpEstablished)});
 
     MetricEvent* nonestablishedEvent = groupPtr->AddMetricEvent(true);
@@ -267,19 +267,19 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     nonestablishedEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    nonestablishedEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_NON_ESTABLISHED);
-    nonestablishedEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
+    nonestablishedEvent->SetTagNoCopy(kTagKeyState, kTcpStateNonEstablished);
+    nonestablishedEvent->SetTagNoCopy(kTagKeyM, kMetricSystemTcp);
     nonestablishedEvent->SetValue<UntypedMultiDoubleValues>(nonestablishedEvent);
     auto* nonestablishedMultiDoubleValues = nonestablishedEvent->MutableValue<UntypedMultiDoubleValues>();
-    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_MIN,
+    nonestablishedMultiDoubleValues->SetValue(kNetTcpConnectionMin,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(minTCP.tcpNonEstablished)});
 
-    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_MAX,
+    nonestablishedMultiDoubleValues->SetValue(kNetTcpConnectionMax,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(maxTCP.tcpNonEstablished)});
 
-    nonestablishedMultiDoubleValues->SetValue(KEY_NET_TCP_CONNECTION_AVG,
+    nonestablishedMultiDoubleValues->SetValue(kNetTcpConnectionAvg,
                                               UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
                                                                       static_cast<double>(avgTCP.tcpNonEstablished)});
 
@@ -289,20 +289,20 @@ bool NetCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
     totalEvent->SetTimestamp(resTCPStat.collectTime, 0);
-    totalEvent->SetTagNoCopy(TAG_KEY_STATE, TCP_STATE_TOTAL);
-    totalEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_TCP);
+    totalEvent->SetTagNoCopy(kTagKeyState, kTcpStateTotal);
+    totalEvent->SetTagNoCopy(kTagKeyM, kMetricSystemTcp);
     totalEvent->SetValue<UntypedMultiDoubleValues>(totalEvent);
     auto* totalMultiDoubleValues = totalEvent->MutableValue<UntypedMultiDoubleValues>();
     totalMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MIN,
+        kNetTcpConnectionMin,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(minTCP.tcpTotal)});
 
     totalMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_MAX,
+        kNetTcpConnectionMax,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(maxTCP.tcpTotal)});
 
     totalMultiDoubleValues->SetValue(
-        KEY_NET_TCP_CONNECTION_AVG,
+        kNetTcpConnectionAvg,
         UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(avgTCP.tcpTotal)});
 
     mLastTime = start;

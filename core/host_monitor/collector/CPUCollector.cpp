@@ -76,13 +76,13 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
             StringView name;
             double* value;
         } metrics[] = {
-            {KEY_CPU_SYSTEM_AVG, &avgCPU.sys},  {KEY_CPU_SYSTEM_MIN, &minCPU.sys},  {KEY_CPU_SYSTEM_MAX, &maxCPU.sys},
-            {KEY_CPU_IDLE_AVG, &avgCPU.idle},   {KEY_CPU_IDLE_MIN, &minCPU.idle},   {KEY_CPU_IDLE_MAX, &maxCPU.idle},
-            {KEY_CPU_USER_AVG, &avgCPU.user},   {KEY_CPU_USER_MIN, &minCPU.user},   {KEY_CPU_USER_MAX, &maxCPU.user},
-            {KEY_CPU_WAIT_AVG, &avgCPU.wait},   {KEY_CPU_WAIT_MIN, &minCPU.wait},   {KEY_CPU_WAIT_MAX, &maxCPU.wait},
-            {KEY_CPU_OTHER_AVG, &avgCPU.other}, {KEY_CPU_OTHER_MIN, &minCPU.other}, {KEY_CPU_OTHER_MAX, &maxCPU.other},
-            {KEY_CPU_TOTAL_AVG, &avgCPU.total}, {KEY_CPU_TOTAL_MIN, &minCPU.total}, {KEY_CPU_TOTAL_MAX, &maxCPU.total},
-            {KEY_CPU_CORES_VALUE, &cpuCores},
+            {kCpuSystemAvg, &avgCPU.sys},  {kCpuSystemMin, &minCPU.sys},  {kCpuSystemMax, &maxCPU.sys},
+            {kCpuIdleAvg, &avgCPU.idle},   {kCpuIdleMin, &minCPU.idle},   {kCpuIdleMax, &maxCPU.idle},
+            {kCpuUserAvg, &avgCPU.user},   {kCpuUserMin, &minCPU.user},   {kCpuUserMax, &maxCPU.user},
+            {kCpuWaitAvg, &avgCPU.wait},   {kCpuWaitMin, &minCPU.wait},   {kCpuWaitMax, &maxCPU.wait},
+            {kCpuOtherAvg, &avgCPU.other}, {kCpuOtherMin, &minCPU.other}, {kCpuOtherMax, &maxCPU.other},
+            {kCpuTotalAvg, &avgCPU.total}, {kCpuTotalMin, &minCPU.total}, {kCpuTotalMax, &maxCPU.total},
+            {kCpuCoresValue, &cpuCores},
         };
         MetricEvent* metricEvent = groupPtr->AddMetricEvent(true);
         if (!metricEvent) {
@@ -90,7 +90,7 @@ bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         }
         metricEvent->SetTimestamp(cpuInfo.collectTime, 0);
         metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
-        metricEvent->SetTagNoCopy(TAG_KEY_M, METRIC_SYSTEM_CPU);
+        metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemCpu);
         auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
         for (const auto& def : metrics) {
             multiDoubleValues->SetValue(def.name,
