@@ -1136,7 +1136,7 @@ void ManualPBParserUnittest::TestReadVarint32Success() {
         APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint32(parser, value),
                               "Should successfully read varint32");
         APSARA_TEST_EQUAL_DESC(
-            testCase.first, value, string("Value should match expected: ") + to_string(testCase.first));
+            testCase.first, value, std::string("Value should match expected: ") + std::to_string(testCase.first));
     }
 }
 
@@ -1201,7 +1201,7 @@ void ManualPBParserUnittest::TestReadVarint64Success() {
         APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadVarint64(parser, value),
                               "Should successfully read varint64");
         APSARA_TEST_EQUAL_DESC(
-            testCase.first, value, string("Value should match expected: ") + to_string(testCase.first));
+            testCase.first, value, std::string("Value should match expected: ") + std::to_string(testCase.first));
     }
 }
 
@@ -1228,7 +1228,7 @@ void ManualPBParserUnittest::TestReadFixed32Success() {
         APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadFixed32(parser, value),
                               "Should successfully read fixed32");
         APSARA_TEST_EQUAL_DESC(
-            expectedValue, value, string("Value should match expected: 0x") + to_string(expectedValue));
+            expectedValue, value, std::string("Value should match expected: 0x") + std::to_string(expectedValue));
     }
 }
 
@@ -1275,7 +1275,7 @@ void ManualPBParserUnittest::TestReadFixed64Success() {
         APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadFixed64(parser, value),
                               "Should successfully read fixed64");
         APSARA_TEST_EQUAL_DESC(
-            expectedValue, value, string("Value should match expected: 0x") + to_string(expectedValue));
+            expectedValue, value, std::string("Value should match expected: 0x") + std::to_string(expectedValue));
     }
 }
 
@@ -1299,11 +1299,12 @@ void ManualPBParserUnittest::TestReadLengthDelimitedSuccess() {
 
         APSARA_TEST_TRUE_DESC(ManualPBParserTestHelper::TestReadLengthDelimited(parser, data, length),
                               "Should successfully read length-delimited data");
-        APSARA_TEST_EQUAL_DESC(testStr.length(), length, string("Length should match: ") + to_string(testStr.length()));
+        APSARA_TEST_EQUAL_DESC(
+            testStr.length(), length, std::string("Length should match: ") + std::to_string(testStr.length()));
 
         if (length > 0 && data != nullptr) {
             std::string result(static_cast<const char*>(static_cast<const void*>(data)), length);
-            APSARA_TEST_EQUAL_DESC(testStr, result, "Data content should match");
+            APSARA_TEST_EQUAL_DESC(testStr, result, std::string("Data content should match"));
         }
     }
 }
@@ -1517,7 +1518,7 @@ void ManualPBParserUnittest::TestParseLogEventComplete() {
 
     APSARA_TEST_TRUE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
                           "Should successfully parse complete LogEvent");
-    APSARA_TEST_EQUAL_DESC(1U, eventGroup.GetEvents().size(), "Should have 1 event");
+    APSARA_TEST_EQUAL_DESC(1U, eventGroup.GetEvents().size(), std::string("Should have 1 event"));
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
     APSARA_TEST_EQUAL(1234567890ULL, logEvent.GetTimestamp());
@@ -1605,7 +1606,7 @@ void ManualPBParserUnittest::TestParseLogEventWithLevel() {
         APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
         const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_EQUAL_DESC(level, logEvent.GetLevel().to_string(), string("Level should match: ") + level);
+        APSARA_TEST_EQUAL_DESC(level, logEvent.GetLevel().to_string(), std::string("Level should match: ") + level);
     }
 }
 
@@ -1704,7 +1705,7 @@ void ManualPBParserUnittest::TestParseLogEventMultipleEvents() {
     string errMsg;
 
     APSARA_TEST_TRUE(parser.ParsePipelineEventGroup(eventGroup, errMsg));
-    APSARA_TEST_EQUAL_DESC(3U, eventGroup.GetEvents().size(), "Should have 3 events");
+    APSARA_TEST_EQUAL_DESC(3U, eventGroup.GetEvents().size(), std::string("Should have 3 events"));
 
     // Verify first event
     const auto& logEvent1 = eventGroup.GetEvents()[0].Cast<LogEvent>();
@@ -1860,7 +1861,7 @@ void ManualPBParserUnittest::TestParseMetricEventDoubleValue() {
         const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
         APSARA_TEST_EQUAL_DESC(expectedValue,
                                metricEvent.GetValue<UntypedSingleValue>()->mValue,
-                               string("Value should match: ") + to_string(expectedValue));
+                               std::string("Value should match: ") + std::to_string(expectedValue));
     }
 }
 
