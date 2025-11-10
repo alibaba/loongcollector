@@ -35,13 +35,14 @@ static constexpr StringView kExternalStr = "external";
 static constexpr StringView kLocalhostStr = "localhost";
 static constexpr StringView kHttpStr = "http";
 static constexpr StringView kMysqlStr = "mysql";
+static constexpr StringView kSqlStr = "SQL";
 static constexpr StringView kRpc25Str = "25";
+static constexpr StringView kRpc60Str = "60";
 static constexpr StringView kRpc0Str = "0";
 static constexpr StringView kHttpClientStr = "http_client";
 static constexpr StringView kUnknownStr = "unknown";
 static constexpr StringView kZeroAddrStr = "0.0.0.0";
 static constexpr StringView kLoopbackStr = "127.0.0.1";
-static constexpr StringView kMysqlClientStr = "mysql_client";
 
 std::regex Connection::mContainerIdRegex = std::regex("[a-f0-9]{64}");
 
@@ -127,17 +128,10 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
             MarkL7MetaAttached();
         }
     } else if (mProtocol == support_proto_e::ProtoMySQL) {
-        if (mRole == support_role_e::IsClient) {
-            mTags.SetNoCopy<kRpcType>(kRpc25Str);
-            mTags.SetNoCopy<kCallKind>(kMysqlClientStr);
-            mTags.SetNoCopy<kCallType>(kMysqlClientStr);
-            MarkL7MetaAttached();
-        } else if (mRole == support_role_e::IsServer) {
-            mTags.SetNoCopy<kRpcType>(kRpc0Str);
-            mTags.SetNoCopy<kCallKind>(kMysqlStr);
-            mTags.SetNoCopy<kCallType>(kMysqlStr);
-            MarkL7MetaAttached();
-        }
+        mTags.SetNoCopy<kRpcType>(kRpc60Str);
+        mTags.SetNoCopy<kCallKind>(kSqlStr);
+        mTags.SetNoCopy<kCallType>(kMysqlStr);
+        MarkL7MetaAttached();
     }
 }
 
