@@ -112,6 +112,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ManualPBParserUnittest;
+    friend class ManualPBParserTestHelper;
 #endif
 };
 
