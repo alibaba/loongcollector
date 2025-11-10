@@ -27,16 +27,21 @@
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
+
+constexpr uint32_t kTimeFallbackDurationSeconds = 3;
+
 class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
                        uint32_t maxConcurrency,
                        uint32_t minConcurrency = 1,
+                       bool timeFallbackEnabled = false,
                        double concurrencyFastFallBackRatio = 0.5,
                        double concurrencySlowFallBackRatio = 0.8)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
+          mTimeFallbackEnabled(timeFallbackEnabled),
           mCurrenctConcurrency(maxConcurrency),
           mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
           mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
@@ -78,8 +83,14 @@ private:
     uint32_t mMaxConcurrency = 0;
     uint32_t mMinConcurrency = 0;
 
+    bool mTimeFallbackEnabled = false;
+
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
+
+    // Time fallback control
+    bool mInTimeFallback = false;
+    std::chrono::system_clock::time_point mTimeFallbackStartTime;
 
     double mConcurrencyFastFallBackRatio = 0.0;
     double mConcurrencySlowFallBackRatio = 0.0;
