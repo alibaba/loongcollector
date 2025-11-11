@@ -199,7 +199,10 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
 
 void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
     filesystem::create_directories("continuous_pipeline_config");
-
+    size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+    builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
     // Step 1: add high priority config 'a' (createTime smaller => higher priority)
     {
         ofstream fout("continuous_pipeline_config/a.json");
@@ -218,7 +221,7 @@ void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
 
     auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     // a should be added, and not ignored/removed; no modified expected
-    APSARA_TEST_EQUAL(1U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, diff1.first.mAdded.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mIgnored.size());
@@ -260,7 +263,10 @@ void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
 
 void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
     filesystem::create_directories("continuous_pipeline_config");
-
+    size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+    builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
     // Step 1: add 'a' (higher priority) and 'b' (lower priority)
     {
         ofstream fa("continuous_pipeline_config/a.json");
@@ -291,7 +297,7 @@ void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
 
     auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     // 'a' selected, 'b' ignored in first scan
-    APSARA_TEST_EQUAL(1U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(1U + builtinPipelineCnt, diff1.first.mAdded.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
     APSARA_TEST_EQUAL(1U, diff1.first.mIgnored.size());
@@ -337,7 +343,10 @@ void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
 
 void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig() const {
     filesystem::create_directories("continuous_pipeline_config");
-
+    size_t builtinPipelineCnt = 0;
+#ifdef __ENTERPRISE__
+    builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
+#endif
     // Step 1: start with running 'b' (mock1) and 'c' (mock2)
     {
         ofstream fb("continuous_pipeline_config/b.json");
@@ -368,7 +377,7 @@ void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig()
 
     auto diff1 = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     // both types should be added initially
-    APSARA_TEST_EQUAL(2U, diff1.first.mAdded.size());
+    APSARA_TEST_EQUAL(2U + builtinPipelineCnt, diff1.first.mAdded.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mModified.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mRemoved.size());
     APSARA_TEST_EQUAL(0U, diff1.first.mIgnored.size());
