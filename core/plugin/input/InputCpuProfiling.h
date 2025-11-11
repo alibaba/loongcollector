@@ -17,6 +17,7 @@
 
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "ebpf/Config.h"
+#include "file_server/FileDiscoveryOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
@@ -33,6 +34,9 @@ public:
 
     ebpf::CpuProfilingOption mCpuProfilingOption;
     PluginMetricManagerPtr mPluginMetricPtr;
+
+    // TODO: We just need container discovery, could this be removed?
+    FileDiscoveryOptions mTempFileDiscoveryOptions;
 };
 
 } // namespace logtail

@@ -14,8 +14,10 @@
 // limitations under the License.
 
 #include "plugin/input/InputCpuProfiling.h"
+#include "container_manager/ContainerManager.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "ebpf/EBPFServer.h"
+#include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
 #include "app_config/AppConfig.h"
@@ -34,6 +36,8 @@ bool InputCpuProfiling::Init(const Json::Value &config,
     if (AppConfig::GetInstance()->IsPurageContainerMode()) {
         mCpuProfilingOption.mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
             optionalGoPipeline, nullptr, mContext->GetPipeline().GenNextPluginMeta(false));
+        mTempFileDiscoveryOptions.SetEnableContainerDiscoveryFlag(true);
+        mTempFileDiscoveryOptions.SetContainerDiscoveryOptions(std::move(mCpuProfilingOption.mContainerDiscovery));
     }
     return true;
 }
@@ -44,6 +48,20 @@ bool InputCpuProfiling::Start() {
             logtail::ebpf::PluginType::CPU_PROFILING)) {
         return false;
     }
+    ContainerManager::GetInstance()->AddContainerHandler(
+        mContext->GetConfigName(),
+        std::make_pair(&mTempFileDiscoveryOptions, mContext),
+        [this](std::shared_ptr<ContainerDiff> diff) {
+            ebpf::ProcessDiscoveryManager::GetInstance()->UpdateDiscovery(
+                    mContext->GetConfigName(), [&](ebpf::ProcessDiscoveryConfig& config) {
+                        for (const auto& containerId : diff->mRemoved) {
+                            config.mContainerIds.erase(containerId);
+                        }
+                        for (const auto& container : diff->mAdded) {
+                            config.mContainerIds.insert(container->mID);
+                        }
+                    });
+        });
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(
         mContext->GetConfigName(), mIndex,
         logtail::ebpf::PluginType::CPU_PROFILING, mContext,
@@ -56,6 +74,8 @@ bool InputCpuProfiling::Stop(bool isPipelineRemoving) {
             mContext->GetConfigName(),
             logtail::ebpf::PluginType::CPU_PROFILING);
     }
+    ContainerManager::GetInstance()->RemoveContainerHandler(
+        mContext->GetConfigName());
     return ebpf::EBPFServer::GetInstance()->DisablePlugin(
         mContext->GetConfigName(), logtail::ebpf::PluginType::CPU_PROFILING);
 }
