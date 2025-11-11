@@ -55,7 +55,6 @@ public:
     void GetCurrentEndpoint(const std::string& domain, std::string& ip, bool& useIPFlag) const {
         if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
             static DnsCache* dnsCache = DnsCache::GetInstance();
-            std::string realIP;
             if (dnsCache->GetIPFromDnsCache(domain, ip)) {
                 useIPFlag = true;
             } else {

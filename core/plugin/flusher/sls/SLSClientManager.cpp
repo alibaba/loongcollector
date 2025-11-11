@@ -165,12 +165,7 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
     } else {
         path.append("/shards/route");
     }
-
-    if (useIP) {
-        header[HOST] = project + "." + ip;
-    } else {
-        header[HOST] = domain;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -262,11 +257,7 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
     path = METRICSTORES;
     path.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
 
-    if (useIP) {
-        header[HOST] = project + "." + ip;
-    } else {
-        header[HOST] = domain;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -303,11 +294,7 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   size_t rawSize,
                                   const string& path,
                                   map<string, string>& header) {
-    if (useIP) {
-        header[HOST] = project + "." + ip;
-    } else {
-        header[HOST] = domain;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
