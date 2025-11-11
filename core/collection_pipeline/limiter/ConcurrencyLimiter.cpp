@@ -124,7 +124,7 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
         LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
         // Enter time fallback state if decreased to minimum
-        if (mTimeFallbackEnabled) {
+        if (mTimeFallbackEnabled && !mInTimeFallback) {
             mInTimeFallback = true;
             mTimeFallbackStartTime = std::chrono::system_clock::now();
             LOG_INFO(sLogger,
