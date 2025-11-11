@@ -75,42 +75,29 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& res
         return ParseState::kNeedsMoreData;
     }
 
-    // 解析MySQL包长度（3字节）
     uint32_t packetLen = (uint8_t)buf[0] | ((uint8_t)buf[1] << 8) | ((uint8_t)buf[2] << 16);
     // 包序号（1字节）
     uint8_t seqId = buf[3];
     // 命令类型（1字节）
     uint8_t command = buf[4];
-    result->mSeqId = seqId;
-    result->mPacketLen = packetLen;
-    result->mCommand = command;
+    result->SetSeqId(seqId);
+    result->SetPacketLen(packetLen);
+    result->SetCommand(command);
 
     // 根据命令类型解析具体内容
     switch (command) {
-        case 0x03: // COM_QUERY
+        case MYSQL_CMD_QUERY:
             if (packetLen > 1) {
-                // size_t sqlLen = std::min(static_cast<size_t>(packetLen - 1), static_cast<size_t>(128));
-                size_t sqlLen = packetLen - 1;
+                size_t sqlLen = std::min(static_cast<size_t>(packetLen - 1), static_cast<size_t>(256));
+                sqlLen = std::min(sqlLen, buf.size() - 5);
                 std::string sql(buf.data() + 5, sqlLen);
                 result->SetSql(sql);
             }
             break;
-        case 0x04: // COM_FIELD_LIST
-            // 处理字段列表命令
-            break;
-        // 其他命令...
         default:
             // 未知命令类型
             break;
     }
-
-    // buf.remove_prefix(5 + packetLen);
-
-    if (result->ShouldSample() || forceSample) {
-        // 解析详细信息
-        return ParseState::kSuccess;
-    }
-
     return ParseState::kSuccess;
 }
 
@@ -123,36 +110,48 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& re
     uint32_t packetLen = (uint8_t)buf[0] | (uint8_t)(buf[1] << 8) | (uint8_t)(buf[2] << 16);
 
     uint8_t seqId = buf[3];
-    result->mSeqId = seqId;
+    result->SetSeqId(seqId);
+    result->SetPacketLen(packetLen);
 
     // 根据响应内容设置状态码等信息
     if (packetLen > 0) {
         uint8_t firstByte = buf[4];
 
-        if (firstByte == 0x00) {
+        if (firstByte == MYSQL_RESPONSE_OK) {
             // OK packet
             result->SetStatusCode(0); // OK
-        } else if (firstByte == 0xff) {
+        } else if (firstByte == MYSQL_RESPONSE_ERR) {
             // ERR packet
             result->SetStatusCode(1); // Error
             if (packetLen >= 9) {
                 uint16_t errorCode = buf[5] | (buf[6] << 8);
                 result->SetErrorCode(errorCode);
+
+                // 提取错误消息
+                // ERR packet格式: header(4) + ERR byte(1) + error code(2) + SQL state marker('#')(1) + SQL state(5) +
+                // error message
+                if (buf.size() >= 13) { // 确保有足够的数据
+                    size_t errorMsgStart = 13; // 4(header) + 1(ERR) + 2(error code) + 1(marker) + 5(SQL state)
+                    if (buf[12] == '#') { // 检查SQL状态标记
+                        // 跳过SQL状态码
+                        errorMsgStart = 13;
+                    } else {
+                        // 没有SQL状态码，错误消息直接从第7字节开始
+                        errorMsgStart = 7; // 4(header) + 1(ERR) + 2(error code)
+                    }
+
+                    if (errorMsgStart < buf.size()) {
+                        std::string errorMsg(buf.data() + errorMsgStart, buf.size() - errorMsgStart);
+                        result->SetErrorMessage(errorMsg); // 需要在MysqlRecord中添加此方法
+                    }
+                }
             }
-        } else if (firstByte == 0xfe) {
+        } else if (firstByte == MYSQL_RESPONSE_EOF) {
             // EOF packet
             result->SetStatusCode(2); // EOF
         }
         // 其他类型的响应包...
     }
-
-    buf.remove_prefix(4 + packetLen);
-
-    if (result->ShouldSample() || forceSample) {
-        // 解析详细信息
-        return ParseState::kSuccess;
-    }
-
     return ParseState::kSuccess;
 }
 

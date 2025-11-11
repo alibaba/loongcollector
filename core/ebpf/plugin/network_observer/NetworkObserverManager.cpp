@@ -571,12 +571,12 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                     logEvent->SetContentNoCopy(kConnTrackerTable.ColLogKey(i), ctAttrVal[i]);
                 }
                 // set time stamp
+                logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(record->GetLatencyNs()));
+                auto timeSpec = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
+                logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
                 auto protocol = record->GetConnection()->GetProtocol();
                 if (protocol == support_proto_e::ProtoHTTP) {
                     auto* httpRecord = static_cast<HttpRecord*>(record);
-                    auto timeSpec = ConvertKernelTimeToUnixTime(httpRecord->GetStartTimeStamp());
-                    logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
-                    logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(httpRecord->GetLatencyNs()));
                     logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
                     logEvent->SetContent(kHTTPPath.LogKey(),
                                          httpRecord->GetRealPath().size() ? httpRecord->GetRealPath()
@@ -585,10 +585,13 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                     logEvent->SetContent(kStatusCode.LogKey(), std::to_string(httpRecord->GetStatusCode()));
                     logEvent->SetContent(kHTTPReqBody.LogKey(), httpRecord->GetReqBody());
                     logEvent->SetContent(kHTTPRespBody.LogKey(), httpRecord->GetRespBody());
-                    LOG_DEBUG(sLogger, ("add one log, log timestamp", timeSpec.tv_sec)("nano", timeSpec.tv_nsec));
                 } else if (protocol == support_proto_e::ProtoMySQL) {
+                    auto* mysqlRecord = static_cast<MysqlRecord*>(record);
+                    logEvent->SetContent(kDBSystemName.LogKey(), "mysql");
+                    logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mysqlRecord->GetStatusCode()));
+                    logEvent->SetContent(kDBStatement.LogKey(), mysqlRecord->GetSql());
                 }
-
+                LOG_DEBUG(sLogger, ("add one log, log timestamp", timeSpec.tv_sec)("nano", timeSpec.tv_nsec));
                 needPush = true;
             }
         });
@@ -1092,6 +1095,10 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                     // spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaderMap());
                     // spanEvent->SetTag(kHTTPRespHeader.SpanKey(), httpRecord->GetRespHeaders());
                 } else if (protocol == support_proto_e::ProtoMySQL) {
+                    auto* mysqlRecord = static_cast<MysqlRecord*>(record);
+                    spanEvent->SetTag(kDBSystemName.SpanKey(), "mysql");
+                    spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mysqlRecord->GetStatusCode()));
+                    spanEvent->SetTag(kDBStatement.SpanKey(), mysqlRecord->GetSql());
                 }
 
                 struct timespec startTime = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());

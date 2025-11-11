@@ -23,6 +23,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/DataTable.h"
+#include "ebpf/type/table/DbTable.h"
 #include "ebpf/type/table/HttpTable.h"
 #include "ebpf/type/table/NetTable.h"
 #include "ebpf/type/table/StaticDataRow.h"
@@ -146,40 +147,28 @@ public:
     [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandType; }
 
     void SetErrorCode(int errorCode) { mErrorCode = errorCode; }
-    void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
-    void SetCommandType(const std::string& commandType) { mCommandType = commandType; }
-    void SetQuery(const std::string& query) { mQuery = query; }
-    void SetRealQuery(const std::string& query) { mRealQuery = query; }
-    void SetDatabaseName(const std::string& dbName) { mDatabaseName = dbName; }
-    void SetTableName(const std::string& tableName) { mTableName = tableName; }
-
     int GetErrorCode() const { return mErrorCode; }
+    void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
     const std::string& GetErrorMessage() const { return mErrorMsg; }
-    const std::string& GetCommandType() const { return mCommandType; }
-    const std::string& GetQuery() const { return mQuery; }
-    const std::string& GetRealQuery() const { return mRealQuery; }
-    const std::string& GetDatabaseName() const { return mDatabaseName; }
-    const std::string& GetTableName() const { return mTableName; }
-
-    void SetRowsAffected(uint64_t rows) { mRowsAffected = rows; }
-    void SetRowsExamined(uint64_t rows) { mRowsExamined = rows; }
-    uint64_t GetRowsAffected() const { return mRowsAffected; }
-    uint64_t GetRowsExamined() const { return mRowsExamined; }
     void SetSql(const std::string& sql) { mSql = sql; }
+
     const std::string& GetSql() const { return mSql; }
+
+    void SetSeqId(int seqId) { mSeqId = seqId; }
+    int GetSeqId() const { return mSeqId; }
+
+    void SetPacketLen(uint32_t packetLen) { mPacketLen = packetLen; }
+    uint32_t GetPacketLen() const { return mPacketLen; }
+    void SetCommand(uint32_t command) { mCommand = command; }
+    uint32_t GetCommand() const { return mCommand; }
 
     // private:
     int mCode = 0;
     int mErrorCode = 0;
     std::string mErrorMsg;
     std::string mCommandType;
-    std::string mQuery;
     std::string mRealQuery;
-    std::string mDatabaseName;
-    std::string mTableName;
     std::string mSql;
-    uint64_t mRowsAffected = 0;
-    uint64_t mRowsExamined = 0;
     int mSeqId = 0;
     uint32_t mPacketLen = 0;
     uint32_t mCommand = 0;
