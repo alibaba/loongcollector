@@ -122,16 +122,15 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
         auto old = mCurrenctConcurrency;
         mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * fallBackRatio), mMinConcurrency);
         LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
-
+    } else {
         // Enter time fallback state if decreased to minimum
-        if (mCurrenctConcurrency == mMinConcurrency && mTimeFallbackEnabled) {
+        if (mTimeFallbackEnabled) {
             mInTimeFallback = true;
             mTimeFallbackStartTime = std::chrono::system_clock::now();
             LOG_INFO(sLogger,
                      ("enter time fallback state", mDescription)("concurrency", mCurrenctConcurrency)(
                          "duration_seconds", kTimeFallbackDurationSeconds));
         }
-    } else {
         if (mMinConcurrency == 0) {
             mCurrenctConcurrency = 1;
             LOG_INFO(sLogger, ("decrease send concurrency to min, type", mDescription)("to", mCurrenctConcurrency));
