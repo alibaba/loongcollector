@@ -142,7 +142,7 @@ jobs:
       - name: Import Image from Tar
         run: docker load -i ./image.tar
 
-      - name: Check Disk Space Before Test
+      - name: Check Disk Space and Memory Before Test
         run: |
           echo "========================================="
           echo "Disk Space Information"
@@ -154,6 +154,15 @@ jobs:
           echo ""
           echo "Available disk space:"
           df -h / | awk 'NR==2 {print "Total: "$2", Used: "$3", Available: "$4", Use%: "$5}'
+          echo "========================================="
+          echo ""
+          echo "========================================="
+          echo "Memory Information"
+          echo "========================================="
+          free -h
+          echo ""
+          echo "Memory Usage Summary:"
+          free -h | awk 'NR==2 {print "Total: "$2", Used: "$3", Available: "$7}'
           echo "========================================="
 
       - name: E2E Behavior Test Case ${{ matrix.test_case }}
@@ -171,7 +180,9 @@ jobs:
               
               # Monitor doris startup
               for i in {1..36}; do
-                echo "[DIAGNOSTIC-$i] $(date) | Runner: $(df -h / | awk 'NR==2 {print $4" avail"}')"
+                RUNNER_DISK=$(df -h / | awk 'NR==2 {print $4" avail"}')
+                RUNNER_MEM=$(free -h | awk 'NR==2 {print $7" avail"}')
+                echo "[DIAGNOSTIC-$i] $(date) | Runner Disk: $RUNNER_DISK | Runner Mem: $RUNNER_MEM"
                 
                 # Container status
                 CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' doris 2>/dev/null || echo "unknown")
@@ -182,9 +193,9 @@ jobs:
                   exit 0
                 fi
                 
-                # Try to get disk info
+                # Try to get disk and memory info from container
                 if docker exec doris df -h / 2>&1 | head -2; then
-                  :
+                  docker exec doris free -h 2>&1 | head -2 || echo "[DIAGNOSTIC-$i] Cannot get container memory info"
                 else
                   echo "[DIAGNOSTIC-$i] Cannot exec in container, checking logs..."
                   docker logs doris 2>&1 | tail -50 | sed "s/^/[CONTAINER-LOG] /"
