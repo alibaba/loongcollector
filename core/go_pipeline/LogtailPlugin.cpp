@@ -27,8 +27,6 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
-// #include "container_manager/ConfigContainerInfoUpdateCmd.h"
-// #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -278,100 +276,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     }
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
-
-// static void extractContainerIds(const Json::Value &allCmd, std::vector<std::string> &ids) {
-//     assert(ids.empty());
-//     if (allCmd.isNull()) {
-//         return;
-//     }
-//     if (!allCmd.isArray()) {
-//         return;
-//     }
-//     for (auto it = allCmd.begin(); it != allCmd.end(); ++it) {
-//         const Json::Value& entry = *it;
-//         if (entry.isMember("ID") && entry["ID"].isString() && !entry["ID"].empty()) {
-//             ids.push_back(entry["ID"].asString());
-//         }
-//     }
-// }
-
-// int LogtailPlugin::ExecPluginCmd(
-//     const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen) {
-//     if (cmdId < (int)PLUGIN_CMD_MIN || cmdId > (int)PLUGIN_CMD_MAX) {
-//         LOG_ERROR(sLogger, ("invalid cmd", cmdId));
-//         return -2;
-//     }
-//     string configNameStr(configName, configNameSize);
-//     string paramsStr(params, paramsLen);
-//     PluginCmdType cmdType = (PluginCmdType)cmdId;
-//     LOG_DEBUG(sLogger, ("exec cmd", cmdType)("config", configNameStr)("detail", paramsStr));
-//     // cmd 解析json
-//     Json::Value jsonParams;
-//     std::string errorMsg;
-//     if (paramsStr.size() < (size_t)5 || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
-//         LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
-//         return -2;
-//     }
-
-//     // for InputCpuProfiling
-//     if (ebpf::ProcessDiscoveryManager::GetInstance()->CheckDiscoveryExist(configNameStr)) {
-//         LOG_DEBUG(sLogger, ("get container info for cpu profiling", "")("config", configNameStr)("cmdId", cmdId));
-//         switch (cmdType) {
-//             case PLUGIN_DOCKER_UPDATE_FILE:
-//             case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
-//                 std::vector<std::string> ids;
-//                 extractContainerIds(jsonParams["AllCmd"], ids);
-//                 bool succ = ebpf::ProcessDiscoveryManager::GetInstance()->UpdateDiscovery(
-//                     configNameStr, [&](ebpf::ProcessDiscoveryConfig& config) {
-//                         config.mContainerIds.insert(ids.begin(), ids.end());
-//                     });
-//                 // this may happen because we stop the c++ input first, then the go pipeline
-//                 if (!succ) {
-//                     LOG_WARNING(sLogger, ("try to update a removed config, config", configNameStr));
-//                 }
-//             } break;
-//             case PLUGIN_DOCKER_STOP_FILE: {
-//                 std::vector<std::string> ids;
-//                 extractContainerIds(jsonParams["AllCmd"], ids);
-//                 bool succ = ebpf::ProcessDiscoveryManager::GetInstance()->UpdateDiscovery(
-//                     configNameStr, [&](ebpf::ProcessDiscoveryConfig& config) {
-//                         for (auto& id : ids) {
-//                             config.mContainerIds.erase(id);
-//                         }
-//                     });
-//                 if (!succ) {
-//                     LOG_WARNING(sLogger, ("try to update a removed config, config", configNameStr));
-//                 }
-//             } break;
-//             default:
-//                 break;
-//         }
-//     }
-
-//     switch (cmdType) {
-//         case PLUGIN_DOCKER_UPDATE_FILE: {
-//             ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-//             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-//         } break;
-//         case PLUGIN_DOCKER_STOP_FILE: {
-//             ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-//             ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
-//         } break;
-//         case PLUGIN_DOCKER_REMOVE_FILE: {
-//             ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-//             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-//         } break;
-//         case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
-//             ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-//             ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-//         } break;
-//         default:
-//             LOG_ERROR(sLogger, ("unknown cmd", cmdType));
-//             break;
-//     }
-//     return 0;
-// }
-
 
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
