@@ -1433,6 +1433,7 @@ void PipelineUpdateUnittest::TestPipelineTopoUpdateCase13() const {
         = CollectionConfig(configName, make_unique<Json::Value>(pipelineConfigJson), filepath);
     pipelineConfigObj.Parse();
     diff.mAdded.push_back(std::move(pipelineConfigObj));
+    AppConfig::GetInstance()->mPurageContainerMode = true;
     pipelineManager->UpdatePipelines(diff);
     APSARA_TEST_EQUAL_FATAL(1U, pipelineManager->GetAllPipelines().size());
     APSARA_TEST_EQUAL_FATAL(true, LogtailPluginMock::GetInstance()->IsStarted());
