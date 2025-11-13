@@ -47,14 +47,6 @@ bool ConcurrencyLimiter::IsInTimeFallback() const {
     return mInTimeFallback;
 }
 
-void ConcurrencyLimiter::SetInTimeFallback(bool inFallback) {
-    lock_guard<mutex> lock(mLimiterMux);
-    mInTimeFallback = inFallback;
-    if (inFallback) {
-        mTimeFallbackStartTime = std::chrono::system_clock::now();
-    }
-}
-
 #endif
 
 bool ConcurrencyLimiter::IsValidToPop() {
@@ -63,8 +55,8 @@ bool ConcurrencyLimiter::IsValidToPop() {
     // Check if in time fallback state
     if (mInTimeFallback) {
         auto now = std::chrono::system_clock::now();
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - mTimeFallbackStartTime).count();
-        if (elapsed < kTimeFallbackDurationSeconds) {
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - mTimeFallbackStartTime).count();
+        if (elapsed < mTimeFallbackDurationMilliSeconds) {
             return false;
         }
         if (mCurrenctConcurrency > mInSendingCnt.load()) {
@@ -124,12 +116,12 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
         LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
         // Enter time fallback state if decreased to minimum
-        if (mTimeFallbackEnabled && !mInTimeFallback) {
+        if (mTimeFallbackDurationMilliSeconds > 0 && !mInTimeFallback) {
             mInTimeFallback = true;
             mTimeFallbackStartTime = std::chrono::system_clock::now();
             LOG_INFO(sLogger,
                      ("enter time fallback state", mDescription)("concurrency", mCurrenctConcurrency)(
-                         "duration_seconds", kTimeFallbackDurationSeconds));
+                         "duration_milliseconds", mTimeFallbackDurationMilliSeconds));
         }
         if (mMinConcurrency == 0) {
             mCurrenctConcurrency = 1;

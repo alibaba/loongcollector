@@ -28,20 +28,20 @@
 
 namespace logtail {
 
-constexpr uint32_t kTimeFallbackDurationSeconds = 3;
+constexpr uint32_t kTimeFallbackDurationMilliSeconds = 1000;
 
 class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
                        uint32_t maxConcurrency,
                        uint32_t minConcurrency = 1,
-                       bool timeFallbackEnabled = false,
+                       uint32_t timeFallbackDurationMilliSeconds = 0,
                        double concurrencyFastFallBackRatio = 0.5,
                        double concurrencySlowFallBackRatio = 0.8)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
-          mTimeFallbackEnabled(timeFallbackEnabled),
+          mTimeFallbackDurationMilliSeconds(timeFallbackDurationMilliSeconds),
           mCurrenctConcurrency(maxConcurrency),
           mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
           mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
@@ -73,7 +73,6 @@ public:
     uint32_t GetInSendingCount() const;
     uint32_t GetStatisticThreshold() const;
     bool IsInTimeFallback() const;
-    void SetInTimeFallback(bool inFallback);
 
 #endif
 
@@ -85,7 +84,7 @@ private:
     uint32_t mMaxConcurrency = 0;
     uint32_t mMinConcurrency = 0;
 
-    bool mTimeFallbackEnabled = false;
+    uint32_t mTimeFallbackDurationMilliSeconds = 0;
 
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
