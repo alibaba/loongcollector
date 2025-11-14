@@ -200,7 +200,7 @@ static void addContentToEvent(LogEvent *event, SourceBuffer *sourceBuffer,
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 
-    for (size_t i = fullStack.size() - 2; i >= 0; i--) {
+    for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
         stack += fullStack[i];
         if (i != 0) {
             stack += "\n";
