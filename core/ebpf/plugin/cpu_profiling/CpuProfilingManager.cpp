@@ -17,7 +17,10 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "common/HashUtil.h"
+#include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "common/UUIDUtil.h"
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 #include "ebpf/type/table/ProfileTable.h"
 
@@ -144,7 +147,7 @@ int CpuProfilingManager::Suspend() {
 }
 
 // stack, cnt, trace_id
-using StackCnt = std::tuple<std::string, uint32_t, std::string>;
+using StackCnt = std::tuple<std::vector<std::string>, uint32_t, std::string>;
 
 static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
     // Format: "<comm>:<pid>;<stacks> <cnt> <trace_id>\n"
@@ -177,8 +180,58 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
         if (traceId == "null") {
             traceId = "";
         }
-        result.push_back(std::make_tuple(stack, cnt, traceId));
+
+        std::vector<std::string> stackVec;
+        std::istringstream sstack(stack);
+        std::string func;
+        while (std::getline(sstack, func, ';')) {
+            stackVec.push_back(func);
+        }
+
+        result.push_back(std::make_tuple(std::move(stackVec), cnt, traceId));
     }
+}
+
+static void addContentToEvent(LogEvent *event, SourceBuffer *sourceBuffer,
+                              const std::vector<std::string> &fullStack, std::string comm) {
+    event->SetContent("dataType", std::string("CallStack"));
+    event->SetContent("language", std::string("go"));
+
+    std::string name = fullStack.back();
+    std::string stack; // stack without the top function name
+
+    for (size_t i = fullStack.size() - 2; i >= 0; i--) {
+        stack += fullStack[i];
+        if (i != 0) {
+            stack += "\n";
+        }
+    }
+
+    std::hash<std::string_view> hasher;
+    size_t hashStack = hasher(stack);
+    AttrHashCombine(hashStack, hasher(name));
+
+    std::string stackId = ToHexString(hashStack);
+
+    event->SetContent("name", name);
+    event->SetContent("stack", stack);
+    event->SetContent("stackID", stackId);
+
+    event->SetContent("type", std::string("profile_cpu"));
+    event->SetContent("type_cn", std::string(""));
+    event->SetContent("units", std::string("nanoseconds"));
+    event->SetContent("val", std::string("1"));
+    event->SetContent("valueType", std::string("cpu"));
+    event->SetContent("valueType_cn", std::string(""));
+
+    // {"__name__": "shuizhao-python-profiling-service", "thread": "abcd"}
+    std::string jsonLabels;
+    jsonLabels += "{\"__name__\": \"";
+    jsonLabels += "shuizhao-python-profiling-service";
+    jsonLabels += "\", \"thread\": \"";
+    jsonLabels += comm;
+    jsonLabels += "\"}";
+    event->SetContent("labels", jsonLabels);
 }
 
 void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
@@ -213,20 +266,29 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
+    std::string profileID = CalculateRandomUUID();
     
-    auto pidSb = sourceBuffer->CopyString(std::to_string(pid));
-    auto commSb = sourceBuffer->CopyString(std::string(comm));
-    for (auto& [stack, cnt, traceId] : stacks) {
-        auto* event = eventGroup.AddLogEvent();
+    // auto pidSb = sourceBuffer->CopyString(std::to_string(pid));
+    // auto commSb = sourceBuffer->CopyString(std::string(comm));
+    // for (auto& [stack, cnt, traceId] : stacks) {
+    //     auto* event = eventGroup.AddLogEvent();
+    //     event->SetTimestamp(logtime);
+    //     auto stackSb = sourceBuffer->CopyString(stack);
+    //     auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
+    //     auto traceIdSb = sourceBuffer->CopyString(traceId);
+    //     event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
+    //     event->SetContentNoCopy(kComm.LogKey(), StringView(commSb.data, commSb.size));
+    //     event->SetContentNoCopy(kStack.LogKey(), StringView(stackSb.data, stackSb.size));
+    //     event->SetContentNoCopy(kCnt.LogKey(), StringView(cntSb.data, cntSb.size));
+    //     event->SetContentNoCopy(kTraceId.LogKey(), StringView(traceIdSb.data, traceIdSb.size));
+    // }
+
+    for (auto &[stack, cnt, traceId] : stacks) {
+        auto *event = eventGroup.AddLogEvent();
         event->SetTimestamp(logtime);
-        auto stackSb = sourceBuffer->CopyString(stack);
-        auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
-        auto traceIdSb = sourceBuffer->CopyString(traceId);
-        event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
-        event->SetContentNoCopy(kComm.LogKey(), StringView(commSb.data, commSb.size));
-        event->SetContentNoCopy(kStack.LogKey(), StringView(stackSb.data, stackSb.size));
-        event->SetContentNoCopy(kCnt.LogKey(), StringView(cntSb.data, cntSb.size));
-        event->SetContentNoCopy(kTraceId.LogKey(), StringView(traceIdSb.data, traceIdSb.size));
+        event->SetContent("profileID", profileID);
+
+        addContentToEvent(event, sourceBuffer.get(), stack, std::string(comm));
     }
 
     for (auto& key : targets) {
