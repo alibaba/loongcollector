@@ -27,6 +27,9 @@ services:
       - "8040:8040"
     environment:
       - SKIP_CHECK_ULIMIT=true
+    privileged: true
+    sysctls:
+      vm.max_map_count: "2000000"
     shm_size: 2gb
     healthcheck:
       test: mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1" || exit 1
