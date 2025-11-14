@@ -178,6 +178,8 @@ jobs:
                 sleep 1
               done
               
+              echo "[DIAGNOSTIC] Doris container found, starting monitoring..."
+              
               # Monitor doris startup
               for i in {1..36}; do
                 RUNNER_DISK=$(df -h / | awk 'NR==2 {print $4" avail"}')
@@ -187,22 +189,36 @@ jobs:
                 # Container status
                 CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' doris 2>/dev/null || echo "unknown")
                 HEALTH=$(docker inspect --format='{{.State.Health.Status}}' doris 2>/dev/null || echo "unknown")
-                echo "[DIAGNOSTIC-$i] Container: $CONTAINER_STATUS | Health: $HEALTH"
+                EXIT_CODE=$(docker inspect --format='{{.State.ExitCode}}' doris 2>/dev/null || echo "N/A")
+                echo "[DIAGNOSTIC-$i] Container: $CONTAINER_STATUS | Health: $HEALTH | ExitCode: $EXIT_CODE"
                 
                 if [ "$HEALTH" = "healthy" ]; then
+                  echo "[DIAGNOSTIC-$i] Doris is healthy, monitoring complete"
                   exit 0
+                fi
+                
+                # If container exited, show logs immediately
+                if [ "$CONTAINER_STATUS" = "exited" ]; then
+                  echo "[DIAGNOSTIC-$i] Container exited! Showing last 100 lines of logs:"
+                  docker logs doris 2>&1 | tail -100 | sed "s/^/[CONTAINER-LOG] /"
+                  echo "[DIAGNOSTIC-$i] Showing container resource limits:"
+                  docker inspect doris | grep -A 20 "Memory\|ShmSize\|Ulimits" || echo "Cannot get resource info"
+                  sleep 10
+                  continue
                 fi
                 
                 # Try to get disk and memory info from container
                 if docker exec doris df -h / 2>&1 | head -2; then
                   docker exec doris free -h 2>&1 | head -2 || echo "[DIAGNOSTIC-$i] Cannot get container memory info"
                 else
-                  echo "[DIAGNOSTIC-$i] Cannot exec in container, checking logs..."
-                  docker logs doris 2>&1 | tail -50 | sed "s/^/[CONTAINER-LOG] /"
+                  echo "[DIAGNOSTIC-$i] Cannot exec in container yet..."
                 fi
                 
                 sleep 10
               done
+              
+              echo "[DIAGNOSTIC] Monitoring timeout reached, showing final logs:"
+              docker logs doris 2>&1 | tail -200 | sed "s/^/[FINAL-LOG] /"
             ) &
             echo $! > /tmp/doris_monitor.pid
           fi
