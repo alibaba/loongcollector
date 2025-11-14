@@ -6,34 +6,38 @@ set -e
 # Use environment variable or default to 'doris' (docker-compose service name)
 DORIS_HOST=${DORIS_HOST:-doris}
 
+# Add initial delay to let Doris fully start before making connections
+echo "Waiting 10 seconds before checking Doris status..."
+sleep 10
+
 echo "Waiting for Doris FE to be ready at $DORIS_HOST:9030..."
-# Wait for Doris FE to be ready (max 60 seconds)
-for i in {1..60}; do
-    if mysql -h $DORIS_HOST -P 9030 -u root -e "SELECT 1" &>/dev/null; then
+# Wait for Doris FE to be ready (max 100 seconds, check every 5 seconds)
+for i in {1..20}; do
+    if timeout 5 mysql -h $DORIS_HOST -P 9030 -u root --connect-timeout=3 -e "SELECT 1" &>/dev/null; then
         echo "Doris FE is ready!"
         break
     fi
-    echo "Waiting for Doris FE... ($i/60)"
-    sleep 1
+    echo "Waiting for Doris FE... ($i/20)"
+    sleep 5
 done
 
 echo "Waiting for Doris BE to be ready..."
-# Wait for at least one BE to be alive (max 60 seconds)
-for i in {1..60}; do
-    BE_ALIVE=$(mysql -h $DORIS_HOST -P 9030 -u root -e "SHOW BACKENDS" 2>/dev/null | grep -c "true" | head -n1 || echo "0")
+# Wait for at least one BE to be alive (max 100 seconds, check every 5 seconds)
+for i in {1..20}; do
+    BE_ALIVE=$(timeout 5 mysql -h $DORIS_HOST -P 9030 -u root --connect-timeout=3 -e "SHOW BACKENDS" 2>/dev/null | grep -c "true" | head -n1 || echo "0")
     if [ "$BE_ALIVE" -gt 0 ]; then
         echo "Doris BE is alive and ready!"
         break
     fi
-    echo "Waiting for BE to be alive... ($i/60)"
-    sleep 1
+    echo "Waiting for BE to be alive... ($i/20)"
+    sleep 5
 done
 
 echo "Verifying Doris cluster status..."
-mysql -h $DORIS_HOST -P 9030 -u root -e "SHOW BACKENDS\G" 2>/dev/null || echo "Warning: Cannot display BE status"
+timeout 5 mysql -h $DORIS_HOST -P 9030 -u root --connect-timeout=3 -e "SHOW BACKENDS\G" 2>/dev/null || echo "Warning: Cannot display BE status"
 
 echo "Creating test user and database..."
-mysql -h $DORIS_HOST -P 9030 -u root <<EOF
+timeout 10 mysql -h $DORIS_HOST -P 9030 -u root --connect-timeout=3 <<EOF
 
 -- Create test database
 CREATE DATABASE IF NOT EXISTS test_db;
