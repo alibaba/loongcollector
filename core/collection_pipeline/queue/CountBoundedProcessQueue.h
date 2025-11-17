@@ -18,21 +18,21 @@
 
 #include <cstdint>
 
+#include <deque>
 #include <memory>
-#include <queue>
 #include <vector>
 
-#include "collection_pipeline/queue/BoundedQueueInterface.h"
+#include "collection_pipeline/queue/CountBoundedQueueInterface.h"
 #include "collection_pipeline/queue/ProcessQueueInterface.h"
 #include "common/FeedbackInterface.h"
 
 namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
-class BoundedProcessQueue : public BoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
+class CountBoundedProcessQueue : public CountBoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
                             public ProcessQueueInterface {
 public:
-    BoundedProcessQueue(
+    CountBoundedProcessQueue(
         size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx);
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
@@ -49,7 +49,7 @@ private:
     std::vector<FeedbackInterface*> mUpStreamFeedbacks;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class BoundedProcessQueueUnittest;
+    friend class CountBoundedProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;
@@ -58,3 +58,4 @@ private:
 };
 
 } // namespace logtail
+

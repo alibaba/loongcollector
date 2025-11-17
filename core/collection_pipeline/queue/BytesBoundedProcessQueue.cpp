@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/BytesBoundedProcessQueue.h"
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 
@@ -20,35 +20,40 @@ using namespace std;
 
 namespace logtail {
 
-BoundedProcessQueue::BoundedProcessQueue(
-    size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx),
-      BoundedQueueInterface(key, cap, low, high, ctx),
-      ProcessQueueInterface(key, cap, priority, ctx) {
+BytesBoundedProcessQueue::BytesBoundedProcessQueue(
+    size_t maxBytes, size_t lowBytes, size_t highBytes, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
+    : QueueInterface(key, maxBytes, ctx),
+      BytesBoundedQueueInterface(key, maxBytes, lowBytes, highBytes, ctx),
+      ProcessQueueInterface(key, maxBytes, priority, ctx) {
     if (ctx.IsExactlyOnceEnabled()) {
         mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
     }
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
-bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
+bool BytesBoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     if (!IsValidToPush()) {
         return false;
     }
     item->mEnqueTime = chrono::system_clock::now();
-    auto size = item->mEventGroup.DataSize();
-    mQueue.push_back(std::move(item));
-    ChangeStateIfNeededAfterPush();
+    size_t itemBytes = item->mEventGroup.DataSize();
+    
+    // Update bytes tracking before push
+    mCurrentBytesSize += itemBytes;
+    mQueue.emplace_back(std::move(item));
+    
+    // Check if reached high watermark
+    ChangeStateIfNeededAfterPush(itemBytes);
 
     ADD_COUNTER(mInItemsTotal, 1);
-    ADD_COUNTER(mInItemDataSizeBytes, size);
+    ADD_COUNTER(mInItemDataSizeBytes, itemBytes);
     SET_GAUGE(mQueueSizeTotal, Size());
-    ADD_COUNTER(mQueueDataSizeByte, size);
+    SET_GAUGE(mQueueDataSizeByte, mCurrentBytesSize);
     SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
-bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
+bool BytesBoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     ADD_COUNTER(mFetchTimesCnt, 1);
     if (Empty()) {
         return false;
@@ -57,22 +62,28 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     if (!IsValidToPop()) {
         return false;
     }
+    
     item = std::move(mQueue.front());
+    size_t itemBytes = item->mEventGroup.DataSize();
     mQueue.pop_front();
+    mCurrentBytesSize -= itemBytes;
+    
     item->AddPipelineInProcessCnt(GetConfigName());
-    if (ChangeStateIfNeededAfterPop()) {
+    
+    // Check if reached low watermark and can resume accepting data
+    if (ChangeStateIfNeededAfterPop(itemBytes)) {
         GiveFeedback();
     }
 
     ADD_COUNTER(mOutItemsTotal, 1);
     ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - item->mEnqueTime);
     SET_GAUGE(mQueueSizeTotal, Size());
-    SUB_GAUGE(mQueueDataSizeByte, item->mEventGroup.DataSize());
+    SET_GAUGE(mQueueDataSizeByte, mCurrentBytesSize);
     SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
 }
 
-void BoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
+void BytesBoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
     mUpStreamFeedbacks.clear();
     for (auto& item : feedbacks) {
         if (item == nullptr) {
@@ -83,10 +94,11 @@ void BoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feed
     }
 }
 
-void BoundedProcessQueue::GiveFeedback() const {
+void BytesBoundedProcessQueue::GiveFeedback() const {
     for (auto& item : mUpStreamFeedbacks) {
         item->Feedback(mKey);
     }
 }
 
 } // namespace logtail
+

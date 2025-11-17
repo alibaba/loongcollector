@@ -14,13 +14,16 @@
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
+#include "collection_pipeline/queue/BytesBoundedProcessQueue.h"
 #include "collection_pipeline/queue/CircularProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/Flags.h"
 
+// For one queue, only one of the following two flags will be used.
 DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 5);
+DEFINE_FLAG_INT32(bounded_process_queue_max_bytes_size, "", 5 * 128 * 1024);
 
 DECLARE_FLAG_INT32(process_thread_count);
 
@@ -28,21 +31,23 @@ using namespace std;
 
 namespace logtail {
 
-ProcessQueueManager::ProcessQueueManager() : mBoundedQueueParam(INT32_FLAG(bounded_process_queue_capacity)) {
+ProcessQueueManager::ProcessQueueManager()
+    : mCountBoundedQueueParam(INT32_FLAG(bounded_process_queue_capacity)),
+      mBytesBoundedQueueParam(INT32_FLAG(bounded_process_queue_max_bytes_size)) {
     ResetCurrentQueueIndex();
 }
 
-bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key,
+bool ProcessQueueManager::CreateOrUpdateCountBoundedQueue(QueueKey key,
                                                      uint32_t priority,
                                                      const CollectionPipelineContext& ctx) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
-        if (iter->second.second != QueueType::BOUNDED) {
+        if (iter->second.second != QueueType::COUNT_BOUNDED) {
             // queue type change only happen when all input plugin types are changed. in such case, old input data not
             // been processed can be discarded since whole pipeline is actually changed.
             DeleteQueueEntity(iter->second.first);
-            CreateBoundedQueue(key, priority, ctx);
+            CreateCountBoundedQueue(key, priority, ctx);
         } else {
             if ((*iter->second.first)->GetPriority() == priority) {
                 return false;
@@ -50,7 +55,7 @@ bool ProcessQueueManager::CreateOrUpdateBoundedQueue(QueueKey key,
             AdjustQueuePriority(iter->second.first, priority);
         }
     } else {
-        CreateBoundedQueue(key, priority, ctx);
+        CreateCountBoundedQueue(key, priority, ctx);
     }
     if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
         mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
@@ -86,6 +91,32 @@ bool ProcessQueueManager::CreateOrUpdateCircularQueue(QueueKey key,
     return true;
 }
 
+bool ProcessQueueManager::CreateOrUpdateBytesBoundedQueue(QueueKey key,
+                                                          uint32_t priority,
+                                                          const CollectionPipelineContext& ctx) {
+    lock_guard<mutex> lock(mQueueMux);
+    auto iter = mQueues.find(key);
+    if (iter != mQueues.end()) {
+        if (iter->second.second != QueueType::BYTES_BOUNDED) {
+            // queue type change only happen when all input plugin types are changed. in such case, old input data not
+            // been processed can be discarded since whole pipeline is actually changed.
+            DeleteQueueEntity(iter->second.first);
+            CreateBytesBoundedQueue(key, priority, ctx);
+        } else {
+            if ((*iter->second.first)->GetPriority() == priority) {
+                return false;
+            }
+            AdjustQueuePriority(iter->second.first, priority);
+        }
+    } else {
+        CreateBytesBoundedQueue(key, priority, ctx);
+    }
+    if (mCurrentQueueIndex.second == mPriorityQueue[mCurrentQueueIndex.first].end()) {
+        mCurrentQueueIndex.second = mPriorityQueue[mCurrentQueueIndex.first].begin();
+    }
+    return true;
+}
+
 bool ProcessQueueManager::DeleteQueue(QueueKey key) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
@@ -102,11 +133,13 @@ bool ProcessQueueManager::IsValidToPush(QueueKey key) const {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
-        if (iter->second.second == QueueType::BOUNDED) {
-            return static_cast<BoundedProcessQueue*>(iter->second.first->get())->IsValidToPush();
-        } else {
-            return true;
+        if (iter->second.second == QueueType::COUNT_BOUNDED) {
+            return static_cast<CountBoundedProcessQueue*>(iter->second.first->get())->IsValidToPush();
         }
+        if (iter->second.second == QueueType::BYTES_BOUNDED) {
+            return static_cast<BytesBoundedProcessQueue*>(iter->second.first->get())->IsValidToPush();
+        }
+        return true;
     }
     return ExactlyOnceQueueManager::GetInstance()->IsValidToPushProcessQueue(key);
 }
@@ -227,7 +260,11 @@ bool ProcessQueueManager::SetFeedbackInterface(QueueKey key, vector<FeedbackInte
     if (iter->second.second == QueueType::CIRCULAR) {
         return false;
     }
-    static_cast<BoundedProcessQueue*>(iter->second.first->get())->SetUpStreamFeedbacks(std::move(feedback));
+    if (iter->second.second == QueueType::COUNT_BOUNDED) {
+        static_cast<CountBoundedProcessQueue*>(iter->second.first->get())->SetUpStreamFeedbacks(std::move(feedback));
+    } else if (iter->second.second == QueueType::BYTES_BOUNDED) {
+        static_cast<BytesBoundedProcessQueue*>(iter->second.first->get())->SetUpStreamFeedbacks(std::move(feedback));
+    }
     return true;
 }
 
@@ -276,14 +313,14 @@ void ProcessQueueManager::Trigger() {
     mCond.notify_one();
 }
 
-void ProcessQueueManager::CreateBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx) {
-    mPriorityQueue[priority].emplace_back(make_unique<BoundedProcessQueue>(mBoundedQueueParam.GetCapacity(),
-                                                                           mBoundedQueueParam.GetLowWatermark(),
-                                                                           mBoundedQueueParam.GetHighWatermark(),
+void ProcessQueueManager::CreateCountBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx) {
+    mPriorityQueue[priority].emplace_back(make_unique<CountBoundedProcessQueue>(mCountBoundedQueueParam.GetCapacity(),
+                                                                           mCountBoundedQueueParam.GetLowWatermark(),
+                                                                           mCountBoundedQueueParam.GetHighWatermark(),
                                                                            key,
                                                                            priority,
                                                                            ctx));
-    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::BOUNDED);
+    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::COUNT_BOUNDED);
 }
 
 void ProcessQueueManager::CreateCircularQueue(QueueKey key,
@@ -292,6 +329,19 @@ void ProcessQueueManager::CreateCircularQueue(QueueKey key,
                                               const CollectionPipelineContext& ctx) {
     mPriorityQueue[priority].emplace_back(make_unique<CircularProcessQueue>(capacity, key, priority, ctx));
     mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::CIRCULAR);
+}
+
+void ProcessQueueManager::CreateBytesBoundedQueue(QueueKey key,
+                                                  uint32_t priority,
+                                                  const CollectionPipelineContext& ctx) {
+    mPriorityQueue[priority].emplace_back(make_unique<BytesBoundedProcessQueue>(
+        mBytesBoundedQueueParam.GetMaxBytesSize(),
+        mBytesBoundedQueueParam.GetLowBytesWatermark(),
+        mBytesBoundedQueueParam.GetHighBytesWatermark(),
+        key,
+        priority,
+        ctx));
+    mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::BYTES_BOUNDED);
 }
 
 void ProcessQueueManager::AdjustQueuePriority(const ProcessQueueIterator& iter, uint32_t priority) {

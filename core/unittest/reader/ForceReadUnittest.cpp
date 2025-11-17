@@ -119,7 +119,7 @@ protected:
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
         FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
         ProcessQueueManager::GetInstance()->EnablePop(mConfigName);
     }
 

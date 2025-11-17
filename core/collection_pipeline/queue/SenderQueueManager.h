@@ -80,7 +80,7 @@ private:
     SenderQueueManager();
     ~SenderQueueManager() = default;
 
-    BoundedQueueParam mDefaultQueueParam;
+    CountBoundedQueueParam mDefaultQueueParam;
 
     mutable std::mutex mQueueMux;
     std::unordered_map<QueueKey, SenderQueue> mQueues;

@@ -15,7 +15,7 @@
 #include <memory>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/SenderQueue.h"
 #include "common/FeedbackInterface.h"
 #include "models/PipelineEventGroup.h"
@@ -36,7 +36,7 @@ protected:
     static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
 
     void SetUp() override {
-        mQueue.reset(new BoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
+        mQueue.reset(new CountBoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
 
         mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
         mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
@@ -60,7 +60,7 @@ private:
         return make_unique<ProcessQueueItem>(std::move(g), 0);
     }
 
-    unique_ptr<BoundedProcessQueue> mQueue;
+    unique_ptr<CountBoundedProcessQueue> mQueue;
     unique_ptr<FeedbackInterface> mFeedback1;
     unique_ptr<FeedbackInterface> mFeedback2;
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue1;
@@ -122,7 +122,7 @@ void BoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME,
                                                         METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE));
-    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "count_bounded"));
 
     auto item = GenerateItem();
     auto e = item->mEventGroup.AddLogEvent();
