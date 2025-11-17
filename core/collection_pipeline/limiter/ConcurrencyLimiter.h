@@ -29,6 +29,8 @@
 namespace logtail {
 
 constexpr uint32_t kTimeFallbackDurationMilliSeconds = 1000;
+constexpr double kTimeFallbackBackoffMultiplier = 2.0;
+constexpr uint32_t kTimeFallbackMaxDurationMilliSeconds = 60000; // 60 seconds
 
 class ConcurrencyLimiter {
 public:
@@ -37,11 +39,16 @@ public:
                        uint32_t minConcurrency = 1,
                        uint32_t timeFallbackDurationMilliSeconds = 0,
                        double concurrencyFastFallBackRatio = 0.5,
-                       double concurrencySlowFallBackRatio = 0.8)
+                       double concurrencySlowFallBackRatio = 0.8,
+                       double timeFallbackBackoffMultiplier = kTimeFallbackBackoffMultiplier,
+                       uint32_t timeFallbackMaxDurationMilliSeconds = kTimeFallbackMaxDurationMilliSeconds)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
           mTimeFallbackDurationMilliSeconds(timeFallbackDurationMilliSeconds),
+          mTimeFallbackBackoffMultiplier(timeFallbackBackoffMultiplier),
+          mTimeFallbackMaxDurationMilliSeconds(timeFallbackMaxDurationMilliSeconds),
+          mTimeFallbackCurrentDurationMilliSeconds(timeFallbackDurationMilliSeconds),
           mCurrenctConcurrency(maxConcurrency),
           mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
           mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
@@ -85,6 +92,9 @@ private:
     uint32_t mMinConcurrency = 0;
 
     uint32_t mTimeFallbackDurationMilliSeconds = 0;
+    double mTimeFallbackBackoffMultiplier = kTimeFallbackBackoffMultiplier;
+    uint32_t mTimeFallbackMaxDurationMilliSeconds = kTimeFallbackMaxDurationMilliSeconds;
+    uint32_t mTimeFallbackCurrentDurationMilliSeconds = 0;
 
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
