@@ -134,8 +134,16 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
     }
     auto limiter = iter->second.lock();
     if (!limiter) {
-        limiter = make_shared<ConcurrencyLimiter>(
-            sName + "#quota#logstore#" + key, AppConfig::GetInstance()->GetSendRequestConcurrency(), 1, 100);
+        limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency(),
+                                                  1,
+                                                  100,
+                                                  0.5,
+                                                  0.8,
+                                                  2.0,
+                                                  60000,
+                                                  3,
+                                                  1);
         iter->second = limiter;
     }
     return limiter;
@@ -145,8 +153,16 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     lock_guard<mutex> lock(sMux);
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
-        auto limiter = make_shared<ConcurrencyLimiter>(
-            sName + "#quota#project#" + project, AppConfig::GetInstance()->GetSendRequestConcurrency(), 1, 1000);
+        auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency(),
+                                                       1,
+                                                       1000,
+                                                       0.5,
+                                                       0.8,
+                                                       2.0,
+                                                       60000,
+                                                       3,
+                                                       1);
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }

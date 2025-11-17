@@ -39,7 +39,7 @@ uint32_t ConcurrencyLimiter::GetInSendingCount() const {
 }
 
 uint32_t ConcurrencyLimiter::GetStatisticThreshold() const {
-    return CONCURRENCY_STATISTIC_THRESHOLD;
+    return mStatisticThreshold;
 }
 
 bool ConcurrencyLimiter::IsInTimeFallback() const {
@@ -160,9 +160,9 @@ void ConcurrencyLimiter::AdjustConcurrency(bool success, std::chrono::system_clo
         if (mLastStatisticsTime == std::chrono::system_clock::time_point()) {
             mLastStatisticsTime = currentTime;
         }
-        if (mStatisticsTotal == CONCURRENCY_STATISTIC_THRESHOLD
+        if (mStatisticsTotal == mStatisticThreshold
             || chrono::duration_cast<chrono::seconds>(currentTime - mLastStatisticsTime).count()
-                > CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS) {
+                > mStatisticIntervalThresholdSeconds) {
             failPercentage = mStatisticsFailTotal * 100 / mStatisticsTotal;
             mStatisticsTotal = 0;
             mStatisticsFailTotal = 0;
