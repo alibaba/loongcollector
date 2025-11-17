@@ -144,7 +144,8 @@ bool ProcessorParseTimestampNative::ProcessEvent(StringView logPath,
     }
     if (logTime.tv_sec <= 0
         || (BOOL_FLAG(ilogtail_discard_old_data)
-            && (time(NULL) - logTime.tv_sec) > INT32_FLAG(ilogtail_discard_interval))) {
+            && (time(NULL) - logTime.tv_sec) > INT32_FLAG(ilogtail_discard_interval)
+            && mContext->GetPipeline().GetInputs()[0]->Name() == InputFile::sName)) {
         if (AppConfig::GetInstance()->IsLogParseAlarmValid()) {
             if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
                 LOG_WARNING(sLogger,
