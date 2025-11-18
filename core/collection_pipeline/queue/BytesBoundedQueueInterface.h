@@ -23,7 +23,8 @@ namespace logtail {
 template <typename T>
 class BytesBoundedQueueInterface : virtual public QueueInterface<T> {
 public:
-    BytesBoundedQueueInterface(QueueKey key, size_t maxBytes, size_t lowBytes, size_t highBytes, const CollectionPipelineContext& ctx)
+    BytesBoundedQueueInterface(
+        QueueKey key, size_t maxBytes, size_t lowBytes, size_t highBytes, const CollectionPipelineContext& ctx)
         : QueueInterface<T>(key, maxBytes, ctx), mLowBytesWatermark(lowBytes), mHighBytesWatermark(highBytes) {
         this->mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_QUEUE_TYPE, "bytes_bounded"}});
         mValidToPushFlag = this->mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_VALID_TO_PUSH_FLAG);
@@ -81,4 +82,3 @@ private:
 };
 
 } // namespace logtail
-

@@ -80,6 +80,7 @@ private:
     friend class ExactlyOnceQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
     friend class PipelineUpdateUnittest;
+    friend class BytesBoundedProcessQueueUnittest;
 #endif
 };
 
