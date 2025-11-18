@@ -87,18 +87,6 @@ void ConcurrencyLimiter::OnSendDone() {
 }
 
 void ConcurrencyLimiter::OnSuccess(std::chrono::system_clock::time_point currentTime) {
-    // Clear time fallback state immediately on any success for fast recovery
-    {
-        lock_guard<mutex> lock(mLimiterMux);
-        if (mInTimeFallback) {
-            mInTimeFallback = false;
-            // Reset backoff duration on success
-            mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
-            LOG_INFO(sLogger,
-                     ("exit time fallback state on success", mDescription)("reset_duration_ms",
-                                                                           mTimeFallbackCurrentDurationMilliSeconds));
-        }
-    }
     AdjustConcurrency(true, currentTime);
 }
 
@@ -108,6 +96,15 @@ void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point currentTim
 
 void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
+    // Clear time fallback state immediately on any success for fast recovery
+    if (mInTimeFallback) {
+        mInTimeFallback = false;
+        // Reset backoff duration on success
+        mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
+        LOG_INFO(sLogger,
+                 ("exit time fallback state on success", mDescription)("reset_duration_ms",
+                                                                       mTimeFallbackCurrentDurationMilliSeconds));
+    }
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
         if (mCurrenctConcurrency == mMaxConcurrency) {
