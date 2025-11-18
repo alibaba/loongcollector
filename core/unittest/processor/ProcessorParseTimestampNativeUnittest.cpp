@@ -17,7 +17,9 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
+#include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/CollectionConfig.h"
@@ -30,6 +32,10 @@ namespace logtail {
 
 class ProcessorParseTimestampNativeUnittest : public ::testing::Test {
 public:
+    static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
+
+    static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
+
     void SetUp() override {
 #ifdef _MSC_VER
         _putenv_s("TZ", "UTC");
@@ -558,6 +564,38 @@ void ProcessorParseTimestampNativeUnittest::TestProcessRegularFormatFailed() {
 }
 
 void ProcessorParseTimestampNativeUnittest::TestProcessHistoryDiscard() {
+    // setup pipeline with input_file
+    std::unique_ptr<Json::Value> pipelineConfigJson(new Json::Value());
+    std::string pipelineConfigStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_file",
+                    "FilePaths": [
+                        "/tmp/test.log"
+                    ]
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls",
+                    "Project": "test_project",
+                    "Logstore": "test_logstore",
+                    "Region": "test_region",
+                    "Endpoint": "test_endpoint"
+                }
+            ]
+        }
+    )";
+    std::string errorMsg;
+    APSARA_TEST_TRUE_FATAL(ParseJsonTable(pipelineConfigStr, *pipelineConfigJson, errorMsg));
+    std::unique_ptr<CollectionConfig> pipelineConfig(
+        new CollectionConfig("project##config_0", std::move(pipelineConfigJson), "/fake/path"));
+    APSARA_TEST_TRUE_FATAL(pipelineConfig->Parse());
+    std::unique_ptr<CollectionPipeline> pipeline(new CollectionPipeline());
+    APSARA_TEST_TRUE_FATAL(pipeline->Init(std::move(*pipelineConfig)));
+    mContext.SetPipeline(*pipeline.get());
+
     // make config
     Json::Value config;
     config["SourceKey"] = "time";
