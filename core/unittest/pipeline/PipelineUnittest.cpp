@@ -2504,8 +2504,7 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
-    APSARA_TEST_EQUAL(QueueType::CIRCULAR,
-                      ProcessQueueManager::GetInstance()->mQueues[key].second);
+    APSARA_TEST_EQUAL(QueueType::CIRCULAR, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());

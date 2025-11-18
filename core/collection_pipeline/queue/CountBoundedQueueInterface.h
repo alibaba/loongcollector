@@ -73,7 +73,7 @@ private:
     bool mValidToPush = true;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class CountBoundedProcessQueueUnittest;
+    friend class BoundedProcessQueueUnittest;
     friend class CircularProcessQueueUnittest;
     friend class ExactlyOnceSenderQueueUnittest;
     friend class ProcessQueueManagerUnittest;
