@@ -125,7 +125,7 @@ void BytesBoundedProcessQueueUnittest::TestPop() {
     APSARA_TEST_FALSE(mQueue->Pop(item));
 
     // Push some items
-    auto item1 = GenerateItemWithSize(3000);
+    auto item1 = GenerateItemWithSize(3500);
     mQueue->Push(std::move(item1));
 
     // Invalidate pop
@@ -139,11 +139,11 @@ void BytesBoundedProcessQueueUnittest::TestPop() {
     mSenderQueue1->mValidToPush = true;
 
     // Push to high watermark
-    auto item2 = GenerateItemWithSize(3000);
+    auto item2 = GenerateItemWithSize(3500);
     size_t item2Size = item2->mEventGroup.DataSize();
     mQueue->Push(std::move(item2));
 
-    auto item3 = GenerateItemWithSize(2500);
+    auto item3 = GenerateItemWithSize(1500);
     size_t item3Size = item3->mEventGroup.DataSize();
     mQueue->Push(std::move(item3));
 
@@ -241,12 +241,12 @@ void BytesBoundedProcessQueueUnittest::TestBytesWatermark() {
     APSARA_TEST_EQUAL(0U, mQueue->mCurrentBytesSize);
 
     // Push items to just below high watermark
-    auto item1 = GenerateItemWithSize(7900);
+    auto item1 = GenerateItemWithSize(7500);
     APSARA_TEST_TRUE(mQueue->Push(std::move(item1)));
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
 
     // Push to reach or exceed high watermark
-    auto item2 = GenerateItemWithSize(200);
+    auto item2 = GenerateItemWithSize(500);
     size_t item2Size = item2->mEventGroup.DataSize();
     APSARA_TEST_TRUE(mQueue->Push(std::move(item2)));
 
