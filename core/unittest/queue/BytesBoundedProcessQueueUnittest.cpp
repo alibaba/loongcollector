@@ -60,9 +60,9 @@ protected:
 private:
     static CollectionPipelineContext sCtx;
     static const QueueKey sKey = 0;
-    static const size_t sMaxBytes = 10000;  // max capacity in bytes
-    static const size_t sLowWatermark = 2000;   // low watermark in bytes
-    static const size_t sHighWatermark = 8000;  // high watermark in bytes
+    static const size_t sMaxBytes = 10000; // max capacity in bytes
+    static const size_t sLowWatermark = 2000; // low watermark in bytes
+    static const size_t sHighWatermark = 8000; // high watermark in bytes
 
     // Generate an item with specified content to control data size
     unique_ptr<ProcessQueueItem> GenerateItem(const string& content = "") {
@@ -120,7 +120,7 @@ void BytesBoundedProcessQueueUnittest::TestPush() {
 
 void BytesBoundedProcessQueueUnittest::TestPop() {
     unique_ptr<ProcessQueueItem> item;
-    
+
     // Nothing to pop from empty queue
     APSARA_TEST_FALSE(mQueue->Pop(item));
 
@@ -142,7 +142,7 @@ void BytesBoundedProcessQueueUnittest::TestPop() {
     auto item2 = GenerateItemWithSize(3000);
     size_t item2Size = item2->mEventGroup.DataSize();
     mQueue->Push(std::move(item2));
-    
+
     auto item3 = GenerateItemWithSize(2500);
     size_t item3Size = item3->mEventGroup.DataSize();
     mQueue->Push(std::move(item3));
@@ -167,20 +167,20 @@ void BytesBoundedProcessQueueUnittest::TestPop() {
 void BytesBoundedProcessQueueUnittest::TestSetUpStreamFeedbacks() {
     // Clear existing feedbacks
     mQueue->SetUpStreamFeedbacks(vector<FeedbackInterface*>{});
-    
+
     // Push to high watermark and pop to low watermark
     auto item1 = GenerateItemWithSize(5000);
     mQueue->Push(std::move(item1));
     auto item2 = GenerateItemWithSize(3500);
     mQueue->Push(std::move(item2));
-    
+
     APSARA_TEST_FALSE(mQueue->IsValidToPush());
-    
+
     // Pop items - no feedback should be triggered since we cleared feedbacks
     unique_ptr<ProcessQueueItem> item;
     mQueue->Pop(item);
     mQueue->Pop(item);
-    
+
     // These should still be false since we cleared the feedbacks
     APSARA_TEST_FALSE(static_cast<FeedbackInterfaceMock*>(mFeedback1.get())->HasFeedback(sKey));
     APSARA_TEST_FALSE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
@@ -188,18 +188,17 @@ void BytesBoundedProcessQueueUnittest::TestSetUpStreamFeedbacks() {
     // Set feedbacks again with nullptr handling
     static_cast<FeedbackInterfaceMock*>(mFeedback1.get())->Clear();
     static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->Clear();
-    mQueue->SetUpStreamFeedbacks(
-        vector<FeedbackInterface*>{mFeedback1.get(), nullptr, mFeedback2.get()});
+    mQueue->SetUpStreamFeedbacks(vector<FeedbackInterface*>{mFeedback1.get(), nullptr, mFeedback2.get()});
 
     // Trigger feedback by reaching high and then low watermark
     auto item3 = GenerateItemWithSize(5000);
     mQueue->Push(std::move(item3));
     auto item4 = GenerateItemWithSize(3500);
     mQueue->Push(std::move(item4));
-    
+
     mQueue->Pop(item);
     mQueue->Pop(item);
-    
+
     // Feedbacks should be triggered
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback1.get())->HasFeedback(sKey));
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
@@ -250,15 +249,15 @@ void BytesBoundedProcessQueueUnittest::TestBytesWatermark() {
     auto item2 = GenerateItemWithSize(200);
     size_t item2Size = item2->mEventGroup.DataSize();
     APSARA_TEST_TRUE(mQueue->Push(std::move(item2)));
-    
+
     // Should now be invalid to push
     APSARA_TEST_FALSE(mQueue->IsValidToPush());
-    
+
     // Pop one item but stay above low watermark
     unique_ptr<ProcessQueueItem> item;
     APSARA_TEST_TRUE(mQueue->Pop(item));
     APSARA_TEST_EQUAL(item2Size, mQueue->mCurrentBytesSize);
-    
+
     // Should still be invalid to push (above low watermark)
     if (item2Size > sLowWatermark) {
         APSARA_TEST_FALSE(mQueue->IsValidToPush());
@@ -273,14 +272,14 @@ void BytesBoundedProcessQueueUnittest::TestBytesWatermark() {
 void BytesBoundedProcessQueueUnittest::TestEmptyQueue() {
     // Test operations on empty queue
     unique_ptr<ProcessQueueItem> item;
-    
+
     // Pop from empty queue
     APSARA_TEST_FALSE(mQueue->Pop(item));
     APSARA_TEST_EQUAL(0U, mQueue->mCurrentBytesSize);
-    
+
     // Queue should be valid to push when empty
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
-    
+
     // Size should be 0
     APSARA_TEST_EQUAL(0U, mQueue->mQueue.size());
 }
@@ -289,28 +288,28 @@ void BytesBoundedProcessQueueUnittest::TestSingleItemExceedsMaxBytes() {
     // Test pushing a single item that exceeds maxBytes
     // Note: Current implementation allows this if IsValidToPush() is true
     // This tests the actual behavior
-    
+
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
     APSARA_TEST_EQUAL(0U, mQueue->mCurrentBytesSize);
-    
+
     // Create an item larger than maxBytes (10000)
     auto largeItem = GenerateItemWithSize(12000);
     size_t largeItemSize = largeItem->mEventGroup.DataSize();
-    
+
     // According to current implementation, this will be accepted if IsValidToPush() is true
     APSARA_TEST_TRUE(mQueue->Push(std::move(largeItem)));
     APSARA_TEST_EQUAL(largeItemSize, mQueue->mCurrentBytesSize);
-    
+
     // After pushing, the queue should exceed maxBytes and be invalid to push
     APSARA_TEST_FALSE(mQueue->IsValidToPush());
-    
+
     // Try to push another item, should fail
     auto anotherItem = GenerateItemWithSize(100);
     APSARA_TEST_FALSE(mQueue->Push(std::move(anotherItem)));
-    
+
     // Current bytes should remain unchanged
     APSARA_TEST_EQUAL(largeItemSize, mQueue->mCurrentBytesSize);
-    
+
     // Pop the large item
     unique_ptr<ProcessQueueItem> item;
     APSARA_TEST_TRUE(mQueue->Pop(item));
@@ -321,55 +320,55 @@ void BytesBoundedProcessQueueUnittest::TestSingleItemExceedsMaxBytes() {
 void BytesBoundedProcessQueueUnittest::TestSingleItemExceedsHighWatermark() {
     // Test pushing a single item that exceeds high watermark but not maxBytes
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
-    
+
     // Create an item larger than highWatermark (8000) but smaller than maxBytes (10000)
     auto item = GenerateItemWithSize(9000);
     size_t itemSize = item->mEventGroup.DataSize();
-    
+
     // Should be able to push
     APSARA_TEST_TRUE(mQueue->Push(std::move(item)));
     APSARA_TEST_EQUAL(itemSize, mQueue->mCurrentBytesSize);
-    
+
     // After pushing, should be invalid to push (exceeded high watermark)
     APSARA_TEST_FALSE(mQueue->IsValidToPush());
-    
+
     // Pop the item
     unique_ptr<ProcessQueueItem> poppedItem;
     APSARA_TEST_TRUE(mQueue->Pop(poppedItem));
     APSARA_TEST_EQUAL(0U, mQueue->mCurrentBytesSize);
-    
+
     // Should be valid to push again (below low watermark)
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
 }
 
 void BytesBoundedProcessQueueUnittest::TestExactWatermarkBoundaries() {
     // Test exact boundary conditions for watermarks
-    
+
     // Test: Push exactly to low watermark
     auto item1 = GenerateItemWithSize(2000);
     size_t item1Size = item1->mEventGroup.DataSize();
     APSARA_TEST_TRUE(mQueue->Push(std::move(item1)));
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
-    
+
     // Test: Push to exactly high watermark
     size_t remaining = sHighWatermark - item1Size;
     if (remaining > 0) {
         auto item2 = GenerateItemWithSize(remaining);
         APSARA_TEST_TRUE(mQueue->Push(std::move(item2)));
-        
+
         // Should be at or near high watermark
         if (mQueue->mCurrentBytesSize >= sHighWatermark) {
             APSARA_TEST_FALSE(mQueue->IsValidToPush());
         }
     }
-    
+
     // Clear queue
     unique_ptr<ProcessQueueItem> item;
     while (mQueue->Pop(item)) {
         // Pop all items
     }
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
-    
+
     // Test: Push exactly maxBytes in a single item
     auto maxItem = GenerateItemWithSize(sMaxBytes);
     size_t maxItemSize = maxItem->mEventGroup.DataSize();
@@ -380,10 +379,10 @@ void BytesBoundedProcessQueueUnittest::TestExactWatermarkBoundaries() {
 
 void BytesBoundedProcessQueueUnittest::TestQueueFullScenario() {
     // Test complete scenario of filling the queue to capacity
-    
+
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
     size_t totalPushed = 0;
-    
+
     // Push items until we hit high watermark
     while (mQueue->IsValidToPush() && totalPushed < sMaxBytes) {
         auto item = GenerateItemWithSize(1500);
@@ -394,21 +393,21 @@ void BytesBoundedProcessQueueUnittest::TestQueueFullScenario() {
             break;
         }
     }
-    
+
     // Should have exceeded high watermark
     APSARA_TEST_FALSE(mQueue->IsValidToPush());
     APSARA_TEST_TRUE(mQueue->mCurrentBytesSize >= sHighWatermark);
-    
+
     // Try to push when queue is "full" (exceeded high watermark)
     auto failItem = GenerateItemWithSize(100);
     APSARA_TEST_FALSE(mQueue->Push(std::move(failItem)));
-    
+
     // Pop items until we reach below low watermark
     unique_ptr<ProcessQueueItem> item;
     while (mQueue->mCurrentBytesSize > sLowWatermark && mQueue->Pop(item)) {
         // Keep popping
     }
-    
+
     // Should now be valid to push again
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
     APSARA_TEST_TRUE(mQueue->mCurrentBytesSize <= sLowWatermark);
@@ -416,31 +415,31 @@ void BytesBoundedProcessQueueUnittest::TestQueueFullScenario() {
 
 void BytesBoundedProcessQueueUnittest::TestMultiplePushPopCycles() {
     // Test multiple cycles of push and pop operations
-    
+
     for (int cycle = 0; cycle < 3; cycle++) {
         // Push phase
         auto item1 = GenerateItemWithSize(3000);
         auto item2 = GenerateItemWithSize(3000);
         auto item3 = GenerateItemWithSize(2500);
-        
+
         size_t size1 = item1->mEventGroup.DataSize();
         size_t size2 = item2->mEventGroup.DataSize();
         size_t size3 = item3->mEventGroup.DataSize();
-        
+
         APSARA_TEST_TRUE(mQueue->Push(std::move(item1)));
         APSARA_TEST_TRUE(mQueue->Push(std::move(item2)));
         APSARA_TEST_TRUE(mQueue->Push(std::move(item3)));
-        
+
         size_t expectedSize = size1 + size2 + size3;
         APSARA_TEST_EQUAL(expectedSize, mQueue->mCurrentBytesSize);
         APSARA_TEST_FALSE(mQueue->IsValidToPush());
-        
+
         // Pop phase
         unique_ptr<ProcessQueueItem> item;
         APSARA_TEST_TRUE(mQueue->Pop(item));
         APSARA_TEST_TRUE(mQueue->Pop(item));
         APSARA_TEST_TRUE(mQueue->Pop(item));
-        
+
         APSARA_TEST_EQUAL(0U, mQueue->mCurrentBytesSize);
         APSARA_TEST_TRUE(mQueue->IsValidToPush());
         APSARA_TEST_EQUAL(0U, mQueue->mQueue.size());
@@ -451,22 +450,22 @@ void BytesBoundedProcessQueueUnittest::TestZeroSizeItem() {
     // Test pushing items with zero or minimal size
     auto emptyItem = GenerateItem("");
     size_t emptySize = emptyItem->mEventGroup.DataSize();
-    
+
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
     APSARA_TEST_TRUE(mQueue->Push(std::move(emptyItem)));
     APSARA_TEST_EQUAL(emptySize, mQueue->mCurrentBytesSize);
     APSARA_TEST_TRUE(mQueue->IsValidToPush());
-    
+
     // Push multiple zero/small size items
     for (int i = 0; i < 10; i++) {
         auto item = GenerateItem("");
         mQueue->Push(std::move(item));
     }
-    
+
     // Even with many small items, should still be valid to push
     // unless total size exceeds high watermark
     APSARA_TEST_EQUAL(11U, mQueue->mQueue.size());
-    
+
     // Pop all items
     unique_ptr<ProcessQueueItem> item;
     size_t popCount = 0;
@@ -482,30 +481,30 @@ void BytesBoundedProcessQueueUnittest::TestExactlyOnceEnabled() {
     CollectionPipelineContext eoCtx;
     eoCtx.SetConfigName("test_exactly_once_config");
     eoCtx.SetExactlyOnceFlag(true);
-    
+
     BytesBoundedProcessQueue eoQueue(sMaxBytes, sLowWatermark, sHighWatermark, 1, 1, eoCtx);
-    
+
     // Check that exactly once label is set
     APSARA_TEST_TRUE(eoQueue.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"));
-    
+
     // Setup downstream and upstream
     unique_ptr<BoundedSenderQueueInterface> senderQueue(new SenderQueue(10, 0, 10, 0, "", eoCtx));
     eoQueue.SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{senderQueue.get()});
-    
+
     unique_ptr<FeedbackInterface> feedback(new FeedbackInterfaceMock);
     eoQueue.SetUpStreamFeedbacks(vector<FeedbackInterface*>{feedback.get()});
     eoQueue.EnablePop();
-    
+
     // Test basic push/pop operations work with exactly once enabled
     auto item1 = GenerateItemWithSize(3000);
     size_t size1 = item1->mEventGroup.DataSize();
     APSARA_TEST_TRUE(eoQueue.Push(std::move(item1)));
     APSARA_TEST_EQUAL(size1, eoQueue.mCurrentBytesSize);
-    
+
     unique_ptr<ProcessQueueItem> poppedItem;
     APSARA_TEST_TRUE(eoQueue.Pop(poppedItem));
     APSARA_TEST_EQUAL(0U, eoQueue.mCurrentBytesSize);
-    
+
     // Verify the popped item has the pipeline in-process count updated
     APSARA_TEST_NOT_EQUAL(nullptr, poppedItem);
 }
@@ -527,4 +526,3 @@ UNIT_TEST_CASE(BytesBoundedProcessQueueUnittest, TestExactlyOnceEnabled)
 } // namespace logtail
 
 UNIT_TEST_MAIN
-

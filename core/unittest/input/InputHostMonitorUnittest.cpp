@@ -56,7 +56,7 @@ void InputHostMonitorUnittest::TestName() {
 void InputHostMonitorUnittest::TestSupportAck() {
     InputHostMonitor input;
     QueueType queueType = input.GetProcessQueueType();
-    APSARA_TEST_EQUAL(queueType, QueueType::COUNT_BOUNDED);
+    APSARA_TEST_EQUAL(queueType, QueueType::BYTES_BOUNDED);
 }
 
 void InputHostMonitorUnittest::OnSuccessfulInit() {

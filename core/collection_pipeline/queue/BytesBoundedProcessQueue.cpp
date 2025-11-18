@@ -20,8 +20,12 @@ using namespace std;
 
 namespace logtail {
 
-BytesBoundedProcessQueue::BytesBoundedProcessQueue(
-    size_t maxBytes, size_t lowBytes, size_t highBytes, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
+BytesBoundedProcessQueue::BytesBoundedProcessQueue(size_t maxBytes,
+                                                   size_t lowBytes,
+                                                   size_t highBytes,
+                                                   int64_t key,
+                                                   uint32_t priority,
+                                                   const CollectionPipelineContext& ctx)
     : QueueInterface(key, maxBytes, ctx),
       BytesBoundedQueueInterface(key, maxBytes, lowBytes, highBytes, ctx),
       ProcessQueueInterface(key, maxBytes, priority, ctx) {
@@ -37,11 +41,11 @@ bool BytesBoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     }
     item->mEnqueTime = chrono::system_clock::now();
     size_t itemBytes = item->mEventGroup.DataSize();
-    
+
     // Update bytes tracking before push
     mCurrentBytesSize += itemBytes;
     mQueue.emplace_back(std::move(item));
-    
+
     // Check if reached high watermark
     ChangeStateIfNeededAfterPush(itemBytes);
 
@@ -62,14 +66,14 @@ bool BytesBoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     if (!IsValidToPop()) {
         return false;
     }
-    
+
     item = std::move(mQueue.front());
     size_t itemBytes = item->mEventGroup.DataSize();
     mQueue.pop_front();
     mCurrentBytesSize -= itemBytes;
-    
+
     item->AddPipelineInProcessCnt(GetConfigName());
-    
+
     // Check if reached low watermark and can resume accepting data
     if (ChangeStateIfNeededAfterPop(itemBytes)) {
         GiveFeedback();
@@ -101,4 +105,3 @@ void BytesBoundedProcessQueue::GiveFeedback() const {
 }
 
 } // namespace logtail
-

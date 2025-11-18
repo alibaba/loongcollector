@@ -30,7 +30,7 @@ namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
 class CountBoundedProcessQueue : public CountBoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
-                            public ProcessQueueInterface {
+                                 public ProcessQueueInterface {
 public:
     CountBoundedProcessQueue(
         size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx);
@@ -58,4 +58,3 @@ private:
 };
 
 } // namespace logtail
-

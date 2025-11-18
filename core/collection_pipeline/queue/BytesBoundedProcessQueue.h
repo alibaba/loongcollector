@@ -33,11 +33,11 @@ class BytesBoundedProcessQueue : public BytesBoundedQueueInterface<std::unique_p
                                  public ProcessQueueInterface {
 public:
     BytesBoundedProcessQueue(size_t maxBytes,
-                            size_t lowBytes,
-                            size_t highBytes,
-                            int64_t key,
-                            uint32_t priority,
-                            const CollectionPipelineContext& ctx);
+                             size_t lowBytes,
+                             size_t highBytes,
+                             int64_t key,
+                             uint32_t priority,
+                             const CollectionPipelineContext& ctx);
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
@@ -62,4 +62,3 @@ private:
 };
 
 } // namespace logtail
-

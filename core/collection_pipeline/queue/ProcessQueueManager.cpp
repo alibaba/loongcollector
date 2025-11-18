@@ -14,9 +14,9 @@
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 
-#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/BytesBoundedProcessQueue.h"
 #include "collection_pipeline/queue/CircularProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/Flags.h"
@@ -38,8 +38,8 @@ ProcessQueueManager::ProcessQueueManager()
 }
 
 bool ProcessQueueManager::CreateOrUpdateCountBoundedQueue(QueueKey key,
-                                                     uint32_t priority,
-                                                     const CollectionPipelineContext& ctx) {
+                                                          uint32_t priority,
+                                                          const CollectionPipelineContext& ctx) {
     lock_guard<mutex> lock(mQueueMux);
     auto iter = mQueues.find(key);
     if (iter != mQueues.end()) {
@@ -313,13 +313,16 @@ void ProcessQueueManager::Trigger() {
     mCond.notify_one();
 }
 
-void ProcessQueueManager::CreateCountBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx) {
-    mPriorityQueue[priority].emplace_back(make_unique<CountBoundedProcessQueue>(mCountBoundedQueueParam.GetCapacity(),
-                                                                           mCountBoundedQueueParam.GetLowWatermark(),
-                                                                           mCountBoundedQueueParam.GetHighWatermark(),
-                                                                           key,
-                                                                           priority,
-                                                                           ctx));
+void ProcessQueueManager::CreateCountBoundedQueue(QueueKey key,
+                                                  uint32_t priority,
+                                                  const CollectionPipelineContext& ctx) {
+    mPriorityQueue[priority].emplace_back(
+        make_unique<CountBoundedProcessQueue>(mCountBoundedQueueParam.GetCapacity(),
+                                              mCountBoundedQueueParam.GetLowWatermark(),
+                                              mCountBoundedQueueParam.GetHighWatermark(),
+                                              key,
+                                              priority,
+                                              ctx));
     mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::COUNT_BOUNDED);
 }
 
@@ -334,13 +337,13 @@ void ProcessQueueManager::CreateCircularQueue(QueueKey key,
 void ProcessQueueManager::CreateBytesBoundedQueue(QueueKey key,
                                                   uint32_t priority,
                                                   const CollectionPipelineContext& ctx) {
-    mPriorityQueue[priority].emplace_back(make_unique<BytesBoundedProcessQueue>(
-        mBytesBoundedQueueParam.GetMaxBytesSize(),
-        mBytesBoundedQueueParam.GetLowBytesWatermark(),
-        mBytesBoundedQueueParam.GetHighBytesWatermark(),
-        key,
-        priority,
-        ctx));
+    mPriorityQueue[priority].emplace_back(
+        make_unique<BytesBoundedProcessQueue>(mBytesBoundedQueueParam.GetMaxBytesSize(),
+                                              mBytesBoundedQueueParam.GetLowBytesWatermark(),
+                                              mBytesBoundedQueueParam.GetHighBytesWatermark(),
+                                              key,
+                                              priority,
+                                              ctx));
     mQueues[key] = make_pair(prev(mPriorityQueue[priority].end()), QueueType::BYTES_BOUNDED);
 }
 
