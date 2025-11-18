@@ -18,8 +18,8 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipeline.h"
-#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
+#include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
 #include "config/CollectionConfig.h"
