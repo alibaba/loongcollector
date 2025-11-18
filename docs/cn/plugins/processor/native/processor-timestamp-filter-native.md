@@ -19,10 +19,10 @@
 | **参数** | **类型** | **是否必填** | **默认值** | **说明** |
 | --- | --- | --- | --- | --- |
 | Type | string | 是 | / | 插件类型。固定为`processor_timestamp_filter_native`。 |
-| SourceKey | string | 否 | `""` | 时间字段名。如果为空，则使用事件自身的`__time__`字段（即事件时间戳）。如果指定了字段名，则从该字段读取时间戳字符串并解析。时间戳格式必须为数字（秒、毫秒或纳秒），处理时会进行检查。 |
-| TimestampPrecision | string | 否 | `"second"` | 时间戳精度。可选值：<br>- `"second"` 或 `"sec"` 或 `"s"`：秒级时间戳<br>- `"millisecond"` 或 `"ms"`：毫秒级时间戳<br>- `"nanosecond"` 或 `"ns"`：纳秒级时间戳<br>该参数同时影响`SourceKey`字段的时间戳解析和`UpperBound`、`LowerBound`的精度。 |
-| UpperBound | Long | 否 | `max timestamp` | 上界时间戳。超过该时间的事件将被丢弃。默认值为最大时间戳值（即不过滤）。该值会根据`TimestampPrecision`转换为秒进行比较。 |
-| LowerBound | Long | 否 | `0` | 下界时间戳。早于该时间的事件将被丢弃。默认值为0。该值会根据`TimestampPrecision`转换为秒进行比较。 |
+| SourceKey | string | 否 | `""` | 时间字段名。如果为空，则使用事件自身的`__time__`字段（即事件时间戳）。如果指定了字段名，则从该字段读取时间戳字符串。时间戳格式必须为数字（秒、毫秒或纳秒），处理时会进行检查。 |
+| TimestampPrecision | string | 否 | `"second"` | 时间戳精度。可选值：<br>- `"second"`：秒级时间戳<br>- `"millisecond"`：毫秒级时间戳<br>- `"nanosecond"`：纳秒级时间戳<br>该参数同时影响`SourceKey`字段的时间戳解析和`UpperBound`、`LowerBound`的精度。 |
+| UpperBound | Long | 否 | `max timestamp` | 上界时间戳。超过该时间的事件将被丢弃。默认值为最大时间戳值（即不过滤）。 |
+| LowerBound | Long | 否 | `0` | 下界时间戳。早于该时间的事件将被丢弃。默认值为0。 |
 
 ## 使用说明
 

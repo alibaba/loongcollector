@@ -17,6 +17,7 @@
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 
 #include "app_config/AppConfig.h"
+#include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
