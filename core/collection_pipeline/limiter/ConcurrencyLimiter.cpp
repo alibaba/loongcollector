@@ -60,14 +60,11 @@ bool ConcurrencyLimiter::IsValidToPop() {
             return false;
         }
         if (mCurrenctConcurrency > mInSendingCnt.load()) {
-            // Apply exponential backoff for next retry
-            auto nextDuration
-                = static_cast<uint32_t>(mTimeFallbackCurrentDurationMilliSeconds * mTimeFallbackBackoffMultiplier);
-            mTimeFallbackCurrentDurationMilliSeconds = std::min(nextDuration, mTimeFallbackMaxDurationMilliSeconds);
+            // Reset time for next check
             mTimeFallbackStartTime = now;
-            LOG_DEBUG(
-                sLogger,
-                ("time fallback retry", mDescription)("next_duration_ms", mTimeFallbackCurrentDurationMilliSeconds));
+            LOG_DEBUG(sLogger,
+                      ("time fallback retry allowed", mDescription)("current_duration_ms",
+                                                                    mTimeFallbackCurrentDurationMilliSeconds));
             return true;
         }
     } else {
@@ -87,18 +84,6 @@ void ConcurrencyLimiter::OnSendDone() {
 }
 
 void ConcurrencyLimiter::OnSuccess(std::chrono::system_clock::time_point currentTime) {
-    // Clear time fallback state immediately on any success for fast recovery
-    {
-        lock_guard<mutex> lock(mLimiterMux);
-        if (mInTimeFallback) {
-            mInTimeFallback = false;
-            // Reset backoff duration on success
-            mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
-            LOG_INFO(sLogger,
-                     ("exit time fallback state on success", mDescription)("reset_duration_ms",
-                                                                           mTimeFallbackCurrentDurationMilliSeconds));
-        }
-    }
     AdjustConcurrency(true, currentTime);
 }
 
@@ -108,6 +93,30 @@ void ConcurrencyLimiter::OnFail(std::chrono::system_clock::time_point currentTim
 
 void ConcurrencyLimiter::Increase() {
     lock_guard<mutex> lock(mLimiterMux);
+    // Gradually recover from time fallback state
+    {
+        if (mInTimeFallback) {
+            // Decrease backoff duration on success
+            uint32_t newDuration = std::max(
+                static_cast<uint32_t>(mTimeFallbackCurrentDurationMilliSeconds / mTimeFallbackBackoffMultiplier),
+                mTimeFallbackDurationMilliSeconds);
+
+            if (newDuration < mTimeFallbackCurrentDurationMilliSeconds) {
+                // Duration reduced, continue gradual recovery
+                mTimeFallbackCurrentDurationMilliSeconds = newDuration;
+                LOG_INFO(sLogger,
+                         ("gradually recover from time fallback",
+                          mDescription)("reduced_duration_ms", mTimeFallbackCurrentDurationMilliSeconds));
+            } else {
+                // Cannot reduce further (reached initial value), exit time fallback
+                mInTimeFallback = false;
+                mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
+                LOG_INFO(sLogger,
+                         ("exit time fallback state after gradual recovery",
+                          mDescription)("final_duration_ms", mTimeFallbackCurrentDurationMilliSeconds));
+            }
+        }
+    }
     if (mCurrenctConcurrency != mMaxConcurrency) {
         ++mCurrenctConcurrency;
         if (mCurrenctConcurrency == mMaxConcurrency) {
@@ -129,16 +138,27 @@ void ConcurrencyLimiter::Decrease(double fallBackRatio) {
         mCurrenctConcurrency = std::max(static_cast<uint32_t>(mCurrenctConcurrency * fallBackRatio), mMinConcurrency);
         LOG_DEBUG(sLogger, ("decrease send concurrency, type", mDescription)("from", old)("to", mCurrenctConcurrency));
     } else {
-        // Enter time fallback state if decreased to minimum
-        if (mTimeFallbackDurationMilliSeconds > 0 && !mInTimeFallback) {
-            mInTimeFallback = true;
-            mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
-            mTimeFallbackStartTime = std::chrono::system_clock::now();
-            LOG_INFO(sLogger,
-                     ("enter time fallback state", mDescription)("concurrency", mCurrenctConcurrency)(
-                         "initial_duration_ms", mTimeFallbackCurrentDurationMilliSeconds)(
-                         "backoff_multiplier", mTimeFallbackBackoffMultiplier)("max_duration_ms",
-                                                                               mTimeFallbackMaxDurationMilliSeconds));
+        // Already at minimum concurrency, apply time fallback
+        if (mTimeFallbackDurationMilliSeconds > 0) {
+            if (!mInTimeFallback) {
+                // Enter time fallback state for the first time
+                mInTimeFallback = true;
+                mTimeFallbackCurrentDurationMilliSeconds = mTimeFallbackDurationMilliSeconds;
+                mTimeFallbackStartTime = std::chrono::system_clock::now();
+                LOG_INFO(sLogger,
+                         ("enter time fallback state", mDescription)("concurrency", mCurrenctConcurrency)(
+                             "initial_duration_ms", mTimeFallbackCurrentDurationMilliSeconds)(
+                             "backoff_multiplier",
+                             mTimeFallbackBackoffMultiplier)("max_duration_ms", mTimeFallbackMaxDurationMilliSeconds));
+            } else {
+                // Already in time fallback, apply exponential backoff
+                auto nextDuration
+                    = static_cast<uint32_t>(mTimeFallbackCurrentDurationMilliSeconds * mTimeFallbackBackoffMultiplier);
+                mTimeFallbackCurrentDurationMilliSeconds = std::min(nextDuration, mTimeFallbackMaxDurationMilliSeconds);
+                LOG_INFO(sLogger,
+                         ("increase time fallback duration on failure",
+                          mDescription)("new_duration_ms", mTimeFallbackCurrentDurationMilliSeconds));
+            }
         }
         if (mMinConcurrency == 0) {
             mCurrenctConcurrency = 1;
