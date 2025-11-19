@@ -66,10 +66,9 @@ public:
     bool IsBatchTimeoutExceeded(const MonitoredReader& monitoredReader, int batchTimeoutMs) const;
 
 private:
-
     // Returns the FD if successful, -1 otherwise
     int addReaderToMonitoring(std::shared_ptr<JournalReader> reader, const std::string& configName);
-    
+
     int mEpollFD{-1};
     mutable std::mutex mEpollMutex;
     std::map<int, MonitoredReader> mMonitoredReaders;
@@ -77,4 +76,3 @@ private:
 };
 
 } // namespace logtail
-

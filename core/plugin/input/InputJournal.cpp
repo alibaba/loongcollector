@@ -109,15 +109,16 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
     }
 
     JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName());
-    
+
     if (isPipelineRemoving) {
         LOG_INFO(sLogger, ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName()));
         if (!JournalServer::GetInstance()->HasRegisteredPlugins()) {
             JournalServer::GetInstance()->Stop();
         }
     } else {
-        LOG_INFO(sLogger,
-                 ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
+        LOG_INFO(
+            sLogger,
+            ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
     }
 
     return true;

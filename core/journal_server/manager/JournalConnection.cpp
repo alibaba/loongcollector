@@ -17,9 +17,9 @@
 #include "JournalConnection.h"
 
 #include "../JournalServer.h"
-#include "JournalMonitor.h"
 #include "../reader/JournalFilter.h"
 #include "../reader/JournalReader.h"
+#include "JournalMonitor.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -76,8 +76,7 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
     // Note: In normal flow, config should have been removed by RemoveConfig() before AddConfig() is called
     // However, we allow replacement here for backward compatibility (e.g., unit tests).
     if (mConfigs.find(configName) != mConfigs.end()) {
-        LOG_WARNING(sLogger,
-                    ("journal connection config already exists, will be replaced", "")("config", configName));
+        LOG_WARNING(sLogger, ("journal connection config already exists, will be replaced", "")("config", configName));
         if (mConfigs[configName].reader) {
             mConfigs[configName].reader->Close();
         }
@@ -127,8 +126,7 @@ void JournalConnection::RemoveConfig(const std::string& configName) {
 
         mConfigs.erase(it);
         LOG_INFO(sLogger,
-                 ("journal connection config removed", "")("config", configName)("remaining_configs",
-                                                                                         mConfigs.size()));
+                 ("journal connection config removed", "")("config", configName)("remaining_configs", mConfigs.size()));
     } else {
         LOG_WARNING(sLogger, ("journal connection config not found for removal", "")("config", configName));
     }
@@ -206,7 +204,8 @@ std::vector<std::string> JournalConnection::GetAllConfigNames() const {
     return configNames;
 }
 
-void JournalConnection::RefreshConnectionsByInterval(const std::vector<std::string>& configNames, JournalMonitor& monitor) {
+void JournalConnection::RefreshConnectionsByInterval(const std::vector<std::string>& configNames,
+                                                     JournalMonitor& monitor) {
     for (const auto& configName : configNames) {
         if (ShouldRefreshConnection(configName)) {
             monitor.RemoveReaderFromMonitoring(configName);
@@ -256,8 +255,7 @@ bool JournalConnection::RefreshConnection(const std::string& configName) {
 
     auto& configInfo = it->second;
     if (!configInfo.reader) {
-        LOG_WARNING(sLogger,
-                    ("journal connection reader is null, cannot refresh", "")("config", configName));
+        LOG_WARNING(sLogger, ("journal connection reader is null, cannot refresh", "")("config", configName));
         return false;
     }
 
@@ -270,16 +268,14 @@ bool JournalConnection::RefreshConnection(const std::string& configName) {
 
     // mJournalPaths is stored in the reader object and doesn't need to be reset,
     if (!configInfo.reader->Open()) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to reopen connection after refresh", "")("config", configName));
+        LOG_ERROR(sLogger, ("journal connection failed to reopen connection after refresh", "")("config", configName));
         return false;
     }
 
     // Reapply filters: necessary because Close() clears all filters
     auto filterConfig = buildFilterConfig(configInfo.config, configName);
     if (!JournalFilter::ApplyAllFilters(configInfo.reader.get(), filterConfig)) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to reapply filters after refresh", "")("config", configName));
+        LOG_ERROR(sLogger, ("journal connection failed to reapply filters after refresh", "")("config", configName));
         configInfo.reader->Close();
         return false;
     }
@@ -290,15 +286,15 @@ bool JournalConnection::RefreshConnection(const std::string& configName) {
     configInfo.lastOpenTime = std::chrono::steady_clock::now();
 
     LOG_INFO(sLogger,
-             ("journal connection connection refreshed successfully", "")("config", configName)("interval",
-                                                                                                        configInfo.config.mResetIntervalSecond));
+             ("journal connection connection refreshed successfully",
+              "")("config", configName)("interval", configInfo.config.mResetIntervalSecond));
 
     return true;
 }
 
 
-JournalFilter::FilterConfig
-JournalConnection::buildFilterConfig(const JournalConfig& config, const std::string& configName) {
+JournalFilter::FilterConfig JournalConnection::buildFilterConfig(const JournalConfig& config,
+                                                                 const std::string& configName) {
     JournalFilter::FilterConfig filterConfig;
     filterConfig.mUnits = config.mUnits;
     filterConfig.mIdentifiers = config.mIdentifiers;
@@ -310,19 +306,18 @@ JournalConnection::buildFilterConfig(const JournalConfig& config, const std::str
 }
 
 bool JournalConnection::initializeReader(const std::shared_ptr<JournalReader>& reader,
-                                                const JournalConfig& config,
-                                                const std::string& configName) {
+                                         const JournalConfig& config,
+                                         const std::string& configName) {
     if (!reader) {
-        LOG_ERROR(sLogger,
-                  ("journal connection reader is null, cannot initialize", "")("config", configName));
+        LOG_ERROR(sLogger, ("journal connection reader is null, cannot initialize", "")("config", configName));
         return false;
     }
 
     if (!config.mJournalPaths.empty()) {
         reader->SetJournalPaths(config.mJournalPaths);
         LOG_INFO(sLogger,
-                 ("journal connection setting journal paths",
-                  "")("config", configName)("paths_count", config.mJournalPaths.size()));
+                 ("journal connection setting journal paths", "")("config", configName)("paths_count",
+                                                                                        config.mJournalPaths.size()));
         for (const auto& path : config.mJournalPaths) {
             LOG_INFO(sLogger, ("journal path", path));
         }
@@ -333,16 +328,14 @@ bool JournalConnection::initializeReader(const std::shared_ptr<JournalReader>& r
     reader->Open(); // try to open, but do not check result
 #else
     if (!reader->Open()) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to open journal connection", "")("config", configName));
+        LOG_ERROR(sLogger, ("journal connection failed to open journal connection", "")("config", configName));
         return false;
     }
 #endif
 
     auto filterConfig = buildFilterConfig(config, configName);
     if (!JournalFilter::ApplyAllFilters(reader.get(), filterConfig)) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to apply filters to connection", "")("config", configName));
+        LOG_ERROR(sLogger, ("journal connection failed to apply filters to connection", "")("config", configName));
         reader->Close();
         return false;
     }
@@ -351,13 +344,12 @@ bool JournalConnection::initializeReader(const std::shared_ptr<JournalReader>& r
 }
 
 bool JournalConnection::setupReaderPosition(const std::shared_ptr<JournalReader>& reader,
-                                                    const JournalConfig& config,
-                                                    const std::string& configName,
-                                                    const std::string& savedCursor) {
+                                            const JournalConfig& config,
+                                            const std::string& configName,
+                                            const std::string& savedCursor) {
     if (!reader || !reader->IsOpen()) {
         LOG_WARNING(sLogger,
-                    ("journal connection reader is not open, cannot setup position", "")("config",
-                                                                                                   configName));
+                    ("journal connection reader is not open, cannot setup position", "")("config", configName));
         return false;
     }
 
@@ -365,13 +357,11 @@ bool JournalConnection::setupReaderPosition(const std::shared_ptr<JournalReader>
     if (!savedCursor.empty()) {
         if (reader->SeekCursor(savedCursor)) {
             reader->Next();
-            LOG_DEBUG(sLogger,
-                      ("journal connection restored cursor", "")("config", configName)("cursor", savedCursor));
+            LOG_DEBUG(sLogger, ("journal connection restored cursor", "")("config", configName)("cursor", savedCursor));
             return true;
         }
         LOG_WARNING(sLogger,
-                    ("journal connection failed to restore cursor", "")("config", configName)("cursor",
-                                                                                                        savedCursor));
+                    ("journal connection failed to restore cursor", "")("config", configName)("cursor", savedCursor));
     }
 
     // if no saved cursor or cursor recovery failed, use seek position in config
@@ -379,16 +369,14 @@ bool JournalConnection::setupReaderPosition(const std::shared_ptr<JournalReader>
         bool seekSuccess = false;
         if (config.mSeekPosition == "tail") {
             seekSuccess = reader->SeekTail();
-            LOG_INFO(sLogger,
-                     ("journal connection seek to tail", "")("config", configName)("success", seekSuccess));
+            LOG_INFO(sLogger, ("journal connection seek to tail", "")("config", configName)("success", seekSuccess));
 
             if (seekSuccess) {
                 reader->Previous();
             }
         } else {
             seekSuccess = reader->SeekHead();
-            LOG_INFO(sLogger,
-                     ("journal connection seek to head", "")("config", configName)("success", seekSuccess));
+            LOG_INFO(sLogger, ("journal connection seek to head", "")("config", configName)("success", seekSuccess));
         }
 
         if (!seekSuccess) {

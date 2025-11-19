@@ -24,8 +24,8 @@
 #include <chrono>
 #include <set>
 
-#include "JournalConnection.h"
 #include "../reader/JournalReader.h"
+#include "JournalConnection.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -48,7 +48,8 @@ bool JournalMonitor::Initialize() {
         std::lock_guard<std::mutex> lock(mEpollMutex);
         mEpollFD = epoll_create1(EPOLL_CLOEXEC);
         if (mEpollFD == -1) {
-            LOG_ERROR(sLogger, ("journal monitor failed to create epoll", "")("error", strerror(errno))("errno", errno));
+            LOG_ERROR(sLogger,
+                      ("journal monitor failed to create epoll", "")("error", strerror(errno))("errno", errno));
             return false;
         }
     }
@@ -69,7 +70,7 @@ void JournalMonitor::Cleanup() {
 #ifdef __linux__
     LOG_INFO(sLogger,
              ("journal monitor cleaning up epoll monitoring", "")("monitored_readers", mMonitoredReaders.size()));
-    
+
     for (auto& pair : mMonitoredReaders) {
         if (pair.second.reader) {
             pair.second.reader->RemoveFromEpoll(mEpollFD);
@@ -141,8 +142,9 @@ void JournalMonitor::AddReadersToMonitoring(const std::vector<std::string>& conf
         if (!alreadyMonitored) {
             int journalFD = addReaderToMonitoring(reader, configName);
             if (journalFD >= 0) {
-                LOG_INFO(sLogger,
-                         ("journal monitor reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
+                LOG_INFO(
+                    sLogger,
+                    ("journal monitor reader added to epoll monitoring", "")("config", configName)("fd", journalFD));
             }
         }
     }
@@ -155,7 +157,7 @@ void JournalMonitor::RemoveReaderFromMonitoring(const std::string& configName, b
             if (it->second.reader && it->second.reader->IsOpen()) {
                 it->second.reader->RemoveFromEpoll(mEpollFD);
             }
-            
+
             // Remove from map if requested
             if (removeFromMap) {
                 it = mMonitoredReaders.erase(it);
@@ -173,8 +175,7 @@ void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
     auto currentReader = connectionManager.GetConnection(configName);
 
     if (!currentReader || !currentReader->IsOpen()) {
-        LOG_WARNING(sLogger,
-                    ("journal monitor reader not available after refresh", "")("config", configName));
+        LOG_WARNING(sLogger, ("journal monitor reader not available after refresh", "")("config", configName));
         return;
     }
 
@@ -199,16 +200,15 @@ void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
 
     if (oldFD >= 0) {
         LOG_DEBUG(sLogger,
-                  ("journal monitor updated reader FD mapping after refresh", "")("config",
-                                                                                                configName)("old_fd",
-                                                                                                                  oldFD)("new_fd", newFD));
+                  ("journal monitor updated reader FD mapping after refresh",
+                   "")("config", configName)("old_fd", oldFD)("new_fd", newFD));
     } else {
         // If not found in monitored readers, it will be handled by AddReadersToMonitoring()
     }
 }
 
 bool JournalMonitor::GetValidatedCurrentReader(MonitoredReader& monitoredReader,
-                                                      std::shared_ptr<JournalReader>& currentReaderOut) const {
+                                               std::shared_ptr<JournalReader>& currentReaderOut) const {
     // Validate reader to prevent using a closed reader during connection refresh
     if (!monitoredReader.reader) {
         return false;
@@ -261,9 +261,8 @@ bool JournalMonitor::IsBatchTimeoutExceeded(const MonitoredReader& monitoredRead
     if (timeoutTrigger) {
         LOG_DEBUG(sLogger,
                   ("journal monitor forcing flush accumulated batch due to timeout",
-                   "")("config", monitoredReader.configName)("elapsed_ms", elapsed)(
-                      "batch_timeout_ms", batchTimeoutMs)("accumulated_count",
-                                                                  monitoredReader.accumulatedEntryCount));
+                   "")("config", monitoredReader.configName)("elapsed_ms", elapsed)("batch_timeout_ms", batchTimeoutMs)(
+                      "accumulated_count", monitoredReader.accumulatedEntryCount));
     }
 
     return timeoutTrigger;

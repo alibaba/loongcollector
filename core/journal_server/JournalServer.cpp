@@ -261,7 +261,7 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
 }
 
 void JournalServer::processMonitoredReader(MonitoredReader& monitoredReader,
-                                          const std::shared_ptr<JournalReader>& currentReader) {
+                                           const std::shared_ptr<JournalReader>& currentReader) {
     // Get connection manager and config
     auto& connectionManager = JournalConnection::GetInstance();
     JournalConfig config = connectionManager.GetConfig(monitoredReader.configName);
