@@ -266,11 +266,11 @@ bool PushEventGroupToQueue(QueueKey queueKey,
 }
 
 void InitializeOrRestoreAccumulatedEventGroup(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
-                                               int* accumulatedEntryCount,
-                                               std::string* accumulatedFirstCursor,
-                                               PipelineEventGroup*& eventGroup,
-                                               int& totalEntryCount,
-                                               std::string& firstEntryCursor) {
+                                              int* accumulatedEntryCount,
+                                              std::string* accumulatedFirstCursor,
+                                              PipelineEventGroup*& eventGroup,
+                                              int& totalEntryCount,
+                                              std::string& firstEntryCursor) {
     if (*accumulatedEventGroup != nullptr) {
         eventGroup = accumulatedEventGroup->get();
         totalEntryCount = (accumulatedEntryCount != nullptr) ? *accumulatedEntryCount : 0;
@@ -317,11 +317,11 @@ bool HandleJournalEntries(const string& configName,
         int totalEntryCount = 0;
 
         InitializeOrRestoreAccumulatedEventGroup(accumulatedEventGroup,
-                                                  accumulatedEntryCount,
-                                                  accumulatedFirstCursor,
-                                                  eventGroup,
-                                                  totalEntryCount,
-                                                  firstEntryCursor);
+                                                 accumulatedEntryCount,
+                                                 accumulatedFirstCursor,
+                                                 eventGroup,
+                                                 totalEntryCount,
+                                                 firstEntryCursor);
 
         while (totalEntryCount + newEntryCount < maxEntriesPerBatch) {
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, newEntryCount)) {
@@ -365,7 +365,7 @@ bool HandleJournalEntries(const string& configName,
             // must push when timeout triggered or reached max batch size
             PushEventGroupToQueue(queueKey,
                                   eventGroup,
-                                  totalEntryCount,  
+                                  totalEntryCount,
                                   firstEntryCursor,
                                   journalReader,
                                   configName,
