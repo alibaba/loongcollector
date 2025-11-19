@@ -14,6 +14,7 @@
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 
+#include "CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/BytesBoundedProcessQueue.h"
 #include "collection_pipeline/queue/CircularProcessQueue.h"
 #include "collection_pipeline/queue/CountBoundedProcessQueue.h"

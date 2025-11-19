@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
+#include "collection_pipeline/queue/BoundedProcessQueue.h"
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 
@@ -20,10 +20,10 @@ using namespace std;
 
 namespace logtail {
 
-CountBoundedProcessQueue::CountBoundedProcessQueue(
+BoundedProcessQueue::BoundedProcessQueue(
     size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
     : QueueInterface(key, cap, ctx),
-      CountBoundedQueueInterface(key, cap, low, high, ctx),
+      BoundedQueueInterface(key, cap, low, high, ctx),
       ProcessQueueInterface(key, cap, priority, ctx) {
     if (ctx.IsExactlyOnceEnabled()) {
         mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
@@ -31,12 +31,14 @@ CountBoundedProcessQueue::CountBoundedProcessQueue(
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
-bool CountBoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
+bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     if (!IsValidToPush()) {
         return false;
     }
     item->mEnqueTime = chrono::system_clock::now();
     auto size = item->mEventGroup.DataSize();
+
+    AddSize(item.get());
     mQueue.push_back(std::move(item));
     ChangeStateIfNeededAfterPush();
 
@@ -48,7 +50,7 @@ bool CountBoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     return true;
 }
 
-bool CountBoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
+bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     ADD_COUNTER(mFetchTimesCnt, 1);
     if (Empty()) {
         return false;
@@ -60,6 +62,7 @@ bool CountBoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     item = std::move(mQueue.front());
     mQueue.pop_front();
     item->AddPipelineInProcessCnt(GetConfigName());
+    SubSize(item.get());
     if (ChangeStateIfNeededAfterPop()) {
         GiveFeedback();
     }
@@ -72,7 +75,7 @@ bool CountBoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void CountBoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
+void BoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&& feedbacks) {
     mUpStreamFeedbacks.clear();
     for (auto& item : feedbacks) {
         if (item == nullptr) {
@@ -83,7 +86,7 @@ void CountBoundedProcessQueue::SetUpStreamFeedbacks(vector<FeedbackInterface*>&&
     }
 }
 
-void CountBoundedProcessQueue::GiveFeedback() const {
+void BoundedProcessQueue::GiveFeedback() const {
     for (auto& item : mUpStreamFeedbacks) {
         item->Feedback(mKey);
     }

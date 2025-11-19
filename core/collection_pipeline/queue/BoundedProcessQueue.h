@@ -22,28 +22,33 @@
 #include <memory>
 #include <vector>
 
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/BoundedQueueInterface.h"
 #include "collection_pipeline/queue/ProcessQueueInterface.h"
 #include "common/FeedbackInterface.h"
 
 namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
-class CountBoundedProcessQueue : public BoundedProcessQueue {
+class BoundedProcessQueue : public BoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
+                                 public ProcessQueueInterface {
 public:
-    CountBoundedProcessQueue(size_t cap,
-                             size_t low,
-                             size_t high,
-                             int64_t key,
-                             uint32_t priority,
-                             const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx),
-      BoundedProcessQueue(cap, low, high, key, priority, ctx){}
+    BoundedProcessQueue(
+        size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx);
+
+    bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
+    bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
+
+    void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
+
+protected:
+    std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
+    std::vector<FeedbackInterface*> mUpStreamFeedbacks;
 
 private:
-    size_t Size() const override { return mQueue.size(); }
-    void AddSize(ProcessQueueItem*) override { /* do nothing */ }
-    void SubSize(ProcessQueueItem*) override { /* do nothing */ }
+    void GiveFeedback() const override;
+    virtual size_t Size() const override = 0;
+    virtual void AddSize(ProcessQueueItem* item) = 0;
+    virtual void SubSize(ProcessQueueItem* item) = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CountBoundedProcessQueueUnittest;
