@@ -25,12 +25,21 @@
 #include <string>
 #include <vector>
 
-#include "../common/JournalCommon.h"
 #include "../common/JournalConfig.h"
 #include "../reader/JournalFilter.h"
 #include "logger/Logger.h"
 
 namespace logtail {
+
+// Forward declarations
+class JournalMonitor;
+class JournalReader;
+struct ConfigInfo {
+    std::string mConfigName;
+    JournalConfig config;
+    std::shared_ptr<JournalReader> reader; // Independent reader/connection per configuration
+    std::chrono::steady_clock::time_point lastOpenTime; // Last connection open time, used for scheduled refresh
+};
 
 class JournalConnection {
 public:
@@ -41,6 +50,7 @@ public:
     void RemoveConfig(const std::string& configName);
     bool RefreshConnection(const std::string& configName);
     bool ShouldRefreshConnection(const std::string& configName) const;
+    void RefreshConnectionsByInterval(const std::vector<std::string>& configNames, JournalMonitor& monitor);
     JournalConfig GetConfig(const std::string& configName) const;
     std::map<std::string, JournalConfig> GetAllConfigs() const;
     std::vector<std::string> GetAllConfigNames() const;
@@ -72,12 +82,6 @@ private:
                              const std::string& configName,
                              const std::string& savedCursor = "");
     static JournalFilter::FilterConfig buildFilterConfig(const JournalConfig& config, const std::string& configName);
-    struct ConfigInfo {
-        std::string mConfigName;
-        JournalConfig config;
-        std::shared_ptr<JournalReader> reader; // Independent reader/connection per configuration
-        std::chrono::steady_clock::time_point lastOpenTime; // Last connection open time, used for scheduled refresh
-    };
 
     std::map<std::string, ConfigInfo> mConfigs; // key: configName
     mutable std::mutex mMutex;

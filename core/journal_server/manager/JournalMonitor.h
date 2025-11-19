@@ -17,32 +17,48 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <map>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
 
-#include "../common/JournalCommon.h"
-#include "../common/JournalConfig.h"
 #include "logger/Logger.h"
 
 namespace logtail {
 
-class JournalEpollMonitor {
-public:
-    JournalEpollMonitor();
-    ~JournalEpollMonitor();
+// Forward declarations
+class JournalReader;
+class PipelineEventGroup;
 
-    JournalEpollMonitor(const JournalEpollMonitor&) = delete;
-    JournalEpollMonitor& operator=(const JournalEpollMonitor&) = delete;
-    JournalEpollMonitor(JournalEpollMonitor&&) = delete;
-    JournalEpollMonitor& operator=(JournalEpollMonitor&&) = delete;
+struct MonitoredReader {
+    std::shared_ptr<JournalReader> reader;
+    std::string configName;
+    bool hasPendingData{true};
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup{nullptr};
+    std::chrono::steady_clock::time_point lastBatchTime;
+    int accumulatedEntryCount{0};
+    std::string accumulatedFirstCursor;
+};
+
+class JournalMonitor {
+public:
+    JournalMonitor();
+    ~JournalMonitor();
+
+    JournalMonitor(const JournalMonitor&) = delete;
+    JournalMonitor& operator=(const JournalMonitor&) = delete;
+    JournalMonitor(JournalMonitor&&) = delete;
+    JournalMonitor& operator=(JournalMonitor&&) = delete;
 
     bool Initialize();
     void Cleanup();
     int GetEpollFD() const;
     std::map<int, MonitoredReader>& GetMonitoredReaders();
-    void SyncMonitoredReaders();
-    void RemoveReaderFromEpoll(const std::string& configName);
+    void AddReadersToMonitoring(const std::vector<std::string>& configNames);
+    void RemoveReaderFromMonitoring(const std::string& configName, bool removeFromMap = false);
+    void RefreshReaderFDMapping(const std::string& configName);
     bool GetValidatedCurrentReader(MonitoredReader& monitoredReader,
                                    std::shared_ptr<JournalReader>& currentReaderOut) const;
 
@@ -51,11 +67,8 @@ public:
 
 private:
 
-    void lazyCleanupRemovedReadersFromEpoll();
-    int cleanupRemovedReadersFromEpoll();
-    void refreshReaderConnectionsByInterval();
-    void addReadersToEpollMonitoring();
-    void syncReaderFDMappingAfterRefresh(const std::string& configName);
+    // Returns the FD if successful, -1 otherwise
+    int addReaderToMonitoring(std::shared_ptr<JournalReader> reader, const std::string& configName);
     
     int mEpollFD{-1};
     mutable std::mutex mEpollMutex;

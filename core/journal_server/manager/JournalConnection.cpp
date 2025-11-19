@@ -17,6 +17,7 @@
 #include "JournalConnection.h"
 
 #include "../JournalServer.h"
+#include "JournalMonitor.h"
 #include "../reader/JournalFilter.h"
 #include "../reader/JournalReader.h"
 #include "logger/Logger.h"
@@ -72,10 +73,11 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
         return false;
     }
 
+    // Note: In normal flow, config should have been removed by RemoveConfig() before AddConfig() is called
+    // However, we allow replacement here for backward compatibility (e.g., unit tests).
     if (mConfigs.find(configName) != mConfigs.end()) {
         LOG_WARNING(sLogger,
                     ("journal connection config already exists, will be replaced", "")("config", configName));
-        // close old reader
         if (mConfigs[configName].reader) {
             mConfigs[configName].reader->Close();
         }
@@ -118,7 +120,7 @@ void JournalConnection::RemoveConfig(const std::string& configName) {
     if (it != mConfigs.end()) {
         LOG_INFO(sLogger, ("journal connection removing config", "")("config", configName));
 
-        // close connection (epoll cleanup should be handled by JournalEpollMonitor)
+        // close connection (epoll cleanup should be handled by JournalMonitor)
         if (it->second.reader) {
             it->second.reader->Close();
         }
@@ -203,6 +205,97 @@ std::vector<std::string> JournalConnection::GetAllConfigNames() const {
 
     return configNames;
 }
+
+void JournalConnection::RefreshConnectionsByInterval(const std::vector<std::string>& configNames, JournalMonitor& monitor) {
+    for (const auto& configName : configNames) {
+        if (ShouldRefreshConnection(configName)) {
+            monitor.RemoveReaderFromMonitoring(configName);
+
+            if (RefreshConnection(configName)) {
+                monitor.RefreshReaderFDMapping(configName);
+            } else {
+                LOG_ERROR(sLogger, ("journal connection refresh failed", "")("config", configName));
+            }
+        }
+    }
+}
+
+bool JournalConnection::ShouldRefreshConnection(const std::string& configName) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (!mInitialized) {
+        return false;
+    }
+
+    auto it = mConfigs.find(configName);
+    if (it == mConfigs.end()) {
+        return false;
+    }
+
+    const auto& configInfo = it->second;
+    if (!configInfo.reader || !configInfo.reader->IsOpen()) {
+        return false;
+    }
+
+    // check if it's time to refresh
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - configInfo.lastOpenTime).count();
+    int resetInterval = configInfo.config.mResetIntervalSecond;
+
+    return elapsed >= resetInterval;
+}
+
+bool JournalConnection::RefreshConnection(const std::string& configName) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    auto it = mConfigs.find(configName);
+    if (it == mConfigs.end()) {
+        LOG_WARNING(sLogger, ("journal connection config not found for refresh", "")("config", configName));
+        return false;
+    }
+
+    auto& configInfo = it->second;
+    if (!configInfo.reader) {
+        LOG_WARNING(sLogger,
+                    ("journal connection reader is null, cannot refresh", "")("config", configName));
+        return false;
+    }
+
+    std::string currentCursor;
+    if (configInfo.reader->IsOpen()) {
+        currentCursor = configInfo.reader->GetCursor();
+    }
+
+    configInfo.reader->Close();
+
+    // mJournalPaths is stored in the reader object and doesn't need to be reset,
+    if (!configInfo.reader->Open()) {
+        LOG_ERROR(sLogger,
+                  ("journal connection failed to reopen connection after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Reapply filters: necessary because Close() clears all filters
+    auto filterConfig = buildFilterConfig(configInfo.config, configName);
+    if (!JournalFilter::ApplyAllFilters(configInfo.reader.get(), filterConfig)) {
+        LOG_ERROR(sLogger,
+                  ("journal connection failed to reapply filters after refresh", "")("config", configName));
+        configInfo.reader->Close();
+        return false;
+    }
+
+    setupReaderPosition(configInfo.reader, configInfo.config, configName, currentCursor);
+
+    // Epoll re-registration should be handled by JournalMonitor
+    configInfo.lastOpenTime = std::chrono::steady_clock::now();
+
+    LOG_INFO(sLogger,
+             ("journal connection connection refreshed successfully", "")("config", configName)("interval",
+                                                                                                        configInfo.config.mResetIntervalSecond));
+
+    return true;
+}
+
 
 JournalFilter::FilterConfig
 JournalConnection::buildFilterConfig(const JournalConfig& config, const std::string& configName) {
@@ -305,89 +398,6 @@ bool JournalConnection::setupReaderPosition(const std::shared_ptr<JournalReader>
         }
         return seekSuccess;
     }
-
-    return true;
-}
-
-bool JournalConnection::ShouldRefreshConnection(const std::string& configName) const {
-    std::lock_guard<std::mutex> lock(mMutex);
-
-    if (!mInitialized) {
-        return false;
-    }
-
-    auto it = mConfigs.find(configName);
-    if (it == mConfigs.end()) {
-        return false;
-    }
-
-    const auto& configInfo = it->second;
-    if (!configInfo.reader || !configInfo.reader->IsOpen()) {
-        return false;
-    }
-
-    // check if it's time to refresh
-    auto now = std::chrono::steady_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - configInfo.lastOpenTime).count();
-    int resetInterval = configInfo.config.mResetIntervalSecond;
-
-    return elapsed >= resetInterval;
-}
-
-bool JournalConnection::RefreshConnection(const std::string& configName) {
-    std::lock_guard<std::mutex> lock(mMutex);
-
-    if (!mInitialized) {
-        LOG_WARNING(sLogger,
-                    ("journal connection cannot refresh connection", "not initialized")("config",
-                                                                                                  configName));
-        return false;
-    }
-
-    auto it = mConfigs.find(configName);
-    if (it == mConfigs.end()) {
-        LOG_WARNING(sLogger, ("journal connection config not found for refresh", "")("config", configName));
-        return false;
-    }
-
-    auto& configInfo = it->second;
-    if (!configInfo.reader) {
-        LOG_WARNING(sLogger,
-                    ("journal connection reader is null, cannot refresh", "")("config", configName));
-        return false;
-    }
-
-    std::string currentCursor;
-    if (configInfo.reader->IsOpen()) {
-        currentCursor = configInfo.reader->GetCursor();
-    }
-
-    // Close connection (epoll cleanup should be handled by JournalEpollMonitor)
-    configInfo.reader->Close();
-
-    // reopen connection
-    if (!configInfo.reader->Open()) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to reopen connection after refresh", "")("config", configName));
-        return false;
-    }
-
-    auto filterConfig = buildFilterConfig(configInfo.config, configName);
-    if (!JournalFilter::ApplyAllFilters(configInfo.reader.get(), filterConfig)) {
-        LOG_ERROR(sLogger,
-                  ("journal connection failed to reapply filters after refresh", "")("config", configName));
-        configInfo.reader->Close();
-        return false;
-    }
-
-    setupReaderPosition(configInfo.reader, configInfo.config, configName, currentCursor);
-
-    // Epoll re-registration should be handled by JournalEpollMonitor
-    configInfo.lastOpenTime = std::chrono::steady_clock::now();
-
-    LOG_INFO(sLogger,
-             ("journal connection connection refreshed successfully", "")("config", configName)("interval",
-                                                                                                        configInfo.config.mResetIntervalSecond));
 
     return true;
 }

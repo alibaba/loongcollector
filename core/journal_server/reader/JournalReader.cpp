@@ -25,8 +25,8 @@
 namespace logtail {
 
 /*========================================================
- *  Impl：Linux 下的 systemd-journal 实现
- *  注意：此插件仅在 Linux 平台可用
+ *  Impl: systemd-journal implementation for Linux
+ *  Note: This plugin is only available on Linux platform
  *========================================================*/
 class JournalReader::Impl {
 public:
@@ -40,7 +40,7 @@ public:
     Impl(Impl&&) = delete;
     Impl& operator=(Impl&&) = delete;
 
-    /*---------------  打开 / 关闭  ----------------*/
+    /*---------------  Open / Close  ----------------*/
     bool Open() {
         if (mIsOpen) {
             return true;
@@ -51,13 +51,13 @@ public:
         if (mJournalPaths.empty()) {
             ret = sd_journal_open(&mJournal, SD_JOURNAL_LOCAL_ONLY);
         } else {
-            // 添加边界检查
+            // Add boundary check
             if (mJournalPaths[0].empty()) {
                 return false;
             }
             const std::string& path = mJournalPaths[0];
 
-            // 验证路径存在性
+            // Verify path existence
             std::error_code ec;
             if (!std::filesystem::exists(path, ec)) {
                 return false;
@@ -67,7 +67,7 @@ public:
         }
 
         if (ret < 0) {
-            // 失败时清理资源
+            // Clean up resources on failure
             if (mJournal != nullptr) {
                 sd_journal_close(mJournal);
                 mJournal = nullptr;
@@ -75,7 +75,7 @@ public:
             return false;
         }
 
-        // 设置数据阈值
+        // Set data threshold
         sd_journal_set_data_threshold(mJournal, mDataThreshold);
 
         mIsOpen = true;
@@ -92,7 +92,7 @@ public:
 
     [[nodiscard]] bool IsOpen() const { return mIsOpen && mJournal != nullptr; }
 
-    /*---------------  遍历  ----------------*/
+    /*---------------  Traversal  ----------------*/
     bool SeekHead() {
         return call([](auto journal) { return sd_journal_seek_head(journal); });
     }
@@ -100,7 +100,7 @@ public:
         return call([](auto journal) { return sd_journal_seek_tail(journal); });
     }
     bool SeekCursor(const std::string& cursor) {
-        // 添加参数验证
+        // Add parameter validation
         if (cursor.empty()) {
             return false;
         }
@@ -115,7 +115,7 @@ public:
         int ret = sd_journal_next(mJournal);
 
         if (ret < 0) {
-            // 区分错误和正常的结束情况
+            // Distinguish between errors and normal end conditions
             return false;
         }
         return ret > 0;
@@ -129,18 +129,18 @@ public:
         int ret = sd_journal_next(mJournal);
 
         if (ret > 0) {
-            // 成功移动到下一条，有数据
+            // Successfully moved to next entry, data available
             return JournalReadStatus::kOk;
         }
         if (ret == 0) {
-            // 到达末尾，没有更多数据
+            // Reached end, no more data
             return JournalReadStatus::kEndOfJournal;
         }
-        // 错误情况 (ret < 0)
-        // 常见错误码：
-        // -ESTALE (116): Journal文件已被删除/轮转，cursor失效
-        // -EINVAL: 参数无效
-        // -EBADMSG: 日志文件损坏
+        // Error condition (ret < 0)
+        // Common error codes:
+        // -ESTALE (116): Journal file has been deleted/rotated, cursor invalid
+        // -EINVAL: Invalid parameter
+        // -EBADMSG: Log file corrupted
         return JournalReadStatus::kError;
     }
 
@@ -152,13 +152,13 @@ public:
         int ret = sd_journal_previous(mJournal);
 
         if (ret < 0) {
-            // 区分错误和正常的结束情况
+            // Distinguish between errors and normal end conditions
             return false;
         }
         return ret > 0;
     }
 
-    /*---------------  读取单条  ----------------*/
+    /*---------------  Read Single Entry  ----------------*/
     bool GetEntry(JournalEntry& entry) {
         if (!IsOpen()) {
             return false;
@@ -173,19 +173,19 @@ public:
         std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
         entry.cursor = cursor.get();
 
-        // 读取 realtime 时间戳
-        // 注意：如果这里返回错误，通常意味着 journal 文件已被删除（轮转）
-        // 需要触发错误恢复流程
+        // Read realtime timestamp
+        // Note: If this returns an error, it usually means the journal file has been deleted (rotated)
+        // Need to trigger error recovery flow
         uint64_t timestamp = 0;
         int timeRet = sd_journal_get_realtime_usec(mJournal, &timestamp);
         if (timeRet < 0) {
-            // 时间戳读取失败，这通常表示 journal 文件已被轮转删除
-            // 返回 false 触发上层的错误恢复逻辑
+            // Timestamp read failed, this usually indicates the journal file has been rotated/deleted
+            // Return false to trigger upper-level error recovery logic
             return false;
         }
         entry.realtimeTimestamp = timestamp;
 
-        // 读取 monotonic 时间戳（这个可以失败，不是致命的）
+        // Read monotonic timestamp (this can fail, not fatal)
         uint64_t monotonicTimestamp = 0;
         sd_id128_t bootId;
         int monoRet = sd_journal_get_monotonic_usec(mJournal, &monotonicTimestamp, &bootId);
@@ -198,7 +198,7 @@ public:
         sd_journal_restart_data(mJournal);
 
         int fieldCount = 0;
-        constexpr int kMaxFieldsPerEntry = 1000; // 防止内存爆炸
+        constexpr int kMaxFieldsPerEntry = 1000; // Prevent memory explosion
 
         while (sd_journal_enumerate_data(mJournal, &data, &len) > 0) {
             if (fieldCount >= kMaxFieldsPerEntry) {
@@ -215,7 +215,7 @@ public:
                 continue;
             }
 
-            // 边界检查
+            // Boundary check
             size_t keyLen = equalSign - dataPtr;
             size_t valueLen = len - keyLen - 1;
 
@@ -223,7 +223,7 @@ public:
                 continue;
             }
 
-            // 限制字段长度
+            // Limit field length
             constexpr size_t kMaxFieldLength = 65536;
             if (keyLen > kMaxFieldLength || valueLen > kMaxFieldLength) {
                 continue;
@@ -232,7 +232,7 @@ public:
             try {
                 entry.fields.emplace(std::string(dataPtr, keyLen), std::string(equalSign + 1, valueLen));
             } catch (const std::bad_alloc&) {
-                break; // 内存不足时停止添加字段
+                break; // Stop adding fields when out of memory
             }
             fieldCount++;
         }
@@ -252,13 +252,13 @@ public:
         return res;
     }
 
-    /*---------------  过滤 / 等待  ----------------*/
+    /*---------------  Filter / Wait  ----------------*/
     bool AddMatch(const std::string& field, const std::string& value) {
         if (!IsOpen() || field.empty() || value.empty()) {
             return false;
         }
 
-        // 限制匹配字符串长度
+        // Limit match string length
         if (field.length() > 1024 || value.length() > 1024) {
             return false;
         }
@@ -278,7 +278,7 @@ public:
         const void* data = nullptr;
         size_t length = 0;
 
-        // 使用sd_journal_query_unique获取字段的唯一值
+        // Use sd_journal_query_unique to get unique values for the field
         int r = sd_journal_query_unique(mJournal, field.c_str());
         if (r < 0) {
             return values;
@@ -298,7 +298,7 @@ public:
 
             std::string entry(static_cast<const char*>(data), length);
 
-            // 分割获取值部分
+            // Split to get value part
             size_t equalPos = entry.find('=');
             if (equalPos != std::string::npos && equalPos + 1 < entry.length()) {
                 std::string value = entry.substr(equalPos + 1);
@@ -312,7 +312,7 @@ public:
     }
 
 
-    /*---------------  配置接口  ----------------*/
+    /*---------------  Configuration Interface  ----------------*/
     bool SetJournalPaths(const std::vector<std::string>& p) {
         mJournalPaths = p;
         return true;
@@ -332,11 +332,11 @@ public:
         event.events = EPOLLIN;
         event.data.fd = fd;
 
-        // 先尝试ADD，如果fd已存在则使用MOD
+        // Try ADD first, use MOD if fd already exists
         int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
         if (result != 0) {
             if (errno == EEXIST) {
-                // fd已存在，使用MOD来修改事件设置
+                // fd already exists, use MOD to modify event settings
                 result = epoll_ctl(epollFD, EPOLL_CTL_MOD, fd, &event);
             }
             if (result != 0) {
@@ -361,11 +361,11 @@ public:
         event.events = EPOLLIN;
         event.data.fd = fd;
 
-        // 先尝试ADD，如果fd已存在则使用MOD
+        // Try ADD first, use MOD if fd already exists
         int result = epoll_ctl(epollFD, EPOLL_CTL_ADD, fd, &event);
         if (result != 0) {
             if (errno == EEXIST) {
-                // fd已存在，使用MOD来修改事件设置
+                // fd already exists, use MOD to modify event settings
                 result = epoll_ctl(epollFD, EPOLL_CTL_MOD, fd, &event);
             }
             if (result != 0) {
@@ -392,10 +392,10 @@ public:
             return JournalStatusType::kError;
         }
 
-        // 调用 sd_journal_process() 来检查 journal 状态变化
+        // Call sd_journal_process() to check journal status changes
         int ret = sd_journal_process(mJournal);
 
-        // 转换为封装的枚举类型
+        // Convert to encapsulated enum type
         if (ret == SD_JOURNAL_NOP) {
             return JournalStatusType::kNop;
         }
@@ -432,9 +432,9 @@ private:
                 return -ENOENT;
             }
 
-            // 🔥 关键修改：使用 sd_journal_open_directory 而不是打开文件列表
-            // 这样可以获取有效的 fd 用于 epoll 监听
-            // sd_journal_open_directory 返回值：0 表示成功，负数表示错误
+            // 🔥 Key modification: Use sd_journal_open_directory instead of opening file list
+            // This allows getting a valid fd for epoll monitoring
+            // sd_journal_open_directory return value: 0 for success, negative for error
             int ret = sd_journal_open_directory(&mJournal, dir.c_str(), 0);
             if (ret < 0) {
                 return ret;
@@ -470,11 +470,11 @@ private:
 };
 
 /*========================================================
- *  公共接口转发 - Pimpl 模式实现
+ *  Public Interface Forwarding - Pimpl Pattern Implementation
  *
- *  设计意图：
- *  1. 编译隔离：避免头文件暴露 systemd 依赖，减小头文件依赖
- *  2. 接口稳定性：Impl 类实现可修改，不影响公共 API
+ *  Design Intent:
+ *  1. Compilation Isolation: Avoid exposing systemd dependencies in headers, reduce header dependencies
+ *  2. Interface Stability: Impl class implementation can be modified without affecting public API
  *========================================================*/
 JournalReader::JournalReader() : mImpl(std::make_unique<Impl>()) {
 }

@@ -23,17 +23,16 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <vector>
 
-#include "common/JournalCommon.h"
 #include "common/JournalConfig.h"
-#include "manager/JournalEpollMonitor.h"
+#include "manager/JournalMonitor.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
 
 // Forward declarations
 class JournalConnection;
-class JournalConnectionInstance;
 class JournalReader;
 class PipelineEventGroup;
 struct JournalEntry;
@@ -66,10 +65,9 @@ public:
     // Configuration Management
     void AddJournalInput(const std::string& configName, const JournalConfig& config);
     void RemoveJournalInput(const std::string& configName);
-    void RemoveConfigOnly(const std::string& configName);
 
     // Query Interfaces
-    std::map<std::string, JournalConfig> GetAllJournalConfigs() const;
+    std::vector<std::string> GetAllJournalConfigNames() const;
 
     // Test Support
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -82,19 +80,17 @@ private:
     // Main Execution Flow
     void run();
 
-    // Handle Pending Data
-    // Note: Pending data is also processed in the main event loop when there are events.
-    // This function is only called as a fallback when there are no events (nfds == 0).
     bool processPendingDataWhenNoEvents(std::map<int, MonitoredReader>& monitoredReaders);
 
-    // Validation/Helper Methods
+    void processMonitoredReader(MonitoredReader& monitoredReader, const std::shared_ptr<JournalReader>& currentReader);
+
     bool getOrValidateQueueKey(const std::string& configName, const JournalConfig& config, QueueKey& queueKey);
 
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
     std::atomic<bool> mIsInitialized{false};
 
-    std::unique_ptr<JournalEpollMonitor> mReaderMonitor;
+    std::unique_ptr<JournalMonitor> mReaderMonitor;
 };
 
 } // namespace logtail

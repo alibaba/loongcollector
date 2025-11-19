@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <chrono>
 #include <memory>
 #include <thread>
@@ -27,6 +28,12 @@
 using namespace std;
 
 namespace logtail {
+
+// Helper function to check if a config exists
+static bool HasConfig(JournalServer* server, const std::string& configName) {
+    auto configNames = server->GetAllJournalConfigNames();
+    return std::find(configNames.begin(), configNames.end(), configName) != configNames.end();
+}
 
 class JournalServerUnittest : public testing::Test {
 public:
@@ -146,8 +153,7 @@ void JournalServerUnittest::TestAddJournalInput() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已添加（即使连接失败，配置也应该被添加）
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
 
     server->Stop();
 }
@@ -165,8 +171,7 @@ void JournalServerUnittest::TestRemoveJournalInput() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置存在
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
 
     // 移除配置
     server->RemoveJournalInput(mConfigName);
@@ -175,8 +180,7 @@ void JournalServerUnittest::TestRemoveJournalInput() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已移除
-    configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, mConfigName));
 
     server->Stop();
 }
@@ -194,18 +198,16 @@ void JournalServerUnittest::TestRemoveConfigOnly() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置存在
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
 
-    // 仅移除配置（不清理epoll）
-    server->RemoveConfigOnly(mConfigName);
+    // 移除配置（统一使用 RemoveJournalInput）
+    server->RemoveJournalInput(mConfigName);
 
     // 等待一小段时间让移除生效
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已移除
-    configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, mConfigName));
 
     server->Stop();
 }
@@ -224,14 +226,14 @@ void JournalServerUnittest::TestGetAllJournalConfigs() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 获取所有配置
-    auto configs = server->GetAllJournalConfigs();
+    auto configNames = server->GetAllJournalConfigNames();
 
     // 验证配置数量
-    APSARA_TEST_TRUE(configs.size() >= 2);
+    APSARA_TEST_TRUE(configNames.size() >= 2);
 
     // 验证特定配置存在
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
-    APSARA_TEST_TRUE(configs.find("another_config") != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
+    APSARA_TEST_TRUE(HasConfig(server, "another_config"));
 
     server->Stop();
 }
@@ -282,8 +284,7 @@ void JournalServerUnittest::TestCleanupEpollMonitoring() {
     server->RemoveJournalInput(mConfigName);
 
     // 验证配置已移除
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, mConfigName));
 
     server->Stop();
 }
@@ -305,8 +306,7 @@ void JournalServerUnittest::TestHasRegisteredPlugins() {
 
     // 检查是否有注册的插件（取决于系统是否支持journal）
     // 在测试环境中，即使journal连接失败，配置也应该被添加
-    auto configs = server->GetAllJournalConfigs();
-    if (configs.find(mConfigName) != configs.end()) {
+    if (HasConfig(server, mConfigName)) {
         // 配置存在，检查是否有活跃连接
         APSARA_TEST_TRUE(server->HasRegisteredPlugins() || !server->HasRegisteredPlugins());
     }
@@ -336,8 +336,7 @@ void JournalServerUnittest::TestClear() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置存在
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
 
     // 清理
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -411,8 +410,7 @@ void JournalServerUnittest::TestAddJournalInputValidationFailure() {
     server->AddJournalInput("invalid_config", invalidConfig);
 
     // 验证配置没有被添加
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find("invalid_config") == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, "invalid_config"));
 
     server->Stop();
 }
@@ -584,8 +582,7 @@ void JournalServerUnittest::TestAddJournalInputWithHandler() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已添加
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find("test_config_with_handler") != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, "test_config_with_handler"));
 
     server->Stop();
 }
@@ -604,8 +601,7 @@ void JournalServerUnittest::TestCleanupEpollMonitoringWithReader() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已添加
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, mConfigName));
 
     // RemoveJournalInput 内部会调用 RemoveConfigWithEpollCleanup 来清理epoll监控
     // 这会移除 epoll 监控并删除配置（测试有reader的情况）
@@ -615,8 +611,7 @@ void JournalServerUnittest::TestCleanupEpollMonitoringWithReader() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     // 验证配置已移除
-    configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find(mConfigName) == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, mConfigName));
 
     server->Stop();
 }
@@ -775,8 +770,7 @@ void JournalServerUnittest::TestValidateQueueKeyNoContext() {
     server->AddJournalInput("invalid_config_no_context", invalidConfig);
 
     // 验证配置没有被添加
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find("invalid_config_no_context") == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, "invalid_config_no_context"));
 
     server->Stop();
 }
@@ -799,8 +793,7 @@ void JournalServerUnittest::TestValidateQueueKeyPreSetKey() {
     server->AddJournalInput("test_config_preset_key", config);
 
     // 验证配置已添加
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find("test_config_preset_key") != configs.end());
+    APSARA_TEST_TRUE(HasConfig(server, "test_config_preset_key"));
 
     server->Stop();
 }
@@ -823,8 +816,7 @@ void JournalServerUnittest::TestValidateQueueKeyNoQueueKey() {
     server->AddJournalInput("test_config_no_queue_key", config);
 
     // 验证配置没有被添加（因为验证失败）
-    auto configs = server->GetAllJournalConfigs();
-    APSARA_TEST_TRUE(configs.find("test_config_no_queue_key") == configs.end());
+    APSARA_TEST_TRUE(!HasConfig(server, "test_config_no_queue_key"));
 
     server->Stop();
 }
@@ -847,8 +839,6 @@ void JournalServerUnittest::TestValidateQueueKeyInvalidQueue() {
     server->AddJournalInput("test_config_invalid_queue", config);
 
     // 验证配置是否被添加（取决于验证逻辑）
-    auto configs = server->GetAllJournalConfigs();
-
     // 在测试环境中，即使队列无效，配置可能仍然被添加
     // 主要测试验证逻辑不崩溃
     APSARA_TEST_TRUE(true);

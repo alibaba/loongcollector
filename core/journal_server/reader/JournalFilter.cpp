@@ -32,7 +32,7 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         return false;
     }
 
-    // 验证配置
+    // Validate configuration
     if (!ValidateConfig(config)) {
         LOG_ERROR(sLogger,
                   ("journal filter with invalid filter config", "")("config", config.mConfigName)("idx",
@@ -53,7 +53,7 @@ bool JournalFilter::ApplyAllFilters(JournalReader* reader, const FilterConfig& c
         return false;
     }
 
-    // 只有在配置了units且enableKernel=true时才添加kernel过滤器
+    // Only add kernel filter when units are configured and enableKernel=true
     if (!config.mUnits.empty() && config.mEnableKernel) {
         if (!AddKernelFilter(reader, config.mConfigName, config.mConfigIndex)) {
             LOG_ERROR(
@@ -87,16 +87,16 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
 
     std::vector<std::string> patterns;
 
-    // 处理每个单元 - 直接添加具体单元或收集glob模式
+    // Process each unit - directly add concrete units or collect glob patterns
     for (const auto& unit : units) {
-        // 将任意字符串转换为有效的systemd单元名称（转换路径、添加后缀等）
+        // Convert any string to a valid systemd unit name (convert paths, add suffixes, etc.)
         std::string mangledUnit = JournalUtils::UnitNameMangle(unit, ".service");
 
         if (JournalUtils::IsStringGlob(mangledUnit)) {
-            // 收集glob模式以备后续处理
+            // Collect glob patterns for later processing
             patterns.push_back(mangledUnit);
         } else {
-            // 立即添加具体单元匹配
+            // Immediately add concrete unit matches
             if (!addSingleUnitMatches(reader, mangledUnit, configName, configIndex)) {
                 LOG_ERROR(sLogger,
                           ("journal filter failed to add unit filter",
@@ -106,7 +106,7 @@ bool JournalFilter::AddUnitsFilter(JournalReader* reader,
         }
     }
 
-    // 处理glob模式（如果有的话）
+    // Process glob patterns (if any)
     if (!patterns.empty()) {
         LOG_INFO(sLogger,
                  ("journal filter processing glob patterns",
@@ -137,15 +137,15 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
                                          const std::string& unit,
                                          const std::string& configName,
                                          size_t configIndex) {
-    // 1. 匹配服务本身（_SYSTEMD_UNIT=unit）的消息
+    // 1. Match messages from the service itself (_SYSTEMD_UNIT=unit)
     if (!reader->AddMatch("_SYSTEMD_UNIT", unit)) {
         LOG_WARNING(sLogger,
                     ("journal filter failed to add unit match", unit)("config", configName)("idx", configIndex));
         return false;
     }
 
-    // 2. 匹配服务的coredump（_UID=0 + COREDUMP_UNIT=unit）
-    // MESSAGE_ID "fc2e22bc6ee647b6b90729ab34a250b1" 是systemd预定义的coredump消息标识符
+    // 2. Match service coredumps (_UID=0 + COREDUMP_UNIT=unit)
+    // MESSAGE_ID "fc2e22bc6ee647b6b90729ab34a250b1" is a systemd predefined coredump message identifier
     if (!reader->AddDisjunction() || !reader->AddMatch("MESSAGE_ID", "fc2e22bc6ee647b6b90729ab34a250b1")
         || !reader->AddMatch("_UID", "0") || !reader->AddMatch("COREDUMP_UNIT", unit)) {
         LOG_WARNING(sLogger,
@@ -153,21 +153,21 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
         return false;
     }
 
-    // 3. 匹配PID 1（systemd）关于此服务的消息
+    // 3. Match messages from PID 1 (systemd) about this service
     if (!reader->AddDisjunction() || !reader->AddMatch("_PID", "1") || !reader->AddMatch("UNIT", unit)) {
         LOG_WARNING(sLogger,
                     ("journal filter failed to add PID1 match", unit)("config", configName)("idx", configIndex));
         return false;
     }
 
-    // 4. 匹配授权守护进程（_UID=0 + OBJECT_SYSTEMD_UNIT=unit）
+    // 4. Match authorized daemon messages (_UID=0 + OBJECT_SYSTEMD_UNIT=unit)
     if (!reader->AddDisjunction() || !reader->AddMatch("_UID", "0") || !reader->AddMatch("OBJECT_SYSTEMD_UNIT", unit)) {
         LOG_WARNING(sLogger,
                     ("journal filter failed to add daemon match", unit)("config", configName)("idx", configIndex));
         return false;
     }
 
-    // 5. 显示属于slice(slice本身是一个容器，需要展开其下所有服务的日志)的所有消息
+    // 5. Show all messages belonging to the slice (slice is a container, need to expand logs of all services under it)
     if (absl::StrContains(unit, ".slice")) {
         if (!reader->AddDisjunction() || !reader->AddMatch("_SYSTEMD_SLICE", unit)) {
             LOG_WARNING(sLogger,
@@ -176,7 +176,7 @@ bool JournalFilter::addSingleUnitMatches(JournalReader* reader,
         }
     }
 
-    // 6. 为此unit添加最终的析取
+    // 6. Add final disjunction for this unit
     if (!reader->AddDisjunction()) {
         LOG_WARNING(sLogger,
                     ("journal filter failed to add final disjunction", unit)("config", configName)("idx", configIndex));
@@ -190,7 +190,7 @@ bool JournalFilter::AddIdentifiersFilter(JournalReader* reader,
                                          const std::string& configName,
                                          size_t configIndex) {
     if (identifiers.empty()) {
-        // 没有identifiers配置，不需要过滤
+        // No identifiers configured, no filtering needed
         return true;
     }
 
@@ -202,7 +202,7 @@ bool JournalFilter::AddIdentifiersFilter(JournalReader* reader,
             return false;
         }
 
-        // 每个identifier后都调用AddDisjunction
+        // Call AddDisjunction after each identifier
         if (!reader->AddDisjunction()) {
             LOG_WARNING(sLogger,
                         ("journal filter failed to add identifier disjunction",
@@ -225,7 +225,7 @@ bool JournalFilter::AddKernelFilter(JournalReader* reader, const std::string& co
         return false;
     }
 
-    // 添加AddDisjunction()以与其他过滤器形成OR逻辑关系
+    // Add AddDisjunction() to form OR logic relationship with other filters
     if (!reader->AddDisjunction()) {
         LOG_WARNING(sLogger,
                     ("journal filter failed to add kernel disjunction", "")("config", configName)("idx", configIndex));
@@ -245,7 +245,7 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
         return true;
     }
 
-    // 直接传递完整模式给AddMatch
+    // Directly pass complete patterns to AddMatch
     for (const auto& pattern : patterns) {
         if (pattern.empty()) {
             LOG_WARNING(sLogger,
@@ -253,7 +253,7 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
             continue;
         }
 
-        // 解析FIELD=VALUE格式的模式以匹配Go版本行为
+        // Parse FIELD=VALUE format patterns to match Go version behavior
         size_t equalPos = pattern.find('=');
         if (equalPos == std::string::npos) {
             LOG_WARNING(
@@ -287,13 +287,13 @@ bool JournalFilter::AddMatchPatternsFilter(JournalReader* reader,
 }
 
 bool JournalFilter::ValidateConfig(const FilterConfig& config) {
-    // 基本验证
+    // Basic validation
     if (config.mConfigName.empty()) {
         LOG_WARNING(sLogger, ("journal filter config missing configName", ""));
         return false;
     }
 
-    // 验证units配置
+    // Validate units configuration
     for (const auto& unit : config.mUnits) {
         if (unit.empty() || unit[0] == '.') {
             LOG_WARNING(sLogger, ("journal filter invalid unit name in config", unit)("config", config.mConfigName));
@@ -301,7 +301,7 @@ bool JournalFilter::ValidateConfig(const FilterConfig& config) {
         }
     }
 
-    // 验证identifiers配置
+    // Validate identifiers configuration
     for (const auto& identifier : config.mIdentifiers) {
         if (identifier.empty()) {
             LOG_WARNING(sLogger, ("journal filter empty identifier in config", "")("config", config.mConfigName));
@@ -309,7 +309,7 @@ bool JournalFilter::ValidateConfig(const FilterConfig& config) {
         }
     }
 
-    // 验证matchPatterns配置
+    // Validate matchPatterns configuration
     for (const auto& pattern : config.mMatchPatterns) {
         if (pattern.empty() || !absl::StrContains(pattern, '=')) {
             LOG_WARNING(sLogger, ("journal filter invalid match pattern", pattern)("config", config.mConfigName));
@@ -326,18 +326,18 @@ std::vector<std::string> JournalFilter::getPossibleUnits(JournalReader* reader,
     std::vector<std::string> found;
     std::vector<std::string> possibles;
 
-    // 从所有字段获取唯一值
+    // Get unique values from all fields
     for (const auto& field : fields) {
         std::vector<std::string> vals = reader->GetUniqueValues(field);
         possibles.insert(possibles.end(), vals.begin(), vals.end());
     }
 
-    // 根据模式过滤可能的列表
+    // Filter possible list according to patterns
     for (const auto& possible : possibles) {
         for (const auto& pattern : patterns) {
             if (JournalUtils::MatchPattern(pattern, possible)) {
                 found.push_back(possible);
-                break; // 找到此可能项的匹配，无需检查其他模式
+                break; // Found a match for this possible item, no need to check other patterns
             }
         }
     }

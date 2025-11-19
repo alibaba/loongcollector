@@ -98,10 +98,8 @@ bool InputJournal::Start() {
 }
 
 bool InputJournal::Stop(bool isPipelineRemoving) {
-    // 使用 CAS 确保幂等性：只有第一个线程能执行清理逻辑
     bool expected = false;
     if (!mShutdown.compare_exchange_strong(expected, true)) {
-        // 已经有其他线程在执行或已完成清理，直接返回
         return true;
     }
 
@@ -110,20 +108,16 @@ bool InputJournal::Stop(bool isPipelineRemoving) {
         return true;
     }
 
+    JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName());
+    
     if (isPipelineRemoving) {
-        // 配置被删除：完全清理
-        JournalServer::GetInstance()->RemoveJournalInput(mContext->GetConfigName());
         LOG_INFO(sLogger, ("InputJournal removed with checkpoint cleanup", "")("config", mContext->GetConfigName()));
-
         if (!JournalServer::GetInstance()->HasRegisteredPlugins()) {
             JournalServer::GetInstance()->Stop();
         }
     } else {
-        // 配置更新：只移除注册
-        JournalServer::GetInstance()->RemoveConfigOnly(mContext->GetConfigName());
-        LOG_INFO(
-            sLogger,
-            ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
+        LOG_INFO(sLogger,
+                 ("InputJournal stopped for config update, checkpoint preserved", "")("config", mContext->GetConfigName()));
     }
 
     return true;

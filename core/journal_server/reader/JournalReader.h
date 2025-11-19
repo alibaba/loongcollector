@@ -54,12 +54,10 @@ public:
     JournalReader(JournalReader&&) = delete;
     JournalReader& operator=(JournalReader&&) = delete;
 
-    // Core journal operations
     bool Open();
     void Close();
     bool IsOpen() const;
 
-    // Seeking operations
     bool SeekHead();
     bool SeekTail();
     bool SeekCursor(const std::string& cursor);
@@ -67,21 +65,16 @@ public:
     bool Previous();
     JournalReadStatus NextWithStatus();
 
-    // Reading operations
     bool GetEntry(JournalEntry& entry);
     std::string GetCursor();
 
-    // Filtering operations
     bool AddMatch(const std::string& field, const std::string& value);
     bool AddDisjunction();
 
-    // Get unique values for a field (for glob pattern matching)
     std::vector<std::string> GetUniqueValues(const std::string& field);
 
-    // Journal paths
     bool SetJournalPaths(const std::vector<std::string>& paths);
 
-    // Event monitoring methods
     bool AddToEpoll(int epollFD);
     int AddToEpollAndGetFD(int epollFD);
     void RemoveFromEpoll(int epollFD);

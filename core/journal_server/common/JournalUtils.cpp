@@ -26,10 +26,10 @@
 namespace logtail {
 
 // ============================================================================
-// Journal相关常量定义
+// Journal-related constant definitions
 // ============================================================================
 
-// Syslog设施转换映射表
+// Syslog facility conversion mapping table
 const std::map<std::string, std::string> JournalUtils::kSyslogFacilityString = {
     {"0", "kernel"},         {"1", "user"},         {"2", "mail"},         {"3", "daemon"},     {"4", "auth"},
     {"5", "syslog"},         {"6", "line printer"}, {"7", "network news"}, {"8", "uucp"},       {"9", "clock daemon"},
@@ -37,7 +37,7 @@ const std::map<std::string, std::string> JournalUtils::kSyslogFacilityString = {
     {"15", "clock daemon"},  {"16", "local0"},      {"17", "local1"},      {"18", "local2"},    {"19", "local3"},
     {"20", "local4"},        {"21", "local5"},      {"22", "local6"},      {"23", "local7"}};
 
-// 优先级转换映射表
+// Priority conversion mapping table
 const std::map<std::string, std::string> JournalUtils::kPriorityConversionMap = {{"0", "emergency"},
                                                                                  {"1", "alert"},
                                                                                  {"2", "critical"},
@@ -47,7 +47,7 @@ const std::map<std::string, std::string> JournalUtils::kPriorityConversionMap = 
                                                                                  {"6", "informational"},
                                                                                  {"7", "debug"}};
 
-// Unit name processing constants (from Go implementation)
+// Unit name processing constants
 const std::string JournalUtils::kLetters = std::string(kLowercaseLetters) + std::string(kUppercaseLetters);
 const std::string JournalUtils::kValidChars = std::string(kDigits) + kLetters + ":-_.\\";
 const std::string JournalUtils::kValidCharsWithAt = "@" + kValidChars;
@@ -70,7 +70,7 @@ const std::vector<std::string> JournalUtils::kUnitTypes = {".service",
                                                            ".scope"};
 
 // ============================================================================
-// 字符串和路径工具函数实现
+// String and path utility function implementations
 // ============================================================================
 
 bool JournalUtils::IsStringGlob(const std::string& name) {
@@ -90,8 +90,8 @@ bool JournalUtils::IsPathAbsolute(const std::string& path) {
 }
 
 bool JournalUtils::MatchPattern(const std::string& pattern, const std::string& string) {
-    // 使用正则表达式进行简单的glob匹配
-    // 将glob模式转换为正则表达式模式
+    // Use regular expressions for simple glob matching
+    // Convert glob pattern to regular expression pattern
     std::string regexPattern;
     regexPattern.reserve(pattern.length() * 2);
 
@@ -135,7 +135,7 @@ bool JournalUtils::MatchPattern(const std::string& pattern, const std::string& s
 }
 
 // ============================================================================
-// Systemd单元相关工具函数实现
+// Systemd unit-related utility function implementations
 // ============================================================================
 
 bool JournalUtils::IsUnitSuffixValid(const std::string& suffix) {
@@ -155,7 +155,7 @@ bool JournalUtils::IsUnitNameValid(const std::string& name) {
 
     size_t dot = name.find('.');
     if (dot == std::string::npos) {
-        return false; // 必须有点号（即后缀）
+        return false; // Must have a dot (i.e., suffix)
     }
 
     std::string suffix = name.substr(dot);
@@ -163,17 +163,17 @@ bool JournalUtils::IsUnitNameValid(const std::string& name) {
         return false;
     }
 
-    // 检查单元名称是否只包含有效字符（字母、数字、特殊符号和@）
+    // Check if unit name contains only valid characters (letters, digits, special symbols, and @)
     if (!InCharset(name, kValidCharsWithAt)) {
         return false;
     }
 
     size_t at = name.find('@');
     if (at == 0) {
-        return false; // 不能以'@'开头
+        return false; // Cannot start with '@'
     }
 
-    // 普通单元（非模板或实例）或模板/实例单元
+    // Regular unit (non-template or instance) or template/instance unit
     if (at == std::string::npos || (at > 0 && dot >= at + 1)) {
         return true;
     }
@@ -187,7 +187,7 @@ std::string JournalUtils::DoEscapeMangle(const std::string& name) {
         if (c == '/') {
             mangled += '-';
         } else if (!absl::StrContains(kValidChars, c)) {
-            // 转换为十六进制转义序列
+            // Convert to hexadecimal escape sequence
             std::ostringstream oss;
             oss << "\\x" << std::hex << static_cast<unsigned char>(c);
             mangled += oss.str();
@@ -199,7 +199,7 @@ std::string JournalUtils::DoEscapeMangle(const std::string& name) {
 }
 
 std::string JournalUtils::UnitNameMangle(const std::string& name, const std::string& suffix) {
-    // 不能为空或以点号开头
+    // Cannot be empty or start with a dot
     if (name.empty() || name[0] == '.') {
         throw std::invalid_argument("unit name can't be empty or begin with a dot");
     }
@@ -208,34 +208,32 @@ std::string JournalUtils::UnitNameMangle(const std::string& name, const std::str
         throw std::invalid_argument("unit name has an invalid suffix");
     }
 
-    // 已经是完全有效的单元名称？
     if (IsUnitNameValid(name)) {
         return name;
     }
 
-    // 已经是完全有效的glob表达式？如果是，则无需处理...
     if (IsStringGlob(name) && InCharset(name, kValidCharsGlob)) {
         return name;
     }
 
-    // 如果是设备路径，转换为.device单元
+    // If it's a device path, convert to .device unit
     if (IsDevicePath(name)) {
-        // 截取路径并在末尾添加.device
+        // Extract path and append .device at the end
         std::filesystem::path p(name);
         return p.filename().string() + ".device";
     }
 
-    // 如果是绝对路径，转换为.mount单元
+    // If it's an absolute path, convert to .mount unit
     if (IsPathAbsolute(name)) {
-        // 截取路径并在末尾添加.mount
+        // Extract path and append .mount at the end
         std::filesystem::path p(name);
         return p.filename().string() + ".mount";
     }
 
     std::string escaped = DoEscapeMangle(name);
 
-    // 如果没有后缀则添加后缀，但仅当这不是glob模式时，
-    // 这样我们可以允许"foo.*"作为有效的glob模式。
+    // If no suffix exists, add suffix, but only when this is not a glob pattern,
+    // so we can allow "foo.*" as a valid glob pattern.
     if (!IsStringGlob(escaped) && !absl::StrContains(escaped, '.')) {
         return escaped + suffix;
     }

@@ -25,10 +25,9 @@
 #include <utility>
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
-#include "common/JournalCommon.h"
 #include "logger/Logger.h"
 #include "manager/JournalConnection.h"
-#include "manager/JournalEpollMonitor.h"
+#include "manager/JournalMonitor.h"
 #include "processor/JournalEntryProcessor.h"
 #include "reader/JournalReader.h"
 
@@ -46,7 +45,7 @@ void JournalServer::Init() {
 
     JournalConnection::GetInstance().Initialize();
 
-    mReaderMonitor = std::make_unique<JournalEpollMonitor>();
+    mReaderMonitor = std::make_unique<JournalMonitor>();
     if (!mReaderMonitor->Initialize()) {
         LOG_ERROR(sLogger, ("journal server failed to initialize reader monitor", ""));
         mIsInitialized.store(false);
@@ -101,10 +100,10 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
              ("journal server input validated",
               "")("config", configName)("ctx_valid", config.mCtx != nullptr)("queue_key", queueKey));
 
-    auto connectionManager = &JournalConnection::GetInstance();
+    auto& connectionManager = JournalConnection::GetInstance();
 
-    if (connectionManager->AddConfig(configName, validatedConfig)) {
-        auto stats = connectionManager->GetStats();
+    if (connectionManager.AddConfig(configName, validatedConfig)) {
+        auto stats = connectionManager.GetStats();
         LOG_INFO(sLogger,
                  ("journal server manager stats", "")("total_configs", stats.totalConfigs)("active_connections",
                                                                                            stats.activeConnections));
@@ -114,49 +113,30 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 }
 
 void JournalServer::RemoveJournalInput(const string& configName) {
-    // Remove reader from epoll monitoring first
     if (mReaderMonitor) {
-        mReaderMonitor->RemoveReaderFromEpoll(configName);
+        mReaderMonitor->RemoveReaderFromMonitoring(configName, true);
     }
 
-    // Remove configuration (reader will be closed)
     JournalConnection::GetInstance().RemoveConfig(configName);
-
-    // Cleanup from monitored readers map
-    if (mReaderMonitor) {
-        auto& monitoredReaders = mReaderMonitor->GetMonitoredReaders();
-        for (auto it = monitoredReaders.begin(); it != monitoredReaders.end();) {
-            if (it->second.configName == configName) {
-                it = monitoredReaders.erase(it);
-            } else {
-                ++it;
-            }
-        }
-    }
 
     LOG_INFO(sLogger, ("journal server input removed", "")("config", configName));
 }
 
-void JournalServer::RemoveConfigOnly(const string& configName) {
-    JournalConnection::GetInstance().RemoveConfig(configName);
 
-    LOG_INFO(sLogger, ("journal server input removed without cleanup", "")("config", configName));
-}
-
-std::map<std::string, JournalConfig> JournalServer::GetAllJournalConfigs() const {
+std::vector<std::string> JournalServer::GetAllJournalConfigNames() const {
     auto allConfigs = JournalConnection::GetInstance().GetAllConfigs();
 
     // Filter out unvalidated configs (mQueueKey == -1 means failed validateQueueKey validation)
-    std::map<std::string, JournalConfig> validatedConfigs;
+    std::vector<std::string> validatedConfigNames;
     for (const auto& [configName, config] : allConfigs) {
         if (config.mQueueKey != -1) {
-            validatedConfigs[configName] = config;
+            validatedConfigNames.push_back(configName);
         } else {
             LOG_DEBUG(sLogger, ("journal server filtering unvalidated config", "")("config", configName));
         }
     }
 
-    return validatedConfigs;
+    return validatedConfigNames;
 }
 
 void JournalServer::run() {
@@ -170,13 +150,16 @@ void JournalServer::run() {
 #ifdef __linux__
     auto& monitoredReaders = mReaderMonitor->GetMonitoredReaders();
     int epollFD = mReaderMonitor->GetEpollFD();
+    auto& connectionManager = JournalConnection::GetInstance();
 
     constexpr int kMaxEvents = 64;
     struct epoll_event events[kMaxEvents];
 
     while (mIsThreadRunning.load()) {
         try {
-            mReaderMonitor->SyncMonitoredReaders();
+            auto configNames = GetAllJournalConfigNames();
+            connectionManager.RefreshConnectionsByInterval(configNames, *mReaderMonitor);
+            mReaderMonitor->AddReadersToMonitoring(configNames);
 
             int nfds = epoll_wait(epollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
 
@@ -226,23 +209,7 @@ void JournalServer::run() {
                 if (status != JournalStatusType::kError) {
                     // Normal status (NOP/APPEND/INVALIDATE), process journal events for this config
                     // Note: HandleJournalEntries merges accumulated data (pendingData) with new entries
-                    auto connectionManager = &JournalConnection::GetInstance();
-                    JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
-
-                    bool timeoutTrigger
-                        = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
-
-
-                    HandleJournalEntries(monitoredReader.configName,
-                                         config,
-                                         currentReader,
-                                         config.mQueueKey,
-                                         timeoutTrigger,
-                                         &monitoredReader.accumulatedEventGroup,
-                                         &monitoredReader.accumulatedEntryCount,
-                                         &monitoredReader.accumulatedFirstCursor,
-                                         &monitoredReader.hasPendingData,
-                                         &monitoredReader.lastBatchTime);
+                    processMonitoredReader(monitoredReader, currentReader);
                 } else {
                     monitoredReader.hasPendingData = false;
                 }
@@ -263,6 +230,7 @@ void JournalServer::run() {
 
 
 bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader>& monitoredReaders) {
+    // Check if there are any readers with pending data
     bool hasReadersWithPendingData = false;
     for (const auto& pair : monitoredReaders) {
         if (pair.second.hasPendingData) {
@@ -275,8 +243,9 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
         return false;
     }
 
-    for (auto it = monitoredReaders.begin(); it != monitoredReaders.end(); ++it) {
-        auto& monitoredReader = it->second;
+    // Process all readers with pending data
+    for (auto& pair : monitoredReaders) {
+        auto& monitoredReader = pair.second;
 
         if (monitoredReader.hasPendingData) {
             std::shared_ptr<JournalReader> currentReader;
@@ -284,30 +253,35 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
                 continue;
             }
 
-            auto connectionManager = &JournalConnection::GetInstance();
-            JournalConfig config = connectionManager->GetConfig(monitoredReader.configName);
-
-            bool timeoutTrigger = false;
-            if (mReaderMonitor) {
-                timeoutTrigger = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
-            }
-
-            HandleJournalEntries(monitoredReader.configName,
-                                 config,
-                                 currentReader,
-                                 config.mQueueKey,
-                                 timeoutTrigger,
-                                 &monitoredReader.accumulatedEventGroup,
-                                 &monitoredReader.accumulatedEntryCount,
-                                 &monitoredReader.accumulatedFirstCursor,
-                                 &monitoredReader.hasPendingData,
-                                 &monitoredReader.lastBatchTime);
+            processMonitoredReader(monitoredReader, currentReader);
         }
     }
 
     return true;
 }
 
+void JournalServer::processMonitoredReader(MonitoredReader& monitoredReader,
+                                          const std::shared_ptr<JournalReader>& currentReader) {
+    // Get connection manager and config
+    auto& connectionManager = JournalConnection::GetInstance();
+    JournalConfig config = connectionManager.GetConfig(monitoredReader.configName);
+
+    // Calculate timeout trigger
+    bool timeoutTrigger = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
+
+    // Process journal entries
+    // Note: HandleJournalEntries merges accumulated data (pendingData) with new entries
+    HandleJournalEntries(monitoredReader.configName,
+                         config,
+                         currentReader,
+                         config.mQueueKey,
+                         timeoutTrigger,
+                         &monitoredReader.accumulatedEventGroup,
+                         &monitoredReader.accumulatedEntryCount,
+                         &monitoredReader.accumulatedFirstCursor,
+                         &monitoredReader.hasPendingData,
+                         &monitoredReader.lastBatchTime);
+}
 
 bool JournalServer::getOrValidateQueueKey(const std::string& configName,
                                           const JournalConfig& config,
