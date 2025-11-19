@@ -77,7 +77,7 @@ InputStaticFileCheckpoint::InputStaticFileCheckpoint(const string& configName,
       mWaitingSentFlags(mFileCheckpoints.size(), false) {
 }
 
-bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump) {
+bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, bool& needDump) {
     if (mCurrentFileIndex >= mFileCheckpoints.size()) {
         // should not happen
         return false;
@@ -96,17 +96,16 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
                          "signature hash", fileCpt.mSignatureHash)("signature size", fileCpt.mSignatureSize));
         case FileStatus::READING:
             fileCpt.mOffset = offset;
-            fileCpt.mSize = size;
             fileCpt.mLastUpdateTime = time(nullptr);
-            if (offset == size) {
+            if (offset >= fileCpt.mSize) {
                 fileCpt.mStatus = FileStatus::FINISHED;
                 needDump = true;
                 LOG_INFO(sLogger,
                          ("file read done, config", mConfigName)("input idx", mInputIdx)(
                              "current file idx", mCurrentFileIndex)("filepath", fileCpt.mFilePath.string())(
                              "device", fileCpt.mDevInode.dev)("inode", fileCpt.mDevInode.inode)(
-                             "signature hash", fileCpt.mSignatureHash)("signature size", fileCpt.mSignatureSize)("size",
-                                                                                                                 size));
+                             "signature hash", fileCpt.mSignatureHash)("signature size",
+                                                                       fileCpt.mSignatureSize)("size", fileCpt.mSize));
                 if (++mCurrentFileIndex == mFileCheckpoints.size()) {
                     mStatus = StaticFileReadingStatus::FINISHED;
                     mFinishTime = time(nullptr);
@@ -118,6 +117,23 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
             // should not happen
             return false;
     }
+}
+
+bool InputStaticFileCheckpoint::UpdateCurrentFileRealPath(const std::filesystem::path& realPath, bool& needDump) {
+    if (mCurrentFileIndex >= mFileCheckpoints.size()) {
+        // should not happen
+        return false;
+    }
+    needDump = false;
+    auto& fileCpt = mFileCheckpoints[mCurrentFileIndex];
+    if (fileCpt.mRealFilePath != realPath) {
+        fileCpt.mRealFilePath = realPath;
+        needDump = true;
+        LOG_INFO(sLogger,
+                 ("update real file path, config", mConfigName)("input idx", mInputIdx)(
+                     "current file idx", mCurrentFileIndex)("real filepath", realPath.string()));
+    }
+    return true;
 }
 
 bool InputStaticFileCheckpoint::InvalidateCurrentFileCheckpoint() {
@@ -157,10 +173,12 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
         return false;
     }
     auto& fileCpt = mFileCheckpoints[mCurrentFileIndex];
-    cpt->mFilePath = fileCpt.mFilePath;
+    // 优先使用 mRealFilePath（如果存在），用于文件轮转场景
+    cpt->mFilePath = fileCpt.mRealFilePath.empty() ? fileCpt.mFilePath : fileCpt.mRealFilePath;
     cpt->mDevInode = fileCpt.mDevInode;
     cpt->mSignatureHash = fileCpt.mSignatureHash;
     cpt->mSignatureSize = fileCpt.mSignatureSize;
+    cpt->mSize = fileCpt.mSize;
     return true;
 }
 
@@ -196,6 +214,7 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
         files.append(Json::objectValue);
         auto& file = files[files.size() - 1];
         file["filepath"] = cpt.mFilePath.string();
+        file["real_filepath"] = cpt.mRealFilePath.string();
         file["status"] = FileStatusToString(cpt.mStatus);
         switch (cpt.mStatus) {
             case FileStatus::WAITING:
@@ -203,6 +222,7 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
                 file["inode"] = cpt.mDevInode.inode;
                 file["sig_hash"] = cpt.mSignatureHash;
                 file["sig_size"] = cpt.mSignatureSize;
+                file["size"] = cpt.mSize;
                 break;
             case FileStatus::READING:
                 file["dev"] = cpt.mDevInode.dev;
@@ -305,6 +325,14 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         }
         cpt.mFilePath = ConvertAndNormalizeNativePath(filepath);
 
+        // 读取 real_filepath，如果不存在则使用 filepath（向后兼容）
+        string realFilepath;
+        if (GetOptionalStringParam(fileCpt, outerKey + ".real_filepath", realFilepath, *errMsg)) {
+            cpt.mRealFilePath = ConvertAndNormalizeNativePath(realFilepath);
+        } else {
+            cpt.mRealFilePath = cpt.mFilePath;
+        }
+
         string statusStr;
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
             return false;
@@ -323,6 +351,9 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
                     return false;
                 }
                 if (!GetMandatoryUIntParam(fileCpt, outerKey + ".sig_size", cpt.mSignatureSize, *errMsg)) {
+                    return false;
+                }
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".size", cpt.mSize, *errMsg)) {
                     return false;
                 }
                 break;

@@ -38,11 +38,12 @@ FileStatus GetFileStatusFromString(const std::string& status);
 
 struct FileCheckpoint {
     std::filesystem::path mFilePath;
+    std::filesystem::path mRealFilePath; // 实际采集的文件路径，用于文件轮转场景
     // std::string mRealFileName;
     DevInode mDevInode;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
-    uint64_t mSize = 0;
+    uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围，保持不变
     uint64_t mOffset = 0;
     FileStatus mStatus = FileStatus::WAITING;
     int32_t mStartTime = 0;
@@ -53,7 +54,11 @@ struct FileCheckpoint {
                    const DevInode& devInode,
                    uint64_t signatureHash,
                    uint32_t signatureSize)
-        : mFilePath(filename), mDevInode(devInode), mSignatureHash(signatureHash), mSignatureSize(signatureSize) {}
+        : mFilePath(filename),
+          mRealFilePath(filename),
+          mDevInode(devInode),
+          mSignatureHash(signatureHash),
+          mSignatureSize(signatureSize) {}
 };
 
 struct FileFingerprint {
@@ -61,6 +66,7 @@ struct FileFingerprint {
     DevInode mDevInode;
     uint32_t mSignatureSize;
     uint64_t mSignatureHash;
+    uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围
 };
 
 } // namespace logtail

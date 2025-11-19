@@ -15,7 +15,9 @@
 #include "file_server/StaticFileServer.h"
 
 #include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/FileSystemUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/checkpoint/InputStaticFileCheckpointManager.h"
 #include "runner/ProcessorRunner.h"
 
@@ -184,7 +186,12 @@ void StaticFileServer::ReadFiles() {
                                       "input idx", inputIdx)("filepath", reader->GetHostLogPath()));
                     }
                     InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileCheckpoint(
-                        configName, inputIdx, reader->GetLastFilePos(), reader->GetFileSize());
+                        configName, inputIdx, reader->GetLastFilePos());
+                    // 更新实际文件路径（如果 reader 的路径发生变化）
+                    if (reader->GetRealLogPath() != reader->GetHostLogPath()) {
+                        InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileRealPath(
+                            configName, inputIdx, reader->GetRealLogPath());
+                    }
                     if (!moreData) {
                         reader = nullptr;
                         skip = true;
@@ -208,24 +215,30 @@ void StaticFileServer::ReadFiles() {
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
     FileFingerprint fingerprint;
     while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
-        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(fingerprint.mFilePath.parent_path().string(),
-                                                                   fingerprint.mFilePath.filename().string(),
-                                                                   fingerprint.mDevInode,
-                                                                   GetFileReaderConfig(configName, idx),
-                                                                   GetMultilineConfig(configName, idx),
-                                                                   GetFileDiscoveryConfig(configName, idx),
-                                                                   GetFileTagConfig(configName, idx),
-                                                                   0,
-                                                                   true));
+        filesystem::path filePath = fingerprint.mFilePath;
         string errMsg;
-        if (!reader) {
-            errMsg = "failed to create reader";
-        } else if (!reader->UpdateFilePtr()) {
-            errMsg = "failed to open file";
-        } else if (!reader->CheckFileSignatureAndOffset(false)
-                   || reader->GetSignature() != make_pair(fingerprint.mSignatureHash, fingerprint.mSignatureSize)) {
-            errMsg = "file signature check failed";
+
+        // 检查文件是否存在，如果不存在或路径变了但 devinode 没变，尝试查找轮转后的文件
+        auto currentDevInode = GetFileDevInode(filePath.string());
+        if (!currentDevInode.IsValid() || currentDevInode != fingerprint.mDevInode) {
+            // 文件不存在或 devinode 不匹配，尝试在目录中查找轮转后的文件
+            auto dirPath = filePath.parent_path();
+            const auto searchResult
+                = SearchFilePathByDevInodeInDirectory(dirPath.string(), 0, fingerprint.mDevInode, nullptr);
+            if (searchResult) {
+                filePath = filesystem::path(ConvertAndNormalizeNativePath(searchResult.value())).lexically_normal();
+                LOG_INFO(sLogger,
+                         ("file rotated, found new path", "")("config", configName)("input idx", idx)(
+                             "old path", fingerprint.mFilePath.string())("new path", filePath.string()));
+                // 更新 checkpoint 中的 real_filepath
+                InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileRealPath(configName, idx, filePath);
+                // 同时更新 fingerprint，方便后续使用
+                fingerprint.mFilePath = filePath;
+            } else {
+                errMsg = "file not found and cannot find rotated file";
+            }
         }
+
         if (!errMsg.empty()) {
             LOG_WARNING(sLogger,
                         ("failed to get reader",
@@ -233,10 +246,44 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             InputStaticFileCheckpointManager::GetInstance()->InvalidateCurrentFileCheckpoint(configName, idx);
             continue;
         }
+
+        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(filePath.parent_path().string(),
+                                                                   filePath.filename().string(),
+                                                                   fingerprint.mDevInode,
+                                                                   GetFileReaderConfig(configName, idx),
+                                                                   GetMultilineConfig(configName, idx),
+                                                                   GetFileDiscoveryConfig(configName, idx),
+                                                                   GetFileTagConfig(configName, idx),
+                                                                   0,
+                                                                   true));
+        if (!reader) {
+            errMsg = "failed to create reader";
+        } else {
+            // 设置预期文件大小限制（仅对 StaticFileServer reader 生效）
+            if (fingerprint.mSize > 0) {
+                reader->SetExpectedFileSize(static_cast<int64_t>(fingerprint.mSize));
+            }
+            if (!reader->UpdateFilePtr()) {
+                errMsg = "failed to open file";
+            } else if (!reader->CheckFileSignatureAndOffset(false)
+                       || reader->GetSignature() != make_pair(fingerprint.mSignatureHash, fingerprint.mSignatureSize)) {
+                errMsg = "file signature check failed";
+            }
+        }
+        if (!errMsg.empty()) {
+            LOG_WARNING(sLogger,
+                        ("failed to get reader", errMsg)("config", configName)("input idx", idx)("filepath",
+                                                                                                 filePath.string()));
+            InputStaticFileCheckpointManager::GetInstance()->InvalidateCurrentFileCheckpoint(configName, idx);
+            continue;
+        }
         return reader;
     }
     // all files have been read
-    mDeletedInputs.emplace(configName, idx);
+    {
+        lock_guard<mutex> lock(mUpdateMux);
+        mDeletedInputs.emplace(configName, idx);
+    }
     return LogFileReaderPtr();
 }
 
