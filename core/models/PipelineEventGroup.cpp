@@ -75,29 +75,12 @@ PipelineEventGroup::PipelineEventGroup(PipelineEventGroup&& rhs) noexcept
 }
 
 PipelineEventGroup::~PipelineEventGroup() {
-    if (mEvents.empty() || !mEvents[0]) {
-        return;
-    }
-    switch (mEvents[0]->GetType()) {
-        case PipelineEvent::Type::LOG:
-            DestroyEvents<LogEvent>(std::move(mEvents));
-            break;
-        case PipelineEvent::Type::METRIC:
-            DestroyEvents<MetricEvent>(std::move(mEvents));
-            break;
-        case PipelineEvent::Type::SPAN:
-            DestroyEvents<SpanEvent>(std::move(mEvents));
-            break;
-        case PipelineEvent::Type::RAW:
-            DestroyEvents<RawEvent>(std::move(mEvents));
-            break;
-        default:
-            break;
-    }
+    destroy();
 }
 
 PipelineEventGroup& PipelineEventGroup::operator=(PipelineEventGroup&& rhs) noexcept {
     if (this != &rhs) {
+        destroy();
         mMetadata = std::move(rhs.mMetadata);
         mTags = std::move(rhs.mTags);
         mEvents = std::move(rhs.mEvents);
@@ -121,6 +104,28 @@ PipelineEventGroup PipelineEventGroup::Copy() const {
         res.mEvents.back()->ResetPipelineEventGroup(&res);
     }
     return res;
+}
+
+void PipelineEventGroup::destroy() {
+    if (mEvents.empty() || !mEvents[0]) {
+        return;
+    }
+    switch (mEvents[0]->GetType()) {
+        case PipelineEvent::Type::LOG:
+            DestroyEvents<LogEvent>(std::move(mEvents));
+            break;
+        case PipelineEvent::Type::METRIC:
+            DestroyEvents<MetricEvent>(std::move(mEvents));
+            break;
+        case PipelineEvent::Type::SPAN:
+            DestroyEvents<SpanEvent>(std::move(mEvents));
+            break;
+        case PipelineEvent::Type::RAW:
+            DestroyEvents<RawEvent>(std::move(mEvents));
+            break;
+        default:
+            break;
+    }
 }
 
 unique_ptr<LogEvent> PipelineEventGroup::CreateLogEvent(bool fromPool, EventPool* pool) {
