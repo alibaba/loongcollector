@@ -179,11 +179,24 @@ void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
         return;
     }
 
-    // Remove old FD mapping if exists
+    // Save accumulated data before removing old FD mapping
+    bool savedHasPendingData = false;
+    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+    int savedAccumulatedEntryCount = 0;
+    std::string savedAccumulatedFirstCursor;
+    std::chrono::steady_clock::time_point savedLastBatchTime;
+
+    // Remove old FD mapping if exists and preserve accumulated data
     int oldFD = -1;
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
         if (it->second.configName == configName) {
             oldFD = it->first;
+            // Save accumulated data before erasing
+            savedHasPendingData = it->second.hasPendingData;
+            savedAccumulatedEventGroup = it->second.accumulatedEventGroup;
+            savedAccumulatedEntryCount = it->second.accumulatedEntryCount;
+            savedAccumulatedFirstCursor = it->second.accumulatedFirstCursor;
+            savedLastBatchTime = it->second.lastBatchTime;
             mMonitoredReaders.erase(it);
             break;
         }
@@ -198,10 +211,19 @@ void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
         return;
     }
 
+    // Restore accumulated data to the new MonitoredReader
     if (oldFD >= 0) {
+        auto& newMonitoredReader = mMonitoredReaders[newFD];
+        newMonitoredReader.hasPendingData = savedHasPendingData;
+        newMonitoredReader.accumulatedEventGroup = savedAccumulatedEventGroup;
+        newMonitoredReader.accumulatedEntryCount = savedAccumulatedEntryCount;
+        newMonitoredReader.accumulatedFirstCursor = savedAccumulatedFirstCursor;
+        newMonitoredReader.lastBatchTime = savedLastBatchTime;
+
         LOG_DEBUG(sLogger,
-                  ("journal monitor updated reader FD mapping after refresh",
-                   "")("config", configName)("old_fd", oldFD)("new_fd", newFD));
+                  ("journal monitor updated reader FD mapping after refresh", "")("config", configName)(
+                      "old_fd", oldFD)("new_fd", newFD)("preserved_pending_data", savedHasPendingData)(
+                      "preserved_entry_count", savedAccumulatedEntryCount));
     } else {
         // If not found in monitored readers, it will be handled by AddReadersToMonitoring()
     }
