@@ -37,8 +37,7 @@ public:
                              int64_t key,
                              uint32_t priority,
                              const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx),
-      BoundedProcessQueue(cap, lowBytes, highBytes, key, priority, ctx){}
+        : QueueInterface(key, cap, ctx), BoundedProcessQueue(cap, lowBytes, highBytes, key, priority, ctx) {}
 
 private:
     size_t Size() const override { return mCurrentBytesSize; }

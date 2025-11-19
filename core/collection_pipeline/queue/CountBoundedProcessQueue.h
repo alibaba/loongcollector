@@ -31,14 +31,9 @@ namespace logtail {
 // not thread-safe, should be protected explicitly by queue manager
 class CountBoundedProcessQueue : public BoundedProcessQueue {
 public:
-    CountBoundedProcessQueue(size_t cap,
-                             size_t low,
-                             size_t high,
-                             int64_t key,
-                             uint32_t priority,
-                             const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx),
-      BoundedProcessQueue(cap, low, high, key, priority, ctx){}
+    CountBoundedProcessQueue(
+        size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx)
+        : QueueInterface(key, cap, ctx), BoundedProcessQueue(cap, low, high, key, priority, ctx) {}
 
 private:
     size_t Size() const override { return mQueue.size(); }
