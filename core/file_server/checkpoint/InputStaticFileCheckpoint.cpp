@@ -415,31 +415,29 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
 string buildFileInfoJson(const FileCheckpoint& cpt) {
     Json::Value fileInfo;
     fileInfo["filepath"] = cpt.mFilePath.string();
+    fileInfo["real_filepath"] = cpt.mRealFilePath.string();
     fileInfo["status"] = FileStatusToString(cpt.mStatus);
+    fileInfo["dev"] = cpt.mDevInode.dev;
+    fileInfo["inode"] = cpt.mDevInode.inode;
+    fileInfo["sig_hash"] = cpt.mSignatureHash;
+    fileInfo["sig_size"] = cpt.mSignatureSize;
+    fileInfo["size"] = cpt.mSize;
 
     switch (cpt.mStatus) {
         case FileStatus::WAITING:
-            fileInfo["dev"] = cpt.mDevInode.dev;
-            fileInfo["inode"] = cpt.mDevInode.inode;
-            fileInfo["sig_hash"] = cpt.mSignatureHash;
-            fileInfo["sig_size"] = cpt.mSignatureSize;
             break;
         case FileStatus::READING:
-            fileInfo["dev"] = cpt.mDevInode.dev;
-            fileInfo["inode"] = cpt.mDevInode.inode;
-            fileInfo["sig_hash"] = cpt.mSignatureHash;
-            fileInfo["sig_size"] = cpt.mSignatureSize;
-            fileInfo["size"] = cpt.mSize;
             fileInfo["offset"] = cpt.mOffset;
             fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["last_read_time"] = cpt.mLastUpdateTime;
             break;
         case FileStatus::FINISHED:
-            fileInfo["size"] = cpt.mSize;
             fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["finish_time"] = cpt.mLastUpdateTime;
             break;
         case FileStatus::ABORT:
+            fileInfo["offset"] = cpt.mOffset;
+            fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["abort_time"] = cpt.mLastUpdateTime;
             break;
         default:
