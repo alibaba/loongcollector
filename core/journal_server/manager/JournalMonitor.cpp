@@ -303,25 +303,11 @@ bool JournalMonitor::IsBatchTimeoutExceeded(const MonitoredReader& monitoredRead
 
 void JournalMonitor::CleanupClosedReaders() {
     // Close and remove readers that have been marked as closing
-    // Note: Even though JournalConnection::RemoveConfig has erased the config from mConfigs,
-    // the reader shared_ptr is still valid in mMonitoredReaders, so we can safely close it here
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
         if (it->second.isClosing.load()) {
             // Now it's safe to close the reader, as all ongoing operations should have completed
-            // The reader shared_ptr is still valid even if mConfigs has been erased,
-            // because mMonitoredReaders maintains its own reference
-            if (it->second.reader) {
-                // Only close if still open (may have been closed elsewhere, but should not happen)
-                if (it->second.reader->IsOpen()) {
-                    it->second.reader->Close();
-                    LOG_DEBUG(sLogger,
-                              ("journal monitor closed reader in lazy cleanup",
-                               "")("config", it->second.configName)("fd", it->first));
-                } else {
-                    LOG_DEBUG(sLogger,
-                              ("journal monitor reader already closed, skipping",
-                               "")("config", it->second.configName)("fd", it->first));
-                }
+            if (it->second.reader && it->second.reader->IsOpen()) {
+                it->second.reader->Close();
             }
             LOG_DEBUG(sLogger,
                       ("journal monitor removing closed reader from map", "")("config",
