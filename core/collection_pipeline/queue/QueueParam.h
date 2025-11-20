@@ -22,7 +22,7 @@ namespace logtail {
 
 class BoundedQueueParam {
 public:
-    explicit BoundedQueueParam(size_t cap, double ratio = 2.0 / 3)
+    BoundedQueueParam(size_t cap, double ratio = 2.0 / 3)
         : mCapacity(cap), mHighWatermark(cap), mLowWatermark(cap * ratio) {
         if (cap == 0) {
             mCapacity = mHighWatermark = 1;

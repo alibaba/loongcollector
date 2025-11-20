@@ -37,6 +37,7 @@ public:
     bool IsValidToPush() const { return mValidToPush; }
 
 protected:
+    virtual size_t Size() const = 0;
     bool Full() const { return this->Size() == this->mCapacity; }
 
     bool ChangeStateIfNeededAfterPush() {
@@ -65,7 +66,6 @@ protected:
 
 private:
     virtual void GiveFeedback() const = 0;
-    virtual size_t Size() const = 0;
 
     size_t mLowWatermark = 0;
     size_t mHighWatermark = 0;
