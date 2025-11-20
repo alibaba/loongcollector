@@ -64,7 +64,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
         {
-            ofstream fout(files[i]);
+            ofstream fout(files[i], ios::binary);
             fout << contents[i];
         }
         auto& item = fingerprints.emplace_back();
@@ -121,8 +121,8 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
         // file 2 not existed && file 3 signature changed
         filesystem::remove(cptFiles[1]);
         {
-            ofstream fout(cptFiles[2]);
-            fout << string(10, 'd') << endl;
+            ofstream fout(cptFiles[2], ios::binary);
+            fout << string(10, 'd') << "\n";
         }
         APSARA_TEST_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
         APSARA_TEST_EQUAL(1U, sServer->mDeletedInputs.size());
@@ -196,7 +196,7 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     filesystem::path testFile = filesystem::absolute("./test_logs/test_file.log");
     string content = string(5000, 'a') + "\n";
     {
-        ofstream fout(testFile);
+        ofstream fout(testFile, ios::binary);
         fout << content;
     }
 
@@ -243,7 +243,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     // Create original file and get its devinode
     DevInode originalDevInode;
     {
-        ofstream fout(originalFile);
+        ofstream fout(originalFile, ios::binary);
         fout << content;
     }
     originalDevInode = GetFileDevInode(originalFile.string());
@@ -275,7 +275,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
 
     // Create new file at original path (will have different devinode)
     {
-        ofstream fout(originalFile);
+        ofstream fout(originalFile, ios::binary);
         fout << string(100, 'b') + "\n";
     }
     auto newFileDevInode = GetFileDevInode(originalFile.string());
@@ -299,7 +299,7 @@ void StaticFileServerUnittest::TestUpdateRealFilePath() const {
     filesystem::path testFile = filesystem::absolute("./test_logs/test_file.log");
     string content = string(2000, 'a') + "\n";
     {
-        ofstream fout(testFile);
+        ofstream fout(testFile, ios::binary);
         fout << content;
     }
 
