@@ -26,25 +26,25 @@ public:
 
 void CountBoundedQueueParamUnittest::TestInit() {
     {
-        CountBoundedQueueParam param(100);
+        BoundedQueueParam param(100);
         APSARA_TEST_EQUAL(param.GetCapacity(), 100U);
         APSARA_TEST_EQUAL(param.GetHighWatermark(), 100U);
         APSARA_TEST_EQUAL(param.GetLowWatermark(), 66U);
     }
     {
-        CountBoundedQueueParam param(0);
+        BoundedQueueParam param(0);
         APSARA_TEST_EQUAL(param.GetCapacity(), 1U);
         APSARA_TEST_EQUAL(param.GetHighWatermark(), 1U);
         APSARA_TEST_EQUAL(param.GetLowWatermark(), 0U);
     }
     {
-        CountBoundedQueueParam param(100, 0.5);
+        BoundedQueueParam param(100, 0.5);
         APSARA_TEST_EQUAL(param.GetCapacity(), 100U);
         APSARA_TEST_EQUAL(param.GetHighWatermark(), 100U);
         APSARA_TEST_EQUAL(param.GetLowWatermark(), 50U);
     }
     {
-        CountBoundedQueueParam param(0, 1.0);
+        BoundedQueueParam param(0, 1.0);
         APSARA_TEST_EQUAL(param.GetCapacity(), 1U);
         APSARA_TEST_EQUAL(param.GetHighWatermark(), 1U);
         APSARA_TEST_EQUAL(param.GetLowWatermark(), 0U);

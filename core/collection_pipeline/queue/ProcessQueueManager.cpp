@@ -23,8 +23,8 @@
 #include "common/Flags.h"
 
 // For one queue, only one of the following two flags will be used.
-DEFINE_FLAG_INT32(bounded_process_queue_capacity, "", 5);
-DEFINE_FLAG_INT32(bounded_process_queue_max_bytes_size, "", 5 * 128 * 1024);
+DEFINE_FLAG_INT32(bounded_process_queue_cnt_capacity, "", 5);
+DEFINE_FLAG_INT32(bounded_process_queue_bytes_capacity, "", 5 * 128 * 1024);
 
 DECLARE_FLAG_INT32(process_thread_count);
 
@@ -33,8 +33,8 @@ using namespace std;
 namespace logtail {
 
 ProcessQueueManager::ProcessQueueManager()
-    : mCountBoundedQueueParam(INT32_FLAG(bounded_process_queue_capacity)),
-      mBytesBoundedQueueParam(INT32_FLAG(bounded_process_queue_max_bytes_size)) {
+    : mCountBoundedQueueParam(INT32_FLAG(bounded_process_queue_cnt_capacity)),
+      mBytesBoundedQueueParam(INT32_FLAG(bounded_process_queue_bytes_capacity)) {
     ResetCurrentQueueIndex();
 }
 
@@ -339,9 +339,9 @@ void ProcessQueueManager::CreateBytesBoundedQueue(QueueKey key,
                                                   uint32_t priority,
                                                   const CollectionPipelineContext& ctx) {
     mPriorityQueue[priority].emplace_back(
-        make_unique<BytesBoundedProcessQueue>(mBytesBoundedQueueParam.GetMaxBytesSize(),
-                                              mBytesBoundedQueueParam.GetLowBytesWatermark(),
-                                              mBytesBoundedQueueParam.GetHighBytesWatermark(),
+        make_unique<BytesBoundedProcessQueue>(mBytesBoundedQueueParam.GetCapacity(),
+                                              mBytesBoundedQueueParam.GetLowWatermark(),
+                                              mBytesBoundedQueueParam.GetHighWatermark(),
                                               key,
                                               priority,
                                               ctx));

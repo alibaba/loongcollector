@@ -46,7 +46,6 @@ protected:
 
 private:
     void GiveFeedback() const override;
-    virtual size_t Size() const override = 0;
     virtual void AddSize(ProcessQueueItem* item) = 0;
     virtual void SubSize(ProcessQueueItem* item) = 0;
 

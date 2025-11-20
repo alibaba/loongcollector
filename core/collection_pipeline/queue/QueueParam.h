@@ -20,9 +20,9 @@
 
 namespace logtail {
 
-class CountBoundedQueueParam {
+class BoundedQueueParam {
 public:
-    explicit CountBoundedQueueParam(size_t cap, double ratio = 2.0 / 3)
+    explicit BoundedQueueParam(size_t cap, double ratio = 2.0 / 3)
         : mCapacity(cap), mHighWatermark(cap), mLowWatermark(cap * ratio) {
         if (cap == 0) {
             mCapacity = mHighWatermark = 1;
@@ -43,33 +43,6 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderQueueManagerUnittest;
-    friend class PipelineUpdateUnittest;
-#endif
-};
-
-class BytesBoundedQueueParam {
-public:
-    explicit BytesBoundedQueueParam(size_t maxBytes, double ratio = 2.0 / 3)
-        : mMaxBytesSize(maxBytes), mHighBytesWatermark(maxBytes), mLowBytesWatermark(maxBytes * ratio) {
-        if (maxBytes == 0) {
-            mMaxBytesSize = mHighBytesWatermark = 1;
-        }
-        if (ratio == 1.0) {
-            mLowBytesWatermark = mHighBytesWatermark - 1;
-        }
-    }
-
-    size_t GetMaxBytesSize() const { return mMaxBytesSize; }
-    size_t GetHighBytesWatermark() const { return mHighBytesWatermark; }
-    size_t GetLowBytesWatermark() const { return mLowBytesWatermark; }
-
-private:
-    size_t mMaxBytesSize;
-    size_t mHighBytesWatermark;
-    size_t mLowBytesWatermark;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class ProcessQueueManagerUnittest;
     friend class PipelineUpdateUnittest;
 #endif
 };

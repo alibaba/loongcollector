@@ -40,7 +40,7 @@ protected:
     bool Full() const { return this->Size() == this->mCapacity; }
 
     bool ChangeStateIfNeededAfterPush() {
-        if (this->Size() == mHighWatermark) {
+        if (this->Size() >= mHighWatermark) {
             mValidToPush = false;
             return true;
         }
@@ -48,7 +48,7 @@ protected:
     }
 
     bool ChangeStateIfNeededAfterPop() {
-        if (!mValidToPush && this->Size() == mLowWatermark) {
+        if (!mValidToPush && this->Size() <= mLowWatermark) {
             mValidToPush = true;
             return true;
         }

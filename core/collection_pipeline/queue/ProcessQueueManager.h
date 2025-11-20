@@ -83,8 +83,8 @@ private:
     void DeleteQueueEntity(const ProcessQueueIterator& iter);
     void ResetCurrentQueueIndex();
 
-    CountBoundedQueueParam mCountBoundedQueueParam;
-    BytesBoundedQueueParam mBytesBoundedQueueParam;
+    BoundedQueueParam mCountBoundedQueueParam;
+    BoundedQueueParam mBytesBoundedQueueParam;
 
     mutable std::mutex mQueueMux;
     std::unordered_map<QueueKey, std::pair<ProcessQueueIterator, QueueType>> mQueues;

@@ -80,7 +80,7 @@ private:
     ExactlyOnceQueueManager();
     ~ExactlyOnceQueueManager() = default;
 
-    CountBoundedQueueParam mProcessQueueParam;
+    BoundedQueueParam mProcessQueueParam;
 
     mutable std::mutex mProcessQueueMux;
     std::unordered_map<QueueKey, std::list<CountBoundedProcessQueue>::iterator> mProcessQueues;
