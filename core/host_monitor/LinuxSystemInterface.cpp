@@ -284,15 +284,34 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
 bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
     
-    // Try to use netlink INET_DIAG first, fallback to /proc/net/tcp if failed
-    bool success = ReadNetLink(tcpStateCount);
-    if (!success) {
-        LOG_INFO(sLogger, ("Netlink INET_DIAG not available, falling back to /proc/net/tcp method", ""));
-        success = ReadProcNetTcp(tcpStateCount);
-        if (!success) {
-            LOG_ERROR(sLogger, ("Failed to read TCP state from both netlink and /proc", ""));
-            return false;
+    // Use static variable to remember if netlink is available, only check once
+    static std::atomic<int> netlinkAvailable{-1}; // -1: not checked, 0: not available, 1: available
+    
+    bool success = false;
+    
+    if (netlinkAvailable.load() == -1) {
+        // First time check: try netlink
+        success = ReadNetLink(tcpStateCount);
+        if (success) {
+            netlinkAvailable.store(1);
+            LOG_INFO(sLogger, ("Netlink INET_DIAG is available, will use it for TCP state collection", ""));
+        } else {
+            netlinkAvailable.store(0);
+            LOG_INFO(sLogger, ("Netlink INET_DIAG not available, will use /proc/net/tcp fallback method", ""));
+            // Try fallback method
+            success = ReadProcNetTcp(tcpStateCount);
         }
+    } else if (netlinkAvailable.load() == 1) {
+        // Netlink is available, use it directly
+        success = ReadNetLink(tcpStateCount);
+    } else {
+        // Netlink is not available, use fallback directly
+        success = ReadProcNetTcp(tcpStateCount);
+    }
+    
+    if (!success) {
+        LOG_ERROR(sLogger, ("Failed to read TCP state", ""));
+        return false;
     }
     
     uint64_t tcp = 0, tcpSocketStat = 0;
