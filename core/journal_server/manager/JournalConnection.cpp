@@ -117,16 +117,10 @@ void JournalConnection::RemoveConfig(const std::string& configName) {
 
     auto it = mConfigs.find(configName);
     if (it != mConfigs.end()) {
-        LOG_INFO(sLogger, ("journal connection removing config", "")("config", configName));
-
-        // close connection (epoll cleanup should be handled by JournalMonitor)
-        if (it->second.reader) {
-            it->second.reader->Close();
-        }
-
         mConfigs.erase(it);
         LOG_INFO(sLogger,
-                 ("journal connection config removed", "")("config", configName)("remaining_configs", mConfigs.size()));
+                 ("journal connection config removed, reader will be closed in CleanupClosedReaders",
+                  "")("config", configName)("remaining_configs", mConfigs.size()));
     } else {
         LOG_WARNING(sLogger, ("journal connection config not found for removal", "")("config", configName));
     }

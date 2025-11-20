@@ -40,6 +40,10 @@ struct MonitoredReader {
     std::chrono::steady_clock::time_point lastBatchTime;
     int accumulatedEntryCount{0};
     std::string accumulatedFirstCursor;
+    // Atomic flag to mark reader as closing, preventing Use-After-Close issues
+    // When set to true, the reader should not be used for new operations
+    // but can still be safely accessed by ongoing operations
+    std::atomic<bool> isClosing{false};
 };
 
 class JournalMonitor {
@@ -64,10 +68,11 @@ public:
 
     void ClearPendingDataForInvalidReader(MonitoredReader& monitoredReader) const;
     bool IsBatchTimeoutExceeded(const MonitoredReader& monitoredReader, int batchTimeoutMs) const;
+    void CleanupClosedReaders();
 
 private:
     // Returns the FD if successful, -1 otherwise
-    int addReaderToMonitoring(std::shared_ptr<JournalReader> reader, const std::string& configName);
+    int addReaderToMonitoring(const std::shared_ptr<JournalReader>& reader, const std::string& configName);
 
     int mEpollFD{-1};
     mutable std::mutex mEpollMutex;

@@ -157,6 +157,10 @@ void JournalServer::run() {
 
     while (mIsThreadRunning.load()) {
         try {
+            // Lazy cleanup: Remove readers that have been marked as closing
+            // This ensures any ongoing journal reads from previous iteration have completed
+            mReaderMonitor->CleanupClosedReaders();
+
             auto configNames = GetAllJournalConfigNames();
             connectionManager.RefreshConnectionsByInterval(configNames, *mReaderMonitor);
             mReaderMonitor->AddReadersToMonitoring(configNames);
@@ -189,6 +193,12 @@ void JournalServer::run() {
                 auto& monitoredReader = pair.second;
                 int readerFD = pair.first;
 
+                // Skip if reader is marked as closing (Use-After-Close prevention)
+                // This allows ongoing operations to complete but prevents new operations
+                if (monitoredReader.isClosing.load()) {
+                    continue;
+                }
+
                 // Skip if no event and no pending data (when there are events)
                 if (nfds > 0 && activeFDs.find(readerFD) == activeFDs.end() && !monitoredReader.hasPendingData) {
                     continue;
@@ -196,6 +206,11 @@ void JournalServer::run() {
 
                 std::shared_ptr<JournalReader> currentReader;
                 if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
+                    continue;
+                }
+
+                // Double-check closing status after getting reader (race condition protection)
+                if (monitoredReader.isClosing.load()) {
                     continue;
                 }
 
@@ -247,9 +262,19 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
     for (auto& pair : monitoredReaders) {
         auto& monitoredReader = pair.second;
 
+        // Skip if reader is marked as closing (Use-After-Close prevention)
+        if (monitoredReader.isClosing.load()) {
+            continue;
+        }
+
         if (monitoredReader.hasPendingData) {
             std::shared_ptr<JournalReader> currentReader;
             if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
+                continue;
+            }
+
+            // Double-check closing status after getting reader (race condition protection)
+            if (monitoredReader.isClosing.load()) {
                 continue;
             }
 

@@ -71,9 +71,15 @@ void JournalMonitor::Cleanup() {
     LOG_INFO(sLogger,
              ("journal monitor cleaning up epoll monitoring", "")("monitored_readers", mMonitoredReaders.size()));
 
+    // First, close all readers that have been marked as closing
+    // This ensures lazy cleanup happens even if main loop has stopped
+    CleanupClosedReaders();
+
+    // Then close and remove all remaining readers
     for (auto& pair : mMonitoredReaders) {
-        if (pair.second.reader) {
+        if (pair.second.reader && pair.second.reader->IsOpen()) {
             pair.second.reader->RemoveFromEpoll(mEpollFD);
+            pair.second.reader->Close();
         }
     }
     mMonitoredReaders.clear();
@@ -101,7 +107,7 @@ std::map<int, MonitoredReader>& JournalMonitor::GetMonitoredReaders() {
 }
 
 
-int JournalMonitor::addReaderToMonitoring(std::shared_ptr<JournalReader> reader, const std::string& configName) {
+int JournalMonitor::addReaderToMonitoring(const std::shared_ptr<JournalReader>& reader, const std::string& configName) {
     if (!reader || !reader->IsOpen()) {
         return -1;
     }
@@ -113,10 +119,10 @@ int JournalMonitor::addReaderToMonitoring(std::shared_ptr<JournalReader> reader,
         return -1;
     }
 
-    MonitoredReader monitoredReader;
+    MonitoredReader& monitoredReader = mMonitoredReaders[journalFD];
     monitoredReader.reader = reader;
     monitoredReader.configName = configName;
-    mMonitoredReaders[journalFD] = monitoredReader;
+    monitoredReader.isClosing.store(false);
 
     return journalFD;
 }
@@ -127,7 +133,7 @@ void JournalMonitor::AddReadersToMonitoring(const std::vector<std::string>& conf
     for (const auto& configName : configNames) {
         auto reader = connectionManager.GetConnection(configName);
         if (!reader || !reader->IsOpen()) {
-            continue; // Skip closed connections
+            continue;
         }
 
         // Check if already monitored
@@ -153,20 +159,23 @@ void JournalMonitor::AddReadersToMonitoring(const std::vector<std::string>& conf
 void JournalMonitor::RemoveReaderFromMonitoring(const std::string& configName, bool removeFromMap) {
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
         if (it->second.configName == configName) {
-            // Remove from epoll if reader is still open
+            it->second.isClosing.store(true);
+            // Only remove from epoll, don't close immediately
+            // Close() will be called in CleanupClosedReaders() after all ongoing operations complete
             if (it->second.reader && it->second.reader->IsOpen()) {
                 it->second.reader->RemoveFromEpoll(mEpollFD);
             }
 
-            // Remove from map if requested
             if (removeFromMap) {
-                it = mMonitoredReaders.erase(it);
+                // Marked as closing, will be removed in next loop iteration
+                LOG_DEBUG(sLogger,
+                          ("journal monitor reader marked for closing, will be removed in next loop",
+                           "")("config", configName)("fd", it->first));
             } else {
-                return;
             }
-        } else {
-            ++it;
+            return;
         }
+        ++it;
     }
 }
 
@@ -186,21 +195,23 @@ void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
     std::string savedAccumulatedFirstCursor;
     std::chrono::steady_clock::time_point savedLastBatchTime;
 
-    // Remove old FD mapping if exists and preserve accumulated data
     int oldFD = -1;
-    for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
+    for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end(); ++it) {
         if (it->second.configName == configName) {
             oldFD = it->first;
-            // Save accumulated data before erasing
+            // Mark old reader as closing to prevent Use-After-Close
+            it->second.isClosing.store(true);
+            if (it->second.reader && it->second.reader->IsOpen()) {
+                it->second.reader->RemoveFromEpoll(mEpollFD);
+            }
+            // Save accumulated data before the old reader is removed
             savedHasPendingData = it->second.hasPendingData;
             savedAccumulatedEventGroup = it->second.accumulatedEventGroup;
             savedAccumulatedEntryCount = it->second.accumulatedEntryCount;
             savedAccumulatedFirstCursor = it->second.accumulatedFirstCursor;
             savedLastBatchTime = it->second.lastBatchTime;
-            mMonitoredReaders.erase(it);
             break;
         }
-        ++it;
     }
 
     // Add reader back to epoll monitoring
@@ -288,6 +299,38 @@ bool JournalMonitor::IsBatchTimeoutExceeded(const MonitoredReader& monitoredRead
     }
 
     return timeoutTrigger;
+}
+
+void JournalMonitor::CleanupClosedReaders() {
+    // Close and remove readers that have been marked as closing
+    // Note: Even though JournalConnection::RemoveConfig has erased the config from mConfigs,
+    // the reader shared_ptr is still valid in mMonitoredReaders, so we can safely close it here
+    for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
+        if (it->second.isClosing.load()) {
+            // Now it's safe to close the reader, as all ongoing operations should have completed
+            // The reader shared_ptr is still valid even if mConfigs has been erased,
+            // because mMonitoredReaders maintains its own reference
+            if (it->second.reader) {
+                // Only close if still open (may have been closed elsewhere, but should not happen)
+                if (it->second.reader->IsOpen()) {
+                    it->second.reader->Close();
+                    LOG_DEBUG(sLogger,
+                              ("journal monitor closed reader in lazy cleanup",
+                               "")("config", it->second.configName)("fd", it->first));
+                } else {
+                    LOG_DEBUG(sLogger,
+                              ("journal monitor reader already closed, skipping",
+                               "")("config", it->second.configName)("fd", it->first));
+                }
+            }
+            LOG_DEBUG(sLogger,
+                      ("journal monitor removing closed reader from map", "")("config",
+                                                                              it->second.configName)("fd", it->first));
+            it = mMonitoredReaders.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 } // namespace logtail
