@@ -1188,9 +1188,12 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            AlarmManager::GetInstance()->SendAlarmCritical(
-                DISCARD_DATA_ALARM,
-                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                           "failed to push data to sender queue: queue not found",
+                                                           mRegion,
+                                                           mProject,
+                                                           mContext->GetConfigName(),
+                                                           mLogstore);
             return false;
         }
         if (i % 100 == 0) {
@@ -1200,12 +1203,15 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
-    LOG_WARNING(
-        sLogger,
-        ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    AlarmManager::GetInstance()->SendAlarmCritical(
-        DISCARD_DATA_ALARM,
-        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
+    LOG_ERROR(sLogger,
+              ("failed to push data to sender queue",
+               "extra buffer is full")("action", "discard data")("config-flusher-dst", str));
+    AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                   "failed to push data to sender queue: extra buffer is full",
+                                                   mRegion,
+                                                   mProject,
+                                                   mContext->GetConfigName(),
+                                                   mLogstore);
     return false;
 }
 
