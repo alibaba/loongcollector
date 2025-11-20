@@ -26,7 +26,7 @@ using namespace std;
 
 namespace logtail {
 
-class BoundedProcessQueueUnittest : public testing::Test {
+class CountBoundedProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
@@ -67,9 +67,9 @@ private:
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
 
-CollectionPipelineContext BoundedProcessQueueUnittest::sCtx;
+CollectionPipelineContext CountBoundedProcessQueueUnittest::sCtx;
 
-void BoundedProcessQueueUnittest::TestPush() {
+void CountBoundedProcessQueueUnittest::TestPush() {
     // push first
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
@@ -86,7 +86,7 @@ void BoundedProcessQueueUnittest::TestPush() {
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
 }
 
-void BoundedProcessQueueUnittest::TestPop() {
+void CountBoundedProcessQueueUnittest::TestPop() {
     unique_ptr<ProcessQueueItem> item;
     // nothing to pop
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
@@ -116,13 +116,13 @@ void BoundedProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
-void BoundedProcessQueueUnittest::TestMetric() {
+void CountBoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME,
                                                         METRIC_LABEL_VALUE_COMPONENT_NAME_PROCESS_QUEUE));
-    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "count_bounded"));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_QUEUE_TYPE, "bounded"));
 
     auto item = GenerateItem();
     auto e = item->mEventGroup.AddLogEvent();
@@ -143,9 +143,9 @@ void BoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
 }
 
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPush)
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPop)
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestMetric)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPush)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPop)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestMetric)
 
 } // namespace logtail
 
