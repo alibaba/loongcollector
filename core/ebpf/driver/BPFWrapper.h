@@ -72,9 +72,7 @@ public:
         if (mInited) {
             return 0;
         }
-        mInited = true;
         mSkel = T::open_and_load();
-        mFlag = true;
         if (!mSkel) {
             return kErrInitSkel;
         }
@@ -88,6 +86,7 @@ public:
             const char* name = bpf_program__name(prog);
             mBpfProgs[name] = prog;
         }
+        mInited = true;
         return 0;
     }
 
@@ -345,24 +344,45 @@ public:
         return 0;
     }
 
-    void DeletePerfBuffer(void* pb) { perf_buffer__free(static_cast<struct perf_buffer*>(pb)); }
+    void DeletePerfBuffer(void* pb) {
+        if (!mInited) {
+            return;
+        }
+        perf_buffer__free(static_cast<struct perf_buffer*>(pb));
+    }
 
     int PollPerfBuffer(void* pb, int /*maxEvents*/, int timeoutMs) {
+        if (!mInited) {
+            return -1;
+        }
         return perf_buffer__poll(static_cast<struct perf_buffer*>(pb), timeoutMs);
     }
 
-    int ConsumePerfBuffer(void* pb) { return perf_buffer__consume(static_cast<struct perf_buffer*>(pb)); }
+    int ConsumePerfBuffer(void* pb) {
+        if (!mInited) {
+            return -1;
+        }
+        return perf_buffer__consume(static_cast<struct perf_buffer*>(pb));
+    }
 
-    int GetPerfBufferEpollFd(void* pb) { return perf_buffer__epoll_fd(static_cast<struct perf_buffer*>(pb)); }
+    int GetPerfBufferEpollFd(void* pb) {
+        if (!mInited) {
+            return -1;
+        }
+        return perf_buffer__epoll_fd(static_cast<struct perf_buffer*>(pb));
+    }
 
     void* CreatePerfBuffer(
         const std::string& name, int pageCnt, void* ctx, perf_buffer_sample_fn dataCb, perf_buffer_lost_fn lossCb) {
+        if (!mInited) {
+            return nullptr;
+        }
         int mapFd = SearchMapFd(name);
         if (mapFd < 0) {
             return nullptr;
         }
 
-        struct perf_buffer* pb = NULL;
+        struct perf_buffer* pb = nullptr;
         pb = perf_buffer__new(mapFd, pageCnt == 0 ? 128 : pageCnt, dataCb, lossCb, ctx, NULL);
         auto err = libbpf_get_error(pb);
         if (err) {
@@ -381,8 +401,6 @@ public:
         }
         return pb;
     }
-
-    int DetachAllPerfBuffers() { return 0; }
 
     /**
      * Destroy skel and release resources.
@@ -410,8 +428,6 @@ public:
         T::destroy(mSkel);
 
         // stop perf threads ...
-        mFlag = false;
-        DetachAllPerfBuffers();
         mInited = false;
     }
 
@@ -446,8 +462,7 @@ private:
     std::unordered_map<int, std::unordered_map<int, int>> mApInMapFds;
 
     T* mSkel = nullptr;
-    volatile bool mInited = false;
-    std::atomic_bool mFlag = false;
+    std::atomic_bool mInited = false;
     // links, used for strore bpf programs
     friend class NetworkSecurityManager;
 };
