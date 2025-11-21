@@ -51,6 +51,7 @@ public:
     bool RefreshConnection(const std::string& configName);
     bool ShouldRefreshConnection(const std::string& configName) const;
     void RefreshConnectionsByInterval(const std::vector<std::string>& configNames, JournalMonitor& monitor);
+    bool RecoverConnectionAndSyncEpoll(const std::string& configName, JournalMonitor* monitor);
     JournalConfig GetConfig(const std::string& configName) const;
     std::map<std::string, JournalConfig> GetAllConfigs() const;
     std::vector<std::string> GetAllConfigNames() const;

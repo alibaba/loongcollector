@@ -15,6 +15,8 @@
 
 #ifdef __linux__
 #include <errno.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <sys/epoll.h>
 #include <systemd/sd-journal.h>
 #include <unistd.h>
@@ -23,6 +25,18 @@
 #include "logger/Logger.h"
 
 namespace logtail {
+
+#ifdef __linux__
+// Thread-local storage for SIGBUS signal handling
+// Used to detect SIGBUS when reading from truncated journal files
+thread_local static sigjmp_buf gSigbusJmpBuf;
+
+// SIGBUS signal handler for detecting truncated journal files
+static void SigbusHandler(int sig) {
+    (void)sig; // Suppress unused parameter warning
+    siglongjmp(gSigbusJmpBuf, 1);
+}
+#endif
 
 /*========================================================
  *  Impl: systemd-journal implementation for Linux
@@ -126,7 +140,43 @@ public:
             return JournalReadStatus::kError;
         }
 
+#ifdef __linux__
+        // Set up SIGBUS handler to catch bus errors when reading truncated journal files
+        // This allows us to detect when journal file is truncated (e.g., truncate -s 0 system.journal)
+        // while still allowing normal reads when journal is valid
+        struct sigaction oldAction = {};
+        struct sigaction newAction = {};
+        newAction.sa_handler = SigbusHandler;
+        sigemptyset(&newAction.sa_mask);
+        newAction.sa_flags = 0;
+
+        if (sigaction(SIGBUS, &newAction, &oldAction) != 0) {
+            // Failed to set signal handler, proceed without protection
+            int ret = sd_journal_next(mJournal);
+            if (ret > 0) {
+                return JournalReadStatus::kOk;
+            }
+            if (ret == 0) {
+                return JournalReadStatus::kEndOfJournal;
+            }
+            return JournalReadStatus::kError;
+        }
+
+        // Use sigsetjmp to set up jump point for SIGBUS handler
+        if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
+            // SIGBUS occurred: journal file was truncated/rotated, reader state is corrupted
+            // Return special status code for upper layer to handle (reopen and reseek)
+            sigaction(SIGBUS, &oldAction, nullptr);
+            return JournalReadStatus::kSigbusError;
+        }
+
         int ret = sd_journal_next(mJournal);
+
+        // Restore old signal handler
+        sigaction(SIGBUS, &oldAction, nullptr);
+#else
+        int ret = sd_journal_next(mJournal);
+#endif
 
         if (ret > 0) {
             // Successfully moved to next entry, data available
@@ -243,13 +293,54 @@ public:
         if (!IsOpen()) {
             return "";
         }
+
+#ifdef __linux__
+        // Set up SIGBUS handler to catch bus errors when reading truncated journal files
+        // This allows us to detect when journal file is truncated (e.g., truncate -s 0 system.journal)
+        // while still allowing normal reads when journal is valid
+        struct sigaction oldAction = {};
+        struct sigaction newAction = {};
+        newAction.sa_handler = SigbusHandler;
+        sigemptyset(&newAction.sa_mask);
+        newAction.sa_flags = 0;
+
+        if (sigaction(SIGBUS, &newAction, &oldAction) != 0) {
+            // Failed to set signal handler, proceed without protection
+            char* cursorPtr = nullptr;
+            if (sd_journal_get_cursor(mJournal, &cursorPtr) < 0 || !cursorPtr) {
+                return "";
+            }
+            std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
+            return std::string(cursor.get());
+        }
+
+        // Use sigsetjmp to set up jump point for SIGBUS handler
+        if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
+            // SIGBUS occurred: journal file was truncated/rotated, reader state is corrupted
+            // Return empty string to indicate error
+            sigaction(SIGBUS, &oldAction, nullptr);
+            return "";
+        }
+
+        char* cursorPtr = nullptr;
+        int ret = sd_journal_get_cursor(mJournal, &cursorPtr);
+
+        // Restore old signal handler
+        sigaction(SIGBUS, &oldAction, nullptr);
+
+        if (ret < 0 || !cursorPtr) {
+            return "";
+        }
+        std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
+        return std::string(cursor.get());
+#else
         char* cursorPtr = nullptr;
         if (sd_journal_get_cursor(mJournal, &cursorPtr) < 0 || !cursorPtr) {
             return "";
         }
         std::unique_ptr<char, decltype(&free)> cursor(cursorPtr, &free);
-        std::string res(cursor.get());
-        return res;
+        return std::string(cursor.get());
+#endif
     }
 
     /*---------------  Filter / Wait  ----------------*/

@@ -40,16 +40,15 @@ struct MonitoredReader {
     std::chrono::steady_clock::time_point lastBatchTime;
     int accumulatedEntryCount{0};
     std::string accumulatedFirstCursor;
-    // Atomic flag to mark reader as closing, preventing Use-After-Close issues
-    // When set to true, the reader should not be used for new operations
-    // but can still be safely accessed by ongoing operations
     std::atomic<bool> isClosing{false};
 };
 
 class JournalMonitor {
 public:
-    JournalMonitor();
-    ~JournalMonitor();
+    static JournalMonitor* GetInstance() {
+        static JournalMonitor sInstance;
+        return &sInstance;
+    }
 
     JournalMonitor(const JournalMonitor&) = delete;
     JournalMonitor& operator=(const JournalMonitor&) = delete;
@@ -60,19 +59,34 @@ public:
     void Cleanup();
     int GetEpollFD() const;
     std::map<int, MonitoredReader>& GetMonitoredReaders();
+    void CleanupClosedReaders();
     void AddReadersToMonitoring(const std::vector<std::string>& configNames);
-    void RemoveReaderFromMonitoring(const std::string& configName, bool removeFromMap = false);
+    int AddReaderToMonitoring(const std::shared_ptr<JournalReader>& reader, const std::string& configName);
+    void MarkReaderAsClosing(const std::string& configName);
+    void RemoveReaderFromMonitoring(const std::string& configName);
     void RefreshReaderFDMapping(const std::string& configName);
+    bool SaveAccumulatedData(const std::string& configName,
+                             bool& savedHasPendingData,
+                             std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
+                             int& savedAccumulatedEntryCount,
+                             std::string& savedAccumulatedFirstCursor,
+                             std::chrono::steady_clock::time_point& savedLastBatchTime);
+    void RestoreAccumulatedData(const std::string& configName,
+                                const std::shared_ptr<JournalReader>& reader,
+                                bool savedHasPendingData,
+                                const std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
+                                int savedAccumulatedEntryCount,
+                                const std::string& savedAccumulatedFirstCursor,
+                                const std::chrono::steady_clock::time_point& savedLastBatchTime);
     bool GetValidatedCurrentReader(MonitoredReader& monitoredReader,
                                    std::shared_ptr<JournalReader>& currentReaderOut) const;
 
     void ClearPendingDataForInvalidReader(MonitoredReader& monitoredReader) const;
     bool IsBatchTimeoutExceeded(const MonitoredReader& monitoredReader, int batchTimeoutMs) const;
-    void CleanupClosedReaders();
 
 private:
-    // Returns the FD if successful, -1 otherwise
-    int addReaderToMonitoring(const std::shared_ptr<JournalReader>& reader, const std::string& configName);
+    JournalMonitor() = default;
+    ~JournalMonitor();
 
     int mEpollFD{-1};
     mutable std::mutex mEpollMutex;

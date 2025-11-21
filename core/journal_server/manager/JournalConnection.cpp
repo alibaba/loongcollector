@@ -77,19 +77,24 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
     // However, we allow replacement here for backward compatibility (e.g., unit tests).
     if (mConfigs.find(configName) != mConfigs.end()) {
         LOG_WARNING(sLogger, ("journal connection config already exists, will be replaced", "")("config", configName));
-        if (mConfigs[configName].reader) {
-            mConfigs[configName].reader->Close();
+        auto* monitor = JournalMonitor::GetInstance();
+        if (monitor) {
+            monitor->MarkReaderAsClosing(configName);
+            monitor->RemoveReaderFromMonitoring(configName);
+        } else {
+            // If monitor is not available, close immediately (fallback for edge cases)
+            if (mConfigs[configName].reader) {
+                mConfigs[configName].reader->Close();
+            }
         }
     }
 
     auto reader = std::make_shared<JournalReader>();
 
-    // Initialize reader (set paths, open, apply filters)
     if (!initializeReader(reader, config, configName)) {
         return false;
     }
 
-    // Set read position
     setupReaderPosition(reader, config, configName);
 
     ConfigInfo configInfo;
@@ -202,17 +207,120 @@ void JournalConnection::RefreshConnectionsByInterval(const std::vector<std::stri
                                                      JournalMonitor& monitor) {
     for (const auto& configName : configNames) {
         if (ShouldRefreshConnection(configName)) {
+            // Step 1: Mark reader as closing and remove from epoll (prevents new operations)
+            monitor.MarkReaderAsClosing(configName);
             monitor.RemoveReaderFromMonitoring(configName);
 
-            if (RefreshConnection(configName)) {
-                monitor.RefreshReaderFDMapping(configName);
-            } else {
+            // Step 2: Save accumulated data BEFORE closing reader
+            bool savedHasPendingData = false;
+            std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+            int savedAccumulatedEntryCount = 0;
+            std::string savedAccumulatedFirstCursor;
+            std::chrono::steady_clock::time_point savedLastBatchTime;
+            bool hadOldReader = monitor.SaveAccumulatedData(configName,
+                                                            savedHasPendingData,
+                                                            savedAccumulatedEventGroup,
+                                                            savedAccumulatedEntryCount,
+                                                            savedAccumulatedFirstCursor,
+                                                            savedLastBatchTime);
+
+            // Step 3: Refresh connection (close and reopen reader, reapply filters, reseek)
+            if (!RefreshConnection(configName)) {
                 LOG_ERROR(sLogger, ("journal connection refresh failed", "")("config", configName));
+                continue;
+            }
+
+            // Step 4: Validate refreshed reader
+            auto refreshedReader = GetConnection(configName);
+            if (!refreshedReader || !refreshedReader->IsOpen()) {
+                LOG_ERROR(
+                    sLogger,
+                    ("journal connection refreshed reader is not available after refresh", "")("config", configName));
+                continue;
+            }
+
+            // Step 5: Add reader back to epoll monitoring (create new FD mapping)
+            int newFD = monitor.AddReaderToMonitoring(refreshedReader, configName);
+            if (newFD < 0) {
+                LOG_WARNING(
+                    sLogger,
+                    ("journal connection failed to re-add reader to epoll after refresh", "")("config", configName));
+                continue;
+            }
+
+            // Step 6: Restore accumulated data to the new MonitoredReader entry
+            if (hadOldReader) {
+                monitor.RestoreAccumulatedData(configName,
+                                               refreshedReader,
+                                               savedHasPendingData,
+                                               savedAccumulatedEventGroup,
+                                               savedAccumulatedEntryCount,
+                                               savedAccumulatedFirstCursor,
+                                               savedLastBatchTime);
             }
         }
     }
 }
 
+bool JournalConnection::RecoverConnectionAndSyncEpoll(const std::string& configName, JournalMonitor* monitor) {
+    if (!monitor) {
+        LOG_WARNING(
+            sLogger,
+            ("journal connection monitor is null, cannot update epoll after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Step 1: Mark reader as closing and remove from epoll (prevents new operations)
+    monitor->MarkReaderAsClosing(configName);
+    monitor->RemoveReaderFromMonitoring(configName);
+
+    // Step 2: Save accumulated data BEFORE closing reader
+    bool savedHasPendingData = false;
+    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+    int savedAccumulatedEntryCount = 0;
+    std::string savedAccumulatedFirstCursor;
+    std::chrono::steady_clock::time_point savedLastBatchTime;
+    bool hadOldReader = monitor->SaveAccumulatedData(configName,
+                                                     savedHasPendingData,
+                                                     savedAccumulatedEventGroup,
+                                                     savedAccumulatedEntryCount,
+                                                     savedAccumulatedFirstCursor,
+                                                     savedLastBatchTime);
+
+    // Step 3: Refresh connection (close and reopen reader, reapply filters, reseek)
+    if (!RefreshConnection(configName)) {
+        return false;
+    }
+
+    // Step 4: Validate refreshed reader
+    auto refreshedReader = GetConnection(configName);
+    if (!refreshedReader || !refreshedReader->IsOpen()) {
+        LOG_ERROR(sLogger,
+                  ("journal connection refreshed reader is not available after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Step 5: Add reader back to epoll monitoring (create new FD mapping)
+    int newFD = monitor->AddReaderToMonitoring(refreshedReader, configName);
+    if (newFD < 0) {
+        LOG_WARNING(sLogger,
+                    ("journal connection failed to re-add reader to epoll after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Step 6: Restore accumulated data to the new MonitoredReader entry
+    if (hadOldReader) {
+        monitor->RestoreAccumulatedData(configName,
+                                        refreshedReader,
+                                        savedHasPendingData,
+                                        savedAccumulatedEventGroup,
+                                        savedAccumulatedEntryCount,
+                                        savedAccumulatedFirstCursor,
+                                        savedLastBatchTime);
+    }
+
+    return true;
+}
 bool JournalConnection::ShouldRefreshConnection(const std::string& configName) const {
     std::lock_guard<std::mutex> lock(mMutex);
 
@@ -285,7 +393,6 @@ bool JournalConnection::RefreshConnection(const std::string& configName) {
 
     return true;
 }
-
 
 JournalFilter::FilterConfig JournalConnection::buildFilterConfig(const JournalConfig& config,
                                                                  const std::string& configName) {

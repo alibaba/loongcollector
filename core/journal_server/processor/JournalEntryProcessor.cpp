@@ -25,6 +25,8 @@
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "logger/Logger.h"
+#include "manager/JournalConnection.h"
+#include "manager/JournalMonitor.h"
 #include "models/PipelineEventGroup.h"
 #include "reader/JournalReader.h"
 #include "runner/ProcessorRunner.h"
@@ -89,6 +91,28 @@ bool MoveToNextJournalEntry(const string& configName,
     if (status == JournalReadStatus::kEndOfJournal) {
         // Reached end, normal termination
         return false;
+    }
+    if (status == JournalReadStatus::kSigbusError) {
+        // SIGBUS occurred: journal file was truncated/rotated
+        // Need to reopen reader and reseek through JournalConnection
+        LOG_WARNING(sLogger,
+                    ("journal processor SIGBUS detected, reopening reader and reseeking",
+                     "journal file may have been truncated")("config", configName));
+
+        auto& connectionManager = JournalConnection::GetInstance();
+        auto* readerMonitor = JournalMonitor::GetInstance();
+        if (connectionManager.RecoverConnectionAndSyncEpoll(configName, readerMonitor)) {
+            // Recovery successful
+            LOG_INFO(sLogger,
+                     ("journal processor recovered from SIGBUS by reopening and reseeking", "")("config", configName));
+            // Return false to let the caller retry with the refreshed reader
+            // The next iteration will get the refreshed reader from JournalConnection
+            return false;
+        } else {
+            LOG_ERROR(sLogger,
+                      ("journal processor failed to refresh connection after SIGBUS", "")("config", configName));
+            return false;
+        }
     }
     // Error case: possibly cursor invalidation due to log rotation/deleted
     // Attempt error recovery

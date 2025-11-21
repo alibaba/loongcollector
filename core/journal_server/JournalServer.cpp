@@ -45,8 +45,7 @@ void JournalServer::Init() {
 
     JournalConnection::GetInstance().Initialize();
 
-    mReaderMonitor = std::make_unique<JournalMonitor>();
-    if (!mReaderMonitor->Initialize()) {
+    if (!JournalMonitor::GetInstance()->Initialize()) {
         LOG_ERROR(sLogger, ("journal server failed to initialize reader monitor", ""));
         mIsInitialized.store(false);
         return;
@@ -72,10 +71,7 @@ void JournalServer::Stop() {
     // Wait for thread to exit
     mThreadRes.get();
 
-    if (mReaderMonitor) {
-        mReaderMonitor->Cleanup();
-        mReaderMonitor.reset();
-    }
+    JournalMonitor::GetInstance()->Cleanup();
 
     JournalConnection::GetInstance().Cleanup();
 
@@ -113,9 +109,8 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
 }
 
 void JournalServer::RemoveJournalInput(const string& configName) {
-    if (mReaderMonitor) {
-        mReaderMonitor->RemoveReaderFromMonitoring(configName, true);
-    }
+    JournalMonitor::GetInstance()->MarkReaderAsClosing(configName);
+    JournalMonitor::GetInstance()->RemoveReaderFromMonitoring(configName);
 
     JournalConnection::GetInstance().RemoveConfig(configName);
 
@@ -142,14 +137,10 @@ std::vector<std::string> JournalServer::GetAllJournalConfigNames() const {
 void JournalServer::run() {
     LOG_INFO(sLogger, ("journal server event-driven thread", "started"));
 
-    if (!mReaderMonitor) {
-        LOG_ERROR(sLogger, ("journal server reader monitor not initialized", ""));
-        return;
-    }
-
 #ifdef __linux__
-    auto& monitoredReaders = mReaderMonitor->GetMonitoredReaders();
-    int epollFD = mReaderMonitor->GetEpollFD();
+    auto* readerMonitor = JournalMonitor::GetInstance();
+    auto& monitoredReaders = readerMonitor->GetMonitoredReaders();
+    int epollFD = readerMonitor->GetEpollFD();
     auto& connectionManager = JournalConnection::GetInstance();
 
     constexpr int kMaxEvents = 64;
@@ -159,11 +150,11 @@ void JournalServer::run() {
         try {
             // Lazy cleanup: Remove readers that have been marked as closing
             // This ensures any ongoing journal reads from previous iteration have completed
-            mReaderMonitor->CleanupClosedReaders();
+            readerMonitor->CleanupClosedReaders();
 
             auto configNames = GetAllJournalConfigNames();
-            connectionManager.RefreshConnectionsByInterval(configNames, *mReaderMonitor);
-            mReaderMonitor->AddReadersToMonitoring(configNames);
+            connectionManager.RefreshConnectionsByInterval(configNames, *JournalMonitor::GetInstance());
+            readerMonitor->AddReadersToMonitoring(configNames);
 
             int nfds = epoll_wait(epollFD, events, kMaxEvents, kJournalEpollTimeoutMS);
 
@@ -205,7 +196,7 @@ void JournalServer::run() {
                 }
 
                 std::shared_ptr<JournalReader> currentReader;
-                if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
+                if (!readerMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
                     continue;
                 }
 
@@ -258,6 +249,8 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
         return false;
     }
 
+    auto* readerMonitor = JournalMonitor::GetInstance();
+
     // Process all readers with pending data
     for (auto& pair : monitoredReaders) {
         auto& monitoredReader = pair.second;
@@ -269,7 +262,7 @@ bool JournalServer::processPendingDataWhenNoEvents(std::map<int, MonitoredReader
 
         if (monitoredReader.hasPendingData) {
             std::shared_ptr<JournalReader> currentReader;
-            if (!mReaderMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
+            if (!readerMonitor->GetValidatedCurrentReader(monitoredReader, currentReader)) {
                 continue;
             }
 
@@ -292,7 +285,8 @@ void JournalServer::processMonitoredReader(MonitoredReader& monitoredReader,
     JournalConfig config = connectionManager.GetConfig(monitoredReader.configName);
 
     // Calculate timeout trigger
-    bool timeoutTrigger = mReaderMonitor->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
+    bool timeoutTrigger
+        = JournalMonitor::GetInstance()->IsBatchTimeoutExceeded(monitoredReader, config.mBatchTimeoutMs);
 
     // Process journal entries
     // Note: HandleJournalEntries merges accumulated data (pendingData) with new entries

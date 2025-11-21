@@ -89,8 +89,6 @@ private:
     std::future<void> mThreadRes;
     std::atomic<bool> mIsThreadRunning{true};
     std::atomic<bool> mIsInitialized{false};
-
-    std::unique_ptr<JournalMonitor> mReaderMonitor;
 };
 
 } // namespace logtail

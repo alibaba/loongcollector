@@ -37,7 +37,8 @@ struct JournalEntry {
 enum class JournalReadStatus {
     kOk = 1, // Successfully moved to next entry with data
     kEndOfJournal = 0, // No more entries (reached end)
-    kError = -1 // Error occurred (e.g., cursor invalidated by log rotation)
+    kError = -1, // Error occurred (e.g., cursor invalidated by log rotation)
+    kSigbusError = -2 // SIGBUS occurred (journal file truncated/rotated, needs reopen and reseek)
 };
 enum class JournalStatusType {
     kNop = 0, // No change (SD_JOURNAL_NOP)
