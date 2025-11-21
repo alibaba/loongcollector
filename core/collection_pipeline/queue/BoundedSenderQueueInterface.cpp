@@ -14,8 +14,6 @@
 
 #include "collection_pipeline/queue/BoundedSenderQueueInterface.h"
 
-#include "collection_pipeline/queue/QueueKeyManager.h"
-
 using namespace std;
 
 namespace logtail {
