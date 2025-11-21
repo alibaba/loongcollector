@@ -179,6 +179,7 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
     cpt->mSignatureHash = fileCpt.mSignatureHash;
     cpt->mSignatureSize = fileCpt.mSignatureSize;
     cpt->mSize = fileCpt.mSize;
+    cpt->mOffset = fileCpt.mOffset;
     return true;
 }
 

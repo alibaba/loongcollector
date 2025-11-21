@@ -277,6 +277,9 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             InputStaticFileCheckpointManager::GetInstance()->InvalidateCurrentFileCheckpoint(configName, idx);
             continue;
         }
+        if (fingerprint.mOffset > 0) {
+            reader->SetLastFilePos(fingerprint.mOffset);
+        }
         return reader;
     }
     // all files have been read

@@ -67,6 +67,7 @@ struct FileFingerprint {
     uint32_t mSignatureSize;
     uint64_t mSignatureHash;
     uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围
+    uint64_t mOffset = 0;
 };
 
 } // namespace logtail
