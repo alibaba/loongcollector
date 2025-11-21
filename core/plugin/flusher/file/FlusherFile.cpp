@@ -24,9 +24,8 @@ namespace logtail {
 const string FlusherFile::sName = "flusher_file";
 
 bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) {
-    static uint32_t sCnt = 0;
-    GenerateQueueKey(to_string(++sCnt));
-    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+    GenerateQueueKey(mFilePath);
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mFilePath, *mContext);
 
     string errorMsg;
     // FilePath

@@ -26,9 +26,14 @@ using namespace std;
 
 namespace logtail {
 
-SenderQueue::SenderQueue(
-    size_t cap, size_t low, size_t high, QueueKey key, const string& flusherId, const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, flusherId, ctx) {
+SenderQueue::SenderQueue(size_t cap,
+                         size_t low,
+                         size_t high,
+                         QueueKey key,
+                         const string& target,
+                         const string& flusherId,
+                         const CollectionPipelineContext& ctx)
+    : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, target, flusherId, ctx) {
     mQueue.resize(cap);
     mFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL);
     mValidFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_VALID_FETCH_TIMES_TOTAL);

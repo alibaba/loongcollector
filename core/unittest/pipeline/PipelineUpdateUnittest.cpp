@@ -237,7 +237,7 @@ private:
             std::move(data), data.size(), flusher, key, "", RawDataType::EVENT_GROUP);
         {
             auto manager = SenderQueueManager::GetInstance();
-            manager->CreateQueue(key, "", CollectionPipelineContext{});
+            manager->CreateQueue(key, "", "", CollectionPipelineContext{});
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());

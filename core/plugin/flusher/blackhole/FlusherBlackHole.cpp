@@ -24,8 +24,9 @@ const string FlusherBlackHole::sName = "flusher_blackhole";
 
 bool FlusherBlackHole::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
     static uint32_t cnt = 0;
-    GenerateQueueKey(to_string(++cnt));
-    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+    auto target = to_string(++cnt);
+    GenerateQueueKey(target);
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, target, *mContext);
     return true;
 }
 

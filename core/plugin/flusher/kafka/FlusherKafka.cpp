@@ -110,7 +110,7 @@ bool FlusherKafka::Init(const Json::Value& config, Json::Value& optionalGoPipeli
 
     mExpandedTopic = mTopicFormatter.GetTemplate();
     GenerateQueueKey(mExpandedTopic);
-    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mExpandedTopic, *mContext);
 
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
     mSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_SUCCESS_TOTAL);

@@ -35,7 +35,7 @@ ExactlyOnceSenderQueue::ExactlyOnceSenderQueue(const std::vector<RangeCheckpoint
                                                QueueKey key,
                                                const CollectionPipelineContext& ctx)
     : QueueInterface(key, checkpoints.size(), ctx),
-      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", ctx),
+      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", "", ctx),
       mRangeCheckpoints(checkpoints) {
     mQueue.resize(checkpoints.size());
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});

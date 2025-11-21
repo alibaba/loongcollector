@@ -231,6 +231,7 @@ extern const std::string METRIC_LABEL_KEY_COMPONENT_NAME;
 extern const std::string METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID;
 extern const std::string METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED;
 extern const std::string METRIC_LABEL_KEY_QUEUE_TYPE;
+extern const std::string METRIC_LBAEL_KEY_TARGET;
 extern const std::string METRIC_LABEL_KEY_GROUP_BATCH_ENABLED;
 
 // label values

@@ -206,7 +206,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
     bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
@@ -229,7 +229,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
     bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }

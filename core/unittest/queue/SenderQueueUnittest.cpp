@@ -34,7 +34,7 @@ protected:
     }
 
     void SetUp() override {
-        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, sFlusherId, sCtx));
+        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, "", sFlusherId, sCtx));
         mQueue->SetConcurrencyLimiters({{"region", sConcurrencyLimiter}});
         mQueue->mRateLimiter = RateLimiter(100);
         mQueue->SetFeedback(&sFeedback);
