@@ -114,6 +114,12 @@ void ContainerManager::ApplyContainerDiffs() {
 
         LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
 
+        for (const auto& pair : diff->mLegacyCheckpointAdded) {
+            const std::string& checkpointPath = pair.first;
+            const std::shared_ptr<RawContainerInfo>& container = pair.second;
+            options->UpdateRawContainerInfo(container, ctx, checkpointPath);
+        }
+
         for (const auto& container : diff->mAdded) {
             options->UpdateRawContainerInfo(container, ctx);
         }
@@ -360,10 +366,6 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
 
     if (hasChanges) {
         mLastUpdateTime = time(nullptr);
-        // Update container info pointers only for the updated containers
-        if (!updatedContainerIDs.empty()) {
-            updateContainerInfoPointersForContainers(updatedContainerIDs);
-        }
     }
 }
 
@@ -611,11 +613,11 @@ void ContainerManager::computeMatchedContainersDiff(
     for (const auto& pair : mContainerMap) {
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
-            fullContainerIDList.insert(pair.first); // 加入到 fullContainerIDList
-
             if (!isStdio && pair.second->mStatus != "running") {
                 continue;
             }
+
+            fullContainerIDList.insert(pair.first); // 加入到 fullContainerIDList
 
             bool isContainerLabelMatch = IsMapLabelsMatch(filters.mContainerLabelFilter, pair.second->mContainerLabels);
             if (!isContainerLabelMatch) {
@@ -858,7 +860,8 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
     }
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> tmpContainerMap;
-    std::unordered_map<std::string, std::vector<std::shared_ptr<RawContainerInfo>>> configContainerMap;
+    std::unordered_map<std::string, std::vector<std::pair<std::string, std::shared_ptr<RawContainerInfo>>>>
+        configContainerMap;
     const auto& arr = root["detail"];
 
     for (Json::ArrayIndex i = 0; i < arr.size(); ++i) {
@@ -875,6 +878,8 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
             if (ParseJsonTable(paramsStr, paramsJson, err)) {
                 auto info = std::make_shared<RawContainerInfo>();
 
+                info->mStatus = "running";
+
                 // Parse basic fields
                 if (paramsJson.isMember("ID") && paramsJson["ID"].isString()) {
                     info->mID = paramsJson["ID"].asString();
@@ -884,6 +889,11 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                 }
                 if (paramsJson.isMember("LogPath") && paramsJson["LogPath"].isString()) {
                     info->mLogPath = paramsJson["LogPath"].asString();
+                }
+
+                std::string checkpointPath;
+                if (info->mUpperDir.empty() && paramsJson.isMember("Path") && paramsJson["Path"].isString()) {
+                    checkpointPath = paramsJson["Path"].asString();
                 }
 
                 // Parse mounts
@@ -904,32 +914,49 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                     }
                 }
 
-                // Parse MetaDatas for K8s info and other metadata
+                // Helper lambda to process metadata key-value pairs
+                auto processMetadata = [&info](const std::string& key, const std::string& value) {
+                    // Store all metadata
+                    info->AddMetadata(key, value);
+
+                    // Also handle specific known fields for backward compatibility
+                    if (key == "_namespace_") {
+                        info->mK8sInfo.mNamespace = value;
+                    } else if (key == "_pod_name_") {
+                        info->mK8sInfo.mPod = value;
+                    } else if (key == "_container_name_") {
+                        info->mK8sInfo.mContainerName = value;
+                    } else if (key == "_image_name_") {
+                        // Store image name in env or container labels
+                        info->mContainerLabels["_image_name_"] = value;
+                    } else if (key == "_container_ip_") {
+                        info->mContainerLabels["_container_ip_"] = value;
+                    } else if (key == "_pod_uid_") {
+                        info->mK8sInfo.mLabels["pod-uid"] = value;
+                    }
+                };
+
+                // Parse MetaDatas for K8s info and other metadata (new format)
                 if (paramsJson.isMember("MetaDatas") && paramsJson["MetaDatas"].isArray()) {
                     const auto& metadatas = paramsJson["MetaDatas"];
                     for (Json::ArrayIndex j = 0; j < metadatas.size(); j += 2) {
                         if (j + 1 < metadatas.size() && metadatas[j].isString() && metadatas[j + 1].isString()) {
                             std::string key = metadatas[j].asString();
                             std::string value = metadatas[j + 1].asString();
+                            processMetadata(key, value);
+                        }
+                    }
+                }
 
-                            // Store all metadata
-                            info->AddMetadata(key, value);
-
-                            // Also handle specific known fields for backward compatibility
-                            if (key == "_namespace_") {
-                                info->mK8sInfo.mNamespace = value;
-                            } else if (key == "_pod_name_") {
-                                info->mK8sInfo.mPod = value;
-                            } else if (key == "_container_name_") {
-                                info->mK8sInfo.mContainerName = value;
-                            } else if (key == "_image_name_") {
-                                // Store image name in env or container labels
-                                info->mContainerLabels["_image_name_"] = value;
-                            } else if (key == "_container_ip_") {
-                                info->mContainerLabels["_container_ip_"] = value;
-                            } else if (key == "_pod_uid_") {
-                                info->mK8sInfo.mLabels["pod-uid"] = value;
-                            }
+                // Parse Tags for K8s info and other metadata (legacy format)
+                // Tags has the same key-value pair structure as MetaDatas
+                if (paramsJson.isMember("Tags") && paramsJson["Tags"].isArray()) {
+                    const auto& tags = paramsJson["Tags"];
+                    for (Json::ArrayIndex j = 0; j < tags.size(); j += 2) {
+                        if (j + 1 < tags.size() && tags[j].isString() && tags[j + 1].isString()) {
+                            std::string key = tags[j].asString();
+                            std::string value = tags[j + 1].asString();
+                            processMetadata(key, value);
                         }
                     }
                 }
@@ -939,7 +966,7 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                     tmpContainerMap[info->mID] = info;
                     // Also associate with config if config name is available
                     if (!configName.empty()) {
-                        configContainerMap[configName].push_back(info);
+                        configContainerMap[configName].push_back(std::make_pair(checkpointPath, info));
                     }
                 }
             } else {
@@ -960,8 +987,8 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
             const auto& containers = configPair.second;
 
             ContainerDiff diff;
-            for (const auto& container : containers) {
-                diff.mAdded.push_back(container);
+            for (const auto& pair : containers) {
+                diff.mLegacyCheckpointAdded.push_back(pair);
             }
 
             if (!diff.IsEmpty()) {
