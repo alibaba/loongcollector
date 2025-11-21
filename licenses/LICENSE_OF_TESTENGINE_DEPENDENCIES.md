@@ -129,6 +129,7 @@ When distributed in a binary form, Logtailplugin Test Engine may contain portion
 - [github.com/hashicorp/errwrap](https://pkg.go.dev/github.com/hashicorp/errwrap?tab=licenses)
 - [github.com/hashicorp/go-multierror](https://pkg.go.dev/github.com/hashicorp/go-multierror?tab=licenses)
 - [github.com/hashicorp/go-uuid](https://pkg.go.dev/github.com/hashicorp/go-uuid?tab=licenses)
+- [github.com/go-sql-driver/mysql](https://pkg.go.dev/github.com/go-sql-driver/mysql?tab=licenses)
 
 ## LGPL v3 licenses
 
