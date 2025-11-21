@@ -17,10 +17,9 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/Flags.h"
-#include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 
-DECLARE_FLAG_INT32(process_thread_count);
+DECLARE_FLAG_INT32(default_extra_buffer_size);
 
 using namespace std;
 
@@ -49,20 +48,7 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     ADD_COUNTER(mInItemDataSizeBytes, size);
 
     if (Full()) {
-        if (mExtraBuffer.size() >= size_t(INT32_FLAG(process_thread_count) * 10)) {
-            LOG_ERROR(sLogger,
-                      ("sender queue extra buffer size is too large",
-                       "discard item")("config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
-                          "size", mExtraBuffer.size()));
-            AlarmManager::GetInstance()->SendAlarmCritical(
-                DISCARD_DATA_ALARM,
-                "sender queue extra buffer size is too large: discard item, config-flusher-dst: "
-                    + QueueKeyManager::GetInstance()->GetName(item->mQueueKey)
-                    + ", size: " + to_string(mExtraBuffer.size()),
-                item->mPipeline->GetContext().GetRegion(),
-                item->mPipeline->GetContext().GetProjectName(),
-                item->mPipeline->GetContext().GetConfigName(),
-                item->mPipeline->GetContext().GetLogstoreName());
+        if (mExtraBufferDataSizeBytes->GetValue() + size >= size_t(INT32_FLAG(default_extra_buffer_size))) {
             return false;
         }
         mExtraBuffer.push_back(std::move(item));
