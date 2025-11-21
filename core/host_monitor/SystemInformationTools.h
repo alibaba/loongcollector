@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "_thirdparty/DCGM/dcgmlib/dcgm_agent.h"
@@ -78,6 +79,7 @@ private:
         GPUInformation* gpuInfo;
         const FieldMap* fieldMap;
         std::unordered_map<unsigned int, size_t> gpuIdToIndex;
+        std::unordered_set<unsigned int> invalidGpuIds; // Track GPUs that have invalid values
     };
 
     bool TransitionToState(ResourceState newState, const std::vector<unsigned short>& fieldsToWatch = {});
