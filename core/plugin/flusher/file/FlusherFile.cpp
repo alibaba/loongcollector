@@ -24,9 +24,6 @@ namespace logtail {
 const string FlusherFile::sName = "flusher_file";
 
 bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) {
-    GenerateQueueKey(mFilePath);
-    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mFilePath, *mContext);
-
     string errorMsg;
     // FilePath
     if (!GetMandatoryStringParam(config, "FilePath", mFilePath, errorMsg)) {
@@ -65,6 +62,9 @@ bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& 
 
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
+
+    GenerateQueueKey(mFilePath);
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mFilePath, *mContext);
     return true;
 }
 
