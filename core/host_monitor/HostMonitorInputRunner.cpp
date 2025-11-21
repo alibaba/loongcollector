@@ -102,7 +102,7 @@ void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
                                                                    std::move(collector));
         collectContext->mCollectType = newCollectorInfos[i].type;
         if (!collectContext->mCollector.Init(*collectContext)) {
-            LOG_ERROR(sLogger, ("host monitor", "init collector failed")("collector", collectorName));
+            LOG_WARNING(sLogger, ("host monitor", "init collector failed")("collector", collectorName));
             continue;
         }
         if (collectContext->mCollectInterval.count() == 0 || collectContext->mReportInterval.count() == 0) {
