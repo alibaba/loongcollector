@@ -45,6 +45,7 @@
 #include "plugin/processor/ProcessorParseJsonNative.h"
 #include "plugin/processor/ProcessorParseRegexNative.h"
 #include "plugin/processor/ProcessorParseTimestampNative.h"
+#include "plugin/processor/ProcessorTimestampFilterNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
@@ -195,6 +196,7 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseJsonNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseRegexNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorParseTimestampNative>());
+    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorTimestampFilterNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorFilterNative>());
 #if defined(__linux__) && !defined(__ANDROID__) && !defined(__EXCLUDE_SPL__)
     if (BOOL_FLAG(enable_processor_spl)) {

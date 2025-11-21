@@ -61,6 +61,7 @@
 | `processor_parse_json_native`<br>[Json 解析原生处理插件](processor/native/processor-parse-json-native.md)            | SLS 官方 | 解析事件中 Json 格式字段内容并提取新字段。                       |
 | `processor_parse_delimiter_native`<br>[分隔符解析原生处理插件](processor/native/processor-parse-delimiter-native.md) | SLS 官方 | 解析事件中分隔符格式字段内容并提取新字段。                       |
 | `processor_parse_timestamp_native`<br>[时间解析原生处理插件](processor/native/processor-parse-timestamp-native.md)   | SLS 官方 | 解析事件中记录时间的字段，并将结果置为事件的 \_\_time\_\_ 字段。 |
+| `processor_timestamp_filter_native`<br>[时间戳过滤原生处理插件](processor/native/processor-timestamp-filter-native.md) | SLS 官方 | 根据时间戳过滤事件，丢弃不在指定时间范围内的事件。               |
 | `processor_filter_regex_native`<br>[过滤原生处理插件](processor/native/processor-filter-regex-native.md)             | SLS 官方 | 根据事件字段内容来过滤事件。                                     |
 | `processor_desensitize_native`<br>[脱敏原生处理插件](processor/native/processor-desensitize-native.md)               | SLS 官方 | 对事件指定字段内容进行脱敏。                                     |
 | `processor_parse_apsara_native`<br>[Apsara 解析](processor/native/processor-parse-apsara-native.md)                  | SLS 官方 | 按飞天格式解析时间与基础字段，并抽取 key:value 字段。         |

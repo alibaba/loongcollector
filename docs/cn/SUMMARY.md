@@ -81,6 +81,7 @@
     * [分隔符解析](plugins/processor/native/processor-parse-delimiter-native.md)
     * [Json解析](plugins/processor/native/processor-parse-json-native.md)
     * [时间解析](plugins/processor/native/processor-parse-timestamp-native.md)
+    * [时间戳过滤](plugins/processor/native/processor-timestamp-filter-native.md)
     * [过滤](plugins/processor/native/processor-filter-regex-native.md)
     * [脱敏](plugins/processor/native/processor-desensitize-native.md)
   * 扩展处理插件
