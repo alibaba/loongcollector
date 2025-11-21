@@ -220,7 +220,7 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerEventHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     // 测试文件权限事件
@@ -266,7 +266,7 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerErrorHandling() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
@@ -297,7 +297,7 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerAggregation() {
     ctx.SetConfigName("test_config");
     SecurityOptions options;
     APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
+        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
         0);
 
     // 创建多个相关的文件事件

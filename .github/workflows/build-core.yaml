@@ -44,6 +44,11 @@ jobs:
         with:
           go-version: 1.19.10
 
+      - name: Set up Rust
+        run: |
+            rustup update --no-self-update stable
+            rustup default stable
+
       - name: Check out code
         uses: actions/checkout@v4
         with:
