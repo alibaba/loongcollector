@@ -31,13 +31,15 @@ extern "C" {
 namespace logtail::ebpf {
 
 std::set<support_proto_e> ProtocolParserManager::AvaliableProtocolTypes() const {
-    return {support_proto_e::ProtoHTTP};
+    return {support_proto_e::ProtoHTTP, support_proto_e::ProtoMySQL};
 }
 
 support_proto_e ProtocolStringToEnum(std::string protocol) {
     std::transform(protocol.begin(), protocol.end(), protocol.begin(), [](unsigned char c) { return std::toupper(c); });
     if (protocol == "HTTP") {
         return support_proto_e::ProtoHTTP;
+    } else if (protocol == "MYSQL") {
+        return support_proto_e::ProtoMySQL;
     }
 
     return support_proto_e::ProtoUnknown;
