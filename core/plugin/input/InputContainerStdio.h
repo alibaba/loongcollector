@@ -41,7 +41,7 @@ public:
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
-    bool SupportAck() const override { return true; }
+    QueueType GetProcessQueueType() const override { return QueueType::COUNT_BOUNDED; }
 
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;

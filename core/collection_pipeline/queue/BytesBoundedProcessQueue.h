@@ -22,35 +22,32 @@
 #include <memory>
 #include <vector>
 
-#include "collection_pipeline/queue/BoundedQueueInterface.h"
+#include "collection_pipeline/queue/BoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueInterface.h"
 #include "common/FeedbackInterface.h"
 
 namespace logtail {
 
 // not thread-safe, should be protected explicitly by queue manager
-class BoundedProcessQueue : public BoundedQueueInterface<std::unique_ptr<ProcessQueueItem>>,
-                            public ProcessQueueInterface {
+class BytesBoundedProcessQueue : public BoundedProcessQueue {
 public:
-    BoundedProcessQueue(
-        size_t cap, size_t low, size_t high, int64_t key, uint32_t priority, const CollectionPipelineContext& ctx);
-
-    bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
-    bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
-
-    void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
-
-protected:
-    std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
-    std::vector<FeedbackInterface*> mUpStreamFeedbacks;
+    BytesBoundedProcessQueue(size_t cap,
+                             size_t lowBytes,
+                             size_t highBytes,
+                             int64_t key,
+                             uint32_t priority,
+                             const CollectionPipelineContext& ctx)
+        : QueueInterface(key, cap, ctx), BoundedProcessQueue(cap, lowBytes, highBytes, key, priority, ctx) {}
 
 private:
-    void GiveFeedback() const override;
-    virtual void AddSize(ProcessQueueItem* item) = 0;
-    virtual void SubSize(ProcessQueueItem* item) = 0;
+    size_t Size() const override { return mCurrentBytesSize; }
+    void AddSize(ProcessQueueItem* item) override { mCurrentBytesSize += item->mEventGroup.DataSize(); }
+    void SubSize(ProcessQueueItem* item) override { mCurrentBytesSize -= item->mEventGroup.DataSize(); }
+
+    size_t mCurrentBytesSize = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class CountBoundedProcessQueueUnittest;
+    friend class BytesBoundedProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;

@@ -37,12 +37,14 @@ bool BoundedProcessQueue::Push(unique_ptr<ProcessQueueItem>&& item) {
     }
     item->mEnqueTime = chrono::system_clock::now();
     auto size = item->mEventGroup.DataSize();
+
+    AddSize(item.get());
     mQueue.push_back(std::move(item));
     ChangeStateIfNeededAfterPush();
 
     ADD_COUNTER(mInItemsTotal, 1);
     ADD_COUNTER(mInItemDataSizeBytes, size);
-    SET_GAUGE(mQueueSizeTotal, Size());
+    SET_GAUGE(mQueueSizeTotal, mQueue.size());
     ADD_COUNTER(mQueueDataSizeByte, size);
     SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;
@@ -60,13 +62,14 @@ bool BoundedProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     item = std::move(mQueue.front());
     mQueue.pop_front();
     item->AddPipelineInProcessCnt(GetConfigName());
+    SubSize(item.get());
     if (ChangeStateIfNeededAfterPop()) {
         GiveFeedback();
     }
 
     ADD_COUNTER(mOutItemsTotal, 1);
     ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - item->mEnqueTime);
-    SET_GAUGE(mQueueSizeTotal, Size());
+    SET_GAUGE(mQueueSizeTotal, mQueue.size());
     SUB_GAUGE(mQueueDataSizeByte, item->mEventGroup.DataSize());
     SET_GAUGE(mValidToPushFlag, IsValidToPush());
     return true;

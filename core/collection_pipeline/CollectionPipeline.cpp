@@ -308,13 +308,14 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
             mContext.SetProcessQueueKey(QueueKeyManager::GetInstance()->GetKey(mName));
         }
 
-        // TODO: for go input, we currently assume bounded process queue
-        bool isInputSupportAck = mInputs.empty() ? true : mInputs[0]->SupportAck();
+        // TODO: for go input, we currently assume count bounded process queue
+        // Determine process queue type based on input plugins
+        QueueType queueType = mInputs.empty() ? QueueType::COUNT_BOUNDED : mInputs[0]->GetProcessQueueType();
         for (auto& input : mInputs) {
-            if (input->SupportAck() != isInputSupportAck) {
+            if (input->GetProcessQueueType() != queueType) {
                 PARAM_ERROR_RETURN(mContext.GetLogger(),
                                    mContext.GetAlarm(),
-                                   "not all inputs' ack support are the same",
+                                   "not all inputs' queue type are the same",
                                    noModule,
                                    mName,
                                    mContext.GetProjectName(),
@@ -322,12 +323,19 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
                                    mContext.GetRegion());
             }
         }
-        if (isInputSupportAck) {
-            ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(
-                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, mContext);
-        } else {
-            ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
-                mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, 1024, mContext);
+        switch (queueType) {
+            case QueueType::COUNT_BOUNDED:
+                ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(
+                    mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, mContext);
+                break;
+            case QueueType::BYTES_BOUNDED:
+                ProcessQueueManager::GetInstance()->CreateOrUpdateBytesBoundedQueue(
+                    mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, mContext);
+                break;
+            case QueueType::CIRCULAR:
+                ProcessQueueManager::GetInstance()->CreateOrUpdateCircularQueue(
+                    mContext.GetProcessQueueKey(), mContext.GetGlobalConfig().mPriority, 1024, mContext);
+                break;
         }
 
 

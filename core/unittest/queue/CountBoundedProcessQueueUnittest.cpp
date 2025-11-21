@@ -15,7 +15,7 @@
 #include <memory>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/SenderQueue.h"
 #include "common/FeedbackInterface.h"
 #include "models/PipelineEventGroup.h"
@@ -26,7 +26,7 @@ using namespace std;
 
 namespace logtail {
 
-class BoundedProcessQueueUnittest : public testing::Test {
+class CountBoundedProcessQueueUnittest : public testing::Test {
 public:
     void TestPush();
     void TestPop();
@@ -36,7 +36,7 @@ protected:
     static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
 
     void SetUp() override {
-        mQueue.reset(new BoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
+        mQueue.reset(new CountBoundedProcessQueue(sCap, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
 
         mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", "", sCtx));
         mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", "", sCtx));
@@ -60,16 +60,16 @@ private:
         return make_unique<ProcessQueueItem>(std::move(g), 0);
     }
 
-    unique_ptr<BoundedProcessQueue> mQueue;
+    unique_ptr<CountBoundedProcessQueue> mQueue;
     unique_ptr<FeedbackInterface> mFeedback1;
     unique_ptr<FeedbackInterface> mFeedback2;
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue1;
     unique_ptr<BoundedSenderQueueInterface> mSenderQueue2;
 };
 
-CollectionPipelineContext BoundedProcessQueueUnittest::sCtx;
+CollectionPipelineContext CountBoundedProcessQueueUnittest::sCtx;
 
-void BoundedProcessQueueUnittest::TestPush() {
+void CountBoundedProcessQueueUnittest::TestPush() {
     // push first
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
@@ -86,7 +86,7 @@ void BoundedProcessQueueUnittest::TestPush() {
     APSARA_TEST_TRUE(mQueue->Push(GenerateItem()));
 }
 
-void BoundedProcessQueueUnittest::TestPop() {
+void CountBoundedProcessQueueUnittest::TestPop() {
     unique_ptr<ProcessQueueItem> item;
     // nothing to pop
     APSARA_TEST_EQUAL(0, mQueue->Pop(item));
@@ -116,7 +116,7 @@ void BoundedProcessQueueUnittest::TestPop() {
     APSARA_TEST_TRUE(static_cast<FeedbackInterfaceMock*>(mFeedback2.get())->HasFeedback(sKey));
 }
 
-void BoundedProcessQueueUnittest::TestMetric() {
+void CountBoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(4U, mQueue->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
@@ -143,9 +143,9 @@ void BoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
 }
 
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPush)
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestPop)
-UNIT_TEST_CASE(BoundedProcessQueueUnittest, TestMetric)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPush)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPop)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestMetric)
 
 } // namespace logtail
 

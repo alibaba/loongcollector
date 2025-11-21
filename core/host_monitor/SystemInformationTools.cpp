@@ -43,13 +43,13 @@ namespace logtail {
 bool CheckGPUDevice() {
 #if defined(__linux__)
     if (!std::filesystem::exists(NVIDIACTL)) {
-        LOG_ERROR(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
+        LOG_WARNING(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
         return false;
     }
 
     auto binary_path = boost::process::search_path(NVSMI);
     if (binary_path.empty()) {
-        LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
+        LOG_WARNING(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
         return false;
     }
 
@@ -59,9 +59,9 @@ bool CheckGPUDevice() {
 
     int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
     if (ec || exit_code != 0) {
-        LOG_ERROR(sLogger,
-                  ("GPU check failed", "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code",
-                                                                                                            exit_code));
+        LOG_WARNING(sLogger,
+                    ("GPU check failed",
+                     "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code", exit_code));
         return false;
     }
 
@@ -75,7 +75,7 @@ bool CheckGPUDevice() {
     }
 
     if (!has_output) {
-        LOG_ERROR(sLogger, ("GPU check failed", "no GPU devices found"));
+        LOG_WARNING(sLogger, ("GPU check failed", "no GPU devices found"));
         return false;
     }
 
