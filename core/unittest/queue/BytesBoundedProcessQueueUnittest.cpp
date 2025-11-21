@@ -47,8 +47,8 @@ protected:
     void SetUp() override {
         mQueue.reset(new BytesBoundedProcessQueue(sMaxBytes, sLowWatermark, sHighWatermark, sKey, 1, sCtx));
 
-        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
-        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", sCtx));
+        mSenderQueue1.reset(new SenderQueue(10, 0, 10, 0, "", "", sCtx));
+        mSenderQueue2.reset(new SenderQueue(10, 0, 10, 0, "", "", sCtx));
         mQueue->SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{mSenderQueue1.get(), mSenderQueue2.get()});
 
         mFeedback1.reset(new FeedbackInterfaceMock);
@@ -488,7 +488,7 @@ void BytesBoundedProcessQueueUnittest::TestExactlyOnceEnabled() {
     APSARA_TEST_TRUE(eoQueue.mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"));
 
     // Setup downstream and upstream
-    unique_ptr<BoundedSenderQueueInterface> senderQueue(new SenderQueue(10, 0, 10, 0, "", eoCtx));
+    unique_ptr<BoundedSenderQueueInterface> senderQueue(new SenderQueue(10, 0, 10, 0, "", "", eoCtx));
     eoQueue.SetDownStreamQueues(vector<BoundedSenderQueueInterface*>{senderQueue.get()});
 
     unique_ptr<FeedbackInterface> feedback(new FeedbackInterfaceMock);
