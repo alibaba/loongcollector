@@ -243,38 +243,53 @@ func GetContainerMapCopy() map[string]*DockerInfoDetail {
 	return copyMap
 }
 
-func GetContainerDiffForPluginManager(fullList map[string]struct{}) (update []*DockerInfoDetail, delete []string, stop []string, changed bool, newFullList map[string]struct{}) {
+// GetContainerDiffForPluginManager detects container changes including metadata updates
+// It uses metadata hash to detect changes even when container ID remains the same
+func GetContainerDiffForPluginManager(cachedList map[string]string) (update []*DockerInfoDetail, delete []string, stop []string, changed bool, newCachedList map[string]string) {
 	instance := getContainerCenterInstance()
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
+
 	delete = make([]string, 0)
 	stop = make([]string, 0)
 	update = make([]*DockerInfoDetail, 0)
 	changed = false
-	for key := range fullList {
-		if c, ok := instance.containerMap[key]; !ok {
-			delete = append(delete, key)
-		} else if c.Status() != ContainerStatusRunning {
-			stop = append(stop, key)
+
+	// Check for deleted or stopped containers
+	for cachedID := range cachedList {
+		if currentInfo, exists := instance.containerMap[cachedID]; !exists {
+			// Container no longer exists
+			delete = append(delete, cachedID)
+			changed = true
+		} else if currentInfo.Status() != ContainerStatusRunning {
+			// Container stopped
+			stop = append(stop, cachedID)
+			changed = true
 		}
 	}
-	for key, value := range instance.containerMap {
-		_, ok := fullList[key]
-		if !ok {
-			update = append(update, value)
+
+	// Build new cache with hashes and check for new or updated containers
+	newCachedList = make(map[string]string)
+	for currentID, currentInfo := range instance.containerMap {
+		currentHash := currentInfo.MetadataHash()
+		newCachedList[currentID] = currentHash
+
+		if cachedHash, exists := cachedList[currentID]; !exists {
+			// New container
+			update = append(update, currentInfo)
+			changed = true
+		} else if cachedHash != currentHash {
+			// Container metadata changed (same ID, different hash)
+			update = append(update, currentInfo)
+			changed = true
 		}
 	}
-	if len(delete) > 0 || len(stop) > 0 || len(update) > 0 {
-		changed = true
+
+	if !changed {
+		return update, delete, stop, false, nil
 	}
-	if changed {
-		newFullList = make(map[string]struct{})
-		for key := range instance.containerMap {
-			newFullList[key] = struct{}{}
-		}
-		return update, delete, stop, changed, newFullList
-	}
-	return update, delete, stop, false, nil
+
+	return update, delete, stop, true, newCachedList
 }
 
 func GetAllContainerToRecord(envSet, labelSet, k8sLabelSet map[string]struct{}, containerIds map[string]struct{}) []*DockerInfoDetailWithFilteredEnvAndLabel {

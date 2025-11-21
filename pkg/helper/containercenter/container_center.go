@@ -16,11 +16,13 @@ package containercenter
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -250,6 +252,7 @@ type DockerInfoDetail struct {
 
 	lastUpdateTime time.Time
 	deleteFlag     bool
+	metadataHash   string // Hash of container metadata for change detection
 }
 
 func (did *DockerInfoDetail) IDPrefix() string {
@@ -275,6 +278,10 @@ func (did *DockerInfoDetail) Status() string {
 		return did.ContainerInfo.State.Status
 	}
 	return ""
+}
+
+func (did *DockerInfoDetail) MetadataHash() string {
+	return did.metadataHash
 }
 
 func (did *DockerInfoDetail) IsTimeout() bool {
@@ -545,6 +552,30 @@ func (dc *ContainerCenter) lookupImageCache(id string) (string, bool) {
 	return imageName, ok
 }
 
+// computeContainerMetadataHash computes a hash for container's mutable metadata fields
+// For the same container ID, only State typically changes in Docker/K8s environments.
+// Other fields (env, labels, mounts) are immutable after container creation.
+func computeContainerMetadataHash(info *DockerInfoDetail) string {
+	if info == nil {
+		return ""
+	}
+
+	// For same container ID, typically only State changes
+	// Most other fields are immutable after container creation
+	var hashComponents []string
+
+	// Container status - the primary field that changes for same container ID
+	if info.ContainerInfo.State != nil {
+		hashComponents = append(hashComponents, info.ContainerInfo.State.Status)
+		hashComponents = append(hashComponents, strconv.Itoa(info.ContainerInfo.State.Pid))
+	}
+	// Compute FNV hash (non-cryptographic, suitable for change detection)
+	data := strings.Join(hashComponents, "|")
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(data))
+	return fmt.Sprintf("%x", h.Sum64())
+}
+
 func (dc *ContainerCenter) getImageName(id, defaultVal string) string {
 	if len(id) == 0 || dc.client == nil {
 		return defaultVal
@@ -681,6 +712,10 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 		did.DefaultRootPath = criRuntimeWrapper.lookupContainerRootfsAbsDir(info)
 	}
 	logger.Debugf(context.Background(), "container(id: %s, name: %s) default root path is %s", info.ID, info.Name, did.DefaultRootPath)
+
+	// Compute and store metadata hash for change detection
+	did.metadataHash = computeContainerMetadataHash(did)
+
 	return did
 }
 
