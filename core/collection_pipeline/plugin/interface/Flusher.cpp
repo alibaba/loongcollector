@@ -58,8 +58,7 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
         if (rst == 0) { // QueueStatus::OK
             return true;
         }
-        std::string errorMsg = "extra buffer is full"; // QueueStatus::QUEUE_FULL
-        if (rst == 2) {
+        if (rst == 2) { // QueueStatus::QUEUE_NOT_EXIST
             // should not happen
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
@@ -79,6 +78,7 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
+    // QueueStatus::QUEUE_FULL
     LOG_ERROR(sLogger,
               ("failed to push data to sender queue",
                "extra buffer is full")("action", "discard data")("config-flusher-dst", str));
