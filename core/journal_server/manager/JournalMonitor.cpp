@@ -117,10 +117,30 @@ int JournalMonitor::AddReaderToMonitoring(const std::shared_ptr<JournalReader>& 
         return -1;
     }
 
+    // Check if entry exists for this FD
+    auto it = mMonitoredReaders.find(journalFD);
+    if (it != mMonitoredReaders.end()) {
+        // Entry exists - just update it and clear isClosing flag
+        // This handles the refresh scenario where FD didn't change
+        it->second.reader = reader;
+        it->second.configName = configName;
+        it->second.isClosing.store(false);
+        LOG_INFO(sLogger,
+                 ("journal monitor reader re-added to epoll monitoring (same FD, reader state refreshed)",
+                  "")("config", configName)("fd", journalFD));
+        return journalFD;
+    }
+
+    // Entry doesn't exist - create new one
+    // This handles the initial add or refresh scenario where FD changed
     MonitoredReader& monitoredReader = mMonitoredReaders[journalFD];
     monitoredReader.reader = reader;
     monitoredReader.configName = configName;
     monitoredReader.isClosing.store(false);
+
+    LOG_INFO(
+        sLogger,
+        ("journal monitor reader added to epoll monitoring (new entry)", "")("config", configName)("fd", journalFD));
 
     return journalFD;
 }
@@ -335,12 +355,38 @@ bool JournalMonitor::IsBatchTimeoutExceeded(const MonitoredReader& monitoredRead
 
 void JournalMonitor::CleanupClosedReaders() {
     // Close and remove readers that have been marked as closing
+    auto& connectionManager = JournalConnection::GetInstance();
+
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
         if (it->second.isClosing.load()) {
-            // Now it's safe to close the reader, as all ongoing operations should have completed
-            if (it->second.reader && it->second.reader->IsOpen()) {
+            // In refresh scenarios, reader is closed and reopened synchronously (same reader object)
+            // Check if this reader is still the current reader for this config
+            auto currentReader = connectionManager.GetConnection(it->second.configName);
+
+            bool shouldCloseReader = true;
+            if (currentReader && it->second.reader == currentReader) {
+                // This entry's reader is still the current reader - check if there's a new entry
+                // with different FD (which means FD changed during refresh)
+                for (const auto& pair : mMonitoredReaders) {
+                    if (pair.first != it->first && pair.second.reader == currentReader
+                        && pair.second.configName == it->second.configName && !pair.second.isClosing.load()) {
+                        // Found a new entry for the same reader/config with different FD
+                        // The reader was already closed and reopened in RefreshConnection
+                        // Don't close it again here
+                        shouldCloseReader = false;
+                        LOG_DEBUG(sLogger,
+                                  ("journal monitor removing old entry after FD change, reader already reopened",
+                                   "")("config", it->second.configName)("old_fd", it->first));
+                        break;
+                    }
+                }
+            }
+
+            // Close reader only if it's NOT the current reader (config deleted/replaced)
+            if (shouldCloseReader && it->second.reader && it->second.reader->IsOpen()) {
                 it->second.reader->Close();
             }
+
             LOG_DEBUG(sLogger,
                       ("journal monitor removing closed reader from map", "")("config",
                                                                               it->second.configName)("fd", it->first));
