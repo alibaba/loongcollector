@@ -905,10 +905,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         "error code", slsResponse.mErrorCode)("errMsg", slsResponse.mErrorMsg)("config", configName)( \
         "region", mRegion)("project", mProject)("logstore", data->mLogstore)("try cnt", data->mTryCnt)( \
         "response time", \
-        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mLastSendTime).count()) \
-            + "ms")("total send time", \
-                    ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
-                        + "ms")("endpoint", data->mCurrentDomain)("is profile data", isProfileData)
+        ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mLastSendTime).count()) + "ms")( \
+        "total send time", \
+        ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mFirstEnqueTime).count()) \
+            + "ms")("endpoint", data->mCurrentDomain)("is profile data", isProfileData)
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:

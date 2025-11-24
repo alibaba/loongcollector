@@ -19,7 +19,7 @@
 #include "common/Flags.h"
 #include "monitor/AlarmManager.h"
 
-DECLARE_FLAG_INT32(default_extra_buffer_size);
+DECLARE_FLAG_INT32(default_max_sender_queue_extra_buffer_size_bytes);
 
 using namespace std;
 
@@ -43,7 +43,8 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     ADD_COUNTER(mInItemDataSizeBytes, size);
 
     if (Full()) {
-        if (mExtraBufferDataSizeBytes->GetValue() + size >= size_t(INT32_FLAG(default_extra_buffer_size))) {
+        if (mExtraBufferDataSizeBytes->GetValue() + size
+            >= size_t(INT32_FLAG(default_max_sender_queue_extra_buffer_size_bytes))) {
             return false;
         }
         mExtraBuffer.push_back(std::move(item));

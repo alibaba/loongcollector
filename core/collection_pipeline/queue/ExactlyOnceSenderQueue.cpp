@@ -23,8 +23,6 @@
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
-DECLARE_FLAG_INT32(process_thread_count);
-
 using namespace std;
 
 namespace logtail {
@@ -90,9 +88,6 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         }
         if (!eo->IsComplete()) {
             item->mFirstEnqueTime = chrono::system_clock::now();
-            if (mExtraBuffer.size() >= size_t(INT32_FLAG(process_thread_count) * 10)) {
-                return false;
-            }
             mExtraBuffer.push_back(std::move(item));
             return true;
         }
