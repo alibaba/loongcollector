@@ -125,6 +125,10 @@ private:
     uint64_t mFileOffset = 0;
     uint64_t mRawSize = 0;
     StringView mLevel;
+    
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class LogEventUnittest;
+#endif
 };
 
 } // namespace logtail

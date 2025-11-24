@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
+
+DECLARE_FLAG_INT32(default_log_event_capacity);
 
 using namespace std;
 
@@ -187,8 +190,17 @@ void LogEventUnittest::TestReset() {
     APSARA_TEST_EQUAL(0, mLogEvent->GetTimestamp());
     APSARA_TEST_FALSE(mLogEvent->GetTimestampNanosecond().has_value());
     APSARA_TEST_TRUE(mLogEvent->Empty());
+    APSARA_TEST_EQUAL(static_cast<size_t>(INT32_FLAG(default_log_event_capacity)), mLogEvent->mContents.capacity());
+    APSARA_TEST_EQUAL(0U, mLogEvent->mContents.size());
     APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().first);
     APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().second);
+
+    for (int i = 0; i < 100; i++) {
+        mLogEvent->SetContent(string("key") + to_string(i), string("value"));
+    }
+    mLogEvent->Reset();
+    APSARA_TEST_EQUAL(static_cast<size_t>(INT32_FLAG(default_log_event_capacity)), mLogEvent->mContents.capacity());
+    APSARA_TEST_EQUAL(0U, mLogEvent->mContents.size());
 }
 
 void LogEventUnittest::TestFromJsonToJson() {
