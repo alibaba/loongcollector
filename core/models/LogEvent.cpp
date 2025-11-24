@@ -131,9 +131,7 @@ LogEvent::ConstContentIterator LogEvent::FindContent(StringView key) const {
 }
 
 LogEvent::ContentIterator LogEvent::begin() {
-    auto it = std::find_if(mContents.begin(), mContents.end(), [](const auto& item) {
-        return item.second;
-    });
+    auto it = std::find_if(mContents.begin(), mContents.end(), [](const auto& item) { return item.second; });
     return ContentIterator(it, mContents);
 }
 
@@ -150,9 +148,7 @@ LogEvent::ConstContentIterator LogEvent::end() const {
 }
 
 LogEvent::ConstContentIterator LogEvent::cbegin() const {
-    auto it = std::find_if(mContents.cbegin(), mContents.cend(), [](const auto& item) {
-        return item.second;
-    });
+    auto it = std::find_if(mContents.cbegin(), mContents.cend(), [](const auto& item) { return item.second; });
     return ConstContentIterator(it, mContents);
 }
 
