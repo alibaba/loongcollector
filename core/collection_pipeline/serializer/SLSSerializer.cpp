@@ -22,6 +22,7 @@
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
+#include "common/StringTools.h"
 #include "common/compression/CompressType.h"
 #include "constants/Constants.h"
 #include "constants/SpanConstants.h"
@@ -282,7 +283,7 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
         }
         if (e.Is<UntypedSingleValue>()) {
             metricEventContentCache[i].mMetricEventContentCache.push_back(
-                to_string(e.GetValue<UntypedSingleValue>()->mValue));
+                DoubleToString(e.GetValue<UntypedSingleValue>()->mValue));
             metricEventContentCache[i].mLabelSize = GetMetricLabelSize(e);
             size_t contentSZ = 0;
             contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_NAME.size(), e.GetName().size());
@@ -312,7 +313,7 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             }
             const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
             for (auto it = multiValue->ValuesBegin(); it != multiValue->ValuesEnd(); ++it) {
-                string valueStr = to_string(it->second.Value);
+                string valueStr = DoubleToString(it->second.Value);
                 metricEventContentCache[i].mMetricEventContentCache.push_back(valueStr); // value
                 contentSZ += GetLogContentSize(it->first.size(), valueStr.size());
             }
