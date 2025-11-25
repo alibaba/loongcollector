@@ -64,7 +64,6 @@ public:
     int AddReaderToMonitoring(const std::shared_ptr<JournalReader>& reader, const std::string& configName);
     void MarkReaderAsClosing(const std::string& configName);
     void RemoveReaderFromMonitoring(const std::string& configName);
-    void RefreshReaderFDMapping(const std::string& configName);
     bool SaveAccumulatedData(const std::string& configName,
                              bool& savedHasPendingData,
                              std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,

@@ -84,6 +84,8 @@ private:
                              const std::string& savedCursor = "");
     static JournalFilter::FilterConfig buildFilterConfig(const JournalConfig& config, const std::string& configName);
 
+    bool refreshSingleConnectionAndSyncEpoll(const std::string& configName, JournalMonitor& monitor);
+
     std::map<std::string, ConfigInfo> mConfigs; // key: configName
     mutable std::mutex mMutex;
     bool mInitialized{false};

@@ -179,9 +179,9 @@ void JournalMonitor::MarkReaderAsClosing(const std::string& configName) {
         if (it->second.configName == configName) {
             // Mark as closing FIRST (prevents new operations from using this reader)
             it->second.isClosing.store(true);
-            LOG_DEBUG(sLogger,
-                      ("journal monitor reader marked as closing, will be removed in CleanupClosedReaders",
-                       "")("config", configName)("fd", it->first));
+            LOG_INFO(sLogger,
+                     ("journal monitor reader marked as closing, will be removed in CleanupClosedReaders",
+                      "")("config", configName)("fd", it->first));
             return;
         }
     }
@@ -194,8 +194,7 @@ void JournalMonitor::RemoveReaderFromMonitoring(const std::string& configName) {
             if (it->second.reader && it->second.reader->IsOpen()) {
                 it->second.reader->RemoveFromEpoll(mEpollFD);
             }
-            LOG_DEBUG(sLogger,
-                      ("journal monitor reader removed from epoll", "")("config", configName)("fd", it->first));
+            LOG_INFO(sLogger, ("journal monitor reader removed from epoll", "")("config", configName)("fd", it->first));
             return;
         }
     }
@@ -237,58 +236,12 @@ void JournalMonitor::RestoreAccumulatedData(const std::string& configName,
             monitoredReader.accumulatedEntryCount = savedAccumulatedEntryCount;
             monitoredReader.accumulatedFirstCursor = savedAccumulatedFirstCursor;
             monitoredReader.lastBatchTime = savedLastBatchTime;
-            LOG_DEBUG(sLogger,
-                      ("journal monitor restored accumulated data", "")("config", configName)("fd", pair.first)(
-                          "preserved_pending_data", savedHasPendingData)("preserved_entry_count",
-                                                                         savedAccumulatedEntryCount));
+            LOG_INFO(sLogger,
+                     ("journal monitor restored accumulated data", "")("config", configName)("fd", pair.first)(
+                         "preserved_pending_data", savedHasPendingData)("preserved_entry_count",
+                                                                        savedAccumulatedEntryCount));
             return;
         }
-    }
-}
-
-void JournalMonitor::RefreshReaderFDMapping(const std::string& configName) {
-    auto& connectionManager = JournalConnection::GetInstance();
-    auto currentReader = connectionManager.GetConnection(configName);
-
-    if (!currentReader || !currentReader->IsOpen()) {
-        LOG_WARNING(sLogger, ("journal monitor reader not available after refresh", "")("config", configName));
-        return;
-    }
-
-    // Mark reader as closing and remove from epoll
-    MarkReaderAsClosing(configName);
-    RemoveReaderFromMonitoring(configName);
-    // Save accumulated data
-    bool savedHasPendingData = false;
-    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
-    int savedAccumulatedEntryCount = 0;
-    std::string savedAccumulatedFirstCursor;
-    std::chrono::steady_clock::time_point savedLastBatchTime;
-
-    bool hadOldReader = SaveAccumulatedData(configName,
-                                            savedHasPendingData,
-                                            savedAccumulatedEventGroup,
-                                            savedAccumulatedEntryCount,
-                                            savedAccumulatedFirstCursor,
-                                            savedLastBatchTime);
-
-    // Add reader back to epoll monitoring
-    int newFD = AddReaderToMonitoring(currentReader, configName);
-    if (newFD < 0) {
-        LOG_WARNING(sLogger,
-                    ("journal monitor failed to re-add reader to epoll after refresh", "")("config", configName));
-        return;
-    }
-
-    // Restore accumulated data to the new MonitoredReader
-    if (hadOldReader) {
-        RestoreAccumulatedData(configName,
-                               currentReader,
-                               savedHasPendingData,
-                               savedAccumulatedEventGroup,
-                               savedAccumulatedEntryCount,
-                               savedAccumulatedFirstCursor,
-                               savedLastBatchTime);
     }
 }
 
@@ -354,42 +307,37 @@ bool JournalMonitor::IsBatchTimeoutExceeded(const MonitoredReader& monitoredRead
 }
 
 void JournalMonitor::CleanupClosedReaders() {
-    // Close and remove readers that have been marked as closing
     auto& connectionManager = JournalConnection::GetInstance();
 
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end();) {
         if (it->second.isClosing.load()) {
-            // In refresh scenarios, reader is closed and reopened synchronously (same reader object)
-            // Check if this reader is still the current reader for this config
             auto currentReader = connectionManager.GetConnection(it->second.configName);
 
             bool shouldCloseReader = true;
             if (currentReader && it->second.reader == currentReader) {
-                // This entry's reader is still the current reader - check if there's a new entry
+                // This entry's reader is still the current reader
                 // with different FD (which means FD changed during refresh)
                 for (const auto& pair : mMonitoredReaders) {
                     if (pair.first != it->first && pair.second.reader == currentReader
                         && pair.second.configName == it->second.configName && !pair.second.isClosing.load()) {
-                        // Found a new entry for the same reader/config with different FD
                         // The reader was already closed and reopened in RefreshConnection
-                        // Don't close it again here
+                        // Don't close it again here，because newFD ref this reader
                         shouldCloseReader = false;
-                        LOG_DEBUG(sLogger,
-                                  ("journal monitor removing old entry after FD change, reader already reopened",
-                                   "")("config", it->second.configName)("old_fd", it->first));
+                        LOG_INFO(sLogger,
+                                 ("journal monitor removing old entry after FD change, reader already reopened",
+                                  "")("config", it->second.configName)("old_fd", it->first));
                         break;
                     }
                 }
             }
 
-            // Close reader only if it's NOT the current reader (config deleted/replaced)
             if (shouldCloseReader && it->second.reader && it->second.reader->IsOpen()) {
                 it->second.reader->Close();
             }
 
-            LOG_DEBUG(sLogger,
-                      ("journal monitor removing closed reader from map", "")("config",
-                                                                              it->second.configName)("fd", it->first));
+            LOG_INFO(sLogger,
+                     ("journal monitor removing closed reader from map", "")("config",
+                                                                             it->second.configName)("fd", it->first));
             it = mMonitoredReaders.erase(it);
         } else {
             ++it;

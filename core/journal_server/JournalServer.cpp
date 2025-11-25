@@ -92,10 +92,6 @@ void JournalServer::AddJournalInput(const string& configName, const JournalConfi
     JournalConfig validatedConfig = config;
     validatedConfig.mQueueKey = queueKey;
 
-    LOG_INFO(sLogger,
-             ("journal server input validated",
-              "")("config", configName)("ctx_valid", config.mCtx != nullptr)("queue_key", queueKey));
-
     auto& connectionManager = JournalConnection::GetInstance();
 
     if (connectionManager.AddConfig(configName, validatedConfig)) {
