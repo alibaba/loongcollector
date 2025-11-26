@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
-
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -29,11 +27,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
+
+	"github.com/docker/docker/api/types/container"
 )
 
 const serviceDockerStdoutKey = "service_docker_stdout_v2"
 
-func logDriverSupported(container types.ContainerJSON) bool {
+func logDriverSupported(container container.InspectResponse) bool {
 	// containerd has no hostConfig, return true
 	if container.HostConfig == nil {
 		return true
@@ -46,7 +46,7 @@ func logDriverSupported(container types.ContainerJSON) bool {
 	}
 }
 
-func logPathEmpty(container types.ContainerJSON) bool {
+func logPathEmpty(container container.InspectResponse) bool {
 	return len(container.LogPath) == 0
 }
 
@@ -58,7 +58,7 @@ type DockerFileSyner struct {
 
 func NewDockerFileSynerByFile(sds *ServiceDockerStdout, filePath string) *DockerFileSyner {
 	dockerInfoDetail := &containercenter.DockerInfoDetail{}
-	dockerInfoDetail.ContainerInfo = types.ContainerJSON{}
+	dockerInfoDetail.ContainerInfo = container.InspectResponse{}
 	dockerInfoDetail.ContainerInfo.LogPath = filePath
 	sds.LogtailInDocker = false
 	sds.StartLogMaxOffset = 10 * 1024 * 1024 * 1024

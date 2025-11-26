@@ -32,8 +32,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/storage"
 )
 
 const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
@@ -43,7 +43,7 @@ const staticContainerInfoPathEnvKey = "ALIYUN_LOG_STATIC_CONTAINER_INFO"
 // const staticContainerTypeContainerD = "containerd"
 
 var containerdScanIntervalMs = 1000
-var staticDockerContainers []types.ContainerJSON
+var staticDockerContainers []container.InspectResponse
 var staticDockerContainerError error
 var staticDockerContainerLock sync.Mutex
 var loadStaticContainerOnce sync.Once
@@ -78,7 +78,7 @@ type staticContainerInfo struct {
 	State    staticContainerState
 }
 
-func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.FileInfo) types.ContainerJSON {
+func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.FileInfo) container.InspectResponse {
 	created, err := time.Parse(time.RFC3339Nano, staticInfo.Created)
 	if err != nil {
 		created = stat.ModTime()
@@ -104,8 +104,8 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 		}
 	}
 
-	dockerContainer := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	dockerContainer := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:      staticInfo.ID,
 			Name:    staticInfo.Name,
 			Created: created.Format(time.RFC3339Nano),
@@ -115,13 +115,13 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 					Type: staticInfo.LogType,
 				},
 			},
-			GraphDriver: types.GraphDriverData{
+			GraphDriver: storage.DriverData{
 				Name: "overlay",
 				Data: map[string]string{
 					"UpperDir": staticInfo.UpperDir,
 				},
 			},
-			State: &types.ContainerState{
+			State: &container.State{
 				Status: status,
 				Pid:    staticInfo.State.Pid,
 			},
@@ -132,21 +132,21 @@ func staticContainerInfoToStandard(staticInfo *staticContainerInfo, stat fs.File
 			Env:      allEnv,
 			Hostname: staticInfo.HostName,
 		},
-		NetworkSettings: &types.NetworkSettings{
-			DefaultNetworkSettings: types.DefaultNetworkSettings{
+		NetworkSettings: &container.NetworkSettings{
+			DefaultNetworkSettings: container.DefaultNetworkSettings{
 				IPAddress: staticInfo.IP,
 			},
 		},
 	}
 
 	for _, mount := range staticInfo.Mounts {
-		dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
+		dockerContainer.Mounts = append(dockerContainer.Mounts, container.MountPoint{
 			Source:      filepath.Clean(mount.Source),
 			Destination: filepath.Clean(mount.Destination),
 			Driver:      mount.Driver,
 		})
 	}
-	sortMounts := func(mounts []types.MountPoint) {
+	sortMounts := func(mounts []container.MountPoint) {
 		sort.Slice(mounts, func(i, j int) bool {
 			return mounts[i].Source < mounts[j].Source
 		})
@@ -211,7 +211,7 @@ func scanContainerdFilesAndReLink(filePath string) {
 	}
 }
 
-func innerReadStatisContainerInfo(file string, lastContainerInfo []types.ContainerJSON, stat fs.FileInfo) (containers []types.ContainerJSON, removed []string, changed bool, err error) {
+func innerReadStatisContainerInfo(file string, lastContainerInfo []container.InspectResponse, stat fs.FileInfo) (containers []container.InspectResponse, removed []string, changed bool, err error) {
 	body, err := os.ReadFile(filepath.Clean(file))
 	if err != nil {
 		return nil, nil, false, err
@@ -249,7 +249,7 @@ func isStaticContainerInfoEnabled() bool {
 	return len(envPath) != 0
 }
 
-func tryReadStaticContainerInfo() ([]types.ContainerJSON, []string, bool, error) {
+func tryReadStaticContainerInfo() ([]container.InspectResponse, []string, bool, error) {
 	statusChanged := false
 	loadStaticContainerOnce.Do(
 		func() {

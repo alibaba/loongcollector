@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	docker "github.com/docker/docker/client"
 
@@ -220,7 +220,7 @@ func Init() {
 	getContainerCenterInstance()
 }
 
-func CreateContainerInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
+func CreateContainerInfoDetail(info container.InspectResponse, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	return getContainerCenterInstance().CreateInfoDetail(info, envConfigPrefix, selfConfigFlag)
 }
 

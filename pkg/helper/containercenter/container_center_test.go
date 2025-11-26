@@ -23,9 +23,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,7 +123,7 @@ func TestFormatContainerJSONPath(t *testing.T) {
 				"Status": "running"
 		}
 }`
-	container1 := types.ContainerJSON{}
+	container1 := container.InspectResponse{}
 	err := json.Unmarshal([]byte(testContainer1), &container1)
 	require.NoError(t, err)
 	formatContainerJSONPath(&container1)
@@ -145,7 +145,7 @@ func TestFormatContainerJSONPath(t *testing.T) {
 		},
 		"LogType": "json-file"
 }`
-	container2 := types.ContainerJSON{}
+	container2 := container.InspectResponse{}
 	err = json.Unmarshal([]byte(testContainer2), &container2)
 	require.NoError(t, err)
 	formatContainerJSONPath(&container2)
@@ -157,11 +157,11 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 	dc := getContainerCenterInstance()
 
 	newContainer := func(id string) *DockerInfoDetail {
-		return dc.CreateInfoDetail(types.ContainerJSON{
-			ContainerJSONBase: &types.ContainerJSONBase{
+		return dc.CreateInfoDetail(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
 				ID:    id,
 				Name:  id,
-				State: &types.ContainerState{},
+				State: &container.State{},
 			},
 			Config: &container.Config{
 				Env: make([]string, 0),
@@ -428,23 +428,23 @@ type ContainerHelperMock struct {
 }
 
 // Events 实现了 DockerClient 的 Events 方法
-func (m *DockerClientMock) Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error) {
+func (m *DockerClientMock) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
 	args := m.Called(ctx, options)
 	return args.Get(0).(chan events.Message), args.Get(1).(chan error)
 }
 
-func (m *DockerClientMock) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
+func (m *DockerClientMock) ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error) {
 	args := m.Called(ctx, imageID)
-	return args.Get(0).(types.ImageInspect), args.Get(1).([]byte), args.Error(2)
+	return args.Get(0).(image.InspectResponse), args.Get(1).([]byte), args.Error(2)
 }
 
-func (m *DockerClientMock) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+func (m *DockerClientMock) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
 	args := m.Called(ctx, containerID)
-	return args.Get(0).(types.ContainerJSON), args.Error(1)
+	return args.Get(0).(container.InspectResponse), args.Error(1)
 }
-func (m *DockerClientMock) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+func (m *DockerClientMock) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 	args := m.Called(ctx, options)
-	return args.Get(0).([]types.Container), args.Error(1)
+	return args.Get(0).([]container.Summary), args.Error(1)
 }
 
 func (m *ContainerHelperMock) ContainerProcessAlive(pid int) bool {
@@ -471,11 +471,11 @@ func TestContainerCenterEvents(t *testing.T) {
 	go containerCenterInstance.eventListener()
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "event1",
 			Name:  "name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -489,11 +489,11 @@ func TestContainerCenterEvents(t *testing.T) {
 	assert.Equal(t, 1, containerLen)
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "event1",
 			Name:  "start",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -519,7 +519,7 @@ func TestContainerCenterFetchAll(t *testing.T) {
 
 	containerHelper := ContainerHelperMock{}
 
-	mockContainerListResult := []types.Container{
+	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
 		{ID: "id2"},
 		{ID: "id3"},
@@ -529,28 +529,28 @@ func TestContainerCenterFetchAll(t *testing.T) {
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id1",
 			Name:  "event_name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id2",
 			Name:  "event_name2",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 	// one failed inspect
-	mockClient.On("ContainerInspect", mock.Anything, "id3").Return(types.ContainerJSON{}, errors.New("id3 not exist")).Times(3)
+	mockClient.On("ContainerInspect", mock.Anything, "id3").Return(container.InspectResponse{}, errors.New("id3 not exist")).Times(3)
 
 	err := containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
@@ -558,29 +558,29 @@ func TestContainerCenterFetchAll(t *testing.T) {
 	containerLen := len(containerCenterInstance.containerMap)
 	assert.Equal(t, 2, containerLen)
 
-	mockContainerListResult2 := []types.Container{
+	mockContainerListResult2 := []container.Summary{
 		{ID: "id4"},
 		{ID: "id5"},
 	}
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult2, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id4").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id4").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id4",
 			Name:  "event_name4",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id5").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id5").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id5",
 			Name:  "event_name5",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -604,28 +604,28 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 
 	containerHelper := ContainerHelperMock{}
 
-	mockContainerListResult := []types.Container{
+	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
 		{ID: "id2"},
 	}
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil)
 
-	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id1",
 			Name:  "event_name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil)
-	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id2",
 			Name:  "event_name2",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -663,7 +663,7 @@ func TestInitClientMutiTime(t *testing.T) {
 
 func TestFindAllEnvConfig(t *testing.T) {
 	did := &DockerInfoDetail{
-		ContainerInfo: types.ContainerJSON{
+		ContainerInfo: container.InspectResponse{
 			Config: &container.Config{
 				Env: []string{
 					"loong_logs_key1=value1",
@@ -674,7 +674,7 @@ func TestFindAllEnvConfig(t *testing.T) {
 					"loong_logs_key1_tags=appName=ut1",
 				},
 			},
-			ContainerJSONBase: &types.ContainerJSONBase{
+			ContainerJSONBase: &container.ContainerJSONBase{
 				Name: "ut-container",
 			},
 		},

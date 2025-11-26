@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
 
@@ -33,12 +33,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
-func logDriverSupported(container types.ContainerJSON) bool {
+func logDriverSupported(c container.InspectResponse) bool {
 	// containerd has no hostConfig, return true
-	if container.HostConfig == nil {
+	if c.HostConfig == nil {
 		return true
 	}
-	switch container.HostConfig.LogConfig.Type {
+	switch c.HostConfig.LogConfig.Type {
 	case "json-file", "journald":
 		return true
 	default:
@@ -242,7 +242,7 @@ func (ss *stdoutSyner) Start(c pipeline.Collector) {
 				"name", ss.info.ContainerInfo.Name, "created", ss.info.ContainerInfo.Created, "status", ss.info.Status())
 		}
 		ss.lock.Unlock()
-		options := types.ContainerLogsOptions{
+		options := container.LogsOptions{
 			ShowStdout: ss.stdout,
 			ShowStderr: ss.stderr,
 			Since:      cpTime.Format(containercenter.DockerTimeFormat),

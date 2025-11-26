@@ -95,7 +95,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 	if informer == nil {
 		return
 	}
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			defer panicRecover()
 			nowTime := time.Now().Unix()
