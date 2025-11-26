@@ -93,14 +93,15 @@ int CpuProfilingManager::AddOrUpdateConfig(
     }
     auto key = it->second;
 
+    CpuProfilingOption *opts = std::get<CpuProfilingOption *>(options);
+
     auto info = ConfigInfo{
         .mPipelineCtx = context,
         .mQueueKey = context->GetProcessQueueKey(),
         .mPluginIndex = index,
+        .mAppName = opts->mAppName,
     };
     mConfigInfoMap.insert_or_assign(key, info);
-
-    CpuProfilingOption *opts = std::get<CpuProfilingOption *>(options);
 
     ProcessDiscoveryConfig config{
         .mConfigKey = key,
@@ -192,8 +193,8 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
     }
 }
 
-static void addContentToEvent(LogEvent *event, SourceBuffer *sourceBuffer,
-                              const std::vector<std::string> &fullStack, std::string comm) {
+static void addContentToEvent(LogEvent *event,
+                              const std::vector<std::string> &fullStack, const std::string &appName, const std::string &comm) {
     event->SetContent("dataType", std::string("CallStack"));
     event->SetContent("language", std::string("go"));
 
@@ -221,13 +222,13 @@ static void addContentToEvent(LogEvent *event, SourceBuffer *sourceBuffer,
     event->SetContent("type_cn", std::string(""));
     event->SetContent("units", std::string("nanoseconds"));
     event->SetContent("val", std::string("1"));
-    event->SetContent("valueType", std::string("cpu"));
-    event->SetContent("valueType_cn", std::string(""));
+    event->SetContent("valueTypes", std::string("cpu"));
+    event->SetContent("valueTypes_cn", std::string(""));
 
     // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
     jsonLabels += "{\"__name__\": \"";
-    jsonLabels += "xxx";
+    jsonLabels += appName;
     jsonLabels += "\", \"thread\": \"";
     jsonLabels += comm;
     jsonLabels += "\"}";
@@ -263,33 +264,9 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
 
     std::vector<StackCnt> stacks;
     parseStackCnt(stack, stacks);
-
-    auto sourceBuffer = std::make_shared<SourceBuffer>();
-    PipelineEventGroup eventGroup(sourceBuffer);
     std::string profileID = CalculateRandomUUID();
-    
-    // auto pidSb = sourceBuffer->CopyString(std::to_string(pid));
-    // auto commSb = sourceBuffer->CopyString(std::string(comm));
-    // for (auto& [stack, cnt, traceId] : stacks) {
-    //     auto* event = eventGroup.AddLogEvent();
-    //     event->SetTimestamp(logtime);
-    //     auto stackSb = sourceBuffer->CopyString(stack);
-    //     auto cntSb = sourceBuffer->CopyString(std::to_string(cnt));
-    //     auto traceIdSb = sourceBuffer->CopyString(traceId);
-    //     event->SetContentNoCopy(kPid.LogKey(), StringView(pidSb.data, pidSb.size));
-    //     event->SetContentNoCopy(kComm.LogKey(), StringView(commSb.data, commSb.size));
-    //     event->SetContentNoCopy(kStack.LogKey(), StringView(stackSb.data, stackSb.size));
-    //     event->SetContentNoCopy(kCnt.LogKey(), StringView(cntSb.data, cntSb.size));
-    //     event->SetContentNoCopy(kTraceId.LogKey(), StringView(traceIdSb.data, traceIdSb.size));
-    // }
 
-    for (auto &[stack, cnt, traceId] : stacks) {
-        auto *event = eventGroup.AddLogEvent();
-        event->SetTimestamp(logtime);
-        event->SetContent("profileID", profileID);
-
-        addContentToEvent(event, sourceBuffer.get(), stack, std::string(comm));
-    }
+    std::string commStr(comm);
 
     for (auto& key : targets) {
         auto it = mConfigInfoMap.find(key);
@@ -297,6 +274,16 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
             continue;
         }
         ConfigInfo& info = it->second;
+
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+
+        for (auto &[stack, cnt, traceId] : stacks) {
+            auto *event = eventGroup.AddLogEvent();
+            event->SetTimestamp(logtime);
+            event->SetContent("profileID", profileID);
+            addContentToEvent(event, stack, info.mAppName, commStr);
+        }
 
         std::unique_ptr<ProcessQueueItem> item =
             std::make_unique<ProcessQueueItem>(
