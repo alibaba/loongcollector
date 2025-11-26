@@ -350,12 +350,15 @@ bool ScrapeConfig::UpdateAuthorization() {
 
 bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
     static auto sScrapeProtocolsHeaders = std::map<string, string>{
+        {prometheus::PrometheusProto,
+         "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited"},
         {prometheus::PrometheusText0_0_4, "text/plain;version=0.0.4"},
         {prometheus::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
         {prometheus::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
     };
     static auto sDefaultScrapeProtocols = vector<string>{
         prometheus::PrometheusText0_0_4,
+        prometheus::PrometheusProto,
         prometheus::OpenMetricsText0_0_1,
         prometheus::OpenMetricsText1_0_0,
     };
