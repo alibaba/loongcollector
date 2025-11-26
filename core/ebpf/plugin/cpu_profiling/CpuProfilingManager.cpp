@@ -224,10 +224,10 @@ static void addContentToEvent(LogEvent *event, SourceBuffer *sourceBuffer,
     event->SetContent("valueType", std::string("cpu"));
     event->SetContent("valueType_cn", std::string(""));
 
-    // {"__name__": "shuizhao-python-profiling-service", "thread": "abcd"}
+    // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
     jsonLabels += "{\"__name__\": \"";
-    jsonLabels += "shuizhao-python-profiling-service";
+    jsonLabels += "xxx";
     jsonLabels += "\", \"thread\": \"";
     jsonLabels += comm;
     jsonLabels += "\"}";
