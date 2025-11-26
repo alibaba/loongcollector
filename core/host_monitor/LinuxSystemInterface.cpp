@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <mutex>
 #include <string>
 
 using namespace std;
@@ -284,29 +285,27 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
 bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
 
-    // Use static variable to remember if netlink is available, only check once
-    static std::atomic<int> netlinkAvailable{-1}; // -1: not checked, 0: not available, 1: available
+    static std::once_flag initFlag;
+    static bool netlinkAvailable = false;
 
     bool success = false;
+    bool ranCallOnce = false;
 
-    if (netlinkAvailable.load() == -1) {
-        // First time check: try netlink
+    std::call_once(initFlag, [this, &tcpStateCount, &success, &ranCallOnce]() {
+        ranCallOnce = true;
         success = ReadNetLink(tcpStateCount);
         if (success) {
-            netlinkAvailable.store(1);
+            netlinkAvailable = true;
             LOG_INFO(sLogger, ("Netlink INET_DIAG is available, will use it for TCP state collection", ""));
         } else {
-            netlinkAvailable.store(0);
+            netlinkAvailable = false;
             LOG_INFO(sLogger, ("Netlink INET_DIAG not available, will use /proc/net/tcp fallback method", ""));
-            // Try fallback method
             success = ReadProcNetTcp(tcpStateCount);
         }
-    } else if (netlinkAvailable.load() == 1) {
-        // Netlink is available, use it directly
-        success = ReadNetLink(tcpStateCount);
-    } else {
-        // Netlink is not available, use fallback directly
-        success = ReadProcNetTcp(tcpStateCount);
+    });
+
+    if (!ranCallOnce) {
+        success = netlinkAvailable ? ReadNetLink(tcpStateCount) : ReadProcNetTcp(tcpStateCount);
     }
 
     if (!success) {
