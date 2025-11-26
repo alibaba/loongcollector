@@ -132,11 +132,11 @@ bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) 
         // Skip the header line
         for (size_t i = 1; i < tcpLines.size(); ++i) {
             const auto& line = tcpLines[i];
-            
+
             // Parse the line format: sl local_address rem_address st tx_queue rx_queue ...
             // We need the 4th field (st) which is the TCP state in hex
             FastFieldParser parser(line);
-            
+
             if (parser.GetFieldCount() < 4) {
                 continue;
             }
@@ -149,7 +149,7 @@ bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) 
 
             // Convert hex string to integer
             unsigned int state = Hex2Int(std::string(stateField));
-            
+
             // Validate state range
             if (state >= TCP_ESTABLISHED && state <= TCP_CLOSING) {
                 tcpStateCount[state]++;
@@ -283,12 +283,12 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
 
 bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
-    
+
     // Use static variable to remember if netlink is available, only check once
     static std::atomic<int> netlinkAvailable{-1}; // -1: not checked, 0: not available, 1: available
-    
+
     bool success = false;
-    
+
     if (netlinkAvailable.load() == -1) {
         // First time check: try netlink
         success = ReadNetLink(tcpStateCount);
@@ -308,12 +308,12 @@ bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
         // Netlink is not available, use fallback directly
         success = ReadProcNetTcp(tcpStateCount);
     }
-    
+
     if (!success) {
         LOG_ERROR(sLogger, ("Failed to read TCP state", ""));
         return false;
     }
-    
+
     uint64_t tcp = 0, tcpSocketStat = 0;
 
     if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT, tcp)) {
