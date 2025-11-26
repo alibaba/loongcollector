@@ -73,14 +73,46 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
         return false;
     }
 
-    // Note: In normal flow, config should have been removed by RemoveConfig() before AddConfig() is called
-    // However, we allow replacement here for backward compatibility (e.g., unit tests).
+    // Save accumulated data from old reader if config already exists
+    bool hadOldReader = false;
+    bool savedHasPendingData = false;
+    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+    int savedAccumulatedEntryCount = 0;
+    std::chrono::steady_clock::time_point savedLastBatchTime;
+    std::string savedReaderCursor;
+    std::string oldSeekPosition;
+
     if (mConfigs.find(configName) != mConfigs.end()) {
         LOG_WARNING(sLogger, ("journal connection config already exists, will be replaced", "")("config", configName));
         auto* monitor = JournalMonitor::GetInstance();
         if (monitor) {
+            // Save old config's seekPosition for comparison
+            oldSeekPosition = mConfigs[configName].config.mSeekPosition;
+
+            // Save accumulated data BEFORE marking as closing
+            hadOldReader = monitor->SaveAccumulatedData(configName,
+                                                        savedHasPendingData,
+                                                        savedAccumulatedEventGroup,
+                                                        savedAccumulatedEntryCount,
+                                                        savedLastBatchTime);
+
+            // Save reader's current cursor position (only use if seekPosition unchanged)
+            auto oldReader = mConfigs[configName].reader;
+            if (oldReader && oldReader->IsOpen()) {
+                savedReaderCursor = oldReader->GetCursor();
+            }
+
             monitor->MarkReaderAsClosing(configName);
             monitor->RemoveReaderFromMonitoring(configName);
+
+            if (hadOldReader && savedHasPendingData) {
+                LOG_INFO(sLogger,
+                         ("journal connection preserved accumulated data during config replacement",
+                          "")("config", configName)("preserved_pending_data", savedHasPendingData)(
+                             "preserved_entry_count", savedAccumulatedEntryCount)("old_seek_position", oldSeekPosition)(
+                             "new_seek_position", config.mSeekPosition)("saved_cursor",
+                                                                        savedReaderCursor.empty() ? "none" : "yes"));
+            }
         } else {
             // If monitor is not available, close immediately (fallback for edge cases)
             if (mConfigs[configName].reader) {
@@ -95,7 +127,19 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
         return false;
     }
 
-    setupReaderPosition(reader, config, configName);
+    // - If seekPosition unchanged: use savedCursor for seamless continuation
+    // - If seekPosition changed: respect new config, ignore savedCursor
+    bool seekPositionChanged = hadOldReader && (oldSeekPosition != config.mSeekPosition);
+    std::string cursorToUse = seekPositionChanged ? "" : savedReaderCursor;
+
+    if (seekPositionChanged) {
+        LOG_INFO(sLogger,
+                 ("journal connection seekPosition changed, will use new seekPosition instead of savedCursor",
+                  "")("config", configName)("old_seek", oldSeekPosition)("new_seek", config.mSeekPosition)(
+                     "accumulated_data_will_be_sent_first", savedHasPendingData));
+    }
+
+    setupReaderPosition(reader, config, configName, cursorToUse);
 
     ConfigInfo configInfo;
     configInfo.mConfigName = configName;
@@ -104,6 +148,29 @@ bool JournalConnection::AddConfig(const std::string& configName, const JournalCo
     configInfo.lastOpenTime = std::chrono::steady_clock::now(); // record open time
 
     mConfigs[configName] = std::move(configInfo);
+
+    // Restore accumulated data to new reader if we had old reader with pending data
+    if (hadOldReader && savedHasPendingData) {
+        auto* monitor = JournalMonitor::GetInstance();
+        if (monitor) {
+            int newFD = monitor->AddReaderToMonitoring(reader, configName);
+            if (newFD >= 0) {
+                monitor->RestoreAccumulatedData(configName,
+                                                reader,
+                                                savedHasPendingData,
+                                                savedAccumulatedEventGroup,
+                                                savedAccumulatedEntryCount,
+                                                savedLastBatchTime);
+                LOG_INFO(sLogger,
+                         ("journal connection restored accumulated data to new reader",
+                          "")("config", configName)("fd", newFD)("restored_entry_count", savedAccumulatedEntryCount));
+            } else {
+                LOG_WARNING(sLogger,
+                            ("journal connection failed to add reader to monitoring after config replacement",
+                             "")("config", configName)("accumulated_data_lost", savedAccumulatedEntryCount));
+            }
+        }
+    }
 
     LOG_INFO(sLogger,
              ("journal connection config added with independent connection",
@@ -232,14 +299,9 @@ bool JournalConnection::refreshSingleConnectionAndSyncEpoll(const std::string& c
     bool savedHasPendingData = false;
     std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
     int savedAccumulatedEntryCount = 0;
-    std::string savedAccumulatedFirstCursor;
     std::chrono::steady_clock::time_point savedLastBatchTime;
-    bool hadOldReader = monitor.SaveAccumulatedData(configName,
-                                                    savedHasPendingData,
-                                                    savedAccumulatedEventGroup,
-                                                    savedAccumulatedEntryCount,
-                                                    savedAccumulatedFirstCursor,
-                                                    savedLastBatchTime);
+    bool hadOldReader = monitor.SaveAccumulatedData(
+        configName, savedHasPendingData, savedAccumulatedEventGroup, savedAccumulatedEntryCount, savedLastBatchTime);
 
     // Step 3: Refresh connection (close and reopen reader, reapply filters, reseek)
     if (!RefreshConnection(configName)) {
@@ -270,7 +332,6 @@ bool JournalConnection::refreshSingleConnectionAndSyncEpoll(const std::string& c
                                        savedHasPendingData,
                                        savedAccumulatedEventGroup,
                                        savedAccumulatedEntryCount,
-                                       savedAccumulatedFirstCursor,
                                        savedLastBatchTime);
     }
 

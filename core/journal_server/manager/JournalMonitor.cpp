@@ -204,7 +204,6 @@ bool JournalMonitor::SaveAccumulatedData(const std::string& configName,
                                          bool& savedHasPendingData,
                                          std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
                                          int& savedAccumulatedEntryCount,
-                                         std::string& savedAccumulatedFirstCursor,
                                          std::chrono::steady_clock::time_point& savedLastBatchTime) {
     for (auto it = mMonitoredReaders.begin(); it != mMonitoredReaders.end(); ++it) {
         if (it->second.configName == configName) {
@@ -212,7 +211,6 @@ bool JournalMonitor::SaveAccumulatedData(const std::string& configName,
             savedHasPendingData = it->second.hasPendingData;
             savedAccumulatedEventGroup = it->second.accumulatedEventGroup;
             savedAccumulatedEntryCount = it->second.accumulatedEntryCount;
-            savedAccumulatedFirstCursor = it->second.accumulatedFirstCursor;
             savedLastBatchTime = it->second.lastBatchTime;
             return true;
         }
@@ -225,7 +223,6 @@ void JournalMonitor::RestoreAccumulatedData(const std::string& configName,
                                             bool savedHasPendingData,
                                             const std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
                                             int savedAccumulatedEntryCount,
-                                            const std::string& savedAccumulatedFirstCursor,
                                             const std::chrono::steady_clock::time_point& savedLastBatchTime) {
     // Find the MonitoredReader entry for this reader
     for (auto& pair : mMonitoredReaders) {
@@ -234,7 +231,6 @@ void JournalMonitor::RestoreAccumulatedData(const std::string& configName,
             monitoredReader.hasPendingData = savedHasPendingData;
             monitoredReader.accumulatedEventGroup = savedAccumulatedEventGroup;
             monitoredReader.accumulatedEntryCount = savedAccumulatedEntryCount;
-            monitoredReader.accumulatedFirstCursor = savedAccumulatedFirstCursor;
             monitoredReader.lastBatchTime = savedLastBatchTime;
             LOG_INFO(sLogger,
                      ("journal monitor restored accumulated data", "")("config", configName)("fd", pair.first)(
@@ -283,7 +279,6 @@ void JournalMonitor::ClearPendingDataForInvalidReader(MonitoredReader& monitored
         monitoredReader.hasPendingData = false;
         monitoredReader.accumulatedEventGroup = nullptr;
         monitoredReader.accumulatedEntryCount = 0;
-        monitoredReader.accumulatedFirstCursor.clear();
     }
 }
 

@@ -243,29 +243,21 @@ CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config
     return logEvent;
 }
 
-void ClearAccumulatedData(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
-                          int* accumulatedEntryCount,
-                          std::string* accumulatedFirstCursor) {
+void ClearAccumulatedData(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup, int* accumulatedEntryCount) {
     if (accumulatedEventGroup != nullptr) {
         *accumulatedEventGroup = nullptr;
     }
     if (accumulatedEntryCount != nullptr) {
         *accumulatedEntryCount = 0;
     }
-    if (accumulatedFirstCursor != nullptr) {
-        accumulatedFirstCursor->clear();
-    }
 }
 
 bool PushEventGroupToQueue(QueueKey queueKey,
                            PipelineEventGroup* eventGroup,
                            int totalEntryCount,
-                           const std::string& firstEntryCursor,
-                           const std::shared_ptr<JournalReader>& journalReader,
                            const std::string& configName,
                            std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                            int* accumulatedEntryCount,
-                           std::string* accumulatedFirstCursor,
                            bool& pushFailed,
                            bool& eventGroupSent) {
     constexpr uint32_t kMaxPushRetries = 100;
@@ -277,30 +269,22 @@ bool PushEventGroupToQueue(QueueKey queueKey,
                   ("journal processor failed to push journal entry batch to queue",
                    "queue may be full, will retry on next cycle")("config", configName)("entry_count", totalEntryCount)(
                       "event_count", eventCount));
-        if (!firstEntryCursor.empty()) {
-            journalReader->SeekCursor(firstEntryCursor);
-            journalReader->Previous();
-        }
+        // Keep accumulated data in memory, will retry on next cycle
         pushFailed = true;
         return false;
     }
     eventGroupSent = true;
-    ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+    ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount);
     return true;
 }
 
 void InitializeOrRestoreAccumulatedEventGroup(std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                                               int* accumulatedEntryCount,
-                                              std::string* accumulatedFirstCursor,
                                               PipelineEventGroup*& eventGroup,
-                                              int& totalEntryCount,
-                                              std::string& firstEntryCursor) {
+                                              int& totalEntryCount) {
     if (*accumulatedEventGroup != nullptr) {
         eventGroup = accumulatedEventGroup->get();
         totalEntryCount = (accumulatedEntryCount != nullptr) ? *accumulatedEntryCount : 0;
-        if (accumulatedFirstCursor != nullptr && !accumulatedFirstCursor->empty()) {
-            firstEntryCursor = *accumulatedFirstCursor;
-        }
     } else {
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         *accumulatedEventGroup = std::make_shared<PipelineEventGroup>(sourceBuffer);
@@ -318,7 +302,6 @@ bool HandleJournalEntries(const string& configName,
                           bool timeoutTrigger,
                           std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                           int* accumulatedEntryCount,
-                          std::string* accumulatedFirstCursor,
                           bool* hasPendingDataOut,
                           std::chrono::steady_clock::time_point* lastBatchTimeOut) {
     if (!journalReader || !journalReader->IsOpen()) {
@@ -337,15 +320,10 @@ bool HandleJournalEntries(const string& configName,
 
     try {
         PipelineEventGroup* eventGroup = nullptr;
-        std::string firstEntryCursor;
         int totalEntryCount = 0;
 
-        InitializeOrRestoreAccumulatedEventGroup(accumulatedEventGroup,
-                                                 accumulatedEntryCount,
-                                                 accumulatedFirstCursor,
-                                                 eventGroup,
-                                                 totalEntryCount,
-                                                 firstEntryCursor);
+        InitializeOrRestoreAccumulatedEventGroup(
+            accumulatedEventGroup, accumulatedEntryCount, eventGroup, totalEntryCount);
 
         while (totalEntryCount + newEntryCount < maxEntriesPerBatch) {
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, newEntryCount)) {
@@ -359,15 +337,6 @@ bool HandleJournalEntries(const string& configName,
                     continue;
                 }
                 break;
-            }
-
-            // Set firstEntryCursor for error recovery: record the cursor of the first entry in this batch
-            // This is used to seek back to the beginning of the batch if push fails
-            if (firstEntryCursor.empty() && !entry.cursor.empty()) {
-                firstEntryCursor = entry.cursor;
-                if (accumulatedFirstCursor != nullptr) {
-                    *accumulatedFirstCursor = firstEntryCursor;
-                }
             }
 
             CreateLogEventFromJournal(entry, config, *eventGroup);
@@ -390,12 +359,9 @@ bool HandleJournalEntries(const string& configName,
             PushEventGroupToQueue(queueKey,
                                   eventGroup,
                                   totalEntryCount,
-                                  firstEntryCursor,
-                                  journalReader,
                                   configName,
                                   accumulatedEventGroup,
                                   accumulatedEntryCount,
-                                  accumulatedFirstCursor,
                                   pushFailed,
                                   eventGroupSent);
         } else if (noNewData) {
@@ -404,12 +370,9 @@ bool HandleJournalEntries(const string& configName,
                 PushEventGroupToQueue(queueKey,
                                       eventGroup,
                                       totalEntryCount,
-                                      firstEntryCursor,
-                                      journalReader,
                                       configName,
                                       accumulatedEventGroup,
                                       accumulatedEntryCount,
-                                      accumulatedFirstCursor,
                                       pushFailed,
                                       eventGroupSent);
             } else {
@@ -456,7 +419,7 @@ bool HandleJournalEntries(const string& configName,
         if (hasPendingDataOut != nullptr) {
             *hasPendingDataOut = false; // Conservative handling on exception
         }
-        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount);
         return false;
     } catch (...) {
         LOG_ERROR(sLogger,
@@ -465,7 +428,7 @@ bool HandleJournalEntries(const string& configName,
         if (hasPendingDataOut != nullptr) {
             *hasPendingDataOut = false; // Conservative handling on exception
         }
-        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount, accumulatedFirstCursor);
+        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount);
         return false;
     }
 

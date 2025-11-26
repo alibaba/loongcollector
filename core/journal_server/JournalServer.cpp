@@ -293,7 +293,6 @@ void JournalServer::processMonitoredReader(MonitoredReader& monitoredReader,
                          timeoutTrigger,
                          &monitoredReader.accumulatedEventGroup,
                          &monitoredReader.accumulatedEntryCount,
-                         &monitoredReader.accumulatedFirstCursor,
                          &monitoredReader.hasPendingData,
                          &monitoredReader.lastBatchTime);
 }

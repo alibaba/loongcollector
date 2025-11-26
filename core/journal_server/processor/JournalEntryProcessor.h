@@ -39,7 +39,6 @@ using QueueKey = int64_t;
  * @param timeoutTrigger Whether timeout triggers forced sending
  * @param accumulatedEventGroup Input/output parameter for accumulated eventGroup (may be nullptr)
  * @param accumulatedEntryCount Input/output parameter for accumulated entry count (may be nullptr)
- * @param accumulatedFirstCursor Input/output parameter for first entry's cursor in accumulated data (may be nullptr)
  * @param hasPendingDataOut Output parameter indicating if there is pending data (may be nullptr)
  * @param lastBatchTimeOut Input/output parameter for last batch processing time (may be nullptr)
  * @return Whether eventGroup was sent (true=sent, false=accumulated to buffer)
@@ -51,7 +50,6 @@ bool HandleJournalEntries(const std::string& configName,
                           bool timeoutTrigger,
                           std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                           int* accumulatedEntryCount,
-                          std::string* accumulatedFirstCursor,
                           bool* hasPendingDataOut,
                           std::chrono::steady_clock::time_point* lastBatchTimeOut);
 

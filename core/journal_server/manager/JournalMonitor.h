@@ -39,7 +39,6 @@ struct MonitoredReader {
     std::shared_ptr<PipelineEventGroup> accumulatedEventGroup{nullptr};
     std::chrono::steady_clock::time_point lastBatchTime;
     int accumulatedEntryCount{0};
-    std::string accumulatedFirstCursor;
     std::atomic<bool> isClosing{false};
 };
 
@@ -68,14 +67,12 @@ public:
                              bool& savedHasPendingData,
                              std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
                              int& savedAccumulatedEntryCount,
-                             std::string& savedAccumulatedFirstCursor,
                              std::chrono::steady_clock::time_point& savedLastBatchTime);
     void RestoreAccumulatedData(const std::string& configName,
                                 const std::shared_ptr<JournalReader>& reader,
                                 bool savedHasPendingData,
                                 const std::shared_ptr<PipelineEventGroup>& savedAccumulatedEventGroup,
                                 int savedAccumulatedEntryCount,
-                                const std::string& savedAccumulatedFirstCursor,
                                 const std::chrono::steady_clock::time_point& savedLastBatchTime);
     bool GetValidatedCurrentReader(MonitoredReader& monitoredReader,
                                    std::shared_ptr<JournalReader>& currentReaderOut) const;
