@@ -28,6 +28,7 @@
 #include "logger/Logger.h"
 #include "manager/JournalConnection.h"
 #include "manager/JournalMonitor.h"
+#include "monitor/AlarmManager.h"
 #include "processor/JournalEntryProcessor.h"
 #include "reader/JournalReader.h"
 
@@ -68,8 +69,22 @@ void JournalServer::Stop() {
 
     // Set stop flag
     mIsThreadRunning.store(false);
-    // Wait for thread to exit
-    mThreadRes.get();
+
+    // Wait for thread to exit with timeout
+    bool alarmOnce = false;
+    while (mThreadRes.valid()) {
+        std::future_status status = mThreadRes.wait_for(std::chrono::seconds(10));
+        if (status == std::future_status::ready) {
+            LOG_DEBUG(sLogger, ("journal server thread", "stopped successfully"));
+            break;
+        }
+        if (!alarmOnce) {
+            LOG_ERROR(sLogger, ("journal server thread stop", "too slow"));
+            AlarmManager::GetInstance()->SendAlarmError(CONFIG_UPDATE_ALARM,
+                                                        std::string("JournalServer stop too slow"));
+            alarmOnce = true;
+        }
+    }
 
     JournalMonitor::GetInstance()->Cleanup();
 
