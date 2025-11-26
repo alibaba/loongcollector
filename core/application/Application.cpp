@@ -77,6 +77,7 @@ DEFINE_FLAG_INT32(config_scan_interval, "seconds", 10);
 DEFINE_FLAG_INT32(tcmalloc_release_memory_interval, "force release memory held by tcmalloc, seconds", 300);
 DEFINE_FLAG_INT32(exit_flushout_duration, "exit process flushout duration", 20 * 1000);
 DEFINE_FLAG_INT32(queue_check_gc_interval_sec, "30s", 30);
+DEFINE_FLAG_INT32(config_server_lost_connection_timeout, "config server lost connection timeout, seconds", 3600);
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
 DEFINE_FLAG_BOOL(enable_cgroup, "", false);
 #endif
@@ -456,8 +457,8 @@ void Application::Exit() {
 void Application::CheckCriticalCondition(int32_t curTime) {
 #ifdef __ENTERPRISE__
     int32_t lastGetConfigTime = EnterpriseConfigProvider::GetInstance()->GetLastConfigGetTime();
-    // force to exit if config update thread is block more than 1 hour
-    if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > 3600) {
+    // force to exit if config update thread is block more than config_server_lost_connection_timeout seconds
+    if (lastGetConfigTime > 0 && curTime - lastGetConfigTime > INT32_FLAG(config_server_lost_connection_timeout)) {
         LOG_ERROR(sLogger, ("last config get time is too old", lastGetConfigTime)("prepare force exit", ""));
         AlarmManager::GetInstance()->SendAlarmCritical(
             LOGTAIL_CRASH_ALARM, "last config get time is too old: " + ToString(lastGetConfigTime) + " force exit");

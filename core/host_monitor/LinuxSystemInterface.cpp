@@ -130,6 +130,11 @@ bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) 
             continue;
         }
 
+        if (tcpLines.size() < 2) {
+            // empty file
+            continue;
+        }
+
         // Skip the header line
         for (size_t i = 1; i < tcpLines.size(); ++i) {
             const auto& line = tcpLines[i];
@@ -139,6 +144,7 @@ bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) 
             FastFieldParser parser(line);
 
             if (parser.GetFieldCount() < 4) {
+                LOG_WARNING(sLogger, ("Failed to parse TCP state line", line));
                 continue;
             }
 

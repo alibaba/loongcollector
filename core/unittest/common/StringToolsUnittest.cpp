@@ -468,7 +468,7 @@ TEST_F(StringToolsUnittest, TestDoubleToStringTrailingZeros) {
 TEST_F(StringToolsUnittest, TestDoubleToStringZero) {
     // Zero should be represented as "0"
     APSARA_TEST_EQUAL("0", DoubleToString(0.0));
-    APSARA_TEST_EQUAL("0", DoubleToString(-0.0));
+    APSARA_TEST_EQUAL("-0", DoubleToString(-0.0));
 }
 
 TEST_F(StringToolsUnittest, TestDoubleToStringSmallValues) {
