@@ -206,10 +206,8 @@ public:
     }
 
     /*---------------  Read Single Entry  ----------------*/
-    bool GetEntry(JournalEntry& entry) {
-        if (!IsOpen()) {
-            return false;
-        }
+    // Internal helper function to read entry without SIGBUS protection
+    bool GetEntryInternal(JournalEntry& entry) {
         entry = {};
 
         char* cursorPtr = nullptr;
@@ -284,6 +282,48 @@ public:
             fieldCount++;
         }
         return true;
+    }
+
+    JournalReadStatus GetEntryWithStatus(JournalEntry& entry) {
+        if (!IsOpen()) {
+            return JournalReadStatus::kError;
+        }
+
+#ifdef __linux__
+        // Set up SIGBUS handler to catch bus errors when reading truncated journal files
+        struct sigaction oldAction = {};
+        struct sigaction newAction = {};
+        newAction.sa_handler = SigbusHandler;
+        sigemptyset(&newAction.sa_mask);
+        newAction.sa_flags = 0;
+
+        if (sigaction(SIGBUS, &newAction, &oldAction) != 0) {
+            // Failed to set signal handler, proceed without protection
+            return GetEntryInternal(entry) ? JournalReadStatus::kOk : JournalReadStatus::kError;
+        }
+
+        // Use sigsetjmp to set up jump point for SIGBUS handler
+        if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
+            // SIGBUS occurred: journal file was truncated/rotated, reader state is corrupted
+            sigaction(SIGBUS, &oldAction, nullptr);
+            return JournalReadStatus::kSigbusError;
+        }
+
+        bool success = GetEntryInternal(entry);
+
+        // Restore old signal handler
+        sigaction(SIGBUS, &oldAction, nullptr);
+
+        return success ? JournalReadStatus::kOk : JournalReadStatus::kError;
+#else
+        return GetEntryInternal(entry) ? JournalReadStatus::kOk : JournalReadStatus::kError;
+#endif
+    }
+
+    bool GetEntry(JournalEntry& entry) {
+        JournalReadStatus status = GetEntryWithStatus(entry);
+        // Convert status to bool for backward compatibility
+        return status == JournalReadStatus::kOk;
     }
 
     std::string GetCursor() {
@@ -602,6 +642,10 @@ JournalReadStatus JournalReader::NextWithStatus() {
 
 bool JournalReader::GetEntry(JournalEntry& entry) {
     return mImpl->GetEntry(entry);
+}
+
+JournalReadStatus JournalReader::GetEntryWithStatus(JournalEntry& entry) {
+    return mImpl->GetEntryWithStatus(entry);
 }
 
 std::string JournalReader::GetCursor() {

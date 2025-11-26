@@ -67,6 +67,7 @@ public:
     JournalReadStatus NextWithStatus();
 
     bool GetEntry(JournalEntry& entry);
+    JournalReadStatus GetEntryWithStatus(JournalEntry& entry);
     std::string GetCursor();
 
     bool AddMatch(const std::string& field, const std::string& value);
