@@ -15,6 +15,7 @@
  */
 
 #include <cstdint>
+
 #include <limits>
 
 #include "common/StringTools.h"
@@ -456,7 +457,7 @@ TEST_F(StringToolsUnittest, TestDoubleToStringTrailingZeros) {
     APSARA_TEST_EQUAL("1.1", DoubleToString(1.1));
     APSARA_TEST_EQUAL("1.01", DoubleToString(1.01));
     APSARA_TEST_EQUAL("1.001", DoubleToString(1.001));
-    
+
     // std::to_string produces up to 6 decimal places by default
     // Values that would have trailing zeros after conversion
     APSARA_TEST_EQUAL("1.2", DoubleToString(1.2));
@@ -478,7 +479,7 @@ TEST_F(StringToolsUnittest, TestDoubleToStringSmallValues) {
     APSARA_TEST_EQUAL("0.001", DoubleToString(0.001));
     APSARA_TEST_EQUAL("0.01", DoubleToString(0.01));
     APSARA_TEST_EQUAL("0.1", DoubleToString(0.1));
-    
+
     // Very small value that goes to zero with std::to_string
     std::string result = DoubleToString(0.0000001);
     // std::to_string with 6 decimal places will show this as "0.000000"
@@ -491,7 +492,7 @@ TEST_F(StringToolsUnittest, TestDoubleToStringLargeValues) {
     APSARA_TEST_EQUAL("10000", DoubleToString(10000.0));
     APSARA_TEST_EQUAL("100000", DoubleToString(100000.0));
     APSARA_TEST_EQUAL("1000000", DoubleToString(1000000.0));
-    
+
     // Very large values may use scientific notation
     std::string result = DoubleToString(1.23e10);
     // std::to_string may produce scientific notation for very large numbers
@@ -503,12 +504,12 @@ TEST_F(StringToolsUnittest, TestDoubleToStringSpecialValues) {
     std::string nanResult = DoubleToString(std::numeric_limits<double>::quiet_NaN());
     // std::to_string for NaN produces "nan" or "-nan"
     APSARA_TEST_TRUE(nanResult.find("nan") != std::string::npos || nanResult.find("NaN") != std::string::npos);
-    
+
     // Infinity
     std::string infResult = DoubleToString(std::numeric_limits<double>::infinity());
     // std::to_string for infinity produces "inf"
     APSARA_TEST_TRUE(infResult.find("inf") != std::string::npos || infResult.find("Inf") != std::string::npos);
-    
+
     // Negative Infinity
     std::string negInfResult = DoubleToString(-std::numeric_limits<double>::infinity());
     // std::to_string for -infinity produces "-inf"
@@ -521,7 +522,7 @@ TEST_F(StringToolsUnittest, TestDoubleToStringPrecision) {
     // Value with more than 6 decimal places will be rounded
     APSARA_TEST_EQUAL("1.123457", DoubleToString(1.1234567890));
     APSARA_TEST_EQUAL("1.234568", DoubleToString(1.2345678901));
-    
+
     // Values with exactly 6 decimal places
     APSARA_TEST_EQUAL("1.123456", DoubleToString(1.123456));
     APSARA_TEST_EQUAL("1.000001", DoubleToString(1.000001));
@@ -541,12 +542,12 @@ TEST_F(StringToolsUnittest, TestDoubleToStringEdgeCases) {
     double minNormal = std::numeric_limits<double>::min();
     std::string minResult = DoubleToString(minNormal);
     APSARA_TEST_TRUE(!minResult.empty());
-    
+
     // Maximum value
     double maxVal = std::numeric_limits<double>::max();
     std::string maxResult = DoubleToString(maxVal);
     APSARA_TEST_TRUE(!maxResult.empty());
-    
+
     // Epsilon (smallest difference from 1.0)
     double eps = std::numeric_limits<double>::epsilon();
     std::string epsResult = DoubleToString(1.0 + eps);
