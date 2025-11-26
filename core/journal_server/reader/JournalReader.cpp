@@ -163,7 +163,7 @@ public:
 
         // Use sigsetjmp to set up jump point for SIGBUS handler
         if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
-            sigaction(SIGBUS, &oldAction, nullptr);// Restore old signal handler
+            sigaction(SIGBUS, &oldAction, nullptr);
             return JournalReadStatus::kSigbusError;
         }
 

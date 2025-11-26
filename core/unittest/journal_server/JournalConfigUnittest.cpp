@@ -44,6 +44,14 @@ public:
     void TestValidateAndFixConfigEmptyStringArrays();
     void TestValidateAndFixConfigInvalidJournalPaths();
     void TestIsValidEdgeCases();
+    void TestParseFromJsonBasic();
+    void TestParseFromJsonWithArrays();
+    void TestParseFromJsonDefaults();
+    void TestParseFromJsonWithContext();
+    void TestParseFromJsonInvalidTypes();
+    void TestParseFromJsonEmptyArrays();
+    void TestParseFromJsonMixedArrayTypes();
+    void TestParseFromJsonBoundaryValues();
 };
 
 void JournalConfigUnittest::TestDefaultValues() {
@@ -281,6 +289,192 @@ void JournalConfigUnittest::TestIsValidEdgeCases() {
     APSARA_TEST_TRUE(config.IsValid());
 }
 
+// ==================== 新增的ParseFromJson测试 ====================
+
+void JournalConfigUnittest::TestParseFromJsonBasic() {
+    // 测试基本的JSON解析
+    Json::Value config;
+    config["SeekPosition"] = "head";
+    config["CursorSeekFallback"] = "tail";
+    config["Kernel"] = false;
+    config["ParsePriority"] = true;
+    config["ParseSyslogFacility"] = true;
+    config["UseJournalEventTime"] = false;
+    config["ResetIntervalSecond"] = 7200;
+    config["MaxEntriesPerBatch"] = 500;
+    config["BatchTimeoutMs"] = 2000;
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证解析结果
+    APSARA_TEST_EQUAL(journalConfig.mSeekPosition, "head");
+    APSARA_TEST_EQUAL(journalConfig.mCursorSeekFallback, "tail");
+    APSARA_TEST_FALSE(journalConfig.mKernel);
+    APSARA_TEST_TRUE(journalConfig.mParsePriority);
+    APSARA_TEST_TRUE(journalConfig.mParseSyslogFacility);
+    APSARA_TEST_FALSE(journalConfig.mUseJournalEventTime);
+    APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 7200);
+    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 500);
+    APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 2000);
+}
+
+void JournalConfigUnittest::TestParseFromJsonWithArrays() {
+    // 测试带数组的JSON解析
+    Json::Value config;
+    config["SeekPosition"] = "tail";
+
+    config["Units"] = Json::Value(Json::arrayValue);
+    config["Units"].append("nginx.service");
+    config["Units"].append("apache.service");
+
+    config["Identifiers"] = Json::Value(Json::arrayValue);
+    config["Identifiers"].append("nginx");
+    config["Identifiers"].append("apache");
+
+    config["JournalPaths"] = Json::Value(Json::arrayValue);
+    config["JournalPaths"].append("/var/log/journal");
+    config["JournalPaths"].append("/run/log/journal");
+
+    config["MatchPatterns"] = Json::Value(Json::arrayValue);
+    config["MatchPatterns"].append("MESSAGE=test");
+    config["MatchPatterns"].append("PRIORITY=6");
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证解析结果
+    APSARA_TEST_EQUAL(journalConfig.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(journalConfig.mUnits[0], "nginx.service");
+    APSARA_TEST_EQUAL(journalConfig.mUnits[1], "apache.service");
+
+    APSARA_TEST_EQUAL(journalConfig.mIdentifiers.size(), 2);
+    APSARA_TEST_EQUAL(journalConfig.mIdentifiers[0], "nginx");
+    APSARA_TEST_EQUAL(journalConfig.mIdentifiers[1], "apache");
+
+    APSARA_TEST_EQUAL(journalConfig.mJournalPaths.size(), 2);
+    APSARA_TEST_EQUAL(journalConfig.mJournalPaths[0], "/var/log/journal");
+    APSARA_TEST_EQUAL(journalConfig.mJournalPaths[1], "/run/log/journal");
+
+    APSARA_TEST_EQUAL(journalConfig.mMatchPatterns.size(), 2);
+    APSARA_TEST_EQUAL(journalConfig.mMatchPatterns[0], "MESSAGE=test");
+    APSARA_TEST_EQUAL(journalConfig.mMatchPatterns[1], "PRIORITY=6");
+}
+
+void JournalConfigUnittest::TestParseFromJsonDefaults() {
+    // 测试默认值处理
+    Json::Value config;
+    // 不设置任何值，使用默认值
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证默认值（从结构体定义中的默认值）
+    // 注意：字符串字段在结构体中默认为空，但 ParseFromJson 会设置默认值
+    // 由于 GetOptionalStringParam 在字段不存在时可能保持原值，我们需要验证实际行为
+    // 数值和布尔字段有明确的默认值
+    APSARA_TEST_TRUE(journalConfig.mKernel); // 默认 true
+    APSARA_TEST_FALSE(journalConfig.mParsePriority); // 默认 false
+    APSARA_TEST_FALSE(journalConfig.mParseSyslogFacility); // 默认 false
+    APSARA_TEST_TRUE(journalConfig.mUseJournalEventTime); // 默认 true（结构体定义）
+    APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 3600); // 默认 3600
+    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1000); // 默认 1000
+    APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 1000); // 默认 1000
+
+    // 验证数组字段为空
+    APSARA_TEST_TRUE(journalConfig.mUnits.empty());
+    APSARA_TEST_TRUE(journalConfig.mIdentifiers.empty());
+    APSARA_TEST_TRUE(journalConfig.mJournalPaths.empty());
+    APSARA_TEST_TRUE(journalConfig.mMatchPatterns.empty());
+}
+
+void JournalConfigUnittest::TestParseFromJsonWithContext() {
+    // 测试带context的JSON解析
+    Json::Value config;
+    config["SeekPosition"] = "head";
+
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config_with_context");
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, ctx.get());
+
+    // 验证context设置
+    APSARA_TEST_TRUE(journalConfig.mCtx != nullptr);
+    APSARA_TEST_EQUAL(journalConfig.mCtx->GetConfigName(), "test_config_with_context");
+}
+
+void JournalConfigUnittest::TestParseFromJsonInvalidTypes() {
+    // 测试无效类型处理
+    Json::Value config;
+    config["SeekPosition"] = 123; // 应该是字符串
+    config["MaxEntriesPerBatch"] = "not_a_number"; // 应该是数字
+    config["Kernel"] = "not_a_bool"; // 应该是bool
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 由于类型不匹配，应该使用默认值
+    APSARA_TEST_EQUAL(journalConfig.mSeekPosition, "tail"); // 默认值
+    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1000); // 默认值
+    APSARA_TEST_TRUE(journalConfig.mKernel); // 默认值
+}
+
+void JournalConfigUnittest::TestParseFromJsonEmptyArrays() {
+    // 测试空数组处理
+    Json::Value config;
+    config["Units"] = Json::Value(Json::arrayValue); // 空数组
+    config["Identifiers"] = Json::Value(Json::arrayValue);
+    config["JournalPaths"] = Json::Value(Json::arrayValue);
+    config["MatchPatterns"] = Json::Value(Json::arrayValue);
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证空数组
+    APSARA_TEST_TRUE(journalConfig.mUnits.empty());
+    APSARA_TEST_TRUE(journalConfig.mIdentifiers.empty());
+    APSARA_TEST_TRUE(journalConfig.mJournalPaths.empty());
+    APSARA_TEST_TRUE(journalConfig.mMatchPatterns.empty());
+}
+
+void JournalConfigUnittest::TestParseFromJsonMixedArrayTypes() {
+    // 测试数组中混合类型
+    Json::Value config;
+    config["Units"] = Json::Value(Json::arrayValue);
+    config["Units"].append("valid.service");
+    config["Units"].append(123); // 非字符串，应该被忽略
+    config["Units"].append("another.service");
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证只有字符串被解析
+    APSARA_TEST_EQUAL(journalConfig.mUnits.size(), 2);
+    APSARA_TEST_EQUAL(journalConfig.mUnits[0], "valid.service");
+    APSARA_TEST_EQUAL(journalConfig.mUnits[1], "another.service");
+}
+
+void JournalConfigUnittest::TestParseFromJsonBoundaryValues() {
+    // 测试边界值
+    Json::Value config;
+    config["ResetIntervalSecond"] = 0; // 最小值
+    config["MaxEntriesPerBatch"] = 1; // 最小值
+    config["BatchTimeoutMs"] = 1; // 最小值
+
+    JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
+
+    // 验证边界值被接受（虽然ValidateAndFixConfig会修正它们）
+    APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 0);
+    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1);
+    APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 1);
+
+    // 测试最大值
+    Json::Value config2;
+    config2["ResetIntervalSecond"] = 999999;
+    config2["MaxEntriesPerBatch"] = 999999;
+    config2["BatchTimeoutMs"] = 999999;
+
+    JournalConfig journalConfig2 = JournalConfig::ParseFromJson(config2, nullptr);
+
+    APSARA_TEST_EQUAL(journalConfig2.mResetIntervalSecond, 999999);
+    APSARA_TEST_EQUAL(journalConfig2.mMaxEntriesPerBatch, 999999);
+    APSARA_TEST_EQUAL(journalConfig2.mBatchTimeoutMs, 999999);
+}
+
 // 注册测试用例
 TEST_F(JournalConfigUnittest, TestDefaultValues) {
     TestDefaultValues();
@@ -328,6 +522,39 @@ TEST_F(JournalConfigUnittest, TestValidateAndFixConfigInvalidJournalPaths) {
 
 TEST_F(JournalConfigUnittest, TestIsValidEdgeCases) {
     TestIsValidEdgeCases();
+}
+
+// 注册新增的ParseFromJson测试用例
+TEST_F(JournalConfigUnittest, TestParseFromJsonBasic) {
+    TestParseFromJsonBasic();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonWithArrays) {
+    TestParseFromJsonWithArrays();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonDefaults) {
+    TestParseFromJsonDefaults();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonWithContext) {
+    TestParseFromJsonWithContext();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonInvalidTypes) {
+    TestParseFromJsonInvalidTypes();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonEmptyArrays) {
+    TestParseFromJsonEmptyArrays();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonMixedArrayTypes) {
+    TestParseFromJsonMixedArrayTypes();
+}
+
+TEST_F(JournalConfigUnittest, TestParseFromJsonBoundaryValues) {
+    TestParseFromJsonBoundaryValues();
 }
 
 } // namespace logtail

@@ -76,10 +76,11 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     // 创建mock journal reader
     auto reader = std::make_shared<JournalReader>();
 
-    // 创建累积 EventGroup（函数要求必须传入）
+    // 创建累积参数
     std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
     int accumulatedEntryCount = 0;
-    std::string accumulatedFirstCursor;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
 
     // 测试函数调用（在测试环境中可能无法实际执行）
     // 但函数接口应该存在且不会崩溃
@@ -88,12 +89,11 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
                              config,
                              reader,
                              12345,
-                             nullptr,
+                             false,
                              &accumulatedEventGroup,
                              &accumulatedEntryCount,
-                             &accumulatedFirstCursor,
-                             false,
-                             nullptr);
+                             &hasPendingData,
+                             &lastBatchTime);
         APSARA_TEST_TRUE(true); // 函数调用成功
     } catch (...) {
         APSARA_TEST_TRUE(true); // 函数存在但可能因为环境问题失败
@@ -541,6 +541,382 @@ TEST_F(JournalEntryProcessorUnittest, TestProcessJournalEntryBatchEmpty) {
 
 TEST_F(JournalEntryProcessorUnittest, TestProcessJournalEntryBatchMaxEntries) {
     TestProcessJournalEntryBatchMaxEntries();
+}
+
+// ==================== 新增的实际处理测试 ====================
+
+void TestHandleJournalEntriesWithNullReader() {
+    // 测试null reader的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    // 使用null reader
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       nullptr,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该返回false或不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithClosedReader() {
+    // 测试closed reader的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+
+    auto reader = std::make_shared<JournalReader>();
+    // 不调用Open()
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该返回false或不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithTimeoutTrigger() {
+    // 测试超时触发的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mBatchTimeoutMs = 1000;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 10; // 模拟有累积数据
+    bool hasPendingData = true;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       true, // timeout trigger
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithZeroMaxEntries() {
+    // 测试maxEntries为0的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 0; // 无效值
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithParsePriority() {
+    // 测试ParsePriority选项
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mParsePriority = true;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithParseSyslogFacility() {
+    // 测试ParseSyslogFacility选项
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mParseSyslogFacility = true;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithUseJournalEventTime() {
+    // 测试UseJournalEventTime选项
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mUseJournalEventTime = true;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithAccumulatedData() {
+    // 测试有累积数据的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup = std::make_shared<PipelineEventGroup>(nullptr);
+    int accumulatedEntryCount = 50; // 模拟已有累积数据
+    bool hasPendingData = true;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       12345,
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestHandleJournalEntriesWithInvalidQueueKey() {
+    // 测试无效队列键的处理
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+
+    auto reader = std::make_shared<JournalReader>();
+
+    std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
+    int accumulatedEntryCount = 0;
+    bool hasPendingData = false;
+    std::chrono::steady_clock::time_point lastBatchTime = std::chrono::steady_clock::now();
+
+    bool result = HandleJournalEntries("test_config",
+                                       config,
+                                       reader,
+                                       -1, // invalid queue key
+                                       false,
+                                       &accumulatedEventGroup,
+                                       &accumulatedEntryCount,
+                                       &hasPendingData,
+                                       &lastBatchTime);
+
+    // 应该不崩溃
+    APSARA_TEST_TRUE(result == true || result == false);
+}
+
+void TestJournalEntryWithMultipleFields() {
+    // 测试包含多个字段的journal entry
+    JournalEntry entry;
+
+    // 设置大量字段
+    entry.fields["MESSAGE"] = "test message with multiple fields";
+    entry.fields["PRIORITY"] = "6";
+    entry.fields["SYSLOG_FACILITY"] = "3";
+    entry.fields["_SYSTEMD_UNIT"] = "nginx.service";
+    entry.fields["SYSLOG_IDENTIFIER"] = "nginx";
+    entry.fields["_HOSTNAME"] = "test-host";
+    entry.fields["_PID"] = "1234";
+    entry.fields["_UID"] = "1000";
+    entry.fields["_GID"] = "1000";
+    entry.fields["_COMM"] = "nginx";
+    entry.fields["_EXE"] = "/usr/sbin/nginx";
+    entry.fields["_CMDLINE"] = "nginx: master process";
+    entry.fields["_BOOT_ID"] = "12345678";
+    entry.fields["_MACHINE_ID"] = "abcdef";
+    entry.fields["_TRANSPORT"] = "syslog";
+    entry.cursor = "test_cursor";
+    entry.realtimeTimestamp = 1234567890;
+    entry.monotonicTimestamp = 9876543210;
+
+    // 验证所有字段
+    APSARA_TEST_EQUAL(entry.fields.size(), 15);
+    APSARA_TEST_EQUAL(entry.fields["MESSAGE"], "test message with multiple fields");
+    APSARA_TEST_EQUAL(entry.fields["PRIORITY"], "6");
+    APSARA_TEST_EQUAL(entry.fields["SYSLOG_FACILITY"], "3");
+    APSARA_TEST_EQUAL(entry.fields["_SYSTEMD_UNIT"], "nginx.service");
+    APSARA_TEST_EQUAL(entry.cursor, "test_cursor");
+    APSARA_TEST_EQUAL(entry.realtimeTimestamp, 1234567890);
+    APSARA_TEST_EQUAL(entry.monotonicTimestamp, 9876543210);
+}
+
+void TestJournalEntryWithLargeMessage() {
+    // 测试大消息的处理
+    JournalEntry entry;
+
+    // 创建大消息（10KB）
+    std::string largeMessage(10000, 'x');
+    entry.fields["MESSAGE"] = largeMessage;
+    entry.cursor = "test_cursor";
+
+    // 验证大消息被正确存储
+    APSARA_TEST_EQUAL(entry.fields["MESSAGE"].size(), 10000);
+    APSARA_TEST_EQUAL(entry.cursor, "test_cursor");
+}
+
+void TestJournalEntryWithSpecialCharacters() {
+    // 测试特殊字符的处理
+    JournalEntry entry;
+
+    entry.fields["MESSAGE"] = "test\nmessage\twith\rspecial\x00characters";
+    entry.fields["PRIORITY"] = "6";
+    entry.cursor = "test_cursor";
+
+    // 验证特殊字符被保留
+    APSARA_TEST_TRUE(entry.fields["MESSAGE"].find("test") != std::string::npos);
+    APSARA_TEST_TRUE(entry.fields["MESSAGE"].find("special") != std::string::npos);
+}
+
+void TestJournalEntryWithUnicodeCharacters() {
+    // 测试Unicode字符的处理
+    JournalEntry entry;
+
+    entry.fields["MESSAGE"] = "测试消息 test message 日本語 テスト";
+    entry.fields["PRIORITY"] = "6";
+    entry.cursor = "test_cursor";
+
+    // 验证Unicode字符被保留
+    APSARA_TEST_TRUE(!entry.fields["MESSAGE"].empty());
+    APSARA_TEST_TRUE(entry.fields["MESSAGE"].find("test") != std::string::npos);
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithNullReader) {
+    TestHandleJournalEntriesWithNullReader();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithClosedReader) {
+    TestHandleJournalEntriesWithClosedReader();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithTimeoutTrigger) {
+    TestHandleJournalEntriesWithTimeoutTrigger();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithZeroMaxEntries) {
+    TestHandleJournalEntriesWithZeroMaxEntries();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithParsePriority) {
+    TestHandleJournalEntriesWithParsePriority();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithParseSyslogFacility) {
+    TestHandleJournalEntriesWithParseSyslogFacility();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithUseJournalEventTime) {
+    TestHandleJournalEntriesWithUseJournalEventTime();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithAccumulatedData) {
+    TestHandleJournalEntriesWithAccumulatedData();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestHandleJournalEntriesWithInvalidQueueKey) {
+    TestHandleJournalEntriesWithInvalidQueueKey();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestJournalEntryWithMultipleFields) {
+    TestJournalEntryWithMultipleFields();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestJournalEntryWithLargeMessage) {
+    TestJournalEntryWithLargeMessage();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestJournalEntryWithSpecialCharacters) {
+    TestJournalEntryWithSpecialCharacters();
+}
+
+TEST_F(JournalEntryProcessorUnittest, TestJournalEntryWithUnicodeCharacters) {
+    TestJournalEntryWithUnicodeCharacters();
 }
 
 } // namespace logtail

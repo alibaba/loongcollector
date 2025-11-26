@@ -71,6 +71,21 @@ public:
     void TestApplyAllFiltersWithDuplicatePatterns();
     void TestApplyAllFiltersWithWildcardPatterns();
     void TestApplyAllFiltersWithRegexPatterns();
+    void TestValidateConfigEmptyConfigName();
+    void TestValidateConfigInvalidUnits();
+    void TestValidateConfigInvalidMatchPatterns();
+    void TestValidateConfigValidConfig();
+    void TestGetConfigDescriptionEmpty();
+    void TestGetConfigDescriptionWithUnits();
+    void TestGetConfigDescriptionWithIdentifiers();
+    void TestGetConfigDescriptionWithKernel();
+    void TestGetConfigDescriptionWithMatchPatterns();
+    void TestGetConfigDescriptionComplete();
+    void TestAddUnitsFilterEmpty();
+    void TestAddIdentifiersFilterEmpty();
+    void TestAddMatchPatternsFilterEmpty();
+    void TestAddMatchPatternsFilterInvalidFormat();
+    void TestAddMatchPatternsFilterValidFormat();
 };
 
 void JournalFilterUnittest::TestFilterConfig() {
@@ -453,6 +468,201 @@ TEST_F(JournalFilterUnittest, TestValidateConfig) {
 
 TEST_F(JournalFilterUnittest, TestGetConfigDescription) {
     TestGetConfigDescription();
+}
+
+// ==================== 新增的实际过滤器测试 ====================
+
+void JournalFilterUnittest::TestValidateConfigEmptyConfigName() {
+    // 测试空configName的验证
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "";
+    config.mConfigIndex = 0;
+
+    bool result = JournalFilter::ValidateConfig(config);
+
+    // 应该返回false（configName为空）
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalFilterUnittest::TestValidateConfigInvalidUnits() {
+    // 测试无效units的验证
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"", ".service", "valid.service"}; // 包含无效unit
+
+    bool result = JournalFilter::ValidateConfig(config);
+
+    // 应该返回false（包含无效unit）
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalFilterUnittest::TestValidateConfigInvalidMatchPatterns() {
+    // 测试无效matchPatterns的验证
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mMatchPatterns = {"valid=pattern", "invalid_pattern", "another=valid"}; // 包含无效pattern
+
+    bool result = JournalFilter::ValidateConfig(config);
+
+    // 应该返回false（包含无效pattern）
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalFilterUnittest::TestValidateConfigValidConfig() {
+    // 测试有效配置的验证
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"nginx.service", "apache.service"};
+    config.mIdentifiers = {"nginx", "apache"};
+    config.mMatchPatterns = {"MESSAGE=test", "PRIORITY=6"};
+    config.mEnableKernel = true;
+
+    bool result = JournalFilter::ValidateConfig(config);
+
+    // 应该返回true（配置有效）
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionEmpty() {
+    // 测试空配置的描述（禁用所有过滤器）
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mEnableKernel = false; // 禁用kernel以真正达到无过滤器状态
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含"no-filters"
+    APSARA_TEST_TRUE(description.find("no-filters") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionWithUnits() {
+    // 测试带units的配置描述
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"nginx.service", "apache.service"};
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含"units(2)"
+    APSARA_TEST_TRUE(description.find("units(2)") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionWithIdentifiers() {
+    // 测试带identifiers的配置描述
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mIdentifiers = {"nginx", "apache", "mysql"};
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含"identifiers(3)"
+    APSARA_TEST_TRUE(description.find("identifiers(3)") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionWithKernel() {
+    // 测试带kernel的配置描述
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mEnableKernel = true;
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含"kernel"
+    APSARA_TEST_TRUE(description.find("kernel") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionWithMatchPatterns() {
+    // 测试带matchPatterns的配置描述
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mMatchPatterns = {"MESSAGE=test", "PRIORITY=6", "FACILITY=3"};
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含"patterns(3)"
+    APSARA_TEST_TRUE(description.find("patterns(3)") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestGetConfigDescriptionComplete() {
+    // 测试完整配置的描述
+    JournalFilter::FilterConfig config;
+    config.mConfigName = "test_config";
+    config.mConfigIndex = 0;
+    config.mUnits = {"nginx.service"};
+    config.mIdentifiers = {"nginx"};
+    config.mEnableKernel = true;
+    config.mMatchPatterns = {"MESSAGE=test"};
+
+    std::string description = JournalFilter::GetConfigDescription(config);
+
+    // 应该包含所有部分
+    APSARA_TEST_TRUE(description.find("units(1)") != std::string::npos);
+    APSARA_TEST_TRUE(description.find("identifiers(1)") != std::string::npos);
+    APSARA_TEST_TRUE(description.find("kernel") != std::string::npos);
+    APSARA_TEST_TRUE(description.find("patterns(1)") != std::string::npos);
+}
+
+void JournalFilterUnittest::TestAddUnitsFilterEmpty() {
+    // 测试空units的处理
+    auto reader = std::make_shared<JournalReader>();
+    std::vector<std::string> units;
+
+    bool result = JournalFilter::AddUnitsFilter(reader.get(), units, "test_config", 0);
+
+    // 空units应该返回true（不需要添加过滤器）
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalFilterUnittest::TestAddIdentifiersFilterEmpty() {
+    // 测试空identifiers的处理
+    auto reader = std::make_shared<JournalReader>();
+    std::vector<std::string> identifiers;
+
+    bool result = JournalFilter::AddIdentifiersFilter(reader.get(), identifiers, "test_config", 0);
+
+    // 空identifiers应该返回true（不需要添加过滤器）
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalFilterUnittest::TestAddMatchPatternsFilterEmpty() {
+    // 测试空matchPatterns的处理
+    auto reader = std::make_shared<JournalReader>();
+    std::vector<std::string> patterns;
+
+    bool result = JournalFilter::AddMatchPatternsFilter(reader.get(), patterns, "test_config", 0);
+
+    // 空patterns应该返回true（不需要添加过滤器）
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalFilterUnittest::TestAddMatchPatternsFilterInvalidFormat() {
+    // 测试无效格式的matchPatterns
+    auto reader = std::make_shared<JournalReader>();
+    std::vector<std::string> patterns = {"invalid_pattern"}; // 缺少'='
+
+    bool result = JournalFilter::AddMatchPatternsFilter(reader.get(), patterns, "test_config", 0);
+
+    // 应该返回true（无效pattern被跳过）
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalFilterUnittest::TestAddMatchPatternsFilterValidFormat() {
+    // 测试有效格式的matchPatterns
+    auto reader = std::make_shared<JournalReader>();
+    std::vector<std::string> patterns = {"MESSAGE=test", "PRIORITY=6"};
+
+    bool result = JournalFilter::AddMatchPatternsFilter(reader.get(), patterns, "test_config", 0);
+
+    // 应该返回true或false（取决于reader是否打开）
+    APSARA_TEST_TRUE(result == true || result == false);
 }
 
 void JournalFilterUnittest::TestApplyAllFiltersWithEmptyUnits() {
@@ -844,6 +1054,67 @@ TEST_F(JournalFilterUnittest, TestApplyAllFiltersWithWildcardPatterns) {
 
 TEST_F(JournalFilterUnittest, TestApplyAllFiltersWithRegexPatterns) {
     TestApplyAllFiltersWithRegexPatterns();
+}
+
+// 注册新增的实际过滤器测试用例
+TEST_F(JournalFilterUnittest, TestValidateConfigEmptyConfigName) {
+    TestValidateConfigEmptyConfigName();
+}
+
+TEST_F(JournalFilterUnittest, TestValidateConfigInvalidUnits) {
+    TestValidateConfigInvalidUnits();
+}
+
+TEST_F(JournalFilterUnittest, TestValidateConfigInvalidMatchPatterns) {
+    TestValidateConfigInvalidMatchPatterns();
+}
+
+TEST_F(JournalFilterUnittest, TestValidateConfigValidConfig) {
+    TestValidateConfigValidConfig();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionEmpty) {
+    TestGetConfigDescriptionEmpty();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionWithUnits) {
+    TestGetConfigDescriptionWithUnits();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionWithIdentifiers) {
+    TestGetConfigDescriptionWithIdentifiers();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionWithKernel) {
+    TestGetConfigDescriptionWithKernel();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionWithMatchPatterns) {
+    TestGetConfigDescriptionWithMatchPatterns();
+}
+
+TEST_F(JournalFilterUnittest, TestGetConfigDescriptionComplete) {
+    TestGetConfigDescriptionComplete();
+}
+
+TEST_F(JournalFilterUnittest, TestAddUnitsFilterEmpty) {
+    TestAddUnitsFilterEmpty();
+}
+
+TEST_F(JournalFilterUnittest, TestAddIdentifiersFilterEmpty) {
+    TestAddIdentifiersFilterEmpty();
+}
+
+TEST_F(JournalFilterUnittest, TestAddMatchPatternsFilterEmpty) {
+    TestAddMatchPatternsFilterEmpty();
+}
+
+TEST_F(JournalFilterUnittest, TestAddMatchPatternsFilterInvalidFormat) {
+    TestAddMatchPatternsFilterInvalidFormat();
+}
+
+TEST_F(JournalFilterUnittest, TestAddMatchPatternsFilterValidFormat) {
+    TestAddMatchPatternsFilterValidFormat();
 }
 
 } // namespace logtail

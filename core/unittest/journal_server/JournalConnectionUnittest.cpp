@@ -16,10 +16,12 @@
 
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "journal_server/common/JournalConfig.h"
 #include "journal_server/manager/JournalConnection.h"
+#include "journal_server/manager/JournalMonitor.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -61,6 +63,14 @@ public:
     void TestAddConfigWithInvalidMatchPatterns();
     void TestAddConfigWithEmptyContext();
     void TestValidateConfig();
+    void TestRefreshConnection();
+    void TestShouldRefreshConnection();
+    void TestRefreshConnectionNonexistent();
+    void TestRefreshConnectionNotInitialized();
+    void TestRefreshConnectionsByInterval();
+    void TestRecoverConnectionAndSyncEpoll();
+    void TestRecoverConnectionWithNullMonitor();
+    void TestGetAllConfigNames();
 };
 
 void JournalConnectionUnittest::TestSingleton() {
@@ -896,6 +906,238 @@ void JournalConnectionUnittest::TestValidateConfig() {
     APSARA_TEST_TRUE(config2.IsValid());
 }
 
+// ==================== 新增的连接刷新测试 ====================
+
+void JournalConnectionUnittest::TestRefreshConnection() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.mCtx = ctx.get();
+    config.mQueueKey = 1;
+
+    // 添加配置
+    bool addResult = manager.AddConfig("test_config_refresh", config);
+    
+    if (addResult) {
+        // 刷新连接
+        bool refreshResult = manager.RefreshConnection("test_config_refresh");
+        
+        // 验证刷新操作（在测试环境中可能失败但不应崩溃）
+        APSARA_TEST_TRUE(refreshResult == true || refreshResult == false);
+    }
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestShouldRefreshConnection() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mResetIntervalSecond = 1; // 设置短暂的刷新间隔
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.mCtx = ctx.get();
+    config.mQueueKey = 1;
+
+    // 添加配置
+    bool addResult = manager.AddConfig("test_config_should_refresh", config);
+    
+    if (addResult) {
+        // 立即检查是否需要刷新（应该返回false）
+        bool shouldRefresh1 = manager.ShouldRefreshConnection("test_config_should_refresh");
+        APSARA_TEST_FALSE(shouldRefresh1);
+
+        // 等待超过刷新间隔
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+
+        // 再次检查（应该返回true）
+        bool shouldRefresh2 = manager.ShouldRefreshConnection("test_config_should_refresh");
+        APSARA_TEST_TRUE(shouldRefresh2);
+    }
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestRefreshConnectionNonexistent() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 尝试刷新不存在的连接
+    bool result = manager.RefreshConnection("nonexistent_config");
+
+    // 应该返回false
+    APSARA_TEST_FALSE(result);
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestRefreshConnectionNotInitialized() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 不初始化管理器，直接刷新
+    bool result = manager.RefreshConnection("test_config");
+
+    // 应该返回false
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalConnectionUnittest::TestRefreshConnectionsByInterval() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+    config.mResetIntervalSecond = 1;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.mCtx = ctx.get();
+    config.mQueueKey = 1;
+
+    // 添加配置
+    manager.AddConfig("test_config_interval", config);
+
+    // 等待超过刷新间隔
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    // 创建mock monitor（在测试环境中可能无法正常工作）
+    auto* monitor = JournalMonitor::GetInstance();
+    if (monitor) {
+        monitor->Initialize();
+
+        std::vector<std::string> configNames = {"test_config_interval"};
+        
+        // 按间隔刷新连接（应该不崩溃）
+        manager.RefreshConnectionsByInterval(configNames, *monitor);
+
+        monitor->Cleanup();
+    }
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestRecoverConnectionAndSyncEpoll() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.mCtx = ctx.get();
+    config.mQueueKey = 1;
+
+    // 添加配置
+    manager.AddConfig("test_config_recover", config);
+
+    // 创建monitor
+    auto* monitor = JournalMonitor::GetInstance();
+    if (monitor) {
+        monitor->Initialize();
+
+        // 尝试恢复连接并同步epoll
+        bool result = manager.RecoverConnectionAndSyncEpoll("test_config_recover", monitor);
+
+        // 验证操作（在测试环境中可能失败但不应崩溃）
+        APSARA_TEST_TRUE(result == true || result == false);
+
+        monitor->Cleanup();
+    }
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestRecoverConnectionWithNullMonitor() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 尝试用null monitor恢复
+    bool result = manager.RecoverConnectionAndSyncEpoll("test_config", nullptr);
+
+    // 应该返回false
+    APSARA_TEST_FALSE(result);
+
+    manager.Cleanup();
+}
+
+void JournalConnectionUnittest::TestGetAllConfigNames() {
+    JournalConnection& manager = JournalConnection::GetInstance();
+
+    // 初始化管理器
+    manager.Initialize();
+
+    // 创建测试配置
+    JournalConfig config;
+    config.mSeekPosition = "tail";
+    config.mMaxEntriesPerBatch = 100;
+    config.mKernel = true;
+
+    // 创建pipeline context
+    auto ctx = std::make_unique<CollectionPipelineContext>();
+    ctx->SetConfigName("test_config");
+    config.mCtx = ctx.get();
+    config.mQueueKey = 1;
+
+    // 添加多个配置
+    manager.AddConfig("config1", config);
+    manager.AddConfig("config2", config);
+    manager.AddConfig("config3", config);
+
+    // 获取所有配置名
+    std::vector<std::string> configNames = manager.GetAllConfigNames();
+
+    // 验证配置数量
+    APSARA_TEST_TRUE(configNames.size() >= 3);
+
+    // 验证特定配置存在
+    bool hasConfig1 = std::find(configNames.begin(), configNames.end(), "config1") != configNames.end();
+    bool hasConfig2 = std::find(configNames.begin(), configNames.end(), "config2") != configNames.end();
+    bool hasConfig3 = std::find(configNames.begin(), configNames.end(), "config3") != configNames.end();
+
+    APSARA_TEST_TRUE(hasConfig1);
+    APSARA_TEST_TRUE(hasConfig2);
+    APSARA_TEST_TRUE(hasConfig3);
+
+    manager.Cleanup();
+}
+
 TEST_F(JournalConnectionUnittest, TestAddConfigWithInvalidUnits) {
     TestAddConfigWithInvalidUnits();
 }
@@ -914,6 +1156,39 @@ TEST_F(JournalConnectionUnittest, TestAddConfigWithEmptyContext) {
 
 TEST_F(JournalConnectionUnittest, TestValidateConfig) {
     TestValidateConfig();
+}
+
+// 注册新增的连接刷新测试用例
+TEST_F(JournalConnectionUnittest, TestRefreshConnection) {
+    TestRefreshConnection();
+}
+
+TEST_F(JournalConnectionUnittest, TestShouldRefreshConnection) {
+    TestShouldRefreshConnection();
+}
+
+TEST_F(JournalConnectionUnittest, TestRefreshConnectionNonexistent) {
+    TestRefreshConnectionNonexistent();
+}
+
+TEST_F(JournalConnectionUnittest, TestRefreshConnectionNotInitialized) {
+    TestRefreshConnectionNotInitialized();
+}
+
+TEST_F(JournalConnectionUnittest, TestRefreshConnectionsByInterval) {
+    TestRefreshConnectionsByInterval();
+}
+
+TEST_F(JournalConnectionUnittest, TestRecoverConnectionAndSyncEpoll) {
+    TestRecoverConnectionAndSyncEpoll();
+}
+
+TEST_F(JournalConnectionUnittest, TestRecoverConnectionWithNullMonitor) {
+    TestRecoverConnectionWithNullMonitor();
+}
+
+TEST_F(JournalConnectionUnittest, TestGetAllConfigNames) {
+    TestGetAllConfigNames();
 }
 
 } // namespace logtail

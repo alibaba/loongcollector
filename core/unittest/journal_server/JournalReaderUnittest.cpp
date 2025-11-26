@@ -74,6 +74,20 @@ public:
     void TestSystemdJournalReaderGetJournalFDNotOpen();
     void TestSystemdJournalReaderSetDataThreshold();
     void TestSystemdJournalReaderSetDataThresholdNotOpen();
+    void TestJournalReaderAddMatch();
+    void TestJournalReaderAddMatchNotOpen();
+    void TestJournalReaderAddDisjunction();
+    void TestJournalReaderAddDisjunctionNotOpen();
+    void TestJournalReaderGetUniqueValues();
+    void TestJournalReaderGetUniqueValuesNotOpen();
+    void TestJournalReaderSetJournalPaths();
+    void TestJournalReaderSetJournalPathsEmpty();
+    void TestJournalReaderGetCursor();
+    void TestJournalReaderGetCursorNotOpen();
+    void TestJournalReaderGetEntryWithStatus();
+    void TestJournalReaderGetEntryWithStatusNotOpen();
+    void TestJournalReadStatusEnum();
+    void TestJournalStatusTypeEnum();
 };
 
 void JournalReaderUnittest::TestJournalEntry() {
@@ -687,6 +701,142 @@ void JournalReaderUnittest::TestSystemdJournalReaderSetDataThresholdNotOpen() {
     APSARA_TEST_TRUE(true);
 }
 
+// ==================== 新增的JournalReader测试 ====================
+
+void JournalReaderUnittest::TestJournalReaderAddMatch() {
+    // 测试AddMatch方法
+    auto reader = std::make_shared<JournalReader>();
+
+    // 添加匹配条件（在未打开状态下应该失败）
+    bool result = reader->AddMatch("_SYSTEMD_UNIT", "nginx.service");
+
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderAddMatchNotOpen() {
+    // 测试AddMatch在未打开状态下
+    auto reader = std::make_shared<JournalReader>();
+
+    bool result = reader->AddMatch("MESSAGE", "test");
+
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderAddDisjunction() {
+    // 测试AddDisjunction方法
+    auto reader = std::make_shared<JournalReader>();
+
+    // 添加OR逻辑（在未打开状态下应该失败）
+    bool result = reader->AddDisjunction();
+
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderAddDisjunctionNotOpen() {
+    // 测试AddDisjunction在未打开状态下
+    auto reader = std::make_shared<JournalReader>();
+
+    bool result = reader->AddDisjunction();
+
+    APSARA_TEST_FALSE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderGetUniqueValues() {
+    // 测试GetUniqueValues方法
+    auto reader = std::make_shared<JournalReader>();
+
+    // 获取唯一值（在未打开状态下应该返回空）
+    std::vector<std::string> values = reader->GetUniqueValues("_SYSTEMD_UNIT");
+
+    APSARA_TEST_TRUE(values.empty());
+}
+
+void JournalReaderUnittest::TestJournalReaderGetUniqueValuesNotOpen() {
+    // 测试GetUniqueValues在未打开状态下
+    auto reader = std::make_shared<JournalReader>();
+
+    std::vector<std::string> values = reader->GetUniqueValues("MESSAGE");
+
+    APSARA_TEST_TRUE(values.empty());
+}
+
+void JournalReaderUnittest::TestJournalReaderSetJournalPaths() {
+    // 测试SetJournalPaths方法
+    auto reader = std::make_shared<JournalReader>();
+
+    std::vector<std::string> paths = {"/var/log/journal", "/run/log/journal"};
+    bool result = reader->SetJournalPaths(paths);
+
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderSetJournalPathsEmpty() {
+    // 测试SetJournalPaths with empty paths
+    auto reader = std::make_shared<JournalReader>();
+
+    std::vector<std::string> paths;
+    bool result = reader->SetJournalPaths(paths);
+
+    APSARA_TEST_TRUE(result);
+}
+
+void JournalReaderUnittest::TestJournalReaderGetCursor() {
+    // 测试GetCursor方法
+    auto reader = std::make_shared<JournalReader>();
+
+    // 在未打开状态下获取cursor
+    std::string cursor = reader->GetCursor();
+
+    // 应该返回空字符串
+    APSARA_TEST_TRUE(cursor.empty());
+}
+
+void JournalReaderUnittest::TestJournalReaderGetCursorNotOpen() {
+    // 测试GetCursor在未打开状态下
+    auto reader = std::make_shared<JournalReader>();
+
+    std::string cursor = reader->GetCursor();
+
+    APSARA_TEST_TRUE(cursor.empty());
+}
+
+void JournalReaderUnittest::TestJournalReaderGetEntryWithStatus() {
+    // 测试GetEntryWithStatus方法
+    auto reader = std::make_shared<JournalReader>();
+
+    JournalEntry entry;
+    JournalReadStatus status = reader->GetEntryWithStatus(entry);
+
+    // 在未打开状态下应该返回错误
+    APSARA_TEST_TRUE(status == JournalReadStatus::kError);
+}
+
+void JournalReaderUnittest::TestJournalReaderGetEntryWithStatusNotOpen() {
+    // 测试GetEntryWithStatus在未打开状态下
+    auto reader = std::make_shared<JournalReader>();
+
+    JournalEntry entry;
+    JournalReadStatus status = reader->GetEntryWithStatus(entry);
+
+    APSARA_TEST_TRUE(status == JournalReadStatus::kError);
+}
+
+void JournalReaderUnittest::TestJournalReadStatusEnum() {
+    // 测试JournalReadStatus枚举值
+    APSARA_TEST_TRUE(static_cast<int>(JournalReadStatus::kOk) == 1);
+    APSARA_TEST_TRUE(static_cast<int>(JournalReadStatus::kEndOfJournal) == 0);
+    APSARA_TEST_TRUE(static_cast<int>(JournalReadStatus::kError) == -1);
+    APSARA_TEST_TRUE(static_cast<int>(JournalReadStatus::kSigbusError) == -2);
+}
+
+void JournalReaderUnittest::TestJournalStatusTypeEnum() {
+    // 测试JournalStatusType枚举值
+    APSARA_TEST_TRUE(static_cast<int>(JournalStatusType::kNop) == 0);
+    APSARA_TEST_TRUE(static_cast<int>(JournalStatusType::kAppend) == 1);
+    APSARA_TEST_TRUE(static_cast<int>(JournalStatusType::kInvalidate) == 2);
+    APSARA_TEST_TRUE(static_cast<int>(JournalStatusType::kError) == -1);
+}
+
 
 TEST_F(JournalReaderUnittest, TestSystemdJournalReaderNextWithStatus) {
     TestSystemdJournalReaderNextWithStatus();
@@ -746,6 +896,63 @@ TEST_F(JournalReaderUnittest, TestSystemdJournalReaderSetDataThreshold) {
 
 TEST_F(JournalReaderUnittest, TestSystemdJournalReaderSetDataThresholdNotOpen) {
     TestSystemdJournalReaderSetDataThresholdNotOpen();
+}
+
+// 注册新增的测试用例
+TEST_F(JournalReaderUnittest, TestJournalReaderAddMatch) {
+    TestJournalReaderAddMatch();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderAddMatchNotOpen) {
+    TestJournalReaderAddMatchNotOpen();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderAddDisjunction) {
+    TestJournalReaderAddDisjunction();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderAddDisjunctionNotOpen) {
+    TestJournalReaderAddDisjunctionNotOpen();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetUniqueValues) {
+    TestJournalReaderGetUniqueValues();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetUniqueValuesNotOpen) {
+    TestJournalReaderGetUniqueValuesNotOpen();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderSetJournalPaths) {
+    TestJournalReaderSetJournalPaths();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderSetJournalPathsEmpty) {
+    TestJournalReaderSetJournalPathsEmpty();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetCursor) {
+    TestJournalReaderGetCursor();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetCursorNotOpen) {
+    TestJournalReaderGetCursorNotOpen();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetEntryWithStatus) {
+    TestJournalReaderGetEntryWithStatus();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReaderGetEntryWithStatusNotOpen) {
+    TestJournalReaderGetEntryWithStatusNotOpen();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalReadStatusEnum) {
+    TestJournalReadStatusEnum();
+}
+
+TEST_F(JournalReaderUnittest, TestJournalStatusTypeEnum) {
+    TestJournalStatusTypeEnum();
 }
 
 } // namespace logtail

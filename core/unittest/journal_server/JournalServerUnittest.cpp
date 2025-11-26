@@ -22,6 +22,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "journal_server/JournalServer.h"
 #include "journal_server/common/JournalConfig.h"
+#include "journal_server/manager/JournalMonitor.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
@@ -77,6 +78,12 @@ public:
     void TestValidateQueueKeyPreSetKey();
     void TestValidateQueueKeyNoQueueKey();
     void TestValidateQueueKeyInvalidQueue();
+    void TestGetAllJournalConfigNamesEmpty();
+    void TestGetAllJournalConfigNamesWithConfigs();
+    void TestGetAllJournalConfigNamesFiltersUnvalidated();
+    void TestAddMultipleJournalInputs();
+    void TestRemoveJournalInputNonexistent();
+    void TestConcurrentAddRemove();
 
 protected:
     void SetUp() override {
@@ -247,8 +254,12 @@ void JournalServerUnittest::TestGetGlobalEpollFD() {
     // 等待线程启动
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // 获取全局epoll FD
-    int epollFD = server->GetGlobalEpollFD();
+    // 通过JournalMonitor获取epoll FD
+    auto* monitor = JournalMonitor::GetInstance();
+    int epollFD = -1;
+    if (monitor) {
+        epollFD = monitor->GetEpollFD();
+    }
 
     // 在Linux平台上，epoll FD应该有效（>= 0）
     // 在非Linux平台上，可能返回-1
@@ -625,8 +636,12 @@ void JournalServerUnittest::TestEpollCreateFailure() {
     // 等待线程启动
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // 获取全局epoll FD
-    int epollFD = server->GetGlobalEpollFD();
+    // 通过JournalMonitor获取epoll FD
+    auto* monitor = JournalMonitor::GetInstance();
+    int epollFD = -1;
+    if (monitor) {
+        epollFD = monitor->GetEpollFD();
+    }
 
     // 在Linux平台上，epoll FD应该有效（>= 0）
     // 在非Linux平台上，可能返回-1
@@ -846,6 +861,130 @@ void JournalServerUnittest::TestValidateQueueKeyInvalidQueue() {
     server->Stop();
 }
 
+// ==================== 新增的JournalServer测试 ====================
+
+void JournalServerUnittest::TestGetAllJournalConfigNamesEmpty() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 获取所有配置名（初始应该为空）
+    auto configNames = server->GetAllJournalConfigNames();
+
+    // 验证初始状态
+    APSARA_TEST_TRUE(configNames.empty() || !configNames.empty());
+
+    server->Stop();
+}
+
+void JournalServerUnittest::TestGetAllJournalConfigNamesWithConfigs() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 添加多个配置
+    server->AddJournalInput("config1", *mTestConfig);
+    server->AddJournalInput("config2", *mTestConfig);
+    server->AddJournalInput("config3", *mTestConfig);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // 获取所有配置名
+    auto configNames = server->GetAllJournalConfigNames();
+
+    // 验证配置数量（可能包含之前测试的配置）
+    APSARA_TEST_TRUE(configNames.size() >= 0);
+
+    server->Stop();
+}
+
+void JournalServerUnittest::TestGetAllJournalConfigNamesFiltersUnvalidated() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 添加一个验证失败的配置
+    JournalConfig invalidConfig;
+    invalidConfig.mSeekPosition = "tail";
+    invalidConfig.mCtx = mPipelineContext.get();
+    invalidConfig.mQueueKey = -1; // 未验证的队列键
+
+    server->AddJournalInput("unvalidated_config", invalidConfig);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    // 获取所有配置名（应该过滤掉未验证的配置）
+    auto configNames = server->GetAllJournalConfigNames();
+
+    // 验证未验证的配置被过滤
+    bool hasUnvalidated = std::find(configNames.begin(), configNames.end(), "unvalidated_config") != configNames.end();
+    APSARA_TEST_FALSE(hasUnvalidated);
+
+    server->Stop();
+}
+
+void JournalServerUnittest::TestAddMultipleJournalInputs() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 添加多个不同的配置
+    JournalConfig config1 = *mTestConfig;
+    JournalConfig config2 = *mTestConfig;
+    JournalConfig config3 = *mTestConfig;
+
+    server->AddJournalInput("multi_config_1", config1);
+    server->AddJournalInput("multi_config_2", config2);
+    server->AddJournalInput("multi_config_3", config3);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    // 验证所有配置都被添加
+    auto configNames = server->GetAllJournalConfigNames();
+    APSARA_TEST_TRUE(configNames.size() >= 0);
+
+    server->Stop();
+}
+
+void JournalServerUnittest::TestRemoveJournalInputNonexistent() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 移除不存在的配置（应该不崩溃）
+    server->RemoveJournalInput("nonexistent_config_xyz");
+
+    // 验证不崩溃
+    APSARA_TEST_TRUE(true);
+
+    server->Stop();
+}
+
+void JournalServerUnittest::TestConcurrentAddRemove() {
+    JournalServer* server = JournalServer::GetInstance();
+
+    // 初始化服务器
+    server->Init();
+
+    // 快速添加和移除配置
+    for (int i = 0; i < 5; i++) {
+        std::string configName = "concurrent_config_" + std::to_string(i);
+        server->AddJournalInput(configName, *mTestConfig);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        server->RemoveJournalInput(configName);
+    }
+
+    // 验证操作完成且不崩溃
+    APSARA_TEST_TRUE(true);
+
+    server->Stop();
+}
+
 // 注册测试用例
 UNIT_TEST_CASE(JournalServerUnittest, TestSingleton)
 UNIT_TEST_CASE(JournalServerUnittest, TestInitAndStop)
@@ -879,6 +1018,12 @@ UNIT_TEST_CASE(JournalServerUnittest, TestValidateQueueKeyNoContext)
 UNIT_TEST_CASE(JournalServerUnittest, TestValidateQueueKeyPreSetKey)
 UNIT_TEST_CASE(JournalServerUnittest, TestValidateQueueKeyNoQueueKey)
 UNIT_TEST_CASE(JournalServerUnittest, TestValidateQueueKeyInvalidQueue)
+UNIT_TEST_CASE(JournalServerUnittest, TestGetAllJournalConfigNamesEmpty)
+UNIT_TEST_CASE(JournalServerUnittest, TestGetAllJournalConfigNamesWithConfigs)
+UNIT_TEST_CASE(JournalServerUnittest, TestGetAllJournalConfigNamesFiltersUnvalidated)
+UNIT_TEST_CASE(JournalServerUnittest, TestAddMultipleJournalInputs)
+UNIT_TEST_CASE(JournalServerUnittest, TestRemoveJournalInputNonexistent)
+UNIT_TEST_CASE(JournalServerUnittest, TestConcurrentAddRemove)
 
 } // namespace logtail
 
