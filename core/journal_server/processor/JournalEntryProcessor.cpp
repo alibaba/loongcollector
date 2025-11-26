@@ -124,88 +124,64 @@ bool ReadAndValidateEntry(const string& configName,
                           const std::shared_ptr<JournalReader>& journalReader,
                           const string& cursorSeekFallback,
                           JournalEntry& entry) {
-    try {
-        // Read current entry with SIGBUS protection
-        JournalReadStatus status = journalReader->GetEntryWithStatus(entry);
+    // Read current entry with SIGBUS protection
+    JournalReadStatus status = journalReader->GetEntryWithStatus(entry);
 
-        if (status == JournalReadStatus::kOk) {
-            // Successfully read entry
-            if (entry.fields.empty()) {
-                LOG_WARNING(sLogger,
-                            ("journal processor journal entry is empty",
-                             "no fields found")("config", configName)("cursor", entry.cursor));
-                return false;
-            }
-            return true;
-        }
-
-        if (status == JournalReadStatus::kSigbusError) {
-            // SIGBUS occurred: journal file was truncated/deleted during GetEntry
+    if (status == JournalReadStatus::kOk) {
+        // Successfully read entry
+        if (entry.fields.empty()) {
             LOG_WARNING(sLogger,
-                        ("journal processor SIGBUS detected in GetEntry, reopening reader and reseeking",
-                         "journal file may have been truncated")("config", configName));
-
-            auto& connectionManager = JournalConnection::GetInstance();
-            auto* readerMonitor = JournalMonitor::GetInstance();
-            if (connectionManager.RecoverConnectionAndSyncEpoll(configName, readerMonitor)) {
-                // Recovery successful
-                LOG_INFO(sLogger,
-                         ("journal processor recovered from SIGBUS in GetEntry by reopening and reseeking",
-                          "")("config", configName));
-                // Return false to let the caller retry with the refreshed reader
-                // The next iteration will get the refreshed reader from JournalConnection
-                return false;
-            } else {
-                LOG_ERROR(sLogger,
-                          ("journal processor failed to refresh connection after SIGBUS in GetEntry", "")("config",
-                                                                                                          configName));
-                return false;
-            }
-        }
-
-        string errorContext = !journalReader->IsOpen()
-            ? "GetEntry failed, connection closed"
-            : "GetEntry failed (possibly due to journal rotation or timestamp read error)";
-
-        LOG_WARNING(sLogger,
-                    ("journal processor get entry failed, attempting recovery", errorContext)("config", configName));
-
-        // Attempt error recovery
-        if (RecoverFromJournalError(journalReader, configName, cursorSeekFallback, errorContext)) {
-            if (journalReader->GetEntry(entry)) {
-                return true;
-            }
-            LOG_WARNING(
-                sLogger,
-                ("journal processor get entry still failed after recovery", "skipping entry")("config", configName));
+                        ("journal processor journal entry is empty",
+                         "no fields found")("config", configName)("cursor", entry.cursor));
             return false;
         }
-        // Recovery failed, abort batch
-        return false;
+        return true;
+    }
 
-    } catch (const std::exception& e) {
-        LOG_ERROR(sLogger,
-                  ("journal processor exception during journal entry reading", e.what())("config", configName));
-        // Clear entry to ensure partial data is not used
-        entry = JournalEntry();
+    if (status == JournalReadStatus::kSigbusError) {
+        // SIGBUS occurred: journal file was truncated/deleted during GetEntry
+        LOG_WARNING(sLogger,
+                    ("journal processor SIGBUS detected in GetEntry, reopening reader and reseeking",
+                     "journal file may have been truncated")("config", configName));
 
-        // Attempt error recovery
-        string errorMsg = string("exception during GetEntry: ") + e.what();
-        if (RecoverFromJournalError(journalReader, configName, cursorSeekFallback, errorMsg)) {
-            return journalReader->GetEntry(entry);
+        auto& connectionManager = JournalConnection::GetInstance();
+        auto* readerMonitor = JournalMonitor::GetInstance();
+        if (connectionManager.RecoverConnectionAndSyncEpoll(configName, readerMonitor)) {
+            // Recovery successful
+            LOG_INFO(sLogger,
+                     ("journal processor recovered from SIGBUS in GetEntry by reopening and reseeking",
+                      "")("config", configName));
+            // Return false to let the caller retry with the refreshed reader
+            // The next iteration will get the refreshed reader from JournalConnection
+            return false;
+        } else {
+            LOG_ERROR(
+                sLogger,
+                ("journal processor failed to refresh connection after SIGBUS in GetEntry", "")("config", configName));
+            return false;
         }
-        return false;
-    } catch (...) {
-        LOG_ERROR(sLogger,
-                  ("journal processor unknown exception during journal entry reading", "")("config", configName));
-        entry = JournalEntry();
+    }
 
-        if (RecoverFromJournalError(
-                journalReader, configName, cursorSeekFallback, "unknown exception during GetEntry")) {
-            return journalReader->GetEntry(entry);
+    // Error case (kError): possibly reader closed or other errors
+    string errorContext = !journalReader->IsOpen()
+        ? "GetEntry failed, connection closed"
+        : "GetEntry failed (possibly due to journal rotation or timestamp read error)";
+
+    LOG_WARNING(sLogger,
+                ("journal processor get entry failed, attempting recovery", errorContext)("config", configName));
+
+    // Attempt error recovery
+    if (RecoverFromJournalError(journalReader, configName, cursorSeekFallback, errorContext)) {
+        if (journalReader->GetEntry(entry)) {
+            return true;
         }
+        LOG_WARNING(
+            sLogger,
+            ("journal processor get entry still failed after recovery", "skipping entry")("config", configName));
         return false;
     }
+    // Recovery failed, abort batch
+    return false;
 }
 
 LogEvent*
