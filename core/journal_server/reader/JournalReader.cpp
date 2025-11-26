@@ -142,14 +142,13 @@ public:
 
 #ifdef __linux__
         // Set up SIGBUS handler to catch bus errors when reading truncated journal files
-        // This allows us to detect when journal file is truncated (e.g., truncate -s 0 system.journal)
-        // while still allowing normal reads when journal is valid
         struct sigaction oldAction = {};
         struct sigaction newAction = {};
         newAction.sa_handler = SigbusHandler;
         sigemptyset(&newAction.sa_mask);
         newAction.sa_flags = 0;
 
+        // Try to set signal handler, if failed, proceed without protection
         if (sigaction(SIGBUS, &newAction, &oldAction) != 0) {
             // Failed to set signal handler, proceed without protection
             int ret = sd_journal_next(mJournal);
@@ -164,9 +163,7 @@ public:
 
         // Use sigsetjmp to set up jump point for SIGBUS handler
         if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
-            // SIGBUS occurred: journal file was truncated/rotated, reader state is corrupted
-            // Return special status code for upper layer to handle (reopen and reseek)
-            sigaction(SIGBUS, &oldAction, nullptr);
+            sigaction(SIGBUS, &oldAction, nullptr);// Restore old signal handler
             return JournalReadStatus::kSigbusError;
         }
 
@@ -296,8 +293,6 @@ public:
 
 #ifdef __linux__
         // Set up SIGBUS handler to catch bus errors when reading truncated journal files
-        // This allows us to detect when journal file is truncated (e.g., truncate -s 0 system.journal)
-        // while still allowing normal reads when journal is valid
         struct sigaction oldAction = {};
         struct sigaction newAction = {};
         newAction.sa_handler = SigbusHandler;
@@ -316,8 +311,6 @@ public:
 
         // Use sigsetjmp to set up jump point for SIGBUS handler
         if (sigsetjmp(gSigbusJmpBuf, 1) != 0) {
-            // SIGBUS occurred: journal file was truncated/rotated, reader state is corrupted
-            // Return empty string to indicate error
             sigaction(SIGBUS, &oldAction, nullptr);
             return "";
         }
