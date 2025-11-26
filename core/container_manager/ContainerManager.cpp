@@ -115,9 +115,9 @@ void ContainerManager::ApplyContainerDiffs() {
         LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
 
         for (const auto& pair : diff->mLegacyCheckpointAdded) {
-            const std::string& checkpointPath = pair.first;
+            const std::string& basePathInCheckpoint = pair.first;
             const std::shared_ptr<RawContainerInfo>& container = pair.second;
-            options->UpdateRawContainerInfo(container, ctx, checkpointPath);
+            options->UpdateRawContainerInfo(container, ctx, basePathInCheckpoint);
         }
 
         for (const auto& container : diff->mAdded) {
@@ -891,9 +891,9 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                     info->mLogPath = paramsJson["LogPath"].asString();
                 }
 
-                std::string checkpointPath;
+                std::string basePathInCheckpoint;
                 if (info->mUpperDir.empty() && paramsJson.isMember("Path") && paramsJson["Path"].isString()) {
-                    checkpointPath = paramsJson["Path"].asString();
+                    basePathInCheckpoint = paramsJson["Path"].asString();
                 }
 
                 // Parse mounts
@@ -966,7 +966,7 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                     tmpContainerMap[info->mID] = info;
                     // Also associate with config if config name is available
                     if (!configName.empty()) {
-                        configContainerMap[configName].push_back(std::make_pair(checkpointPath, info));
+                        configContainerMap[configName].push_back(std::make_pair(basePathInCheckpoint, info));
                     }
                 }
             } else {

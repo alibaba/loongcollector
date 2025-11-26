@@ -657,7 +657,6 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithTags() c
 
     // Verify container info
     EXPECT_EQ(it->second->mID, "2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0");
-    // Verify that Path was processed: /logtail_host prefix removed and assigned to UpperDir
     EXPECT_EQ(it->second->mUpperDir, "");
     EXPECT_EQ(it->second->mK8sInfo.mNamespace, "kube-system");
     EXPECT_EQ(it->second->mK8sInfo.mPod, "csi-provisioner-5f5d9d84fc-hc6mt");

@@ -269,7 +269,7 @@ func GetContainerDiffForPluginManager(cachedList map[string]string) (update []*D
 	}
 
 	// Build new cache with hashes and check for new or updated containers
-	newCachedList = make(map[string]string)
+	newCachedList = make(map[string]string, len(instance.containerMap))
 	for currentID, currentInfo := range instance.containerMap {
 		currentHash := currentInfo.MetadataHash()
 		newCachedList[currentID] = currentHash
@@ -286,7 +286,7 @@ func GetContainerDiffForPluginManager(cachedList map[string]string) (update []*D
 	}
 
 	if !changed {
-		return update, delete, stop, false, nil
+		return update, delete, stop, false, make(map[string]string)
 	}
 
 	return update, delete, stop, true, newCachedList

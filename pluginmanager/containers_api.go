@@ -151,7 +151,6 @@ func GetDiffContainers() string {
 	}
 	lastUpdateTime = newUpdateTime
 
-	// Use GetContainerDiffForPluginManagerV2 which supports metadata hash comparison
 	update, delete, stop, changed, newFullList := containercenter.GetContainerDiffForPluginManager(caCachedFullList)
 	if !changed {
 		return ""

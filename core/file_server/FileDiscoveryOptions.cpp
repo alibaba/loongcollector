@@ -798,7 +798,7 @@ size_t FileDiscoveryOptions::GetRealBaseDirIndex(const ContainerInfo* containerI
 
 bool FileDiscoveryOptions::UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
                                                   const CollectionPipelineContext* ctx,
-                                                  const std::string& checkpointPath) {
+                                                  const std::string& basePathInCheckpoint) {
     if (!mContainerInfos) {
         return false;
     }
@@ -809,11 +809,11 @@ bool FileDiscoveryOptions::UpdateRawContainerInfo(const std::shared_ptr<RawConta
     mContainerDiscovery.GetCustomExternalTags(
         rawContainerInfo->mEnv, rawContainerInfo->mK8sInfo.mLabels, containerInfo.mExtraTags);
 
-    if (!checkpointPath.empty()) {
+    if (!basePathInCheckpoint.empty()) {
         LOG_INFO(sLogger,
-                 ("set container base dir for checkpoint path", checkpointPath)("container id",
-                                                                                containerInfo.mRawContainerInfo->mID));
-        containerInfo.mRealBaseDirs.push_back(checkpointPath);
+                 ("set container base dir for checkpoint path",
+                  basePathInCheckpoint)("container id", containerInfo.mRawContainerInfo->mID));
+        containerInfo.mRealBaseDirs.push_back(basePathInCheckpoint);
     } else {
         if (!mDeduceAndSetContainerBaseDirFunc(containerInfo, ctx, this)) {
             return false;

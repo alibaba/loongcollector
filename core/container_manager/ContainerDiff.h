@@ -31,6 +31,8 @@ namespace logtail {
 struct ContainerDiff {
     std::vector<std::shared_ptr<RawContainerInfo>> mAdded;
     std::vector<std::shared_ptr<RawContainerInfo>> mModified;
+
+    // 旧版本checkpoint中，只包含完整的rootfs+采集配置路径信息，因此这里需要额外字段记录
     std::vector<std::pair<std::string, std::shared_ptr<RawContainerInfo>>> mLegacyCheckpointAdded;
     std::vector<std::string> mRemoved;
 

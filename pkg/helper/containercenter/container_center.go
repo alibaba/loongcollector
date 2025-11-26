@@ -1216,6 +1216,7 @@ func (dc *ContainerCenter) markRemove(containerID string) {
 		logger.Debugf(context.Background(), "mark remove container: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
 			container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 		container.ContainerInfo.State.Status = ContainerStatusExited
+		computeContainerMetadataHash(container)
 		container.deleteFlag = true
 		container.lastUpdateTime = time.Now()
 		dc.refreshLastUpdateMapTime()

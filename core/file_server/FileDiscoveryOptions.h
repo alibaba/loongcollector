@@ -96,7 +96,7 @@ public:
 
     bool UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
                                 const CollectionPipelineContext*,
-                                const std::string& checkpointPath = "");
+                                const std::string& basePathInCheckpoint = "");
     bool DeleteRawContainerInfo(const std::string& containerID);
 
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;
