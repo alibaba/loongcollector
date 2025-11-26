@@ -96,7 +96,7 @@ void JournalMonitorUnittest::TestInitialize() {
     // 在Linux平台上应该成功
 #ifdef __linux__
     APSARA_TEST_TRUE(result);
-    
+
     // 获取epoll FD
     int epollFD = mMonitor->GetEpollFD();
     APSARA_TEST_TRUE(epollFD >= 0 || epollFD == -1); // 可能失败但不应崩溃
@@ -273,11 +273,8 @@ void JournalMonitorUnittest::TestSaveAccumulatedData() {
     std::chrono::steady_clock::time_point savedLastBatchTime;
 
     // 保存累积数据（reader不存在时应该返回false）
-    bool result = mMonitor->SaveAccumulatedData(configName,
-                                                savedHasPendingData,
-                                                savedAccumulatedEventGroup,
-                                                savedAccumulatedEntryCount,
-                                                savedLastBatchTime);
+    bool result = mMonitor->SaveAccumulatedData(
+        configName, savedHasPendingData, savedAccumulatedEventGroup, savedAccumulatedEntryCount, savedLastBatchTime);
 
     // 应该返回false（因为reader不存在）
     APSARA_TEST_FALSE(result);
@@ -616,4 +613,3 @@ TEST_F(JournalMonitorUnittest, TestIsBatchTimeoutNoData) {
 } // namespace logtail
 
 UNIT_TEST_MAIN
-
