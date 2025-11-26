@@ -928,11 +928,11 @@ void JournalConnectionUnittest::TestRefreshConnection() {
 
     // 添加配置
     bool addResult = manager.AddConfig("test_config_refresh", config);
-    
+
     if (addResult) {
         // 刷新连接
         bool refreshResult = manager.RefreshConnection("test_config_refresh");
-        
+
         // 验证刷新操作（在测试环境中可能失败但不应崩溃）
         APSARA_TEST_TRUE(refreshResult == true || refreshResult == false);
     }
@@ -961,7 +961,7 @@ void JournalConnectionUnittest::TestShouldRefreshConnection() {
 
     // 添加配置
     bool addResult = manager.AddConfig("test_config_should_refresh", config);
-    
+
     if (addResult) {
         // 立即检查是否需要刷新（应该返回false）
         bool shouldRefresh1 = manager.ShouldRefreshConnection("test_config_should_refresh");
@@ -1034,7 +1034,7 @@ void JournalConnectionUnittest::TestRefreshConnectionsByInterval() {
         monitor->Initialize();
 
         std::vector<std::string> configNames = {"test_config_interval"};
-        
+
         // 按间隔刷新连接（应该不崩溃）
         manager.RefreshConnectionsByInterval(configNames, *monitor);
 
