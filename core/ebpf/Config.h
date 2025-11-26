@@ -56,6 +56,7 @@ public:
     bool Init(const Json::Value& config, const CollectionPipelineContext* mContext, const std::string& sName);
 
     std::vector<std::string> mCmdlines;
+    std::string mAppName;
     ContainerDiscoveryOptions mContainerDiscovery;
 };
 
