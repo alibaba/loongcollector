@@ -186,7 +186,7 @@ bool ReadAndValidateEntry(const string& configName,
 
 LogEvent*
 CreateLogEventFromJournal(const JournalEntry& entry, const JournalConfig& config, PipelineEventGroup& eventGroup) {
-    LogEvent* logEvent = eventGroup.AddLogEvent();
+    LogEvent* logEvent = eventGroup.AddLogEvent(true);
 
     for (const auto& field : entry.fields) {
         std::string fieldValue = field.second;
@@ -251,19 +251,17 @@ bool PushEventGroupToQueue(QueueKey queueKey,
                            const std::string& configName,
                            std::shared_ptr<PipelineEventGroup>* accumulatedEventGroup,
                            int* accumulatedEntryCount,
-                           bool& pushFailed,
                            bool& eventGroupSent) {
     constexpr uint32_t kMaxPushRetries = 100;
-    PipelineEventGroup eventGroupToPush = eventGroup->Copy();
-    size_t eventCount = eventGroupToPush.GetEvents().size();
+    size_t eventCount = eventGroup->GetEvents().size();
 
-    if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(eventGroupToPush), kMaxPushRetries)) {
+    if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, 0, std::move(*eventGroup), kMaxPushRetries)) {
         LOG_ERROR(sLogger,
                   ("journal processor failed to push journal entry batch to queue",
-                   "queue may be full, will retry on next cycle")("config", configName)("entry_count", totalEntryCount)(
+                   "queue full after retries, DATA DISCARDED")("config", configName)("entry_count", totalEntryCount)(
                       "event_count", eventCount));
-        // Keep accumulated data in memory, will retry on next cycle
-        pushFailed = true;
+        // Move data failed, data is lost, clear accumulated data
+        ClearAccumulatedData(accumulatedEventGroup, accumulatedEntryCount);
         return false;
     }
     eventGroupSent = true;
@@ -308,7 +306,6 @@ bool HandleJournalEntries(const string& configName,
 
     const int maxEntriesPerBatch = config.mMaxEntriesPerBatch;
     int newEntryCount = 0;
-    bool pushFailed = false;
     bool eventGroupSent = false;
 
     try {
@@ -355,7 +352,6 @@ bool HandleJournalEntries(const string& configName,
                                   configName,
                                   accumulatedEventGroup,
                                   accumulatedEntryCount,
-                                  pushFailed,
                                   eventGroupSent);
         } else if (noNewData) {
             // No new data but has accumulated data: push if process queue is available
@@ -366,7 +362,6 @@ bool HandleJournalEntries(const string& configName,
                                       configName,
                                       accumulatedEventGroup,
                                       accumulatedEntryCount,
-                                      pushFailed,
                                       eventGroupSent);
             } else {
                 // Process queue not available, keep accumulating for next cycle
@@ -392,8 +387,7 @@ bool HandleJournalEntries(const string& configName,
             // hasPendingDataOut: indicates whether there is pending data to process
             // - totalEntryCount > 0 && !eventGroupSent: has data but not sent (continue accumulating)
             // - reachedMaxBatch: reached max batch size, while loop exits, but journal may have more entries to process
-            // - pushFailed: push failed, data still exists (in accumulated buffer)
-            *hasPendingDataOut = pushFailed || (totalEntryCount > 0 && !eventGroupSent) || reachedMaxBatch;
+            *hasPendingDataOut = (totalEntryCount > 0 && !eventGroupSent) || reachedMaxBatch;
         }
 
         if (lastBatchTimeOut != nullptr) {
