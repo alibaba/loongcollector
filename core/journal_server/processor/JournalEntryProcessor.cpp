@@ -94,7 +94,6 @@ bool MoveToNextJournalEntry(const string& configName,
     }
     if (status == JournalReadStatus::kSigbusError) {
         // SIGBUS occurred: journal file was truncated/rotated
-        // Need to reopen reader and reseek through JournalConnection
         LOG_WARNING(sLogger,
                     ("journal processor SIGBUS detected, reopening reader and reseeking",
                      "journal file may have been truncated")("config", configName));
@@ -106,7 +105,6 @@ bool MoveToNextJournalEntry(const string& configName,
             LOG_INFO(sLogger,
                      ("journal processor recovered from SIGBUS by reopening and reseeking", "")("config", configName));
             // Return false to let the caller retry with the refreshed reader
-            // The next iteration will get the refreshed reader from JournalConnection
             return false;
         } else {
             LOG_ERROR(sLogger,
@@ -142,8 +140,7 @@ bool ReadAndValidateEntry(const string& configName,
         }
 
         if (status == JournalReadStatus::kSigbusError) {
-            // SIGBUS occurred: journal file was truncated/rotated during GetEntry
-            // This is a TOCTOU race condition between NextWithStatus and GetEntry
+            // SIGBUS occurred: journal file was truncated/deleted during GetEntry
             LOG_WARNING(sLogger,
                         ("journal processor SIGBUS detected in GetEntry, reopening reader and reseeking",
                          "journal file may have been truncated")("config", configName));
@@ -160,35 +157,27 @@ bool ReadAndValidateEntry(const string& configName,
                 return false;
             } else {
                 LOG_ERROR(sLogger,
-                          ("journal processor failed to refresh connection after SIGBUS in GetEntry",
-                           "")("config", configName));
+                          ("journal processor failed to refresh connection after SIGBUS in GetEntry", "")("config",
+                                                                                                          configName));
                 return false;
             }
         }
 
-        // Error case (kError): possibly reader closed or other errors
-        // Possible reasons for GetEntry failure:
-        // 1. Connection closed
-        // 2. Journal file rotated/deleted (sd_journal_get_realtime_usec returns error)
-        // 3. Cursor invalidated
-        //
-        // In all cases, attempt error recovery
         string errorContext = !journalReader->IsOpen()
             ? "GetEntry failed, connection closed"
             : "GetEntry failed (possibly due to journal rotation or timestamp read error)";
 
-        LOG_WARNING(
-            sLogger,
-            ("journal processor get entry failed, attempting recovery", errorContext)("config", configName));
+        LOG_WARNING(sLogger,
+                    ("journal processor get entry failed, attempting recovery", errorContext)("config", configName));
 
         // Attempt error recovery
         if (RecoverFromJournalError(journalReader, configName, cursorSeekFallback, errorContext)) {
             if (journalReader->GetEntry(entry)) {
                 return true;
             }
-            LOG_WARNING(sLogger,
-                        ("journal processor get entry still failed after recovery", "skipping entry")("config",
-                                                                                                      configName));
+            LOG_WARNING(
+                sLogger,
+                ("journal processor get entry still failed after recovery", "skipping entry")("config", configName));
             return false;
         }
         // Recovery failed, abort batch
