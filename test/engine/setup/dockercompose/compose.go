@@ -20,17 +20,15 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	dockertypes "github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/testcontainers/testcontainers-go"
+	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gopkg.in/yaml.v3"
 
@@ -86,6 +84,12 @@ type StrategyWrapper struct {
 	virtualPort nat.Port
 }
 
+// composeWaiter is a minimal interface to register wait strategies for services.
+// It is implemented by modules/compose DockerCompose types.
+type composeWaiter interface {
+	WaitForService(service string, strategy wait.Strategy) composeModule.ComposeStack
+}
+
 // NewComposeBooter create a new compose booter.
 func NewComposeBooter() *ComposeBooter {
 	return &ComposeBooter{}
@@ -99,24 +103,27 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	hasher := sha256.New()
 	hasher.Write([]byte(projectName))
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
-	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
-	strategyWrappers := withExposedService(compose)
+	dc, err := composeModule.NewDockerCompose(config.CaseHome + finalFileName)
+	if err != nil {
+		return err
+	}
+	strategyWrappers := withExposedService(dc)
 	// retry 3 times
 	for i := 0; i < 3; i++ {
-		execError := compose.Invoke()
-		if execError.Error == nil {
+		err := dc.Up(ctx)
+		if err == nil {
 			break
 		}
 		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Error.Error())
+			"stdout", err.Error())
 		if i == 2 {
-			return execError.Error
+			return err
 		}
-		execError = testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
-		if execError.Error != nil {
+		downErr := dc.Down(ctx)
+		if downErr != nil {
 			logger.Error(context.Background(), "DOWN_DOCKER_COMPOSE_ERROR",
-				"stdout", execError.Error.Error())
-			return execError.Error
+				"stdout", downErr.Error())
+			return downErr
 		}
 	}
 	cli, err := CreateDockerClient()
@@ -125,7 +132,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	}
 	c.cli = cli
 
-	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	list, err := cli.ContainerList(context.Background(), containertypes.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("name", fmt.Sprintf("%s_loongcollectorC*", projectName)),
 			filters.Arg("name", fmt.Sprintf("%s-loongcollectorC*", projectName)),
@@ -157,18 +164,21 @@ func (c *ComposeBooter) Stop() error {
 	hasher := sha256.New()
 	hasher.Write([]byte(projectName))
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
-	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
-	if execError.Error != nil {
+	dc, err := composeModule.NewDockerCompose(config.CaseHome + finalFileName)
+	if err != nil {
+		return err
+	}
+	if err := dc.Down(context.Background()); err != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
-		return execError.Error
+			"stdout", err.Error())
+		return err
 	}
 	_ = os.Remove(config.CaseHome + finalFileName)
 	return nil
 }
 
 func (c *ComposeBooter) exec(id string, cmd []string) error {
-	cfg := dockertypes.ExecConfig{
+	cfg := containertypes.ExecOptions{
 		User: "root",
 		Cmd:  cmd,
 	}
@@ -177,7 +187,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
 		return err
 	}
-	err = c.cli.ContainerExecStart(context.Background(), resp.ID, dockertypes.ExecStartCheck{
+	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
 		Detach: false,
 		Tty:    false,
 	})
@@ -231,6 +241,11 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 		}
 	}
 	cfg := c.getLogtailpluginConfig()
+	// ensure compose project name aligns with container lookup (hashed project name)
+	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
+	hasher := sha256.New()
+	hasher.Write([]byte(projectName))
+	cfg["name"] = fmt.Sprintf("%x", hasher.Sum(nil))
 	services := cfg["services"].(map[string]interface{})
 	loongcollector := services["loongcollectorC"].(map[string]interface{})
 	// merge docker compose file.
@@ -311,36 +326,49 @@ func registerDockerNetMapping(wrappers []*StrategyWrapper) error {
 	return nil
 }
 
-// withExposedService add wait.Strategy to the docker compose.
-func withExposedService(compose testcontainers.DockerCompose) (wrappers []*StrategyWrapper) {
-	localCompose := compose.(*testcontainers.LocalDockerCompose)
-	for serv, rawCfg := range localCompose.Services {
-		cfg := rawCfg.(map[string]interface{})
-		rawPorts, ok := cfg["ports"]
+// withExposedService add wait.Strategy to the docker compose by parsing the compose YAML.
+func withExposedService(dc composeWaiter) (wrappers []*StrategyWrapper) {
+	// read generated compose file
+	bytes, err := os.ReadFile(config.CaseHome + finalFileName)
+	if err != nil {
+		return
+	}
+	cfg := make(map[string]interface{})
+	if err = yaml.Unmarshal(bytes, &cfg); err != nil {
+		return
+	}
+	rawServices, ok := cfg["services"].(map[string]interface{})
+	if !ok {
+		return
+	}
+	for serv, rawCfg := range rawServices {
+		svcCfg, ok := rawCfg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		rawPorts, ok := svcCfg["ports"]
 		if !ok {
 			continue
 		}
 		ports := rawPorts.([]interface{})
 		for i := 0; i < len(ports); i++ {
-			var wrapper StrategyWrapper
-			var portNum int
 			var np nat.Port
 			switch p := ports[i].(type) {
 			case int:
-				portNum = p
 				np = nat.Port(fmt.Sprintf("%d/tcp", p))
 			case string:
 				relations := strings.Split(p, ":")
 				proto, port := nat.SplitProtoPort(relations[len(relations)-1])
 				np = nat.Port(fmt.Sprintf("%s/%s", port, proto))
-				portNum, _ = strconv.Atoi(port)
+			default:
+				continue
 			}
-			wrapper = StrategyWrapper{
+			wrapper := StrategyWrapper{
 				original:    wait.ForListeningPort(np),
 				service:     serv,
 				virtualPort: np,
 			}
-			localCompose.WithExposedService(serv, portNum, &wrapper)
+			dc.WaitForService(serv, &wrapper)
 			wrappers = append(wrappers, &wrapper)
 		}
 	}
