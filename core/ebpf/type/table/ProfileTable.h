@@ -19,20 +19,36 @@
 
 namespace logtail::ebpf {
 
-constexpr DataElement kPid = {
-    "pid",
-    "pid", // metric
-    "pid", // span
-    "pid", // log
-    "process pid",
+constexpr DataElement kProfileID = {
+    "profileID",
+    "profile_id", // metric
+    "profile.id", // span
+    "profile.id", // log
+    "profile ID",
 };
 
-constexpr DataElement kComm = {
-    "comm",
-    "comm", // metric
-    "comm", // span
-    "comm", // log
-    "process command name",
+constexpr DataElement kProfileDataType = {
+    "dataType",
+    "data_type", // metric
+    "data.type", // span
+    "data.type", // log
+    "profile data type",
+};
+
+constexpr DataElement kProfileLanguage = {
+    "language",
+    "language", // metric
+    "language", // span
+    "language", // log
+    "programming language",
+};
+
+constexpr DataElement kName = {
+    "name",
+    "name", // metric
+    "name", // span
+    "name", // log
+    "profile name",
 };
 
 constexpr DataElement kStack = {
@@ -43,20 +59,68 @@ constexpr DataElement kStack = {
     "call stack",
 };
 
-constexpr DataElement kCnt = {
-    "cnt",
-    "cnt", // metric
-    "cnt", // span
-    "cnt", // log
-    "call stack count",
+constexpr DataElement kStackID = {
+    "stackID",
+    "stackID", // metric
+    "stackID", // span
+    "stackID", // log
+    "call stack ID",
 };
 
-constexpr DataElement kTraceId = {
-    "trace_id",
-    "trace_id", // metric
-    "trace_id", // span
-    "trace_id", // log
-    "call stack trace id",
+constexpr DataElement kType = {
+    "type",
+    "type", // metric
+    "type", // span
+    "type", // log
+    "profile type",
+};
+
+constexpr DataElement kTypeCN = {
+    "type_cn",
+    "type_cn", // metric
+    "type_cn", // span
+    "type_cn", // log
+    "profile type in Chinese",
+};
+
+constexpr DataElement kUnits = {
+    "units",
+    "units", // metric
+    "units", // span
+    "units", // log
+    "profile units",
+};
+
+constexpr DataElement kVal = {
+    "val",
+    "val", // metric
+    "val", // span
+    "val", // log
+    "profile value",
+};
+
+constexpr DataElement kValueTypes = {
+    "valueTypes",
+    "valueTypes", // metric
+    "valueTypes", // span
+    "valueTypes", // log
+    "profile value types",
+};
+
+constexpr DataElement kValueTypesCN = {
+    "valueTypes_cn",
+    "valueTypes_cn", // metric
+    "valueTypes_cn", // span
+    "valueTypes_cn", // log
+    "profile value types in Chinese",
+};
+
+constexpr DataElement kLabels = {
+    "labels",
+    "labels", // metric
+    "labels", // span
+    "labels", // log
+    "profile labels",
 };
 
 } // namespace logtail::ebpf
