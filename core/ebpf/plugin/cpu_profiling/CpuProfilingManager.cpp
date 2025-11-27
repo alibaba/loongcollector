@@ -100,6 +100,7 @@ int CpuProfilingManager::AddOrUpdateConfig(
         .mQueueKey = context->GetProcessQueueKey(),
         .mPluginIndex = index,
         .mAppName = opts->mAppName,
+        .mLanguage = opts->mLanguage,
     };
     mConfigInfoMap.insert_or_assign(key, info);
 
@@ -195,9 +196,6 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
 
 static void addContentToEvent(LogEvent *event,
                               const std::vector<std::string> &fullStack, const std::string &appName, const std::string &comm) {
-    event->SetContent("dataType", std::string("CallStack"));
-    event->SetContent("language", std::string("go"));
-
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 
@@ -282,6 +280,8 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
             auto *event = eventGroup.AddLogEvent();
             event->SetTimestamp(logtime);
             event->SetContent("profileID", profileID);
+            event->SetContent("dataType", std::string("CallStack"));
+            event->SetContent("language", info.mLanguage);
             addContentToEvent(event, stack, info.mAppName, commStr);
         }
 
