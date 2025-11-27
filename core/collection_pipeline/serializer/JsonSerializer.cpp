@@ -101,16 +101,14 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     writer.String(tag->second.to_string().c_str());
                 }
                 writer.EndObject();
+                // __name__
+                writer.Key(METRIC_RESERVED_KEY_NAME.c_str());
+                writer.String(e.GetName().to_string().c_str());
+                // __value__
+                writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
                 if (e.Is<UntypedSingleValue>()) {
-                    // __name__
-                    writer.Key(METRIC_RESERVED_KEY_NAME.c_str());
-                    writer.String(e.GetName().to_string().c_str());
-                    // __value__
-                    writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
                     writer.Double(e.GetValue<UntypedSingleValue>()->mValue);
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
-                    // __value__
-                    writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
                     writer.StartObject();
                     for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
