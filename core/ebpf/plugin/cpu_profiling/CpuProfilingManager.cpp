@@ -212,16 +212,16 @@ static void addContentToEvent(LogEvent *event,
 
     std::string stackId = ToHexString(hashStack);
 
-    event->SetContent("name", name);
-    event->SetContent("stack", stack);
-    event->SetContent("stackID", stackId);
+    event->SetContent(kName.LogKey(), name);
+    event->SetContent(kStack.LogKey(), stack);
+    event->SetContent(kStackID.LogKey(), stackId);
 
-    event->SetContent("type", std::string("profile_cpu"));
-    event->SetContent("type_cn", std::string(""));
-    event->SetContent("units", std::string("nanoseconds"));
-    event->SetContent("val", std::string("1"));
-    event->SetContent("valueTypes", std::string("cpu"));
-    event->SetContent("valueTypes_cn", std::string(""));
+    event->SetContent(kType.LogKey(), std::string("profile_cpu"));
+    event->SetContent(kTypeCN.LogKey(), std::string(""));
+    event->SetContent(kUnits.LogKey(), std::string("nanoseconds"));
+    event->SetContent(kVal.LogKey(), std::string("1"));
+    event->SetContent(kValueTypes.LogKey(), std::string("cpu"));
+    event->SetContent(kValueTypesCN.LogKey(), std::string(""));
 
     // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
@@ -230,7 +230,7 @@ static void addContentToEvent(LogEvent *event,
     jsonLabels += "\", \"thread\": \"";
     jsonLabels += comm;
     jsonLabels += "\"}";
-    event->SetContent("labels", jsonLabels);
+    event->SetContent(kLabels.LogKey(), jsonLabels);
 }
 
 void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
@@ -279,9 +279,9 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
         for (auto &[stack, cnt, traceId] : stacks) {
             auto *event = eventGroup.AddLogEvent();
             event->SetTimestamp(logtime);
-            event->SetContent("profileID", profileID);
-            event->SetContent("dataType", std::string("CallStack"));
-            event->SetContent("language", info.mLanguage);
+            event->SetContent(kProfileID.LogKey(), profileID);
+            event->SetContent(kProfileDataType.LogKey(), std::string("CallStack"));
+            event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
             addContentToEvent(event, stack, info.mAppName, commStr);
         }
 
