@@ -27,6 +27,13 @@
 namespace logtail {
 namespace ebpf {
 
+const std::string CpuProfilingManager::kProfileCpuValue = "profile_cpu";
+const std::string CpuProfilingManager::kEmptyValue = "";
+const std::string CpuProfilingManager::kNanosecondsValue = "nanoseconds";
+const std::string CpuProfilingManager::kOneValue = "1";
+const std::string CpuProfilingManager::kCpuValue = "cpu";
+const std::string CpuProfilingManager::kCallStackValue = "CallStack";
+
 std::unique_ptr<PluginConfig>
 buildCpuProfilingConfig(std::unordered_set<uint32_t> pids,
                         std::optional<std::string> hostRootPath,
@@ -216,13 +223,12 @@ static void addContentToEvent(LogEvent *event,
     event->SetContent(kStack.LogKey(), stack);
     event->SetContent(kStackID.LogKey(), stackId);
 
-    event->SetContent(kType.LogKey(), std::string("profile_cpu"));
-    event->SetContent(kTypeCN.LogKey(), std::string(""));
-    event->SetContent(kUnits.LogKey(), std::string("nanoseconds"));
-    event->SetContent(kVal.LogKey(), std::string("1"));
-    event->SetContent(kValueTypes.LogKey(), std::string("cpu"));
-    event->SetContent(kValueTypesCN.LogKey(), std::string(""));
-
+    event->SetContentNoCopy(kType.LogKey(), StringView(CpuProfilingManager::kProfileCpuValue));
+    event->SetContentNoCopy(kTypeCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
+    event->SetContentNoCopy(kUnits.LogKey(), StringView(CpuProfilingManager::kNanosecondsValue));
+    event->SetContentNoCopy(kVal.LogKey(), StringView(CpuProfilingManager::kOneValue));
+    event->SetContentNoCopy(kValueTypes.LogKey(), StringView(CpuProfilingManager::kCpuValue));
+    event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
     jsonLabels += "{\"__name__\": \"";
@@ -280,7 +286,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid,
             auto *event = eventGroup.AddLogEvent();
             event->SetTimestamp(logtime);
             event->SetContent(kProfileID.LogKey(), profileID);
-            event->SetContent(kProfileDataType.LogKey(), std::string("CallStack"));
+            event->SetContentNoCopy(kProfileDataType.LogKey(), StringView(CpuProfilingManager::kCallStackValue));
             event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
             addContentToEvent(event, stack, info.mAppName, commStr);
         }
