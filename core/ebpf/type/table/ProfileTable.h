@@ -21,17 +21,17 @@ namespace logtail::ebpf {
 
 constexpr DataElement kProfileID = {
     "profileID",
-    "profile_id", // metric
-    "profile.id", // span
-    "profile.id", // log
+    "profileID", // metric
+    "profileID", // span
+    "profileID", // log
     "profile ID",
 };
 
 constexpr DataElement kProfileDataType = {
     "dataType",
-    "data_type", // metric
-    "data.type", // span
-    "data.type", // log
+    "dataType", // metric
+    "dataType", // span
+    "dataType", // log
     "profile data type",
 };
 
