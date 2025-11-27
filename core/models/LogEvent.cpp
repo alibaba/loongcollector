@@ -115,7 +115,7 @@ LogEvent::ContentIterator LogEvent::FindContent(StringView key) {
         return item.first.first == key && item.second;
     });
     if (it != mContents.rend()) {
-        return ContentIterator(--it.base(), mContents);
+        return ContentIterator(it.base() - 1, mContents);
     }
     return ContentIterator(mContents.end(), mContents);
 }
@@ -125,7 +125,7 @@ LogEvent::ConstContentIterator LogEvent::FindContent(StringView key) const {
         return item.first.first == key && item.second;
     });
     if (it != mContents.crend()) {
-        return ConstContentIterator(--it.base(), mContents);
+        return ConstContentIterator(it.base() - 1, mContents);
     }
     return ConstContentIterator(mContents.end(), mContents);
 }
