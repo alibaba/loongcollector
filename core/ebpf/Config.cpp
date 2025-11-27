@@ -572,6 +572,17 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                              mContext->GetRegion());
     }
 
+    if (!GetOptionalStringParam(config, "Language", mLanguage, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
     if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),

@@ -57,6 +57,9 @@ public:
 
     std::vector<std::string> mCmdlines;
     std::string mAppName;
+    // Since ebpf may collect mulit-language profiling data,
+    // the language field should be set by user.
+    std::string mLanguage = "java";
     ContainerDiscoveryOptions mContainerDiscovery;
 };
 

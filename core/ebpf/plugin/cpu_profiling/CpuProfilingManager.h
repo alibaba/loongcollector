@@ -81,6 +81,7 @@ private:
         logtail::QueueKey mQueueKey = 0;
         uint32_t mPluginIndex{0};
         std::string mAppName;
+        std::string mLanguage;
     };
     ConfigKey mNextKey = 0;
     std::unordered_map<std::string, ConfigKey> mConfigNameToKey;
