@@ -107,7 +107,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     writer.String(e.GetName().to_string().c_str());
                     // __value__
                     writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
-                    writer.String(DoubleToString(e.GetValue<UntypedSingleValue>()->mValue).c_str());
+                    writer.Double(e.GetValue<UntypedSingleValue>()->mValue);
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
                     // __value__
                     writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
@@ -116,7 +116,7 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
                         writer.Key(value->first.to_string().c_str());
-                        writer.String(DoubleToString(value->second.Value).c_str());
+                        writer.Double(value->second.Value);
                     }
                     writer.EndObject();
                 }
