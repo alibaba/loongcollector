@@ -57,6 +57,7 @@ public:
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;
     }
+    size_t GetPipelineCount() const;
 
 private:
     CollectionPipelineManager() = default;

@@ -12,4 +12,5 @@ message MetricEvent {
     oneof Value {
         UntypedSingleValue UntypedSingleValue = 4;
     }
+    map<string, bytes> Metadata = 5;    // Metadata related to the metric, only used to construct the Flusher Request
 }

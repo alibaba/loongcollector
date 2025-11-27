@@ -48,6 +48,7 @@ public:
 
     bool CreateQueue(QueueKey key,
                      const std::string& flusherId,
+                     const std::string& target,
                      const CollectionPipelineContext& ctx,
                      std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap
                      = std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>(),

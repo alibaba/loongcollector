@@ -65,8 +65,8 @@ void InputProcessSecurityUnittest::TestName() {
 
 void InputProcessSecurityUnittest::TestSupportAck() {
     InputProcessSecurity input;
-    bool supportAck = input.SupportAck();
-    APSARA_TEST_TRUE(supportAck);
+    QueueType queueType = input.GetProcessQueueType();
+    APSARA_TEST_EQUAL(queueType, QueueType::COUNT_BOUNDED);
 }
 
 void InputProcessSecurityUnittest::OnSuccessfulInit() {

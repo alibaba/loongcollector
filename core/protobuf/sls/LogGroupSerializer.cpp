@@ -262,6 +262,10 @@ size_t GetMetricLabelSize(const MetricEvent& e) {
     static size_t labelSepSZ = METRIC_LABELS_SEPARATOR.size();
     static size_t keyValSepSZ = METRIC_LABELS_KEY_VALUE_SEPARATOR.size();
 
+    if (e.TagsSize() == 0) {
+        return 0;
+    }
+
     size_t valueSZ = e.TagsSize() * keyValSepSZ + (e.TagsSize() - 1) * labelSepSZ;
     for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
         valueSZ += it->first.size() + it->second.size();

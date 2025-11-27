@@ -144,8 +144,9 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
                                     const string& accessKeySecret,
                                     const std::string& secToken,
                                     AuthType type,
-                                    const string& host,
-                                    bool isHostIp,
+                                    const string& domain,
+                                    const string& ip,
+                                    bool useIP,
                                     const string& project,
                                     const string& logstore,
                                     const string& compressType,
@@ -164,12 +165,7 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
     } else {
         path.append("/shards/route");
     }
-
-    if (isHostIp) {
-        header[HOST] = project + "." + host;
-    } else {
-        header[HOST] = host;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -248,8 +244,9 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
                                        const string& accessKeySecret,
                                        const std::string& secToken,
                                        AuthType type,
-                                       const string& host,
-                                       bool isHostIp,
+                                       const string& domain,
+                                       const string& ip,
+                                       bool useIP,
                                        const string& project,
                                        const string& logstore,
                                        const string& compressType,
@@ -260,11 +257,7 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
     path = METRICSTORES;
     path.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
 
-    if (isHostIp) {
-        header[HOST] = project + "." + host;
-    } else {
-        header[HOST] = host;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -291,8 +284,9 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   const string& accessKeySecret,
                                   const std::string& secToken,
                                   AuthType type,
-                                  const string& host,
-                                  bool isHostIp,
+                                  const string& domain,
+                                  const string& ip,
+                                  bool useIP,
                                   const string& project,
                                   const string& compressType,
                                   RawDataType dataType,
@@ -300,11 +294,7 @@ void PreparePostAPMBackendRequest(const string& accessKeyId,
                                   size_t rawSize,
                                   const string& path,
                                   map<string, string>& header) {
-    if (isHostIp) {
-        header[HOST] = project + "." + host;
-    } else {
-        header[HOST] = host;
-    }
+    header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -336,7 +326,9 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                              const string& accessKeySecret,
                              const std::string& secToken,
                              AuthType type,
-                             const string& host,
+                             const string& domain,
+                             const string& ip,
+                             bool useIP,
                              bool httpsFlag,
                              const string& project,
                              const string& logstore,
@@ -351,8 +343,9 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                                    accessKeySecret,
                                    secToken,
                                    type,
-                                   host,
-                                   false, // sync request always uses vip
+                                   domain,
+                                   ip,
+                                   useIP,
                                    project,
                                    logstore,
                                    compressType,
@@ -365,8 +358,9 @@ SLSResponse PostLogStoreLogs(const string& accessKeyId,
                                    query,
                                    header);
     HttpResponse response;
+    std::string endpoint = useIP ? ip : domain;
     SendHttpRequest(
-        make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, path, query, header, body),
+        make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, path, query, header, body),
         response);
     return ParseHttpResponse(response);
 }
@@ -375,7 +369,9 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                 const string& accessKeySecret,
                                 const std::string& secToken,
                                 AuthType type,
-                                const string& host,
+                                const string& domain,
+                                const string& ip,
+                                bool useIP,
                                 bool httpsFlag,
                                 const string& project,
                                 const string& logstore,
@@ -388,8 +384,9 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       accessKeySecret,
                                       secToken,
                                       type,
-                                      host,
-                                      false, // sync request always uses vip
+                                      domain,
+                                      ip,
+                                      useIP,
                                       project,
                                       logstore,
                                       compressType,
@@ -398,8 +395,10 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
                                       path,
                                       header);
     HttpResponse response;
-    SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, path, "", header, body),
-                    response);
+    std::string endpoint = useIP ? ip : domain;
+    SendHttpRequest(
+        make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, path, "", header, body),
+        response);
     return ParseHttpResponse(response);
 }
 
@@ -407,7 +406,9 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                const string& accessKeySecret,
                                const std::string& secToken,
                                AuthType type,
-                               const string& host,
+                               const string& domain,
+                               const string& ip,
+                               bool useIP,
                                bool httpsFlag,
                                const string& project,
                                const string& compressType,
@@ -420,8 +421,9 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  accessKeySecret,
                                  secToken,
                                  type,
-                                 host,
-                                 false, // sync request always uses vip
+                                 domain,
+                                 ip,
+                                 useIP,
                                  project,
                                  compressType,
                                  dataType,
@@ -430,8 +432,9 @@ SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                  subpath,
                                  header);
     HttpResponse response;
+    std::string endpoint = useIP ? ip : domain;
     SendHttpRequest(
-        make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, subpath, "", header, body),
+        make_unique<HttpRequest>(HTTP_POST, httpsFlag, endpoint, httpsFlag ? 443 : 80, subpath, "", header, body),
         response);
     return ParseHttpResponse(response);
 }

@@ -17,7 +17,8 @@
 #include <array>
 #include <vector>
 
-#include "json/json.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
 #include "common/Flags.h"
@@ -28,35 +29,133 @@
 #include "models/MetricValue.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
-DEFINE_FLAG_BOOL(debug_sls_serializer, "", false);
-
 DECLARE_FLAG_INT32(max_send_log_group_size);
 
 using namespace std;
 
 namespace logtail {
 
-std::string SerializeSpanLinksToString(const SpanEvent& event) {
+// Maximum size threshold for thread_local buffer before reallocation
+constexpr size_t kMaxThreadLocalBufferSize = 1024 * 1024;
+
+void SerializeSpanLinksToString(const SpanEvent& event, std::string& result) {
     if (event.GetLinks().empty()) {
-        return "";
+        result.clear();
+        return;
     }
-    Json::Value jsonLinks(Json::arrayValue);
+
+    // reuse thread_local buffer to avoid repeated memory allocation
+    thread_local rapidjson::StringBuffer buffer;
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
+        buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
+    }
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+    writer.StartArray();
+
     for (const auto& link : event.GetLinks()) {
-        jsonLinks.append(link.ToJson());
+        writer.StartObject();
+
+        writer.Key(DEFAULT_TRACE_TAG_TRACE_ID.data(), DEFAULT_TRACE_TAG_TRACE_ID.size());
+        writer.String(link.GetTraceId().data(), link.GetTraceId().size());
+
+        writer.Key(DEFAULT_TRACE_TAG_SPAN_ID.data(), DEFAULT_TRACE_TAG_SPAN_ID.size());
+        writer.String(link.GetSpanId().data(), link.GetSpanId().size());
+
+        if (!link.GetTraceState().empty()) {
+            writer.Key(DEFAULT_TRACE_TAG_TRACE_STATE.data(), DEFAULT_TRACE_TAG_TRACE_STATE.size());
+            writer.String(link.GetTraceState().data(), link.GetTraceState().size());
+        }
+
+        if (link.TagsSize() > 0) {
+            writer.Key(DEFAULT_TRACE_TAG_ATTRIBUTES.data(), DEFAULT_TRACE_TAG_ATTRIBUTES.size());
+            writer.StartObject();
+            for (auto it = link.TagsBegin(); it != link.TagsEnd(); ++it) {
+                writer.Key(it->first.data(), it->first.size());
+                writer.String(it->second.data(), it->second.size());
+            }
+            writer.EndObject();
+        }
+
+        writer.EndObject();
     }
-    Json::StreamWriterBuilder writer;
-    return Json::writeString(writer, jsonLinks);
+
+    writer.EndArray();
+    result.assign(buffer.GetString(), buffer.GetSize());
 }
-std::string SerializeSpanEventsToString(const SpanEvent& event) {
+
+void SerializeSpanEventsToString(const SpanEvent& event, std::string& result) {
     if (event.GetEvents().empty()) {
-        return "";
+        result.clear();
+        return;
     }
-    Json::Value jsonEvents(Json::arrayValue);
-    for (const auto& event : event.GetEvents()) {
-        jsonEvents.append(event.ToJson());
+
+    // reuse thread_local buffer to avoid repeated memory allocation
+    thread_local rapidjson::StringBuffer buffer;
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
+        buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
     }
-    Json::StreamWriterBuilder writer;
-    return Json::writeString(writer, jsonEvents);
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+    writer.StartArray();
+
+    for (const auto& evt : event.GetEvents()) {
+        writer.StartObject();
+
+        writer.Key(DEFAULT_TRACE_TAG_SPAN_EVENT_NAME.data(), DEFAULT_TRACE_TAG_SPAN_EVENT_NAME.size());
+        writer.String(evt.GetName().data(), evt.GetName().size());
+
+        writer.Key(DEFAULT_TRACE_TAG_TIMESTAMP.data(), DEFAULT_TRACE_TAG_TIMESTAMP.size());
+        writer.Uint64(evt.GetTimestampNs());
+
+        if (evt.TagsSize() > 0) {
+            writer.Key(DEFAULT_TRACE_TAG_ATTRIBUTES.data(), DEFAULT_TRACE_TAG_ATTRIBUTES.size());
+            writer.StartObject();
+            for (auto it = evt.TagsBegin(); it != evt.TagsEnd(); ++it) {
+                writer.Key(it->first.data(), it->first.size());
+                writer.String(it->second.data(), it->second.size());
+            }
+            writer.EndObject();
+        }
+
+        writer.EndObject();
+    }
+
+    writer.EndArray();
+    result.assign(buffer.GetString(), buffer.GetSize());
+}
+
+void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result) {
+    if (event.TagsSize() == 0 && event.ScopeTagsSize() == 0) {
+        result.clear();
+        return;
+    }
+
+    // reuse thread_local buffer to avoid repeated memory allocation
+    thread_local rapidjson::StringBuffer buffer;
+    if (buffer.GetSize() > kMaxThreadLocalBufferSize) {
+        buffer = rapidjson::StringBuffer(); // reallocate to avoid holding too much memory
+    }
+    buffer.Clear();
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+
+    writer.StartObject();
+
+    for (auto it = event.TagsBegin(); it != event.TagsEnd(); ++it) {
+        writer.Key(it->first.data(), it->first.size());
+        writer.String(it->second.data(), it->second.size());
+    }
+
+    for (auto it = event.ScopeTagsBegin(); it != event.ScopeTagsEnd(); ++it) {
+        writer.Key(it->first.data(), it->first.size());
+        writer.String(it->second.data(), it->second.size());
+    }
+
+    writer.EndObject();
+
+    result.assign(buffer.GetString(), buffer.GetSize());
 }
 
 bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
@@ -148,19 +247,6 @@ bool SLSEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, stri
         }
     }
     res = std::move(serializer.GetResult());
-
-    // when function stablize, remove the following logic
-    if (BOOL_FLAG(debug_sls_serializer)) {
-        sls_logs::LogGroup logGroup;
-        if (!logGroup.ParseFromString(res)) {
-            JsonEventGroupSerializer ser(const_cast<Flusher*>(mFlusher));
-            string jsonStr;
-            ser.DoSerialize(std::move(group), jsonStr, errorMsg);
-            LOG_ERROR(sLogger,
-                      ("failed to parse log group", jsonStr)("config", mFlusher->GetContext().GetConfigName()));
-            return false;
-        }
-    }
     return true;
 }
 
@@ -205,6 +291,10 @@ void SLSEventGroupSerializer::CalculateMetricEventSize(
             contentSZ
                 += GetLogContentSize(METRIC_RESERVED_KEY_TIME_NANO.size(), e.GetTimestampNanosecond() ? 19U : 10U);
             contentSZ += GetLogContentSize(METRIC_RESERVED_KEY_LABELS.size(), metricEventContentCache[i].mLabelSize);
+            // Add metadata
+            for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                contentSZ += GetLogContentSize(it->first.size(), it->second.size());
+            }
             logGroupSZ += GetLogSize(contentSZ, false, logSZ[i]);
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             if (e.GetValue<UntypedMultiDoubleValues>()->ValuesSize() == 0) {
@@ -251,24 +341,12 @@ void SLSEventGroupSerializer::CalculateSpanEventSize(const BatchedEvents& group,
         contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_STATUS_CODE.size(), GetStatusString(e.GetStatus()).size());
         contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_TRACE_STATE.size(), e.GetTraceState().size());
 
-        // set tags and scope tags
-        Json::Value jsonVal;
-        for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
-            jsonVal[it->first.to_string()] = it->second.to_string();
-        }
-        for (auto it = e.ScopeTagsBegin(); it != e.ScopeTagsEnd(); ++it) {
-            jsonVal[it->first.to_string()] = it->second.to_string();
-        }
-        Json::StreamWriterBuilder writer;
-        std::string attrString = Json::writeString(writer, jsonVal);
-        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_ATTRIBUTES.size(), attrString.size());
-        spanEventContentCache[i][0] = std::move(attrString);
-        auto linkString = SerializeSpanLinksToString(e);
-        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_LINKS.size(), linkString.size());
-        spanEventContentCache[i][1] = std::move(linkString);
-        auto eventString = SerializeSpanEventsToString(e);
-        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_EVENTS.size(), eventString.size());
-        spanEventContentCache[i][2] = std::move(eventString);
+        SerializeSpanAttributesToString(e, spanEventContentCache[i][0]);
+        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_ATTRIBUTES.size(), spanEventContentCache[i][0].size());
+        SerializeSpanLinksToString(e, spanEventContentCache[i][1]);
+        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_LINKS.size(), spanEventContentCache[i][1].size());
+        SerializeSpanEventsToString(e, spanEventContentCache[i][2]);
+        contentSZ += GetLogContentSize(DEFAULT_TRACE_TAG_EVENTS.size(), spanEventContentCache[i][2].size());
 
         // time related
         auto startTsNs = std::to_string(e.GetStartTimeNs());
@@ -334,6 +412,16 @@ void SLSEventGroupSerializer::SerializeLogEvent(LogGroupSerializer& serializer,
 //      label2: value2
 //      value1: 123
 //      value2: 456
+// Metric with __apm_metric_type__ in Metadata
+// event: {"labels": {"label1": "value1", "label2": "value2"}, "values": {"value1": 123, "value2": 456}, "metadata":
+// {"__apm_metric_type__": "app"}} result:
+//   __time__: 1234567890
+//   content:
+//      __label__: label1#$#value1|label2#$#value2
+//      __time_nano__: 1234567890
+//      __name__: value
+//      __value__: 123
+//      __apm_metric_type__: app
 void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serializer,
                                                    BatchedEvents& group,
                                                    std::vector<MetricEventContentCacheItem>& metricEventContentCache,
@@ -357,6 +445,9 @@ void SLSEventGroupSerializer::SerializeMetricEvent(LogGroupSerializer& serialize
             serializer.AddLogContentMetricTimeNano(e);
             serializer.AddLogContent(METRIC_RESERVED_KEY_VALUE, metricEventContentCache[i].mMetricEventContentCache[0]);
             serializer.AddLogContent(METRIC_RESERVED_KEY_NAME, e.GetName());
+            for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                serializer.AddLogContent(it->first, it->second);
+            }
         } else if (e.Is<UntypedMultiDoubleValues>()) {
             const auto* const multiValue = e.GetValue<UntypedMultiDoubleValues>();
             if (metricEventContentCache[i].mMetricEventContentCache.size() != multiValue->ValuesSize()) {

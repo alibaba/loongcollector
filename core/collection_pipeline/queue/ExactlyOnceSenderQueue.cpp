@@ -16,8 +16,11 @@
 
 #include <iostream>
 
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
-#include "logger/Logger.h"
+#include "common/Flags.h"
+#include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 
 using namespace std;
@@ -29,7 +32,7 @@ ExactlyOnceSenderQueue::ExactlyOnceSenderQueue(const std::vector<RangeCheckpoint
                                                QueueKey key,
                                                const CollectionPipelineContext& ctx)
     : QueueInterface(key, checkpoints.size(), ctx),
-      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", ctx),
+      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", "", ctx),
       mRangeCheckpoints(checkpoints) {
     mQueue.resize(checkpoints.size());
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
@@ -122,6 +125,7 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
     if (Empty()) {
         return;
     }
+    auto now = chrono::system_clock::now();
     if (limit < 0) {
         for (size_t index = 0; index < mCapacity; ++index) {
             SenderQueueItem* item = mQueue[index].get();
@@ -129,6 +133,10 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
                 continue;
             }
             if (item->mStatus.load() == SendingStatus::IDLE) {
+                // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+                if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
+                    continue;
+                }
                 item->mStatus = SendingStatus::SENDING;
                 items.emplace_back(item);
             }
@@ -151,6 +159,10 @@ void ExactlyOnceSenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, 
             }
         }
         if (item->mStatus.load() == SendingStatus::IDLE) {
+            // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+            if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
+                continue;
+            }
             --limit;
             item->mStatus = SendingStatus::SENDING;
             items.emplace_back(item);

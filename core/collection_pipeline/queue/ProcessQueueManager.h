@@ -31,6 +31,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "collection_pipeline/queue/QueueParam.h"
+#include "collection_pipeline/queue/QueueType.h"
 #include "common/FeedbackInterface.h"
 
 namespace logtail {
@@ -40,8 +41,6 @@ enum class QueueStatus { OK, QUEUE_FULL, QUEUE_NOT_EXIST };
 class ProcessQueueManager : public FeedbackInterface {
 public:
     using ProcessQueueIterator = std::list<std::unique_ptr<ProcessQueueInterface>>::iterator;
-
-    enum class QueueType { BOUNDED, CIRCULAR };
 
     static constexpr uint32_t sMaxPriority = 2;
 
@@ -55,9 +54,10 @@ public:
 
     void Feedback(QueueKey key) override { Trigger(); }
 
-    bool CreateOrUpdateBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
+    bool CreateOrUpdateCountBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
     bool
     CreateOrUpdateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const CollectionPipelineContext& ctx);
+    bool CreateOrUpdateBytesBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
     bool DeleteQueue(QueueKey key);
     bool IsValidToPush(QueueKey key) const;
     // 0: success, 1: queue is full, 2: queue not found
@@ -76,13 +76,15 @@ private:
     ProcessQueueManager();
     ~ProcessQueueManager() = default;
 
-    void CreateBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
+    void CreateCountBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
     void CreateCircularQueue(QueueKey key, uint32_t priority, size_t capacity, const CollectionPipelineContext& ctx);
+    void CreateBytesBoundedQueue(QueueKey key, uint32_t priority, const CollectionPipelineContext& ctx);
     void AdjustQueuePriority(const ProcessQueueIterator& iter, uint32_t priority);
     void DeleteQueueEntity(const ProcessQueueIterator& iter);
     void ResetCurrentQueueIndex();
 
-    BoundedQueueParam mBoundedQueueParam;
+    BoundedQueueParam mCountBoundedQueueParam;
+    BoundedQueueParam mBytesBoundedQueueParam;
 
     mutable std::mutex mQueueMux;
     std::unordered_map<QueueKey, std::pair<ProcessQueueIterator, QueueType>> mQueues;
@@ -100,6 +102,7 @@ private:
     friend class PipelineUpdateUnittest;
     friend class HostMonitorInputRunnerUnittest;
     friend class ModifyHandlerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 

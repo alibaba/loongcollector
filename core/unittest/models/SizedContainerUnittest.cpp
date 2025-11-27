@@ -124,7 +124,6 @@ void SizedContainerUnittest::TestInsertAndErase() {
     }
 }
 
-
 UNIT_TEST_CASE(SizedContainerUnittest, TestInsertAndErase)
 
 } // namespace logtail

@@ -117,6 +117,10 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                     }
                     writer.EndObject();
                 }
+                for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                    writer.Key(it->first.to_string().c_str());
+                    writer.String(it->second.to_string().c_str());
+                }
                 writer.EndObject();
                 res.append(jsonBuffer.GetString());
                 res.append("\n");

@@ -207,7 +207,7 @@ void FileSecurityManagerUnittest::TestSendEvents() {
     QueueKey queueKey = QueueKeyManager::GetInstance()->GetKey("test_config");
     ctx.SetProcessQueueKey(queueKey);
     // mManager->UpdateContext(&ctx, queueKey, 1);
-    ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(queueKey, 0, ctx);
     result = cacheManager->SendEvents();
     APSARA_TEST_EQUAL(0, result);
 }

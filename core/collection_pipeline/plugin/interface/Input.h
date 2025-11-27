@@ -23,6 +23,7 @@
 
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "collection_pipeline/plugin/interface/Plugin.h"
+#include "collection_pipeline/queue/QueueType.h"
 
 namespace logtail {
 
@@ -33,7 +34,7 @@ public:
     virtual bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) = 0;
     virtual bool Start() = 0;
     virtual bool Stop(bool isPipelineRemoving) = 0;
-    virtual bool SupportAck() const = 0;
+    virtual QueueType GetProcessQueueType() const = 0;
 
     void SetInputIndex(size_t idx) { mIndex = idx; }
     std::vector<std::unique_ptr<ProcessorInstance>>& GetInnerProcessors() { return mInnerProcessors; }

@@ -469,7 +469,7 @@ std::string ContainerManager::joinContainerIDs(const std::vector<std::string>& c
 }
 
 void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     std::vector<std::string> stoppedContainerIDs;
     {
         std::lock_guard<std::mutex> lock(mStoppedContainerIDsMutex);

@@ -46,6 +46,10 @@ public:
     void Release(std::vector<MetricEvent*>&& obj);
     void Release(std::vector<SpanEvent*>&& obj);
     void Release(std::vector<RawEvent*>&& obj);
+    void Release(LogEvent* e);
+    void Release(MetricEvent* e);
+    void Release(SpanEvent* e);
+    void Release(RawEvent* e);
     void CheckGC();
 
 #ifdef APSARA_UNIT_TEST_MAIN
@@ -104,6 +108,7 @@ private:
     friend class EventPoolUnittest;
     friend class PipelineEventGroupUnittest;
     friend class BatchedEventsUnittest;
+    friend class PipelineEventPtrUnittest;
 #endif
 };
 

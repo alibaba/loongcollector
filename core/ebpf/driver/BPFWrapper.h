@@ -391,8 +391,6 @@ public:
         if (!mInited) {
             return;
         }
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_INFO, "[BPFWrapper] begin destroy \n");
-        //     LOG(INFO) << "begin to destroy bpf wrapper";
         // clear all links first
         for (auto& it : mLinks) {
             auto* link = it.second;

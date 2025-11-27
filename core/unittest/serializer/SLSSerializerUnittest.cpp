@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "rapidjson/document.h"
+
 #include "collection_pipeline/serializer/SLSSerializer.h"
+#include "common/JsonUtil.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "unittest/Unittest.h"
 
@@ -22,10 +25,18 @@ using namespace std;
 
 namespace logtail {
 
+// Forward declarations of the serialization functions
+void SerializeSpanLinksToString(const SpanEvent& event, std::string& result);
+void SerializeSpanEventsToString(const SpanEvent& event, std::string& result);
+void SerializeSpanAttributesToString(const SpanEvent& event, std::string& result);
+
 class SLSSerializerUnittest : public ::testing::Test {
 public:
     void TestSerializeEventGroup();
     void TestSerializeEventGroupList();
+    void TestSerializeSpanLinksToString();
+    void TestSerializeSpanEventsToString();
+    void TestSerializeSpanAttributesToString();
 
 protected:
     static void SetUpTestCase() { sFlusher = make_unique<FlusherSLS>(); }
@@ -40,8 +51,14 @@ protected:
 private:
     BatchedEvents
     CreateBatchedLogEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
-    BatchedEvents
-    CreateBatchedMetricEvents(bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag);
+    BatchedEvents CreateBatchedMetricEvents(bool enableNanosecond,
+                                            uint32_t nanoTimestamp,
+                                            bool emptyValue,
+                                            bool onlyOneTag,
+                                            bool noTag = false,
+                                            bool withMetadata = false);
+    BatchedEvents CreateAPMBatchedMetricEvents(
+        bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool withMetadata = false);
     BatchedEvents CreateBatchedMultiValueMetricEvents(bool enableNanosecond,
                                                       uint32_t nanoTimestamp,
                                                       bool emptyTag,
@@ -127,6 +144,32 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
         }
     } // namespace logtail
     { // metric
+        { // no tag
+            string res, errorMsg;
+            APSARA_TEST_TRUE(
+                serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false, false, true), res, errorMsg));
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_FALSE(logGroup.logs(0).has_time_ns());
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents_size(), 4);
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__labels__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
+            APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
+            APSARA_TEST_STREQ("machine_uuid", logGroup.machineuuid().c_str());
+            APSARA_TEST_STREQ("source", logGroup.source().c_str());
+            APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
+        }
         { // only 1 tag
             string res, errorMsg;
             APSARA_TEST_TRUE(serializer.DoSerialize(CreateBatchedMetricEvents(false, 0, false, true), res, errorMsg));
@@ -231,8 +274,35 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_STREQ("source", logGroup.source().c_str());
             APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
         }
-        {
-            // timestamp invalid
+        { // nano second enabled, exactly 9 digits, with metadata
+            string res, errorMsg;
+            APSARA_TEST_TRUE(serializer.DoSerialize(
+                CreateBatchedMetricEvents(true, 999999999, false, false, false, true), res, errorMsg));
+            sls_logs::LogGroup logGroup;
+            APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+
+            APSARA_TEST_EQUAL(1, logGroup.logs_size());
+            APSARA_TEST_EQUAL(1234567890U, logGroup.logs(0).time());
+            APSARA_TEST_FALSE(logGroup.logs(0).has_time_ns());
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents_size(), 5);
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__labels__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "key1#$#value1|key2#$#value2");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890999999999");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "__apm_metric_type__");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "app");
+            APSARA_TEST_EQUAL(1, logGroup.logtags_size());
+            APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
+            APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
+            APSARA_TEST_STREQ("machine_uuid", logGroup.machineuuid().c_str());
+            APSARA_TEST_STREQ("source", logGroup.source().c_str());
+            APSARA_TEST_STREQ("topic", logGroup.topic().c_str());
+        }
+        { // timestamp invalid
             string res, errorMsg;
             auto batch = CreateBatchedMetricEvents(false, 0, false, false);
             batch.mEvents[0]->SetTimestamp(123);
@@ -734,10 +804,8 @@ SLSSerializerUnittest::CreateBatchedLogEvents(bool enableNanosecond, bool withEm
     return batch;
 }
 
-BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(bool enableNanosecond,
-                                                               uint32_t nanoTimestamp,
-                                                               bool emptyValue,
-                                                               bool onlyOneTag) {
+BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(
+    bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool noTag, bool withMetadata) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
@@ -748,9 +816,11 @@ BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(bool enableNanose
     group.SetMetadataNoCopy(EventGroupMetaKey::SOURCE_ID, StringView(b.data, b.size));
     group.SetExactlyOnceCheckpoint(RangeCheckpointPtr(new RangeCheckpoint));
     MetricEvent* e = group.AddMetricEvent();
-    e->SetTag(string("key1"), string("value1"));
-    if (!onlyOneTag) {
-        e->SetTag(string("key2"), string("value2"));
+    if (!noTag) {
+        e->SetTag(string("key1"), string("value1"));
+        if (!onlyOneTag) {
+            e->SetTag(string("key2"), string("value2"));
+        }
     }
     if (enableNanosecond) {
         e->SetTimestamp(1234567890, nanoTimestamp);
@@ -762,6 +832,11 @@ BatchedEvents SLSSerializerUnittest::CreateBatchedMetricEvents(bool enableNanose
         double value = 0.1;
         e->SetValue<UntypedSingleValue>(value);
     }
+
+    if (withMetadata) {
+        e->SetMetadata(string("__apm_metric_type__"), string("app"));
+    }
+
     e->SetName("test_gauge");
     BatchedEvents batch(std::move(group.MutableEvents()),
                         std::move(group.GetSizedTags()),
@@ -901,8 +976,222 @@ BatchedEvents SLSSerializerUnittest::CreateBatchedSpanEvents() {
     return batch;
 }
 
+void SLSSerializerUnittest::TestSerializeSpanLinksToString() {
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    SpanEvent* spanEvent = group.AddSpanEvent();
+
+    // test empty links
+    {
+        string result;
+        SerializeSpanLinksToString(*spanEvent, result);
+        APSARA_TEST_TRUE_FATAL(result.empty());
+    }
+
+    // test single link with all fields
+    {
+        auto* link1 = spanEvent->AddLink();
+        link1->SetTraceId("trace-link-1");
+        link1->SetSpanId("span-link-1");
+        link1->SetTraceState("link-state-1");
+        link1->SetTag(string("link-key-1"), string("link-value-1"));
+
+        string result;
+        SerializeSpanLinksToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsArray());
+        APSARA_TEST_EQUAL_FATAL(1U, doc.Size());
+
+        const auto& linkObj = doc[0];
+        APSARA_TEST_TRUE_FATAL(linkObj.IsObject());
+        APSARA_TEST_TRUE_FATAL(linkObj.HasMember("traceId"));
+        APSARA_TEST_EQUAL_FATAL("trace-link-1", string(linkObj["traceId"].GetString()));
+        APSARA_TEST_TRUE_FATAL(linkObj.HasMember("spanId"));
+        APSARA_TEST_EQUAL_FATAL("span-link-1", string(linkObj["spanId"].GetString()));
+        APSARA_TEST_TRUE_FATAL(linkObj.HasMember("traceState"));
+        APSARA_TEST_EQUAL_FATAL("link-state-1", string(linkObj["traceState"].GetString()));
+        APSARA_TEST_TRUE_FATAL(linkObj.HasMember("attributes"));
+        APSARA_TEST_TRUE_FATAL(linkObj["attributes"].IsObject());
+        APSARA_TEST_EQUAL_FATAL("link-value-1", string(linkObj["attributes"]["link-key-1"].GetString()));
+    }
+
+    // test multiple links
+    {
+        auto* link2 = spanEvent->AddLink();
+        link2->SetTraceId("trace-link-2");
+        link2->SetSpanId("span-link-2");
+
+        string result;
+        SerializeSpanLinksToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsArray());
+        APSARA_TEST_EQUAL_FATAL(2U, doc.Size());
+
+        const auto& link2Obj = doc[1];
+        APSARA_TEST_TRUE_FATAL(link2Obj.IsObject());
+        APSARA_TEST_EQUAL_FATAL("trace-link-2", string(link2Obj["traceId"].GetString()));
+        APSARA_TEST_EQUAL_FATAL("span-link-2", string(link2Obj["spanId"].GetString()));
+        // link2 has no traceState and attributes
+        APSARA_TEST_FALSE_FATAL(link2Obj.HasMember("traceState"));
+        APSARA_TEST_FALSE_FATAL(link2Obj.HasMember("attributes"));
+    }
+}
+
+void SLSSerializerUnittest::TestSerializeSpanEventsToString() {
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    SpanEvent* spanEvent = group.AddSpanEvent();
+
+    // test empty events
+    {
+        string result;
+        SerializeSpanEventsToString(*spanEvent, result);
+        APSARA_TEST_TRUE_FATAL(result.empty());
+    }
+
+    // test single event with all fields
+    {
+        auto* event1 = spanEvent->AddEvent();
+        event1->SetName("event-1");
+        event1->SetTimestampNs(1234567890123456789ULL);
+        event1->SetTag(string("event-key-1"), string("event-value-1"));
+
+        string result;
+        SerializeSpanEventsToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsArray());
+        APSARA_TEST_EQUAL_FATAL(1U, doc.Size());
+
+        const auto& eventObj = doc[0];
+        APSARA_TEST_TRUE_FATAL(eventObj.IsObject());
+        APSARA_TEST_TRUE_FATAL(eventObj.HasMember("name"));
+        APSARA_TEST_EQUAL_FATAL("event-1", string(eventObj["name"].GetString()));
+        APSARA_TEST_TRUE_FATAL(eventObj.HasMember("timestamp"));
+        APSARA_TEST_EQUAL_FATAL(1234567890123456789ULL, eventObj["timestamp"].GetUint64());
+        APSARA_TEST_TRUE_FATAL(eventObj.HasMember("attributes"));
+        APSARA_TEST_TRUE_FATAL(eventObj["attributes"].IsObject());
+        APSARA_TEST_EQUAL_FATAL("event-value-1", string(eventObj["attributes"]["event-key-1"].GetString()));
+    }
+
+    // test multiple events
+    {
+        auto* event2 = spanEvent->AddEvent();
+        event2->SetName("event-2");
+        event2->SetTimestampNs(9876543210987654321ULL);
+
+        string result;
+        SerializeSpanEventsToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsArray());
+        APSARA_TEST_EQUAL_FATAL(2U, doc.Size());
+
+        const auto& event2Obj = doc[1];
+        APSARA_TEST_TRUE_FATAL(event2Obj.IsObject());
+        APSARA_TEST_EQUAL_FATAL("event-2", string(event2Obj["name"].GetString()));
+        APSARA_TEST_EQUAL_FATAL(9876543210987654321ULL, event2Obj["timestamp"].GetUint64());
+        // event2 has no attributes
+        APSARA_TEST_FALSE_FATAL(event2Obj.HasMember("attributes"));
+    }
+}
+
+void SLSSerializerUnittest::TestSerializeSpanAttributesToString() {
+    PipelineEventGroup group(make_shared<SourceBuffer>());
+    SpanEvent* spanEvent = group.AddSpanEvent();
+
+    // test empty attributes
+    {
+        string result;
+        SerializeSpanAttributesToString(*spanEvent, result);
+        APSARA_TEST_TRUE_FATAL(result.empty());
+    }
+
+    // test only tags
+    {
+        spanEvent->SetTag(string("tag-key-1"), string("tag-value-1"));
+        spanEvent->SetTag(string("tag-key-2"), string("tag-value-2"));
+
+        string result;
+        SerializeSpanAttributesToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsObject());
+        APSARA_TEST_EQUAL_FATAL(2U, doc.MemberCount());
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("tag-key-1"));
+        APSARA_TEST_EQUAL_FATAL("tag-value-1", string(doc["tag-key-1"].GetString()));
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("tag-key-2"));
+        APSARA_TEST_EQUAL_FATAL("tag-value-2", string(doc["tag-key-2"].GetString()));
+    }
+
+    // test tags and scope tags
+    {
+        spanEvent->SetScopeTag(string("scope-key-1"), string("scope-value-1"));
+
+        string result;
+        SerializeSpanAttributesToString(*spanEvent, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsObject());
+        APSARA_TEST_EQUAL_FATAL(3U, doc.MemberCount());
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("tag-key-1"));
+        APSARA_TEST_EQUAL_FATAL("tag-value-1", string(doc["tag-key-1"].GetString()));
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("tag-key-2"));
+        APSARA_TEST_EQUAL_FATAL("tag-value-2", string(doc["tag-key-2"].GetString()));
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("scope-key-1"));
+        APSARA_TEST_EQUAL_FATAL("scope-value-1", string(doc["scope-key-1"].GetString()));
+    }
+
+    // test only scope tags
+    {
+        PipelineEventGroup group2(make_shared<SourceBuffer>());
+        SpanEvent* spanEvent2 = group2.AddSpanEvent();
+        spanEvent2->SetScopeTag(string("scope-only-key"), string("scope-only-value"));
+
+        string result;
+        SerializeSpanAttributesToString(*spanEvent2, result);
+        APSARA_TEST_FALSE_FATAL(result.empty());
+
+        // parse and verify
+        rapidjson::Document doc;
+        doc.Parse(result.c_str());
+        APSARA_TEST_FALSE_FATAL(doc.HasParseError());
+        APSARA_TEST_TRUE_FATAL(doc.IsObject());
+        APSARA_TEST_EQUAL_FATAL(1U, doc.MemberCount());
+        APSARA_TEST_TRUE_FATAL(doc.HasMember("scope-only-key"));
+        APSARA_TEST_EQUAL_FATAL("scope-only-value", string(doc["scope-only-key"].GetString()));
+    }
+}
+
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanEventsToString)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanAttributesToString)
 
 } // namespace logtail
 

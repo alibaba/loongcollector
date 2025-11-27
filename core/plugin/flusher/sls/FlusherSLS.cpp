@@ -135,7 +135,15 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetLogstoreConcurrencyLimiter(const s
     auto limiter = iter->second.lock();
     if (!limiter) {
         limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#logstore#" + key,
-                                                  AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                  AppConfig::GetInstance()->GetSendRequestConcurrency(),
+                                                  1,
+                                                  100,
+                                                  0.5,
+                                                  0.8,
+                                                  2.0,
+                                                  60000,
+                                                  3,
+                                                  1);
         iter->second = limiter;
     }
     return limiter;
@@ -146,7 +154,15 @@ shared_ptr<ConcurrencyLimiter> FlusherSLS::GetProjectConcurrencyLimiter(const st
     auto iter = sProjectConcurrencyLimiterMap.find(project);
     if (iter == sProjectConcurrencyLimiterMap.end()) {
         auto limiter = make_shared<ConcurrencyLimiter>(sName + "#quota#project#" + project,
-                                                       AppConfig::GetInstance()->GetSendRequestConcurrency());
+                                                       AppConfig::GetInstance()->GetSendRequestConcurrency(),
+                                                       1,
+                                                       1000,
+                                                       0.5,
+                                                       0.8,
+                                                       2.0,
+                                                       60000,
+                                                       3,
+                                                       1);
         sProjectConcurrencyLimiterMap.try_emplace(project, limiter);
         return limiter;
     }
@@ -383,6 +399,18 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
                               mContext->GetRegion());
     }
 
+    // ExtraHeaders
+    if (!GetOptionalMapParam(config, "ExtraHeaders", mExtraHeaders, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
 #ifdef __ENTERPRISE__
     // Aliuid
     if (!GetOptionalStringParam(config, "Aliuid", mAliuid, errorMsg)) {
@@ -550,10 +578,12 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
     }
 
     if (!mContext->IsExactlyOnceEnabled()) {
-        GenerateQueueKey(mProject + "#" + mLogstore);
+        auto target = mProject + "#" + mLogstore;
+        GenerateQueueKey(target);
         SenderQueueManager::GetInstance()->CreateQueue(
             mQueueKey,
             mPluginID,
+            target,
             *mContext,
             {{"region", GetRegionConcurrencyLimiter(mRegion)},
              {"project", GetProjectConcurrencyLimiter(mProject)},
@@ -642,8 +672,8 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
     auto data = static_cast<SLSSenderQueueItem*>(item);
 #ifdef __ENTERPRISE__
     if (BOOL_FLAG(send_prefer_real_ip)) {
-        data->mCurrentHost = EnterpriseSLSClientManager::GetInstance()->GetRealIp(mRegion);
-        if (data->mCurrentHost.empty()) {
+        data->mCurrentDomain = EnterpriseSLSClientManager::GetInstance()->GetRealIp(mRegion);
+        if (data->mCurrentDomain.empty()) {
             auto info
                 = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
             if (mCandidateHostsInfo.get() != info.get()) {
@@ -653,10 +683,10 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
                              "to", EndpointModeToString(info->GetMode())));
                 mCandidateHostsInfo = info;
             }
-            data->mCurrentHost = mCandidateHostsInfo->GetCurrentHost();
-            data->mRealIpFlag = false;
+            data->mCurrentDomain = mCandidateHostsInfo->GetCurrentHost();
+            data->mUseIPFlag = false;
         } else {
-            data->mRealIpFlag = true;
+            data->mUseIPFlag = true;
         }
     } else {
         // in case local region endpoint mode is changed, we should always check before sending
@@ -672,9 +702,9 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
                          "to", EndpointModeToString(info->GetMode())));
             mCandidateHostsInfo = info;
         }
-        data->mCurrentHost = mCandidateHostsInfo->GetCurrentHost();
+        data->mCurrentDomain = mCandidateHostsInfo->GetCurrentHost();
     }
-    if (data->mCurrentHost.empty()) {
+    if (data->mCurrentDomain.empty()) {
         if (mCandidateHostsInfo->IsInitialized()) {
             GetRegionConcurrencyLimiter(mRegion)->OnFail(chrono::system_clock::now());
         }
@@ -683,8 +713,13 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
         return false;
     }
 #else
-    static string host = mProject + "." + mEndpoint;
-    data->mCurrentHost = host;
+    SLSClientManager::GetInstance()->GetCurrentEndpoint(
+        mProject, mEndpoint, data->mCurrentDomain, data->mCurrentIP, data->mUseIPFlag);
+    LOG_DEBUG(
+        sLogger,
+        ("get current endpoint, project", mProject)("endpoint", mEndpoint)("current domain", data->mCurrentDomain)(
+            "current ip", data->mCurrentIP)("use ip flag", data->mUseIPFlag));
+
 #endif
 
     switch (mTelemetryType) {
@@ -715,7 +750,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
     string configName = HasContext() ? GetContext().GetConfigName() : "";
-    string hostname = data->mCurrentHost;
+    string hostname = data->mCurrentDomain;
     bool isProfileData = GetProfileSender()->IsProfileData(mRegion, mProject, data->mLogstore);
     int32_t curTime = time(NULL);
     auto curSystemTime = chrono::system_clock::now();
@@ -735,8 +770,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                     + "ms")(
                 "total send time",
                 ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - item->mFirstEnqueTime).count())
-                    + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentHost)("is profile data",
-                                                                                      isProfileData));
+                    + "ms")("try cnt", data->mTryCnt)("endpoint", data->mCurrentDomain)("real ip", data->mCurrentIP)(
+                "real ip flag", data->mUseIPFlag)("is profile data", isProfileData));
         GetRegionConcurrencyLimiter(mRegion)->OnSuccess(curSystemTime);
         GetProjectConcurrencyLimiter(mProject)->OnSuccess(curSystemTime);
         GetLogstoreConcurrencyLimiter(mProject, mLogstore)->OnSuccess(curSystemTime);
@@ -757,7 +792,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
             }
             suggestion << "check network connection to endpoint";
 #ifdef __ENTERPRISE__
-            if (data->mRealIpFlag) {
+            if (data->mUseIPFlag) {
                 // connect refused, use vip directly
                 failDetail << ", real ip may be stale, force update";
                 EnterpriseSLSClientManager::GetInstance()->UpdateOutdatedRealIpRegions(mRegion);
@@ -872,10 +907,10 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         "error code", slsResponse.mErrorCode)("errMsg", slsResponse.mErrorMsg)("config", configName)( \
         "region", mRegion)("project", mProject)("logstore", data->mLogstore)("try cnt", data->mTryCnt)( \
         "response time", \
-        ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mLastSendTime).count()) \
-            + "ms")("total send time", \
-                    ToString(chrono::duration_cast<chrono::seconds>(curSystemTime - data->mFirstEnqueTime).count()) \
-                        + "ms")("endpoint", data->mCurrentHost)("is profile data", isProfileData)
+        ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mLastSendTime).count()) + "ms")( \
+        "total send time", \
+        ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mFirstEnqueTime).count()) \
+            + "ms")("endpoint", data->mCurrentDomain)("is profile data", isProfileData)
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
@@ -904,7 +939,7 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
                             + "\trequestId: " + slsResponse.mRequestId
                             + "\tstatusCode: " + ToString(slsResponse.mStatusCode)
                             + "\terrorCode: " + slsResponse.mErrorCode + "\terrorMessage: " + slsResponse.mErrorMsg
-                            + "\tconfig: " + configName + "\tendpoint: " + data->mCurrentHost,
+                            + "\tconfig: " + configName + "\tendpoint: " + data->mCurrentDomain,
                         mRegion,
                         mProject,
                         mContext ? mContext->GetConfigName() : "",
@@ -957,7 +992,7 @@ bool FlusherSLS::Send(string&& data, const string& shardHashKey, const string& l
         if (SenderQueueManager::GetInstance()->GetQueue(key) == nullptr) {
             CollectionPipelineContext ctx;
             SenderQueueManager::GetInstance()->CreateQueue(
-                key, "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
+                key, "", "", ctx, std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>());
         }
     }
     return Flusher::PushToQueue(make_unique<SLSSenderQueueItem>(std::move(compressedData),
@@ -1147,17 +1182,20 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
     const string& str = QueueKeyManager::GetInstance()->GetName(key);
     for (size_t i = 0; i < retryTimes; ++i) {
         int rst = SenderQueueManager::GetInstance()->PushQueue(key, std::move(item));
-        if (rst == 0) {
+        if (rst == 0) { // QueueStatus::OK
             return true;
         }
-        if (rst == 2) {
+        if (rst == 2) { // QueueStatus::QUEUE_NOT_EXIST
             // should not happen
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            AlarmManager::GetInstance()->SendAlarmCritical(
-                DISCARD_DATA_ALARM,
-                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str);
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                           "failed to push data to sender queue: queue not found",
+                                                           mRegion,
+                                                           mProject,
+                                                           mContext->GetConfigName(),
+                                                           mLogstore);
             return false;
         }
         if (i % 100 == 0) {
@@ -1167,12 +1205,16 @@ bool FlusherSLS::PushToQueue(QueueKey key, unique_ptr<SenderQueueItem>&& item, u
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
-    LOG_WARNING(
-        sLogger,
-        ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    AlarmManager::GetInstance()->SendAlarmCritical(
-        DISCARD_DATA_ALARM,
-        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str);
+    // QueueStatus::QUEUE_FULL
+    LOG_ERROR(sLogger,
+              ("failed to push data to sender queue",
+               "extra buffer is full")("action", "discard data")("config-flusher-dst", str));
+    AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                   "failed to push data to sender queue: extra buffer is full",
+                                                   mRegion,
+                                                   mProject,
+                                                   mContext->GetConfigName(),
+                                                   mLogstore);
     return false;
 }
 
@@ -1213,12 +1255,16 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
     }
     string path, query;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostLogStoreLogsRequest(accessKeyId,
                                    accessKeySecret,
                                    secToken,
                                    type,
-                                   item->mCurrentHost,
-                                   item->mRealIpFlag,
+                                   item->mCurrentDomain,
+                                   item->mCurrentIP,
+                                   item->mUseIPFlag,
                                    mProject,
                                    item->mLogstore,
                                    CompressTypeToString(mCompressor->GetCompressType()),
@@ -1231,9 +1277,10 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostLogStoreLogsRequest(const stri
                                    query,
                                    header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
-                                        item->mCurrentHost,
+                                        endpoint,
                                         httpsFlag ? 443 : 80,
                                         path,
                                         query,
@@ -1252,6 +1299,9 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
                                                                      SLSSenderQueueItem* item) const {
     string path, query;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostHostMetricsRequest(accessKeyId,
                                   accessKeySecret,
                                   secToken,
@@ -1263,9 +1313,10 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostHostMetricsRequest(const strin
                                   path,
                                   header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
-                                        item->mCurrentHost,
+                                        endpoint,
                                         httpsFlag ? 443 : 80,
                                         path,
                                         query,
@@ -1284,12 +1335,16 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                                                          SLSSenderQueueItem* item) const {
     string path;
     map<string, string> header;
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostMetricStoreLogsRequest(accessKeyId,
                                       accessKeySecret,
                                       secToken,
                                       type,
-                                      item->mCurrentHost,
-                                      item->mRealIpFlag,
+                                      item->mCurrentDomain,
+                                      item->mCurrentIP,
+                                      item->mUseIPFlag,
                                       mProject,
                                       item->mLogstore,
                                       CompressTypeToString(mCompressor->GetCompressType()),
@@ -1298,9 +1353,10 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostMetricStoreLogsRequest(const s
                                       path,
                                       header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
-                                        item->mCurrentHost,
+                                        endpoint,
                                         httpsFlag ? 443 : 80,
                                         path,
                                         "",
@@ -1321,12 +1377,16 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
     map<string, string> header;
     header.insert({CMS_HEADER_WORKSPACE, mWorkspace});
     header.insert({APM_HEADER_PROJECT, mProject});
+    if (!mExtraHeaders.empty()) {
+        header.insert(mExtraHeaders.begin(), mExtraHeaders.end());
+    }
     PreparePostAPMBackendRequest(accessKeyId,
                                  accessKeySecret,
                                  secToken,
                                  type,
-                                 item->mCurrentHost,
-                                 item->mRealIpFlag,
+                                 item->mCurrentDomain,
+                                 item->mCurrentIP,
+                                 item->mUseIPFlag,
                                  mProject,
                                  CompressTypeToString(mCompressor->GetCompressType()),
                                  item->mType,
@@ -1335,9 +1395,10 @@ unique_ptr<HttpSinkRequest> FlusherSLS::CreatePostAPMBackendRequest(const string
                                  mSubpath,
                                  header);
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(mRegion);
+    std::string endpoint = item->GetEndpoint();
     return make_unique<HttpSinkRequest>(HTTP_POST,
                                         httpsFlag,
-                                        item->mCurrentHost,
+                                        endpoint,
                                         httpsFlag ? 443 : 80,
                                         mSubpath,
                                         "",

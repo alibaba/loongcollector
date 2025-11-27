@@ -58,8 +58,15 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
-        if (config.isMember("SupportAck")) {
-            mSupportAck = config["SupportAck"].asBool();
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
         }
         auto processor = PluginRegistry::GetInstance()->CreateProcessor(
             ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -74,12 +81,12 @@ public:
         }
         return true;
     }
-    bool SupportAck() const override { return mSupportAck; }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
 
     void Block() { mBlockFlag = true; }
     void Unblock() { mBlockFlag = false; }
 
-    bool mSupportAck = true;
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
 
 private:
     std::atomic_bool mBlockFlag = false;
@@ -93,8 +100,15 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
-        if (config.isMember("SupportAck")) {
-            mSupportAck = config["SupportAck"].asBool();
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
         }
         auto processor = PluginRegistry::GetInstance()->CreateProcessor(
             ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -109,12 +123,12 @@ public:
         }
         return true;
     }
-    bool SupportAck() const override { return mSupportAck; }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
 
     void Block() { mBlockFlag = true; }
     void Unblock() { mBlockFlag = false; }
 
-    bool mSupportAck = true;
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
 
 private:
     std::atomic_bool mBlockFlag = false;
@@ -128,8 +142,15 @@ public:
 
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
-        if (config.isMember("SupportAck")) {
-            mSupportAck = config["SupportAck"].asBool();
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
         }
         auto processor = PluginRegistry::GetInstance()->CreateProcessor(
             ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -144,12 +165,12 @@ public:
         }
         return true;
     }
-    bool SupportAck() const override { return mSupportAck; }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
 
     void Block() { mBlockFlag = true; }
     void Unblock() { mBlockFlag = false; }
 
-    bool mSupportAck = true;
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
 
 private:
     std::atomic_bool mBlockFlag = false;
@@ -206,7 +227,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
     bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
@@ -229,7 +250,7 @@ public:
     const std::string& Name() const override { return sName; }
     bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
     bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }

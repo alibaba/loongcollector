@@ -80,7 +80,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     auto queueKey = QueueKeyManager::GetInstance()->GetKey(configName);
     auto ctx = CollectionPipelineContext();
     ctx.SetConfigName(configName);
-    ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(queueKey, 0, ctx);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(queueKey, 0, ctx);
 
     auto mockCollector = std::make_unique<MockCollector>();
     auto collectContext = std::make_shared<HostMonitorContext>(configName,

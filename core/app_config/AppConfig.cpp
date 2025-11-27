@@ -72,6 +72,7 @@ DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-
 DEFINE_FLAG_STRING(logtail_sys_conf_dir, "store machine-unique-id, user-defined-id, aliuid", "C:\\LogtailData\\");
 #endif
 DEFINE_FLAG_STRING(default_include_config_path, "", "config.d");
+DEFINE_FLAG_INT32(default_max_sender_queue_extra_buffer_size_bytes, "default extra buffer size", 100 * 1024 * 1024);
 
 DEFINE_FLAG_INT32(default_oas_connect_timeout, "default (minimum) connect timeout for OSARequest", 5);
 DEFINE_FLAG_INT32(default_oas_request_timeout, "default (minimum) request timeout for OSARequest", 10);
@@ -683,7 +684,7 @@ void AppConfig::LoadLocalInstanceConfig() {
     }
     InstanceConfigWatcher::GetInstance()->AddSource(localConfigPath.string());
     InstanceConfigDiff instanceConfigDiff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
-    if (!instanceConfigDiff.IsEmpty()) {
+    if (instanceConfigDiff.HasDiff()) {
         InstanceConfigManager::GetInstance()->UpdateInstanceConfigs(instanceConfigDiff);
     }
 }

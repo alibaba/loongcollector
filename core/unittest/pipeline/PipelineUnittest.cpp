@@ -23,7 +23,7 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/batch/TimeoutFlushManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "common/JsonUtil.h"
@@ -476,7 +476,7 @@ void PipelineUnittest::OnFailedInit() const {
                 },
                 {
                     "Type": "input_mock",
-                    "SupportAck": false
+                    "QueueType": "CIRCULAR"
                 }
             ],
             "flushers": [
@@ -2412,14 +2412,14 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
-    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
+    APSARA_TEST_EQUAL(QueueType::COUNT_BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
     APSARA_TEST_EQUAL(0U, (*que)->GetPriority());
-    APSARA_TEST_EQUAL(1U, static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks.size());
+    APSARA_TEST_EQUAL(1U, static_cast<CountBoundedProcessQueue*>(que->get())->mUpStreamFeedbacks.size());
     APSARA_TEST_EQUAL(InputFeedbackInterfaceRegistry::GetInstance()->GetFeedbackInterface("input_file"),
-                      static_cast<BoundedProcessQueue*>(que->get())->mUpStreamFeedbacks[0]);
+                      static_cast<CountBoundedProcessQueue*>(que->get())->mUpStreamFeedbacks[0]);
     APSARA_TEST_EQUAL(1U, (*que)->mDownStreamQueues.size());
     // pipeline level
     APSARA_TEST_EQUAL(key, pipeline->GetContext().GetProcessQueueKey());
@@ -2457,7 +2457,7 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
-    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
+    APSARA_TEST_EQUAL(QueueType::COUNT_BOUNDED, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
@@ -2477,11 +2477,11 @@ void PipelineUnittest::TestProcessQueue() const {
             "inputs": [
                 {
                     "Type": "input_mock",
-                    "SupportAck": false
+                    "QueueType": "CIRCULAR"
                 },
                 {
                     "Type": "input_mock",
-                    "SupportAck": false
+                    "QueueType": "CIRCULAR"
                 }
             ],
             "flushers": [
@@ -2504,8 +2504,7 @@ void PipelineUnittest::TestProcessQueue() const {
 
     key = QueueKeyManager::GetInstance()->GetKey(configName);
     que = ProcessQueueManager::GetInstance()->mQueues[key].first;
-    APSARA_TEST_EQUAL(ProcessQueueManager::QueueType::CIRCULAR,
-                      ProcessQueueManager::GetInstance()->mQueues[key].second);
+    APSARA_TEST_EQUAL(QueueType::CIRCULAR, ProcessQueueManager::GetInstance()->mQueues[key].second);
     // queue level
     APSARA_TEST_EQUAL(configName, (*que)->GetConfigName());
     APSARA_TEST_EQUAL(key, (*que)->GetKey());
@@ -3023,8 +3022,8 @@ void PipelineUnittest::TestInProcessingCount() const {
     pipeline->mInProcessCnt.store(0);
 
     CollectionPipelineContext ctx;
-    unique_ptr<BoundedProcessQueue> processQueue;
-    processQueue.reset(new BoundedProcessQueue(2, 2, 3, 0, 1, ctx));
+    unique_ptr<CountBoundedProcessQueue> processQueue;
+    processQueue.reset(new CountBoundedProcessQueue(2, 2, 3, 0, 1, ctx));
 
     vector<PipelineEventGroup> group;
     group.emplace_back(make_shared<SourceBuffer>());

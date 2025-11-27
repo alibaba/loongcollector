@@ -24,10 +24,12 @@
 
 #include "MetricValue.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "logger/Logger.h"
 
 DEFINE_FLAG_INT32(basic_host_monitor_mem_collect_interval, "basic host monitor mem collect interval, seconds", 5);
@@ -60,43 +62,43 @@ bool MemCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
     metricEvent->SetTimestamp(meminfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-    multiDoubleValues->SetValue(std::string("memory_usedutilization_min"),
+    multiDoubleValues->SetValue(kMemoryUsedutilizationMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.usedPercent});
-    multiDoubleValues->SetValue(std::string("memory_usedutilization_max"),
+    multiDoubleValues->SetValue(kMemoryUsedutilizationMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.usedPercent});
-    multiDoubleValues->SetValue(std::string("memory_usedutilization_avg"),
+    multiDoubleValues->SetValue(kMemoryUsedutilizationAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.usedPercent});
-    multiDoubleValues->SetValue(std::string("memory_freeutilization_min"),
+    multiDoubleValues->SetValue(kMemoryFreeutilizationMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.freePercent});
-    multiDoubleValues->SetValue(std::string("memory_freeutilization_max"),
+    multiDoubleValues->SetValue(kMemoryFreeutilizationMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.freePercent});
-    multiDoubleValues->SetValue(std::string("memory_freeutilization_avg"),
+    multiDoubleValues->SetValue(kMemoryFreeutilizationAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.freePercent});
-    multiDoubleValues->SetValue(std::string("memory_actualusedspace_min"),
+    multiDoubleValues->SetValue(kMemoryActualusedspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.actualUsed});
-    multiDoubleValues->SetValue(std::string("memory_actualusedspace_max"),
+    multiDoubleValues->SetValue(kMemoryActualusedspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.actualUsed});
-    multiDoubleValues->SetValue(std::string("memory_actualusedspace_avg"),
+    multiDoubleValues->SetValue(kMemoryActualusedspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.actualUsed});
-    multiDoubleValues->SetValue(std::string("memory_freespace_min"),
+    multiDoubleValues->SetValue(kMemoryFreespaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.free});
-    multiDoubleValues->SetValue(std::string("memory_freespace_max"),
+    multiDoubleValues->SetValue(kMemoryFreespaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.free});
-    multiDoubleValues->SetValue(std::string("memory_freespace_avg"),
+    multiDoubleValues->SetValue(kMemoryFreespaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.free});
-    multiDoubleValues->SetValue(std::string("memory_usedspace_min"),
+    multiDoubleValues->SetValue(kMemoryUsedspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.used});
-    multiDoubleValues->SetValue(std::string("memory_usedspace_max"),
+    multiDoubleValues->SetValue(kMemoryUsedspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.used});
-    multiDoubleValues->SetValue(std::string("memory_usedspace_avg"),
+    multiDoubleValues->SetValue(kMemoryUsedspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.used});
-    multiDoubleValues->SetValue(std::string("memory_totalspace_min"),
+    multiDoubleValues->SetValue(kMemoryTotalspaceMin,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, minMem.total});
-    multiDoubleValues->SetValue(std::string("memory_totalspace_max"),
+    multiDoubleValues->SetValue(kMemoryTotalspaceMax,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, maxMem.total});
-    multiDoubleValues->SetValue(std::string("memory_totalspace_avg"),
+    multiDoubleValues->SetValue(kMemoryTotalspaceAvg,
                                 UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, avgMem.total});
-    metricEvent->SetTag(std::string("m"), std::string("system.memory"));
+    metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemMemory);
     return true;
 }
 

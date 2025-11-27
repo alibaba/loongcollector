@@ -551,6 +551,7 @@ public:
     friend class EnterpriseConfigProviderUnittest;
     friend class PollingPreservedDirDepthUnittest;
     friend class InputStaticFileUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 

@@ -18,8 +18,11 @@ project(queue_unittest)
 add_executable(queue_key_manager_unittest QueueKeyManagerUnittest.cpp)
 target_link_libraries(queue_key_manager_unittest ${UT_BASE_TARGET})
 
-add_executable(bounded_process_queue_unittest BoundedProcessQueueUnittest.cpp)
-target_link_libraries(bounded_process_queue_unittest ${UT_BASE_TARGET})
+add_executable(count_bounded_process_queue_unittest CountBoundedProcessQueueUnittest.cpp)
+target_link_libraries(count_bounded_process_queue_unittest ${UT_BASE_TARGET})
+
+add_executable(bytes_bounded_process_queue_unittest BytesBoundedProcessQueueUnittest.cpp)
+target_link_libraries(bytes_bounded_process_queue_unittest ${UT_BASE_TARGET})
 
 add_executable(circular_process_queue_unittest CircularProcessQueueUnittest.cpp)
 target_link_libraries(circular_process_queue_unittest ${UT_BASE_TARGET})
@@ -44,7 +47,8 @@ target_link_libraries(queue_param_unittest ${UT_BASE_TARGET})
 
 include(GoogleTest)
 gtest_discover_tests(queue_key_manager_unittest)
-gtest_discover_tests(bounded_process_queue_unittest)
+gtest_discover_tests(count_bounded_process_queue_unittest)
+gtest_discover_tests(bytes_bounded_process_queue_unittest)
 gtest_discover_tests(circular_process_queue_unittest)
 gtest_discover_tests(process_queue_manager_unittest)
 gtest_discover_tests(sender_queue_unittest)

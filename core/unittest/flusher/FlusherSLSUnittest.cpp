@@ -163,7 +163,10 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "TelemetryType": "logs",
             "ShardHashKeys": [
                 "__source__"
-            ]
+            ],
+            "ExtraHeaders": {
+                "x-header-key": "value"
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -186,6 +189,8 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_EQUAL(1U, flusher->mShardHashKeys.size());
     APSARA_TEST_EQUAL("__source__", flusher->mShardHashKeys[0]);
+    APSARA_TEST_EQUAL(1U, flusher->mExtraHeaders.size());
+    APSARA_TEST_EQUAL("value", flusher->mExtraHeaders["x-header-key"]);
     SenderQueueManager::GetInstance()->Clear();
 
     // invalid optional param
@@ -197,7 +202,8 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
             "Region": true,
             "Aliuid": true,
             "TelemetryType": true,
-            "ShardHashKeys": true
+            "ShardHashKeys": true,
+            "ExtraHeaders": true
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -220,6 +226,7 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL("", flusher->mAliuid);
     APSARA_TEST_EQUAL(sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS, flusher->mTelemetryType);
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
+    APSARA_TEST_TRUE(flusher->mExtraHeaders.empty());
     SenderQueueManager::GetInstance()->Clear();
 
 #ifdef __ENTERPRISE__
@@ -409,6 +416,31 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
     flusher->CommitMetricsRecordRef();
     APSARA_TEST_TRUE(flusher->mShardHashKeys.empty());
+    ctx.SetExactlyOnceFlag(false);
+    SenderQueueManager::GetInstance()->Clear();
+
+    // ExtraHeaders
+    configStr = R"(
+        {
+            "Type": "flusher_sls",
+            "Project": "test_project",
+            "Logstore": "test_logstore",
+            "Region": "test_region",
+            "Endpoint": "test_region.log.aliyuncs.com",
+            "ExtraHeaders": {
+                "x-header-key": "value"
+            }
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    flusher.reset(new FlusherSLS());
+    ctx.SetExactlyOnceFlag(true);
+    flusher->SetContext(ctx);
+    flusher->CreateMetricsRecordRef(FlusherSLS::sName, "1");
+    APSARA_TEST_TRUE(flusher->Init(configJson, optionalGoPipeline));
+    flusher->CommitMetricsRecordRef();
+    APSARA_TEST_EQUAL(1U, flusher->mExtraHeaders.size());
+    APSARA_TEST_EQUAL("value", flusher->mExtraHeaders["x-header-key"]);
     ctx.SetExactlyOnceFlag(false);
     SenderQueueManager::GetInstance()->Clear();
 
@@ -824,7 +856,10 @@ void FlusherSLSUnittest::TestBuildRequest() {
             "Logstore": "test_logstore",
             "Region": "test_region-b",
             "Aliuid": "1234567890",
-            "Endpoint": "test_endpoint"
+            "Endpoint": "test_endpoint",
+            "ExtraHeaders": {
+                "x-header-key": "value"
+            }
         }
     )";
     APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
@@ -896,9 +931,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL("/logstores/test_logstore/shards/lb", req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -914,6 +949,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -933,11 +969,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_traces telemetry type
@@ -957,9 +993,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(APM_TRACES_URL, req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(14U, req->mHeader.size());
+        APSARA_TEST_EQUAL(15U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(13U, req->mHeader.size());
+        APSARA_TEST_EQUAL(14U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -975,6 +1011,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -994,11 +1031,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_metrics telemetry type
@@ -1018,9 +1055,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(APM_METRICS_URL, req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(14U, req->mHeader.size());
+        APSARA_TEST_EQUAL(15U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(13U, req->mHeader.size());
+        APSARA_TEST_EQUAL(14U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1036,6 +1073,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1055,11 +1093,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // arms_agentinfo telemetry type
@@ -1079,9 +1117,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(APM_AGENTINFOS_URL, req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(14U, req->mHeader.size());
+        APSARA_TEST_EQUAL(15U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(13U, req->mHeader.size());
+        APSARA_TEST_EQUAL(14U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1097,6 +1135,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1116,11 +1155,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     flusher.mTelemetryType = sls_logs::SLS_TELEMETRY_TYPE_LOGS;
@@ -1143,9 +1182,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL("/logstores/test_logstore/shards/lb", req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(13U, req->mHeader.size());
+        APSARA_TEST_EQUAL(14U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1162,6 +1201,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(bodyLenStr, req->mHeader[X_LOG_BODYRAWSIZE]);
         APSARA_TEST_EQUAL(LOG_MODE_BATCH_GROUP, req->mHeader[X_LOG_MODE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1182,9 +1222,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     {
@@ -1207,9 +1247,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         map<string, string> params{{"key", "hash_key"}};
         APSARA_TEST_EQUAL(GetQueryString(params), req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1225,6 +1265,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1244,11 +1285,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     {
@@ -1276,9 +1317,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         map<string, string> params{{"key", "hash_key_0"}, {"seqid", "1"}};
         APSARA_TEST_EQUAL(GetQueryString(params), req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1294,6 +1335,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1313,11 +1355,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     // metric telemtery type
@@ -1334,9 +1376,9 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL("/prometheus/test_project/test_logstore/api/v1/write", req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
 #else
-        APSARA_TEST_EQUAL(11U, req->mHeader.size());
+        APSARA_TEST_EQUAL(12U, req->mHeader.size());
 #endif
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", req->mHeader[HOST]);
@@ -1352,6 +1394,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
 #ifdef __ENTERPRISE__
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
 #endif
@@ -1371,11 +1414,11 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
 #ifdef __ENTERPRISE__
-        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_region-b.log.aliyuncs.com", item.mCurrentDomain);
 #else
-        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentHost);
+        APSARA_TEST_EQUAL("test_project.test_endpoint", item.mCurrentDomain);
 #endif
     }
     flusher.mTelemetryType = sls_logs::SlsTelemetryType::SLS_TELEMETRY_TYPE_LOGS;
@@ -1407,7 +1450,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_FALSE(req->mHTTPSFlag);
         APSARA_TEST_EQUAL("/logstores/test_logstore/shards/lb", req->mUrl);
         APSARA_TEST_EQUAL("", req->mQueryString);
-        APSARA_TEST_EQUAL(12U, req->mHeader.size());
+        APSARA_TEST_EQUAL(13U, req->mHeader.size());
         APSARA_TEST_EQUAL("test_project.192.168.0.1", req->mHeader[HOST]);
         APSARA_TEST_EQUAL(SLSClientManager::GetInstance()->GetUserAgent(), req->mHeader[USER_AGENT]);
         APSARA_TEST_FALSE(req->mHeader[DATE].empty());
@@ -1418,6 +1461,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
         APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
         APSARA_TEST_EQUAL(body, req->mBody);
@@ -1427,8 +1471,8 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_TRUE(item.mRealIpFlag);
-        APSARA_TEST_EQUAL("192.168.0.1", item.mCurrentHost);
+        APSARA_TEST_TRUE(item.mUseIPFlag);
+        APSARA_TEST_EQUAL("192.168.0.1", item.mCurrentDomain);
     }
     {
         // ip empty
@@ -1445,6 +1489,7 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(HMAC_SHA1, req->mHeader[X_LOG_SIGNATUREMETHOD]);
         APSARA_TEST_EQUAL("lz4", req->mHeader[X_LOG_COMPRESSTYPE]);
         APSARA_TEST_EQUAL(rawSizeStr, req->mHeader[X_LOG_BODYRAWSIZE]);
+        APSARA_TEST_EQUAL("value", req->mHeader["x-header-key"]);
         APSARA_TEST_EQUAL(MD5_SHA1_SALT_KEYPROVIDER, req->mHeader[X_LOG_KEYPROVIDER]);
         APSARA_TEST_FALSE(req->mHeader[AUTHORIZATION].empty());
         APSARA_TEST_EQUAL(body, req->mBody);
@@ -1454,8 +1499,8 @@ void FlusherSLSUnittest::TestBuildRequest() {
         APSARA_TEST_EQUAL(1U, req->mMaxTryCnt);
         APSARA_TEST_FALSE(req->mFollowRedirects);
         APSARA_TEST_EQUAL(&item, req->mItem);
-        APSARA_TEST_FALSE(item.mRealIpFlag);
-        APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, item.mCurrentHost);
+        APSARA_TEST_FALSE(item.mUseIPFlag);
+        APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, item.mCurrentDomain);
     }
     {
         // ip empty, and region mode changed

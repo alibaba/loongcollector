@@ -14,6 +14,7 @@
 
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
+#include "protobuf/sls/LogGroupSerializer.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
 
@@ -40,8 +41,12 @@ protected:
 private:
     BatchedEvents
     createBatchedLogEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
-    BatchedEvents createBatchedMetricEvents(
-        bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue = false);
+    BatchedEvents createBatchedMetricEvents(bool enableNanosecond,
+                                            uint32_t nanoTimestamp,
+                                            bool emptyValue,
+                                            bool onlyOneTag,
+                                            bool multiValue = false,
+                                            bool withMetadata = false);
     BatchedEvents
     createBatchedRawEvents(bool enableNanosecond, bool withEmptyContent = false, bool withNonEmptyContent = true);
     BatchedEvents createBatchedSpanEvents();
@@ -104,6 +109,18 @@ void JsonSerializerUnittest::TestSerializeEventGroup() {
                               "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
                               "\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1}\n",
                               res);
+            APSARA_TEST_EQUAL("", errorMsg);
+        }
+        { // with metadata
+            string res;
+            string errorMsg;
+            APSARA_TEST_TRUE(
+                serializer.DoSerialize(createBatchedMetricEvents(false, 0, false, true, false, true), res, errorMsg));
+            APSARA_TEST_EQUAL(
+                "{\"__machine_uuid__\":\"machine_uuid\",\"__pack_id__\":\"pack_id\",\"__source__\":"
+                "\"source\",\"__topic__\":\"topic\",\"__time__\":1234567890,\"__labels__\":{\"key1\":"
+                "\"value1\"},\"__name__\":\"test_gauge\",\"__value__\":0.1,\"__apm_metric_type__\":\"app\"}\n",
+                res);
             APSARA_TEST_EQUAL("", errorMsg);
         }
         { // multi value
@@ -298,8 +315,12 @@ JsonSerializerUnittest::createBatchedLogEvents(bool enableNanosecond, bool withE
     return batch;
 }
 
-BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(
-    bool enableNanosecond, uint32_t nanoTimestamp, bool emptyValue, bool onlyOneTag, bool multiValue) {
+BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(bool enableNanosecond,
+                                                                uint32_t nanoTimestamp,
+                                                                bool emptyValue,
+                                                                bool onlyOneTag,
+                                                                bool multiValue,
+                                                                bool withMetadata) {
     PipelineEventGroup group(make_shared<SourceBuffer>());
     group.SetTag(LOG_RESERVED_KEY_TOPIC, "topic");
     group.SetTag(LOG_RESERVED_KEY_SOURCE, "source");
@@ -332,6 +353,9 @@ BatchedEvents JsonSerializerUnittest::createBatchedMetricEvents(
         }
     }
     e->SetName("test_gauge");
+    if (withMetadata) {
+        e->SetMetadata("__apm_metric_type__", string("app"));
+    }
     BatchedEvents batch(std::move(group.MutableEvents()),
                         std::move(group.GetSizedTags()),
                         std::move(group.GetSourceBuffer()),
@@ -396,6 +420,7 @@ BatchedEvents JsonSerializerUnittest::createBatchedSpanEvents() {
     spanEvent->SetTag(std::string("callType"), std::string("http-client"));
     spanEvent->SetTag(std::string("statusCode"), std::string("200"));
     spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+    spanEvent->SortTags();
     auto innerEvent = spanEvent->AddEvent();
     innerEvent->SetTag(std::string("innner-event-key-0"), std::string("inner-event-value-0"));
     innerEvent->SetTag(std::string("innner-event-key-1"), std::string("inner-event-value-1"));
