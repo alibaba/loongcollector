@@ -21,6 +21,13 @@ namespace logtail::ebpf {
 
 class CpuProfilingManager : public AbstractManager {
 public:
+    static const std::string kProfileCpuValue;
+    static const std::string kEmptyValue;
+    static const std::string kNanosecondsValue;
+    static const std::string kOneValue;
+    static const std::string kCpuValue;
+    static const std::string kCallStackValue;
+
     CpuProfilingManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
