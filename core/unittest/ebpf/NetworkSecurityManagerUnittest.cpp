@@ -45,9 +45,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerEventHandling() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
 
     // 测试TCP连接事件
     auto connectEvent
@@ -123,9 +121,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
 
     APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
 
@@ -178,9 +174,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerAggregation() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
 
     // 创建多个相关的网络事件
     std::vector<std::shared_ptr<NetworkEvent>> events;

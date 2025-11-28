@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdlib>
+
 #include <mutex>
 
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
@@ -39,7 +40,7 @@ void ProcessDiscoveryManagerUnittest::TestStartAndStop() {
     ProcessDiscoveryManager::GetInstance()->Stop();
     ProcessDiscoveryManager::GetInstance()->Start(callback);
     ProcessDiscoveryManager::GetInstance()->Stop();
-    
+
     // scope
     {
         ProcessDiscoveryManager manager;
@@ -51,37 +52,27 @@ void ProcessDiscoveryManagerUnittest::TestStartAndStop() {
 
 void ProcessDiscoveryManagerUnittest::TestSingleConfig() {
     std::atomic<int> count = 0;
-    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) {
-        count += r.size();
-    };
+    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
     manager.Start(callback);
 
     // watch single config
-    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
-        .mRegexs = {boost::regex("sleep.+")}
-    });
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 1);
 }
 
 void ProcessDiscoveryManagerUnittest::TestMultiConfig() {
     std::atomic<int> count = 0;
-    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) {
-        count += r.size();
-    };
+    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
     manager.Start(callback);
 
     // watch single config
-    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
-        .mRegexs = {boost::regex("sleep.+")}
-    });
-    manager.AddDiscovery("test_watch2", ProcessDiscoveryConfig{
-        .mRegexs = {boost::regex("sleep.+")}
-    });
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
+    manager.AddDiscovery("test_watch2", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 2);
 }
@@ -95,22 +86,18 @@ void ProcessDiscoveryManagerUnittest::TestUpdateConfig() {
     // ok to update "test_watch"
     APSARA_TEST_TRUE(manager.UpdateDiscovery("test_watch", [](ProcessDiscoveryConfig& config) {}));
 
-    // not ok to update "test_watch2" 
+    // not ok to update "test_watch2"
     APSARA_TEST_FALSE(manager.UpdateDiscovery("test_watch2", [](ProcessDiscoveryConfig& config) {}));
 }
 
 void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {
     std::atomic<int> count = 0;
-    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) {
-        count += r.size();
-    };
+    auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
     manager.Start(callback);
 
-    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{
-        .mRegexs = {boost::regex("sleep.+")}
-    });
+    manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 1);
 
