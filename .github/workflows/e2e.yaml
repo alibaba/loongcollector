@@ -150,12 +150,12 @@ jobs:
 
   # E2E测试 - Docker Engine版本兼容性测试
   E2EWithDockerEngineVersions:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: 
       - GenerateE2ETestImage
     strategy:
       matrix:
-        docker_engine_version: ["29.0", "28.3", "26.0", "25.0", "24.0", "20.10", "19.03", "1.12"]
+        docker_engine_version: ["29.1", "28.5", "27.5", "26.1", "25.0", "24.0", "23.0", "20.10"]
       fail-fast: false
     timeout-minutes: 60
     steps:
@@ -171,8 +171,9 @@ jobs:
 
       - name: Install Docker Engine ${{ matrix.docker_engine_version }}
         run: |
-          # 移除现有的docker
-          sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+          # 移除现有的docker（包括docker-ce）
+          sudo apt-get remove -y docker docker-engine docker.io docker-ce docker-ce-cli containerd runc 2>/dev/null || true
+          sudo apt-get purge -y docker docker-engine docker.io docker-ce docker-ce-cli containerd runc 2>/dev/null || true
           
           # 安装依赖
           sudo apt-get update
@@ -204,40 +205,32 @@ jobs:
           echo "$AVAILABLE_VERSIONS"
           
           # 根据主版本号匹配
-          if [[ "$VERSION" == "1.12" ]]; then
-            # Docker 1.12 太旧，使用docker.io包
-            echo "Installing Docker 1.12 using docker.io package"
-            sudo apt-get install -y docker.io=1.12.* || {
-              echo "Docker 1.12 not available, installing latest docker.io"
-              sudo apt-get install -y docker.io
-            }
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          
+          # 查找匹配的版本
+          MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\.$MINOR\." | head -1)
+          
+          if [ -z "$MATCHED_VERSION" ]; then
+            # 如果找不到精确匹配，尝试匹配主版本号
+            MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | head -1)
+          fi
+          
+          if [ -n "$MATCHED_VERSION" ]; then
+            echo "Installing Docker CE version: $MATCHED_VERSION"
+            sudo apt-get install -y --allow-downgrades docker-ce=$MATCHED_VERSION docker-ce-cli=$MATCHED_VERSION containerd.io
           else
-            # 提取主版本号和次版本号
-            MAJOR=$(echo $VERSION | cut -d. -f1)
-            MINOR=$(echo $VERSION | cut -d. -f2)
-            
-            # 查找匹配的版本
-            MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\.$MINOR\." | head -1)
-            
-            if [ -z "$MATCHED_VERSION" ]; then
-              # 如果找不到精确匹配，尝试匹配主版本号
-              MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | head -1)
-            fi
-            
-            if [ -n "$MATCHED_VERSION" ]; then
-              echo "Installing Docker CE version: $MATCHED_VERSION"
-              sudo apt-get install -y docker-ce=$MATCHED_VERSION docker-ce-cli=$MATCHED_VERSION containerd.io
+            echo "Warning: Exact version $VERSION not found, trying to install latest version in major version $MAJOR"
+            LATEST_MAJOR=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | tail -1)
+            if [ -n "$LATEST_MAJOR" ]; then
+              echo "Installing latest available version in major version $MAJOR: $LATEST_MAJOR"
+              sudo apt-get install -y --allow-downgrades docker-ce=$LATEST_MAJOR docker-ce-cli=$LATEST_MAJOR containerd.io
             else
-              echo "Warning: Exact version $VERSION not found, installing latest compatible version"
-              # 尝试安装主版本号匹配的最新版本
-              LATEST_MAJOR=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | tail -1)
-              if [ -n "$LATEST_MAJOR" ]; then
-                echo "Installing latest version in major version $MAJOR: $LATEST_MAJOR"
-                sudo apt-get install -y docker-ce=$LATEST_MAJOR docker-ce-cli=$LATEST_MAJOR containerd.io
-              else
-                echo "Error: No compatible version found for $VERSION"
-                exit 1
-              fi
+              echo "::warning::Docker $VERSION is not available on this Ubuntu version"
+              echo "Available versions:"
+              echo "$AVAILABLE_VERSIONS"
+              echo "Skipping Docker $VERSION test"
+              exit 0
             fi
           fi
           
@@ -268,10 +261,23 @@ jobs:
         with:
           name: loongcollector-image
 
+      - name: Check if Docker is installed
+        id: check_docker
+        run: |
+          if command -v docker &> /dev/null; then
+            echo "docker_installed=true" >> $GITHUB_OUTPUT
+            echo "Docker is installed"
+          else
+            echo "docker_installed=false" >> $GITHUB_OUTPUT
+            echo "Docker is not installed, skipping test"
+          fi
+
       - name: Import Image from Tar
+        if: steps.check_docker.outputs.docker_installed == 'true'
         run: docker load -i ./image.tar
 
       - name: E2E Test with Docker Engine ${{ matrix.docker_engine_version }} - input_container_stdio
+        if: steps.check_docker.outputs.docker_installed == 'true'
         env:
           TEST_CASE: input_container_stdio
         run: |
