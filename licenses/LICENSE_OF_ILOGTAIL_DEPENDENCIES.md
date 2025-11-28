@@ -63,6 +63,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/xdg-go/pbkdf2](https://pkg.go.dev/github.com/xdg-go/pbkdf2?tab=licenses)
 - [github.com/xdg-go/scram](https://pkg.go.dev/github.com/xdg-go/scram?tab=licenses)
 - [github.com/xdg-go/stringprep](https://pkg.go.dev/github.com/xdg-go/stringprep?tab=licenses)
+- [github.com/apache/doris/sdk/go-doris-sdk](https://pkg.go.dev/github.com/apache/doris/sdk/go-doris-sdk?tab=licenses)
 - [github.com/apache/pulsar-client-go](https://pkg.go.dev/github.com/apache/pulsar-client-go?tab=licenses)
 - [github.com/AthenZ/athenz](https://pkg.go.dev/github.com/AthenZ/athenz?tab=licenses)
 - [github.com/ardielle/ardielle-go](https://pkg.go.dev/github.com/ardielle/ardielle-go?tab=licenses)
