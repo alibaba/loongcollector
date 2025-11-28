@@ -66,16 +66,13 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 	if err := c.createComposeFile(); err != nil {
 		return err
 	}
-	dc, err := composeModule.NewDockerCompose(config.CaseHome + finalFileName)
-	if err != nil {
-		return err
-	}
-	strategyWrappers := withExposedService(dc)
-	err = dc.Up(ctx)
-	if err != nil {
+	compose := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).WithCommand([]string{"up", "-d", "--build"})
+	strategyWrappers := withExposedService(compose)
+	execError := compose.Invoke()
+	if execError.Error != nil {
 		logger.Error(context.Background(), "START_DOCKER_COMPOSE_ERROR",
-			"stdout", err.Error())
-		return err
+			"stdout", execError.Error.Error())
+		return execError.Error
 	}
 	cli, err := CreateDockerClient()
 	if err != nil {
@@ -107,14 +104,11 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 }
 
 func (c *ComposeBenchmarkBooter) Stop() error {
-	dc, err := composeModule.NewDockerCompose(config.CaseHome + finalFileName)
-	if err != nil {
-		return err
-	}
-	if err := dc.Down(context.Background()); err != nil {
+	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
+	if execError.Error != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
-			"err", err.Error())
-		return err
+			"err", execError.Error.Error())
+		return execError.Error
 	}
 	_ = os.Remove(config.CaseHome + finalFileName)
 	return nil
@@ -164,8 +158,6 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 		}
 	}
 	cfg := c.getAdvisorConfig(filepath.Base(filepath.Dir(config.CaseHome)))
-	// ensure compose project name for benchmark is stable
-	cfg["name"] = benchmarkIdentifier
 	services := cfg["services"].(map[string]interface{})
 	// merge docker compose file.
 	if len(bytes) > 0 {
