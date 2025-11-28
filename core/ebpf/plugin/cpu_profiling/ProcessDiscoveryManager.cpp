@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cassert>
-#include <thread>
-#include <thread>
-#include <chrono>
-
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
+
+#include <cassert>
+
+#include <chrono>
+#include <thread>
+
 #include "ebpf/plugin/cpu_profiling/ProcessEntry.h"
 #include "logger/Logger.h"
 
@@ -30,8 +31,7 @@ void ProcessDiscoveryManager::Start(NotifyFn fn) {
     }
     mRunning = true;
     mCallback = std::move(fn);
-    mThreadRes = std::async(std::launch::async,
-                            &ProcessDiscoveryManager::run, this);
+    mThreadRes = std::async(std::launch::async, &ProcessDiscoveryManager::run, this);
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "start"));
 }
 
@@ -48,31 +48,31 @@ void ProcessDiscoveryManager::Stop() {
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "stop"));
 }
 
-void ProcessDiscoveryManager::AddDiscovery(const std::string &configName, ProcessDiscoveryConfig config) {
+void ProcessDiscoveryManager::AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config) {
     std::lock_guard<std::mutex> guard(mLock);
     auto it = mStates.emplace(configName, InnerState{}).first;
-    auto &state = it->second;
+    auto& state = it->second;
     state.mConfig = std::move(config);
 }
 
-bool ProcessDiscoveryManager::UpdateDiscovery(const std::string &configName, UpdateFn updater) {
+bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, UpdateFn updater) {
     std::lock_guard<std::mutex> guard(mLock);
     auto it = mStates.find(configName);
     if (it == mStates.end()) {
         return false;
     }
-    auto &state = it->second;
-    auto &config = state.mConfig;
+    auto& state = it->second;
+    auto& config = state.mConfig;
     updater(config);
     return true;
 }
 
-void ProcessDiscoveryManager::RemoveDiscovery(const std::string &configName) {
+void ProcessDiscoveryManager::RemoveDiscovery(const std::string& configName) {
     std::lock_guard<std::mutex> guard(mLock);
     mStates.erase(configName);
 }
 
-bool ProcessDiscoveryManager::CheckDiscoveryExist(const std::string &configName) {
+bool ProcessDiscoveryManager::CheckDiscoveryExist(const std::string& configName) {
     std::lock_guard<std::mutex> guard(mLock);
     return mStates.find(configName) != mStates.end();
 }
@@ -87,7 +87,7 @@ void ProcessDiscoveryManager::run() {
         {
             std::lock_guard<std::mutex> guard(mLock);
 
-            for (auto &[_, state] : mStates) {
+            for (auto& [_, state] : mStates) {
                 auto& config = state.mConfig;
                 std::set<uint32_t> matchedPids;
                 for (const auto& proc : procs) {
