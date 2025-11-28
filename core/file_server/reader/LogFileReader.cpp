@@ -1463,16 +1463,26 @@ void LogFileReader::SetReadBufferSize(int32_t bufSize) {
  * "SingleLineLog_1\nSingleLineLog_2\nxxx" -> "SingleLineLog_1\nSingleLineLog_2\0"
  */
 bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback) {
+    // if the expected file size limit is set (StaticFileServer reader), use the smaller value
+    int64_t effectiveFileSize = fileSize;
+    if (mExpectedFileSize > 0) {
+        effectiveFileSize = std::min(fileSize, mExpectedFileSize);
+        // if already read to the expected size, return false to indicate no more data
+        if (mLastFilePos >= mExpectedFileSize) {
+            return false;
+        }
+    }
+
     // Truncate, return false to indicate no more data.
-    if (fileSize == mLastFilePos) {
+    if (effectiveFileSize == mLastFilePos) {
         return false;
     }
 
     bool moreData = false;
     if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK) {
-        ReadGBK(logBuffer, fileSize, moreData, tryRollback);
+        ReadGBK(logBuffer, effectiveFileSize, moreData, tryRollback);
     } else {
-        ReadUTF8(logBuffer, fileSize, moreData, tryRollback);
+        ReadUTF8(logBuffer, effectiveFileSize, moreData, tryRollback);
     }
     int64_t delta = fileSize - mLastFilePos;
     if (delta > mReaderConfig.first->mReadDelayAlertThresholdBytes && !logBuffer.rawBuffer.empty()) {

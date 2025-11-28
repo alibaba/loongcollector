@@ -91,6 +91,17 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
             continue;
         }
 
+        // 获取文件大小
+        fsutil::PathStat pathStat;
+        uint64_t initialSize = 0;
+        if (fsutil::PathStat::stat(file.string(), pathStat)) {
+            initialSize = static_cast<uint64_t>(pathStat.GetFileSize());
+        } else {
+            LOG_WARNING(sLogger,
+                        ("failed to get file size", "skip")("config", configName)("input idx", idx)("filepath", file));
+            continue;
+        }
+
         ifstream is(file, ios::binary);
         if (!is) {
             LOG_WARNING(sLogger,
@@ -112,10 +123,11 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         auto sigHash = static_cast<uint64_t>(HashSignatureString(signature.c_str(), signature.size()));
 
         fileCpts.emplace_back(file, devInode, sigHash, signature.size());
+        fileCpts.back().mSize = initialSize;
         LOG_INFO(sLogger,
-                 ("create file checkpoint succeeded, config", configName)("input idx", idx)("filepath", file)(
-                     "device", devInode.dev)("inode", devInode.inode)("signature hash", sigHash)("signature size",
-                                                                                                 signature.size()));
+                 ("create file checkpoint succeeded, config",
+                  configName)("input idx", idx)("filepath", file)("device", devInode.dev)("inode", devInode.inode)(
+                     "signature hash", sigHash)("signature size", signature.size())("initial size", initialSize));
     }
     LOG_INFO(sLogger,
              ("create checkpoint succeeded, config", configName)("input idx", idx)("file count", fileCpts.size()));
@@ -178,8 +190,7 @@ bool InputStaticFileCheckpointManager::DeleteCheckpoint(const string& configName
 
 bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string& configName,
                                                                    size_t idx,
-                                                                   uint64_t offset,
-                                                                   uint64_t size) {
+                                                                   uint64_t offset) {
     lock_guard<mutex> lock(mUpdateMux);
     auto it = mInputCheckpointMap.find(make_pair(configName, idx));
     if (it == mInputCheckpointMap.end()) {
@@ -187,7 +198,7 @@ bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string&
         return false;
     }
     bool needDump = false;
-    if (!it->second.UpdateCurrentFileCheckpoint(offset, size, needDump)) {
+    if (!it->second.UpdateCurrentFileCheckpoint(offset, needDump)) {
         // should not happen
         return false;
     }
@@ -195,6 +206,31 @@ bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string&
         if (!DumpCheckpointFile(it->second)) {
             LOG_WARNING(sLogger,
                         ("failed to update file checkpoint",
+                         "failed to dump checkpoint file")("config", configName)("input idx", idx));
+            return false;
+        }
+    }
+    return true;
+}
+
+bool InputStaticFileCheckpointManager::UpdateCurrentFileRealPath(const string& configName,
+                                                                 size_t idx,
+                                                                 const filesystem::path& realPath) {
+    lock_guard<mutex> lock(mUpdateMux);
+    auto it = mInputCheckpointMap.find(make_pair(configName, idx));
+    if (it == mInputCheckpointMap.end()) {
+        // should not happen
+        return false;
+    }
+    bool needDump = false;
+    if (!it->second.UpdateCurrentFileRealPath(realPath, needDump)) {
+        // should not happen
+        return false;
+    }
+    if (needDump) {
+        if (!DumpCheckpointFile(it->second)) {
+            LOG_WARNING(sLogger,
+                        ("failed to update real file path",
                          "failed to dump checkpoint file")("config", configName)("input idx", idx));
             return false;
         }
