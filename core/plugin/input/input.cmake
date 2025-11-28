@@ -30,6 +30,7 @@ if(MSVC)
         ${CMAKE_SOURCE_DIR}/plugin/input/InputHostMonitor.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputPrometheus.cpp
         ${CMAKE_SOURCE_DIR}/plugin/input/InputForward.cpp
+        ${CMAKE_SOURCE_DIR}/plugin/input/InputJournal.cpp
         )
 elseif(UNIX)
 endif()
