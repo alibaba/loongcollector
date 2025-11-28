@@ -34,10 +34,10 @@ extern "C" {
 }
 
 #include "BPFWrapper.h"
+#include "CpuProfiler.h"
 #include "FileFilter.h"
 #include "Log.h"
 #include "NetworkFilter.h"
-#include "CpuProfiler.h"
 #include "common/magic_enum.hpp"
 
 #ifdef ENABLE_COMPATIBLE_MODE
@@ -562,12 +562,11 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::CPU_PROFILING: {
-            auto *config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
+            auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
             assert(config != nullptr);
-            
+
             gCpuProfiler->UpdatePids(std::move(config->mPids));
-            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "cpu profiling: profiler pids updated\n");
+            EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler pids updated\n");
             break;
         }
         default:
