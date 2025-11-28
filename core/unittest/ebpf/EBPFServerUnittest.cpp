@@ -31,11 +31,11 @@
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
+#include "plugin/input/InputCpuProfiling.h"
 #include "plugin/input/InputFileSecurity.h"
 #include "plugin/input/InputNetworkObserver.h"
 #include "plugin/input/InputNetworkSecurity.h"
 #include "plugin/input/InputProcessSecurity.h"
-#include "plugin/input/InputCpuProfiling.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_BOOL(logtail_mode);

@@ -32,11 +32,11 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "plugin/cpu_profiling/CpuProfilingManager.h"
 #include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
 #include "plugin/process_security/ProcessSecurityManager.h"
-#include "plugin/cpu_profiling/CpuProfilingManager.h"
 
 DEFINE_FLAG_INT64(kernel_min_version_for_ebpf,
                   "the minimum kernel version that supported eBPF normal running, 4.19.0.0 -> 4019000000",
@@ -384,7 +384,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
-    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE && type != PluginType::CPU_PROFILING) {
+    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
+        && type != PluginType::CPU_PROFILING) {
         RegisterPluginPerfBuffers(type);
     }
 
@@ -563,9 +564,8 @@ void EBPFServer::pollPerfBuffers() {
         mProcessCacheManager->ClearProcessExpiredCache();
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
-        std::vector<PluginState*> pluginStatePtrs = {
-            &getPluginState(PluginType::NETWORK_OBSERVE),
-            &getPluginState(PluginType::CPU_PROFILING)};
+        std::vector<PluginState*> pluginStatePtrs
+            = {&getPluginState(PluginType::NETWORK_OBSERVE), &getPluginState(PluginType::CPU_PROFILING)};
         for (auto& pluginStatePtr : pluginStatePtrs) {
             auto& pluginState = *pluginStatePtr;
             if (!pluginState.mValid.load(std::memory_order_acquire)) {

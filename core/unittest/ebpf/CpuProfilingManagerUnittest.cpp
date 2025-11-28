@@ -57,10 +57,8 @@ protected:
             MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE);
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricRef);
 
-        mManager = std::make_shared<CpuProfilingManager>(mWrapper.mProcessCacheManager,
-                                                         mEBPFAdapter,
-                                                         *mEventQueue,
-                                                         &mEventPool);
+        mManager = std::make_shared<CpuProfilingManager>(
+            mWrapper.mProcessCacheManager, mEBPFAdapter, *mEventQueue, &mEventPool);
     }
 
     void TearDown() override {
@@ -112,9 +110,7 @@ void CpuProfilingManagerUnittest::TestAddOrUpdateConfig() {
 }
 
 using DiscoverResult = ProcessDiscoveryManager::DiscoverResult;
-void AddMockDiscoverResult(
-    DiscoverResult& result, size_t configKey,
-    std::set<uint32_t> matchedPids) {
+void AddMockDiscoverResult(DiscoverResult& result, size_t configKey, std::set<uint32_t> matchedPids) {
     result.emplace_back(configKey, std::move(matchedPids));
 }
 
