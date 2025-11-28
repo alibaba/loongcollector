@@ -124,11 +124,10 @@ func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
 		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
 		return err
 	}
-	startCheck := containertypes.ExecStartOptions{
+	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
 		Detach: false,
 		Tty:    false,
-	}
-	err = c.cli.ContainerExecStart(context.Background(), resp.ID, startCheck)
+	})
 	if err != nil {
 		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot start exec config: %v", err)
 		return err
