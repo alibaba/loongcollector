@@ -60,7 +60,7 @@ GO_PATH = $$($(GO) env GOPATH)
 GO_BUILD = $(GO) build
 GO_GET = $(GO) get
 GO_TEST = $(GO) test
-GO_LINT = golangci-lint
+GO_LINT = /opt/go/bin/golangci-lint
 GO_ADDLICENSE = $(GO_PATH)/bin/addlicense
 GO_PACKR = $(GO_PATH)/bin/packr2
 GO_BUILD_FLAGS = -v
@@ -107,15 +107,15 @@ check-license: clean tools import_plugins
 	./scripts/package_license.sh check $(SCOPE) | tee $(LICENSE_COVERAGE_FILE)
 
 .PHONY: lint
-lint: clean tools
+lint: tools
 	$(GO_LINT) run -v --timeout 10m $(SCOPE)/... && make lint-pkg && make lint-e2e
 
 .PHONY: lint-pkg
-lint-pkg: clean tools
+lint-pkg: tools
 	cd pkg && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
 .PHONY: lint-e2e
-lint-e2e: clean tools
+lint-e2e: tools
 	cd test && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
 .PHONY: core
@@ -159,7 +159,7 @@ vendor: clean import_plugins
 	$(GO) mod vendor
 
 .PHONY: check-dependency-licenses
-check-dependency-licenses: clean import_plugins
+check-dependency-licenses: import_plugins
 	./scripts/dependency_licenses.sh plugin_main LICENSE_OF_ILOGTAIL_DEPENDENCIES.md && ./scripts/dependency_licenses.sh test LICENSE_OF_TESTENGINE_DEPENDENCIES.md
 
 .PHONY: docs

@@ -148,8 +148,137 @@ jobs:
         run: |
           ./scripts/e2e.sh e2e
 
+  # E2E测试 - Docker Engine版本兼容性测试
+  E2EWithDockerEngineVersions:
+    runs-on: ubuntu-latest
+    needs: 
+      - GenerateE2ETestImage
+    strategy:
+      matrix:
+        docker_engine_version: ["29.0", "28.3", "26.0", "25.0", "24.0", "20.10", "19.03", "1.12"]
+      fail-fast: false
+    timeout-minutes: 60
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.23.12
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Install Docker Engine ${{ matrix.docker_engine_version }}
+        run: |
+          # 移除现有的docker
+          sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null || true
+          
+          # 安装依赖
+          sudo apt-get update
+          sudo apt-get install -y \
+            ca-certificates \
+            curl \
+            gnupg \
+            lsb-release \
+            apt-transport-https
+          
+          # 添加Docker官方GPG密钥
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          
+          # 设置Docker仓库
+          echo \
+            "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+            $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+          
+          # 更新包列表
+          sudo apt-get update
+          
+          # 根据版本号确定要安装的版本
+          VERSION="${{ matrix.docker_engine_version }}"
+          
+          # 查找可用的docker-ce版本
+          AVAILABLE_VERSIONS=$(apt-cache madison docker-ce | awk '{print $3}' | sort -V)
+          echo "Available Docker CE versions:"
+          echo "$AVAILABLE_VERSIONS"
+          
+          # 根据主版本号匹配
+          if [[ "$VERSION" == "1.12" ]]; then
+            # Docker 1.12 太旧，使用docker.io包
+            echo "Installing Docker 1.12 using docker.io package"
+            sudo apt-get install -y docker.io=1.12.* || {
+              echo "Docker 1.12 not available, installing latest docker.io"
+              sudo apt-get install -y docker.io
+            }
+          else
+            # 提取主版本号和次版本号
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            
+            # 查找匹配的版本
+            MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\.$MINOR\." | head -1)
+            
+            if [ -z "$MATCHED_VERSION" ]; then
+              # 如果找不到精确匹配，尝试匹配主版本号
+              MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | head -1)
+            fi
+            
+            if [ -n "$MATCHED_VERSION" ]; then
+              echo "Installing Docker CE version: $MATCHED_VERSION"
+              sudo apt-get install -y docker-ce=$MATCHED_VERSION docker-ce-cli=$MATCHED_VERSION containerd.io
+            else
+              echo "Warning: Exact version $VERSION not found, installing latest compatible version"
+              # 尝试安装主版本号匹配的最新版本
+              LATEST_MAJOR=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | tail -1)
+              if [ -n "$LATEST_MAJOR" ]; then
+                echo "Installing latest version in major version $MAJOR: $LATEST_MAJOR"
+                sudo apt-get install -y docker-ce=$LATEST_MAJOR docker-ce-cli=$LATEST_MAJOR containerd.io
+              else
+                echo "Error: No compatible version found for $VERSION"
+                exit 1
+              fi
+            fi
+          fi
+          
+          # 启动Docker服务
+          sudo systemctl start docker || sudo service docker start
+          sudo systemctl enable docker || true
+          
+          # 等待Docker服务就绪
+          sleep 5
+          
+          # 输出Docker Engine版本信息
+          echo "========================================="
+          echo "Docker Engine Version Information:"
+          echo "========================================="
+          docker --version
+          echo ""
+          echo "Docker Engine Server Version:"
+          docker version --format '{{.Server.Version}}'
+          echo "========================================="
+
+      - name: Update Docker-compose to v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.7.0/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: loongcollector-image
+
+      - name: Import Image from Tar
+        run: docker load -i ./image.tar
+
+      - name: E2E Test with Docker Engine ${{ matrix.docker_engine_version }} - input_container_stdio
+        env:
+          TEST_CASE: input_container_stdio
+        run: |
+          ./scripts/e2e.sh e2e
+
   actions-timeline:
-    needs: [E2E]
+    needs: [E2E, E2EWithDockerEngineVersions]
     runs-on: ubuntu-latest
     permissions:
       actions: read
