@@ -1,305 +1,176 @@
-#JournalServer - High - Performance Systemd Journal Collector
+# input_journal
 
-![JournalServer](https://img.shields.io/badge/Component-JournalServer-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-green) ![Language](https://img.shields.io/badge/Language-C%2B%2B-red)
+## Overview
 
-JournalServer is a high-performance systemd journal log collection component designed for efficient and reliable journal data extraction. It provides comprehensive filtering capabilities and maintains compatibility with the Golang implementation.
+The `input_journal` plugin collects systemd journal logs. It supports flexible filtering configurations to collect logs by service units, identifiers, kernel logs, and custom patterns.
 
----
+## Configuration Parameters
 
-## ✨ Key Features
+| Parameter | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| Type | String | Yes | - | Plugin type, must be `input_journal` |
+| JournalPaths | String Array | No | `[]` | Journal file paths (empty = system default) |
+| SeekPosition | String | No | `tail` | Initial read position: `head` (from beginning), `tail` (from end), `cursor` (from saved position) |
+| CursorSeekFallback | String | No | `head` | Fallback position when cursor is invalid: `head` or `tail` |
+| ResetIntervalSecond | Int | No | `3600` | Checkpoint reset interval (seconds) |
+| Units | String Array | No | `[]` | List of systemd service units to monitor |
+| Kernel | Boolean | No | `false` | Enable kernel log collection (requires Units to be configured) |
+| Identifiers | String Array | No | `[]` | List of syslog identifiers to monitor |
+| MatchPatterns | String Array | No | `[]` | Custom match patterns supporting journal field matching |
+| ParseSyslogFacility | Boolean | No | `false` | Convert facility numbers to names |
+| ParsePriority | Boolean | No | `false` | Convert priority numbers to names |
+| UseJournalEventTime | Boolean | No | `false` | Use journal event time (otherwise use collection time) |
 
-- **🚀 High Performance**: Optimized C++ implementation for maximum throughput
-- **🔧 Flexible Filtering**: Support for units, identifiers, kernel logs, and custom patterns
-- **⚡ Real-time Collection**: Live journal streaming with checkpoint recovery
-- **🛡️ Production Ready**: Battle-tested with comprehensive error handling
-- **🎯 OR Logic**: All filters use OR logic for maximum flexibility
-- **📊 Rich Metadata**: Collects comprehensive journal entry metadata
+## Filter Logic
 
+All filters use **OR logic**, meaning logs matching any filter condition will be collected:
 
-### Core Components
-
-| Component | Purpose | Description |
-|-----------|---------|-------------|
-| **JournalServer** | Main coordinator | Manages journal connections and data flow |
-| **Connection Manager** | Connection handling | Manages journal reader connections and lifecycle |
-| **Journal Filter** | Data filtering | Applies configured filters with OR logic |
-| **Journal Reader** | Data extraction | Interfaces with systemd journal API |
-| **Checkpoint Manager** | State persistence | Manages reading position and recovery |
-
-## 🎯 Filter System
-
-JournalServer provides a sophisticated filtering system that allows precise control over which journal entries are collected. **All filters use OR logic**, meaning entries matching any configured filter will be collected.
+```text
+(Any service in Units) OR (Any identifier in Identifiers) OR (Kernel logs) OR (Any pattern in MatchPatterns)
+```
 
 ### Filter Types
 
-#### 1. Units Filter
-Collects logs from specific systemd units (services, timers, etc.).
+#### 1. Units (Service Unit Filter)
 
-**Configuration:**
-```json
-{
-    "units" : [ "nginx.service", "mysql.service", "redis.service" ]
-}
-```
+Specifies systemd service units to collect logs from, e.g., `nginx.service`, `mysql.service`
 
-**Matching Logic:**
-- Service messages: `_SYSTEMD_UNIT=nginx.service`
-- Core dumps: `MESSAGE_ID=<coredump_id> + COREDUMP_UNIT=nginx.service`
-- PID1 messages: `_PID=1 + UNIT=nginx.service`
-- Daemon messages: `_UID=0 + OBJECT_SYSTEMD_UNIT=nginx.service`
-- Slice messages: `_SYSTEMD_SLICE=nginx.service`
+#### 2. Identifiers (Identifier Filter)
 
-#### 2. Identifiers Filter
-Collects logs from specific syslog identifiers.
+Specifies syslog identifiers to collect logs from, e.g., `sshd`, `systemd`
 
-**Configuration:**
-```json
-{
-    "identifiers" : [ "sshd", "systemd", "kernel" ]
-}
-```
+#### 3. Kernel (Kernel Log Filter)
 
-**Matching Logic:**
-- `SYSLOG_IDENTIFIER=sshd`
-- `SYSLOG_IDENTIFIER=systemd`
-- `SYSLOG_IDENTIFIER=kernel`
-
-#### 3. Kernel Filter ⚠️
 Collects kernel logs (dmesg equivalent).
 
-**Important:** Kernel filter only activates when **both conditions** are met:
-- `units` is configured (not empty)
-- `kernel` is set to `true`
+**Note**: Kernel filtering requires both conditions:
 
-**Configuration:**
-```json
-{
-    "units" : ["nginx.service"], "kernel" : true
-}
-```
+- `Units` is not empty
+- `Kernel` is set to `true`
 
-**Matching Logic:**
-- `_TRANSPORT=kernel`
+To collect kernel logs only, use `MatchPatterns: ["_TRANSPORT=kernel"]`
 
-**Why this condition?** 
-This prevents accidental collection of high-volume kernel logs when no specific collection target is defined.
+#### 4. MatchPatterns (Custom Pattern Filter)
 
-#### 4. Match Patterns Filter
-Supports custom journal field matching patterns.
+Supports custom journal field matching, examples:
 
-**Configuration:**
-```json
-{
-    "matchPatterns" : [ "_SYSTEMD_USER_UNIT=myapp.service", "PRIORITY=3", "_COMM=nginx" ]
-}
-```
+- `_SYSTEMD_USER_UNIT=myapp.service` - Match user services
+- `PRIORITY=3` - Match specific priority
+- `_COMM=nginx` - Match specific command
+- `_UID=0` - Match specific user ID
 
-### Filter Logic Relationship
+## Checkpoint Mechanism
 
-All filters are combined using **OR logic**:
+### Overview
 
-```
-(Unit1 OR Unit2 OR Unit3)
-OR
-(Identifier1 OR Identifier2)  
-OR
-(Kernel Transport)
-OR
-(Pattern1 OR Pattern2)
-```
+The plugin supports resumable log collection through a checkpoint mechanism that records the reading position. This ensures that after restart or failure recovery, collection can continue from the last stopped position, preventing log loss or duplicate collection.
 
-### Configuration Examples
+### How It Works
 
-#### Example 1: Web Server + Database Monitoring
-```json
-{
-    "units" : [ "nginx.service", "mysql.service" ], "kernel" : true, "identifiers" : ["sshd"]
-}
-```
-**Result:** Collects nginx, mysql, kernel logs, and SSH daemon logs.
+1. **Position Recording**: The plugin periodically saves the current journal cursor position
+2. **Resume Reading**: After restart, with `SeekPosition: "cursor"`, reading continues from the last saved position
+3. **Cursor Invalidation**: If the saved cursor is invalid (e.g., log files deleted or rotated), it falls back to `head` or `tail` based on `CursorSeekFallback` configuration
+4. **Periodic Reset**: The `ResetIntervalSecond` parameter controls checkpoint reset interval to avoid performance issues from long-term accumulation
 
-#### Example 2: System Service Monitoring  
-```json
-{
-    "units" : [ "systemd-networkd.service", "systemd-resolved.service" ], "kernel" : false, "matchPatterns" : ["_UID=0"]
-}
-```
-**Result:** Collects networkd, resolved services, and all root user processes.
-
-#### Example 3: Kernel-Only Collection
-```json
-{
-    "matchPatterns" : ["_TRANSPORT=kernel"]
-}
-```
-**Result:** Collects only kernel logs (bypasses the units+kernel requirement).
-
-#### Example 4: High-Priority Alerts
-```json
-{
-    "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
-}
-```
-**Result:** Collects emergency, alert, and critical priority messages only.
-
-## ⚙️ Configuration Reference
-
-### Complete Configuration Schema
+### Related Configuration
 
 ```json
 {
-    "Type" : "input_journal",
-             "JournalPaths" : ["/var/log/journal"],
-                              "SeekPosition" : "tail",
-                                               "CursorSeekFallback" : "head",
-                                                                      "ResetIntervalSecond" : 3600,
-
-                                                                      "Units" : [ "nginx.service", "mysql.service" ],
-                                                                                "Kernel" : true,
-                                                                                           "Identifiers"
-        : [ "sshd", "systemd" ],
-          "MatchPatterns" : ["_UID=0"],
-
-                            "ParseSyslogFacility" : true,
-                                                    "ParsePriority" : true,
-                                                                      "UseJournalEventTime" : true
+    "Type": "input_journal",
+    "SeekPosition": "cursor",        // Use cursor mode to enable resumable collection
+    "CursorSeekFallback": "tail",    // Start from tail when cursor is invalid
+    "ResetIntervalSecond": 3600      // Reset checkpoint every hour
 }
 ```
 
-### Configuration Parameters
+## Configuration Examples
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `JournalPaths` | Array | `[]` | Journal file paths (empty = system journal) |
-| `SeekPosition` | String | `"tail"` | Initial read position: `head`, `tail`, `cursor` |
-| `CursorSeekFallback` | String | `"head"` | Fallback position when cursor invalid (options: `head` or `tail`) |
-| `ResetIntervalSecond` | Integer | `3600` | Checkpoint reset interval |
-| `Units` | Array | `[]` | Systemd units to monitor |
-| `Kernel` | Boolean | `false` | Enable kernel log collection |
-| `Identifiers` | Array | `[]` | Syslog identifiers to monitor |
-| `MatchPatterns` | Array | `[]` | Custom matching patterns |
-| `ParseSyslogFacility` | Boolean | `false` | Convert facility numbers to names |
-| `ParsePriority` | Boolean | `false` | Convert priority numbers to names |
-| `UseJournalEventTime` | Boolean | `false` | Use journal timestamp vs current time |
-
-## 🚀 Usage Examples
-
-### Basic Service Monitoring
-Monitor specific services and collect kernel logs:
+### Example 1: Monitor Web Services
 
 ```json
 {
-    "Type" : "input_journal", "Units" : [ "nginx.service", "mysql.service" ], "Kernel" : true, "SeekPosition" : "tail"
+    "Type": "input_journal",
+    "Units": ["nginx.service", "mysql.service"],
+    "Kernel": true,
+    "SeekPosition": "tail"
 }
 ```
 
-### System-Wide Monitoring
-Collect logs from multiple sources:
+### Example 2: System-Wide Monitoring
 
 ```json
 {
-    "Type" : "input_journal",
-             "Units" : ["systemd-networkd.service"],
-                       "Identifiers" : [ "kernel", "systemd", "NetworkManager" ],
-                                       "Kernel" : true,
-                                                  "MatchPatterns" : ["_UID=0"],
-                                                                    "ParsePriority" : true
+    "Type": "input_journal",
+    "Units": ["systemd-networkd.service"],
+    "Identifiers": ["sshd", "systemd"],
+    "Kernel": true,
+    "SeekPosition": "cursor",
+    "ParsePriority": true
 }
 ```
 
-### Emergency Alerts Only
-High-priority messages across the system:
+### Example 3: Kernel Logs Only
 
 ```json
 {
-    "Type" : "input_journal",
-             "MatchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ],
-                               "ParsePriority" : true,
-                                                 "UseJournalEventTime" : true
+    "Type": "input_journal",
+    "MatchPatterns": ["_TRANSPORT=kernel"]
 }
 ```
 
-## 🔧 Building and Development
+### Example 4: High-Priority Alerts
 
-### Prerequisites
-- Linux with systemd
-- CMake 3.16+
-- GCC 9+ or Clang 10+
-- libsystemd-dev
+```json
+{
+    "Type": "input_journal",
+    "MatchPatterns": ["PRIORITY=0", "PRIORITY=1", "PRIORITY=2"],
+    "ParsePriority": true,
+    "UseJournalEventTime": true
+}
+```
 
-### Build Commands
+## Troubleshooting
+
+### 1. Kernel logs not collected despite `Kernel: true`
+
+**Cause**: Kernel filtering requires `Units` to be configured
+
+**Solution**:
+
+```json
+{
+    "Units": ["any.service"],  // Add at least one service unit
+    "Kernel": true
+}
+```
+
+Or use MatchPatterns:
+
+```json
+{
+    "MatchPatterns": ["_TRANSPORT=kernel"]
+}
+```
+
+### 2. Incorrect log collection position
+
+**Solutions**:
+
+- Start from beginning: Set `"SeekPosition": "head"`
+- Collect only new logs: Set `"SeekPosition": "tail"`
+- Resume from last position: Set `"SeekPosition": "cursor"`
+
+### 3. How to verify configuration
+
+Test manually using journalctl commands:
+
 ```bash
-#From project root
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make journal_server
+# Test service unit filter
+journalctl -u nginx.service
+
+# Test identifier filter
+journalctl -t sshd
+
+# List available fields
+journalctl --list-fields
 ```
-
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-#### Issue: Kernel logs not collected despite `kernel: true`
-**Cause:** Kernel filter requires `units` to be configured.
-
-**Solution:**
-```json
-{
-    "units" : ["some.service"], // Add at least one unit
-              "kernel" : true
-}
-```
-Or use match patterns:
-```json
-{
-    "matchPatterns" : ["_TRANSPORT=kernel"]
-}
-```
-
-#### Issue: No logs collected with multiple filters
-**Cause:** Expecting AND logic instead of OR logic.
-
-**Solution:** Remember filters use OR logic. If you need AND logic, use specific match patterns:
-```json
-{
-    "matchPatterns" : ["_SYSTEMD_UNIT=nginx.service + PRIORITY=3"]
-}
-```
-
-#### Issue: High CPU usage
-**Cause:** Too broad filters collecting excessive data.
-
-**Solution:** Use more specific filters:
-```json
-{
-    "units" : ["specific.service"], "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
-}
-```
-
-#### Issue: Missing log entries
-**Cause:** 
-1. Incorrect unit names
-2. Journal not readable
-3. Checkpoint position issues
-
-**Solution:**
-1. Verify unit names: `systemctl list-units`
-2. Check permissions: `journalctl --verify`
-3. Reset position: `"SeekPosition": "head"`
-
-### Debug Tips
-
-1. **Enable debug logging** in logtail configuration
-2. **Check journal integrity**: `journalctl --verify`
-3. **Test filters manually**: `journalctl -u nginx.service`
-4. **Monitor checkpoint files** for position tracking
-5. **Use `journalctl --list-fields`** to discover available fields
-
-
----
-
-**📚 Related Documentation:**
-- [LoongCollector Main README](../../../README.md)
-- [Plugin Development Guide](../../../docs/en/guides/README.md)
-- [Performance Benchmarks](../../../docs/en/concept&designs/README.md)

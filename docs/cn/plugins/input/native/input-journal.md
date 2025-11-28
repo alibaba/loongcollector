@@ -1,305 +1,176 @@
-#InputJournal - 高性能Systemd日志收集器
+# input_journal
 
-![InputJournal](https://img.shields.io/badge/Component-JournalServer-blue) ![Platform](https://img.shields.io/badge/Platform-Linux-green) ![Language](https://img.shields.io/badge/Language-C%2B%2B-red)
+## 简介
 
-InputJournal是一个高性能的systemd日志收集组件，专为高效可靠的日志数据提取而设计。它提供全面的过滤功能，并与Golang实现保持兼容性。
+`input_journal` 插件用于收集 systemd journal 日志。支持灵活的过滤配置，可以按服务单元、标识符、内核日志和自定义模式进行日志收集。
 
----
+## 配置参数
 
-## ✨ 核心特性
+| 参数 | 类型 | 是否必选 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| Type | String | 是 | - | 插件类型，固定为 `input_journal` |
+| JournalPaths | String数组 | 否 | `[]` | journal 文件路径，为空则使用系统默认路径 |
+| SeekPosition | String | 否 | `tail` | 初始读取位置，可选值：`head`（从头开始）、`tail`（从尾部开始）、`cursor`（从上次保存的位置开始） |
+| CursorSeekFallback | String | 否 | `head` | 当游标失效时的回退位置，可选值：`head` 或 `tail` |
+| ResetIntervalSecond | Int | 否 | `3600` | 检查点重置间隔（秒） |
+| Units | String数组 | 否 | `[]` | 要监控的 systemd 服务单元列表 |
+| Kernel | Boolean | 否 | `false` | 是否收集内核日志（需同时配置 Units） |
+| Identifiers | String数组 | 否 | `[]` | 要监控的 syslog 标识符列表 |
+| MatchPatterns | String数组 | 否 | `[]` | 自定义匹配模式，支持 journal 字段匹配 |
+| ParseSyslogFacility | Boolean | 否 | `false` | 是否将 facility 编号转换为名称 |
+| ParsePriority | Boolean | 否 | `false` | 是否将 priority 编号转换为名称 |
+| UseJournalEventTime | Boolean | 否 | `false` | 是否使用 journal 事件时间（否则使用采集时间） |
 
-- **🚀 高性能**: 为最大吞吐量优化的C++实现
-- **🔧 灵活过滤**: 支持单元、标识符、内核日志和自定义模式过滤
-- **⚡ 实时收集**: 实时日志流和检查点恢复
-- **🛡️ 生产就绪**: 经过实战考验的全面错误处理
-- **🎯 或逻辑**: 所有过滤器使用或逻辑，提供最大灵活性
-- **📊 丰富元数据**: 收集全面的日志条目元数据
+## 过滤逻辑
 
+所有过滤器使用**或（OR）逻辑**，即满足任一过滤条件的日志都会被收集：
 
-### 核心组件
-
-| 组件 | 用途 | 描述 |
-|-----------|---------|-------------|
-| **JournalServer** | 主协调器 | 管理日志连接和数据流 |
-| **连接管理器** | 连接处理 | 管理日志读取器连接和生命周期 |
-| **日志过滤器** | 数据过滤 | 应用配置的或逻辑过滤器 |
-| **日志读取器** | 数据提取 | 与systemd日志API接口 |
-
-## 🎯 过滤系统
-
-InputJournal提供一个复杂的过滤系统，允许精确控制收集哪些日志条目。**所有过滤器使用或逻辑**，意味着匹配任何配置过滤器的条目都将被收集。
-
-### 过滤器类型
-
-#### 1. 单元过滤器
-收集来自特定systemd单元（服务、定时器等）的日志。
-
-**配置:**
-```json
-{
-    "units" : [ "nginx.service", "mysql.service", "redis.service" ]
-}
+```text
+(Units 中的任一服务) OR (Identifiers 中的任一标识符) OR (内核日志) OR (MatchPatterns 中的任一模式)
 ```
 
-**匹配逻辑:**
-- 服务消息: `_SYSTEMD_UNIT=nginx.service`
-- 核心转储: `MESSAGE_ID=<coredump_id> + COREDUMP_UNIT=nginx.service`
-- PID1消息: `_PID=1 + UNIT=nginx.service`
-- 守护进程消息: `_UID=0 + OBJECT_SYSTEMD_UNIT=nginx.service`
-- Slice消息: `_SYSTEMD_SLICE=nginx.service`
+### 过滤器类型说明
 
-#### 2. 标识符过滤器
-收集来自特定syslog标识符的日志。
+#### 1. Units（服务单元过滤）
 
-**配置:**
-```json
-{
-    "identifiers" : [ "sshd", "systemd", "kernel" ]
-}
-```
+指定要收集的 systemd 服务单元日志，例如：`nginx.service`、`mysql.service`
 
-**匹配逻辑:**
-- `SYSLOG_IDENTIFIER=sshd`
-- `SYSLOG_IDENTIFIER=systemd`
-- `SYSLOG_IDENTIFIER=kernel`
+#### 2. Identifiers（标识符过滤）
 
-#### 3. 内核过滤器 ⚠️
-收集内核日志（相当于dmesg）。
+指定要收集的 syslog 标识符日志，例如：`sshd`、`systemd`
 
-**重要:** 内核过滤器仅在**同时满足两个条件**时激活:
-- `units`已配置（不为空）
-- `kernel`设置为`true`
+#### 3. Kernel（内核日志过滤）
 
-**配置:**
-```json
-{
-    "units" : ["nginx.service"], "kernel" : true
-}
-```
+收集内核日志（等同于 dmesg）。
 
-**匹配逻辑:**
-- `_TRANSPORT=kernel`
+**注意**：内核过滤需要同时满足两个条件：
 
-**为什么有这个条件？**
-这防止在没有定义特定收集目标时意外收集大量内核日志。
+- `Units` 不为空
+- `Kernel` 设置为 `true`
 
-#### 4. 匹配模式过滤器
-支持自定义日志字段匹配模式。
+如需单独收集内核日志，可使用 `MatchPatterns: ["_TRANSPORT=kernel"]`
 
-**配置:**
-```json
-{
-    "matchPatterns" : [ "_SYSTEMD_USER_UNIT=myapp.service", "PRIORITY=3", "_COMM=nginx" ]
-}
-```
+#### 4. MatchPatterns（自定义模式过滤）
 
-### 过滤器逻辑关系
+支持自定义 journal 字段匹配，例如：
 
-所有过滤器使用**或逻辑**组合:
+- `_SYSTEMD_USER_UNIT=myapp.service` - 匹配用户服务
+- `PRIORITY=3` - 匹配特定优先级
+- `_COMM=nginx` - 匹配特定命令
+- `_UID=0` - 匹配特定用户ID
 
-```
-(单元1 或 单元2 或 单元3)
-或
-(标识符1 或 标识符2)  
-或
-(内核传输)
-或
-(模式1 或 模式2)
-```
+## Checkpoint 机制
 
-### 配置示例
+### 功能说明
 
-#### 示例1: Web服务器 + 数据库监控
-```json
-{
-    "units" : [ "nginx.service", "mysql.service" ], "kernel" : true, "identifiers" : ["sshd"]
-}
-```
-**结果:** 收集nginx、mysql、内核日志和SSH守护进程日志。
+插件支持断点续传功能，通过 checkpoint 机制记录已读取的日志位置，确保在重启或故障恢复后能够从上次停止的位置继续读取，避免日志丢失或重复采集。
 
-#### 示例2: 系统服务监控  
-```json
-{
-    "units" : [ "systemd-networkd.service", "systemd-resolved.service" ], "kernel" : false, "matchPatterns" : ["_UID=0"]
-}
-```
-**结果:** 收集networkd、resolved服务和所有root用户进程。
+### 工作原理
 
-#### 示例3: 仅内核收集
-```json
-{
-    "matchPatterns" : ["_TRANSPORT=kernel"]
-}
-```
-**结果:** 仅收集内核日志（绕过units+kernel要求）。
+1. **位置记录**：插件会定期保存当前读取到的 journal cursor（游标位置）
+2. **恢复读取**：重启后通过 `SeekPosition: "cursor"` 从上次保存的位置继续读取
+3. **游标失效**：如果保存的游标失效（如日志文件被删除或轮转），则根据 `CursorSeekFallback` 配置回退到 `head` 或 `tail`
+4. **定期重置**：通过 `ResetIntervalSecond` 参数控制检查点重置间隔，避免长时间累积导致的性能问题
 
-#### 示例4: 高优先级警报
-```json
-{
-    "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
-}
-```
-**结果:** 仅收集紧急、警报和关键优先级消息。
-
-## ⚙️ 配置参考
-
-### 完整配置模式
+### 相关配置
 
 ```json
 {
-    "Type" : "input_journal",
-             "JournalPaths" : ["/var/log/journal"],
-                              "SeekPosition" : "tail",
-                                               "CursorSeekFallback" : "head",
-                                                                      "ResetIntervalSecond" : 3600,
-
-                                                                      "Units" : [ "nginx.service", "mysql.service" ],
-                                                                                "Kernel" : true,
-                                                                                           "Identifiers"
-        : [ "sshd", "systemd" ],
-          "MatchPatterns" : ["_UID=0"],
-
-                            "ParseSyslogFacility" : true,
-                                                    "ParsePriority" : true,
-                                                                      "UseJournalEventTime" : true
+    "Type": "input_journal",
+    "SeekPosition": "cursor",        // 使用 cursor 模式启用断点续传
+    "CursorSeekFallback": "tail",    // 游标失效时从尾部开始
+    "ResetIntervalSecond": 3600      // 每小时重置一次检查点
 }
 ```
 
-### 配置参数
+## 配置示例
 
-| 参数 | 类型 | 默认值 | 描述 |
-|-----------|------|---------|-------------|
-| `JournalPaths` | 数组 | `[]` | 日志文件路径（空=系统日志） |
-| `SeekPosition` | 字符串 | `"tail"` | 初始读取位置: `head`、`tail`、`cursor` |
-| `CursorSeekFallback` | 字符串 | `"head"` | 游标无效时的回退位置（可选值：`head` 或 `tail`） |
-| `ResetIntervalSecond` | 整数 | `3600` | 检查点重置间隔 |
-| `Units` | 数组 | `[]` | 要监控的Systemd单元 |
-| `Kernel` | 布尔值 | `false` | 启用内核日志收集 |
-| `Identifiers` | 数组 | `[]` | 要监控的Syslog标识符 |
-| `MatchPatterns` | 数组 | `[]` | 自定义匹配模式 |
-| `ParseSyslogFacility` | 布尔值 | `false` | 将设施号转换为名称 |
-| `ParsePriority` | 布尔值 | `false` | 将优先级号转换为名称 |
-| `UseJournalEventTime` | 布尔值 | `false` | 使用日志时间戳而非当前时间 |
-
-## 🚀 使用示例
-
-### 基本服务监控
-监控特定服务并收集内核日志:
+### 示例1：监控 Web 服务
 
 ```json
 {
-    "Type" : "input_journal", "Units" : [ "nginx.service", "mysql.service" ], "Kernel" : true, "SeekPosition" : "tail"
+    "Type": "input_journal",
+    "Units": ["nginx.service", "mysql.service"],
+    "Kernel": true,
+    "SeekPosition": "tail"
 }
 ```
 
-### 系统级监控
-从多个源收集日志:
+### 示例2：系统级监控
 
 ```json
 {
-    "Type" : "input_journal",
-             "Units" : ["systemd-networkd.service"],
-                       "Identifiers" : [ "kernel", "systemd", "NetworkManager" ],
-                                       "Kernel" : true,
-                                                  "MatchPatterns" : ["_UID=0"],
-                                                                    "ParsePriority" : true
+    "Type": "input_journal",
+    "Units": ["systemd-networkd.service"],
+    "Identifiers": ["sshd", "systemd"],
+    "Kernel": true,
+    "SeekPosition": "cursor",
+    "ParsePriority": true
 }
 ```
 
-### 仅紧急警报
-系统中的高优先级消息:
+### 示例3：仅收集内核日志
 
 ```json
 {
-    "Type" : "service_journal_server",
-             "MatchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ],
-                               "ParsePriority" : true,
-                                                 "UseJournalEventTime" : true
+    "Type": "input_journal",
+    "MatchPatterns": ["_TRANSPORT=kernel"]
 }
 ```
 
-## 🔧 构建和开发
+### 示例4：高优先级告警
 
-### 前置要求
-- 带有systemd的Linux
-- CMake 3.16+
-- GCC 9+ 或 Clang 10+
-- libsystemd-dev
+```json
+{
+    "Type": "input_journal",
+    "MatchPatterns": ["PRIORITY=0", "PRIORITY=1", "PRIORITY=2"],
+    "ParsePriority": true,
+    "UseJournalEventTime": true
+}
+```
 
-### 构建命令
+## 常见问题
+
+### 1. 设置了 `Kernel: true` 但未收集到内核日志
+
+**原因**：内核过滤需要同时配置 `Units`
+
+**解决方案**：
+
+```json
+{
+    "Units": ["any.service"],  // 添加至少一个服务单元
+    "Kernel": true
+}
+```
+
+或使用 MatchPatterns：
+
+```json
+{
+    "MatchPatterns": ["_TRANSPORT=kernel"]
+}
+```
+
+### 2. 日志采集位置不正确
+
+**解决方案**：
+
+- 从头开始采集：设置 `"SeekPosition": "head"`
+- 仅采集新日志：设置 `"SeekPosition": "tail"`
+- 断点续传：设置 `"SeekPosition": "cursor"`
+
+### 3. 如何验证配置是否正确
+
+使用 journalctl 命令手动测试：
+
 ```bash
-#从项目根目录
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make journal_server
+# 测试服务单元过滤
+journalctl -u nginx.service
+
+# 测试标识符过滤
+journalctl -t sshd
+
+# 查看可用字段
+journalctl --list-fields
 ```
-
-
-
-## 🐛 故障排除
-
-### 常见问题
-
-#### 问题: 尽管设置了`kernel: true`但不收集内核日志
-**原因:** 内核过滤器需要配置`units`。
-
-**解决方案:**
-```json
-{
-    "units" : ["some.service"], // 至少添加一个单元
-              "kernel" : true
-}
-```
-或使用匹配模式:
-```json
-{
-    "matchPatterns" : ["_TRANSPORT=kernel"]
-}
-```
-
-#### 问题: 多个过滤器时无日志收集
-**原因:** 期望与逻辑而非或逻辑。
-
-**解决方案:** 记住过滤器使用或逻辑。如果需要与逻辑，使用特定匹配模式:
-```json
-{
-    "matchPatterns" : ["_SYSTEMD_UNIT=nginx.service + PRIORITY=3"]
-}
-```
-
-#### 问题: CPU使用率高
-**原因:** 过滤器过于宽泛，收集了过多数据。
-
-**解决方案:** 使用更具体的过滤器:
-```json
-{
-    "units" : ["specific.service"], "matchPatterns" : [ "PRIORITY=0", "PRIORITY=1", "PRIORITY=2" ]
-}
-```
-
-#### 问题: 缺少日志条目
-**原因:** 
-1. 错误的单元名称
-2. 日志不可读
-3. 检查点位置问题
-
-**解决方案:**
-1. 验证单元名称: `systemctl list-units`
-2. 检查权限: `journalctl --verify`
-3. 重置位置: `"SeekPosition": "head"`
-
-### 调试提示
-
-1. **启用调试日志** 在logtail配置中
-2. **检查日志完整性**: `journalctl --verify`
-3. **手动测试过滤器**: `journalctl -u nginx.service`
-4. **监控检查点文件** 用于位置跟踪
-5. **使用`journalctl --list-fields`** 发现可用字段
-
-
----
-
-**📚 相关文档:**
-- [LoongCollector主README](../../README.md)
-- [插件开发指南](../../docs/en/guides/README.md)
-- [性能基准](../../docs/en/concept&designs/README.md)
