@@ -7,6 +7,7 @@ require (
 	github.com/IBM/sarama v1.42.2
 	github.com/VictoriaMetrics/VictoriaMetrics v1.83.0
 	github.com/alibaba/ilogtail/pkg v0.0.0
+	github.com/apache/doris/sdk/go-doris-sdk v0.0.0-20251128023530-ff9100777811
 	github.com/apache/pulsar-client-go v0.10.0
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -48,7 +49,6 @@ require (
 	github.com/prometheus/procfs v0.8.0
 	github.com/prometheus/prometheus v1.8.2-0.20210430082741-2a4b8e12bbf2
 	github.com/pyroscope-io/pyroscope v1.5.0
-	github.com/selectdb/go-doris-sdk v0.0.0-20250608154242-7467dabcf56b
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.9.3
 	github.com/smartystreets/goconvey v1.7.2
@@ -239,7 +239,7 @@ require (
 	github.com/valyala/fastjson v1.6.3 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/valyala/gozstd v1.17.0 // indirect
+	github.com/valyala/gozstd v1.24.0 // indirect
 	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/valyala/quicktemplate v1.7.0 // indirect
 	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5 // indirect
@@ -302,6 +302,5 @@ replace (
 	github.com/pyroscope-io/jfr-parser => github.com/iLogtail/jfr-parser v0.6.0
 	github.com/pyroscope-io/pyroscope => github.com/iLogtail/pyroscope-lib v0.35.2-ilogtail
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
-	github.com/selectdb/go-doris-sdk => ./external/github.com/selectdb/go-doris-sdk
 	github.com/streadway/handy => github.com/iLogtail/handy v0.0.0-20230327021402-6a47ec586270
 )

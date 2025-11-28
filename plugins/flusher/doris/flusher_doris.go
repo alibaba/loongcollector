@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/selectdb/go-doris-sdk/pkg/load"
+	"github.com/apache/doris/sdk/go-doris-sdk/pkg/load"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
