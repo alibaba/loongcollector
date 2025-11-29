@@ -399,36 +399,37 @@ string TargetSubscriberScheduler::GetId() const {
     return mJobName;
 }
 
-void TargetSubscriberScheduler::ScheduleNext() {
+bool TargetSubscriberScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
         this->OnSubscription(response, timestampMilliSec);
         this->ExecDone();
-        this->ScheduleNext();
-        return true;
+        return this->ScheduleNext();
     });
-    if (IsCancelled()) {
-        mFuture->Cancel();
-        return;
-    }
 
     {
         WriteLock lock(mLock);
+        if (mValidState == false) {
+            return false;
+        }
         mFuture = future;
     }
 
     auto event = BuildSubscriberTimerEvent(GetNextExecTime());
     Timer::GetInstance()->PushEvent(std::move(event));
+    return true;
 }
 
 void TargetSubscriberScheduler::Cancel() {
-    if (mFuture != nullptr) {
-        mFuture->Cancel();
-    }
     {
         WriteLock lock(mLock);
         mValidState = false;
     }
+
+    if (mFuture != nullptr) {
+        mFuture->Cancel();
+    }
+
     CancelAllScrapeScheduler();
 }
 

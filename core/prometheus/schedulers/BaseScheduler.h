@@ -14,7 +14,7 @@ public:
     BaseScheduler() = default;
     virtual ~BaseScheduler() = default;
 
-    virtual void ScheduleNext() = 0;
+    virtual bool ScheduleNext() = 0;
 
     void ExecDone();
 
