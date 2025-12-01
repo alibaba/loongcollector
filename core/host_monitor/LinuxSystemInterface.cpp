@@ -101,9 +101,14 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
 
         for (auto const& line : sockstatLines) {
             if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
-                auto twValue = FastParse::GetFieldAs<uint64_t>(line, 6, 0);
-                auto allocValue = FastParse::GetFieldAs<uint64_t>(line, 8, 0);
-
+                uint64_t twValue = 0;
+                uint64_t allocValue = 0;
+                if (!FastParse::GetFieldAs(line, 6, twValue)) {
+                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get tw value", line));
+                }
+                if (!FastParse::GetFieldAs(line, 8, allocValue)) {
+                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get alloc value", line));
+                }
                 tcp += twValue + allocValue;
             }
         }
@@ -522,12 +527,19 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
     // cat /proc/loadavg
     // 0.10 0.07 0.03 1/561 78450
     const auto& loadLine = loadLines[0];
-    auto load1 = FastParse::GetFieldAs<double>(loadLine, 0, 0.0);
-    auto load5 = FastParse::GetFieldAs<double>(loadLine, 1, 0.0);
-    auto load15 = FastParse::GetFieldAs<double>(loadLine, 2, 0.0);
-
-    if (load1 == 0.0 && load5 == 0.0 && load15 == 0.0) {
-        LOG_WARNING(sLogger, ("failed to parse load metric", "invalid System collector"));
+    double load1 = 0.0;
+    double load5 = 0.0;
+    double load15 = 0.0;
+    if (!FastParse::GetFieldAs(loadLine, 0, load1)) {
+        LOG_WARNING(sLogger, ("failed to get load1 value", loadLine));
+        return false;
+    }
+    if (!FastParse::GetFieldAs(loadLine, 1, load5)) {
+        LOG_WARNING(sLogger, ("failed to get load5 value", loadLine));
+        return false;
+    }
+    if (!FastParse::GetFieldAs(loadLine, 2, load15)) {
+        LOG_WARNING(sLogger, ("failed to get load15 value", loadLine));
         return false;
     }
 
@@ -799,7 +811,12 @@ bool LinuxSystemInterface::GetSystemUptimeInformationOnce(SystemUptimeInformatio
     }
 
     const auto& uptimeLine = uptimeLines.empty() ? "" : uptimeLines.front();
-    systemUptimeInfo.uptime = FastParse::GetFieldAs<double>(uptimeLine, 0, 0.0);
+    double uptime = 0.0;
+    if (!FastParse::GetFieldAs(uptimeLine, 0, uptime)) {
+        LOG_WARNING(sLogger, ("failed to get uptime value", uptimeLine));
+        return false;
+    }
+    systemUptimeInfo.uptime = uptime;
 
     return true;
 }
@@ -1098,18 +1115,28 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
                 getName = true;
             }
         } else if (firstField == "Uid:") {
-            // 直接解析数值字段，避免中间字符串转换
-            auto uid = parser.GetFieldAs<uint64_t>(1, 0);
-            auto euid = parser.GetFieldAs<uint64_t>(2, 0);
+            uint64_t uid = 0;
+            uint64_t euid = 0;
+            if (!parser.GetFieldAs<uint64_t>(1, uid)) {
+                LOG_WARNING(sLogger, ("failed to get uid value", line));
+            }
+            if (!parser.GetFieldAs<uint64_t>(2, euid)) {
+                LOG_WARNING(sLogger, ("failed to get euid value", line));
+            }
             if (uid > 0) { // 基本有效性检查
                 cred.uid = uid;
                 cred.euid = euid;
                 getUID = true;
             }
         } else if (firstField == "Gid:") {
-            // 直接解析数值字段，避免中间字符串转换
-            auto gid = parser.GetFieldAs<uint64_t>(1, 0);
-            auto egid = parser.GetFieldAs<uint64_t>(2, 0);
+            uint64_t gid = 0;
+            uint64_t egid = 0;
+            if (!parser.GetFieldAs<uint64_t>(1, gid)) {
+                LOG_WARNING(sLogger, ("failed to get gid value", line));
+            }
+            if (!parser.GetFieldAs<uint64_t>(2, egid)) {
+                LOG_WARNING(sLogger, ("failed to get egid value", line));
+            }
             if (gid > 0) { // 基本有效性检查
                 cred.gid = gid;
                 cred.egid = egid;

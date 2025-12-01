@@ -39,7 +39,7 @@ public:
     static SLSClientManager* GetInstance();
 
     virtual void Init();
-    virtual void Stop() {};
+    virtual void Stop(){};
 
     const std::string& GetUserAgent() const { return mUserAgent; }
 
@@ -177,6 +177,16 @@ SLSResponse PostMetricStoreLogs(const std::string& accessKeyId,
                                 const std::string& compressType,
                                 const std::string& body,
                                 size_t rawSize);
+SLSResponse PostMetricHostLogs(const std::string& accessKeyId,
+                               const std::string& accessKeySecret,
+                               const std::string& secToken,
+                               AuthType type,
+                               const std::string& host,
+                               bool httpsFlag,
+                               const std::string& compressType,
+                               RawDataType dataType,
+                               const std::string& body,
+                               size_t rawSize);
 SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
                                const std::string& accessKeySecret,
                                const std::string& secToken,

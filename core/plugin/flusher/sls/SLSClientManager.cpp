@@ -402,6 +402,26 @@ SLSResponse PostMetricStoreLogs(const string& accessKeyId,
     return ParseHttpResponse(response);
 }
 
+SLSResponse PostMetricHostLogs(const string& accessKeyId,
+                               const string& accessKeySecret,
+                               const std::string& secToken,
+                               AuthType type,
+                               const string& host,
+                               bool httpsFlag,
+                               const string& compressType,
+                               RawDataType dataType,
+                               const string& body,
+                               size_t rawSize) {
+    string path;
+    map<string, string> header;
+    PreparePostHostMetricsRequest(
+        accessKeyId, accessKeySecret, secToken, type, compressType, dataType, body, rawSize, path, header);
+    HttpResponse response;
+    SendHttpRequest(make_unique<HttpRequest>(HTTP_POST, httpsFlag, host, httpsFlag ? 443 : 80, path, "", header, body),
+                    response);
+    return ParseHttpResponse(response);
+}
+
 SLSResponse PostAPMBackendLogs(const string& accessKeyId,
                                const string& accessKeySecret,
                                const std::string& secToken,
