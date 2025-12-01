@@ -1117,13 +1117,9 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
         } else if (firstField == "Uid:") {
             uint64_t uid = 0;
             uint64_t euid = 0;
-            if (!parser.GetFieldAs<uint64_t>(1, uid)) {
-                LOG_WARNING(sLogger, ("failed to get uid value", line));
-            }
-            if (!parser.GetFieldAs<uint64_t>(2, euid)) {
-                LOG_WARNING(sLogger, ("failed to get euid value", line));
-            }
-            if (uid > 0) { // 基本有效性检查
+            if (!parser.GetFieldAs<uint64_t>(1, uid) || !parser.GetFieldAs<uint64_t>(2, euid)) {
+                LOG_WARNING(sLogger, ("failed to get uid/euid value", line));
+            } else {
                 cred.uid = uid;
                 cred.euid = euid;
                 getUID = true;
@@ -1131,13 +1127,9 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
         } else if (firstField == "Gid:") {
             uint64_t gid = 0;
             uint64_t egid = 0;
-            if (!parser.GetFieldAs<uint64_t>(1, gid)) {
-                LOG_WARNING(sLogger, ("failed to get gid value", line));
-            }
-            if (!parser.GetFieldAs<uint64_t>(2, egid)) {
-                LOG_WARNING(sLogger, ("failed to get egid value", line));
-            }
-            if (gid > 0) { // 基本有效性检查
+            if (!parser.GetFieldAs<uint64_t>(1, gid) || !parser.GetFieldAs<uint64_t>(2, egid)) {
+                LOG_WARNING(sLogger, ("failed to get gid/egid value", line));
+            } else {
                 cred.gid = gid;
                 cred.egid = egid;
                 getGID = true;
