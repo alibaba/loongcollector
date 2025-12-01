@@ -156,6 +156,7 @@ jobs:
     strategy:
       matrix:
         docker_engine_version: ["29.1", "28.5", "27.5", "26.1", "25.0", "24.0", "23.0", "20.10"]
+        test_case: ["input_container_stdio", "input_docker_static_file"]
       fail-fast: false
     timeout-minutes: 60
     steps:
@@ -276,10 +277,10 @@ jobs:
         if: steps.check_docker.outputs.docker_installed == 'true'
         run: docker load -i ./image.tar
 
-      - name: E2E Test with Docker Engine ${{ matrix.docker_engine_version }} - input_container_stdio
+      - name: E2E Test with Docker Engine ${{ matrix.docker_engine_version }} - ${{ matrix.test_case }}
         if: steps.check_docker.outputs.docker_installed == 'true'
         env:
-          TEST_CASE: input_container_stdio
+          TEST_CASE: ${{ matrix.test_case }}
         run: |
           ./scripts/e2e.sh e2e
 
