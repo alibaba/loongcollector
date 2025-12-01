@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -611,6 +612,45 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 	return ""
 }
 
+// extractUpperDirFromProcMounts extracts upperdir from /proc/{pid}/mounts for containerd overlayfs
+// It executes: cat /proc/{pid}/mounts | grep "overlay / " and extracts upperdir=xxx value
+func extractUpperDirFromProcMounts(pid int) (string, error) {
+	// Execute: cat /proc/{pid}/mounts | grep "overlay / "
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("cat /proc/%d/mounts | grep \"overlay / \"", pid))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to read /proc/%d/mounts: %w", pid, err)
+	}
+
+	// Parse output to extract upperdir=xxx
+	// Example: overlay / overlay rw,relatime,...,upperdir=/var/lib/containerd/...,workdir=...
+	line := strings.TrimSpace(string(output))
+	if len(line) == 0 {
+		return "", fmt.Errorf("no overlay mount found in /proc/%d/mounts", pid)
+	}
+
+	// Find upperdir= in the line
+	upperDirPrefix := "upperdir="
+	upperDirIdx := strings.Index(line, upperDirPrefix)
+	if upperDirIdx == -1 {
+		return "", fmt.Errorf("upperdir not found in mount info")
+	}
+
+	// Extract the value after upperdir=
+	startIdx := upperDirIdx + len(upperDirPrefix)
+	endIdx := startIdx
+	for endIdx < len(line) && line[endIdx] != ',' && line[endIdx] != ' ' {
+		endIdx++
+	}
+
+	upperDir := line[startIdx:endIdx]
+	if len(upperDir) == 0 {
+		return "", fmt.Errorf("empty upperdir value")
+	}
+
+	return upperDir, nil
+}
+
 // CreateInfoDetail create DockerInfoDetail with docker.Container
 // Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
@@ -706,6 +746,16 @@ func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envC
 	if info.GraphDriver.Data != nil {
 		if rootPath, ok := did.ContainerInfo.GraphDriver.Data["UpperDir"]; ok {
 			did.DefaultRootPath = rootPath
+		}
+	}
+	// for docker v29+ with containerd storage driver (GraphDriver is empty)
+	if dc.client != nil && len(did.DefaultRootPath) == 0 && info.State != nil && info.State.Pid > 0 {
+		// Try to extract upperdir from /proc/{pid}/mounts for containerd overlayfs
+		upperDir, err := extractUpperDirFromProcMounts(info.State.Pid)
+		if err != nil {
+			logger.Debugf(context.Background(), "failed to extract upperdir from /proc/%d/mounts: %v", info.State.Pid, err)
+		} else if len(upperDir) > 0 {
+			did.DefaultRootPath = upperDir
 		}
 	}
 	// for cri-runtime
