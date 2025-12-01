@@ -704,7 +704,7 @@ RawEvent* raw = group.AddRawEvent(true);
 | 创建开销 | 100% (基准) | ~15-20% | ~5-10% |
 | 锁开销 | malloc锁 | pool锁（轻量） | 无锁 |
 | 适用场景 | 低频（<100次/秒） | 多线程高频 | 单线程高频 |
-| 代表实现 | Container Manager | Journal/File Server | eBPF Server |
+| 代表实现 | File Server | Journal/Host Monitor | eBPF Server |
 
 #### 实际应用示例
 
@@ -732,10 +732,23 @@ RawEvent* raw = group.AddRawEvent(true);
 
 **File Server**：
 
-- **使用方式**：全局EventPool
-- **原因**：EventGroup在多个线程间传递（采集线程 → 处理线程）
-- **代码示例**：`LogEvent* event = group.AddLogEvent(true);`
-- **性能提升**：日志采集场景显著减少内存分配开销
+- **使用方式**：不使用EventPool
+- **原因**：日志文件采集频率相对较低，且每次只创建单个Event
+- **代码示例**：
+
+  ```cpp
+  // core/file_server/reader/LogFileReader.cpp
+  PipelineEventGroup group{std::shared_ptr<SourceBuffer>(std::move(logBuffer->sourcebuffer))};
+  LogEvent* event = group.AddLogEvent();  // 不使用pool（默认false）
+  event->SetTimestamp(logtime);
+  event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
+  event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
+  
+  // move推送到处理队列
+  ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group));
+  ```
+
+- **设计考虑**：文件采集通常不是高频操作（相比内核事件或journal），内存分配开销在可接受范围内
 
 **eBPF Server**：
 
@@ -801,7 +814,6 @@ RawEvent* raw = group.AddRawEvent(true);
   - **初始化**：加载checkpoint + 启动inotify + 启动polling双重监控
   - **反压处理**：时间片控制（50ms/pipeline）+ 每次读取前IsValidToPush检查
   - **退出处理**：condition_variable唤醒 + 1秒超时
-  - **EventPool**：使用全局pool创建LogEvent
   - 适合日志文件采集，支持checkpoint断点续传和文件轮转
 
 ### Container Manager（容器发现与管理）
@@ -812,7 +824,6 @@ RawEvent* raw = group.AddRawEvent(true);
   - **初始化**：简单bool标志 + 轮询线程启动
   - **反压处理**：不直接推送数据，通过diff通知各配置更新状态
   - **退出处理**：5秒超时 + try-catch异常保护
-  - **EventPool**：不直接使用（由依赖它的input插件使用）
   - 适合容器环境，支持Docker/CRI多运行时和K8s过滤
 
 **选择参考**：

@@ -74,7 +74,7 @@ public:
 
 ## No Copy 模式
 
-LoongCollector C++ 数据模型的核心优化是**No Copy（Zero-Copy）模式**，通过统一的内存管理机制避免频繁的字符串拷贝，显著提升性能。
+LoongCollector C++ 数据模型的核心优化是**No Copy模式**，通过统一的内存管理机制避免频繁的字符串拷贝，显著提升性能。
 
 ### 核心组件
 
