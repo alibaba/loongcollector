@@ -18,7 +18,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
-	"os/exec"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -613,25 +613,33 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 }
 
 // extractUpperDirFromProcMounts extracts upperdir from /proc/{pid}/mounts for containerd overlayfs
-// It executes: cat /proc/{pid}/mounts | grep "overlay / " and extracts upperdir=xxx value
+// It reads /logtail_host/proc/{pid}/mounts and extracts upperdir=xxx from the line containing "overlay / "
 func extractUpperDirFromProcMounts(pid int) (string, error) {
-	// Execute: cat /proc/{pid}/mounts | grep "overlay / "
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("cat /proc/%d/mounts | grep \"overlay / \"", pid))
-	output, err := cmd.CombinedOutput()
+	// Read /proc/{pid}/mounts through /logtail_host mount point
+	mountsPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
+	content, err := os.ReadFile(mountsPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to read /proc/%d/mounts: %w", pid, err)
+		return "", fmt.Errorf("failed to read %s: %w", mountsPath, err)
 	}
 
-	// Parse output to extract upperdir=xxx
-	// Example: overlay / overlay rw,relatime,...,upperdir=/var/lib/containerd/...,workdir=...
-	line := strings.TrimSpace(string(output))
-	if len(line) == 0 {
-		return "", fmt.Errorf("no overlay mount found in /proc/%d/mounts", pid)
+	// Parse content line by line to find the line containing "overlay / "
+	lines := strings.Split(string(content), "\n")
+	var targetLine string
+	for _, line := range lines {
+		if strings.Contains(line, "overlay / ") {
+			targetLine = line
+			break
+		}
+	}
+
+	if len(targetLine) == 0 {
+		return "", fmt.Errorf("no overlay mount found in %s", mountsPath)
 	}
 
 	// Find upperdir= in the line
+	// Example: overlay / overlay rw,relatime,...,upperdir=/var/lib/containerd/...,workdir=...
 	upperDirPrefix := "upperdir="
-	upperDirIdx := strings.Index(line, upperDirPrefix)
+	upperDirIdx := strings.Index(targetLine, upperDirPrefix)
 	if upperDirIdx == -1 {
 		return "", fmt.Errorf("upperdir not found in mount info")
 	}
@@ -639,11 +647,11 @@ func extractUpperDirFromProcMounts(pid int) (string, error) {
 	// Extract the value after upperdir=
 	startIdx := upperDirIdx + len(upperDirPrefix)
 	endIdx := startIdx
-	for endIdx < len(line) && line[endIdx] != ',' && line[endIdx] != ' ' {
+	for endIdx < len(targetLine) && targetLine[endIdx] != ',' && targetLine[endIdx] != ' ' {
 		endIdx++
 	}
 
-	upperDir := line[startIdx:endIdx]
+	upperDir := targetLine[startIdx:endIdx]
 	if len(upperDir) == 0 {
 		return "", fmt.Errorf("empty upperdir value")
 	}
@@ -652,7 +660,7 @@ func extractUpperDirFromProcMounts(pid int) (string, error) {
 }
 
 // CreateInfoDetail create DockerInfoDetail with docker.Container
-// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
+// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts, State.Pid
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
 func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	// Generate Log Tags

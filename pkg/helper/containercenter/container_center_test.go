@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
@@ -812,4 +813,158 @@ func TestEnvRegex(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExtractUpperDirFromProcMounts(t *testing.T) {
+	// Create a temporary directory to simulate /logtail_host
+	tmpDir, err := os.MkdirTemp("", "logtail_host_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original DefaultLogtailMountPath
+	originalMountPath := DefaultLogtailMountPath
+	defer func() {
+		DefaultLogtailMountPath = originalMountPath
+	}()
+
+	// Set DefaultLogtailMountPath to temp directory
+	DefaultLogtailMountPath = tmpDir
+
+	// Create /proc directory structure
+	procDir := tmpDir + "/proc"
+	err = os.MkdirAll(procDir, 0755)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		pid           int
+		mountsContent string
+		expected      string
+		expectError   bool
+	}{
+		{
+			name: "valid overlay mount with upperdir",
+			pid:  42433,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/13/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/12/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/11/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/10/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/9/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/8/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/7/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/5/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/4/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/3/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0
+/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0`,
+			expected:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs",
+			expectError: false,
+		},
+		{
+			name: "no overlay mount found",
+			pid:  42434,
+			mountsContent: `/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0`,
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:          "overlay mount without upperdir",
+			pid:           42435,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0`,
+			expected:      "",
+			expectError:   true,
+		},
+		{
+			name: "multiple overlay mounts, extract first one",
+			pid:  42436,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0
+overlay /tmp overlay rw,relatime,lowerdir=/tmp/lower,upperdir=/tmp/upper,workdir=/tmp/work 0 0`,
+			expected:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create /proc/{pid} directory
+			pidDir := procDir + "/" + fmt.Sprintf("%d", tt.pid)
+			err := os.MkdirAll(pidDir, 0755)
+			require.NoError(t, err)
+
+			// Write mounts file
+			mountsFile := pidDir + "/mounts"
+			err = os.WriteFile(mountsFile, []byte(tt.mountsContent), 0644)
+			require.NoError(t, err)
+
+			// Test extractUpperDirFromProcMounts
+			result, err := extractUpperDirFromProcMounts(tt.pid)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+
+			// Cleanup
+			os.RemoveAll(pidDir)
+		})
+	}
+}
+
+func TestCreateInfoDetailWithContainerdStorageDriver(t *testing.T) {
+	// Create a temporary directory to simulate /logtail_host
+	tmpDir, err := os.MkdirTemp("", "logtail_host_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original DefaultLogtailMountPath
+	originalMountPath := DefaultLogtailMountPath
+	defer func() {
+		DefaultLogtailMountPath = originalMountPath
+	}()
+
+	// Set DefaultLogtailMountPath to temp directory
+	DefaultLogtailMountPath = tmpDir
+
+	// Create /proc directory structure
+	procDir := tmpDir + "/proc"
+	err = os.MkdirAll(procDir, 0755)
+	require.NoError(t, err)
+
+	// Create /proc/{pid} directory and mounts file
+	pid := 42433
+	pidDir := procDir + "/" + fmt.Sprintf("%d", pid)
+	err = os.MkdirAll(pidDir, 0755)
+	require.NoError(t, err)
+
+	mountsContent := `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0`
+	mountsFile := pidDir + "/mounts"
+	err = os.WriteFile(mountsFile, []byte(mountsContent), 0644)
+	require.NoError(t, err)
+	defer os.RemoveAll(pidDir)
+
+	// Reset container center instance
+	resetContainerCenter()
+	dc := getContainerCenterInstance()
+
+	// Create a mock docker client
+	mockClient := DockerClientMock{}
+	dc.client = &mockClient
+
+	// Test container info with empty GraphDriver (docker v29+ with containerd)
+	// GraphDriver is not set, which simulates docker v29+ with containerd storage driver
+	info := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
+			ID:   "test-container-id",
+			Name: "test-container",
+			State: &container.State{
+				Pid:    pid,
+				Status: "running",
+			},
+			// GraphDriver is not set (nil or empty), simulating docker v29+ with containerd
+		},
+		Config: &container.Config{
+			Env: make([]string, 0),
+		},
+	}
+
+	// Create DockerInfoDetail
+	did := dc.CreateInfoDetail(info, "", false)
+
+	// Verify that DefaultRootPath was extracted from /proc/{pid}/mounts
+	expectedUpperDir := "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs"
+	assert.Equal(t, expectedUpperDir, did.DefaultRootPath)
 }
