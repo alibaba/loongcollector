@@ -617,7 +617,7 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 func extractUpperDirFromProcMounts(pid int) (string, error) {
 	// Read /proc/{pid}/mounts through /logtail_host mount point
 	mountsPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
-	content, err := os.ReadFile(mountsPath)
+	content, err := os.ReadFile(filepath.Clean(mountsPath))
 	if err != nil {
 		return "", fmt.Errorf("failed to read %s: %w", mountsPath, err)
 	}

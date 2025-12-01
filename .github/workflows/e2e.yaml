@@ -209,12 +209,12 @@ jobs:
           MAJOR=$(echo $VERSION | cut -d. -f1)
           MINOR=$(echo $VERSION | cut -d. -f2)
           
-          # 查找匹配的版本
-          MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\.$MINOR\." | head -1)
+          # 查找匹配的版本，选择最高的小版本
+          MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\.$MINOR\." | tail -1)
           
           if [ -z "$MATCHED_VERSION" ]; then
-            # 如果找不到精确匹配，尝试匹配主版本号
-            MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | head -1)
+            # 如果找不到精确匹配，尝试匹配主版本号，选择最高版本
+            MATCHED_VERSION=$(echo "$AVAILABLE_VERSIONS" | grep "^5:$MAJOR\." | tail -1)
           fi
           
           if [ -n "$MATCHED_VERSION" ]; then
