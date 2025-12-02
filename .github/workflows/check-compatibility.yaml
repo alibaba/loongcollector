@@ -31,7 +31,7 @@ on:
       - 2.*
 
 jobs:
-  BuildCore:
+  CheckCompatibility:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
@@ -81,7 +81,7 @@ jobs:
         run: make dist && scripts/check_glibc.sh && scripts/check_cpu_instruction.sh && scripts/check_dependencies.sh
 
   actions-timeline:
-    needs: [BuildCore]
+    needs: [CheckCompatibility]
     runs-on: ubuntu-latest
     permissions:
       actions: read

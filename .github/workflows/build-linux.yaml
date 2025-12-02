@@ -101,8 +101,43 @@ jobs:
       - name: Report code coverage
         run: python3 tools/coverage-diff/main.py --path core/coverage.json --summary core/summary.json
 
+  BuildPurePlugin:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        runner: [arc-runner-set-ilogtail]
+      fail-fast: true
+    steps:
+      - name: Set up Go (pre-installed on runner)
+        run: |
+          # Go 已经预安装在 /usr/local/go，确保 PATH 包含 Go 二进制文件路径
+          echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+          echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+          
+          # 验证 Go 是否可用
+          if [ -f "/usr/local/go/bin/go" ]; then
+            echo "✅ Go 已安装在 /usr/local/go"
+            /usr/local/go/bin/go version
+          elif command -v go &> /dev/null; then
+            echo "✅ Go 已在 PATH 中可用"
+            go version
+          else
+            echo "❌ 错误: Go 未找到"
+            echo "请确保 Go 已安装在 /usr/local/go 或已添加到 PATH"
+            exit 1
+          fi
+
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Build pure plugin
+        run: make plugin_main
+
   actions-timeline:
-    needs: [BuildCoreUT]
+    needs: [BuildCoreUT, BuildPurePlugin]
     runs-on: ubuntu-latest
     permissions:
       actions: read
