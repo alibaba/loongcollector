@@ -164,33 +164,54 @@ if (ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
 
 根据数据源的读取特性，有三种主要的反压处理策略：
 
-**策略1：累积 + 队列检查**（小粒度读取）
+**策略1：累积 + 队列检查（按字节大小）**（小粒度读取）
 
 **适用场景**：数据源API只能逐条读取（如systemd journal的entry-by-entry）
 
-**为什么需要累积**：journal API每次只能读取一个entry，需要累积到一定数量才推送，不然如果每个EventGroup中只有比较稀疏的Event数，而Event Group持续增加，会造成Processor队列积压，从而产生类似push attemps to process queue continuously faild的持续报错。
+**为什么需要累积**：journal API每次只能读取一个entry，需要累积到一定大小才推送，不然如果每个EventGroup中只有比较稀疏的Event数，而Event Group持续增加，会造成Processor队列积压，从而产生类似push attemps to process queue continuously faild的持续报错。
+
+**关键改进**：使用**字节大小**而非条数控制批次，避免单条日志过大导致内存无法控制。
 
 ```c++
 // 累积数据到EventGroup
 std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
 int accumulatedCount = 0;
-const int maxBatchSize = 1000;
+const size_t maxBytesPerBatch = 512 * 1024;  // 512KB，控制内存占用
 
-while (accumulatedCount < maxBatchSize) {
+// 1. 先检查队列（避免读取无法发送的数据）
+if (!IsValidToPush(queueKey)) {
+    if (accumulatedCount > 0) {
+        // 有累积数据，保持等待
+        return false;  
+    }
+    // 无累积数据，跳过读取
+    return false;
+}
+
+// 2. 队列可用，开始读取
+while (true) {
+    size_t currentDataSize = eventGroup->DataSize();
+    
+    // 检查字节大小限制
+    if (currentDataSize >= maxBytesPerBatch) {
+        break;  // 达到大小限制
+    }
+    
     Entry entry = ReadOneEntry();  // 只能一次读一条
+    if (entry == EndOfJournal) {
+        break;  // 无更多数据，立即退出（不阻塞等待）
+    }
+    
     AddToEventGroup(entry, accumulatedEventGroup);
     accumulatedCount++;
 }
 
-// 推送时机判断
-bool timeout = (now - lastPushTime) > batchTimeout;
-bool reachedMax = accumulatedCount >= maxBatchSize;
+// 3. 推送时机判断
+bool reachedSizeLimit = eventGroup->DataSize() >= maxBytesPerBatch;
+bool shouldPush = reachedSizeLimit || (timeout && accumulatedCount > 0);
 
-if (timeout || reachedMax) {
-    // 必须推送：超时或达到上限
-    PushEventGroup(...);
-} else if (hasAccumulatedData && IsValidToPush(queueKey)) {
-    // 队列可用且有数据，可以推送
+if (shouldPush) {
+    // 推送数据
     PushEventGroup(...);
 } else {
     // 保留累积数据，下次继续
@@ -199,9 +220,14 @@ if (timeout || reachedMax) {
 
 **推送触发条件**：
 
-1. 达到批次上限（如1000条）
-2. 超时触发（如1秒）
-3. 无新数据但队列可用
+1. **达到字节大小限制**（如512KB）- 主要控制
+2. **超时触发**（如1秒）- 保证实时性
+3. 注意：无新数据时**立即退出**读取循环，不阻塞等待
+
+**与 FileServer 的对齐**：
+- FileServer：按 `BUFFER_SIZE`（512KB）读取，达到限制或无数据即发送
+- JournalServer：按 `MaxBytesPerBatch`（512KB）累积，达到限制或超时即发送
+- 都是**先检查队列，再读取数据，按字节大小控制**
 
 **实际应用**：Journal Server
 
@@ -303,9 +329,22 @@ if (!ProcessorRunner::GetInstance()->PushQueue(queueKey, inputIdx,
 
 合理的EventGroup大小可以平衡吞吐量和内存占用：
 
-- **批次大小**：通常1000-5000条事件
+- **字节大小**：512KB - 10MB（推荐512KB，与FileServer的BUFFER_SIZE对齐）
 - **超时时间**：1-3秒（保证实时性）
-- **触发条件**：达到批次上限 OR 超时触发 OR 队列恢复可用
+- **触发条件**：达到字节限制 OR 超时触发
+
+**配置示例**：
+```json
+{
+  "MaxBytesPerBatch": 524288,    // 512KB，控制内存占用
+  "BatchTimeoutMs": 1000         // 1秒，保证实时性
+}
+```
+
+**为什么用字节大小而非条数**：
+- ❌ 条数控制：单条大时（如100KB），1000条 = 100MB，内存无法控制
+- ✅ 字节控制：无论单条多大，总量可控（如512KB），防止内存累积
+- 注意：`MaxEntriesPerBatch` 配置已废弃移除，只使用 `MaxBytesPerBatch`
 
 #### 策略选择指南
 
@@ -778,12 +817,24 @@ RawEvent* raw = group.AddRawEvent(true);
 
 - **插件实现**：`core/plugin/input/InputJournal.cpp`
 - **管理类实现**：`core/journal_server/JournalServer.cpp`
+- **处理逻辑**：`core/journal_server/processor/JournalEntryProcessor.cpp`
 - **特点**：
   - **初始化**：使用atomic CAS确保线程安全的单次初始化
-  - **反压处理**：数据累积 + IsValidToPush检查 + 超时/批次触发
+  - **反压处理**：
+    - ✅ **提前检查IsValidToPush**：读取前先检查队列，队列满则不读取
+    - ✅ **按字节大小累积**：使用 `MaxBytesPerBatch`（默认512KB）控制批次大小
+    - ✅ **双重触发机制**：达到字节限制 OR 超时（`BatchTimeoutMs`，默认1秒）
+    - ✅ **与FileServer对齐**：字节大小控制逻辑与FileServer的BUFFER_SIZE一致
   - **退出处理**：原子标志 + 自然唤醒（epoll_wait 200ms）+ 10秒超时等待
   - **EventPool**：使用全局EventPool + move推送（高性能模式）
   - 使用epoll实现事件驱动的数据采集，支持多配置实例共享线程
+  - **配置参数**：
+    ```json
+    {
+      "MaxBytesPerBatch": 524288,  // 512KB，控制内存占用
+      "BatchTimeoutMs": 1000       // 1秒超时，保证实时性
+    }
+    ```
 
 ### Host Monitor（主机监控指标采集）
 

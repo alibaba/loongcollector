@@ -99,7 +99,7 @@ void JournalConnectionUnittest::TestAddConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -126,7 +126,7 @@ void JournalConnectionUnittest::TestRemoveConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -156,7 +156,7 @@ void JournalConnectionUnittest::TestGetConfig() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -172,7 +172,7 @@ void JournalConnectionUnittest::TestGetConfig() {
 
     // 验证配置（检查默认值）
     APSARA_TEST_EQUAL(retrievedConfig.mSeekPosition, "tail");
-    APSARA_TEST_TRUE(retrievedConfig.mMaxEntriesPerBatch >= 100);
+    APSARA_TEST_TRUE(retrievedConfig.mMaxBytesPerBatch >= 512 * 1024);
     APSARA_TEST_TRUE(retrievedConfig.mKernel || !retrievedConfig.mKernel); // 可能被验证逻辑修改
 }
 
@@ -185,7 +185,7 @@ void JournalConnectionUnittest::TestGetConnection() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -213,7 +213,7 @@ void JournalConnectionUnittest::TestGetAllConfigs() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -269,7 +269,7 @@ void JournalConnectionUnittest::TestGetConnectionCount() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -309,7 +309,7 @@ void JournalConnectionUnittest::TestCleanup() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -339,7 +339,7 @@ void JournalConnectionUnittest::TestAddConfigDuplicate() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 添加配置
@@ -376,7 +376,7 @@ void JournalConnectionUnittest::TestAddConfigReaderOpenFailure() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 添加配置（在测试环境中可能失败）
@@ -397,7 +397,7 @@ void JournalConnectionUnittest::TestAddConfigFilterFailure() {
     // 创建测试配置（带可能导致过滤器失败的参数）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mUnits = {"non-existent.service"}; // 使用不存在的服务单元
 
@@ -424,7 +424,7 @@ void JournalConnectionUnittest::TestAddConfigSeekFailure() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "none"; // 特殊位置
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -505,7 +505,7 @@ void JournalConnectionUnittest::TestGetStatsWithInvalidConnections() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 添加配置
@@ -531,7 +531,7 @@ void JournalConnectionUnittest::TestAddConfigWithFilters() {
     // 创建测试配置（带过滤器）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mUnits = {"test.service"};
     config.mMatchPatterns = {"MESSAGE=test"};
@@ -560,7 +560,7 @@ void JournalConnectionUnittest::TestAddConfigSeekHead() {
     // 创建测试配置（seek到head）
     JournalConfig config;
     config.mSeekPosition = "head";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -587,7 +587,7 @@ void JournalConnectionUnittest::TestAddConfigSeekCursor() {
     // 创建测试配置（seek到cursor）
     JournalConfig config;
     config.mSeekPosition = "cursor:test_cursor";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -615,12 +615,12 @@ void JournalConnectionUnittest::TestAddConfigReplaceExisting() {
     // 创建测试配置
     JournalConfig config1;
     config1.mSeekPosition = "tail";
-    config1.mMaxEntriesPerBatch = 100;
+    config1.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config1.mKernel = true;
 
     JournalConfig config2;
     config2.mSeekPosition = "head";
-    config2.mMaxEntriesPerBatch = 50;
+    config2.mMaxBytesPerBatch = 256 * 1024; // 256KB
     config2.mKernel = false;
 
     // 创建pipeline context
@@ -651,7 +651,7 @@ void JournalConnectionUnittest::TestGetStatsWithActiveConnections() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -774,7 +774,7 @@ void JournalConnectionUnittest::TestAddConfigWithInvalidUnits() {
     // 创建测试配置（无效的units）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mUnits = {""}; // 空字符串会被过滤掉
 
@@ -803,7 +803,7 @@ void JournalConnectionUnittest::TestAddConfigWithInvalidIdentifiers() {
     // 创建测试配置（无效的identifiers）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mIdentifiers = {""}; // 空字符串会被过滤掉
 
@@ -832,7 +832,7 @@ void JournalConnectionUnittest::TestAddConfigWithInvalidMatchPatterns() {
     // 创建测试配置（无效的matchPatterns）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mMatchPatterns = {""}; // 空字符串会被过滤掉
 
@@ -861,7 +861,7 @@ void JournalConnectionUnittest::TestAddConfigWithEmptyContext() {
     // 创建测试配置（空context）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mCtx = nullptr; // 空的ctx
 
@@ -883,12 +883,12 @@ void JournalConnectionUnittest::TestValidateConfig() {
 
     // 测试无效配置
     config.mSeekPosition = "";
-    config.mMaxEntriesPerBatch = 0;
+    config.mMaxBytesPerBatch = 0; // 无效值
     APSARA_TEST_TRUE(!config.IsValid());
 
     // 测试有效的配置
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 1000;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mCursorSeekFallback = "head";
     APSARA_TEST_TRUE(config.IsValid());
 
@@ -899,7 +899,7 @@ void JournalConnectionUnittest::TestValidateConfig() {
     // 测试边界值修正
     JournalConfig config2;
     config2.mSeekPosition = "invalid";
-    config2.mMaxEntriesPerBatch = 100000;
+    config2.mMaxBytesPerBatch = 100 * 1024 * 1024; // 100MB 超过最大值
     config2.mCursorSeekFallback = "invalid";
     int fixedCount2 = config2.ValidateAndFixConfig();
     APSARA_TEST_TRUE(fixedCount2 > 0);
@@ -917,7 +917,7 @@ void JournalConnectionUnittest::TestRefreshConnection() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -949,7 +949,7 @@ void JournalConnectionUnittest::TestShouldRefreshConnection() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mResetIntervalSecond = 1; // 设置短暂的刷新间隔
 
@@ -1012,7 +1012,7 @@ void JournalConnectionUnittest::TestRefreshConnectionsByInterval() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mResetIntervalSecond = 1;
 
@@ -1053,7 +1053,7 @@ void JournalConnectionUnittest::TestRecoverConnectionAndSyncEpoll() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context
@@ -1106,7 +1106,7 @@ void JournalConnectionUnittest::TestGetAllConfigNames() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
 
     // 创建pipeline context

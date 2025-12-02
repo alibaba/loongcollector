@@ -64,7 +64,7 @@ void JournalConfigUnittest::TestDefaultValues() {
     APSARA_TEST_TRUE(config.mIdentifiers.empty());
     APSARA_TEST_TRUE(config.mMatchPatterns.empty());
     APSARA_TEST_TRUE(config.mKernel);
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000);
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 512 * 1024); // 默认 512KB
     APSARA_TEST_FALSE(config.mParsePriority);
     APSARA_TEST_FALSE(config.mParseSyslogFacility);
     APSARA_TEST_TRUE(config.mUseJournalEventTime);
@@ -77,7 +77,7 @@ void JournalConfigUnittest::TestValidateAndFixConfig() {
     JournalConfig config;
 
     // 设置一些无效值
-    config.mMaxEntriesPerBatch = 0; // 无效值
+    config.mMaxBytesPerBatch = 0; // 无效值（小于最小值 10KB）
     config.mSeekPosition = "invalid_position"; // 无效值
     config.mCursorSeekFallback = "invalid_fallback"; // 无效值
     config.mUnits = {"valid_unit", "", "another_valid_unit"}; // 包含空字符串
@@ -90,7 +90,7 @@ void JournalConfigUnittest::TestValidateAndFixConfig() {
 
     // 验证修正结果
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000); // 修正为默认值
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 512 * 1024); // 默认 512KB // 修正为默认值
     APSARA_TEST_EQUAL(config.mSeekPosition, "tail"); // 修正为默认值
     APSARA_TEST_EQUAL(config.mCursorSeekFallback, "head"); // 修正为默认值
 
@@ -117,7 +117,7 @@ void JournalConfigUnittest::TestIsValid() {
     APSARA_TEST_FALSE(config.IsValid());
 
     // 设置有效值
-    config.mMaxEntriesPerBatch = 1000;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mSeekPosition = "tail";
     config.mCursorSeekFallback = "head";
 
@@ -125,10 +125,10 @@ void JournalConfigUnittest::TestIsValid() {
     APSARA_TEST_TRUE(config.IsValid());
 
     // 测试边界值
-    config.mMaxEntriesPerBatch = 1;
+    config.mMaxBytesPerBatch = 10 * 1024; // 最小值 10KB
     APSARA_TEST_TRUE(config.IsValid());
 
-    config.mMaxEntriesPerBatch = 10000; // 最大值
+    config.mMaxBytesPerBatch = 10 * 1024 * 1024; // 最大值 10MB
     APSARA_TEST_TRUE(config.IsValid());
 }
 
@@ -142,7 +142,7 @@ void JournalConfigUnittest::TestFieldSettings() {
     config.mIdentifiers = {"nginx", "apache"};
     config.mMatchPatterns = {"*error*", "*warning*"};
     config.mKernel = false;
-    config.mMaxEntriesPerBatch = 500;
+    config.mMaxBytesPerBatch = 256 * 1024; // 256KB
     config.mParsePriority = true;
     config.mParseSyslogFacility = true;
     config.mUseJournalEventTime = false;
@@ -161,7 +161,7 @@ void JournalConfigUnittest::TestFieldSettings() {
     APSARA_TEST_EQUAL(config.mMatchPatterns[0], "*error*");
     APSARA_TEST_EQUAL(config.mMatchPatterns[1], "*warning*");
     APSARA_TEST_FALSE(config.mKernel);
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 500);
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 256 * 1024);
     APSARA_TEST_TRUE(config.mParsePriority);
     APSARA_TEST_TRUE(config.mParseSyslogFacility);
     APSARA_TEST_FALSE(config.mUseJournalEventTime);
@@ -193,26 +193,26 @@ void JournalConfigUnittest::TestValidateAndFixConfigEdgeCases() {
     JournalConfig config;
 
     // 测试边界值
-    config.mMaxEntriesPerBatch = 0;
+    config.mMaxBytesPerBatch = 0; // 无效值
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复这些值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_TRUE(config.mMaxEntriesPerBatch > 0);
+    APSARA_TEST_TRUE(config.mMaxBytesPerBatch >= 10 * 1024); // 至少 10KB
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigBoundaryValues() {
     JournalConfig config;
 
     // 测试最大值边界
-    config.mMaxEntriesPerBatch = 10001; // 超过最大值
+    config.mMaxBytesPerBatch = 100 * 1024 * 1024; // 超过最大值 10MB
 
     int fixedCount = config.ValidateAndFixConfig();
 
     // 应该修复这些值
     APSARA_TEST_TRUE(fixedCount > 0);
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10000);
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 10 * 1024 * 1024); // 修正为 10MB
 }
 
 void JournalConfigUnittest::TestValidateAndFixConfigInvalidSeekPosition() {
@@ -275,14 +275,14 @@ void JournalConfigUnittest::TestIsValidEdgeCases() {
     JournalConfig config;
 
     // 测试无效配置
-    config.mMaxEntriesPerBatch = 0;
+    config.mMaxBytesPerBatch = 0; // 无效值
     config.mSeekPosition = "";
     config.mCursorSeekFallback = "";
 
     APSARA_TEST_FALSE(config.IsValid());
 
     // 测试部分有效配置
-    config.mMaxEntriesPerBatch = 1000;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mSeekPosition = "tail";
     config.mCursorSeekFallback = "head";
 
@@ -301,7 +301,7 @@ void JournalConfigUnittest::TestParseFromJsonBasic() {
     config["ParseSyslogFacility"] = true;
     config["UseJournalEventTime"] = false;
     config["ResetIntervalSecond"] = 7200;
-    config["MaxEntriesPerBatch"] = 500;
+    config["MaxBytesPerBatch"] = 256 * 1024; // 256KB
     config["BatchTimeoutMs"] = 2000;
 
     JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
@@ -314,7 +314,7 @@ void JournalConfigUnittest::TestParseFromJsonBasic() {
     APSARA_TEST_TRUE(journalConfig.mParseSyslogFacility);
     APSARA_TEST_FALSE(journalConfig.mUseJournalEventTime);
     APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 7200);
-    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 500);
+    APSARA_TEST_EQUAL(journalConfig.mMaxBytesPerBatch, 256 * 1024); // 256KB
     APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 2000);
 }
 
@@ -375,7 +375,7 @@ void JournalConfigUnittest::TestParseFromJsonDefaults() {
     APSARA_TEST_FALSE(journalConfig.mParseSyslogFacility); // 默认 false
     APSARA_TEST_TRUE(journalConfig.mUseJournalEventTime); // 默认 true（结构体定义）
     APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 3600); // 默认 3600
-    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1000); // 默认 1000
+    APSARA_TEST_EQUAL(journalConfig.mMaxBytesPerBatch, 512 * 1024); // 默认 512KB
     APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 1000); // 默认 1000
 
     // 验证数组字段为空
@@ -404,14 +404,14 @@ void JournalConfigUnittest::TestParseFromJsonInvalidTypes() {
     // 测试无效类型处理
     Json::Value config;
     config["SeekPosition"] = 123; // 应该是字符串
-    config["MaxEntriesPerBatch"] = "not_a_number"; // 应该是数字
+    config["MaxBytesPerBatch"] = "not_a_number"; // 应该是数字
     config["Kernel"] = "not_a_bool"; // 应该是bool
 
     JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
 
     // 由于类型不匹配，应该使用默认值
     APSARA_TEST_EQUAL(journalConfig.mSeekPosition, "tail"); // 默认值
-    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1000); // 默认值
+    APSARA_TEST_EQUAL(journalConfig.mMaxBytesPerBatch, 512 * 1024); // 默认值 512KB
     APSARA_TEST_TRUE(journalConfig.mKernel); // 默认值
 }
 
@@ -452,26 +452,26 @@ void JournalConfigUnittest::TestParseFromJsonBoundaryValues() {
     // 测试边界值
     Json::Value config;
     config["ResetIntervalSecond"] = 0; // 最小值
-    config["MaxEntriesPerBatch"] = 1; // 最小值
+    config["MaxBytesPerBatch"] = 1; // 无效值（小于最小值 10KB）
     config["BatchTimeoutMs"] = 1; // 最小值
 
     JournalConfig journalConfig = JournalConfig::ParseFromJson(config, nullptr);
 
     // 验证边界值被接受（虽然ValidateAndFixConfig会修正它们）
     APSARA_TEST_EQUAL(journalConfig.mResetIntervalSecond, 0);
-    APSARA_TEST_EQUAL(journalConfig.mMaxEntriesPerBatch, 1);
+    APSARA_TEST_EQUAL(journalConfig.mMaxBytesPerBatch, 1); // 会被 ValidateAndFixConfig 修正
     APSARA_TEST_EQUAL(journalConfig.mBatchTimeoutMs, 1);
 
     // 测试最大值
     Json::Value config2;
     config2["ResetIntervalSecond"] = 999999;
-    config2["MaxEntriesPerBatch"] = 999999;
+    config2["MaxBytesPerBatch"] = 999999999; // 超过最大值 10MB
     config2["BatchTimeoutMs"] = 999999;
 
     JournalConfig journalConfig2 = JournalConfig::ParseFromJson(config2, nullptr);
 
     APSARA_TEST_EQUAL(journalConfig2.mResetIntervalSecond, 999999);
-    APSARA_TEST_EQUAL(journalConfig2.mMaxEntriesPerBatch, 999999);
+    APSARA_TEST_EQUAL(journalConfig2.mMaxBytesPerBatch, 999999999); // 会被 ValidateAndFixConfig 修正
     APSARA_TEST_EQUAL(journalConfig2.mBatchTimeoutMs, 999999);
 }
 

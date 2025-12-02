@@ -62,7 +62,7 @@ void JournalEntryProcessorUnittest::TestReadJournalEntriesFunction() {
     // 创建测试配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mParsePriority = true;
     config.mParseSyslogFacility = true;
@@ -305,22 +305,22 @@ void JournalEntryProcessorUnittest::TestTimestampHandling() {
 }
 
 void JournalEntryProcessorUnittest::TestBatchProcessing() {
-    // 测试批处理逻辑
+    // 测试批处理逻辑（改为测试 MaxBytesPerBatch）
     JournalConfig config;
-    config.mMaxEntriesPerBatch = 10;
+    config.mMaxBytesPerBatch = 10 * 1024; // 10KB
 
     // 验证批处理配置
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10);
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 10 * 1024);
 
     // 测试批处理边界值
-    config.mMaxEntriesPerBatch = 1;
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1);
+    config.mMaxBytesPerBatch = 10 * 1024; // 最小值 10KB
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 10 * 1024);
 
-    config.mMaxEntriesPerBatch = 1000;
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 1000);
+    config.mMaxBytesPerBatch = 512 * 1024; // 默认值 512KB
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 512 * 1024);
 
-    config.mMaxEntriesPerBatch = 10000;
-    APSARA_TEST_EQUAL(config.mMaxEntriesPerBatch, 10000);
+    config.mMaxBytesPerBatch = 10 * 1024 * 1024; // 最大值 10MB
+    APSARA_TEST_EQUAL(config.mMaxBytesPerBatch, 10 * 1024 * 1024);
 }
 
 void JournalEntryProcessorUnittest::TestErrorHandling() {
@@ -438,7 +438,7 @@ void JournalEntryProcessorUnittest::TestNavigateToNextEntryUnknownException() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatch() {
     // 测试处理journal条目批次
     JournalConfig config;
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
 
     // 测试批次处理逻辑
     APSARA_TEST_TRUE(true);
@@ -447,7 +447,7 @@ void JournalEntryProcessorUnittest::TestProcessJournalEntryBatch() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchEmpty() {
     // 测试处理空批次
     JournalConfig config;
-    config.mMaxEntriesPerBatch = 0;
+    config.mMaxBytesPerBatch = 0; // 无效值
 
     // 测试空批次处理
     APSARA_TEST_TRUE(true);
@@ -456,7 +456,7 @@ void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchEmpty() {
 void JournalEntryProcessorUnittest::TestProcessJournalEntryBatchMaxEntries() {
     // 测试处理最大条目数批次
     JournalConfig config;
-    config.mMaxEntriesPerBatch = 10000;
+    config.mMaxBytesPerBatch = 10 * 1024 * 1024; // 10MB 最大值
 
     // 测试最大条目数处理
     APSARA_TEST_TRUE(true);
@@ -549,7 +549,7 @@ void TestHandleJournalEntriesWithNullReader() {
     // 测试null reader的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
 
     std::shared_ptr<PipelineEventGroup> accumulatedEventGroup;
     int accumulatedEntryCount = 0;
@@ -575,7 +575,7 @@ void TestHandleJournalEntriesWithClosedReader() {
     // 测试closed reader的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
 
     auto reader = std::make_shared<JournalReader>();
     // 不调用Open()
@@ -603,7 +603,7 @@ void TestHandleJournalEntriesWithTimeoutTrigger() {
     // 测试超时触发的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mBatchTimeoutMs = 1000;
 
     auto reader = std::make_shared<JournalReader>();
@@ -631,7 +631,7 @@ void TestHandleJournalEntriesWithZeroMaxEntries() {
     // 测试maxEntries为0的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 0; // 无效值
+    config.mMaxBytesPerBatch = 0; // 无效值（小于最小值 10KB）
 
     auto reader = std::make_shared<JournalReader>();
 
@@ -658,7 +658,7 @@ void TestHandleJournalEntriesWithParsePriority() {
     // 测试ParsePriority选项
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mParsePriority = true;
 
     auto reader = std::make_shared<JournalReader>();
@@ -686,7 +686,7 @@ void TestHandleJournalEntriesWithParseSyslogFacility() {
     // 测试ParseSyslogFacility选项
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mParseSyslogFacility = true;
 
     auto reader = std::make_shared<JournalReader>();
@@ -714,7 +714,7 @@ void TestHandleJournalEntriesWithUseJournalEventTime() {
     // 测试UseJournalEventTime选项
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mUseJournalEventTime = true;
 
     auto reader = std::make_shared<JournalReader>();
@@ -742,7 +742,7 @@ void TestHandleJournalEntriesWithAccumulatedData() {
     // 测试有累积数据的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
 
     auto reader = std::make_shared<JournalReader>();
 
@@ -769,7 +769,7 @@ void TestHandleJournalEntriesWithInvalidQueueKey() {
     // 测试无效队列键的处理
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
 
     auto reader = std::make_shared<JournalReader>();
 

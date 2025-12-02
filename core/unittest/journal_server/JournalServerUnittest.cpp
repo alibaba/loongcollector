@@ -99,7 +99,7 @@ protected:
         // 创建测试用的journal配置
         mTestConfig = std::make_unique<JournalConfig>();
         mTestConfig->mSeekPosition = "tail";
-        mTestConfig->mMaxEntriesPerBatch = 100;
+        mTestConfig->mMaxBytesPerBatch = 512 * 1024; // 512KB
         mTestConfig->mKernel = true;
         mTestConfig->mCtx = mPipelineContext.get();
 
@@ -581,7 +581,7 @@ void JournalServerUnittest::TestAddJournalInputWithHandler() {
     // 创建有效配置
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
     config.mQueueKey = 1;
@@ -799,7 +799,7 @@ void JournalServerUnittest::TestValidateQueueKeyPreSetKey() {
     // 创建有效配置（预设置queueKey）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
     config.mQueueKey = 123; // 预设置的队列键
@@ -822,7 +822,7 @@ void JournalServerUnittest::TestValidateQueueKeyNoQueueKey() {
     // 创建配置（没有queueKey）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
     config.mQueueKey = -1; // 没有队列键
@@ -845,7 +845,7 @@ void JournalServerUnittest::TestValidateQueueKeyInvalidQueue() {
     // 创建配置（无效的队列）
     JournalConfig config;
     config.mSeekPosition = "tail";
-    config.mMaxEntriesPerBatch = 100;
+    config.mMaxBytesPerBatch = 512 * 1024; // 512KB
     config.mKernel = true;
     config.mCtx = mPipelineContext.get();
     config.mQueueKey = 999999; // 无效的队列键

@@ -304,7 +304,7 @@ bool HandleJournalEntries(const string& configName,
         return false;
     }
 
-    const int maxEntriesPerBatch = config.mMaxEntriesPerBatch;
+    const size_t maxBytesPerBatch = config.mMaxBytesPerBatch;
     int newEntryCount = 0;
     bool eventGroupSent = false;
 
@@ -315,7 +315,41 @@ bool HandleJournalEntries(const string& configName,
         InitializeOrRestoreAccumulatedEventGroup(
             accumulatedEventGroup, accumulatedEntryCount, eventGroup, totalEntryCount);
 
-        while (totalEntryCount + newEntryCount < maxEntriesPerBatch) {
+        // Calculate current accumulated size
+        size_t currentDataSize = eventGroup->DataSize();
+
+        // Check if queue is valid to push BEFORE reading new data
+        if (!ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
+            // Queue is full, cannot push now
+            if (totalEntryCount > 0) {
+                // Have accumulated data, keep it and wait for next cycle
+                if (accumulatedEntryCount != nullptr) {
+                    *accumulatedEntryCount = totalEntryCount;
+                }
+                if (hasPendingDataOut != nullptr) {
+                    *hasPendingDataOut = true;
+                }
+                LOG_DEBUG(sLogger,
+                          ("journal processor queue not valid to push, keep accumulated data",
+                           "")("config", configName)("entry_count", totalEntryCount)("data_size", currentDataSize));
+            } else {
+                // No accumulated data, just skip
+                if (hasPendingDataOut != nullptr) {
+                    *hasPendingDataOut = false;
+                }
+                LOG_DEBUG(sLogger,
+                          ("journal processor queue not valid to push, skip reading", "")("config", configName));
+            }
+            return false;
+        }
+
+        // Queue is valid, now read entries until size limit reached or no more data
+        while (true) {
+            // Check size limit before reading next entry
+            if (currentDataSize >= maxBytesPerBatch) {
+                break;
+            }
+
             if (!MoveToNextJournalEntry(configName, journalReader, config.mCursorSeekFallback, newEntryCount)) {
                 break;
             }
@@ -331,21 +365,27 @@ bool HandleJournalEntries(const string& configName,
 
             CreateLogEventFromJournal(entry, config, *eventGroup);
             newEntryCount++;
+
+            // Update current data size after adding new event
+            currentDataSize = eventGroup->DataSize();
         }
 
         totalEntryCount += newEntryCount;
-        bool noNewData = newEntryCount == 0 && totalEntryCount > 0;
-        bool reachedMaxBatch = totalEntryCount >= maxEntriesPerBatch;
 
         if (totalEntryCount == 0) {
+            // No data at all
             if (hasPendingDataOut != nullptr) {
                 *hasPendingDataOut = false;
             }
             return false;
         }
 
-        if ((timeoutTrigger && totalEntryCount > 0) || reachedMaxBatch) {
-            // must push when timeout triggered or reached max batch size
+        // Decide whether to push: reached size limit OR timeout with data
+        bool reachedSizeLimit = currentDataSize >= maxBytesPerBatch;
+        bool shouldPush = reachedSizeLimit || (timeoutTrigger && totalEntryCount > 0);
+
+        if (shouldPush) {
+            // Push data to queue
             PushEventGroupToQueue(queueKey,
                                   eventGroup,
                                   totalEntryCount,
@@ -353,41 +393,21 @@ bool HandleJournalEntries(const string& configName,
                                   accumulatedEventGroup,
                                   accumulatedEntryCount,
                                   eventGroupSent);
-        } else if (noNewData) {
-            // No new data but has accumulated data: push if process queue is available
-            if (ProcessQueueManager::GetInstance()->IsValidToPush(queueKey)) {
-                PushEventGroupToQueue(queueKey,
-                                      eventGroup,
-                                      totalEntryCount,
-                                      configName,
-                                      accumulatedEventGroup,
-                                      accumulatedEntryCount,
-                                      eventGroupSent);
-            } else {
-                // Process queue not available, keep accumulating for next cycle
-                if (accumulatedEntryCount != nullptr) {
-                    *accumulatedEntryCount = totalEntryCount;
-                }
-                if (hasPendingDataOut != nullptr) {
-                    *hasPendingDataOut = true;
-                }
-                return false;
-            }
         } else {
-            // continue accumulating
+            // Continue accumulating
             if (accumulatedEntryCount != nullptr) {
                 *accumulatedEntryCount = totalEntryCount;
             }
             LOG_DEBUG(sLogger,
-                      ("journal processor accumulating event group", "")("config", configName)("entry_count",
-                                                                                               totalEntryCount));
+                      ("journal processor accumulating event group",
+                       "")("config", configName)("entry_count", totalEntryCount)("data_size", currentDataSize));
         }
 
         if (hasPendingDataOut != nullptr) {
             // hasPendingDataOut: indicates whether there is pending data to process
             // - totalEntryCount > 0 && !eventGroupSent: has data but not sent (continue accumulating)
-            // - reachedMaxBatch: reached max batch size, while loop exits, but journal may have more entries to process
-            *hasPendingDataOut = (totalEntryCount > 0 && !eventGroupSent) || reachedMaxBatch;
+            // - reachedSizeLimit: reached size limit, journal may have more entries
+            *hasPendingDataOut = (totalEntryCount > 0 && !eventGroupSent) || reachedSizeLimit;
         }
 
         if (lastBatchTimeOut != nullptr) {

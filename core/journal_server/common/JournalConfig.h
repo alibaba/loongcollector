@@ -42,7 +42,7 @@ struct JournalConfig {
     bool mKernel = true;
 
     int mResetIntervalSecond = 3600;
-    int mMaxEntriesPerBatch = 1000;
+    size_t mMaxBytesPerBatch = 512 * 1024; // 512KB, default like file reader BUFFER_SIZE
     int mBatchTimeoutMs = 1000;
 
     bool mParsePriority = false;
@@ -90,15 +90,18 @@ struct JournalConfig {
             journalConfig.mResetIntervalSecond = 3600;
         }
 
-        if (!GetOptionalIntParam(config, "MaxEntriesPerBatch", journalConfig.mMaxEntriesPerBatch, errorMsg)) {
-            journalConfig.mMaxEntriesPerBatch = 1000;
+        int maxBytesPerBatch = 0;
+        if (GetOptionalIntParam(config, "MaxBytesPerBatch", maxBytesPerBatch, errorMsg) && maxBytesPerBatch > 0) {
+            journalConfig.mMaxBytesPerBatch = static_cast<size_t>(maxBytesPerBatch);
+        } else {
+            journalConfig.mMaxBytesPerBatch = 512 * 1024; // 512KB default
         }
 
         if (!GetOptionalIntParam(config, "BatchTimeoutMs", journalConfig.mBatchTimeoutMs, errorMsg)) {
             journalConfig.mBatchTimeoutMs = 1000;
         }
 
-        static auto parseStringArray = [](const Json::Value& jsonConfig, const std::string& key) {
+        auto ParseStringArray = [](const Json::Value& jsonConfig, const std::string& key) {
             std::vector<std::string> result;
             if (jsonConfig.isMember(key) && jsonConfig[key].isArray()) {
                 for (const auto& item : jsonConfig[key]) {
@@ -110,10 +113,10 @@ struct JournalConfig {
             return result;
         };
 
-        journalConfig.mUnits = parseStringArray(config, "Units");
-        journalConfig.mIdentifiers = parseStringArray(config, "Identifiers");
-        journalConfig.mJournalPaths = parseStringArray(config, "JournalPaths");
-        journalConfig.mMatchPatterns = parseStringArray(config, "MatchPatterns");
+        journalConfig.mUnits = ParseStringArray(config, "Units");
+        journalConfig.mIdentifiers = ParseStringArray(config, "Identifiers");
+        journalConfig.mJournalPaths = ParseStringArray(config, "JournalPaths");
+        journalConfig.mMatchPatterns = ParseStringArray(config, "MatchPatterns");
 
         return journalConfig;
     }
@@ -131,11 +134,12 @@ struct JournalConfig {
             fixedCount++;
         }
 
-        if (mMaxEntriesPerBatch <= 0) {
-            mMaxEntriesPerBatch = 1000;
+        // Validate MaxBytesPerBatch: min 10KB, max 10MB
+        if (mMaxBytesPerBatch < 10 * 1024) {
+            mMaxBytesPerBatch = 10 * 1024; // 10KB minimum
             fixedCount++;
-        } else if (mMaxEntriesPerBatch > 10000) {
-            mMaxEntriesPerBatch = 10000;
+        } else if (mMaxBytesPerBatch > 10 * 1024 * 1024) {
+            mMaxBytesPerBatch = 10 * 1024 * 1024; // 10MB maximum
             fixedCount++;
         }
 
@@ -189,7 +193,7 @@ struct JournalConfig {
         return fixedCount;
     }
 
-    bool IsValid() const { return mMaxEntriesPerBatch > 0 && !mSeekPosition.empty() && !mCursorSeekFallback.empty(); }
+    bool IsValid() const { return mMaxBytesPerBatch > 0 && !mSeekPosition.empty() && !mCursorSeekFallback.empty(); }
 };
 
 } // namespace logtail

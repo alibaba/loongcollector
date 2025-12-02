@@ -66,7 +66,7 @@ void InputJournalUnittest::TestInit() {
     // 创建测试配置
     Json::Value config;
     config["SeekPosition"] = "tail";
-    config["MaxEntriesPerBatch"] = 1000;
+    config["MaxBytesPerBatch"] = 512 * 1024; // 512KB
     config["Kernel"] = true;
     config["ParsePriority"] = false;
     config["ParseSyslogFacility"] = false;
@@ -244,7 +244,7 @@ void InputJournalUnittest::TestComplexConfig() {
     Json::Value config;
     config["SeekPosition"] = "cursor";
     config["CursorSeekFallback"] = "head";
-    config["MaxEntriesPerBatch"] = 500;
+    config["MaxBytesPerBatch"] = 256 * 1024; // 256KB
     config["Kernel"] = true;
     config["ParsePriority"] = true;
     config["ParseSyslogFacility"] = true;
@@ -403,7 +403,7 @@ void InputJournalUnittest::TestInitWithValidationFailure() {
 
     // 创建会导致验证失败的配置
     Json::Value config;
-    config["MaxEntriesPerBatch"] = -1; // 无效值
+    config["MaxBytesPerBatch"] = -1; // 无效值
     config["SeekPosition"] = "invalid_position"; // 无效位置
 
     Json::Value optionalGoPipeline;
@@ -424,7 +424,7 @@ void InputJournalUnittest::TestStartWithInvalidConfig() {
 
     // 创建无效配置
     Json::Value config;
-    config["MaxEntriesPerBatch"] = -100;
+    config["MaxBytesPerBatch"] = -100;
     config["SeekPosition"] = "";
 
     Json::Value optionalGoPipeline;
