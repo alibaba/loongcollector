@@ -81,24 +81,50 @@ void FastFieldParserUnittest::TestNumericParsing() {
     FastFieldParser parser(testLine);
 
     // 测试整数解析
-    APSARA_TEST_EQUAL(123, parser.GetFieldAs<int>(0));
-    APSARA_TEST_EQUAL(-789, parser.GetFieldAs<int>(2));
-    APSARA_TEST_EQUAL(0, parser.GetFieldAs<int>(3));
-    APSARA_TEST_EQUAL(999999999999ULL, parser.GetFieldAs<uint64_t>(4));
+    int intValue1;
+    APSARA_TEST_TRUE(parser.GetFieldAs<int>(0, intValue1));
+    APSARA_TEST_EQUAL(123, intValue1);
+
+    int intValue2;
+    APSARA_TEST_TRUE(parser.GetFieldAs<int>(2, intValue2));
+    APSARA_TEST_EQUAL(-789, intValue2);
+
+    int intValue3;
+    APSARA_TEST_TRUE(parser.GetFieldAs<int>(3, intValue3));
+    APSARA_TEST_EQUAL(0, intValue3);
+
+    uint64_t uint64Value;
+    APSARA_TEST_TRUE(parser.GetFieldAs<uint64_t>(4, uint64Value));
+    APSARA_TEST_EQUAL(999999999999ULL, uint64Value);
 
     // 测试浮点数解析
-    APSARA_TEST_EQUAL(456.78, parser.GetFieldAs<double>(1));
-    APSARA_TEST_EQUAL(-789.0, parser.GetFieldAs<double>(2));
+    double doubleValue1;
+    APSARA_TEST_TRUE(parser.GetFieldAs<double>(1, doubleValue1));
+    APSARA_TEST_EQUAL(456.78, doubleValue1);
 
-    // 测试默认值
-    APSARA_TEST_EQUAL(42, parser.GetFieldAs<int>(10, 42));
-    APSARA_TEST_EQUAL(3.14, parser.GetFieldAs<double>(10, 3.14));
+    double doubleValue2;
+    APSARA_TEST_TRUE(parser.GetFieldAs<double>(2, doubleValue2));
+    APSARA_TEST_EQUAL(-789.0, doubleValue2);
+
+    // 测试默认值（字段不存在时返回 false）
+    int defaultInt = 42;
+    APSARA_TEST_FALSE(parser.GetFieldAs<int>(10, defaultInt));
+    APSARA_TEST_EQUAL(42, defaultInt); // 默认值未改变
+
+    double defaultDouble = 3.14;
+    APSARA_TEST_FALSE(parser.GetFieldAs<double>(10, defaultDouble));
+    APSARA_TEST_EQUAL(3.14, defaultDouble); // 默认值未改变
 
     // 测试无效数据
     string invalidLine = "abc def ghi";
     FastFieldParser invalidParser(invalidLine);
-    APSARA_TEST_EQUAL(0, invalidParser.GetFieldAs<int>(0, 0));
-    APSARA_TEST_EQUAL(999, invalidParser.GetFieldAs<int>(0, 999));
+    int invalidInt1 = 0;
+    APSARA_TEST_FALSE(invalidParser.GetFieldAs<int>(0, invalidInt1));
+    APSARA_TEST_EQUAL(0, invalidInt1); // 解析失败，值未改变
+
+    int invalidInt2 = 999;
+    APSARA_TEST_FALSE(invalidParser.GetFieldAs<int>(0, invalidInt2));
+    APSARA_TEST_EQUAL(999, invalidInt2); // 解析失败，值未改变
 }
 
 void FastFieldParserUnittest::TestCpuStatParser() {
@@ -209,9 +235,17 @@ void FastFieldParserUnittest::TestFastParseNamespace() {
     APSARA_TEST_EQUAL("text", string(FastParse::GetField(testLine, 2)));
 
     // 测试快速数值解析
-    APSARA_TEST_EQUAL(100, FastParse::GetFieldAs<int>(testLine, 0));
-    APSARA_TEST_EQUAL(200.5, FastParse::GetFieldAs<double>(testLine, 1));
-    APSARA_TEST_EQUAL(300ULL, FastParse::GetFieldAs<uint64_t>(testLine, 3));
+    int intValue;
+    APSARA_TEST_TRUE(FastParse::GetFieldAs<int>(testLine, 0, intValue));
+    APSARA_TEST_EQUAL(100, intValue);
+
+    double doubleValue;
+    APSARA_TEST_TRUE(FastParse::GetFieldAs<double>(testLine, 1, doubleValue));
+    APSARA_TEST_EQUAL(200.5, doubleValue);
+
+    uint64_t uint64Value;
+    APSARA_TEST_TRUE(FastParse::GetFieldAs<uint64_t>(testLine, 3, uint64Value));
+    APSARA_TEST_EQUAL(300ULL, uint64Value);
 
     // 测试前缀检查
     APSARA_TEST_TRUE(FastParse::FieldStartsWith(testLine, 2, "tex"));

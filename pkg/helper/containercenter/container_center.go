@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -611,8 +612,67 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 	return ""
 }
 
+// extractUpperDirFromProcMounts extracts upperdir from /proc/{pid}/mounts for containerd overlayfs
+// It reads /logtail_host/proc/{pid}/mounts and extracts upperdir=xxx from the overlay mount at root "/"
+// The /proc/{pid}/mounts file follows /etc/fstab format with 6 space-separated fields:
+// <device> <mount_point> <filesystem_type> <mount_options> <dump> <fsck>
+func extractUpperDirFromProcMounts(pid int) (string, error) {
+	// Read /proc/{pid}/mounts through /logtail_host mount point
+	mountsPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
+	content, err := os.ReadFile(filepath.Clean(mountsPath))
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", mountsPath, err)
+	}
+
+	// Parse content line by line following fstab format
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		// Skip empty lines
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		// Parse fields using strings.Fields (handles multiple spaces correctly)
+		// Format: <device> <mount_point> <filesystem_type> <mount_options> <dump> <fsck>
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			// Skip malformed lines
+			continue
+		}
+
+		mountPoint := fields[1]
+		fsType := fields[2]
+		mountOptions := fields[3]
+
+		// Match overlay filesystem mounted at root "/"
+		if fsType != "overlay" || mountPoint != "/" {
+			continue
+		}
+
+		// Parse mount_options to find upperdir=
+		// mount_options is comma-separated: rw,relatime,upperdir=/path,workdir=/path,...
+		options := strings.Split(mountOptions, ",")
+		for _, opt := range options {
+			opt = strings.TrimSpace(opt)
+			// Check if this option starts with "upperdir="
+			if strings.HasPrefix(opt, "upperdir=") {
+				upperDir := strings.TrimPrefix(opt, "upperdir=")
+				if len(upperDir) == 0 {
+					// Continue searching other lines in case there are multiple overlay mounts
+					continue
+				}
+				return upperDir, nil
+			}
+		}
+		// Continue searching other lines if upperdir not found in this mount options
+	}
+
+	return "", fmt.Errorf("no overlay mount found at root (/) in %s", mountsPath)
+}
+
 // CreateInfoDetail create DockerInfoDetail with docker.Container
-// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
+// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts, State.Pid
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
 func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	// Generate Log Tags
@@ -706,6 +766,16 @@ func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envC
 	if info.GraphDriver.Data != nil {
 		if rootPath, ok := did.ContainerInfo.GraphDriver.Data["UpperDir"]; ok {
 			did.DefaultRootPath = rootPath
+		}
+	}
+	// for docker v29+ with containerd storage driver (GraphDriver is empty)
+	if dc.client != nil && len(did.DefaultRootPath) == 0 && info.State != nil && info.State.Pid > 0 {
+		// Try to extract upperdir from /proc/{pid}/mounts for containerd overlayfs
+		upperDir, err := extractUpperDirFromProcMounts(info.State.Pid)
+		if err != nil {
+			logger.Debugf(context.Background(), "failed to extract upperdir from /proc/%d/mounts: %v", info.State.Pid, err)
+		} else if len(upperDir) > 0 {
+			did.DefaultRootPath = upperDir
 		}
 	}
 	// for cri-runtime

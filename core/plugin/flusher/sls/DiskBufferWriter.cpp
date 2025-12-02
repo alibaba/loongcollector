@@ -961,6 +961,26 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                        GetSLSCompressTypeString(bufferMeta.compresstype()),
                                        logData,
                                        bufferMeta.rawsize());
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST: {
+#ifdef __ENTERPRISE__
+            return PostMetricHostLogs(accessKeyId,
+                                      accessKeySecret,
+                                      secToken,
+                                      type,
+                                      domain,
+                                      httpsFlag,
+                                      GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                      dataType,
+                                      logData,
+                                      bufferMeta.rawsize());
+#else
+            LOG_WARNING(sLogger, ("metrics_host is not supported in community edition", ""));
+            // return 200 to avoid retry
+            SLSResponse response;
+            response.mStatusCode = 200;
+            return response;
+#endif
+        }
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS: {
