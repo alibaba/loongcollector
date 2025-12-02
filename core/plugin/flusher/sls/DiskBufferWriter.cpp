@@ -974,9 +974,7 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       logData,
                                       bufferMeta.rawsize());
 #else
-            LOG_WARNING(
-                sLogger,
-                ("metrics_host is not supported in community edition", "please use metrics_multivalue instead"));
+            LOG_WARNING(sLogger, ("metrics_host is not supported in community edition", ""));
             // return 200 to avoid retry
             SLSResponse response;
             response.mStatusCode = 200;
