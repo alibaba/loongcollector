@@ -31,12 +31,8 @@ on:
       - 2.*
 jobs:
   BuildPurePlugin:
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      matrix:
-        runner: [arc-runner-set-ilogtail]
-      fail-fast: true
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
