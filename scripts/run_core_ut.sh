@@ -14,7 +14,6 @@
 # limitations under the License.
 
 TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
-CURSOR_FILE=${1:-""}
 
 # Blacklist: directory names to skip
 # Example: "test_dir"
@@ -34,7 +33,6 @@ declare -A DIR_TESTS  # Directory -> space-separated test files
 declare -a DIR_ORDER # Order of directories
 declare -A DIR_OUTPUT_FILES  # Directory -> output file path
 FAILED_TESTS=()
-START_RUNNING=0
 TOTAL_START_TIME=0
 TOTAL_END_TIME=0
 OUTPUT_LOCK_FILE=""
@@ -72,15 +70,6 @@ collect_tests() {
                 # Check if directory is blacklisted
                 if is_blacklisted "$test_dir"; then
                     continue
-                fi
-                
-                # Check if we should start from cursor file
-                if [ -n "$CURSOR_FILE" ] && [ $START_RUNNING -eq 0 ]; then
-                    if [[ "$full_path" == "$CURSOR_FILE" ]]; then
-                        START_RUNNING=1
-                    else
-                        continue
-                    fi
                 fi
                 
                 # Group tests by directory
@@ -343,7 +332,6 @@ main() {
         echo
         for failed_test in "${FAILED_TESTS[@]}"; do
             echo "  - $failed_test"
-            echo "    Resume with: $0 $failed_test"
             echo
             
             # Extract and display failure details from output file
