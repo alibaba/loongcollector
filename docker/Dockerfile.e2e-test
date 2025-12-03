@@ -1,4 +1,4 @@
-FROM golang:1.19.10
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/common/golang:1.23.12
 
 RUN mkdir -p /tmp/loongcollector
 

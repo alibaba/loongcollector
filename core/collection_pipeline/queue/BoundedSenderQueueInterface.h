@@ -42,6 +42,7 @@ public:
                                 size_t low,
                                 size_t high,
                                 QueueKey key,
+                                const std::string& target,
                                 const std::string& flusherId,
                                 const CollectionPipelineContext& ctx);
 

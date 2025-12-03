@@ -67,6 +67,7 @@ private:
     bool GetHostLoadavg(std::vector<std::string>& lines, std::string& errorMessage);
     bool ReadSocketStat(const std::filesystem::path& path, uint64_t& tcp);
     bool ReadNetLink(std::vector<uint64_t>& tcpStateCount);
+    bool ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount);
     bool GetNetStateByNetLink(NetState& netState);
     bool GetHostNetDev(std::vector<std::string>& lines, std::string& errorMessage);
     bool GetInterfaceConfig(InterfaceConfig& interfaceConfig, const std::string& name);

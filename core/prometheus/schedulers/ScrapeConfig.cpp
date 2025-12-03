@@ -350,15 +350,12 @@ bool ScrapeConfig::UpdateAuthorization() {
 
 bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
     static auto sScrapeProtocolsHeaders = std::map<string, string>{
-        {prometheus::PrometheusProto,
-         "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited"},
         {prometheus::PrometheusText0_0_4, "text/plain;version=0.0.4"},
         {prometheus::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
         {prometheus::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
     };
     static auto sDefaultScrapeProtocols = vector<string>{
         prometheus::PrometheusText0_0_4,
-        prometheus::PrometheusProto,
         prometheus::OpenMetricsText0_0_1,
         prometheus::OpenMetricsText1_0_0,
     };
@@ -386,23 +383,25 @@ bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
         return true;
     };
 
-    auto validateScrapeProtocols = [](const vector<string>& scrapeProtocols) {
+    auto validateScrapeProtocols = [](const vector<string>& scrapeProtocols) -> vector<string> {
         set<string> dups;
+        vector<string> validScrapeProtocols;
         for (const auto& scrapeProtocol : scrapeProtocols) {
             if (!sScrapeProtocolsHeaders.count(scrapeProtocol)) {
-                LOG_ERROR(sLogger,
-                          ("unknown scrape protocol prometheusproto", scrapeProtocol)(
-                              "supported",
-                              "[OpenMetricsText0.0.1 OpenMetricsText1.0.0 PrometheusProto PrometheusText0.0.4]"));
-                return false;
+                LOG_WARNING(sLogger,
+                            ("unknown scrape protocol prometheusproto", scrapeProtocol)(
+                                "supported", "[OpenMetricsText0.0.1 OpenMetricsText1.0.0 PrometheusText0.0.4]"));
+                continue;
             }
             if (dups.count(scrapeProtocol)) {
-                LOG_ERROR(sLogger, ("duplicated protocol in scrape_protocols", scrapeProtocol));
-                return false;
+                LOG_WARNING(sLogger, ("duplicated protocol in scrape_protocols", scrapeProtocol));
+                continue;
             }
             dups.insert(scrapeProtocol);
+            validScrapeProtocols.push_back(scrapeProtocol);
         }
-        return true;
+
+        return validScrapeProtocols;
     };
 
     vector<string> tmpScrapeProtocols;
@@ -411,12 +410,10 @@ bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
         return false;
     }
 
+    tmpScrapeProtocols = validateScrapeProtocols(tmpScrapeProtocols);
     // if scrape_protocols is empty, use default protocols
     if (tmpScrapeProtocols.empty()) {
         tmpScrapeProtocols = sDefaultScrapeProtocols;
-    }
-    if (!validateScrapeProtocols(tmpScrapeProtocols)) {
-        return false;
     }
 
     auto weight = tmpScrapeProtocols.size() + 1;

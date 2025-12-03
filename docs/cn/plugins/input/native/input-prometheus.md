@@ -84,14 +84,14 @@ ScrapeConfig 兼容绝大部分 [Prometheus scrape_config 采集配置](https://
 
 3. **本地采集模式可用 labels 列表**：
 
-    1. _host_hostname：当前主机名称
-    2. _host_ip：当前主机网络 IP
-    3. _ecs_meta_instance_id：ECS 实例 ID（仅在阿里云 ECS 环境中可用）
-    4. _ecs_meta_region_id：ECS 地域 ID（仅在阿里云 ECS 环境中可用）
-    5. _ecs_meta_zone_id：ECS 可用区 ID（仅在阿里云 ECS 环境中可用）
-    6. _ecs_meta_user_id：ECS 用户 ID，即账号 ID（仅在阿里云 ECS 环境中可用）
-    7. _ecs_meta_vpc_id：ECS VPC ID（仅在阿里云 ECS 环境中可用）
-    8. _ecs_meta_vswitch_id：ECS 虚拟交换机 ID（仅在阿里云 ECS 环境中可用）
+    1. __host_hostname：当前主机名称
+    2. __host_ip：当前主机网络 IP
+    3. __ecs_meta_instance_id：ECS 实例 ID（仅在阿里云 ECS 环境中可用）
+    4. __ecs_meta_region_id：ECS 地域 ID（仅在阿里云 ECS 环境中可用）
+    5. __ecs_meta_zone_id：ECS 可用区 ID（仅在阿里云 ECS 环境中可用）
+    6. __ecs_meta_user_id：ECS 用户 ID，即账号 ID（仅在阿里云 ECS 环境中可用）
+    7. __ecs_meta_vpc_id：ECS VPC ID（仅在阿里云 ECS 环境中可用）
+    8. __ecs_meta_vswitch_id：ECS 虚拟交换机 ID（仅在阿里云 ECS 环境中可用）
 
 ## 样例
 

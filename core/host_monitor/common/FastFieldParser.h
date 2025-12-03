@@ -53,13 +53,12 @@ public:
      * @return 解析结果
      */
     template <typename T>
-    T GetFieldAs(size_t index, T defaultValue = T{}) {
+    bool GetFieldAs(size_t index, T& result) {
         auto field = GetField(index);
         if (field.empty()) {
-            return defaultValue;
+            return false;
         }
-        T result;
-        return StringTo(field, result) ? result : defaultValue;
+        return StringTo(field, result);
     }
 
     /**
@@ -221,9 +220,9 @@ StringView GetField(StringView line, size_t index, char delimiter = ' ');
  * @brief 快速解析数值字段
  */
 template <typename T>
-T GetFieldAs(StringView line, size_t index, T defaultValue = T{}, char delimiter = ' ') {
+bool GetFieldAs(StringView line, size_t index, T& result, char delimiter = ' ') {
     FastFieldParser parser(line, delimiter);
-    return parser.GetFieldAs<T>(index, defaultValue);
+    return parser.GetFieldAs<T>(index, result);
 }
 
 /**

@@ -37,10 +37,11 @@ public:
     bool IsValidToPush() const { return mValidToPush; }
 
 protected:
+    virtual size_t Size() const = 0;
     bool Full() const { return this->Size() == this->mCapacity; }
 
     bool ChangeStateIfNeededAfterPush() {
-        if (this->Size() == mHighWatermark) {
+        if (this->Size() >= mHighWatermark) {
             mValidToPush = false;
             return true;
         }
@@ -48,7 +49,7 @@ protected:
     }
 
     bool ChangeStateIfNeededAfterPop() {
-        if (!mValidToPush && this->Size() == mLowWatermark) {
+        if (!mValidToPush && this->Size() <= mLowWatermark) {
             mValidToPush = true;
             return true;
         }
@@ -65,7 +66,6 @@ protected:
 
 private:
     virtual void GiveFeedback() const = 0;
-    virtual size_t Size() const = 0;
 
     size_t mLowWatermark = 0;
     size_t mHighWatermark = 0;
@@ -73,13 +73,14 @@ private:
     bool mValidToPush = true;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class BoundedProcessQueueUnittest;
+    friend class CountBoundedProcessQueueUnittest;
     friend class CircularProcessQueueUnittest;
     friend class ExactlyOnceSenderQueueUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
     friend class PipelineUpdateUnittest;
+    friend class BytesBoundedProcessQueueUnittest;
 #endif
 };
 

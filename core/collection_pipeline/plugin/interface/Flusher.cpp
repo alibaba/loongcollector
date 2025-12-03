@@ -55,21 +55,20 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
     const string& str = QueueKeyManager::GetInstance()->GetName(item->mQueueKey);
     for (size_t i = 0; i < retryTimes; ++i) {
         int rst = SenderQueueManager::GetInstance()->PushQueue(item->mQueueKey, std::move(item));
-        if (rst == 0) {
+        if (rst == 0) { // QueueStatus::OK
             return true;
         }
-        if (rst == 2) {
+        if (rst == 2) { // QueueStatus::QUEUE_NOT_EXIST
             // should not happen
             LOG_ERROR(sLogger,
                       ("failed to push data to sender queue",
                        "queue not found")("action", "discard data")("config-flusher-dst", str));
-            AlarmManager::GetInstance()->SendAlarmCritical(
-                DISCARD_DATA_ALARM,
-                "failed to push data to sender queue: queue not found\taction: discard data\tconfig-flusher-dst" + str,
-                item->mPipeline->GetContext().GetRegion(),
-                item->mPipeline->GetContext().GetProjectName(),
-                item->mPipeline->GetContext().GetConfigName(),
-                item->mPipeline->GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                           "failed to push data to sender queue: queue not found",
+                                                           mContext->GetRegion(),
+                                                           mContext->GetProjectName(),
+                                                           mContext->GetConfigName(),
+                                                           mContext->GetLogstoreName());
             return false;
         }
         if (i % 100 == 0) {
@@ -79,16 +78,16 @@ bool Flusher::PushToQueue(unique_ptr<SenderQueueItem>&& item, uint32_t retryTime
         }
         this_thread::sleep_for(chrono::milliseconds(10));
     }
-    LOG_WARNING(
-        sLogger,
-        ("failed to push data to sender queue", "queue full")("action", "discard data")("config-flusher-dst", str));
-    AlarmManager::GetInstance()->SendAlarmCritical(
-        DISCARD_DATA_ALARM,
-        "failed to push data to sender queue: queue full\taction: discard data\tconfig-flusher-dst" + str,
-        item->mPipeline->GetContext().GetRegion(),
-        item->mPipeline->GetContext().GetProjectName(),
-        item->mPipeline->GetContext().GetConfigName(),
-        item->mPipeline->GetContext().GetLogstoreName());
+    // QueueStatus::QUEUE_FULL
+    LOG_ERROR(sLogger,
+              ("failed to push data to sender queue",
+               "extra buffer is full")("action", "discard data")("config-flusher-dst", str));
+    AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_DATA_ALARM,
+                                                   "failed to push data to sender queue: extra buffer is full",
+                                                   mContext->GetRegion(),
+                                                   mContext->GetProjectName(),
+                                                   mContext->GetConfigName(),
+                                                   mContext->GetLogstoreName());
     return false;
 }
 

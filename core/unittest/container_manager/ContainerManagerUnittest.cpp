@@ -44,6 +44,10 @@ public:
     void TestincrementallyUpdateContainersSnapshot() const;
     void TestSaveLoadContainerInfo() const;
     void TestLoadContainerInfoFromDetailFormat() const;
+    void TestLoadContainerInfoFromDetailFormatWithTags() const;
+    void TestLoadContainerInfoFromDetailFormatWithMounts() const;
+    void TestLoadContainerInfoFromDetailFormatMixed() const;
+    void TestLoadContainerInfoFromDetailFormatPathHandling() const;
     void TestLoadContainerInfoFromContainersFormat() const;
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
@@ -610,6 +614,335 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormat() const {
                 != containerManager.mConfigContainerDiffMap.end());
 }
 
+void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithTags() const {
+    ContainerManager containerManager;
+
+    // Test data with Tags format (legacy format)
+    Json::Value root;
+    root["version"] = "0.1.0";
+
+    Json::Value detailArray(Json::arrayValue);
+    Json::Value item1(Json::objectValue);
+    item1["config_name"] = "##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test";
+    item1["container_id"] = "2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0";
+    item1["params"] = R"({
+        "ID": "2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0",
+        "Path": "/logtail_host/run/containerd/io.containerd.runtime.v2.task/k8s.io/2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0/rootfs/app/logs",
+        "Tags": [
+            "_container_name_",
+            "external-snapshot-controller",
+            "_pod_name_",
+            "csi-provisioner-5f5d9d84fc-hc6mt",
+            "_namespace_",
+            "kube-system",
+            "_pod_uid_",
+            "21d7468a-dc19-44fa-81ad-c799f21df5ff",
+            "_container_ip_",
+            "192.168.0.48",
+            "_image_name_",
+            "registry-cn-hongkong-vpc.ack.aliyuncs.com/acs/snapshot-controller:v4.0.0-a230d5b3-aliyun"
+        ]
+    })";
+
+    detailArray.append(item1);
+    root["detail"] = detailArray;
+
+    // Test loading from detail format with Tags
+    containerManager.loadContainerInfoFromDetailFormat(root, "test_path");
+
+    // Verify container is loaded
+    EXPECT_EQ(containerManager.mContainerMap.size(), 1);
+    auto it = containerManager.mContainerMap.find("2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0");
+    EXPECT_TRUE(it != containerManager.mContainerMap.end());
+
+    // Verify container info
+    EXPECT_EQ(it->second->mID, "2e832614c7e4ca22a79d5735fc7bf2b77d76d1dabc18cd5d6fc47764394a97c0");
+    EXPECT_EQ(it->second->mUpperDir, "");
+    EXPECT_EQ(it->second->mK8sInfo.mNamespace, "kube-system");
+    EXPECT_EQ(it->second->mK8sInfo.mPod, "csi-provisioner-5f5d9d84fc-hc6mt");
+    EXPECT_EQ(it->second->mK8sInfo.mContainerName, "external-snapshot-controller");
+    EXPECT_EQ(it->second->mContainerLabels["_image_name_"],
+              "registry-cn-hongkong-vpc.ack.aliyuncs.com/acs/snapshot-controller:v4.0.0-a230d5b3-aliyun");
+    EXPECT_EQ(it->second->mContainerLabels["_container_ip_"], "192.168.0.48");
+
+    // Verify metadata is stored
+    bool foundNamespace = false, foundPodName = false, foundContainerName = false, foundImageName = false,
+         foundContainerIp = false, foundPodUid = false;
+    for (const auto& metadata : it->second->mMetadatas) {
+        std::string key = GetDefaultTagKeyString(metadata.first);
+        if (key == "_namespace_" && metadata.second == "kube-system")
+            foundNamespace = true;
+        else if (key == "_pod_name_" && metadata.second == "csi-provisioner-5f5d9d84fc-hc6mt")
+            foundPodName = true;
+        else if (key == "_container_name_" && metadata.second == "external-snapshot-controller")
+            foundContainerName = true;
+        else if (key == "_image_name_")
+            foundImageName = true;
+        else if (key == "_container_ip_" && metadata.second == "192.168.0.48")
+            foundContainerIp = true;
+        else if (key == "_pod_uid_" && metadata.second == "21d7468a-dc19-44fa-81ad-c799f21df5ff")
+            foundPodUid = true;
+    }
+
+    EXPECT_TRUE(foundNamespace);
+    EXPECT_TRUE(foundPodName);
+    EXPECT_TRUE(foundContainerName);
+    EXPECT_TRUE(foundImageName);
+    EXPECT_TRUE(foundContainerIp);
+    EXPECT_TRUE(foundPodUid);
+
+    // Verify config diff is created
+    EXPECT_TRUE(
+        containerManager.mConfigContainerDiffMap.find("##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test")
+        != containerManager.mConfigContainerDiffMap.end());
+}
+
+void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithMounts() const {
+    ContainerManager containerManager;
+
+    // Test data with MetaDatas and Mounts (new format)
+    Json::Value root;
+    root["version"] = "0.1.0";
+
+    Json::Value detailArray(Json::arrayValue);
+    Json::Value item1(Json::objectValue);
+    item1["config_name"] = "##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test";
+    item1["container_id"] = "8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44";
+    item1["params"] = R"({
+        "ID": "8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44",
+        "LogPath": "/var/log/pods/dynatrace_dynatrace-webhook-5676d99f4-5dl6n_bddb70c4-e44d-4685-b429-4150aaa51eea/webhook/1.log",
+        "MetaDatas": [
+            "_pod_name_",
+            "dynatrace-webhook-5676d99f4-5dl6n",
+            "_namespace_",
+            "dynatrace",
+            "_pod_uid_",
+            "bddb70c4-e44d-4685-b429-4150aaa51eea",
+            "_container_ip_",
+            "192.168.0.50",
+            "_image_name_",
+            "public.ecr.aws/dynatrace/dynatrace-operator:v1.2.1",
+            "_container_name_",
+            "webhook"
+        ],
+        "Mounts": [
+            {
+                "Destination": "/dev/shm",
+                "Source": "/run/containerd/io.containerd.grpc.v1.cri/sandboxes/81028d27e413191ac921800bc5393dedfce19e7f56313c9aad9a442d9d80e9e0/shm"
+            },
+            {
+                "Destination": "/etc/hostname",
+                "Source": "/var/lib/containerd/io.containerd.grpc.v1.cri/sandboxes/81028d27e413191ac921800bc5393dedfce19e7f56313c9aad9a442d9d80e9e0/hostname"
+            },
+            {
+                "Destination": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "Source": "/var/lib/kubelet/pods/bddb70c4-e44d-4685-b429-4150aaa51eea/volumes/kubernetes.io~projected/kube-api-access-hp4zj"
+            }
+        ],
+        "Path": "/logtail_host/run/containerd/io.containerd.runtime.v2.task/k8s.io/8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44/rootfs/app/logs",
+        "Tags": [],
+        "UpperDir": "/run/containerd/io.containerd.runtime.v2.task/k8s.io/8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44/rootfs"
+    })";
+
+    detailArray.append(item1);
+    root["detail"] = detailArray;
+
+    // Test loading from detail format with MetaDatas and Mounts
+    containerManager.loadContainerInfoFromDetailFormat(root, "test_path");
+
+    // Verify container is loaded
+    EXPECT_EQ(containerManager.mContainerMap.size(), 1);
+    auto it = containerManager.mContainerMap.find("8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44");
+    EXPECT_TRUE(it != containerManager.mContainerMap.end());
+
+    // Verify container info
+    EXPECT_EQ(it->second->mID, "8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44");
+    EXPECT_EQ(
+        it->second->mLogPath,
+        "/var/log/pods/dynatrace_dynatrace-webhook-5676d99f4-5dl6n_bddb70c4-e44d-4685-b429-4150aaa51eea/webhook/1.log");
+    EXPECT_EQ(it->second->mUpperDir,
+              "/run/containerd/io.containerd.runtime.v2.task/k8s.io/"
+              "8859e31bc57dae7cf750cc2353204c6b4d1fa9a40e4eb26fb4c5257be81dcf44/rootfs");
+    EXPECT_EQ(it->second->mK8sInfo.mNamespace, "dynatrace");
+    EXPECT_EQ(it->second->mK8sInfo.mPod, "dynatrace-webhook-5676d99f4-5dl6n");
+    EXPECT_EQ(it->second->mK8sInfo.mContainerName, "webhook");
+    EXPECT_EQ(it->second->mContainerLabels["_image_name_"], "public.ecr.aws/dynatrace/dynatrace-operator:v1.2.1");
+    EXPECT_EQ(it->second->mContainerLabels["_container_ip_"], "192.168.0.50");
+
+    // Verify mounts are loaded
+    EXPECT_EQ(it->second->mMounts.size(), 3);
+    EXPECT_EQ(it->second->mMounts[0].mDestination, "/dev/shm");
+    EXPECT_EQ(it->second->mMounts[0].mSource,
+              "/run/containerd/io.containerd.grpc.v1.cri/sandboxes/"
+              "81028d27e413191ac921800bc5393dedfce19e7f56313c9aad9a442d9d80e9e0/shm");
+    EXPECT_EQ(it->second->mMounts[1].mDestination, "/etc/hostname");
+    EXPECT_EQ(it->second->mMounts[2].mDestination, "/var/run/secrets/kubernetes.io/serviceaccount");
+
+    // Verify metadata is stored
+    bool foundNamespace = false, foundPodName = false, foundContainerName = false;
+    for (const auto& metadata : it->second->mMetadatas) {
+        std::string key = GetDefaultTagKeyString(metadata.first);
+        if (key == "_namespace_" && metadata.second == "dynatrace")
+            foundNamespace = true;
+        else if (key == "_pod_name_" && metadata.second == "dynatrace-webhook-5676d99f4-5dl6n")
+            foundPodName = true;
+        else if (key == "_container_name_" && metadata.second == "webhook")
+            foundContainerName = true;
+    }
+
+    EXPECT_TRUE(foundNamespace);
+    EXPECT_TRUE(foundPodName);
+    EXPECT_TRUE(foundContainerName);
+}
+
+void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatMixed() const {
+    ContainerManager containerManager;
+
+    // Test data with both Tags format and MetaDatas format
+    Json::Value root;
+    root["version"] = "0.1.0";
+
+    Json::Value detailArray(Json::arrayValue);
+
+    // Item with Tags format
+    Json::Value item1(Json::objectValue);
+    item1["config_name"] = "##1.0##config1";
+    item1["container_id"] = "container1";
+    item1["params"] = R"({
+        "ID": "container1",
+        "Path": "/path/to/container1",
+        "Tags": [
+            "_container_name_",
+            "test-container-1",
+            "_pod_name_",
+            "test-pod-1",
+            "_namespace_",
+            "default"
+        ]
+    })";
+
+    // Item with MetaDatas format
+    Json::Value item2(Json::objectValue);
+    item2["config_name"] = "##1.0##config2";
+    item2["container_id"] = "container2";
+    item2["params"] = R"({
+        "ID": "container2",
+        "LogPath": "/var/log/container2.log",
+        "UpperDir": "/var/lib/docker/overlay2/container2",
+        "MetaDatas": [
+            "_container_name_",
+            "test-container-2",
+            "_pod_name_",
+            "test-pod-2",
+            "_namespace_",
+            "kube-system"
+        ],
+        "Mounts": [
+            {
+                "Destination": "/app/logs",
+                "Source": "/var/log/apps"
+            }
+        ]
+    })";
+
+    detailArray.append(item1);
+    detailArray.append(item2);
+    root["detail"] = detailArray;
+
+    // Test loading both formats
+    containerManager.loadContainerInfoFromDetailFormat(root, "test_path");
+
+    // Verify both containers are loaded
+    EXPECT_EQ(containerManager.mContainerMap.size(), 2);
+
+    // Verify container1 (Tags format)
+    auto it1 = containerManager.mContainerMap.find("container1");
+    EXPECT_TRUE(it1 != containerManager.mContainerMap.end());
+    EXPECT_EQ(it1->second->mID, "container1");
+    EXPECT_EQ(it1->second->mK8sInfo.mNamespace, "default");
+    EXPECT_EQ(it1->second->mK8sInfo.mPod, "test-pod-1");
+    EXPECT_EQ(it1->second->mK8sInfo.mContainerName, "test-container-1");
+
+    // Verify container2 (MetaDatas format)
+    auto it2 = containerManager.mContainerMap.find("container2");
+    EXPECT_TRUE(it2 != containerManager.mContainerMap.end());
+    EXPECT_EQ(it2->second->mID, "container2");
+    EXPECT_EQ(it2->second->mLogPath, "/var/log/container2.log");
+    EXPECT_EQ(it2->second->mUpperDir, "/var/lib/docker/overlay2/container2");
+    EXPECT_EQ(it2->second->mK8sInfo.mNamespace, "kube-system");
+    EXPECT_EQ(it2->second->mK8sInfo.mPod, "test-pod-2");
+    EXPECT_EQ(it2->second->mK8sInfo.mContainerName, "test-container-2");
+    EXPECT_EQ(it2->second->mMounts.size(), 1);
+    EXPECT_EQ(it2->second->mMounts[0].mDestination, "/app/logs");
+}
+
+void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatPathHandling() const {
+    ContainerManager containerManager;
+
+    // Test Path field handling with various scenarios
+    Json::Value root;
+    root["version"] = "0.1.0";
+
+    Json::Value detailArray(Json::arrayValue);
+
+    // Scenario 1: Path with /logtail_host prefix, no UpperDir -> should strip prefix
+    Json::Value item1(Json::objectValue);
+    item1["config_name"] = "##1.0##config1";
+    item1["container_id"] = "container1";
+    item1["params"] = R"({
+        "ID": "container1",
+        "Path": "/logtail_host/var/lib/docker/overlay2/abc123/merged",
+        "Tags": []
+    })";
+
+    // Scenario 2: Path without /logtail_host prefix, no UpperDir -> should use as-is
+    Json::Value item2(Json::objectValue);
+    item2["config_name"] = "##1.0##config2";
+    item2["container_id"] = "container2";
+    item2["params"] = R"({
+        "ID": "container2",
+        "Path": "/var/lib/docker/overlay2/def456/merged",
+        "Tags": []
+    })";
+
+    // Scenario 3: Both Path and UpperDir present -> should keep UpperDir, ignore Path
+    Json::Value item3(Json::objectValue);
+    item3["config_name"] = "##1.0##config3";
+    item3["container_id"] = "container3";
+    item3["params"] = R"({
+        "ID": "container3",
+        "Path": "/logtail_host/some/other/path",
+        "UpperDir": "/var/lib/docker/overlay2/ghi789/merged",
+        "Tags": []
+    })";
+
+    detailArray.append(item1);
+    detailArray.append(item2);
+    detailArray.append(item3);
+    root["detail"] = detailArray;
+
+    // Test loading
+    containerManager.loadContainerInfoFromDetailFormat(root, "test_path");
+
+    // Verify all containers are loaded
+    EXPECT_EQ(containerManager.mContainerMap.size(), 3);
+
+    // Verify Scenario 1: Path with /logtail_host prefix stripped
+    auto it1 = containerManager.mContainerMap.find("container1");
+    EXPECT_TRUE(it1 != containerManager.mContainerMap.end());
+    EXPECT_EQ(it1->second->mUpperDir, "");
+
+    // Verify Scenario 2: Path without prefix used as-is
+    auto it2 = containerManager.mContainerMap.find("container2");
+    EXPECT_TRUE(it2 != containerManager.mContainerMap.end());
+    EXPECT_EQ(it2->second->mUpperDir, "");
+
+    // Verify Scenario 3: UpperDir takes precedence, Path is ignored
+    auto it3 = containerManager.mContainerMap.find("container3");
+    EXPECT_TRUE(it3 != containerManager.mContainerMap.end());
+    EXPECT_EQ(it3->second->mUpperDir, "/var/lib/docker/overlay2/ghi789/merged");
+}
+
 void ContainerManagerUnittest::TestLoadContainerInfoFromContainersFormat() const {
     ContainerManager containerManager;
 
@@ -1011,6 +1344,10 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestrefreshAllContainersSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestincrementallyUpdateContainersSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveLoadContainerInfo)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormat)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatWithTags)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatWithMounts)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatMixed)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatPathHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersFormat)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)

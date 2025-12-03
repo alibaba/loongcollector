@@ -16,6 +16,7 @@
 
 #include "host_monitor/SystemInformationTools.h"
 
+#include <algorithm>
 #include <boost/process.hpp>
 #include <boost/system.hpp>
 #include <filesystem>
@@ -43,13 +44,13 @@ namespace logtail {
 bool CheckGPUDevice() {
 #if defined(__linux__)
     if (!std::filesystem::exists(NVIDIACTL)) {
-        LOG_ERROR(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
+        LOG_WARNING(sLogger, ("GPU check failed", "NVIDIA control device not found")("device", NVIDIACTL));
         return false;
     }
 
     auto binary_path = boost::process::search_path(NVSMI);
     if (binary_path.empty()) {
-        LOG_ERROR(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
+        LOG_WARNING(sLogger, ("GPU check failed", "nvidia-smi not found in PATH"));
         return false;
     }
 
@@ -59,9 +60,9 @@ bool CheckGPUDevice() {
 
     int exit_code = boost::process::system(cmd, boost::process::std_out > pipe_stream, ec);
     if (ec || exit_code != 0) {
-        LOG_ERROR(sLogger,
-                  ("GPU check failed", "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code",
-                                                                                                            exit_code));
+        LOG_WARNING(sLogger,
+                    ("GPU check failed",
+                     "nvidia-smi execution error")("command", cmd)("error", ec.message())("exit_code", exit_code));
         return false;
     }
 
@@ -75,7 +76,7 @@ bool CheckGPUDevice() {
     }
 
     if (!has_output) {
-        LOG_ERROR(sLogger, ("GPU check failed", "no GPU devices found"));
+        LOG_WARNING(sLogger, ("GPU check failed", "no GPU devices found"));
         return false;
     }
 
@@ -204,12 +205,35 @@ bool DCGMCollector::Collect(GPUInformation& outData) {
     }
 
     outData.stats.clear();
-    CallbackContext context = {&outData, &mFieldMap, {}};
+    CallbackContext context = {&outData, &mFieldMap, {}, {}};
 
     if (!GetLatestValues(mDcgmHandle, DCGM_GROUP_ALL_GPUS, mFieldGroupId, &context)) {
         LOG_ERROR(sLogger, ("GPU data collection failed", "get latest values failed"));
         return false;
     }
+
+    // Remove all GPUs that were marked as invalid during callbacks (from back to front to maintain index validity)
+    if (!context.invalidGpuIds.empty()) {
+        std::vector<size_t> indicesToRemove;
+        for (unsigned int invalidGpuId : context.invalidGpuIds) {
+            auto it = context.gpuIdToIndex.find(invalidGpuId);
+            if (it != context.gpuIdToIndex.end()) {
+                indicesToRemove.push_back(it->second);
+            }
+        }
+
+        std::sort(indicesToRemove.begin(), indicesToRemove.end(), std::greater<size_t>());
+        for (size_t index : indicesToRemove) {
+            if (index < outData.stats.size()) {
+                outData.stats.erase(outData.stats.begin() + index);
+                LOG_DEBUG(sLogger,
+                          ("DCGM invalid GPU data removed", "GPU data removed after collection")("index", index));
+            }
+        }
+
+        LOG_WARNING(sLogger, ("DCGM invalid GPUs removed", "removed count")("count", context.invalidGpuIds.size()));
+    }
+
     LOG_DEBUG(sLogger, ("GPU data collection successful", "data retrieved")("gpu_count", outData.stats.size()));
     return true;
 }
@@ -454,31 +478,68 @@ int DCGMCollector::DcgmDataCallbackV1(unsigned int gpuId, dcgmFieldValue_v1* val
     }
     auto& currentStat = context->gpuInfo->stats[it->second];
 
+    bool hasInvalidValue = false;
     for (int i = 0; i < numValues; ++i) {
         const auto& fieldValue = values[i];
-        if (fieldValue.status != DCGM_ST_OK)
-            continue;
+        if (fieldValue.status != DCGM_ST_OK) {
+            hasInvalidValue = true;
+            LOG_DEBUG(sLogger,
+                      ("DCGM data callback V1 invalid value detected",
+                       "status not OK")("gpu_id", gpuId)("field_id", fieldValue.fieldId)("status", fieldValue.status));
+            break;
+        }
 
         switch (fieldValue.fieldType) {
             case DCGM_FT_INT64: {
+                if (DCGM_INT64_IS_BLANK(fieldValue.value.i64)) {
+                    hasInvalidValue = true;
+                    LOG_DEBUG(sLogger,
+                              ("DCGM data callback V1 invalid value detected",
+                               "blank int64 value")("gpu_id", gpuId)("field_id", fieldValue.fieldId));
+                    break;
+                }
                 auto it = context->fieldMap->int64Fields.find(fieldValue.fieldId);
                 if (it != context->fieldMap->int64Fields.end())
                     currentStat.*(it->second) = fieldValue.value.i64;
                 break;
             }
             case DCGM_FT_STRING: {
+                if (DCGM_STR_IS_BLANK(fieldValue.value.str)) {
+                    hasInvalidValue = true;
+                    LOG_DEBUG(sLogger,
+                              ("DCGM data callback V1 invalid value detected",
+                               "blank string value")("gpu_id", gpuId)("field_id", fieldValue.fieldId));
+                    break;
+                }
                 auto it = context->fieldMap->stringFields.find(fieldValue.fieldId);
                 if (it != context->fieldMap->stringFields.end())
                     currentStat.*(it->second) = fieldValue.value.str;
                 break;
             }
             case DCGM_FT_DOUBLE: {
+                if (DCGM_FP64_IS_BLANK(fieldValue.value.dbl)) {
+                    hasInvalidValue = true;
+                    LOG_DEBUG(sLogger,
+                              ("DCGM data callback V1 invalid value detected",
+                               "blank double value")("gpu_id", gpuId)("field_id", fieldValue.fieldId));
+                    break;
+                }
                 auto it = context->fieldMap->doubleFields.find(fieldValue.fieldId);
                 if (it != context->fieldMap->doubleFields.end())
                     currentStat.*(it->second) = fieldValue.value.dbl;
                 break;
             }
         }
+        if (hasInvalidValue)
+            break;
+    }
+
+    if (hasInvalidValue) {
+        // Mark this GPU as invalid, will be removed after all callbacks complete
+        context->invalidGpuIds.insert(gpuId);
+        LOG_WARNING(sLogger,
+                    ("DCGM data callback V1 invalid value detected", "GPU marked as invalid")("gpu_id", gpuId));
+        return 0;
     }
     return 0;
 }

@@ -20,11 +20,8 @@
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "common/Flags.h"
-#include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
-
-DECLARE_FLAG_INT32(process_thread_count);
 
 using namespace std;
 
@@ -35,7 +32,7 @@ ExactlyOnceSenderQueue::ExactlyOnceSenderQueue(const std::vector<RangeCheckpoint
                                                QueueKey key,
                                                const CollectionPipelineContext& ctx)
     : QueueInterface(key, checkpoints.size(), ctx),
-      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", ctx),
+      BoundedSenderQueueInterface(checkpoints.size(), checkpoints.size() - 1, checkpoints.size(), key, "", "", ctx),
       mRangeCheckpoints(checkpoints) {
     mQueue.resize(checkpoints.size());
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED, "true"}});
@@ -91,22 +88,6 @@ bool ExactlyOnceSenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
         }
         if (!eo->IsComplete()) {
             item->mFirstEnqueTime = chrono::system_clock::now();
-            if (mExtraBuffer.size() >= size_t(INT32_FLAG(process_thread_count) * 10)) {
-                LOG_ERROR(sLogger,
-                          ("exactly once sender queue extra buffer size is too large", "discard item")(
-                              "config-flusher-dst",
-                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("size", mExtraBuffer.size()));
-                AlarmManager::GetInstance()->SendAlarmCritical(
-                    DISCARD_DATA_ALARM,
-                    "exactly once sender queue extra buffer size is too large: discard item, config-flusher-dst: "
-                        + QueueKeyManager::GetInstance()->GetName(item->mQueueKey)
-                        + ", size: " + to_string(mExtraBuffer.size()),
-                    item->mPipeline->GetContext().GetRegion(),
-                    item->mPipeline->GetContext().GetProjectName(),
-                    item->mPipeline->GetContext().GetConfigName(),
-                    item->mPipeline->GetContext().GetLogstoreName());
-                return false;
-            }
             mExtraBuffer.push_back(std::move(item));
             return true;
         }

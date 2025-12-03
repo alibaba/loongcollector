@@ -38,6 +38,8 @@ const extern int64_t SYSTEM_HERTZ;
 const extern std::filesystem::path PROCESS_NET_SOCKSTAT;
 const extern std::filesystem::path PROCESS_NET_SOCKSTAT6;
 const extern std::filesystem::path PROCESS_NET_DEV;
+const extern std::filesystem::path PROCESS_NET_TCP;
+const extern std::filesystem::path PROCESS_NET_TCP6;
 const extern std::filesystem::path PROCESS_STATM;
 const extern std::filesystem::path PROCESS_FD;
 const extern std::filesystem::path PROCESS_CMDLINE;

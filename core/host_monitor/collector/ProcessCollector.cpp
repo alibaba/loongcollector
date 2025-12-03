@@ -465,9 +465,14 @@ bool ProcessCollector::GetProcessCpuInformation(const CollectTime& collectTime,
     information.sys = processTime.sys.count();
     information.total = processTime.total.count();
 
-    // calculate cpuPercent = (thisTotal - prevTotal)/HZ;
-    auto totalCPUDiff = static_cast<double>(information.total - prev->total) / SYSTEM_HERTZ;
-    information.percent = 100 * totalCPUDiff / (static_cast<double>(timeDiff) / SYSTEM_HERTZ); // 100%
+    // calculate cpuPercent = (thisTotal - prevTotal) / timeDiff * 100
+    // information.total is already in milliseconds, timeDiff is also in milliseconds
+    if (timeDiff > 0) {
+        auto totalCPUDiff = static_cast<double>(information.total - prev->total);
+        information.percent = 100.0 * totalCPUDiff / static_cast<double>(timeDiff);
+    } else {
+        information.percent = 0.0;
+    }
     cpuTimeCache[pid] = information;
     return true;
 }
@@ -481,10 +486,14 @@ bool ProcessCollector::GetProcessTime(time_t now, pid_t pid, ProcessTime& output
 
     output.startTime = processInfo.stat.startTicks;
 
-    output.cutime = std::chrono::milliseconds(processInfo.stat.cutimeTicks);
-    output.cstime = std::chrono::milliseconds(processInfo.stat.cstimeTicks);
-    output.user = std::chrono::milliseconds(processInfo.stat.utimeTicks + processInfo.stat.cutimeTicks);
-    output.sys = std::chrono::milliseconds(processInfo.stat.stimeTicks + processInfo.stat.cstimeTicks);
+    // Convert ticks to milliseconds: ticks * 1000 / SYSTEM_HERTZ
+    constexpr const uint64_t MILLISECOND = 1000;
+    output.cutime = std::chrono::milliseconds(processInfo.stat.cutimeTicks * MILLISECOND / SYSTEM_HERTZ);
+    output.cstime = std::chrono::milliseconds(processInfo.stat.cstimeTicks * MILLISECOND / SYSTEM_HERTZ);
+    output.user = std::chrono::milliseconds((processInfo.stat.utimeTicks + processInfo.stat.cutimeTicks) * MILLISECOND
+                                            / SYSTEM_HERTZ);
+    output.sys = std::chrono::milliseconds((processInfo.stat.stimeTicks + processInfo.stat.cstimeTicks) * MILLISECOND
+                                           / SYSTEM_HERTZ);
 
     output.total = std::chrono::milliseconds(output.user + output.sys);
 

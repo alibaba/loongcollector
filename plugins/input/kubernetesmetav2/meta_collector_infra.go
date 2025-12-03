@@ -48,7 +48,7 @@ func (m *metaCollector) generateInfraServerKeyID(nodeObj *v1.Node) string {
 	}
 
 	// (2) if node status has host name filed, using hostname instead
-	if nodeObj.Status.Addresses != nil && len(nodeObj.Status.Addresses) > 0 {
+	if len(nodeObj.Status.Addresses) > 0 {
 		for _, addr := range nodeObj.Status.Addresses {
 			if addr.Type == v1.NodeHostName {
 				serverID = addr.Address

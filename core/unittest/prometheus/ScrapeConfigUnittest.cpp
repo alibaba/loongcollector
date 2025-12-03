@@ -123,8 +123,7 @@ void ScrapeConfigUnittest::TestInit() {
 
     // scrape protocols
     APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Accept"],
-                      "text/plain;version=0.0.4;q=0.4,application/"
-                      "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.3,"
+                      "text/plain;version=0.0.4;q=0.3,"
                       "application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1");
 
     // follow redirects
@@ -335,11 +334,11 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(
-        "text/plain;version=0.0.4;q=0.5,application/"
-        "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.4,application/"
-        "openmetrics-text;version=0.0.1;q=0.3,application/openmetrics-text;version=1.0.0;q=0.2,*/*;q=0.1",
-        scrapeConfig.mRequestHeaders["Accept"]);
+    APSARA_TEST_EQUAL("text/plain;version=0.0.4;q=0.4,"
+                      "application/openmetrics-text;version=0.0.1;q=0.3,"
+                      "application/openmetrics-text;version=1.0.0;q=0.2,"
+                      "*/*;q=0.1",
+                      scrapeConfig.mRequestHeaders["Accept"]);
 
     // custom quality protocols
     configStr = R"JSON({
@@ -353,11 +352,9 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(
-        "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.5,"
-        "application/openmetrics-text;version=1.0.0;q=0.4,"
-        "text/plain;version=0.0.4;q=0.3,application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1",
-        scrapeConfig.mRequestHeaders["Accept"]);
+    APSARA_TEST_EQUAL("application/openmetrics-text;version=1.0.0;q=0.4,"
+                      "text/plain;version=0.0.4;q=0.3,application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1",
+                      scrapeConfig.mRequestHeaders["Accept"]);
 
     // only prometheus0.0.4 protocols
     configStr = R"JSON({
@@ -385,7 +382,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 
     // OpenMetricsText1.0.0 duplication error
     configStr = R"JSON({
@@ -399,7 +396,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 
     // protocols invalid
     configStr = R"JSON({
@@ -427,7 +424,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 }
 
 void ScrapeConfigUnittest::TestEnableCompression() {

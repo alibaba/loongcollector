@@ -18,7 +18,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 
@@ -97,8 +96,8 @@ func (s *containerExportTestSuite) AfterTest(suiteName, testName string) {
 }
 
 func mockDockerInfoDetail(containerName string, envList []string) *DockerInfoDetail {
-	dockerInfo := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	dockerInfo := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			Name: containerName,
 			ID:   "test",
 		},

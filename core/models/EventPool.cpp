@@ -112,6 +112,42 @@ void EventPool::Release(vector<RawEvent*>&& obj) {
     }
 }
 
+void EventPool::Release(LogEvent* e) {
+    if (mEnableLock) {
+        lock_guard<mutex> lock(mPoolBakMux);
+        mLogEventPoolBak.push_back(e);
+    } else {
+        mLogEventPool.push_back(e);
+    }
+}
+
+void EventPool::Release(MetricEvent* e) {
+    if (mEnableLock) {
+        lock_guard<mutex> lock(mPoolBakMux);
+        mMetricEventPoolBak.push_back(e);
+    } else {
+        mMetricEventPool.push_back(e);
+    }
+}
+
+void EventPool::Release(SpanEvent* e) {
+    if (mEnableLock) {
+        lock_guard<mutex> lock(mPoolBakMux);
+        mSpanEventPoolBak.push_back(e);
+    } else {
+        mSpanEventPool.push_back(e);
+    }
+}
+
+void EventPool::Release(RawEvent* e) {
+    if (mEnableLock) {
+        lock_guard<mutex> lock(mPoolBakMux);
+        mRawEventPoolBak.push_back(e);
+    } else {
+        mRawEventPool.push_back(e);
+    }
+}
+
 template <class T>
 void DoGC(vector<T*>& pool, vector<T*>& poolBak, size_t& minUnusedCnt, mutex* mux, const string& type) {
     if (minUnusedCnt <= pool.size() || minUnusedCnt == numeric_limits<size_t>::max()) {

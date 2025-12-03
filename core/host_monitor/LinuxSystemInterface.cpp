@@ -16,7 +16,10 @@
 
 #include "host_monitor/LinuxSystemInterface.h"
 
+#include <unistd.h>
+
 #include <chrono>
+#include <mutex>
 #include <string>
 
 using namespace std;
@@ -99,13 +102,73 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
 
         for (auto const& line : sockstatLines) {
             if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
-                auto twValue = FastParse::GetFieldAs<uint64_t>(line, 6, 0);
-                auto allocValue = FastParse::GetFieldAs<uint64_t>(line, 8, 0);
-
+                uint64_t twValue = 0;
+                uint64_t allocValue = 0;
+                if (!FastParse::GetFieldAs(line, 6, twValue)) {
+                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get tw value", line));
+                }
+                if (!FastParse::GetFieldAs(line, 8, allocValue)) {
+                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get alloc value", line));
+                }
                 tcp += twValue + allocValue;
             }
         }
     }
+    return true;
+}
+
+// Parse TCP state from /proc/net/tcp and /proc/net/tcp6 as a fallback when INET_DIAG is not available
+bool LinuxSystemInterface::ReadProcNetTcp(std::vector<uint64_t>& tcpStateCount) {
+    // Read /proc/net/tcp and /proc/net/tcp6
+    std::vector<std::filesystem::path> tcpFiles = {PROCESS_DIR / PROCESS_NET_TCP, PROCESS_DIR / PROCESS_NET_TCP6};
+
+    for (const auto& tcpFile : tcpFiles) {
+        if (!CheckExistance(tcpFile)) {
+            LOG_DEBUG(sLogger, ("TCP state file does not exist, skipping", tcpFile.string()));
+            continue;
+        }
+
+        std::vector<std::string> tcpLines;
+        std::string errorMessage;
+        if (GetFileLines(tcpFile, tcpLines, true, &errorMessage) != 0 || tcpLines.empty()) {
+            LOG_WARNING(sLogger, ("Failed to read TCP state file", tcpFile.string())("error", errorMessage));
+            continue;
+        }
+
+        if (tcpLines.size() < 2) {
+            // empty file
+            continue;
+        }
+
+        // Skip the header line
+        for (size_t i = 1; i < tcpLines.size(); ++i) {
+            const auto& line = tcpLines[i];
+
+            // Parse the line format: sl local_address rem_address st tx_queue rx_queue ...
+            // We need the 4th field (st) which is the TCP state in hex
+            FastFieldParser parser(line);
+
+            if (parser.GetFieldCount() < 4) {
+                LOG_WARNING(sLogger, ("Failed to parse TCP state line", line));
+                continue;
+            }
+
+            // Get the state field (index 3, 0-based)
+            auto stateField = parser.GetField(3);
+            if (stateField.empty()) {
+                continue;
+            }
+
+            // Convert hex string to integer
+            unsigned int state = Hex2Int(std::string(stateField));
+
+            // Validate state range
+            if (state >= TCP_ESTABLISHED && state <= TCP_CLOSING) {
+                tcpStateCount[state]++;
+            }
+        }
+    }
+
     return true;
 }
 
@@ -232,9 +295,35 @@ bool LinuxSystemInterface::ReadNetLink(std::vector<uint64_t>& tcpStateCount) {
 
 bool LinuxSystemInterface::GetNetStateByNetLink(NetState& netState) {
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
-    if (ReadNetLink(tcpStateCount) == false) {
+
+    static std::once_flag initFlag;
+    static bool netlinkAvailable = false;
+
+    bool success = false;
+    bool ranCallOnce = false;
+
+    std::call_once(initFlag, [this, &tcpStateCount, &success, &ranCallOnce]() {
+        ranCallOnce = true;
+        success = ReadNetLink(tcpStateCount);
+        if (success) {
+            netlinkAvailable = true;
+            LOG_INFO(sLogger, ("Netlink INET_DIAG is available, will use it for TCP state collection", ""));
+        } else {
+            netlinkAvailable = false;
+            LOG_INFO(sLogger, ("Netlink INET_DIAG not available, will use /proc/net/tcp fallback method", ""));
+            success = ReadProcNetTcp(tcpStateCount);
+        }
+    });
+
+    if (!ranCallOnce) {
+        success = netlinkAvailable ? ReadNetLink(tcpStateCount) : ReadProcNetTcp(tcpStateCount);
+    }
+
+    if (!success) {
+        LOG_ERROR(sLogger, ("Failed to read TCP state", ""));
         return false;
     }
+
     uint64_t tcp = 0, tcpSocketStat = 0;
 
     if (ReadSocketStat(PROCESS_DIR / PROCESS_NET_SOCKSTAT, tcp)) {
@@ -452,25 +541,49 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
     }
 
     std::error_code ec;
-    for (auto it = std::filesystem::directory_iterator(
-             PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
-         it != std::filesystem::directory_iterator();
-         ++it) {
-        if (ec) {
-            LOG_ERROR(sLogger, ("failed to iterate process directory", PROCESS_DIR)("error", ec.message()));
-            return false;
-        }
-        const auto& dirEntry = *it;
-        std::string dirName = dirEntry.path().filename().string();
-        if (IsInt(dirName)) {
-            pid_t pid{};
-            if (!StringTo(dirName, pid)) {
-                LOG_ERROR(sLogger, ("failed to parse pid", dirName));
-            } else {
-                processListInfo.pids.push_back(pid);
+    try {
+        auto it = std::filesystem::directory_iterator(
+            PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
+        while (it != std::filesystem::directory_iterator()) {
+#ifdef APSARA_UNIT_TEST_MAIN
+            sleep(2);
+#endif
+            if (ec) {
+                LOG_WARNING(sLogger,
+                            ("failed to iterate process directory", PROCESS_DIR)("skipping invalid directory entry",
+                                                                                 ec.message()));
+                ec.clear(); // 重置错误码继续遍历
+                it.increment(ec); // 尝试移动到下一项
+                continue;
             }
+
+            const auto& dirEntry = *it;
+            std::string dirName;
+            try {
+                dirName = dirEntry.path().filename().string();
+            } catch (const std::exception& e) {
+                LOG_WARNING(sLogger, ("failed to process: ", e.what()));
+            }
+
+            if (IsInt(dirName)) {
+                pid_t pid{};
+                if (!StringTo(dirName, pid)) {
+                    LOG_WARNING(sLogger, ("failed to parse pid", dirName));
+                } else {
+                    processListInfo.pids.push_back(pid);
+                }
+            }
+            // 使用increment替代++it实现安全递增
+            it.increment(ec);
         }
+    } catch (const std::filesystem::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("filesystem error occurred", e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        LOG_WARNING(sLogger, ("unexpected exception during process directory iteration", e.what()));
+        return false;
     }
+
     return true;
 }
 
@@ -496,12 +609,19 @@ bool LinuxSystemInterface::GetSystemLoadInformationOnce(SystemLoadInformation& s
     // cat /proc/loadavg
     // 0.10 0.07 0.03 1/561 78450
     const auto& loadLine = loadLines[0];
-    auto load1 = FastParse::GetFieldAs<double>(loadLine, 0, 0.0);
-    auto load5 = FastParse::GetFieldAs<double>(loadLine, 1, 0.0);
-    auto load15 = FastParse::GetFieldAs<double>(loadLine, 2, 0.0);
-
-    if (load1 == 0.0 && load5 == 0.0 && load15 == 0.0) {
-        LOG_WARNING(sLogger, ("failed to parse load metric", "invalid System collector"));
+    double load1 = 0.0;
+    double load5 = 0.0;
+    double load15 = 0.0;
+    if (!FastParse::GetFieldAs(loadLine, 0, load1)) {
+        LOG_WARNING(sLogger, ("failed to get load1 value", loadLine));
+        return false;
+    }
+    if (!FastParse::GetFieldAs(loadLine, 1, load5)) {
+        LOG_WARNING(sLogger, ("failed to get load5 value", loadLine));
+        return false;
+    }
+    if (!FastParse::GetFieldAs(loadLine, 2, load15)) {
+        LOG_WARNING(sLogger, ("failed to get load15 value", loadLine));
         return false;
     }
 
@@ -773,7 +893,12 @@ bool LinuxSystemInterface::GetSystemUptimeInformationOnce(SystemUptimeInformatio
     }
 
     const auto& uptimeLine = uptimeLines.empty() ? "" : uptimeLines.front();
-    systemUptimeInfo.uptime = FastParse::GetFieldAs<double>(uptimeLine, 0, 0.0);
+    double uptime = 0.0;
+    if (!FastParse::GetFieldAs(uptimeLine, 0, uptime)) {
+        LOG_WARNING(sLogger, ("failed to get uptime value", uptimeLine));
+        return false;
+    }
+    systemUptimeInfo.uptime = uptime;
 
     return true;
 }
@@ -1072,19 +1197,21 @@ bool LinuxSystemInterface::GetProcessCredNameOnce(pid_t pid, ProcessCredName& pr
                 getName = true;
             }
         } else if (firstField == "Uid:") {
-            // 直接解析数值字段，避免中间字符串转换
-            auto uid = parser.GetFieldAs<uint64_t>(1, 0);
-            auto euid = parser.GetFieldAs<uint64_t>(2, 0);
-            if (uid > 0) { // 基本有效性检查
+            uint64_t uid = 0;
+            uint64_t euid = 0;
+            if (!parser.GetFieldAs<uint64_t>(1, uid) || !parser.GetFieldAs<uint64_t>(2, euid)) {
+                LOG_WARNING(sLogger, ("failed to get uid/euid value", line));
+            } else {
                 cred.uid = uid;
                 cred.euid = euid;
                 getUID = true;
             }
         } else if (firstField == "Gid:") {
-            // 直接解析数值字段，避免中间字符串转换
-            auto gid = parser.GetFieldAs<uint64_t>(1, 0);
-            auto egid = parser.GetFieldAs<uint64_t>(2, 0);
-            if (gid > 0) { // 基本有效性检查
+            uint64_t gid = 0;
+            uint64_t egid = 0;
+            if (!parser.GetFieldAs<uint64_t>(1, gid) || !parser.GetFieldAs<uint64_t>(2, egid)) {
+                LOG_WARNING(sLogger, ("failed to get gid/egid value", line));
+            } else {
                 cred.gid = gid;
                 cred.egid = egid;
                 getGID = true;
@@ -1133,15 +1260,54 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
     // 检查目录是否存在，进程可能已经被杀死
 
     if (!CheckExistance(procFdPath)) {
-        LOG_ERROR(sLogger, ("file does not exist", procFdPath.string()));
+        LOG_WARNING(sLogger, ("file does not exist", procFdPath.string()));
         return false;
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    sleep(2);
+#endif
+
     int count = 0;
-    for (const auto& dirEntry :
-         std::filesystem::directory_iterator{procFdPath, std::filesystem::directory_options::skip_permission_denied}) {
-        std::string filename = dirEntry.path().filename().string();
-        count++;
+
+    std::error_code ec; // 用于捕获错误码
+    try {
+        auto it = std::filesystem::directory_iterator(
+            procFdPath, std::filesystem::directory_options::skip_permission_denied, ec);
+        while (it != std::filesystem::directory_iterator()) {
+#ifdef APSARA_UNIT_TEST_MAIN
+            sleep(2);
+#endif
+
+            if (ec) {
+                if (ec == std::errc::permission_denied) {
+                    LOG_WARNING(sLogger, ("skipping fd due to permissions", procFdPath.string()));
+                } else if (ec == std::errc::no_such_file_or_directory) {
+                    LOG_INFO(sLogger, ("process exited during fd collection", pid));
+                    break; // 进程退出，停止遍历
+                } else {
+                    LOG_WARNING(sLogger, ("temporary fd error", ec.message())("path", procFdPath.string()));
+                }
+                ec.clear();
+                it.increment(ec);
+                continue;
+            }
+            // 处理当前文件描述符
+            try {
+                std::string filename = it->path().filename().string();
+                count++;
+            } catch (const std::exception& e) {
+                LOG_WARNING(sLogger, ("failed to process fd entry", it->path().string())("error", e.what()));
+            }
+
+            it.increment(ec);
+        }
+    } catch (const std::filesystem::filesystem_error& e) {
+        LOG_WARNING(sLogger, ("filesystem error occurred", e.what()));
+        return false;
+    } catch (const std::exception& e) {
+        LOG_WARNING(sLogger, ("unexpected error occurred", e.what()));
+        return false;
     }
 
     processFd.total = count;

@@ -21,12 +21,10 @@ on:
         description: 'Release version (e.g., 3.1.4)'
         required: true
         type: string
-        pattern: '^[0-9]+\.[0-9]+\.[0-9]+.*$'
       milestone_id:
         description: 'Milestone ID from GitHub (e.g., 26 for https://github.com/alibaba/ilogtail/milestone/26)'
         required: true
         type: string
-        pattern: '^[0-9]+$'
       build_linux_amd64:
         description: 'Build Linux AMD64 package'
         required: false
@@ -54,7 +52,7 @@ on:
         default: true
 
 env:
-  GO_VERSION: 1.19.10
+  GO_VERSION: 1.23.12
 
 jobs:
   create-release-branch:
@@ -159,6 +157,16 @@ jobs:
             runner: ubuntu-24.04-arm
             should_build: ${{ github.event.inputs.build_linux_arm64 == 'true' }}
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          df -hT $PWD
+
       - name: Check out code
         if: matrix.should_build
         uses: actions/checkout@v4

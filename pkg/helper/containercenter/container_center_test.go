@@ -18,14 +18,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/image"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -123,7 +124,7 @@ func TestFormatContainerJSONPath(t *testing.T) {
 				"Status": "running"
 		}
 }`
-	container1 := types.ContainerJSON{}
+	container1 := container.InspectResponse{}
 	err := json.Unmarshal([]byte(testContainer1), &container1)
 	require.NoError(t, err)
 	formatContainerJSONPath(&container1)
@@ -145,7 +146,7 @@ func TestFormatContainerJSONPath(t *testing.T) {
 		},
 		"LogType": "json-file"
 }`
-	container2 := types.ContainerJSON{}
+	container2 := container.InspectResponse{}
 	err = json.Unmarshal([]byte(testContainer2), &container2)
 	require.NoError(t, err)
 	formatContainerJSONPath(&container2)
@@ -157,11 +158,11 @@ func TestGetAllAcceptedInfoV2(t *testing.T) {
 	dc := getContainerCenterInstance()
 
 	newContainer := func(id string) *DockerInfoDetail {
-		return dc.CreateInfoDetail(types.ContainerJSON{
-			ContainerJSONBase: &types.ContainerJSONBase{
+		return dc.CreateInfoDetail(container.InspectResponse{
+			ContainerJSONBase: &container.ContainerJSONBase{
 				ID:    id,
 				Name:  id,
-				State: &types.ContainerState{},
+				State: &container.State{},
 			},
 			Config: &container.Config{
 				Env: make([]string, 0),
@@ -428,23 +429,23 @@ type ContainerHelperMock struct {
 }
 
 // Events 实现了 DockerClient 的 Events 方法
-func (m *DockerClientMock) Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error) {
+func (m *DockerClientMock) Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error) {
 	args := m.Called(ctx, options)
 	return args.Get(0).(chan events.Message), args.Get(1).(chan error)
 }
 
-func (m *DockerClientMock) ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error) {
+func (m *DockerClientMock) ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error) {
 	args := m.Called(ctx, imageID)
-	return args.Get(0).(types.ImageInspect), args.Get(1).([]byte), args.Error(2)
+	return args.Get(0).(image.InspectResponse), args.Get(1).([]byte), args.Error(2)
 }
 
-func (m *DockerClientMock) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+func (m *DockerClientMock) ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error) {
 	args := m.Called(ctx, containerID)
-	return args.Get(0).(types.ContainerJSON), args.Error(1)
+	return args.Get(0).(container.InspectResponse), args.Error(1)
 }
-func (m *DockerClientMock) ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error) {
+func (m *DockerClientMock) ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error) {
 	args := m.Called(ctx, options)
-	return args.Get(0).([]types.Container), args.Error(1)
+	return args.Get(0).([]container.Summary), args.Error(1)
 }
 
 func (m *ContainerHelperMock) ContainerProcessAlive(pid int) bool {
@@ -471,11 +472,11 @@ func TestContainerCenterEvents(t *testing.T) {
 	go containerCenterInstance.eventListener()
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(false).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "event1",
 			Name:  "name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -489,11 +490,11 @@ func TestContainerCenterEvents(t *testing.T) {
 	assert.Equal(t, 1, containerLen)
 
 	containerHelper.On("ContainerProcessAlive", mock.Anything).Return(true).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "event1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "event1",
 			Name:  "start",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -519,7 +520,7 @@ func TestContainerCenterFetchAll(t *testing.T) {
 
 	containerHelper := ContainerHelperMock{}
 
-	mockContainerListResult := []types.Container{
+	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
 		{ID: "id2"},
 		{ID: "id3"},
@@ -529,28 +530,28 @@ func TestContainerCenterFetchAll(t *testing.T) {
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id1",
 			Name:  "event_name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
-	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id2",
 			Name:  "event_name2",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 	// one failed inspect
-	mockClient.On("ContainerInspect", mock.Anything, "id3").Return(types.ContainerJSON{}, errors.New("id3 not exist")).Times(3)
+	mockClient.On("ContainerInspect", mock.Anything, "id3").Return(container.InspectResponse{}, errors.New("id3 not exist")).Times(3)
 
 	err := containerCenterInstance.fetchAll()
 	assert.Nil(t, err)
@@ -558,29 +559,29 @@ func TestContainerCenterFetchAll(t *testing.T) {
 	containerLen := len(containerCenterInstance.containerMap)
 	assert.Equal(t, 2, containerLen)
 
-	mockContainerListResult2 := []types.Container{
+	mockContainerListResult2 := []container.Summary{
 		{ID: "id4"},
 		{ID: "id5"},
 	}
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult2, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id4").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id4").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id4",
 			Name:  "event_name4",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil).Once()
 
-	mockClient.On("ContainerInspect", mock.Anything, "id5").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id5").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id5",
 			Name:  "event_name5",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -604,28 +605,28 @@ func TestContainerCenterFetchAllAndOne(t *testing.T) {
 
 	containerHelper := ContainerHelperMock{}
 
-	mockContainerListResult := []types.Container{
+	mockContainerListResult := []container.Summary{
 		{ID: "id1"},
 		{ID: "id2"},
 	}
 
 	mockClient.On("ContainerList", mock.Anything, mock.Anything).Return(mockContainerListResult, nil)
 
-	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id1").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id1",
 			Name:  "event_name1",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
 		},
 	}, nil)
-	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	mockClient.On("ContainerInspect", mock.Anything, "id2").Return(container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:    "id2",
 			Name:  "event_name2",
-			State: &types.ContainerState{},
+			State: &container.State{},
 		},
 		Config: &container.Config{
 			Env: make([]string, 0),
@@ -663,7 +664,7 @@ func TestInitClientMutiTime(t *testing.T) {
 
 func TestFindAllEnvConfig(t *testing.T) {
 	did := &DockerInfoDetail{
-		ContainerInfo: types.ContainerJSON{
+		ContainerInfo: container.InspectResponse{
 			Config: &container.Config{
 				Env: []string{
 					"loong_logs_key1=value1",
@@ -674,7 +675,7 @@ func TestFindAllEnvConfig(t *testing.T) {
 					"loong_logs_key1_tags=appName=ut1",
 				},
 			},
-			ContainerJSONBase: &types.ContainerJSONBase{
+			ContainerJSONBase: &container.ContainerJSONBase{
 				Name: "ut-container",
 			},
 		},
@@ -812,4 +813,158 @@ func TestEnvRegex(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExtractUpperDirFromProcMounts(t *testing.T) {
+	// Create a temporary directory to simulate /logtail_host
+	tmpDir, err := os.MkdirTemp("", "logtail_host_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original DefaultLogtailMountPath
+	originalMountPath := DefaultLogtailMountPath
+	defer func() {
+		DefaultLogtailMountPath = originalMountPath
+	}()
+
+	// Set DefaultLogtailMountPath to temp directory
+	DefaultLogtailMountPath = tmpDir
+
+	// Create /proc directory structure
+	procDir := tmpDir + "/proc"
+	err = os.MkdirAll(procDir, 0755)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name          string
+		pid           int
+		mountsContent string
+		expected      string
+		expectError   bool
+	}{
+		{
+			name: "valid overlay mount with upperdir",
+			pid:  42433,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/13/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/12/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/11/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/10/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/9/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/8/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/7/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/6/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/5/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/4/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/3/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/2/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0
+/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0`,
+			expected:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs",
+			expectError: false,
+		},
+		{
+			name: "no overlay mount found",
+			pid:  42434,
+			mountsContent: `/dev/sda1 / ext4 rw,relatime 0 0
+proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0`,
+			expected:    "",
+			expectError: true,
+		},
+		{
+			name:          "overlay mount without upperdir",
+			pid:           42435,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0`,
+			expected:      "",
+			expectError:   true,
+		},
+		{
+			name: "multiple overlay mounts, extract first one",
+			pid:  42436,
+			mountsContent: `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0
+overlay /tmp overlay rw,relatime,lowerdir=/tmp/lower,upperdir=/tmp/upper,workdir=/tmp/work 0 0`,
+			expected:    "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create /proc/{pid} directory
+			pidDir := procDir + "/" + fmt.Sprintf("%d", tt.pid)
+			err := os.MkdirAll(pidDir, 0755)
+			require.NoError(t, err)
+
+			// Write mounts file
+			mountsFile := pidDir + "/mounts"
+			err = os.WriteFile(mountsFile, []byte(tt.mountsContent), 0644)
+			require.NoError(t, err)
+
+			// Test extractUpperDirFromProcMounts
+			result, err := extractUpperDirFromProcMounts(tt.pid)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expected, result)
+			}
+
+			// Cleanup
+			os.RemoveAll(pidDir)
+		})
+	}
+}
+
+func TestCreateInfoDetailWithContainerdStorageDriver(t *testing.T) {
+	// Create a temporary directory to simulate /logtail_host
+	tmpDir, err := os.MkdirTemp("", "logtail_host_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original DefaultLogtailMountPath
+	originalMountPath := DefaultLogtailMountPath
+	defer func() {
+		DefaultLogtailMountPath = originalMountPath
+	}()
+
+	// Set DefaultLogtailMountPath to temp directory
+	DefaultLogtailMountPath = tmpDir
+
+	// Create /proc directory structure
+	procDir := tmpDir + "/proc"
+	err = os.MkdirAll(procDir, 0755)
+	require.NoError(t, err)
+
+	// Create /proc/{pid} directory and mounts file
+	pid := 42433
+	pidDir := procDir + "/" + fmt.Sprintf("%d", pid)
+	err = os.MkdirAll(pidDir, 0755)
+	require.NoError(t, err)
+
+	mountsContent := `overlay / overlay rw,relatime,lowerdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/16/fs:/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/14/fs,upperdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs,workdir=/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/work 0 0`
+	mountsFile := pidDir + "/mounts"
+	err = os.WriteFile(mountsFile, []byte(mountsContent), 0644)
+	require.NoError(t, err)
+	defer os.RemoveAll(pidDir)
+
+	// Reset container center instance
+	resetContainerCenter()
+	dc := getContainerCenterInstance()
+
+	// Create a mock docker client
+	mockClient := DockerClientMock{}
+	dc.client = &mockClient
+
+	// Test container info with empty GraphDriver (docker v29+ with containerd)
+	// GraphDriver is not set, which simulates docker v29+ with containerd storage driver
+	info := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
+			ID:   "test-container-id",
+			Name: "test-container",
+			State: &container.State{
+				Pid:    pid,
+				Status: "running",
+			},
+			// GraphDriver is not set (nil or empty), simulating docker v29+ with containerd
+		},
+		Config: &container.Config{
+			Env: make([]string, 0),
+		},
+	}
+
+	// Create DockerInfoDetail
+	did := dc.CreateInfoDetail(info, "", false)
+
+	// Verify that DefaultRootPath was extracted from /proc/{pid}/mounts
+	expectedUpperDir := "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/17/fs"
+	assert.Equal(t, expectedUpperDir, did.DefaultRootPath)
 }

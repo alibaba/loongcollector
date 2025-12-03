@@ -71,7 +71,7 @@ void InputForwardUnittest::TestName() {
 
 void InputForwardUnittest::TestSupportAck() {
     InputForward input;
-    APSARA_TEST_TRUE_FATAL(input.SupportAck());
+    APSARA_TEST_EQUAL_FATAL(input.GetProcessQueueType(), QueueType::COUNT_BOUNDED);
 }
 
 void InputForwardUnittest::OnSuccessfulInit() {

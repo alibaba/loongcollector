@@ -66,38 +66,38 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config_1");
     ctx.SetProcessQueueKey(key);
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(key, 0, ctx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key, 0, ctx));
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[0].size());
     auto iter = sProcessQueueManager->mQueues[key].first;
     APSARA_TEST_TRUE(iter == prev(sProcessQueueManager->mPriorityQueue[0].end()));
     APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == iter);
-    APSARA_TEST_EQUAL(sProcessQueueManager->mBoundedQueueParam.GetCapacity(), (*iter)->mCapacity);
-    APSARA_TEST_EQUAL(sProcessQueueManager->mBoundedQueueParam.GetLowWatermark(),
-                      static_cast<BoundedProcessQueue*>(iter->get())->mLowWatermark);
-    APSARA_TEST_EQUAL(sProcessQueueManager->mBoundedQueueParam.GetHighWatermark(),
-                      static_cast<BoundedProcessQueue*>(iter->get())->mHighWatermark);
+    APSARA_TEST_EQUAL(sProcessQueueManager->mCountBoundedQueueParam.GetCapacity(), (*iter)->mCapacity);
+    APSARA_TEST_EQUAL(sProcessQueueManager->mCountBoundedQueueParam.GetLowWatermark(),
+                      static_cast<CountBoundedProcessQueue*>(iter->get())->mLowWatermark);
+    APSARA_TEST_EQUAL(sProcessQueueManager->mCountBoundedQueueParam.GetHighWatermark(),
+                      static_cast<CountBoundedProcessQueue*>(iter->get())->mHighWatermark);
     APSARA_TEST_EQUAL("test_config_1", (*iter)->GetConfigName());
 
     // create queue
     //   and current index is valid before creation
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(1, 0, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(1, 0, sCtx));
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_TRUE(sProcessQueueManager->mQueues[1].first == prev(sProcessQueueManager->mPriorityQueue[0].end()));
     APSARA_TEST_TRUE(sProcessQueueManager->mCurrentQueueIndex.second == sProcessQueueManager->mQueues[0].first);
 
     // add more queue
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(2, 0, sCtx));
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(3, 0, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(2, 0, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(3, 0, sCtx));
     sProcessQueueManager->mCurrentQueueIndex.second = sProcessQueueManager->mQueues[2].first;
 
     // update queue with same priority
-    APSARA_TEST_FALSE(sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx));
+    APSARA_TEST_FALSE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx));
 
     // update queue with different priority
     //   and current index not equal to the updated queue
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 1, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 1, sCtx));
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(3U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[1].size());
@@ -107,7 +107,7 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
     // update queue with different priority
     //   and current index equals to the updated queue
     //     and the updated queue is not the last in the list
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(2, 1, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(2, 1, sCtx));
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mPriorityQueue[1].size());
@@ -118,7 +118,7 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
     //   and current index equals to the updated queue
     //     and the updated queue is the last in the list
     //       and more queues exist
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(3, 1, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(3, 1, sCtx));
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_EQUAL(3U, sProcessQueueManager->mPriorityQueue[1].size());
@@ -129,7 +129,7 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
     //   and current index equals to the updated queue
     //     and the updated queue is the last in the list
     //       and no more queue exists
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(1, 1, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(1, 1, sCtx));
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(0U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mPriorityQueue[1].size());
@@ -138,7 +138,7 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
 
     // update queue with different priority
     //   and current index is invalid before update
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx));
     APSARA_TEST_EQUAL(4U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(1U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_EQUAL(3U, sProcessQueueManager->mPriorityQueue[1].size());
@@ -147,8 +147,8 @@ void ProcessQueueManagerUnittest::TestUpdateSameTypeQueue() {
 }
 
 void ProcessQueueManagerUnittest::TestUpdateDifferentTypeQueue() {
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx);
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(1, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(1, 0, sCtx);
 
     // current index not equal to the updated queue
     APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCircularQueue(1, 0, 100, sCtx));
@@ -168,7 +168,7 @@ void ProcessQueueManagerUnittest::TestUpdateDifferentTypeQueue() {
     // current index equals to the update queue
     //   and the updated queue is the last in the list
     sProcessQueueManager->mCurrentQueueIndex.second = prev(sProcessQueueManager->mPriorityQueue[0].end());
-    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx));
+    APSARA_TEST_TRUE(sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx));
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mQueues.size());
     APSARA_TEST_EQUAL(2U, sProcessQueueManager->mPriorityQueue[0].size());
     APSARA_TEST_TRUE(sProcessQueueManager->mQueues[0].first == prev(sProcessQueueManager->mPriorityQueue[0].end()));
@@ -180,10 +180,10 @@ void ProcessQueueManagerUnittest::TestDeleteQueue() {
     QueueKey key2 = QueueKeyManager::GetInstance()->GetKey("test_config_2");
     QueueKey key3 = QueueKeyManager::GetInstance()->GetKey("test_config_3");
     QueueKey key4 = QueueKeyManager::GetInstance()->GetKey("test_config_4");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key1, 0, sCtx);
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key2, 0, sCtx);
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key3, 0, sCtx);
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key4, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key1, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key2, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key3, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key4, 0, sCtx);
     sProcessQueueManager->mCurrentQueueIndex.second = sProcessQueueManager->mQueues[key3].first;
 
     // current index not equal to the deleted queue
@@ -224,7 +224,7 @@ void ProcessQueueManagerUnittest::TestDeleteQueue() {
 }
 
 void ProcessQueueManagerUnittest::TestSetQueueUpstreamAndDownStream() {
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx);
 
     // queue exists
     APSARA_TEST_TRUE(sProcessQueueManager->SetDownStreamQueues(0, vector<BoundedSenderQueueInterface*>()));
@@ -235,7 +235,7 @@ void ProcessQueueManagerUnittest::TestSetQueueUpstreamAndDownStream() {
 }
 
 void ProcessQueueManagerUnittest::TestPushQueue() {
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(0, 0, sCtx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(0, 0, sCtx);
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, sCtx, vector<RangeCheckpointPtr>(5));
 
     // queue belongs to normal process queue
@@ -251,7 +251,7 @@ void ProcessQueueManagerUnittest::TestPushQueue() {
     APSARA_TEST_EQUAL(QueueStatus::QUEUE_NOT_EXIST, sProcessQueueManager->PushQueue(2, GenerateItem()));
 
     // invalid to push
-    static_cast<BoundedProcessQueue*>(sProcessQueueManager->mQueues[0].first->get())->mValidToPush = false;
+    static_cast<CountBoundedProcessQueue*>(sProcessQueueManager->mQueues[0].first->get())->mValidToPush = false;
     APSARA_TEST_FALSE(sProcessQueueManager->IsValidToPush(0));
     APSARA_TEST_EQUAL(QueueStatus::QUEUE_FULL, sProcessQueueManager->PushQueue(0, GenerateItem()));
 
@@ -267,19 +267,19 @@ void ProcessQueueManagerUnittest::TestPopItem() {
 
     ctx.SetConfigName("test_config_1");
     QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("test_config_1");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key1, 0, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key1, 0, ctx);
     sProcessQueueManager->EnablePop("test_config_1");
     ctx.SetConfigName("test_config_2");
     QueueKey key2 = QueueKeyManager::GetInstance()->GetKey("test_config_2");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key2, 1, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key2, 1, ctx);
     sProcessQueueManager->EnablePop("test_config_2");
     ctx.SetConfigName("test_config_3");
     QueueKey key3 = QueueKeyManager::GetInstance()->GetKey("test_config_3");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key3, 1, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key3, 1, ctx);
     sProcessQueueManager->EnablePop("test_config_3");
     ctx.SetConfigName("test_config_4");
     QueueKey key4 = QueueKeyManager::GetInstance()->GetKey("test_config_4");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key4, 1, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key4, 1, ctx);
     sProcessQueueManager->EnablePop("test_config_4");
     ctx.SetConfigName("test_config_5");
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(5, 0, ctx, vector<RangeCheckpointPtr>(5));
@@ -327,12 +327,12 @@ void ProcessQueueManagerUnittest::TestIsAllQueueEmpty() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config_1");
     QueueKey key1 = QueueKeyManager::GetInstance()->GetKey("test_config_1");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key1, 0, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key1, 0, ctx);
     sProcessQueueManager->EnablePop("test_config_1");
 
     ctx.SetConfigName("test_config_2");
     QueueKey key2 = QueueKeyManager::GetInstance()->GetKey("test_config_2");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key2, 1, ctx);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key2, 1, ctx);
     sProcessQueueManager->EnablePop("test_config_2");
 
     ctx.SetConfigName("test_config_3");
@@ -368,7 +368,7 @@ void ProcessQueueManagerUnittest::OnPipelineUpdate() {
     ctx1.SetConfigName("test_config_1");
     ctx2.SetConfigName("test_config_2");
     QueueKey key = QueueKeyManager::GetInstance()->GetKey("test_config_1");
-    sProcessQueueManager->CreateOrUpdateBoundedQueue(key, 0, ctx1);
+    sProcessQueueManager->CreateOrUpdateCountBoundedQueue(key, 0, ctx1);
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(1, 0, ctx2, vector<RangeCheckpointPtr>(5));
     ExactlyOnceQueueManager::GetInstance()->CreateOrUpdateQueue(2, 0, ctx2, vector<RangeCheckpointPtr>(5));
 

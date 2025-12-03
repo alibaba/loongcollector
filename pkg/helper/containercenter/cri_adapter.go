@@ -27,7 +27,6 @@ import (
 
 	"github.com/containerd/containerd"
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
@@ -162,12 +161,12 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 	if state == ContainerStateContainerRunning && ContainerProcessAlive(int(ci.Pid)) {
 		stateStatus = ContainerStatusRunning
 	}
-	dockerContainer := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	dockerContainer := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID:      containerID,
 			Created: time.Unix(0, status.Status.CreatedAt).Format(time.RFC3339Nano),
 			LogPath: status.Status.LogPath,
-			State: &types.ContainerState{
+			State: &container.State{
 				Status: stateStatus,
 				Pid:    int(ci.Pid),
 			},
@@ -209,7 +208,7 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 			if mount.Destination == "/etc/hostname" {
 				hostnamePath = mount.Source
 			}
-			dockerContainer.Mounts = append(dockerContainer.Mounts, types.MountPoint{
+			dockerContainer.Mounts = append(dockerContainer.Mounts, container.MountPoint{
 				Source:      mount.Source,
 				Destination: mount.Destination,
 				Driver:      mount.Type,
@@ -476,7 +475,7 @@ func (cw *CRIRuntimeWrapper) lookupRootfsCache(containerID string) (string, bool
 	return dir, ok
 }
 
-func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info types.ContainerJSON) string {
+func (cw *CRIRuntimeWrapper) lookupContainerRootfsAbsDir(info container.InspectResponse) string {
 	// For cri-runtime
 	containerID := info.ID
 	if dir, ok := cw.lookupRootfsCache(containerID); ok {

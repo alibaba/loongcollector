@@ -18,7 +18,7 @@
 
 #include "Application.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
@@ -157,9 +157,9 @@ protected:
 
         FlusherRunner::GetInstance()->mEnableRateLimiter = false;
         SenderQueueManager::GetInstance()->mDefaultQueueParam.mCapacity = 1; // test extra buffer
-        ProcessQueueManager::GetInstance()->mBoundedQueueParam.mCapacity = 100;
-        ProcessQueueManager::GetInstance()->mBoundedQueueParam.mLowWatermark = 50;
-        ProcessQueueManager::GetInstance()->mBoundedQueueParam.mHighWatermark = 80;
+        ProcessQueueManager::GetInstance()->mCountBoundedQueueParam.mCapacity = 100;
+        ProcessQueueManager::GetInstance()->mCountBoundedQueueParam.mLowWatermark = 50;
+        ProcessQueueManager::GetInstance()->mCountBoundedQueueParam.mHighWatermark = 80;
         FLAGS_sls_client_send_compress = false;
         AppConfig::GetInstance()->mSendRequestConcurrency = 100;
         AppConfig::GetInstance()->mSendRequestGlobalConcurrency = 200;
@@ -214,11 +214,11 @@ private:
         std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(g), 0);
         {
             auto manager = ProcessQueueManager::GetInstance();
-            manager->CreateOrUpdateBoundedQueue(key, 0, CollectionPipelineContext{});
+            manager->CreateOrUpdateCountBoundedQueue(key, 0, CollectionPipelineContext{});
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());
-            static_cast<BoundedProcessQueue*>((*iter->second.first).get())->mValidToPush = true;
+            static_cast<CountBoundedProcessQueue*>((*iter->second.first).get())->mValidToPush = true;
             APSARA_TEST_TRUE_FATAL((*iter->second.first)->Push(std::move(item)));
         }
     };
@@ -237,7 +237,7 @@ private:
             std::move(data), data.size(), flusher, key, "", RawDataType::EVENT_GROUP);
         {
             auto manager = SenderQueueManager::GetInstance();
-            manager->CreateQueue(key, "", CollectionPipelineContext{});
+            manager->CreateQueue(key, "", "", CollectionPipelineContext{});
             lock_guard<mutex> lock(manager->mQueueMux);
             auto iter = manager->mQueues.find(key);
             APSARA_TEST_NOT_EQUAL(iter, manager->mQueues.end());

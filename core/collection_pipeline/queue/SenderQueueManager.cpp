@@ -31,6 +31,7 @@ SenderQueueManager::SenderQueueManager() : mDefaultQueueParam(INT32_FLAG(sender_
 bool SenderQueueManager::CreateQueue(
     QueueKey key,
     const string& flusherId,
+    const string& target,
     const CollectionPipelineContext& ctx,
     std::unordered_map<std::string, std::shared_ptr<ConcurrencyLimiter>>&& concurrencyLimitersMap,
     uint32_t maxRate) {
@@ -42,6 +43,7 @@ bool SenderQueueManager::CreateQueue(
                             mDefaultQueueParam.GetLowWatermark(),
                             mDefaultQueueParam.GetHighWatermark(),
                             key,
+                            target,
                             flusherId,
                             ctx);
         iter = mQueues.find(key);

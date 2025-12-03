@@ -427,5 +427,7 @@ inline std::string TrimRightSpace(const std::string& str) {
     return TrimRight(str, kSpaceChars);
 }
 
+// Convert double to string with up to 6 decimal places, removing trailing zeros
+std::string DoubleToString(double value);
 
 } // namespace logtail

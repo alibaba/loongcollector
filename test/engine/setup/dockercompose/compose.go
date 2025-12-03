@@ -24,13 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	dockertypes "github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"github.com/testcontainers/testcontainers-go"
+	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"gopkg.in/yaml.v3"
 
@@ -41,7 +40,7 @@ import (
 const (
 	composeCategory = "docker-compose"
 	finalFileName   = "testcase-compose.yaml"
-	template        = `version: '3.8'
+	template        = `
 services:
   loongcollectorC:
     image: aliyun/loongcollector:0.0.1
@@ -99,7 +98,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	hasher := sha256.New()
 	hasher.Write([]byte(projectName))
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
-	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
+	compose := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
 	strategyWrappers := withExposedService(compose)
 	// retry 3 times
 	for i := 0; i < 3; i++ {
@@ -112,7 +111,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		if i == 2 {
 			return execError.Error
 		}
-		execError = testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
+		execError = composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 		if execError.Error != nil {
 			logger.Error(context.Background(), "DOWN_DOCKER_COMPOSE_ERROR",
 				"stdout", execError.Error.Error())
@@ -125,7 +124,7 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 	}
 	c.cli = cli
 
-	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	list, err := cli.ContainerList(context.Background(), containertypes.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("name", fmt.Sprintf("%s_loongcollectorC*", projectName)),
 			filters.Arg("name", fmt.Sprintf("%s-loongcollectorC*", projectName)),
@@ -157,7 +156,7 @@ func (c *ComposeBooter) Stop() error {
 	hasher := sha256.New()
 	hasher.Write([]byte(projectName))
 	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
-	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
+	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
 	if execError.Error != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
 			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
@@ -168,7 +167,7 @@ func (c *ComposeBooter) Stop() error {
 }
 
 func (c *ComposeBooter) exec(id string, cmd []string) error {
-	cfg := dockertypes.ExecConfig{
+	cfg := containertypes.ExecOptions{
 		User: "root",
 		Cmd:  cmd,
 	}
@@ -177,7 +176,7 @@ func (c *ComposeBooter) exec(id string, cmd []string) error {
 		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
 		return err
 	}
-	err = c.cli.ContainerExecStart(context.Background(), resp.ID, dockertypes.ExecStartCheck{
+	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
 		Detach: false,
 		Tty:    false,
 	})
@@ -312,8 +311,8 @@ func registerDockerNetMapping(wrappers []*StrategyWrapper) error {
 }
 
 // withExposedService add wait.Strategy to the docker compose.
-func withExposedService(compose testcontainers.DockerCompose) (wrappers []*StrategyWrapper) {
-	localCompose := compose.(*testcontainers.LocalDockerCompose)
+func withExposedService(compose composeModule.DockerComposer) (wrappers []*StrategyWrapper) {
+	localCompose := compose.(*composeModule.LocalDockerCompose)
 	for serv, rawCfg := range localCompose.Services {
 		cfg := rawCfg.(map[string]interface{})
 		rawPorts, ok := cfg["ports"]

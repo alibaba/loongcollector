@@ -81,6 +81,7 @@ std::string JoinBytesLimit(const T& v, const std::string& splitter, size_t n) {
 }
 
 bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
+    std::unordered_set<std::string> currentDevices;
     std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
     std::map<std::string, DiskCollectStat> diskCollectStatMap;
     if (GetDiskCollectStatMap(collectContext.mCollectTime, diskCollectStatMap) <= 0) {
@@ -106,6 +107,7 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
 
     for (auto& it : mCurrentDiskCollectStatMap) {
         const std::string& devName = it.first;
+        currentDevices.insert(devName);
         DeviceMetric deviceMetric{};
         if (mLastDiskCollectStatMap.find(devName) != mLastDiskCollectStatMap.end()) {
             const DiskCollectStat& currentStat = mCurrentDiskCollectStatMap[devName];
@@ -133,6 +135,15 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
         }
     }
     mLastDiskCollectStatMap = mCurrentDiskCollectStatMap;
+
+    // Clean up devices that are no longer present in current collection
+    for (auto it = mDeviceCalMap.begin(); it != mDeviceCalMap.end();) {
+        if (currentDevices.find(it->first) == currentDevices.end()) {
+            it = mDeviceCalMap.erase(it);
+        } else {
+            ++it;
+        }
+    }
 
     // If group is not provided, just collect data without generating metrics
     if (!groupPtr) {

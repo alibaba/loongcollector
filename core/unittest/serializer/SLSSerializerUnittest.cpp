@@ -160,7 +160,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
@@ -185,7 +185,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
@@ -211,7 +211,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
@@ -237,7 +237,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890000000001");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
@@ -264,7 +264,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890999999999");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
@@ -290,7 +290,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "1234567890999999999");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "__value__");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "__name__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "test_gauge");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "__apm_metric_type__");
@@ -331,7 +331,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "key1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "value1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -355,9 +355,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "key1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "value1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -383,7 +383,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "key2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "value2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.1");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -409,9 +409,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "key2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "value2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -433,7 +433,7 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "0.1");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -455,9 +455,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).key(), "__time_nano__");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(0).value(), "1234567890");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(1).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -484,9 +484,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "key2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "value2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -513,9 +513,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "key2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "value2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());
@@ -542,9 +542,9 @@ void SLSSerializerUnittest::TestSerializeEventGroup() {
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).key(), "key2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(2).value(), "value2");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).key(), "multi_value1");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.100000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(3).value(), "0.1");
             APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).key(), "multi_value2");
-            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.200000");
+            APSARA_TEST_EQUAL(logGroup.logs(0).contents(4).value(), "0.2");
             APSARA_TEST_EQUAL(1, logGroup.logtags_size());
             APSARA_TEST_STREQ("__pack_id__", logGroup.logtags(0).key().c_str());
             APSARA_TEST_STREQ("pack_id", logGroup.logtags(0).value().c_str());

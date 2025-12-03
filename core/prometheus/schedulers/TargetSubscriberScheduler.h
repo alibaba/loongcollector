@@ -48,7 +48,7 @@ public:
 
     std::string GetId() const;
 
-    void ScheduleNext() override;
+    bool ScheduleNext() override;
     void Cancel() override;
     void InitSelfMonitor(const MetricLabels&);
 

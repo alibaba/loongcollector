@@ -17,6 +17,7 @@
 #include "host_monitor/collector/GPUCollector.h"
 
 #include <string>
+#include <unordered_set>
 
 #include "_thirdparty/DCGM/dcgmlib/dcgm_fields.h"
 #include "common/Flags.h"
@@ -73,6 +74,7 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
         return false;
     }
 
+    std::unordered_set<std::string> currentGpuIds;
     for (const auto& gpu : gpuInfo.stats) {
         double availableMemory = gpu.memoryTotal - gpu.memoryReserved;
         double memoryFreeUtilization = 0.0;
@@ -93,6 +95,16 @@ bool GPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGrou
                                (double)gpu.gpuTemperature,
                                gpu.powerUsage};
         mCalculateMap[gpu.gpuId].AddValue(gpuMetric);
+        currentGpuIds.insert(gpu.gpuId);
+    }
+
+    // Clean up GPU entries that are no longer present in current collection
+    for (auto it = mCalculateMap.begin(); it != mCalculateMap.end();) {
+        if (currentGpuIds.find(it->first) == currentGpuIds.end()) {
+            it = mCalculateMap.erase(it);
+        } else {
+            ++it;
+        }
     }
 
     // If group is not provided, just collect data without generating metrics

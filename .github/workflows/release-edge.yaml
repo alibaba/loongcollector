@@ -39,6 +39,16 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          df -hT $PWD
+
       - name: Check out code
         uses: actions/checkout@v4
         with:
@@ -47,7 +57,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: 1.19.10
+          go-version: 1.23.12
 
       - name: Set custom submodule URL and fetch
         run: |
@@ -195,7 +205,7 @@ jobs:
   #     - name: Set up Go
   #       uses: actions/setup-go@v4
   #       with:
-  #         go-version: 1.19.10
+  #         go-version: 1.23.12
 
   #     - name: Set up Python ${{ matrix.python-version }}
   #       uses: actions/setup-python@v5

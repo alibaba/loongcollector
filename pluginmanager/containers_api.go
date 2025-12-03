@@ -2,13 +2,12 @@ package pluginmanager
 
 import (
 	"encoding/json"
-	"path/filepath"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 )
 
-var caCachedFullList map[string]struct{}
+var caCachedFullList map[string]string // containerID -> hash
 var lastUpdateTime int64
 
 type Mount struct {
@@ -36,6 +35,8 @@ type ContainerInfoCmd struct {
 	ContainerLabels map[string]string // 容器标签信息
 	Stopped         bool              // 容器是否已停止
 	Status          string            // 容器状态
+
+	MetadataHash string // 容器元数据哈希
 }
 
 type AllCmd struct {
@@ -52,8 +53,8 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	var cmd ContainerInfoCmd
 	cmd.ID = info.ContainerInfo.ID
 
-	cmd.UpperDir = filepath.Clean(info.DefaultRootPath)
-	cmd.LogPath = filepath.Clean(info.StdoutPath)
+	cmd.UpperDir = info.DefaultRootPath
+	cmd.LogPath = info.StdoutPath
 
 	// info.ContainerNameTag
 	cmd.MetaDatas = make(map[string]string, len(info.ContainerNameTag))
@@ -62,7 +63,7 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	}
 	cmd.Name = info.ContainerInfo.Name
 	cmd.Status = info.ContainerInfo.State.Status
-
+	cmd.MetadataHash = info.MetadataHash()
 	// K8s info
 	if info.K8SInfo != nil {
 		cmd.K8sInfo = K8sInfo{
@@ -113,8 +114,8 @@ func convertDockerInfos(info *containercenter.DockerInfoDetail, cmds *[]Containe
 	cmd.Mounts = make([]Mount, 0, len(info.ContainerInfo.Mounts))
 	for _, mount := range info.ContainerInfo.Mounts {
 		cmd.Mounts = append(cmd.Mounts, Mount{
-			Source:      filepath.Clean(mount.Source),
-			Destination: filepath.Clean(mount.Destination),
+			Source:      mount.Source,
+			Destination: mount.Destination,
 		})
 	}
 	*cmds = append(*cmds, cmd)
@@ -128,10 +129,10 @@ func GetAllContainers() string {
 	if len(rawMap) == 0 {
 		return ""
 	}
-	caCachedFullList = make(map[string]struct{})
+	caCachedFullList = make(map[string]string)
 	for _, info := range rawMap {
 		convertDockerInfos(info, &allCmd.All)
-		caCachedFullList[info.ContainerInfo.ID] = struct{}{}
+		caCachedFullList[info.ContainerInfo.ID] = info.MetadataHash()
 	}
 	cmdBuf, _ := json.Marshal(allCmd)
 	return string(cmdBuf)
@@ -146,13 +147,15 @@ func GetDiffContainers() string {
 	}
 
 	if caCachedFullList == nil {
-		caCachedFullList = make(map[string]struct{})
+		caCachedFullList = make(map[string]string)
 	}
 	lastUpdateTime = newUpdateTime
+
 	update, delete, stop, changed, newFullList := containercenter.GetContainerDiffForPluginManager(caCachedFullList)
 	if !changed {
 		return ""
 	}
+
 	diff := new(DiffCmd)
 	diff.Update = make([]ContainerInfoCmd, 0)
 	for _, info := range update {

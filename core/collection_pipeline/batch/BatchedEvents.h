@@ -34,7 +34,8 @@ struct BatchedEvents {
     StringView mPackIdPrefix;
 
     BatchedEvents() = default;
-    ~BatchedEvents();
+    BatchedEvents(const BatchedEvents& other) = delete;
+    BatchedEvents& operator=(const BatchedEvents& other) = delete;
     BatchedEvents(BatchedEvents&& other) noexcept
         : mEvents(std::move(other.mEvents)),
           mTags(std::move(other.mTags)),
@@ -42,7 +43,8 @@ struct BatchedEvents {
           mSizeBytes(other.mSizeBytes),
           mExactlyOnceCheckpoint(std::move(other.mExactlyOnceCheckpoint)),
           mPackIdPrefix(other.mPackIdPrefix) {}
-    BatchedEvents& operator=(BatchedEvents&&) noexcept = default;
+    BatchedEvents& operator=(BatchedEvents&&) noexcept = delete;
+    ~BatchedEvents();
 
     // for flusher_sls only
     BatchedEvents(EventsContainer&& events,
