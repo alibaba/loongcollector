@@ -18,8 +18,8 @@ TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
 # Blacklist: directory names to skip
 # Example: "test_dir"
 BLACKLIST_DIRS=(
-    "pipeline"
-    "host_monitor"
+    # "pipeline"
+    # "host_monitor"
 )
 
 # Get CPU core count for parallel execution
