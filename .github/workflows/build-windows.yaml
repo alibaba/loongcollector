@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build Core Windows
+name: Build Windows
 
 on:
   pull_request:
@@ -41,12 +41,12 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
-      - name: Build Binary
+      - name: Build
         env:
           BUILD_LOGTAIL_UT: ON
         run: scripts/windows64_build.bat
 
-      - name: Run UT
+      - name: Run Core UT
         run: scripts/windows64_run_core_ut.bat
 
   actions-timeline:
