@@ -27,9 +27,7 @@ public:
     void TestCheckpointFileNames() const;
     void TestDumpCheckpoints() const;
     void TestInvalidCheckpointFile() const;
-    void TestUpdateRealFilePath() const;
     void TestSizeRemainsConstant() const;
-    void TestSerializationWithRealFilePath() const;
 
 protected:
     void SetUp() override {
@@ -120,8 +118,6 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(static_cast<uint64_t>(contents[0].size()),
                           cpt.mFileCheckpoints[0].mSize); // mSize should be initial file size
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
-        APSARA_TEST_EQUAL(fingerprints[0].mFilePath,
-                          cpt.mFileCheckpoints[0].mRealFilePath); // mRealFilePath should equal mFilePath initially
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
         APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
@@ -145,8 +141,6 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(static_cast<uint64_t>(contents[1].size()),
                           cpt.mFileCheckpoints[0].mSize); // mSize should be initial file size
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
-        APSARA_TEST_EQUAL(fingerprints[1].mFilePath,
-                          cpt.mFileCheckpoints[0].mRealFilePath); // mRealFilePath should equal mFilePath initially
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
         APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_2@0.json"));
@@ -430,17 +424,14 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
         APSARA_TEST_EQUAL(expectedCpt.mCurrentFileIndex, cpt.mCurrentFileIndex);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints.size(), cpt.mFileCheckpoints.size());
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mFilePath, cpt.mFileCheckpoints[0].mFilePath);
-        APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mRealFilePath, cpt.mFileCheckpoints[0].mRealFilePath);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mStatus, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mSize, cpt.mFileCheckpoints[0].mSize);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mStartTime, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[0].mLastUpdateTime, cpt.mFileCheckpoints[0].mLastUpdateTime);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[1].mFilePath, cpt.mFileCheckpoints[1].mFilePath);
-        APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[1].mRealFilePath, cpt.mFileCheckpoints[1].mRealFilePath);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[1].mStatus, cpt.mFileCheckpoints[1].mStatus);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[1].mLastUpdateTime, cpt.mFileCheckpoints[1].mLastUpdateTime);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mFilePath, cpt.mFileCheckpoints[2].mFilePath);
-        APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mRealFilePath, cpt.mFileCheckpoints[2].mRealFilePath);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mStatus, cpt.mFileCheckpoints[2].mStatus);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mDevInode, cpt.mFileCheckpoints[2].mDevInode);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mSignatureHash, cpt.mFileCheckpoints[2].mSignatureHash);
@@ -450,7 +441,6 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mStartTime, cpt.mFileCheckpoints[2].mStartTime);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[2].mLastUpdateTime, cpt.mFileCheckpoints[2].mLastUpdateTime);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[3].mFilePath, cpt.mFileCheckpoints[3].mFilePath);
-        APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[3].mRealFilePath, cpt.mFileCheckpoints[3].mRealFilePath);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[3].mStatus, cpt.mFileCheckpoints[3].mStatus);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[3].mDevInode, cpt.mFileCheckpoints[3].mDevInode);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints[3].mSignatureHash, cpt.mFileCheckpoints[3].mSignatureHash);
@@ -655,39 +645,6 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
     }
 }
 
-void InputStaticFileCheckpointManagerUnittest::TestUpdateRealFilePath() const {
-    filesystem::create_directories("test_logs");
-    filesystem::path testFile = "./test_logs/test_file.log";
-    string content = string(2000, 'a') + "\n";
-    {
-        ofstream fout(testFile, std::ios_base::binary);
-        fout << content;
-    }
-
-    optional<vector<filesystem::path>> filesOpt({testFile});
-    sManager->CreateCheckpoint("test_config", 0, filesOpt);
-
-    // Update real file path
-    filesystem::path newPath = "./test_logs/test_file_new.log";
-    APSARA_TEST_TRUE(sManager->UpdateCurrentFileRealPath("test_config", 0, newPath));
-
-    // Check that real_filepath is updated
-    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    APSARA_TEST_EQUAL(newPath, cpt.mFileCheckpoints[0].mRealFilePath);
-
-    // Check that GetCurrentFileFingerprint returns updated path
-    FileFingerprint fingerprint;
-    sManager->GetCurrentFileFingerprint("test_config", 0, &fingerprint);
-    APSARA_TEST_EQUAL(newPath, fingerprint.mFilePath);
-
-    // Verify serialization includes real_filepath
-    InputStaticFileCheckpoint cptLoaded;
-    sManager->LoadCheckpointFile(sManager->mCheckpointRootPath / "test_config@0.json", &cptLoaded);
-    APSARA_TEST_EQUAL(newPath, cptLoaded.mFileCheckpoints[0].mRealFilePath);
-
-    filesystem::remove_all("test_logs");
-}
-
 void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
     filesystem::create_directories("test_logs");
     filesystem::path testFile = "./test_logs/test_file.log";
@@ -721,48 +678,12 @@ void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
     filesystem::remove_all("test_logs");
 }
 
-void InputStaticFileCheckpointManagerUnittest::TestSerializationWithRealFilePath() const {
-    filesystem::create_directories("test_logs");
-    filesystem::path testFile = "./test_logs/test_file.log";
-    string content = string(2000, 'a') + "\n";
-    {
-        ofstream fout(testFile, std::ios_base::binary);
-        fout << content;
-    }
-
-    optional<vector<filesystem::path>> filesOpt({testFile});
-    sManager->CreateCheckpoint("test_config", 0, filesOpt);
-
-    // Update real file path
-    filesystem::path newPath = "./test_logs/test_file_rotated.log";
-    sManager->UpdateCurrentFileRealPath("test_config", 0, newPath);
-
-    // Serialize and deserialize
-    sManager->DumpAllCheckpointFiles();
-    InputStaticFileCheckpoint cptLoaded;
-    APSARA_TEST_TRUE(sManager->LoadCheckpointFile(sManager->mCheckpointRootPath / "test_config@0.json", &cptLoaded));
-
-    // Verify all fields are preserved
-    const auto& originalCpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mFilePath, cptLoaded.mFileCheckpoints[0].mFilePath);
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mRealFilePath, cptLoaded.mFileCheckpoints[0].mRealFilePath);
-    APSARA_TEST_EQUAL(newPath, cptLoaded.mFileCheckpoints[0].mRealFilePath);
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mSize, cptLoaded.mFileCheckpoints[0].mSize);
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mDevInode, cptLoaded.mFileCheckpoints[0].mDevInode);
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mSignatureHash, cptLoaded.mFileCheckpoints[0].mSignatureHash);
-    APSARA_TEST_EQUAL(originalCpt.mFileCheckpoints[0].mSignatureSize, cptLoaded.mFileCheckpoints[0].mSignatureSize);
-
-    filesystem::remove_all("test_logs");
-}
-
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpointMap)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpoint)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestCheckpointFileNames)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestDumpCheckpoints)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestInvalidCheckpointFile)
-UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateRealFilePath)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestSizeRemainsConstant)
-UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestSerializationWithRealFilePath)
 
 } // namespace logtail
 

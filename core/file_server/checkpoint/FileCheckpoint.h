@@ -38,7 +38,6 @@ FileStatus GetFileStatusFromString(const std::string& status);
 
 struct FileCheckpoint {
     std::filesystem::path mFilePath;
-    std::filesystem::path mRealFilePath; // 实际采集的文件路径，用于文件轮转场景
     // std::string mRealFileName;
     DevInode mDevInode;
     uint64_t mSignatureHash = 0;
@@ -54,11 +53,7 @@ struct FileCheckpoint {
                    const DevInode& devInode,
                    uint64_t signatureHash,
                    uint32_t signatureSize)
-        : mFilePath(filename),
-          mRealFilePath(filename),
-          mDevInode(devInode),
-          mSignatureHash(signatureHash),
-          mSignatureSize(signatureSize) {}
+        : mFilePath(filename), mDevInode(devInode), mSignatureHash(signatureHash), mSignatureSize(signatureSize) {}
 };
 
 struct FileFingerprint {

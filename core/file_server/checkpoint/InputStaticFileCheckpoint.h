@@ -44,7 +44,6 @@ public:
                               uint32_t expireTime = 0);
 
     bool UpdateCurrentFileCheckpoint(uint64_t offset, bool& needDump);
-    bool UpdateCurrentFileRealPath(const std::filesystem::path& realPath, bool& needDump);
     bool InvalidateCurrentFileCheckpoint();
     bool GetCurrentFileFingerprint(FileFingerprint* cpt);
     void SetAbort();

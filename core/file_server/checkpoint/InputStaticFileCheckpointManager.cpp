@@ -213,31 +213,6 @@ bool InputStaticFileCheckpointManager::UpdateCurrentFileCheckpoint(const string&
     return true;
 }
 
-bool InputStaticFileCheckpointManager::UpdateCurrentFileRealPath(const string& configName,
-                                                                 size_t idx,
-                                                                 const filesystem::path& realPath) {
-    lock_guard<mutex> lock(mUpdateMux);
-    auto it = mInputCheckpointMap.find(make_pair(configName, idx));
-    if (it == mInputCheckpointMap.end()) {
-        // should not happen
-        return false;
-    }
-    bool needDump = false;
-    if (!it->second.UpdateCurrentFileRealPath(realPath, needDump)) {
-        // should not happen
-        return false;
-    }
-    if (needDump) {
-        if (!DumpCheckpointFile(it->second)) {
-            LOG_WARNING(sLogger,
-                        ("failed to update real file path",
-                         "failed to dump checkpoint file")("config", configName)("input idx", idx));
-            return false;
-        }
-    }
-    return true;
-}
-
 bool InputStaticFileCheckpointManager::InvalidateCurrentFileCheckpoint(const string& configName, size_t idx) {
     lock_guard<mutex> lock(mUpdateMux);
     auto it = mInputCheckpointMap.find(make_pair(configName, idx));

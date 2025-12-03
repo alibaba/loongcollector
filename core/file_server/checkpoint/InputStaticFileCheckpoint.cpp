@@ -119,23 +119,6 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, boo
     }
 }
 
-bool InputStaticFileCheckpoint::UpdateCurrentFileRealPath(const std::filesystem::path& realPath, bool& needDump) {
-    if (mCurrentFileIndex >= mFileCheckpoints.size()) {
-        // should not happen
-        return false;
-    }
-    needDump = false;
-    auto& fileCpt = mFileCheckpoints[mCurrentFileIndex];
-    if (fileCpt.mRealFilePath != realPath) {
-        fileCpt.mRealFilePath = realPath;
-        needDump = true;
-        LOG_INFO(sLogger,
-                 ("update real file path, config", mConfigName)("input idx", mInputIdx)(
-                     "current file idx", mCurrentFileIndex)("real filepath", realPath.string()));
-    }
-    return true;
-}
-
 bool InputStaticFileCheckpoint::InvalidateCurrentFileCheckpoint() {
     if (mCurrentFileIndex >= mFileCheckpoints.size()) {
         // should not happen
@@ -173,8 +156,7 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
         return false;
     }
     auto& fileCpt = mFileCheckpoints[mCurrentFileIndex];
-    // 优先使用 mRealFilePath（如果存在），用于文件轮转场景
-    cpt->mFilePath = fileCpt.mRealFilePath.empty() ? fileCpt.mFilePath : fileCpt.mRealFilePath;
+    cpt->mFilePath = fileCpt.mFilePath;
     cpt->mDevInode = fileCpt.mDevInode;
     cpt->mSignatureHash = fileCpt.mSignatureHash;
     cpt->mSignatureSize = fileCpt.mSignatureSize;
@@ -215,7 +197,6 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
         files.append(Json::objectValue);
         auto& file = files[files.size() - 1];
         file["filepath"] = cpt.mFilePath.string();
-        file["real_filepath"] = cpt.mRealFilePath.string();
         file["status"] = FileStatusToString(cpt.mStatus);
         switch (cpt.mStatus) {
             case FileStatus::WAITING:
@@ -326,14 +307,6 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
         }
         cpt.mFilePath = ConvertAndNormalizeNativePath(filepath);
 
-        // 读取 real_filepath，如果不存在则使用 filepath（向后兼容）
-        string realFilepath;
-        if (GetOptionalStringParam(fileCpt, outerKey + ".real_filepath", realFilepath, *errMsg)) {
-            cpt.mRealFilePath = ConvertAndNormalizeNativePath(realFilepath);
-        } else {
-            cpt.mRealFilePath = cpt.mFilePath;
-        }
-
         string statusStr;
         if (!GetMandatoryStringParam(fileCpt, outerKey + ".status", statusStr, *errMsg)) {
             return false;
@@ -416,7 +389,6 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
 string buildFileInfoJson(const FileCheckpoint& cpt) {
     Json::Value fileInfo;
     fileInfo["filepath"] = cpt.mFilePath.string();
-    fileInfo["real_filepath"] = cpt.mRealFilePath.string();
     fileInfo["status"] = FileStatusToString(cpt.mStatus);
     fileInfo["dev"] = cpt.mDevInode.dev;
     fileInfo["inode"] = cpt.mDevInode.inode;

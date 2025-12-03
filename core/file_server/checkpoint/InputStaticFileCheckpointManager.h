@@ -49,7 +49,6 @@ public:
                           uint32_t expireTime = 0);
     bool DeleteCheckpoint(const std::string& configName, size_t idx);
     bool UpdateCurrentFileCheckpoint(const std::string& configName, size_t idx, uint64_t offset);
-    bool UpdateCurrentFileRealPath(const std::string& configName, size_t idx, const std::filesystem::path& realPath);
     bool InvalidateCurrentFileCheckpoint(const std::string& configName, size_t idx);
     bool GetCurrentFileFingerprint(const std::string& configName, size_t idx, FileFingerprint* cpt);
 

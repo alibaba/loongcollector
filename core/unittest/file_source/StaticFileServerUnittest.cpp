@@ -31,7 +31,6 @@ public:
     void TestClearUnusedCheckpoints() const;
     void TestSetExpectedFileSize() const;
     void TestFileRotationDetection() const;
-    void TestUpdateRealFilePath() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -284,59 +283,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     // Get reader - should find rotated file by devinode
     auto reader = sServer->GetNextAvailableReader("test_config", 0);
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
-
-    // Check that real_filepath is updated in checkpoint
-    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    APSARA_TEST_EQUAL(rotatedFile, cpt.mFileCheckpoints[0].mRealFilePath);
-
-    sServer->RemoveInput("test_config", 0);
-    filesystem::remove_all("test_logs");
-}
-
-void StaticFileServerUnittest::TestUpdateRealFilePath() const {
-    // prepare test log
-    filesystem::create_directories("test_logs");
-    filesystem::path testFile = filesystem::absolute("./test_logs/test_file.log");
-    string content = string(2000, 'a') + "\n";
-    {
-        ofstream fout(testFile, ios::binary);
-        fout << content;
-    }
-
-    // build input
-    CollectionPipeline p;
-    p.mName = "test_config";
-    p.mPluginID.store(0);
-    CollectionPipelineContext ctx;
-    ctx.SetConfigName("test_config");
-    ctx.SetPipeline(p);
-
-    optional<vector<filesystem::path>> filesOpt({testFile});
-    FileDiscoveryOptions discoveryOpts;
-    FileReaderOptions readerOpts;
-    readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
-    MultilineOptions multilineOpts;
-    FileTagOptions fileTagOpts;
-
-    sServer->AddInput("test_config", 0, filesOpt, &discoveryOpts, &readerOpts, &multilineOpts, &fileTagOpts, &ctx);
-    sServer->UpdateInputs();
-
-    // Get reader
-    auto reader = sServer->GetNextAvailableReader("test_config", 0);
-    APSARA_TEST_NOT_EQUAL(nullptr, reader);
-
-    // Update real file path
-    filesystem::path newPath = filesystem::absolute("./test_logs/test_file_new.log");
-    sManager->UpdateCurrentFileRealPath("test_config", 0, newPath);
-
-    // Check that real_filepath is updated
-    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    APSARA_TEST_EQUAL(newPath, cpt.mFileCheckpoints[0].mRealFilePath);
-
-    // Check that GetCurrentFileFingerprint returns updated path
-    FileFingerprint fingerprint;
-    sManager->GetCurrentFileFingerprint("test_config", 0, &fingerprint);
-    APSARA_TEST_EQUAL(newPath, fingerprint.mFilePath);
+    APSARA_TEST_EQUAL(rotatedFile, reader->GetHostLogPath());
 
     sServer->RemoveInput("test_config", 0);
     filesystem::remove_all("test_logs");
@@ -347,7 +294,6 @@ UNIT_TEST_CASE(StaticFileServerUnittest, TestUpdateInputs)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestClearUnusedCheckpoints)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestSetExpectedFileSize)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestFileRotationDetection)
-UNIT_TEST_CASE(StaticFileServerUnittest, TestUpdateRealFilePath)
 
 } // namespace logtail
 

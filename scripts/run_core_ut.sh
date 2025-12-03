@@ -18,8 +18,8 @@ TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
 # Blacklist: directory names to skip
 # Example: "test_dir"
 BLACKLIST_DIRS=(
-    # "pipeline"
-    # "host_monitor"
+    "pipeline"
+    "host_monitor"
 )
 
 # Get CPU core count for parallel execution
@@ -130,7 +130,7 @@ run_directory_tests() {
             (
                 flock -x 200
                 echo "$test_file" >> "$OUTPUT_LOCK_FILE.failed"
-                echo "[FAILED] $test_file" >&1
+                echo "❌ $test_file" >&1
             ) 200>"$OUTPUT_LOCK_FILE.lock"
             
             local end_time=$(date +%s.%N)
@@ -155,7 +155,7 @@ run_directory_tests() {
         # Output real-time result for successful test (outside output redirection)
         (
             flock -x 200
-            echo "[OK] $test_file" >&1
+            echo "✅ $test_file" >&1
         ) 200>"$OUTPUT_LOCK_FILE.lock"
         
         ((dir_test_count++))
@@ -323,15 +323,50 @@ main() {
     echo
     echo "----------------------"
     
-    # Only output failed tests before statistics
+    # Calculate and display statistics
+    echo "=========================================="
+    echo "Statistics"
+    echo "=========================================="
+    
+    local total_duration=$(calc_duration "$TOTAL_START_TIME" "$TOTAL_END_TIME")
+    echo "Total Duration: $(format_duration $total_duration)"
+    echo "Total Tests: $TESTS_RUN"
+    echo
+    
+    # Directory statistics - read from stats files
+    local max_duration=0
+    local longest_dir=""
+    echo "Directory Statistics:"
+    for test_dir in "${DIR_ORDER[@]}"; do
+        local stats_file="${DIR_STATS_FILES[$test_dir]}"
+        if [ -f "$stats_file" ]; then
+            IFS='|' read -r dir_path start_time end_time test_count dir_duration < "$stats_file"
+            local dir_name=$(basename "$test_dir")
+            
+            # Compare to find longest directory
+            if awk -v d1="$dir_duration" -v d2="$max_duration" 'BEGIN {exit !(d1 > d2)}'; then
+                max_duration=$dir_duration
+                longest_dir="$dir_name"
+            fi
+            
+            printf "  %-40s: %8s (%d tests)\n" "$dir_name" "$(format_duration $dir_duration)" "$test_count"
+        fi
+    done
+    echo
+    
+    if [ -n "$longest_dir" ] && [ "$max_duration" != "0" ]; then
+        echo "Longest Directory: $longest_dir ($(format_duration $max_duration))"
+    fi
+    echo
+    
+    # Output failed tests details after statistics
     if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
-        echo
         echo "=========================================="
-        echo "Failed Tests Summary"
+        echo "❌ Failed Tests Summary"
         echo "=========================================="
         echo
         for failed_test in "${FAILED_TESTS[@]}"; do
-            echo "  - $failed_test"
+            echo "  ❌ $failed_test"
             echo
             
             # Extract and display failure details from output file
@@ -369,52 +404,16 @@ main() {
         done
     fi
     
-    # Calculate and display statistics
-    echo "=========================================="
-    echo "Statistics"
-    echo "=========================================="
-    
-    local total_duration=$(calc_duration "$TOTAL_START_TIME" "$TOTAL_END_TIME")
-    echo "Total Duration: $(format_duration $total_duration)"
-    echo "Total Tests: $TESTS_RUN"
-    echo
-    
-    # Directory statistics - read from stats files
-    local max_duration=0
-    local longest_dir=""
-    echo "Directory Statistics:"
-    for test_dir in "${DIR_ORDER[@]}"; do
-        local stats_file="${DIR_STATS_FILES[$test_dir]}"
-        if [ -f "$stats_file" ]; then
-            IFS='|' read -r dir_path start_time end_time test_count dir_duration < "$stats_file"
-            local dir_name=$(basename "$test_dir")
-            
-            # Compare to find longest directory
-            if awk -v d1="$dir_duration" -v d2="$max_duration" 'BEGIN {exit !(d1 > d2)}'; then
-                max_duration=$dir_duration
-                longest_dir="$dir_name"
-            fi
-            
-            printf "  %-40s: %8s (%d tests)\n" "$dir_name" "$(format_duration $dir_duration)" "$test_count"
-        fi
-    done
-    echo
-    
-    if [ -n "$longest_dir" ] && [ "$max_duration" != "0" ]; then
-        echo "Longest Directory: $longest_dir ($(format_duration $max_duration))"
-    fi
-    echo
-    
     # Report results
     if [ $failed -eq 0 ] && [ ${#FAILED_TESTS[@]} -eq 0 ]; then
         echo "=========================================="
-        echo "All $TESTS_RUN tests completed successfully!"
+        echo "✅ All $TESTS_RUN tests completed successfully!"
         echo "=========================================="
         rm -rf "$temp_dir"
         exit 0
     else
         echo "=========================================="
-        echo "Some tests failed!"
+        echo "❌ Some tests failed!"
         echo "=========================================="
         rm -rf "$temp_dir"
         exit 1

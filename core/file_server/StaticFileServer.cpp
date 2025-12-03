@@ -187,11 +187,6 @@ void StaticFileServer::ReadFiles() {
                     }
                     InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileCheckpoint(
                         configName, inputIdx, reader->GetLastFilePos());
-                    // 更新实际文件路径（如果 reader 的路径发生变化）
-                    if (reader->GetRealLogPath() != reader->GetHostLogPath()) {
-                        InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileRealPath(
-                            configName, inputIdx, reader->GetRealLogPath());
-                    }
                     if (!moreData) {
                         reader = nullptr;
                         skip = true;
@@ -230,10 +225,6 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
                 LOG_INFO(sLogger,
                          ("file rotated, found new path", "")("config", configName)("input idx", idx)(
                              "old path", fingerprint.mFilePath.string())("new path", filePath.string()));
-                // 更新 checkpoint 中的 real_filepath
-                InputStaticFileCheckpointManager::GetInstance()->UpdateCurrentFileRealPath(configName, idx, filePath);
-                // 同时更新 fingerprint，方便后续使用
-                fingerprint.mFilePath = filePath;
             } else {
                 errMsg = "file not found and cannot find rotated file";
             }
