@@ -61,6 +61,7 @@ public:
     void UpdateConnState(struct conn_ctrl_event_t* event, bool& isClose);
 
     [[nodiscard]] size_t GetContainerIdKey() const { return mCidKey; }
+    [[nodiscard]] support_proto_e GetProtocol() const { return mProtocol; }
 
     const StaticDataRow<&kConnTrackerTable>& GetConnTrackerAttrs() { return mTags; }
 
@@ -158,6 +159,7 @@ public:
 
     void MarkConnDeleted() { mMetaFlags.fetch_or(kSFlagConnDeleted, std::memory_order_release); }
 
+
     static std::string gSelfPodName;
     static std::string gSelfPodIp;
 
@@ -190,8 +192,6 @@ private:
     void MarkPeerMetaAttached() { mMetaFlags.fetch_or(kSFlagPeerMetaAttached, std::memory_order_release); }
     void MarkL4MetaAttached() { mMetaFlags.fetch_or(kSFlagL4MetaAttached, std::memory_order_release); }
     void MarkL7MetaAttached() { mMetaFlags.fetch_or(kSFlagL7MetaAttached, std::memory_order_release); }
-
-    [[nodiscard]] support_proto_e GetProtocol() const { return mProtocol; }
 
     void MarkClose() {
         this->mIsClose = true;
