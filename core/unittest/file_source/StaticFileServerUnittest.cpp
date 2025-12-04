@@ -229,6 +229,7 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     APSARA_TEST_EQUAL(static_cast<uint64_t>(content.size()), fingerprint.mSize);
 
     sServer->RemoveInput("test_config", 0);
+    sServer->UpdateInputs();
     filesystem::remove_all("test_logs");
 }
 
@@ -286,6 +287,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     APSARA_TEST_EQUAL(rotatedFile, reader->GetHostLogPath());
 
     sServer->RemoveInput("test_config", 0);
+    sServer->UpdateInputs();
     filesystem::remove_all("test_logs");
 }
 
