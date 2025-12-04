@@ -95,6 +95,7 @@ public:
     void TestParseMetricEventWithValue();
     void TestParseMetricEventDoubleValue();
     void TestParseMetricEventInvalidTagsWireType();
+    void TestParseMetricEventInvalidMetadataWireType();
     void TestParseMetricEventInvalidValueWireType();
     void TestParseMetricEventMultipleEvents();
 
@@ -247,10 +248,16 @@ public:
     void TestMetricValueReadTagFailed();
     void TestLogContentUnknownField();
     void TestMetricTagsUnknownField();
+    void TestMetricMetadataUnknownField();
     void TestSpanTagsUnknownField();
     void TestSpanScopeTagsUnknownField();
     void TestSpanInnerEventReadTimestampFailed();
     void TestSpanLinkReadTraceIdFailed();
+
+    // Timestamp conversion tests
+    void TestLogEventTimestampNanosecondConversion();
+    void TestMetricEventTimestampNanosecondConversion();
+    void TestSpanEventTimestampNanosecondConversion();
 
 protected:
     void SetUp() override {}
@@ -499,7 +506,8 @@ protected:
                                                   const std::string& name,
                                                   const std::vector<std::pair<std::string, std::string>>& tags,
                                                   double value = 0.0,
-                                                  bool hasValue = false) {
+                                                  bool hasValue = false,
+                                                  const std::vector<std::pair<std::string, std::string>>& metadata = {}) {
         std::vector<uint8_t> result;
 
         // field 1: timestamp (varint)
@@ -534,6 +542,17 @@ protected:
             auto valueLen = encodeVarint32(valueData.size());
             result.insert(result.end(), valueLen.begin(), valueLen.end());
             result.insert(result.end(), valueData.begin(), valueData.end());
+        }
+
+        // field 5: metadata (repeated, length-delimited, map<string, bytes>)
+        for (const auto& meta : metadata) {
+            auto metadataTag = encodeVarint32(encodeTag(5, 2)); // field 5, wire type 2 (length-delimited)
+            result.insert(result.end(), metadataTag.begin(), metadataTag.end());
+
+            auto metadataData = encodeMetricTag(meta.first, meta.second);
+            auto metadataLen = encodeVarint32(metadataData.size());
+            result.insert(result.end(), metadataLen.begin(), metadataLen.end());
+            result.insert(result.end(), metadataData.begin(), metadataData.end());
         }
 
         return result;
@@ -1491,7 +1510,7 @@ void ManualPBParserUnittest::TestParseMetricEventsInvalidWireType() {
 void ManualPBParserUnittest::TestParseLogEventComplete() {
     // Create a complete LogEvent with all fields
     vector<pair<string, string>> contents = {{"key1", "value1"}, {"key2", "value2"}, {"message", "test log message"}};
-    auto logEventData = encodeLogEvent(1234567890, contents, "INFO", 1024, 512);
+    auto logEventData = encodeLogEvent(1234567890000000000ULL, contents, "INFO", 1024, 512);
 
     vector<vector<uint8_t>> logEvents = {logEventData};
     auto data = encodePipelineEventGroupWithLogs(logEvents);
@@ -1521,7 +1540,7 @@ void ManualPBParserUnittest::TestParseLogEventComplete() {
 void ManualPBParserUnittest::TestParseLogEventMinimalFields() {
     // Create a minimal LogEvent with only timestamp (no contents)
     vector<pair<string, string>> contents; // Empty contents
-    auto logEventData = encodeLogEvent(9876543210ULL, contents);
+    auto logEventData = encodeLogEvent(1700000000000000000ULL, contents);
 
     vector<vector<uint8_t>> logEvents = {logEventData};
     auto data = encodePipelineEventGroupWithLogs(logEvents);
@@ -1535,7 +1554,9 @@ void ManualPBParserUnittest::TestParseLogEventMinimalFields() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
-    APSARA_TEST_EQUAL(9876543210ULL, logEvent.GetTimestamp());
+    APSARA_TEST_EQUAL(1700000000ULL, logEvent.GetTimestamp());
+    APSARA_TEST_TRUE(logEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(0U, logEvent.GetTimestampNanosecond().value());
 }
 
 // Test case 21: ParseLogEvent_WithContents - LogEvent with multiple contents
@@ -1671,13 +1692,13 @@ void ManualPBParserUnittest::TestParseLogEventInvalidContentWireType() {
 void ManualPBParserUnittest::TestParseLogEventMultipleEvents() {
     // Create multiple LogEvents
     vector<pair<string, string>> contents1 = {{"event", "first"}};
-    auto logEvent1Data = encodeLogEvent(1000000000ULL, contents1, "INFO");
+    auto logEvent1Data = encodeLogEvent(1000000000000000000ULL, contents1, "INFO");
 
     vector<pair<string, string>> contents2 = {{"event", "second"}};
-    auto logEvent2Data = encodeLogEvent(2000000000ULL, contents2, "WARN");
+    auto logEvent1Data = encodeLogEvent(2000000000000000000ULL, contents1, "INFO");
 
     vector<pair<string, string>> contents3 = {{"event", "third"}};
-    auto logEvent3Data = encodeLogEvent(3000000000ULL, contents3, "ERROR");
+    auto logEvent1Data = encodeLogEvent(3000000000000000000ULL, contents1, "INFO");
 
     vector<vector<uint8_t>> logEvents = {logEvent1Data, logEvent2Data, logEvent3Data};
     auto data = encodePipelineEventGroupWithLogs(logEvents);
@@ -1715,9 +1736,10 @@ void ManualPBParserUnittest::TestParseLogEventMultipleEvents() {
 
 // Test case 27: ParseMetricEvent_Complete - Complete MetricEvent with all fields
 void ManualPBParserUnittest::TestParseMetricEventComplete() {
-    // Create a complete MetricEvent with all fields
+    // Create a complete MetricEvent with all fields including Metadata
     vector<pair<string, string>> tags = {{"host", "server1"}, {"region", "us-west"}, {"env", "prod"}};
-    auto metricEventData = encodeMetricEvent(1234567890ULL, "cpu_usage", tags, 75.5, true);
+    vector<pair<string, string>> metadata = {{"source", "monitoring"}, {"version", "1.0"}, {"component", "cpu"}};
+    auto metricEventData = encodeMetricEvent(1234567890000000000ULL, "cpu_usage", tags, 75.5, true, metadata);
 
     vector<vector<uint8_t>> metricEvents = {metricEventData};
     auto data = encodePipelineEventGroupWithMetrics(metricEvents);
@@ -1744,13 +1766,21 @@ void ManualPBParserUnittest::TestParseMetricEventComplete() {
 
     // Verify value
     APSARA_TEST_EQUAL(75.5, metricEvent.GetValue<UntypedSingleValue>()->mValue);
+
+    // Verify metadata
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("source"));
+    APSARA_TEST_EQUAL("monitoring", metricEvent.GetMetadata("source").to_string());
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("version"));
+    APSARA_TEST_EQUAL("1.0", metricEvent.GetMetadata("version").to_string());
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("component"));
+    APSARA_TEST_EQUAL("cpu", metricEvent.GetMetadata("component").to_string());
 }
 
 // Test case 28: ParseMetricEvent_MinimalFields - MetricEvent with only timestamp and name
 void ManualPBParserUnittest::TestParseMetricEventMinimalFields() {
     // Create a minimal MetricEvent with only timestamp and name
     vector<pair<string, string>> tags; // Empty tags
-    auto metricEventData = encodeMetricEvent(9876543210ULL, "request_count", tags, 0.0, false);
+    auto metricEventData = encodeMetricEvent(1700000000000000000ULL, "request_count", tags, 0.0, false);
 
     vector<vector<uint8_t>> metricEvents = {metricEventData};
     auto data = encodePipelineEventGroupWithMetrics(metricEvents);
@@ -1764,19 +1794,22 @@ void ManualPBParserUnittest::TestParseMetricEventMinimalFields() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
-    APSARA_TEST_EQUAL(9876543210ULL, metricEvent.GetTimestamp());
+    APSARA_TEST_EQUAL(1700000000ULL, metricEvent.GetTimestamp());
+    APSARA_TEST_TRUE(metricEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(0U, metricEvent.GetTimestampNanosecond().value());
     APSARA_TEST_EQUAL("request_count", metricEvent.GetName().to_string());
 }
 
 // Test case 29: ParseMetricEvent_WithTags - MetricEvent with multiple tags
 void ManualPBParserUnittest::TestParseMetricEventWithTags() {
-    // Create MetricEvent with multiple tags
+    // Create MetricEvent with multiple tags and metadata
     vector<pair<string, string>> tags = {{"service", "web-api"},
                                          {"instance", "i-1234567"},
                                          {"az", "az-1a"},
                                          {"version", "v2.1.0"},
                                          {"team", "platform"}};
-    auto metricEventData = encodeMetricEvent(1111111111ULL, "response_time", tags, 0.0, false);
+    vector<pair<string, string>> metadata = {{"source", "api-gateway"}, {"environment", "production"}};
+    auto metricEventData = encodeMetricEvent(1111111111ULL, "response_time", tags, 0.0, false, metadata);
 
     vector<vector<uint8_t>> metricEvents = {metricEventData};
     auto data = encodePipelineEventGroupWithMetrics(metricEvents);
@@ -1797,12 +1830,19 @@ void ManualPBParserUnittest::TestParseMetricEventWithTags() {
     APSARA_TEST_EQUAL("az-1a", metricEvent.GetTag("az").to_string());
     APSARA_TEST_EQUAL("v2.1.0", metricEvent.GetTag("version").to_string());
     APSARA_TEST_EQUAL("platform", metricEvent.GetTag("team").to_string());
+
+    // Verify metadata
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("source"));
+    APSARA_TEST_EQUAL("api-gateway", metricEvent.GetMetadata("source").to_string());
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("environment"));
+    APSARA_TEST_EQUAL("production", metricEvent.GetMetadata("environment").to_string());
 }
 
 // Test case 30: ParseMetricEvent_WithValue - MetricEvent with untyped_single_value
 void ManualPBParserUnittest::TestParseMetricEventWithValue() {
     vector<pair<string, string>> tags = {{"metric", "test"}};
-    auto metricEventData = encodeMetricEvent(2000000000ULL, "memory_usage", tags, 85.25, true);
+    vector<pair<string, string>> metadata = {{"unit", "bytes"}, {"type", "gauge"}};
+    auto metricEventData = encodeMetricEvent(2000000000ULL, "memory_usage", tags, 85.25, true, metadata);
 
     vector<vector<uint8_t>> metricEvents = {metricEventData};
     auto data = encodePipelineEventGroupWithMetrics(metricEvents);
@@ -1818,6 +1858,12 @@ void ManualPBParserUnittest::TestParseMetricEventWithValue() {
     const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
     APSARA_TEST_EQUAL("memory_usage", metricEvent.GetName().to_string());
     APSARA_TEST_EQUAL(85.25, metricEvent.GetValue<UntypedSingleValue>()->mValue);
+
+    // Verify metadata
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("unit"));
+    APSARA_TEST_EQUAL("bytes", metricEvent.GetMetadata("unit").to_string());
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("type"));
+    APSARA_TEST_EQUAL("gauge", metricEvent.GetMetadata("type").to_string());
 }
 
 // Test case 31: ParseMetricEvent_DoubleValue - Test double value conversion (IEEE 754)
@@ -1880,7 +1926,42 @@ void ManualPBParserUnittest::TestParseMetricEventInvalidTagsWireType() {
     APSARA_TEST_TRUE(!errMsg.empty());
 }
 
-// Test case 33: ParseMetricEvent_InvalidValueWireType - Value with wrong wire type
+// Test case 33: ParseMetricEvent_InvalidMetadataWireType - Metadata with wrong wire type
+void ManualPBParserUnittest::TestParseMetricEventInvalidMetadataWireType() {
+    // Manually construct MetricEvent with invalid metadata wire type
+    vector<uint8_t> metricEventData;
+
+    // field 1: timestamp
+    auto timestampTag = encodeVarint32(encodeTag(1, 0));
+    metricEventData.insert(metricEventData.end(), timestampTag.begin(), timestampTag.end());
+    auto timestampData = encodeVarint64(1234567890ULL);
+    metricEventData.insert(metricEventData.end(), timestampData.begin(), timestampData.end());
+
+    // field 2: name
+    auto nameTag = encodeVarint32(encodeTag(2, 2));
+    metricEventData.insert(metricEventData.end(), nameTag.begin(), nameTag.end());
+    auto nameData = encodeLengthDelimited("test_metric");
+    metricEventData.insert(metricEventData.end(), nameData.begin(), nameData.end());
+
+    // field 5: metadata with WRONG wire type (varint instead of length-delimited)
+    auto metadataTag = encodeVarint32(encodeTag(5, 0)); // wire type 0 (varint) - WRONG!
+    metricEventData.insert(metricEventData.end(), metadataTag.begin(), metadataTag.end());
+    metricEventData.push_back(0x01); // Some varint value
+
+    vector<vector<uint8_t>> metricEvents = {metricEventData};
+    auto data = encodePipelineEventGroupWithMetrics(metricEvents);
+
+    ManualPBParser parser(data.data(), data.size(), false);
+    auto sourceBuffer = make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    string errMsg;
+
+    APSARA_TEST_FALSE_DESC(parser.ParsePipelineEventGroup(eventGroup, errMsg),
+                           "Should fail with invalid metadata wire type");
+    APSARA_TEST_TRUE(!errMsg.empty());
+}
+
+// Test case 34: ParseMetricEvent_InvalidValueWireType - Value with wrong wire type
 void ManualPBParserUnittest::TestParseMetricEventInvalidValueWireType() {
     // Manually construct MetricEvent with invalid value wire type
     vector<uint8_t> metricEventData;
@@ -1915,17 +1996,20 @@ void ManualPBParserUnittest::TestParseMetricEventInvalidValueWireType() {
     APSARA_TEST_TRUE(!errMsg.empty());
 }
 
-// Test case 34: ParseMetricEvent_MultipleEvents - Multiple MetricEvents
+// Test case 35: ParseMetricEvent_MultipleEvents - Multiple MetricEvents
 void ManualPBParserUnittest::TestParseMetricEventMultipleEvents() {
-    // Create multiple MetricEvents
+    // Create multiple MetricEvents with metadata
     vector<pair<string, string>> tags1 = {{"host", "server1"}};
-    auto metricEvent1Data = encodeMetricEvent(1000000000ULL, "cpu_usage", tags1, 50.0, true);
+    vector<pair<string, string>> metadata1 = {{"datacenter", "dc1"}};
+    auto metricEvent1Data = encodeMetricEvent(1000000000000000000ULL, "cpu_usage", tags1, 50.0, true, metadata1);
 
     vector<pair<string, string>> tags2 = {{"host", "server2"}};
-    auto metricEvent2Data = encodeMetricEvent(2000000000ULL, "memory_usage", tags2, 70.0, true);
+    vector<pair<string, string>> metadata2 = {{"datacenter", "dc2"}};
+    auto metricEvent2Data = encodeMetricEvent(2000000000000000000ULL, "memory_usage", tags2, 70.0, true, metadata2);
 
     vector<pair<string, string>> tags3 = {{"host", "server3"}};
-    auto metricEvent3Data = encodeMetricEvent(3000000000ULL, "disk_usage", tags3, 90.0, true);
+    vector<pair<string, string>> metadata3 = {{"datacenter", "dc3"}};
+    auto metricEvent3Data = encodeMetricEvent(3000000000000000000ULL, "disk_usage", tags3, 90.0, true, metadata3);
 
     vector<vector<uint8_t>> metricEvents = {metricEvent1Data, metricEvent2Data, metricEvent3Data};
     auto data = encodePipelineEventGroupWithMetrics(metricEvents);
@@ -1944,6 +2028,8 @@ void ManualPBParserUnittest::TestParseMetricEventMultipleEvents() {
     APSARA_TEST_EQUAL("cpu_usage", metricEvent1.GetName().to_string());
     APSARA_TEST_EQUAL("server1", metricEvent1.GetTag("host").to_string());
     APSARA_TEST_EQUAL(50.0, metricEvent1.GetValue<UntypedSingleValue>()->mValue);
+    APSARA_TEST_TRUE(metricEvent1.HasMetadata("datacenter"));
+    APSARA_TEST_EQUAL("dc1", metricEvent1.GetMetadata("datacenter").to_string());
 
     // Verify second event
     const auto& metricEvent2 = eventGroup.GetEvents()[1].Cast<MetricEvent>();
@@ -1951,6 +2037,8 @@ void ManualPBParserUnittest::TestParseMetricEventMultipleEvents() {
     APSARA_TEST_EQUAL("memory_usage", metricEvent2.GetName().to_string());
     APSARA_TEST_EQUAL("server2", metricEvent2.GetTag("host").to_string());
     APSARA_TEST_EQUAL(70.0, metricEvent2.GetValue<UntypedSingleValue>()->mValue);
+    APSARA_TEST_TRUE(metricEvent2.HasMetadata("datacenter"));
+    APSARA_TEST_EQUAL("dc2", metricEvent2.GetMetadata("datacenter").to_string());
 
     // Verify third event
     const auto& metricEvent3 = eventGroup.GetEvents()[2].Cast<MetricEvent>();
@@ -1958,13 +2046,15 @@ void ManualPBParserUnittest::TestParseMetricEventMultipleEvents() {
     APSARA_TEST_EQUAL("disk_usage", metricEvent3.GetName().to_string());
     APSARA_TEST_EQUAL("server3", metricEvent3.GetTag("host").to_string());
     APSARA_TEST_EQUAL(90.0, metricEvent3.GetValue<UntypedSingleValue>()->mValue);
+    APSARA_TEST_TRUE(metricEvent3.HasMetadata("datacenter"));
+    APSARA_TEST_EQUAL("dc3", metricEvent3.GetMetadata("datacenter").to_string());
 }
 
 // ============================================================================
 // Category 5: SpanEvent Complete Tests (8 test cases)
 // ============================================================================
 
-// Test case 35: ParseSpanEvent_Complete - Complete SpanEvent with all fields
+// Test case 36: ParseSpanEvent_Complete - Complete SpanEvent with all fields
 void ManualPBParserUnittest::TestParseSpanEventComplete() {
     // Create a complete SpanEvent with all fields
     vector<pair<string, string>> tags = {{"http.method", "GET"}, {"http.url", "/api/users"}};
@@ -2012,7 +2102,7 @@ void ManualPBParserUnittest::TestParseSpanEventComplete() {
     APSARA_TEST_EQUAL("api-service", spanEvent.GetScopeTag("service.name").to_string());
 }
 
-// Test case 36: ParseSpanEvent_MinimalFields - SpanEvent with minimal fields
+// Test case 37: ParseSpanEvent_MinimalFields - SpanEvent with minimal fields
 void ManualPBParserUnittest::TestParseSpanEventMinimalFields() {
     // Create a minimal SpanEvent
     auto spanEventData = encodeSpanEvent(9876543210ULL, // timestamp
@@ -2040,7 +2130,7 @@ void ManualPBParserUnittest::TestParseSpanEventMinimalFields() {
     APSARA_TEST_EQUAL("minimal-span", spanEvent.GetName().to_string());
 }
 
-// Test case 37: ParseSpanEvent_WithTraceInfo - SpanEvent with full trace information
+// Test case 38: ParseSpanEvent_WithTraceInfo - SpanEvent with full trace information
 void ManualPBParserUnittest::TestParseSpanEventWithTraceInfo() {
     auto spanEventData = encodeSpanEvent(1111111111ULL,
                                          "00000000000000000000000000000001",
@@ -2072,7 +2162,7 @@ void ManualPBParserUnittest::TestParseSpanEventWithTraceInfo() {
     APSARA_TEST_EQUAL("0000000000000000", spanEvent.GetParentSpanId().to_string());
 }
 
-// Test case 38: ParseSpanEvent_AllKinds - Test all SpanEvent Kind enum values
+// Test case 39: ParseSpanEvent_AllKinds - Test all SpanEvent Kind enum values
 void ManualPBParserUnittest::TestParseSpanEventAllKinds() {
     // Test all Kind enum values: Unspecified=0, Internal=1, Server=2, Client=3, Producer=4, Consumer=5
     vector<pair<uint32_t, SpanEvent::Kind>> kindTests = {{0, SpanEvent::Kind::Unspecified},
@@ -2100,7 +2190,7 @@ void ManualPBParserUnittest::TestParseSpanEventAllKinds() {
     }
 }
 
-// Test case 39: ParseSpanEvent_AllStatus - Test all SpanEvent Status enum values
+// Test case 40: ParseSpanEvent_AllStatus - Test all SpanEvent Status enum values
 void ManualPBParserUnittest::TestParseSpanEventAllStatus() {
     // Test all Status enum values: Unset=0, Ok=1, Error=2
     vector<pair<uint32_t, SpanEvent::StatusCode>> statusTests
@@ -2134,7 +2224,7 @@ void ManualPBParserUnittest::TestParseSpanEventAllStatus() {
     }
 }
 
-// Test case 40: ParseSpanEvent_WithTags - SpanEvent with multiple tags
+// Test case 41: ParseSpanEvent_WithTags - SpanEvent with multiple tags
 void ManualPBParserUnittest::TestParseSpanEventWithTags() {
     vector<pair<string, string>> tags = {{"http.method", "POST"},
                                          {"http.status_code", "201"},
@@ -2169,7 +2259,7 @@ void ManualPBParserUnittest::TestParseSpanEventWithTags() {
     APSARA_TEST_EQUAL("mydb", spanEvent.GetTag("db.name").to_string());
 }
 
-// Test case 41: ParseSpanEvent_WithScopeTags - SpanEvent with scope tags
+// Test case 42: ParseSpanEvent_WithScopeTags - SpanEvent with scope tags
 void ManualPBParserUnittest::TestParseSpanEventWithScopeTags() {
     vector<pair<string, string>> scopeTags = {{"service.name", "my-service"},
                                               {"service.namespace", "production"},
@@ -2205,7 +2295,7 @@ void ManualPBParserUnittest::TestParseSpanEventWithScopeTags() {
     APSARA_TEST_EQUAL("cpp", spanEvent.GetScopeTag("telemetry.sdk.language").to_string());
 }
 
-// Test case 42: ParseSpanEvent_WithInnerEvents - SpanEvent with inner events
+// Test case 43: ParseSpanEvent_WithInnerEvents - SpanEvent with inner events
 void ManualPBParserUnittest::TestParseSpanEventWithInnerEvents() {
     // Create inner events
     vector<pair<string, string>> innerEventTags1 = {{"error", "timeout"}};
@@ -2260,7 +2350,7 @@ void ManualPBParserUnittest::TestParseSpanEventWithInnerEvents() {
 // Category 6: Map Field Parsing Tests (8 test cases)
 // ============================================================================
 
-// Test case 43: ParseMapField_Empty - Empty map field (no entries)
+// Test case 44: ParseMapField_Empty - Empty map field (no entries)
 void ManualPBParserUnittest::TestParseMapFieldEmpty() {
     // Create a PipelineEventGroup with a LogEvent but no metadata/tags
     // An empty byte array would be invalid, so we need at least one valid field
@@ -2285,7 +2375,7 @@ void ManualPBParserUnittest::TestParseMapFieldEmpty() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 }
 
-// Test case 44: ParseMapField_SingleEntry - Map field with single entry
+// Test case 45: ParseMapField_SingleEntry - Map field with single entry
 void ManualPBParserUnittest::TestParseMapFieldSingleEntry() {
     vector<pair<string, string>> metadata = {{"env", "production"}};
     auto data = encodePipelineEventGroupWithMetadata(metadata);
@@ -2300,7 +2390,7 @@ void ManualPBParserUnittest::TestParseMapFieldSingleEntry() {
     APSARA_TEST_EQUAL("production", eventGroup.GetTag("env").to_string());
 }
 
-// Test case 45: ParseMapField_MultipleEntries - Map field with multiple entries
+// Test case 46: ParseMapField_MultipleEntries - Map field with multiple entries
 void ManualPBParserUnittest::TestParseMapFieldMultipleEntries() {
     vector<pair<string, string>> tags = {{"region", "us-west-2"},
                                          {"cluster", "prod-cluster"},
@@ -2323,7 +2413,7 @@ void ManualPBParserUnittest::TestParseMapFieldMultipleEntries() {
     APSARA_TEST_EQUAL("high", eventGroup.GetTag("priority").to_string());
 }
 
-// Test case 46: ParseMapField_KeyOnlyNoValue - Map entry with only key, no value
+// Test case 47: ParseMapField_KeyOnlyNoValue - Map entry with only key, no value
 void ManualPBParserUnittest::TestParseMapFieldKeyOnlyNoValue() {
     vector<uint8_t> result;
 
@@ -2345,7 +2435,7 @@ void ManualPBParserUnittest::TestParseMapFieldKeyOnlyNoValue() {
     APSARA_TEST_TRUE(eventGroup.GetTags().empty());
 }
 
-// Test case 47: ParseMapField_ValueOnlyNoKey - Map entry with only value, no key
+// Test case 48: ParseMapField_ValueOnlyNoKey - Map entry with only value, no key
 void ManualPBParserUnittest::TestParseMapFieldValueOnlyNoKey() {
     vector<uint8_t> result;
 
@@ -2367,7 +2457,7 @@ void ManualPBParserUnittest::TestParseMapFieldValueOnlyNoKey() {
     APSARA_TEST_TRUE(eventGroup.GetTags().empty());
 }
 
-// Test case 48: ParseMapField_InvalidKeyWireType - Map entry with invalid wire type for key
+// Test case 49: ParseMapField_InvalidKeyWireType - Map entry with invalid wire type for key
 void ManualPBParserUnittest::TestParseMapFieldInvalidKeyWireType() {
     vector<uint8_t> result;
 
@@ -2388,7 +2478,7 @@ void ManualPBParserUnittest::TestParseMapFieldInvalidKeyWireType() {
                            "Should fail to parse map entry with invalid key wire type");
 }
 
-// Test case 49: ParseMapField_InvalidValueWireType - Map entry with invalid wire type for value
+// Test case 50: ParseMapField_InvalidValueWireType - Map entry with invalid wire type for value
 void ManualPBParserUnittest::TestParseMapFieldInvalidValueWireType() {
     vector<uint8_t> result;
 
@@ -2409,7 +2499,7 @@ void ManualPBParserUnittest::TestParseMapFieldInvalidValueWireType() {
                            "Should fail to parse map entry with invalid value wire type");
 }
 
-// Test case 50: ParseMapField_UnknownFieldNumber - Map entry with unknown field number
+// Test case 51: ParseMapField_UnknownFieldNumber - Map entry with unknown field number
 void ManualPBParserUnittest::TestParseMapFieldUnknownFieldNumber() {
     vector<uint8_t> result;
 
@@ -2435,7 +2525,7 @@ void ManualPBParserUnittest::TestParseMapFieldUnknownFieldNumber() {
 // Category 7: Unknown Field Handling Tests (5 test cases)
 // ============================================================================
 
-// Test case 51: SkipField_Varint - Test skipping varint wire type
+// Test case 52: SkipField_Varint - Test skipping varint wire type
 void ManualPBParserUnittest::TestSkipFieldVarint() {
     vector<uint8_t> result;
 
@@ -2463,7 +2553,7 @@ void ManualPBParserUnittest::TestSkipFieldVarint() {
     APSARA_TEST_EQUAL("value", eventGroup.GetTag("test").to_string());
 }
 
-// Test case 52: SkipField_Fixed32 - Test skipping fixed32 wire type
+// Test case 53: SkipField_Fixed32 - Test skipping fixed32 wire type
 void ManualPBParserUnittest::TestSkipFieldFixed32() {
     vector<uint8_t> result;
 
@@ -2491,7 +2581,7 @@ void ManualPBParserUnittest::TestSkipFieldFixed32() {
     APSARA_TEST_EQUAL("prod", eventGroup.GetTag("env").to_string());
 }
 
-// Test case 53: SkipField_Fixed64 - Test skipping fixed64 wire type
+// Test case 54: SkipField_Fixed64 - Test skipping fixed64 wire type
 void ManualPBParserUnittest::TestSkipFieldFixed64() {
     vector<uint8_t> result;
 
@@ -2519,7 +2609,7 @@ void ManualPBParserUnittest::TestSkipFieldFixed64() {
     APSARA_TEST_EQUAL("us-east-1", eventGroup.GetTag("region").to_string());
 }
 
-// Test case 54: SkipField_LengthDelimited - Test skipping length-delimited wire type
+// Test case 55: SkipField_LengthDelimited - Test skipping length-delimited wire type
 void ManualPBParserUnittest::TestSkipFieldLengthDelimited() {
     vector<uint8_t> result;
 
@@ -2547,7 +2637,7 @@ void ManualPBParserUnittest::TestSkipFieldLengthDelimited() {
     APSARA_TEST_EQUAL("web-api", eventGroup.GetTag("service").to_string());
 }
 
-// Test case 55: UnknownField_InPipelineEventGroup - Multiple unknown fields interspersed with known fields
+// Test case 56: UnknownField_InPipelineEventGroup - Multiple unknown fields interspersed with known fields
 void ManualPBParserUnittest::TestUnknownFieldInPipelineEventGroup() {
     vector<uint8_t> result;
 
@@ -2615,7 +2705,7 @@ void ManualPBParserUnittest::TestUnknownFieldInPipelineEventGroup() {
 // Category 8: Mixed Scenario Tests (5 test cases)
 // ============================================================================
 
-// Test case 56: MixedEventTypes - PipelineEventGroup with LogEvents, MetricEvents, and SpanEvents
+// Test case 57: MixedEventTypes - PipelineEventGroup with LogEvents, MetricEvents, and SpanEvents
 void ManualPBParserUnittest::TestMixedEventTypes() {
     vector<uint8_t> result;
 
@@ -2668,7 +2758,7 @@ void ManualPBParserUnittest::TestMixedEventTypes() {
     APSARA_TEST_EQUAL("trace-id", spanEvent.GetTraceId().to_string());
 }
 
-// Test case 57: MixedWithMetadataAndTags - Mixed events with metadata and tags
+// Test case 58: MixedWithMetadataAndTags - Mixed events with metadata and tags
 void ManualPBParserUnittest::TestMixedWithMetadataAndTags() {
     vector<uint8_t> result;
 
@@ -2717,7 +2807,7 @@ void ManualPBParserUnittest::TestMixedWithMetadataAndTags() {
     APSARA_TEST_EQUAL("us-west", eventGroup.GetTag("region").to_string());
 }
 
-// Test case 58: MixedEventsWithUnknownFields - Mixed events with unknown fields interspersed
+// Test case 59: MixedEventsWithUnknownFields - Mixed events with unknown fields interspersed
 void ManualPBParserUnittest::TestMixedEventsWithUnknownFields() {
     vector<uint8_t> result;
 
@@ -2760,7 +2850,7 @@ void ManualPBParserUnittest::TestMixedEventsWithUnknownFields() {
     APSARA_TEST_EQUAL(2U, eventGroup.GetEvents().size());
 }
 
-// Test case 59: ComplexNestedStructure - Complex nested structure with all features
+// Test case 60: ComplexNestedStructure - Complex nested structure with all features
 void ManualPBParserUnittest::TestComplexNestedStructure() {
     vector<uint8_t> result;
 
@@ -2825,7 +2915,7 @@ void ManualPBParserUnittest::TestComplexNestedStructure() {
     APSARA_TEST_EQUAL(1U, spanEvent.GetEvents().size());
 }
 
-// Test case 60: LargeScaleMixedData - Large scale mixed data with many events
+// Test case 61: LargeScaleMixedData - Large scale mixed data with many events
 void ManualPBParserUnittest::TestLargeScaleMixedData() {
     vector<uint8_t> result;
 
@@ -2875,7 +2965,7 @@ void ManualPBParserUnittest::TestLargeScaleMixedData() {
 // Category 9: Boundary and Extreme Cases (5 test cases)
 // ============================================================================
 
-// Test case 61: EmptyStrings - Test empty string handling
+// Test case 62: EmptyStrings - Test empty string handling
 void ManualPBParserUnittest::TestEmptyStrings() {
     // LogEvent with empty strings - note: duplicate keys will be overwritten
     // First {"", "first"} then {"", "second"} means final value for "" is "second"
@@ -2904,10 +2994,11 @@ void ManualPBParserUnittest::TestEmptyStrings() {
     APSARA_TEST_EQUAL("", logEvent.GetContent("key").to_string());
 }
 
-// Test case 62: VeryLargeVarint - Test very large varint values
+// Test case 63: VeryLargeVarint - Test very large varint values
 void ManualPBParserUnittest::TestVeryLargeVarint() {
-    // Create LogEvent with maximum timestamp value
-    auto logEventData = encodeLogEvent(0xFFFFFFFFFFFFFFFFULL, {{"data", "test"}});
+    // Create LogEvent with maximum safe timestamp value (INT64_MAX nanoseconds)
+    // INT64_MAX = 9223372036854775807 ns (year 2262)
+    auto logEventData = encodeLogEvent(static_cast<uint64_t>(INT64_MAX), {{"data", "test"}});
     auto logEventsData = encodeLogEvents({logEventData});
 
     vector<uint8_t> result;
@@ -2926,10 +3017,13 @@ void ManualPBParserUnittest::TestVeryLargeVarint() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
-    APSARA_TEST_EQUAL(0xFFFFFFFFFFFFFFFFULL, logEvent.GetTimestamp());
+    // INT64_MAX ns = 9223372036 seconds + 854775807 nanoseconds
+    APSARA_TEST_EQUAL(9223372036ULL, logEvent.GetTimestamp());
+    APSARA_TEST_TRUE(logEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(854775807U, logEvent.GetTimestampNanosecond().value());
 }
 
-// Test case 63: MaximumNesting - Test maximum nesting depth
+// Test case 64: MaximumNesting - Test maximum nesting depth
 void ManualPBParserUnittest::TestMaximumNesting() {
     // Create SpanEvent with multiple nested inner events
     vector<pair<string, string>> tags1 = {{"event", "1"}};
@@ -2976,7 +3070,7 @@ void ManualPBParserUnittest::TestMaximumNesting() {
     APSARA_TEST_EQUAL(3U, spanEvent.GetEvents().size());
 }
 
-// Test case 64: ZeroValues - Test zero values for all numeric fields
+// Test case 65: ZeroValues - Test zero values for all numeric fields
 void ManualPBParserUnittest::TestZeroValues() {
     // LogEvent with zero timestamp
     auto logEventData = encodeLogEvent(0ULL, {{"data", "zero"}}, "", 0ULL, 0ULL);
@@ -3030,7 +3124,7 @@ void ManualPBParserUnittest::TestZeroValues() {
     APSARA_TEST_EQUAL(0ULL, spanEvent.GetTimestamp());
 }
 
-// Test case 65: LargeNumberOfFields - Test handling large number of map fields
+// Test case 66: LargeNumberOfFields - Test handling large number of map fields
 void ManualPBParserUnittest::TestLargeNumberOfFields() {
     vector<uint8_t> result;
 
@@ -3080,7 +3174,7 @@ void ManualPBParserUnittest::TestLargeNumberOfFields() {
 // Category 10: SpanLink Complete Tests (10 test cases)
 // ============================================================================
 
-// Test case 66: ParseSpanLink_Complete - Complete SpanLink with all fields
+// Test case 67: ParseSpanLink_Complete - Complete SpanLink with all fields
 void ManualPBParserUnittest::TestParseSpanLinkComplete() {
     vector<pair<string, string>> linkTags = {{"link.type", "parent"}, {"sampled", "true"}};
     auto spanLinkData = encodeSpanLink("link-trace-123", "link-span-456", "link-state=abc", linkTags);
@@ -3115,7 +3209,7 @@ void ManualPBParserUnittest::TestParseSpanLinkComplete() {
     APSARA_TEST_EQUAL("true", link.GetTag("sampled").to_string());
 }
 
-// Test case 67: ParseSpanLink_MinimalFields - SpanLink with minimal fields
+// Test case 68: ParseSpanLink_MinimalFields - SpanLink with minimal fields
 void ManualPBParserUnittest::TestParseSpanLinkMinimalFields() {
     auto spanLinkData = encodeSpanLink("minimal-trace", "minimal-span");
 
@@ -3146,7 +3240,7 @@ void ManualPBParserUnittest::TestParseSpanLinkMinimalFields() {
     APSARA_TEST_EQUAL("minimal-span", link.GetSpanId().to_string());
 }
 
-// Test case 68: ParseSpanLink_WithTags - SpanLink with multiple tags
+// Test case 69: ParseSpanLink_WithTags - SpanLink with multiple tags
 void ManualPBParserUnittest::TestParseSpanLinkWithTags() {
     vector<pair<string, string>> linkTags
         = {{"relationship", "follows"}, {"reason", "retry"}, {"priority", "high"}, {"source", "external"}};
@@ -3178,7 +3272,7 @@ void ManualPBParserUnittest::TestParseSpanLinkWithTags() {
     APSARA_TEST_EQUAL("external", link.GetTag("source").to_string());
 }
 
-// Test case 69: ParseSpanLink_MultipleLinks - SpanEvent with multiple links
+// Test case 70: ParseSpanLink_MultipleLinks - SpanEvent with multiple links
 void ManualPBParserUnittest::TestParseSpanLinkMultipleLinks() {
     auto spanLink1 = encodeSpanLink("trace-1", "span-1", "state-1");
     auto spanLink2 = encodeSpanLink("trace-2", "span-2", "state-2");
@@ -3219,7 +3313,7 @@ void ManualPBParserUnittest::TestParseSpanLinkMultipleLinks() {
     APSARA_TEST_EQUAL("state-3", spanEvent.GetLinks()[2].GetTraceState().to_string());
 }
 
-// Test case 70: ParseSpanLink_InvalidTraceIdWireType - Invalid wire type for trace_id
+// Test case 71: ParseSpanLink_InvalidTraceIdWireType - Invalid wire type for trace_id
 void ManualPBParserUnittest::TestParseSpanLinkInvalidTraceIdWireType() {
     auto spanLinkData = encodeSpanLinkInvalidTraceIdWireType();
 
@@ -3243,7 +3337,7 @@ void ManualPBParserUnittest::TestParseSpanLinkInvalidTraceIdWireType() {
                            "Should fail with invalid trace_id wire type");
 }
 
-// Test case 71: ParseSpanLink_InvalidSpanIdWireType - Invalid wire type for span_id
+// Test case 72: ParseSpanLink_InvalidSpanIdWireType - Invalid wire type for span_id
 void ManualPBParserUnittest::TestParseSpanLinkInvalidSpanIdWireType() {
     auto spanLinkData = encodeSpanLinkInvalidSpanIdWireType();
 
@@ -3267,7 +3361,7 @@ void ManualPBParserUnittest::TestParseSpanLinkInvalidSpanIdWireType() {
                            "Should fail with invalid span_id wire type");
 }
 
-// Test case 72: ParseSpanLink_InvalidTagsWireType - Invalid wire type for tags
+// Test case 73: ParseSpanLink_InvalidTagsWireType - Invalid wire type for tags
 void ManualPBParserUnittest::TestParseSpanLinkInvalidTagsWireType() {
     auto spanLinkData = encodeSpanLinkInvalidTagsWireType();
 
@@ -3291,7 +3385,7 @@ void ManualPBParserUnittest::TestParseSpanLinkInvalidTagsWireType() {
                            "Should fail with invalid tags wire type");
 }
 
-// Test case 73: ParseSpanLinkTags_KeyOnlyNoValue - SpanLink tag with only key
+// Test case 74: ParseSpanLinkTags_KeyOnlyNoValue - SpanLink tag with only key
 void ManualPBParserUnittest::TestParseSpanLinkTagsKeyOnlyNoValue() {
     // Create SpanLink with tag that has only key, no value
     vector<uint8_t> spanLinkData;
@@ -3340,7 +3434,7 @@ void ManualPBParserUnittest::TestParseSpanLinkTagsKeyOnlyNoValue() {
     APSARA_TEST_TRUE(link.TagsSize() == 0 || link.GetTag("key-only").to_string().empty());
 }
 
-// Test case 74: ParseSpanLinkTags_InvalidKeyWireType - Invalid wire type for tag key
+// Test case 75: ParseSpanLinkTags_InvalidKeyWireType - Invalid wire type for tag key
 void ManualPBParserUnittest::TestParseSpanLinkTagsInvalidKeyWireType() {
     // Create SpanLink with tag that has invalid key wire type
     vector<uint8_t> spanLinkData;
@@ -3385,7 +3479,7 @@ void ManualPBParserUnittest::TestParseSpanLinkTagsInvalidKeyWireType() {
                            "Should fail with invalid tag key wire type");
 }
 
-// Test case 75: ParseSpanLink_WithUnknownFields - SpanLink with unknown fields
+// Test case 76: ParseSpanLink_WithUnknownFields - SpanLink with unknown fields
 void ManualPBParserUnittest::TestParseSpanLinkWithUnknownFields() {
     auto spanLinkData = encodeSpanLinkWithUnknownField("unknown-trace", "unknown-span");
 
@@ -3420,7 +3514,7 @@ void ManualPBParserUnittest::TestParseSpanLinkWithUnknownFields() {
 // Category 11: Data Corruption and Error Recovery Tests (10 test cases)
 // ============================================================================
 
-// Test case 76: ReadVarint32Truncated - Truncated varint32 data
+// Test case 77: ReadVarint32Truncated - Truncated varint32 data
 void ManualPBParserUnittest::TestReadVarint32Truncated() {
     // Create a varint32 that starts but is truncated (missing continuation bytes)
     vector<uint8_t> data;
@@ -3435,7 +3529,7 @@ void ManualPBParserUnittest::TestReadVarint32Truncated() {
                            "Should fail to read truncated varint32");
 }
 
-// Test case 77: ReadVarint64Truncated - Truncated varint64 data
+// Test case 78: ReadVarint64Truncated - Truncated varint64 data
 void ManualPBParserUnittest::TestReadVarint64Truncated() {
     // Create a varint64 that starts but is truncated
     vector<uint8_t> data;
@@ -3452,7 +3546,7 @@ void ManualPBParserUnittest::TestReadVarint64Truncated() {
                            "Should fail to read truncated varint64");
 }
 
-// Test case 78: ReadFixed64InsufficientData - Fixed64 with insufficient data
+// Test case 79: ReadFixed64InsufficientData - Fixed64 with insufficient data
 void ManualPBParserUnittest::TestReadFixed64InsufficientData() {
     // Create data with less than 8 bytes for fixed64
     vector<uint8_t> data = {0x01, 0x02, 0x03, 0x04, 0x05}; // Only 5 bytes
@@ -3464,7 +3558,7 @@ void ManualPBParserUnittest::TestReadFixed64InsufficientData() {
                            "Should fail to read fixed64 with insufficient data");
 }
 
-// Test case 79: ReadStringLengthExceedsBounds - String length exceeds available data
+// Test case 80: ReadStringLengthExceedsBounds - String length exceeds available data
 void ManualPBParserUnittest::TestReadStringLengthExceedsBounds() {
     vector<uint8_t> data;
 
@@ -3481,7 +3575,7 @@ void ManualPBParserUnittest::TestReadStringLengthExceedsBounds() {
                            "Should fail when string length exceeds bounds");
 }
 
-// Test case 80: ParseLogEventReadNameFailed - LogEvent content key read failure
+// Test case 81: ParseLogEventReadNameFailed - LogEvent content key read failure
 void ManualPBParserUnittest::TestParseLogEventReadNameFailed() {
     vector<uint8_t> logEventData;
 
@@ -3526,7 +3620,7 @@ void ManualPBParserUnittest::TestParseLogEventReadNameFailed() {
                            "Should fail when content key read fails");
 }
 
-// Test case 81: ParseMetricEventReadNameFailed - MetricEvent name read failure
+// Test case 82: ParseMetricEventReadNameFailed - MetricEvent name read failure
 void ManualPBParserUnittest::TestParseMetricEventReadNameFailed() {
     vector<uint8_t> metricEventData;
 
@@ -3561,7 +3655,7 @@ void ManualPBParserUnittest::TestParseMetricEventReadNameFailed() {
                            "Should fail when metric name read fails");
 }
 
-// Test case 82: ParseSpanEventReadTraceIdFailed - SpanEvent trace_id read failure
+// Test case 83: ParseSpanEventReadTraceIdFailed - SpanEvent trace_id read failure
 void ManualPBParserUnittest::TestParseSpanEventReadTraceIdFailed() {
     vector<uint8_t> spanEventData;
 
@@ -3596,7 +3690,7 @@ void ManualPBParserUnittest::TestParseSpanEventReadTraceIdFailed() {
                            "Should fail when span trace_id read fails");
 }
 
-// Test case 83: ParseMapEntryReadKeyFailed - Map entry key read failure
+// Test case 84: ParseMapEntryReadKeyFailed - Map entry key read failure
 void ManualPBParserUnittest::TestParseMapEntryReadKeyFailed() {
     vector<uint8_t> result;
 
@@ -3625,7 +3719,7 @@ void ManualPBParserUnittest::TestParseMapEntryReadKeyFailed() {
                            "Should fail when map entry key read fails");
 }
 
-// Test case 84: ParseMapEntryReadValueFailed - Map entry value read failure
+// Test case 85: ParseMapEntryReadValueFailed - Map entry value read failure
 void ManualPBParserUnittest::TestParseMapEntryReadValueFailed() {
     vector<uint8_t> result;
 
@@ -3661,7 +3755,7 @@ void ManualPBParserUnittest::TestParseMapEntryReadValueFailed() {
                            "Should fail when map entry value read fails");
 }
 
-// Test case 85: NestedMessageParseFailed - Nested message parse failure and state recovery
+// Test case 86: NestedMessageParseFailed - Nested message parse failure and state recovery
 void ManualPBParserUnittest::TestNestedMessageParseFailed() {
     vector<uint8_t> result;
 
@@ -3714,10 +3808,11 @@ void ManualPBParserUnittest::TestNestedMessageParseFailed() {
 // Category 12: Boundary and Special Value Tests (8 test cases)
 // ============================================================================
 
-// Test case 86: Varint64MaxValue - Parse maximum varint64 value
+// Test case 87: Varint64MaxValue - Parse maximum varint64 value
 void ManualPBParserUnittest::TestVarint64MaxValueParsing() {
-    // Create LogEvent with maximum timestamp value (0xFFFFFFFFFFFFFFFF)
-    auto logEventData = encodeLogEvent(0xFFFFFFFFFFFFFFFFULL, {{"data", "max-timestamp"}});
+    // Create LogEvent with maximum safe timestamp value to test varint64 parsing
+    // Use INT64_MAX nanoseconds (year 2262)
+    auto logEventData = encodeLogEvent(static_cast<uint64_t>(INT64_MAX), {{"data", "max-timestamp"}});
     auto logEventsData = encodeLogEvents({logEventData});
 
     vector<uint8_t> result;
@@ -3736,11 +3831,15 @@ void ManualPBParserUnittest::TestVarint64MaxValueParsing() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
-    APSARA_TEST_EQUAL(0xFFFFFFFFFFFFFFFFULL, logEvent.GetTimestamp());
+    // INT64_MAX ns = 9223372036 seconds + 854775807 nanoseconds
+    APSARA_TEST_EQUAL(9223372036ULL, logEvent.GetTimestamp());
+    APSARA_TEST_TRUE(logEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(854775807U, logEvent.GetTimestampNanosecond().value());
+    APSARA_TEST_TRUE(logEvent.HasContent("data"));
     APSARA_TEST_EQUAL("max-timestamp", logEvent.GetContent("data").to_string());
 }
 
-// Test case 87: Varint32_10ByteEncoding - Test 10-byte varint32 (invalid/overflow)
+// Test case 88: Varint32_10ByteEncoding - Test 10-byte varint32 (invalid/overflow)
 void ManualPBParserUnittest::TestVarint3210ByteEncoding() {
     // Create a 10-byte varint (all continuation bits set for first 9 bytes)
     // This should be invalid for varint32 as it can overflow
@@ -3760,7 +3859,7 @@ void ManualPBParserUnittest::TestVarint3210ByteEncoding() {
                            "Should fail on overly long varint32 encoding");
 }
 
-// Test case 88: LengthDelimitedZeroLength - String with zero length
+// Test case 89: LengthDelimitedZeroLength - String with zero length
 void ManualPBParserUnittest::TestLengthDelimitedZeroLength() {
     // Create LogEvent with empty string content
     auto logEventData = encodeLogEvent(1000ULL, {{"empty-key", ""}, {"", "empty-value"}});
@@ -3786,7 +3885,7 @@ void ManualPBParserUnittest::TestLengthDelimitedZeroLength() {
     APSARA_TEST_EQUAL("empty-value", logEvent.GetContent("").to_string());
 }
 
-// Test case 89: LengthDelimitedVeryLarge - Very large string (1MB)
+// Test case 90: LengthDelimitedVeryLarge - Very large string (1MB)
 void ManualPBParserUnittest::TestLengthDelimitedVeryLarge() {
     // Create a 1MB string
     string largeString(1024 * 1024, 'A'); // 1MB of 'A's
@@ -3813,10 +3912,10 @@ void ManualPBParserUnittest::TestLengthDelimitedVeryLarge() {
     APSARA_TEST_EQUAL(1024U * 1024U, logEvent.GetContent("large").to_string().size());
 }
 
-// Test case 90: SpanEventAllFieldsMaxValues - SpanEvent with maximum values
+// Test case 91: SpanEventAllFieldsMaxValues - SpanEvent with maximum values
 void ManualPBParserUnittest::TestSpanEventAllFieldsMaxValues() {
-    // Create SpanEvent with maximum numeric values
-    auto spanEventData = encodeSpanEvent(0xFFFFFFFFFFFFFFFFULL, // max timestamp
+    // Create SpanEvent with maximum safe numeric values
+    auto spanEventData = encodeSpanEvent(static_cast<uint64_t>(INT64_MAX), // max safe timestamp
                                          "max-trace",
                                          "max-span",
                                          "max-values-span",
@@ -3847,14 +3946,18 @@ void ManualPBParserUnittest::TestSpanEventAllFieldsMaxValues() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 
     const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
-    APSARA_TEST_EQUAL(0xFFFFFFFFFFFFFFFFULL, spanEvent.GetTimestamp());
+    // INT64_MAX ns = 9223372036 seconds + 854775807 nanoseconds
+    APSARA_TEST_EQUAL(9223372036ULL, spanEvent.GetTimestamp());
+    APSARA_TEST_TRUE(spanEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(854775807U, spanEvent.GetTimestampNanosecond().value());
+    // Start and end times are already in nanoseconds, no conversion needed
     APSARA_TEST_EQUAL(0xFFFFFFFFFFFFFFFFULL, spanEvent.GetStartTimeNs());
     APSARA_TEST_EQUAL(0xFFFFFFFFFFFFFFFFULL, spanEvent.GetEndTimeNs());
     APSARA_TEST_EQUAL(SpanEvent::Kind::Consumer, spanEvent.GetKind());
     APSARA_TEST_EQUAL(SpanEvent::StatusCode::Error, spanEvent.GetStatus());
 }
 
-// Test case 91: MetricEventNegativeDoubleValue - MetricEvent with negative double
+// Test case 92: MetricEventNegativeDoubleValue - MetricEvent with negative double
 void ManualPBParserUnittest::TestMetricEventNegativeDoubleValue() {
     // Create MetricEvent with negative double value
     vector<pair<string, string>> tags = {{"type", "temperature"}};
@@ -3885,7 +3988,7 @@ void ManualPBParserUnittest::TestMetricEventNegativeDoubleValue() {
     APSARA_TEST_TRUE(value < -273.14 && value > -273.16);
 }
 
-// Test case 92: LogEventTimestampZeroValue - LogEvent with timestamp zero
+// Test case 93: LogEventTimestampZeroValue - LogEvent with timestamp zero
 void ManualPBParserUnittest::TestLogEventTimestampZeroValue() {
     // Create LogEvent with zero timestamp
     auto logEventData = encodeLogEvent(0ULL, {{"event", "zero-time"}}, "", 0ULL, 0ULL);
@@ -3917,7 +4020,7 @@ void ManualPBParserUnittest::TestLogEventTimestampZeroValue() {
     APSARA_TEST_EQUAL("zero-time", logEvent.GetContent("event").to_string());
 }
 
-// Test case 93: DeepNestedSpanEventStructure - Deeply nested SpanEvent with multiple levels
+// Test case 94: DeepNestedSpanEventStructure - Deeply nested SpanEvent with multiple levels
 void ManualPBParserUnittest::TestDeepNestedSpanEventStructure() {
     // Create SpanEvent with deep nesting: multiple inner events, each with multiple tags
     vector<pair<string, string>> innerTags1 = {{"level", "1"}, {"detail", "first"}};
@@ -3982,7 +4085,7 @@ void ManualPBParserUnittest::TestDeepNestedSpanEventStructure() {
 // Category 13: skipField Detailed Tests (5 test cases)
 // ============================================================================
 
-// Test case 94: SkipFieldInvalidWireType - Test skipping invalid wire types
+// Test case 95: SkipFieldInvalidWireType - Test skipping invalid wire types
 void ManualPBParserUnittest::TestSkipFieldInvalidWireType() {
     // Wire types: 0=varint, 1=fixed64, 2=length-delimited, 3=start group, 4=end group, 5=fixed32
     // Wire types 3 and 4 (group) are deprecated, 6 and 7 are invalid
@@ -4012,7 +4115,7 @@ void ManualPBParserUnittest::TestSkipFieldInvalidWireType() {
                            "Should fail to skip invalid wire type 7");
 }
 
-// Test case 95: SkipFieldNestedLengthDelimited - Test skipping nested length-delimited fields
+// Test case 96: SkipFieldNestedLengthDelimited - Test skipping nested length-delimited fields
 void ManualPBParserUnittest::TestSkipFieldNestedLengthDelimited() {
     // Create a PipelineEventGroup with an unknown length-delimited field containing nested data
     vector<uint8_t> result;
@@ -4057,7 +4160,7 @@ void ManualPBParserUnittest::TestSkipFieldNestedLengthDelimited() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 }
 
-// Test case 96: SkipFieldMultipleConsecutive - Test skipping multiple consecutive unknown fields
+// Test case 97: SkipFieldMultipleConsecutive - Test skipping multiple consecutive unknown fields
 void ManualPBParserUnittest::TestSkipFieldMultipleConsecutive() {
     // Create a PipelineEventGroup with multiple consecutive unknown fields of different types
     vector<uint8_t> result;
@@ -4109,7 +4212,7 @@ void ManualPBParserUnittest::TestSkipFieldMultipleConsecutive() {
     APSARA_TEST_EQUAL("unknowns", logEvent.GetContent("after").to_string());
 }
 
-// Test case 97: SkipFieldAfterPartialParse - Test skipping fields after partial parsing
+// Test case 98: SkipFieldAfterPartialParse - Test skipping fields after partial parsing
 void ManualPBParserUnittest::TestSkipFieldAfterPartialParse() {
     // Create PipelineEventGroup with a known field, then unknown fields, then more known fields
     vector<uint8_t> result;
@@ -4160,7 +4263,7 @@ void ManualPBParserUnittest::TestSkipFieldAfterPartialParse() {
     APSARA_TEST_EQUAL("event", logEvent2.GetContent("second").to_string());
 }
 
-// Test case 98: SkipFieldLargeVarint - Test skipping large varint values
+// Test case 99: SkipFieldLargeVarint - Test skipping large varint values
 void ManualPBParserUnittest::TestSkipFieldLargeVarint() {
     // Create data with very large varint values in unknown fields
     vector<uint8_t> result;
@@ -5686,6 +5789,56 @@ void ManualPBParserUnittest::TestMetricTagsUnknownField() {
     APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
 }
 
+// Test unknown field in MetricMetadata map entry
+void ManualPBParserUnittest::TestMetricMetadataUnknownField() {
+    // Create MetricEvent with metadata containing unknown field
+    std::vector<uint8_t> mapEntryData;
+    // key
+    auto keyTag = encodeVarint32(encodeTag(1, kLengthDelimited));
+    mapEntryData.insert(mapEntryData.end(), keyTag.begin(), keyTag.end());
+    std::string key = "meta1";
+    auto keyLen = encodeVarint32(key.size());
+    mapEntryData.insert(mapEntryData.end(), keyLen.begin(), keyLen.end());
+    mapEntryData.insert(mapEntryData.end(), key.begin(), key.end());
+    // value
+    auto valTag = encodeVarint32(encodeTag(2, kLengthDelimited));
+    mapEntryData.insert(mapEntryData.end(), valTag.begin(), valTag.end());
+    std::string val = "meta_value1";
+    auto valLen = encodeVarint32(val.size());
+    mapEntryData.insert(mapEntryData.end(), valLen.begin(), valLen.end());
+    mapEntryData.insert(mapEntryData.end(), val.begin(), val.end());
+    // Unknown field (should be skipped)
+    auto unknownTag = encodeVarint32(encodeTag(888, kFixed32));
+    mapEntryData.insert(mapEntryData.end(), unknownTag.begin(), unknownTag.end());
+    auto unknownVal = encodeFixed32(654321);
+    mapEntryData.insert(mapEntryData.end(), unknownVal.begin(), unknownVal.end());
+
+    // Create MetricEvent
+    auto metricData = encodeMetricEvent(123456789ULL, "test_metric", {}, 10.0, false);
+    std::vector<uint8_t> metricEventData(metricData.begin(), metricData.end());
+    // Add metadata field (map entry is added directly as repeated field)
+    auto metricMetadataTag = encodeVarint32(encodeTag(5, kLengthDelimited));
+    metricEventData.insert(metricEventData.end(), metricMetadataTag.begin(), metricMetadataTag.end());
+    auto metadataLen = encodeVarint32(mapEntryData.size());
+    metricEventData.insert(metricEventData.end(), metadataLen.begin(), metadataLen.end());
+    metricEventData.insert(metricEventData.end(), mapEntryData.begin(), mapEntryData.end());
+
+    auto data = encodePipelineEventGroupWithMetrics({metricEventData});
+
+    auto sourceBuffer = make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    std::string errMsg;
+    ManualPBParser parser(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+
+    APSARA_TEST_TRUE(parser.ParsePipelineEventGroup(eventGroup, errMsg));
+    APSARA_TEST_EQUAL(1U, eventGroup.GetEvents().size());
+
+    // Verify metadata was parsed correctly despite unknown field
+    const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
+    APSARA_TEST_TRUE(metricEvent.HasMetadata("meta1"));
+    APSARA_TEST_EQUAL("meta_value1", metricEvent.GetMetadata("meta1").to_string());
+}
+
 // Test unknown field in SpanTags
 void ManualPBParserUnittest::TestSpanTagsUnknownField() {
     // Create SpanEvent with tags containing unknown field
@@ -5851,6 +6004,85 @@ void ManualPBParserUnittest::TestSpanLinkReadTraceIdFailed() {
     APSARA_TEST_FALSE(parser.ParsePipelineEventGroup(eventGroup, errMsg));
 }
 
+// Test LogEvent timestamp nanosecond conversion
+void ManualPBParserUnittest::TestLogEventTimestampNanosecondConversion() {
+    // Create LogEvent with timestamp in nanoseconds: 1764735735000000000 ns
+    // This should convert to: 1764735735 seconds + 0 nanoseconds
+    uint64_t timestampNs = 1764735735000000000ULL;
+    vector<pair<string, string>> contents = {{"key1", "value1"}};
+    auto logEventData = encodeLogEvent(timestampNs, contents, "", 0, 0);
+    auto data = encodePipelineEventGroupWithLogs({logEventData});
+
+    auto sourceBuffer = make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    string errMsg;
+    ManualPBParser parser(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
+    APSARA_TEST_EQUAL_FATAL(1U, eventGroup.GetEvents().size());
+
+    const auto& logEvent = eventGroup.GetEvents()[0].Cast<LogEvent>();
+    APSARA_TEST_EQUAL(1764735735ULL, logEvent.GetTimestamp());
+    APSARA_TEST_TRUE(logEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(0U, logEvent.GetTimestampNanosecond().value());
+}
+
+// Test MetricEvent timestamp nanosecond conversion
+void ManualPBParserUnittest::TestMetricEventTimestampNanosecondConversion() {
+    // Create MetricEvent with timestamp in nanoseconds: 1764735735000000000 ns
+    // This should convert to: 1764735735 seconds + 0 nanoseconds
+    uint64_t timestampNs = 1764735735000000000ULL;
+    auto metricEventData = encodeMetricEvent(timestampNs, "test_metric", {}, 42.5, {});
+    auto data = encodePipelineEventGroupWithMetrics({metricEventData});
+
+    auto sourceBuffer = make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    string errMsg;
+    ManualPBParser parser(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
+    APSARA_TEST_EQUAL_FATAL(1U, eventGroup.GetEvents().size());
+
+    const auto& metricEvent = eventGroup.GetEvents()[0].Cast<MetricEvent>();
+    APSARA_TEST_EQUAL(1764735735ULL, metricEvent.GetTimestamp());
+    APSARA_TEST_TRUE(metricEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(0U, metricEvent.GetTimestampNanosecond().value());
+}
+
+// Test SpanEvent timestamp nanosecond conversion
+void ManualPBParserUnittest::TestSpanEventTimestampNanosecondConversion() {
+    // Create SpanEvent with timestamp in nanoseconds: 1764735735000000000 ns
+    // This should convert to: 1764735735 seconds + 0 nanoseconds
+    uint64_t timestampNs = 1764735735000000000ULL;
+    auto spanEventData = encodeSpanEvent(timestampNs,
+                                         "trace123",
+                                         "span456",
+                                         "test_span",
+                                         1,
+                                         1000000000ULL,
+                                         2000000000ULL,
+                                         {},
+                                         {},
+                                         "",
+                                         "",
+                                         0,
+                                         {});
+    auto data = encodePipelineEventGroupWithSpans({spanEventData});
+
+    auto sourceBuffer = make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    string errMsg;
+    ManualPBParser parser(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+
+    APSARA_TEST_TRUE_FATAL(parser.ParsePipelineEventGroup(eventGroup, errMsg));
+    APSARA_TEST_EQUAL_FATAL(1U, eventGroup.GetEvents().size());
+
+    const auto& spanEvent = eventGroup.GetEvents()[0].Cast<SpanEvent>();
+    APSARA_TEST_EQUAL(1764735735ULL, spanEvent.GetTimestamp());
+    APSARA_TEST_TRUE(spanEvent.GetTimestampNanosecond().has_value());
+    APSARA_TEST_EQUAL(0U, spanEvent.GetTimestampNanosecond().value());
+}
+
 // Category 1 test cases
 UNIT_TEST_CASE(ManualPBParserUnittest, TestReadVarint32Success)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestReadVarint32MaxValue)
@@ -5890,6 +6122,7 @@ UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventWithTags)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventWithValue)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventDoubleValue)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventInvalidTagsWireType)
+UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventInvalidMetadataWireType)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventInvalidValueWireType)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestParseMetricEventMultipleEvents)
 
@@ -6042,10 +6275,14 @@ UNIT_TEST_CASE(ManualPBParserUnittest, TestMetricValueReadLengthDelimitedFailed)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestMetricValueReadTagFailed)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestLogContentUnknownField)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestMetricTagsUnknownField)
+UNIT_TEST_CASE(ManualPBParserUnittest, TestMetricMetadataUnknownField)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestSpanTagsUnknownField)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestSpanScopeTagsUnknownField)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestSpanInnerEventReadTimestampFailed)
 UNIT_TEST_CASE(ManualPBParserUnittest, TestSpanLinkReadTraceIdFailed)
+UNIT_TEST_CASE(ManualPBParserUnittest, TestLogEventTimestampNanosecondConversion)
+UNIT_TEST_CASE(ManualPBParserUnittest, TestMetricEventTimestampNanosecondConversion)
+UNIT_TEST_CASE(ManualPBParserUnittest, TestSpanEventTimestampNanosecondConversion)
 
 } // namespace logtail
 

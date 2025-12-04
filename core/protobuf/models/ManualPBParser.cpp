@@ -57,7 +57,8 @@ enum MetricEventField {
     kMetricTimestampField = 1,
     kMetricNameField = 2,
     kMetricTagsField = 3,
-    kMetricUntypedSingleValueField = 4
+    kMetricUntypedSingleValueField = 4,
+    kMetricMetadataField = 5
 };
 
 // SpanEvent field numbers
@@ -277,7 +278,7 @@ bool ManualPBParser::readBytes(const uint8_t*& data, size_t& length) {
 }
 
 bool ManualPBParser::skipField(uint32_t wireType) {
-    LOG_ERROR(sLogger, ("ManualPBParser encountered unknown wire type", std::to_string(wireType)));
+    LOG_DEBUG(sLogger, ("ManualPBParser encountered unknown wire type", std::to_string(wireType)));
     switch (wireType) {
         case kVarint: {
             uint64_t dummy = 0;
@@ -714,7 +715,10 @@ bool ManualPBParser::parseLogEvent(PipelineEventGroup& eventGroup) {
     mPos = eventData + eventLength;
 
     // Set parsed values
-    logEvent->SetTimestamp(timestamp);
+    // timestamp is in nanoseconds, convert to seconds and nanoseconds
+    std::chrono::nanoseconds tns(timestamp);
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
+    logEvent->SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
     logEvent->SetPosition(fileOffset, rawSize);
     if (!level.empty()) {
         logEvent->SetLevel(level);
@@ -846,6 +850,18 @@ bool ManualPBParser::parseMetricEvent(PipelineEventGroup& eventGroup) {
                 break;
             }
 
+            case kMetricMetadataField:
+                if (wireType != kLengthDelimited) {
+                    restoreState(savedState);
+                    setError("Invalid wire type for metadata");
+                    return false;
+                }
+                if (!parseMetricMetadata(eventGroup, metricEvent)) {
+                    restoreState(savedState);
+                    return false;
+                }
+                break;
+
             default:
                 if (!skipField(wireType)) {
                     restoreState(savedState);
@@ -860,7 +876,10 @@ bool ManualPBParser::parseMetricEvent(PipelineEventGroup& eventGroup) {
     mPos = eventData + eventLength;
 
     // Set parsed values
-    metricEvent->SetTimestamp(timestamp);
+    // timestamp is in nanoseconds, convert to seconds and nanoseconds
+    std::chrono::nanoseconds tns(timestamp);
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
+    metricEvent->SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
     if (!name.empty()) {
         metricEvent->SetName(name);
     }
@@ -1300,6 +1319,81 @@ bool ManualPBParser::parseMetricTags(PipelineEventGroup& /* eventGroup */, Metri
     // Set tag if both key and value are present
     if (hasKey && hasValue) {
         metricEvent->SetTag(key, value);
+    }
+
+    return true;
+}
+
+bool ManualPBParser::parseMetricMetadata(PipelineEventGroup& /* eventGroup */, MetricEvent* metricEvent) {
+    const uint8_t* mapData = nullptr;
+    size_t mapLength = 0;
+    if (!readLengthDelimited(mapData, mapLength)) {
+        return false;
+    }
+
+    // Save current state and parse map entry
+    ParseState savedState = saveState();
+    mPos = mapData;
+    mEnd = mapData + mapLength;
+
+    std::string key;
+    std::string value;
+    bool hasKey = false;
+    bool hasValue = false;
+
+    while (hasMoreData()) {
+        uint32_t tag = 0;
+        if (!readVarint32(tag)) {
+            restoreState(savedState);
+            return false;
+        }
+
+        uint32_t fieldNumber = tag >> 3;
+        uint32_t wireType = tag & 0x7;
+
+        switch (fieldNumber) {
+            case 1: // key
+                if (wireType != kLengthDelimited) {
+                    restoreState(savedState);
+                    setError("Invalid wire type for map key");
+                    return false;
+                }
+                if (!readString(key)) {
+                    restoreState(savedState);
+                    return false;
+                }
+                hasKey = true;
+                break;
+
+            case 2: // value
+                if (wireType != kLengthDelimited) {
+                    restoreState(savedState);
+                    setError("Invalid wire type for map value");
+                    return false;
+                }
+                if (!readString(value)) {
+                    restoreState(savedState);
+                    return false;
+                }
+                hasValue = true;
+                break;
+
+            default:
+                if (!skipField(wireType)) {
+                    restoreState(savedState);
+                    return false;
+                }
+                break;
+        }
+    }
+
+    // Restore parser state
+    restoreState(savedState);
+    mPos = mapData + mapLength;
+
+    // Set metadata if both key and value are present
+    if (hasKey && hasValue) {
+        metricEvent->SetMetadata(key, value);
     }
 
     return true;

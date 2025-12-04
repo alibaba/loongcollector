@@ -37,6 +37,9 @@ public:
     void TestSerializeSpanLinksToString();
     void TestSerializeSpanEventsToString();
     void TestSerializeSpanAttributesToString();
+    void TestSerializeMetricEventSingleValue();
+    void TestSerializeMetricEventMultiValue();
+    void TestSerializeMetricEventWithMetadata();
 
 protected:
     static void SetUpTestCase() { sFlusher = make_unique<FlusherSLS>(); }
@@ -1187,11 +1190,381 @@ void SLSSerializerUnittest::TestSerializeSpanAttributesToString() {
     }
 }
 
+void SLSSerializerUnittest::TestSerializeMetricEventSingleValue() {
+    SLSEventGroupSerializer serializer(sFlusher.get());
+    
+    // Test basic single value metric
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify timestamp
+        APSARA_TEST_EQUAL(1234567890U, log.time());
+        APSARA_TEST_FALSE(log.has_time_ns());
+        
+        // Verify contents: __labels__, __time_nano__, __value__, __name__
+        APSARA_TEST_EQUAL(4, log.contents_size());
+        
+        // Find and verify each field
+        bool hasLabels = false, hasTimeNano = false, hasValue = false, hasName = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__labels__") {
+                hasLabels = true;
+                APSARA_TEST_EQUAL("key1#$#value1|key2#$#value2", content.value());
+            } else if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+                APSARA_TEST_EQUAL("1234567890", content.value());
+            } else if (content.key() == "__value__") {
+                hasValue = true;
+                APSARA_TEST_EQUAL("0.1", content.value());
+            } else if (content.key() == "__name__") {
+                hasName = true;
+                APSARA_TEST_EQUAL("test_gauge", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasLabels);
+        APSARA_TEST_TRUE(hasTimeNano);
+        APSARA_TEST_TRUE(hasValue);
+        APSARA_TEST_TRUE(hasName);
+    }
+    
+    // Test single value metric with nanosecond timestamp
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(true, 123456789, false, false);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Find __time_nano__ field
+        bool found = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            if (log.contents(i).key() == "__time_nano__") {
+                found = true;
+                // timestamp(1234567890) * 1e9 + nano(123456789)
+                APSARA_TEST_EQUAL("1234567890123456789", log.contents(i).value());
+                break;
+            }
+        }
+        APSARA_TEST_TRUE(found);
+    }
+    
+    // Test single value metric with only one tag
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(false, 0, false, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Find __labels__ field
+        bool found = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            if (log.contents(i).key() == "__labels__") {
+                found = true;
+                APSARA_TEST_EQUAL("key1#$#value1", log.contents(i).value());
+                break;
+            }
+        }
+        APSARA_TEST_TRUE(found);
+    }
+    
+    // Test single value metric with no tags
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Find __labels__ field - should be empty
+        bool found = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            if (log.contents(i).key() == "__labels__") {
+                found = true;
+                APSARA_TEST_EQUAL("", log.contents(i).value());
+                break;
+            }
+        }
+        APSARA_TEST_TRUE(found);
+    }
+}
+
+void SLSSerializerUnittest::TestSerializeMetricEventMultiValue() {
+    SLSEventGroupSerializer serializer(sFlusher.get());
+    
+    // Test multi-value metric with multiple tags and values
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMultiValueMetricEvents(false, 0, false, false, false, false);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify timestamp
+        APSARA_TEST_EQUAL(1234567890U, log.time());
+        
+        // Verify contents: __time_nano__, key1, key2, multi_value1, multi_value2
+        APSARA_TEST_EQUAL(5, log.contents_size());
+        
+        // Verify each field exists with correct value
+        bool hasTimeNano = false, hasKey1 = false, hasKey2 = false;
+        bool hasValue1 = false, hasValue2 = false;
+        
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+                APSARA_TEST_EQUAL("1234567890", content.value());
+            } else if (content.key() == "key1") {
+                hasKey1 = true;
+                APSARA_TEST_EQUAL("value1", content.value());
+            } else if (content.key() == "key2") {
+                hasKey2 = true;
+                APSARA_TEST_EQUAL("value2", content.value());
+            } else if (content.key() == "multi_value1") {
+                hasValue1 = true;
+                APSARA_TEST_EQUAL("0.1", content.value());
+            } else if (content.key() == "multi_value2") {
+                hasValue2 = true;
+                APSARA_TEST_EQUAL("0.2", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasTimeNano);
+        APSARA_TEST_TRUE(hasKey1);
+        APSARA_TEST_TRUE(hasKey2);
+        APSARA_TEST_TRUE(hasValue1);
+        APSARA_TEST_TRUE(hasValue2);
+    }
+    
+    // Test multi-value metric with single tag and single value
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMultiValueMetricEvents(false, 0, false, false, true, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify contents: __time_nano__, key1, multi_value1
+        APSARA_TEST_EQUAL(3, log.contents_size());
+        
+        bool hasTimeNano = false, hasKey1 = false, hasValue1 = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+            } else if (content.key() == "key1") {
+                hasKey1 = true;
+                APSARA_TEST_EQUAL("value1", content.value());
+            } else if (content.key() == "multi_value1") {
+                hasValue1 = true;
+                APSARA_TEST_EQUAL("0.1", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasTimeNano);
+        APSARA_TEST_TRUE(hasKey1);
+        APSARA_TEST_TRUE(hasValue1);
+    }
+    
+    // Test multi-value metric with no tags
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMultiValueMetricEvents(false, 0, true, false, false, false);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify contents: __time_nano__, multi_value1, multi_value2 (no tag fields)
+        APSARA_TEST_EQUAL(3, log.contents_size());
+        
+        bool hasTimeNano = false, hasValue1 = false, hasValue2 = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+            } else if (content.key() == "multi_value1") {
+                hasValue1 = true;
+                APSARA_TEST_EQUAL("0.1", content.value());
+            } else if (content.key() == "multi_value2") {
+                hasValue2 = true;
+                APSARA_TEST_EQUAL("0.2", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasTimeNano);
+        APSARA_TEST_TRUE(hasValue1);
+        APSARA_TEST_TRUE(hasValue2);
+    }
+    
+    // Test multi-value metric with nanosecond precision
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMultiValueMetricEvents(true, 999999999, false, false, false, false);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Find __time_nano__ field and verify nanosecond precision
+        bool found = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            if (log.contents(i).key() == "__time_nano__") {
+                found = true;
+                APSARA_TEST_EQUAL("1234567890999999999", log.contents(i).value());
+                break;
+            }
+        }
+        APSARA_TEST_TRUE(found);
+    }
+}
+
+void SLSSerializerUnittest::TestSerializeMetricEventWithMetadata() {
+    SLSEventGroupSerializer serializer(sFlusher.get());
+    
+    // Test single value metric with metadata
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false, false, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify timestamp
+        APSARA_TEST_EQUAL(1234567890U, log.time());
+        
+        // Verify contents: __labels__, __time_nano__, __value__, __name__, __apm_metric_type__
+        APSARA_TEST_EQUAL(5, log.contents_size());
+        
+        // Verify standard fields
+        bool hasLabels = false, hasTimeNano = false, hasValue = false, hasName = false, hasMetadata = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__labels__") {
+                hasLabels = true;
+                APSARA_TEST_EQUAL("key1#$#value1|key2#$#value2", content.value());
+            } else if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+                APSARA_TEST_EQUAL("1234567890", content.value());
+            } else if (content.key() == "__value__") {
+                hasValue = true;
+                APSARA_TEST_EQUAL("0.1", content.value());
+            } else if (content.key() == "__name__") {
+                hasName = true;
+                APSARA_TEST_EQUAL("test_gauge", content.value());
+            } else if (content.key() == "__apm_metric_type__") {
+                hasMetadata = true;
+                APSARA_TEST_EQUAL("app", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasLabels);
+        APSARA_TEST_TRUE(hasTimeNano);
+        APSARA_TEST_TRUE(hasValue);
+        APSARA_TEST_TRUE(hasName);
+        APSARA_TEST_TRUE(hasMetadata);
+    }
+    
+    // Test metric with metadata and nanosecond precision
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(true, 123456789, false, false, false, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        APSARA_TEST_EQUAL(1, logGroup.logs_size());
+        const auto& log = logGroup.logs(0);
+        
+        // Verify metadata field exists
+        bool hasMetadata = false;
+        bool hasTimeNano = false;
+        for (int i = 0; i < log.contents_size(); ++i) {
+            const auto& content = log.contents(i);
+            if (content.key() == "__apm_metric_type__") {
+                hasMetadata = true;
+                APSARA_TEST_EQUAL("app", content.value());
+            } else if (content.key() == "__time_nano__") {
+                hasTimeNano = true;
+                APSARA_TEST_EQUAL("1234567890123456789", content.value());
+            }
+        }
+        
+        APSARA_TEST_TRUE(hasMetadata);
+        APSARA_TEST_TRUE(hasTimeNano);
+    }
+    
+    // Test that the order is correct: __labels__, __time_nano__, __value__, __name__, then metadata
+    {
+        string res, errorMsg;
+        auto batch = CreateBatchedMetricEvents(false, 0, false, false, false, true);
+        APSARA_TEST_TRUE(serializer.DoSerialize(std::move(batch), res, errorMsg));
+        
+        sls_logs::LogGroup logGroup;
+        APSARA_TEST_TRUE(logGroup.ParseFromString(res));
+        
+        const auto& log = logGroup.logs(0);
+        APSARA_TEST_EQUAL(5, log.contents_size());
+        
+        // Verify the order based on SerializeMetricEvent implementation
+        APSARA_TEST_EQUAL("__labels__", log.contents(0).key());
+        APSARA_TEST_EQUAL("__time_nano__", log.contents(1).key());
+        APSARA_TEST_EQUAL("__value__", log.contents(2).key());
+        APSARA_TEST_EQUAL("__name__", log.contents(3).key());
+        APSARA_TEST_EQUAL("__apm_metric_type__", log.contents(4).key());
+    }
+}
+
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroup)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeEventGroupList)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanLinksToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanEventsToString)
 UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeSpanAttributesToString)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventSingleValue)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventMultiValue)
+UNIT_TEST_CASE(SLSSerializerUnittest, TestSerializeMetricEventWithMetadata)
 
 } // namespace logtail
 
