@@ -29,6 +29,8 @@ public:
     void TestGetNextAvailableReader() const;
     void TestUpdateInputs() const;
     void TestClearUnusedCheckpoints() const;
+    void TestSetExpectedFileSize() const;
+    void TestFileRotationDetection() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -57,11 +59,11 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     filesystem::create_directories("test_logs");
     vector<filesystem::path> files{
         "./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
-    vector<string> contents{string(2000, 'a') + "\n", string(200, 'b') + "\n", string(1000, 'c') + "\n"};
+    vector<string> contents{string(500, 'a') + "\n", string(500, 'b') + "\n", string(500, 'c') + "\n"};
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
         {
-            ofstream fout(files[i]);
+            ofstream fout(files[i], ios::binary);
             fout << contents[i];
         }
         auto& item = fingerprints.emplace_back();
@@ -70,6 +72,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
         item.mSignatureSize = contents[i].size() > 1024 ? 1024 : contents[i].size();
         item.mSignatureHash
             = HashSignatureString(contents[i].substr(0, item.mSignatureSize).c_str(), item.mSignatureSize);
+        item.mSize = contents[i].size();
     }
 
     // build input
@@ -112,13 +115,13 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
         APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
     }
-    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 2001, 2001);
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 501);
     {
         // file 2 not existed && file 3 signature changed
         filesystem::remove(cptFiles[1]);
         {
-            ofstream fout(cptFiles[2]);
-            fout << string(10, 'd') << endl;
+            ofstream fout(cptFiles[2], ios::binary);
+            fout << string(10, 'd') << "\n";
         }
         APSARA_TEST_EQUAL(nullptr, sServer->GetNextAvailableReader("test_config", 0));
         APSARA_TEST_EQUAL(1U, sServer->mDeletedInputs.size());
@@ -186,9 +189,113 @@ void StaticFileServerUnittest::TestClearUnusedCheckpoints() const {
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
 
+void StaticFileServerUnittest::TestSetExpectedFileSize() const {
+    // prepare test log
+    filesystem::create_directories("test_logs");
+    filesystem::path testFile = filesystem::absolute("./test_logs/test_file.log");
+    string content = string(5000, 'a') + "\n";
+    {
+        ofstream fout(testFile, ios::binary);
+        fout << content;
+    }
+
+    // build input
+    CollectionPipeline p;
+    p.mName = "test_config";
+    p.mPluginID.store(0);
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    ctx.SetPipeline(p);
+
+    optional<vector<filesystem::path>> filesOpt({testFile});
+    FileDiscoveryOptions discoveryOpts;
+    FileReaderOptions readerOpts;
+    readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    MultilineOptions multilineOpts;
+    FileTagOptions fileTagOpts;
+
+    sServer->AddInput("test_config", 0, filesOpt, &discoveryOpts, &readerOpts, &multilineOpts, &fileTagOpts, &ctx);
+    sServer->UpdateInputs();
+
+    // Get reader and check if mExpectedFileSize is set correctly
+    auto reader = sServer->GetNextAvailableReader("test_config", 0);
+    APSARA_TEST_NOT_EQUAL(nullptr, reader);
+
+    // Check that mExpectedFileSize is set to initial file size
+    FileFingerprint fingerprint;
+    sManager->GetCurrentFileFingerprint("test_config", 0, &fingerprint);
+    // Note: mExpectedFileSize is protected, but we can verify through GetRawData behavior
+    // The actual size should match the initial file size
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(content.size()), fingerprint.mSize);
+
+    sServer->RemoveInput("test_config", 0);
+    sServer->UpdateInputs();
+    filesystem::remove_all("test_logs");
+}
+
+void StaticFileServerUnittest::TestFileRotationDetection() const {
+    // prepare test log
+    filesystem::create_directories("test_logs");
+    filesystem::path originalFile = filesystem::absolute("test_logs/test_file.log");
+    filesystem::path rotatedFile = filesystem::absolute("test_logs/test_file.log.1");
+    string content = string(2000, 'a') + "\n";
+
+    // Create original file and get its devinode
+    DevInode originalDevInode;
+    {
+        ofstream fout(originalFile, ios::binary);
+        fout << content;
+    }
+    originalDevInode = GetFileDevInode(originalFile.string());
+    APSARA_TEST_TRUE(originalDevInode.IsValid());
+
+    // build input
+    CollectionPipeline p;
+    p.mName = "test_config";
+    p.mPluginID.store(0);
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_config");
+    ctx.SetPipeline(p);
+
+    optional<vector<filesystem::path>> filesOpt({originalFile});
+    FileDiscoveryOptions discoveryOpts;
+    FileReaderOptions readerOpts;
+    readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    MultilineOptions multilineOpts;
+    FileTagOptions fileTagOpts;
+
+    sServer->AddInput("test_config", 0, filesOpt, &discoveryOpts, &readerOpts, &multilineOpts, &fileTagOpts, &ctx);
+    sServer->UpdateInputs();
+
+    // Rotate file: move original to rotated (this preserves devinode), create new file
+    filesystem::rename(originalFile, rotatedFile);
+    // Verify rotated file has the same devinode
+    auto rotatedDevInode = GetFileDevInode(rotatedFile.string());
+    APSARA_TEST_EQUAL(originalDevInode, rotatedDevInode);
+
+    // Create new file at original path (will have different devinode)
+    {
+        ofstream fout(originalFile, ios::binary);
+        fout << string(100, 'b') + "\n";
+    }
+    auto newFileDevInode = GetFileDevInode(originalFile.string());
+    APSARA_TEST_NOT_EQUAL(originalDevInode, newFileDevInode);
+
+    // Get reader - should find rotated file by devinode
+    auto reader = sServer->GetNextAvailableReader("test_config", 0);
+    APSARA_TEST_NOT_EQUAL(nullptr, reader);
+    APSARA_TEST_EQUAL(rotatedFile, reader->GetHostLogPath());
+
+    sServer->RemoveInput("test_config", 0);
+    sServer->UpdateInputs();
+    filesystem::remove_all("test_logs");
+}
+
 UNIT_TEST_CASE(StaticFileServerUnittest, TestGetNextAvailableReader)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestUpdateInputs)
 UNIT_TEST_CASE(StaticFileServerUnittest, TestClearUnusedCheckpoints)
+UNIT_TEST_CASE(StaticFileServerUnittest, TestSetExpectedFileSize)
+UNIT_TEST_CASE(StaticFileServerUnittest, TestFileRotationDetection)
 
 } // namespace logtail
 

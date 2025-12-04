@@ -77,7 +77,7 @@ InputStaticFileCheckpoint::InputStaticFileCheckpoint(const string& configName,
       mWaitingSentFlags(mFileCheckpoints.size(), false) {
 }
 
-bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump) {
+bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, bool& needDump) {
     if (mCurrentFileIndex >= mFileCheckpoints.size()) {
         // should not happen
         return false;
@@ -96,17 +96,16 @@ bool InputStaticFileCheckpoint::UpdateCurrentFileCheckpoint(uint64_t offset, uin
                          "signature hash", fileCpt.mSignatureHash)("signature size", fileCpt.mSignatureSize));
         case FileStatus::READING:
             fileCpt.mOffset = offset;
-            fileCpt.mSize = size;
             fileCpt.mLastUpdateTime = time(nullptr);
-            if (offset == size) {
+            if (offset >= fileCpt.mSize) {
                 fileCpt.mStatus = FileStatus::FINISHED;
                 needDump = true;
                 LOG_INFO(sLogger,
                          ("file read done, config", mConfigName)("input idx", mInputIdx)(
                              "current file idx", mCurrentFileIndex)("filepath", fileCpt.mFilePath.string())(
                              "device", fileCpt.mDevInode.dev)("inode", fileCpt.mDevInode.inode)(
-                             "signature hash", fileCpt.mSignatureHash)("signature size", fileCpt.mSignatureSize)("size",
-                                                                                                                 size));
+                             "signature hash", fileCpt.mSignatureHash)("signature size",
+                                                                       fileCpt.mSignatureSize)("size", fileCpt.mSize));
                 if (++mCurrentFileIndex == mFileCheckpoints.size()) {
                     mStatus = StaticFileReadingStatus::FINISHED;
                     mFinishTime = time(nullptr);
@@ -161,6 +160,8 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
     cpt->mDevInode = fileCpt.mDevInode;
     cpt->mSignatureHash = fileCpt.mSignatureHash;
     cpt->mSignatureSize = fileCpt.mSignatureSize;
+    cpt->mSize = fileCpt.mSize;
+    cpt->mOffset = fileCpt.mOffset;
     return true;
 }
 
@@ -203,6 +204,7 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
                 file["inode"] = cpt.mDevInode.inode;
                 file["sig_hash"] = cpt.mSignatureHash;
                 file["sig_size"] = cpt.mSignatureSize;
+                file["size"] = cpt.mSize;
                 break;
             case FileStatus::READING:
                 file["dev"] = cpt.mDevInode.dev;
@@ -325,6 +327,9 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
                 if (!GetMandatoryUIntParam(fileCpt, outerKey + ".sig_size", cpt.mSignatureSize, *errMsg)) {
                     return false;
                 }
+                if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".size", cpt.mSize, *errMsg)) {
+                    return false;
+                }
                 break;
             case FileStatus::READING:
                 if (!GetMandatoryUInt64Param(fileCpt, outerKey + ".dev", cpt.mDevInode.dev, *errMsg)) {
@@ -385,30 +390,27 @@ string buildFileInfoJson(const FileCheckpoint& cpt) {
     Json::Value fileInfo;
     fileInfo["filepath"] = cpt.mFilePath.string();
     fileInfo["status"] = FileStatusToString(cpt.mStatus);
+    fileInfo["dev"] = cpt.mDevInode.dev;
+    fileInfo["inode"] = cpt.mDevInode.inode;
+    fileInfo["sig_hash"] = cpt.mSignatureHash;
+    fileInfo["sig_size"] = cpt.mSignatureSize;
+    fileInfo["size"] = cpt.mSize;
 
     switch (cpt.mStatus) {
         case FileStatus::WAITING:
-            fileInfo["dev"] = cpt.mDevInode.dev;
-            fileInfo["inode"] = cpt.mDevInode.inode;
-            fileInfo["sig_hash"] = cpt.mSignatureHash;
-            fileInfo["sig_size"] = cpt.mSignatureSize;
             break;
         case FileStatus::READING:
-            fileInfo["dev"] = cpt.mDevInode.dev;
-            fileInfo["inode"] = cpt.mDevInode.inode;
-            fileInfo["sig_hash"] = cpt.mSignatureHash;
-            fileInfo["sig_size"] = cpt.mSignatureSize;
-            fileInfo["size"] = cpt.mSize;
             fileInfo["offset"] = cpt.mOffset;
             fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["last_read_time"] = cpt.mLastUpdateTime;
             break;
         case FileStatus::FINISHED:
-            fileInfo["size"] = cpt.mSize;
             fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["finish_time"] = cpt.mLastUpdateTime;
             break;
         case FileStatus::ABORT:
+            fileInfo["offset"] = cpt.mOffset;
+            fileInfo["start_time"] = cpt.mStartTime;
             fileInfo["abort_time"] = cpt.mLastUpdateTime;
             break;
         default:

@@ -43,7 +43,7 @@ public:
                               uint32_t startTime = 0,
                               uint32_t expireTime = 0);
 
-    bool UpdateCurrentFileCheckpoint(uint64_t offset, uint64_t size, bool& needDump);
+    bool UpdateCurrentFileCheckpoint(uint64_t offset, bool& needDump);
     bool InvalidateCurrentFileCheckpoint();
     bool GetCurrentFileFingerprint(FileFingerprint* cpt);
     void SetAbort();

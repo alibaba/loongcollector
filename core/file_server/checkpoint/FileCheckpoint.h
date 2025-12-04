@@ -42,7 +42,7 @@ struct FileCheckpoint {
     DevInode mDevInode;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
-    uint64_t mSize = 0;
+    uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围，保持不变
     uint64_t mOffset = 0;
     FileStatus mStatus = FileStatus::WAITING;
     int32_t mStartTime = 0;
@@ -61,6 +61,8 @@ struct FileFingerprint {
     DevInode mDevInode;
     uint32_t mSignatureSize;
     uint64_t mSignatureHash;
+    uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围
+    uint64_t mOffset = 0;
 };
 
 } // namespace logtail

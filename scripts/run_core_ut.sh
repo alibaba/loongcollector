@@ -28,6 +28,9 @@ if [ -z "$MAX_JOBS" ] || [ "$MAX_JOBS" -lt 1 ]; then
     MAX_JOBS=1
 fi
 
+# Timeout for directory tests (20 minutes = 1200 seconds)
+DIRECTORY_TIMEOUT=${DIRECTORY_TIMEOUT:-1200}
+
 # Global variables
 declare -A DIR_TESTS  # Directory -> space-separated test files
 declare -a DIR_ORDER # Order of directories
@@ -91,11 +94,50 @@ calc_duration() {
     awk "BEGIN {printf \"%.2f\", $end - $start}"
 }
 
+# Get relative path of test file (relative to TARGET_ARTIFACT_PATH)
+get_test_relative_path() {
+    local test_file="$1"
+    local artifact_path="$2"
+    
+    # Get absolute paths
+    local test_abs
+    if [ -f "$test_file" ] || [ -L "$test_file" ]; then
+        test_abs=$(realpath "$test_file" 2>/dev/null || echo "$test_file")
+    else
+        test_abs="$test_file"
+    fi
+    
+    local artifact_abs
+    if [ -d "$artifact_path" ]; then
+        artifact_abs=$(realpath "$artifact_path" 2>/dev/null || echo "$artifact_path")
+    else
+        artifact_abs="$artifact_path"
+    fi
+    
+    # Remove artifact path prefix (with trailing slash)
+    if [[ "$test_abs" == "$artifact_abs"/* ]]; then
+        echo "${test_abs#$artifact_abs/}"
+    elif [[ "$test_abs" == "$artifact_abs" ]]; then
+        # If test file is the artifact path itself, return basename
+        basename "$test_file"
+    else
+        # Fallback: try to remove common prefix patterns
+        local pattern="*/core/build/unittest/"
+        if [[ "$test_abs" == *"$pattern"* ]]; then
+            echo "${test_abs#*$pattern}"
+        else
+            # Last resort: return basename
+            basename "$test_file"
+        fi
+    fi
+}
+
 # Run tests in a directory sequentially
 run_directory_tests() {
     local test_dir="$1"
     local output_file="$2"
     local stats_file="$3"
+    local artifact_path="$4"  # TARGET_ARTIFACT_PATH absolute path
     local tests="${DIR_TESTS[$test_dir]}"
     local dir_name=$(basename "$test_dir")
     local dir_test_count=0
@@ -114,14 +156,22 @@ run_directory_tests() {
             echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$dir_name] $test_file Start **********"
         } >> "$output_file" 2>&1
         
+        # Output real-time result for test start (outside output redirection)
+        (
+            flock -x 200
+            local rel_path=$(get_test_relative_path "$test_file" "$artifact_path")
+            echo "🔄 $rel_path (starting...)" >&1
+        ) 200>"$OUTPUT_LOCK_FILE.lock"
+        
         cd "$test_dir"
         local test_output=$(mktemp)
-        if ! "./$test_name" > "$test_output" 2>&1; then
+        # Run test and capture output to both temp file and output file in real-time
+        # This ensures we can see partial output even if test times out
+        if ! "./$test_name" 2>&1 | tee "$test_output" >> "$output_file"; then
             local test_end=$(date +%s.%N)
             local test_duration=$(calc_duration "$test_start" "$test_end")
             {
                 echo "[$(date '+%Y-%m-%d %H:%M:%S')] [$dir_name] $test_file Failed (${test_duration}s) **********"
-                cat "$test_output"
             } >> "$output_file" 2>&1
             cd - > /dev/null
             rm -f "$test_output"
@@ -130,7 +180,8 @@ run_directory_tests() {
             (
                 flock -x 200
                 echo "$test_file" >> "$OUTPUT_LOCK_FILE.failed"
-                echo "[FAILED] $test_file" >&1
+                local rel_path=$(get_test_relative_path "$test_file" "$artifact_path")
+                echo "❌ $rel_path" >&1
             ) 200>"$OUTPUT_LOCK_FILE.lock"
             
             local end_time=$(date +%s.%N)
@@ -155,7 +206,8 @@ run_directory_tests() {
         # Output real-time result for successful test (outside output redirection)
         (
             flock -x 200
-            echo "[OK] $test_file" >&1
+            local rel_path=$(get_test_relative_path "$test_file" "$artifact_path")
+            echo "✅ $rel_path" >&1
         ) 200>"$OUTPUT_LOCK_FILE.lock"
         
         ((dir_test_count++))
@@ -209,6 +261,13 @@ main() {
     local original_dir=$(pwd)
     cd "$TARGET_ARTIFACT_PATH" || exit 1
     
+    # Get absolute path of TARGET_ARTIFACT_PATH for relative path calculation
+    local artifact_abs_path=$(pwd)
+    
+    # Disable job control messages to suppress termination messages
+    # This prevents bash from printing "Terminated" messages when background jobs are killed
+    set +m 2>/dev/null || true
+    
     # Create temporary directory for output files
     local temp_dir=$(mktemp -d)
     OUTPUT_LOCK_FILE="$temp_dir/lock"
@@ -250,8 +309,122 @@ main() {
     local dir_index=0
     local failed=0
     local active_pids=()
+    declare -A PID_TO_DIR  # PID -> test_dir
+    declare -A PID_START_TIME  # PID -> start_time
     
     while [ $dir_index -lt ${#DIR_ORDER[@]} ] || [ ${#active_pids[@]} -gt 0 ]; do
+        # Check for timeouts first
+        local new_active_pids=()
+        for pid in "${active_pids[@]}"; do
+            if kill -0 "$pid" 2>/dev/null; then
+                # Process is still running, check for timeout
+                local test_dir="${PID_TO_DIR[$pid]}"
+                local start_time="${PID_START_TIME[$pid]}"
+                if [ -n "$test_dir" ] && [ -n "$start_time" ]; then
+                    local current_time=$(date +%s.%N)
+                    local elapsed=$(calc_duration "$start_time" "$current_time")
+                    if awk -v elapsed="$elapsed" -v timeout="$DIRECTORY_TIMEOUT" 'BEGIN {exit !(elapsed >= timeout)}'; then
+                        # Timeout occurred, kill the process and its children
+                        # Temporarily redirect stderr to suppress bash termination messages
+                        exec 3>&2 2>/dev/null
+                        
+                        local dir_name=$(basename "$test_dir")
+                        echo "⏱️  Directory $dir_name timeout exceeded (${DIRECTORY_TIMEOUT}s), killing process $pid" >&3
+                        
+                        # Kill the process and all its children
+                        # First try to get the process group ID
+                        local pgid=$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')
+                        if [ -n "$pgid" ] && [ "$pgid" != "$$" ]; then
+                            # Kill the entire process group
+                            kill -TERM -"$pgid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+                        else
+                            # Fallback: kill the process and find its children
+                            kill -TERM "$pid" 2>/dev/null
+                            # Kill all children of this process
+                            pkill -TERM -P "$pid" 2>/dev/null || true
+                        fi
+                        sleep 1
+                        # Force kill if still running
+                        if kill -0 "$pid" 2>/dev/null; then
+                            if [ -n "$pgid" ] && [ "$pgid" != "$$" ]; then
+                                kill -KILL -"$pgid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
+                            else
+                                kill -KILL "$pid" 2>/dev/null
+                                pkill -KILL -P "$pid" 2>/dev/null || true
+                            fi
+                        fi
+                        
+                        # Wait for the killed process to clean up (suppress termination messages)
+                        wait "$pid" 2>/dev/null || true
+                        # Small delay to ensure termination message is suppressed
+                        sleep 0.1
+                        
+                        # Restore stderr
+                        exec 2>&3 3>&-
+                        
+                        # Mark only incomplete tests in this directory as failed
+                        # Check output file to see which tests have already completed
+                        local output_file="${DIR_OUTPUT_FILES[$test_dir]}"
+                        local stats_file="${DIR_STATS_FILES[$test_dir]}"
+                        local tests_in_dir="${DIR_TESTS[$test_dir]}"
+                        
+                        {
+                            flock -x 200
+                            for test_file in $tests_in_dir; do
+                                local test_name=$(basename "$test_file")
+                                # Check if this test has already completed successfully
+                                # Look for "End" marker in the output file
+                                if [ -f "$output_file" ] && grep -q "\[$dir_name\] $test_file End" "$output_file" 2>/dev/null; then
+                                    # Test already completed successfully, skip it
+                                    continue
+                                fi
+                                # Test hasn't completed, mark it as failed due to timeout
+                                echo "$test_file" >> "$OUTPUT_LOCK_FILE.failed"
+                                local rel_path=$(get_test_relative_path "$test_file" "$artifact_abs_path")
+                                echo "❌ $rel_path (timeout)" >&1
+                            done
+                        } 200>"$OUTPUT_LOCK_FILE.lock"
+                        
+                        # Write timeout message to output file
+                        {
+                            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ⚠️  Directory timeout exceeded (${DIRECTORY_TIMEOUT}s)"
+                            echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========== Directory: $dir_name Timeout =========="
+                            echo
+                        } >> "$output_file" 2>&1
+                        
+                        # Write timeout stats
+                        local end_time=$(date +%s.%N)
+                        local duration=$(calc_duration "$start_time" "$end_time")
+                        echo "$test_dir|$start_time|$end_time|0|$duration|TIMEOUT" > "$stats_file"
+                        
+                        failed=1
+                        # Clean up tracking info
+                        unset PID_TO_DIR[$pid]
+                        unset PID_START_TIME[$pid]
+                        # Don't add to new_active_pids, process is killed
+                        continue
+                    fi
+                fi
+                # Process is still running and not timed out
+                new_active_pids+=($pid)
+            else
+                # Process has completed, wait for it to get exit status
+                # Temporarily redirect stderr to suppress bash termination messages
+                exec 3>&2 2>/dev/null
+                wait "$pid" 2>/dev/null
+                local wait_status=$?
+                exec 2>&3 3>&-
+                if [ $wait_status -ne 0 ]; then
+                    failed=1
+                fi
+                # Clean up tracking info
+                unset PID_TO_DIR[$pid]
+                unset PID_START_TIME[$pid]
+                # Don't add to new_active_pids, process has completed
+            fi
+        done
+        active_pids=("${new_active_pids[@]}")
+        
         # Start new jobs if we have capacity and more directories
         while [ ${#active_pids[@]} -lt $MAX_JOBS ] && [ $dir_index -lt ${#DIR_ORDER[@]} ]; do
             local test_dir="${DIR_ORDER[$dir_index]}"
@@ -259,12 +432,17 @@ main() {
             local stats_file="${DIR_STATS_FILES[$test_dir]}"
             
             (
-                if ! run_directory_tests "$test_dir" "$output_file" "$stats_file"; then
+                # Suppress job control messages
+                set +m 2>/dev/null || true
+                if ! run_directory_tests "$test_dir" "$output_file" "$stats_file" "$artifact_abs_path"; then
                     exit 1
                 fi
-            ) &
+            ) 2>/dev/null &
             local pid=$!
+            local start_time=$(date +%s.%N)
             active_pids+=($pid)
+            PID_TO_DIR[$pid]="$test_dir"
+            PID_START_TIME[$pid]="$start_time"
             ((dir_index++))
         done
         
@@ -284,6 +462,9 @@ main() {
                     if [ $wait_status -ne 0 ]; then
                         failed=1
                     fi
+                    # Clean up tracking info
+                    unset PID_TO_DIR[$pid]
+                    unset PID_START_TIME[$pid]
                 fi
             done
             active_pids=("${new_active_pids[@]}")
@@ -297,11 +478,17 @@ main() {
     
     # Wait for any remaining jobs to complete
     for pid in "${active_pids[@]}"; do
+        # Temporarily redirect stderr to suppress bash termination messages
+        exec 3>&2 2>/dev/null
         wait "$pid" 2>/dev/null
         local wait_status=$?
+        exec 2>&3 3>&-
         if [ $wait_status -ne 0 ]; then
             failed=1
         fi
+        # Clean up tracking info
+        unset PID_TO_DIR[$pid]
+        unset PID_START_TIME[$pid]
     done
     
     TOTAL_END_TIME=$(date +%s.%N)
@@ -322,52 +509,6 @@ main() {
     
     echo
     echo "----------------------"
-    
-    # Only output failed tests before statistics
-    if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
-        echo
-        echo "=========================================="
-        echo "Failed Tests Summary"
-        echo "=========================================="
-        echo
-        for failed_test in "${FAILED_TESTS[@]}"; do
-            echo "  - $failed_test"
-            echo
-            
-            # Extract and display failure details from output file
-            for test_dir in "${DIR_ORDER[@]}"; do
-                local output_file="${DIR_OUTPUT_FILES[$test_dir]}"
-                if [ -f "$output_file" ] && grep -q "$failed_test" "$output_file" 2>/dev/null; then
-                    local test_name=$(basename "$failed_test")
-                    # Extract failure section: find Start line and extract until next test or completion
-                    # Use a simpler approach: find the line number and extract from there
-                    local start_line=$(grep -n "Start.*$test_name" "$output_file" 2>/dev/null | head -1 | cut -d: -f1)
-                    if [ -n "$start_line" ]; then
-                        # Extract from start_line until we hit next test start or directory completion
-                        awk -v start="$start_line" -v test_name="$test_name" '
-                        NR >= start {
-                            print
-                            # Stop at next test start (but not our own)
-                            if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !/Start.*test_name/) {
-                                exit
-                            }
-                            # Stop at directory completion
-                            if (/========== Directory.*Completed/) {
-                                exit
-                            }
-                        }
-                        ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
-                    else
-                        # Fallback: show lines containing the test and failure info
-                        grep -A 200 "$test_name" "$output_file" 2>/dev/null | \
-                        grep -B 5 -A 200 "Failed" | head -100 | sed 's/^/    /' || true
-                    fi
-                    break
-                fi
-            done
-            echo
-        done
-    fi
     
     # Calculate and display statistics
     echo "=========================================="
@@ -405,16 +546,90 @@ main() {
     fi
     echo
     
+    # Output failed tests details after statistics
+    if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
+        echo "=========================================="
+        echo "❌ Failed Tests Summary"
+        echo "=========================================="
+        echo
+        for failed_test in "${FAILED_TESTS[@]}"; do
+            local rel_path=$(get_test_relative_path "$failed_test" "$artifact_abs_path")
+            echo "  ❌ $rel_path"
+            echo
+            
+            # Extract and display failure details from output file
+            for test_dir in "${DIR_ORDER[@]}"; do
+                local output_file="${DIR_OUTPUT_FILES[$test_dir]}"
+                if [ -f "$output_file" ] && grep -q "$failed_test" "$output_file" 2>/dev/null; then
+                    local test_name=$(basename "$failed_test")
+                    local dir_name=$(basename "$test_dir")
+                    # Extract failure section: find Start line and extract until next test or completion
+                    # Use a simpler approach: find the line number and extract from there
+                    local start_line=$(grep -n "Start.*$test_name" "$output_file" 2>/dev/null | head -1 | cut -d: -f1)
+                    if [ -n "$start_line" ]; then
+                        # Check if this is a timeout case (no "End" marker)
+                        local has_end=$(grep -c "\[$dir_name\] $failed_test End" "$output_file" 2>/dev/null || echo "0")
+                        local has_timeout=$(grep -c "Directory timeout exceeded\|Directory.*Timeout" "$output_file" 2>/dev/null || echo "0")
+                        
+                        if [ "$has_end" -eq 0 ]; then
+                            # This might be a timeout case, extract from Start until timeout message, next test, or directory completion
+                            # Include all output including any partial test output
+                            # Extract everything after Start line, including test output that was written in real-time
+                            awk -v start="$start_line" -v test_name="$test_name" -v dir_name="$dir_name" '
+                            NR >= start {
+                                print
+                                # Stop at timeout message (but include it)
+                                if (/Directory timeout exceeded|Directory.*Timeout/) {
+                                    exit
+                                }
+                                # Stop at next test start (but not our own)
+                                if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !/Start.*test_name/) {
+                                    exit
+                                }
+                                # Stop at directory completion
+                                if (/========== Directory.*Completed/) {
+                                    exit
+                                }
+                            }
+                            ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
+                        else
+                            # Normal failure case, extract from Start until next test or completion
+                            awk -v start="$start_line" -v test_name="$test_name" '
+                            NR >= start {
+                                print
+                                # Stop at next test start (but not our own)
+                                if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !/Start.*test_name/) {
+                                    exit
+                                }
+                                # Stop at directory completion
+                                if (/========== Directory.*Completed/) {
+                                    exit
+                                }
+                            }
+                            ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
+                        fi
+                    else
+                        # Fallback: show lines containing the test and failure info
+                        grep -A 200 "$test_name" "$output_file" 2>/dev/null | \
+                        grep -B 5 -A 200 "Failed\|timeout" | head -100 | sed 's/^/    /' || true
+                    fi
+                    break
+                fi
+            done
+            echo
+        done
+    fi
+    
     # Report results
     if [ $failed -eq 0 ] && [ ${#FAILED_TESTS[@]} -eq 0 ]; then
         echo "=========================================="
-        echo "All $TESTS_RUN tests completed successfully!"
+        echo "✅ All $TESTS_RUN tests completed successfully!"
         echo "=========================================="
         rm -rf "$temp_dir"
         exit 0
     else
         echo "=========================================="
-        echo "Some tests failed!"
+        echo "❌ Some tests failed!"
         echo "=========================================="
         rm -rf "$temp_dir"
         exit 1

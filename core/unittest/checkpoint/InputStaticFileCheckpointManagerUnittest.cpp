@@ -27,6 +27,7 @@ public:
     void TestCheckpointFileNames() const;
     void TestDumpCheckpoints() const;
     void TestInvalidCheckpointFile() const;
+    void TestSizeRemainsConstant() const;
 
 protected:
     void SetUp() override {
@@ -114,7 +115,8 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(fingerprints[0].mSignatureHash, cpt.mFileCheckpoints[0].mSignatureHash);
         APSARA_TEST_EQUAL(fingerprints[0].mSignatureSize, cpt.mFileCheckpoints[0].mSignatureSize);
         APSARA_TEST_EQUAL(0U, cpt.mFileCheckpoints[0].mOffset);
-        APSARA_TEST_EQUAL(0U, cpt.mFileCheckpoints[0].mSize);
+        APSARA_TEST_EQUAL(static_cast<uint64_t>(contents[0].size()),
+                          cpt.mFileCheckpoints[0].mSize); // mSize should be initial file size
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
@@ -136,7 +138,8 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(fingerprints[1].mSignatureHash, cpt.mFileCheckpoints[0].mSignatureHash);
         APSARA_TEST_EQUAL(fingerprints[1].mSignatureSize, cpt.mFileCheckpoints[0].mSignatureSize);
         APSARA_TEST_EQUAL(0U, cpt.mFileCheckpoints[0].mOffset);
-        APSARA_TEST_EQUAL(0U, cpt.mFileCheckpoints[0].mSize);
+        APSARA_TEST_EQUAL(static_cast<uint64_t>(contents[1].size()),
+                          cpt.mFileCheckpoints[0].mSize); // mSize should be initial file size
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
@@ -221,12 +224,14 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     sManager->CreateCheckpoint("test_config_2", 0, optional<vector<filesystem::path>>({files[0]}));
     {
         // from waiting to reading
-        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 1000, 2001));
+        uint64_t initialSize = static_cast<uint64_t>(contents[0].size());
+        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 1000));
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_1", 0));
         APSARA_TEST_EQUAL(0U, cpt.mCurrentFileIndex);
         APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
         APSARA_TEST_EQUAL(1000U, cpt.mFileCheckpoints[0].mOffset);
-        APSARA_TEST_EQUAL(2001U, cpt.mFileCheckpoints[0].mSize);
+        // mSize should remain as initial file size, not updated to 2001
+        APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
         APSARA_TEST_EQUAL(FileStatus::READING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
@@ -247,12 +252,14 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     }
     {
         // maintain reading
-        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 1500, 2001));
+        uint64_t initialSize = static_cast<uint64_t>(contents[0].size());
+        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 1500));
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_1", 0));
         APSARA_TEST_EQUAL(0U, cpt.mCurrentFileIndex);
         APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
         APSARA_TEST_EQUAL(1500U, cpt.mFileCheckpoints[0].mOffset);
-        APSARA_TEST_EQUAL(2001U, cpt.mFileCheckpoints[0].mSize);
+        // mSize should remain as initial file size, not updated to 2001
+        APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
         APSARA_TEST_EQUAL(FileStatus::READING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
@@ -269,12 +276,14 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     }
     {
         // from reading to finished
-        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 2001, 2001));
+        uint64_t initialSize = static_cast<uint64_t>(contents[0].size());
+        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, initialSize));
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_1", 0));
         APSARA_TEST_EQUAL(1U, cpt.mCurrentFileIndex);
         APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
-        APSARA_TEST_EQUAL(2001U, cpt.mFileCheckpoints[0].mOffset);
-        APSARA_TEST_EQUAL(2001U, cpt.mFileCheckpoints[0].mSize);
+        APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mOffset);
+        // mSize should remain as initial file size
+        APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
         APSARA_TEST_EQUAL(FileStatus::FINISHED, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
@@ -312,7 +321,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     }
     {
         // job finished with last file finished
-        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 501, 501));
+        APSARA_TEST_TRUE(sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 501));
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_1", 0));
         APSARA_TEST_EQUAL(3U, cpt.mCurrentFileIndex);
         APSARA_TEST_EQUAL(StaticFileReadingStatus::FINISHED, cpt.mStatus);
@@ -395,13 +404,14 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
     }
     // job_1 running: file 1 finished, file 2 abort, file 3 reading, file 4 waiting
     sManager->CreateCheckpoint("test_config_1", 0, files);
-    sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 2001, 2001);
+    uint64_t file1InitialSize = static_cast<uint64_t>(string(2000, 'a').size() + 1); // 2000 'a' + '\n'
+    sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, file1InitialSize);
     sManager->InvalidateCurrentFileCheckpoint("test_config_1", 0);
-    sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 100, 501);
+    sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 100);
     // job_2 finished
     optional<vector<filesystem::path>> filesOpt({files[0]});
     sManager->CreateCheckpoint("test_config_2", 0, filesOpt);
-    sManager->UpdateCurrentFileCheckpoint("test_config_2", 0, 2001, 2001);
+    sManager->UpdateCurrentFileCheckpoint("test_config_2", 0, file1InitialSize);
 
     sManager->DumpAllCheckpointFiles();
     {
@@ -635,11 +645,45 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
     }
 }
 
+void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
+    filesystem::create_directories("test_logs");
+    filesystem::path testFile = "./test_logs/test_file.log";
+    string content = string(2000, 'a') + "\n";
+    {
+        ofstream fout(testFile, std::ios_base::binary);
+        fout << content;
+    }
+
+    optional<vector<filesystem::path>> filesOpt({testFile});
+    sManager->CreateCheckpoint("test_config", 0, filesOpt);
+
+    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
+    uint64_t initialSize = cpt.mFileCheckpoints[0].mSize;
+    APSARA_TEST_EQUAL(static_cast<uint64_t>(content.size()), initialSize);
+
+    // Update checkpoint multiple times - mSize should remain constant
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 100);
+    APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
+
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 500);
+    APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
+
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, 1000);
+    APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
+
+    // Even when file is finished, mSize should remain initial size
+    sManager->UpdateCurrentFileCheckpoint("test_config", 0, initialSize);
+    APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
+
+    filesystem::remove_all("test_logs");
+}
+
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpointMap)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpoint)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestCheckpointFileNames)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestDumpCheckpoints)
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestInvalidCheckpointFile)
+UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestSizeRemainsConstant)
 
 } // namespace logtail
 
