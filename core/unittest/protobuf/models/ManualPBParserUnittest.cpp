@@ -507,7 +507,8 @@ protected:
                                                   const std::vector<std::pair<std::string, std::string>>& tags,
                                                   double value = 0.0,
                                                   bool hasValue = false,
-                                                  const std::vector<std::pair<std::string, std::string>>& metadata = {}) {
+                                                  const std::vector<std::pair<std::string, std::string>>& metadata
+                                                  = {}) {
         std::vector<uint8_t> result;
 
         // field 1: timestamp (varint)
@@ -6054,19 +6055,8 @@ void ManualPBParserUnittest::TestSpanEventTimestampNanosecondConversion() {
     // Create SpanEvent with timestamp in nanoseconds: 1764735735000000000 ns
     // This should convert to: 1764735735 seconds + 0 nanoseconds
     uint64_t timestampNs = 1764735735000000000ULL;
-    auto spanEventData = encodeSpanEvent(timestampNs,
-                                         "trace123",
-                                         "span456",
-                                         "test_span",
-                                         1,
-                                         1000000000ULL,
-                                         2000000000ULL,
-                                         {},
-                                         {},
-                                         "",
-                                         "",
-                                         0,
-                                         {});
+    auto spanEventData = encodeSpanEvent(
+        timestampNs, "trace123", "span456", "test_span", 1, 1000000000ULL, 2000000000ULL, {}, {}, "", "", 0, {});
     auto data = encodePipelineEventGroupWithSpans({spanEventData});
 
     auto sourceBuffer = make_shared<SourceBuffer>();
