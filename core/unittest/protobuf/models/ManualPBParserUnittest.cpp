@@ -1696,10 +1696,10 @@ void ManualPBParserUnittest::TestParseLogEventMultipleEvents() {
     auto logEvent1Data = encodeLogEvent(1000000000000000000ULL, contents1, "INFO");
 
     vector<pair<string, string>> contents2 = {{"event", "second"}};
-    auto logEvent2Data = encodeLogEvent(2000000000000000000ULL, contents2, "INFO");
+    auto logEvent2Data = encodeLogEvent(2000000000000000000ULL, contents2, "WARN");
 
     vector<pair<string, string>> contents3 = {{"event", "third"}};
-    auto logEvent3Data = encodeLogEvent(3000000000000000000ULL, contents3, "INFO");
+    auto logEvent3Data = encodeLogEvent(3000000000000000000ULL, contents3, "ERROR");
 
     vector<vector<uint8_t>> logEvents = {logEvent1Data, logEvent2Data, logEvent3Data};
     auto data = encodePipelineEventGroupWithLogs(logEvents);
