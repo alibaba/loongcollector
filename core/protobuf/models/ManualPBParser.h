@@ -78,6 +78,7 @@ private:
     // Parse nested structures
     bool parseLogContent(PipelineEventGroup& eventGroup, class LogEvent* logEvent);
     bool parseMetricTags(PipelineEventGroup& eventGroup, class MetricEvent* metricEvent);
+    bool parseMetricMetadata(PipelineEventGroup& eventGroup, class MetricEvent* metricEvent);
     bool parseSpanTags(PipelineEventGroup& eventGroup, class SpanEvent* spanEvent);
     bool parseSpanScopeTags(PipelineEventGroup& eventGroup, class SpanEvent* spanEvent);
     bool parseSpanInnerEvent(PipelineEventGroup& eventGroup, class SpanEvent* spanEvent);
