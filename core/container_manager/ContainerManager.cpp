@@ -103,12 +103,21 @@ void ContainerManager::ApplyContainerDiffs() {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     for (auto& pair : mConfigContainerDiffMap) {
+        FileDiscoveryOptions* options = nullptr;
+        const CollectionPipelineContext* ctx = nullptr;
         const auto& itr = nameConfigMap.find(pair.first);
         if (itr == nameConfigMap.end()) {
-            continue;
+            std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+            const auto& handlerItr = mContainerHandlers.find(pair.first);
+            if (handlerItr == mContainerHandlers.end()) {
+                continue;
+            }
+            options = handlerItr->second.first.first;
+            ctx = handlerItr->second.first.second;
+        } else {
+            options = itr->second.first;
+            ctx = itr->second.second;
         }
-        const auto& options = itr->second.first;
-        const auto& ctx = itr->second.second;
 
         const auto& diff = pair.second;
 
@@ -206,6 +215,20 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
             }
         }
     }
+    {
+        std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+        for (auto itr = mContainerHandlers.begin(); itr != mContainerHandlers.end(); ++itr) {
+            FileDiscoveryOptions* options = itr->second.first.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                bool isCurrentConfigUpdate = checkContainerDiffForOneConfig(options, itr->second.first.second);
+                if (isCurrentConfigUpdate) {
+                    isUpdate = true;
+                    // Invoke callback
+                    itr->second.second(mConfigContainerDiffMap[itr->first]);
+                }
+            }
+        }
+    }
     return isUpdate;
 }
 
@@ -270,6 +293,17 @@ void ContainerManager::sendMatchedContainerInfo(std::vector<std::shared_ptr<Matc
     }
 }
 
+void ContainerManager::AddContainerHandler(const std::string& name,
+                                           const FileDiscoveryConfig& config,
+                                           const std::function<void(std::shared_ptr<ContainerDiff>)>& handler) {
+    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+    mContainerHandlers[name] = std::make_pair(config, handler);
+}
+
+void ContainerManager::RemoveContainerHandler(const std::string& name) {
+    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+    mContainerHandlers.erase(name);
+}
 
 bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx) {
@@ -1031,6 +1065,18 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             FileDiscoveryOptions* options = itr->second.first;
             if (options->IsContainerDiscoveryEnabled()) {
                 checkContainerDiffForOneConfig(options, itr->second.second);
+            }
+        }
+        {
+            std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+            for (auto iter = mContainerHandlers.begin(); iter != mContainerHandlers.end(); ++iter) {
+                FileDiscoveryOptions* options = iter->second.first.first;
+                if (options->IsContainerDiscoveryEnabled()) {
+                    if (checkContainerDiffForOneConfig(options, nullptr)) {
+                        // Invoke callback
+                        iter->second.second(mConfigContainerDiffMap[iter->first]);
+                    }
+                }
             }
         }
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));
