@@ -1126,7 +1126,10 @@ bool ManualPBParser::parseSpanEvent(PipelineEventGroup& eventGroup) {
     mPos = eventData + eventLength;
 
     // Set parsed values
-    spanEvent->SetTimestamp(timestamp);
+    // timestamp is in nanoseconds, convert to seconds and nanoseconds
+    std::chrono::nanoseconds tns(timestamp);
+    std::chrono::seconds ts = std::chrono::duration_cast<std::chrono::seconds>(tns);
+    spanEvent->SetTimestamp(ts.count(), tns.count() - ts.count() * 1000000000);
     spanEvent->SetStartTimeNs(startTime);
     spanEvent->SetEndTimeNs(endTime);
 
