@@ -15,6 +15,8 @@
  */
 
 #pragma once
+#include <grpcpp/support/byte_buffer.h>
+
 #include <string>
 
 namespace logtail {
@@ -36,6 +38,7 @@ extern const std::string METRIC_LABEL_KEY_VERSION;
 extern const std::string METRIC_LABEL_KEY_ECS_INSTANCE_ID;
 extern const std::string METRIC_LABEL_KEY_ECS_REGION_ID;
 extern const std::string METRIC_LABEL_KEY_ECS_USER_ID;
+extern const std::string METRIC_LABEL_KEY_HOST_ID;
 
 // metric keys
 extern const std::string METRIC_AGENT_CPU;
