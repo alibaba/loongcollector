@@ -543,7 +543,7 @@ size_t SystemInterface::SystemInformationCache<InfoT>::GetCacheSize() const {
 
 void SystemInterface::InitMetrics() {
     MetricLabels labels;
-    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "system_interface");
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "host_monitor");
     WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
 

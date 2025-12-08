@@ -15,8 +15,6 @@
  */
 
 #pragma once
-#include <grpcpp/support/byte_buffer.h>
-
 #include <string>
 
 namespace logtail {
