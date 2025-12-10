@@ -561,6 +561,17 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                               const std::string& sName) {
     std::string errorMsg;
 
+    if (!GetOptionalUIntParam(config, "CollectIntervalMs", mCollectIntervalMs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
     if (!GetOptionalStringParam(config, "AppName", mAppName, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
