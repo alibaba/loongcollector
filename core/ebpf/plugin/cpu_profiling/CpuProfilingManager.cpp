@@ -31,7 +31,6 @@ namespace ebpf {
 const std::string CpuProfilingManager::kProfileCpuValue = "profile_cpu";
 const std::string CpuProfilingManager::kEmptyValue = "";
 const std::string CpuProfilingManager::kNanosecondsValue = "nanoseconds";
-const std::string CpuProfilingManager::kOneValue = "1";
 const std::string CpuProfilingManager::kCpuValue = "cpu";
 const std::string CpuProfilingManager::kCallStackValue = "CallStack";
 
@@ -105,6 +104,10 @@ int CpuProfilingManager::AddOrUpdateConfig(const CollectionPipelineContext* cont
         .mLanguage = opts->mLanguage,
     };
     mConfigInfoMap.insert_or_assign(key, info);
+    if (opts->mCollectIntervalMs != 0) {
+        // We always use the collect interval from the latest added/updated config
+        mGlobalConfigCollectIntervalMs = opts->mCollectIntervalMs;
+    }
 
     ProcessDiscoveryConfig config{
         .mConfigKey = key,
@@ -198,7 +201,8 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
 static void addContentToEvent(LogEvent* event,
                               const std::vector<std::string>& fullStack,
                               const std::string& appName,
-                              const std::string& comm) {
+                              const std::string& comm,
+                              uint32_t val_ns) {
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 
@@ -222,7 +226,7 @@ static void addContentToEvent(LogEvent* event,
     event->SetContentNoCopy(kType.LogKey(), StringView(CpuProfilingManager::kProfileCpuValue));
     event->SetContentNoCopy(kTypeCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     event->SetContentNoCopy(kUnits.LogKey(), StringView(CpuProfilingManager::kNanosecondsValue));
-    event->SetContentNoCopy(kVal.LogKey(), StringView(CpuProfilingManager::kOneValue));
+    event->SetContent(kVal.LogKey(), std::to_string(val_ns));
     event->SetContentNoCopy(kValueTypes.LogKey(), StringView(CpuProfilingManager::kCpuValue));
     event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     // {"__name__": "xxx", "thread": "comm"}
@@ -282,7 +286,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
             event->SetContent(kProfileID.LogKey(), profileID);
             event->SetContentNoCopy(kProfileDataType.LogKey(), StringView(CpuProfilingManager::kCallStackValue));
             event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
-            addContentToEvent(event, stack, info.mAppName, commStr);
+            addContentToEvent(event, stack, info.mAppName, commStr, cnt * mSamplePeriodMs * 1000000);
         }
 
         std::unique_ptr<ProcessQueueItem> item
