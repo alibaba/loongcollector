@@ -52,8 +52,13 @@ struct FileCheckpoint {
     FileCheckpoint(const std::filesystem::path& filename,
                    const DevInode& devInode,
                    uint64_t signatureHash,
-                   uint32_t signatureSize)
-        : mFilePath(filename), mDevInode(devInode), mSignatureHash(signatureHash), mSignatureSize(signatureSize) {}
+                   uint32_t signatureSize,
+                   uint64_t initialSize = 0)
+        : mFilePath(filename),
+          mDevInode(devInode),
+          mSignatureHash(signatureHash),
+          mSignatureSize(signatureSize),
+          mSize(initialSize) {}
 };
 
 struct FileFingerprint {

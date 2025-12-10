@@ -122,8 +122,7 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         signature.resize(is.gcount());
         auto sigHash = static_cast<uint64_t>(HashSignatureString(signature.c_str(), signature.size()));
 
-        fileCpts.emplace_back(file, devInode, sigHash, signature.size());
-        fileCpts.back().mSize = initialSize;
+        fileCpts.emplace_back(file, devInode, sigHash, signature.size(), initialSize);
         LOG_INFO(sLogger,
                  ("create file checkpoint succeeded, config",
                   configName)("input idx", idx)("filepath", file)("device", devInode.dev)("inode", devInode.inode)(
