@@ -1171,17 +1171,16 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
 
             if (dropIfBlocked && GetCurrentTimeInMilliSeconds() - startTime > 120000) { // 2 minutes
                 LOG_ERROR(sLogger,
-                            ("push log to processor blocked, drop log", reader->GetHostLogPath())(
-                                "project", reader->GetProject())("logstore", reader->GetLogstore())(
-                                "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                                "log reader queue size", reader->GetReaderArray()->size()));
-                AlarmManager::GetInstance()->SendAlarmCritical(
-                    DROP_LOG_ALARM,
-                    "push log to processor blocked, drop log",
-                    reader->GetRegion(),
-                    reader->GetProject(),
-                    reader->GetConfigName(),
-                    reader->GetLogstore());
+                          ("push log to processor blocked, drop log", reader->GetHostLogPath())(
+                              "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                              "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                              "log reader queue size", reader->GetReaderArray()->size()));
+                AlarmManager::GetInstance()->SendAlarmCritical(DROP_LOG_ALARM,
+                                                               "push log to processor blocked, drop log",
+                                                               reader->GetRegion(),
+                                                               reader->GetProject(),
+                                                               reader->GetConfigName(),
+                                                               reader->GetLogstore());
                 break;
             }
         }
