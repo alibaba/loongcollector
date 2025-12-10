@@ -1153,20 +1153,37 @@ void ModifyHandler::ForceReadLogAndPush(LogFileReaderPtr reader) {
     auto logBuffer = make_unique<LogBuffer>();
     auto pEvent = reader->CreateFlushTimeoutEvent();
     reader->ReadLog(*logBuffer, pEvent.get());
-    PushLogToProcessor(reader, logBuffer.get());
+    PushLogToProcessor(reader, logBuffer.get(), true);
 }
 
-int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer) {
+int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer, bool dropIfBlocked) {
     int32_t pushRetry = 0;
     if (!logBuffer->rawBuffer.empty()) {
         reader->ReportMetrics(logBuffer->readLength);
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
+        auto startTime = GetCurrentTimeInMilliSeconds();
 
         while (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group))) // 10ms
         {
             ++pushRetry;
             if (pushRetry % 10 == 0)
                 LogInput::GetInstance()->TryReadEvents(false);
+
+            if (dropIfBlocked && GetCurrentTimeInMilliSeconds() - startTime > 120000) { // 2 minutes
+                LOG_ERROR(sLogger,
+                            ("push log to processor blocked, drop log", reader->GetHostLogPath())(
+                                "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                "log reader queue size", reader->GetReaderArray()->size()));
+                AlarmManager::GetInstance()->SendAlarmCritical(
+                    DROP_LOG_ALARM,
+                    "push log to processor blocked, drop log",
+                    reader->GetRegion(),
+                    reader->GetProject(),
+                    reader->GetConfigName(),
+                    reader->GetLogstore());
+                break;
+            }
         }
     }
     return pushRetry;
