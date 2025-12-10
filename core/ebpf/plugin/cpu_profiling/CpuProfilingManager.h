@@ -24,7 +24,6 @@ public:
     static const std::string kProfileCpuValue;
     static const std::string kEmptyValue;
     static const std::string kNanosecondsValue;
-    static const std::string kOneValue;
     static const std::string kCpuValue;
     static const std::string kCallStackValue;
 
@@ -48,6 +47,17 @@ public:
     int HandleEvent(const std::shared_ptr<CommonEvent>& event) override { return 0; }
 
     int SendEvents() override { return 0; }
+
+    int PollPerfBuffer(int maxWaitTimeMs) override {
+        // Check if Collect Interval reached
+        auto now = std::chrono::steady_clock::now();
+        auto durationSinceLastCollect = std::chrono::duration_cast<std::chrono::milliseconds>(now - mPreviousCollectTs);
+        if (durationSinceLastCollect.count() < mGlobalConfigCollectIntervalMs) {
+            return 0;
+        }
+        mPreviousCollectTs = now;
+        return AbstractManager::PollPerfBuffer(maxWaitTimeMs);
+    }
 
     int RegisteredConfigCount() override { return mConfigNameToKey.size(); }
 
@@ -93,6 +103,12 @@ private:
     ConfigKey mNextKey = 0;
     std::unordered_map<std::string, ConfigKey> mConfigNameToKey;
     std::unordered_map<ConfigKey, ConfigInfo> mConfigInfoMap;
+
+    uint32_t mGlobalConfigCollectIntervalMs = 1000;
+    std::chrono::time_point<std::chrono::steady_clock> mPreviousCollectTs = std::chrono::steady_clock::now();
+
+    // Default sample period from coolbpf libprofiler, TODO: make it configurable
+    const uint32_t mSamplePeriodMs = 50;
 
     std::mutex mMutex;
     std::unordered_map<uint32_t, std::unordered_set<ConfigKey>> mRouter;
