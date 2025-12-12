@@ -56,6 +56,9 @@ bool DiskCollector::Init(HostMonitorContext& collectContext) {
     }
     mLastTime = std::chrono::steady_clock::time_point{};
     mDeviceMountMapExpireTime = std::chrono::steady_clock::time_point{};
+    mErrorWarningCount = 0;
+    mFirstTimeWarningCount = 0;
+    mFrequencyWarningCount = 0;
     return true;
 }
 
@@ -85,20 +88,29 @@ bool DiskCollector::Collect(HostMonitorContext& collectContext, PipelineEventGro
     std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
     std::map<std::string, DiskCollectStat> diskCollectStatMap;
     if (GetDiskCollectStatMap(collectContext.mCollectTime, diskCollectStatMap) <= 0) {
-        LOG_WARNING(sLogger, ("collect disk error", "skip"));
+        if (++mErrorWarningCount >= kWarningPrintInterval) {
+            LOG_WARNING(sLogger, ("collect disk error", "skip")("occurred_times", mErrorWarningCount));
+            mErrorWarningCount = 0;
+        }
         return false;
     }
 
     mCurrentDiskCollectStatMap = diskCollectStatMap;
     if (IsZero(mLastTime)) {
-        LOG_WARNING(sLogger, ("collect disk first time", "skip"));
+        if (++mFirstTimeWarningCount >= kWarningPrintInterval) {
+            LOG_WARNING(sLogger, ("collect disk first time", "skip")("occurred_times", mFirstTimeWarningCount));
+            mFirstTimeWarningCount = 0;
+        }
         mLastDiskCollectStatMap = mCurrentDiskCollectStatMap;
         mLastTime = currentTime;
         return true;
     }
     if (mLastTime + std::chrono::milliseconds(1) >= currentTime) {
         // 调度间隔不能低于1ms
-        LOG_WARNING(sLogger, ("collect disk too frequency", "skip"));
+        if (++mFrequencyWarningCount >= kWarningPrintInterval) {
+            LOG_WARNING(sLogger, ("collect disk too frequency", "skip")("occurred_times", mFrequencyWarningCount));
+            mFrequencyWarningCount = 0;
+        }
         return false;
     }
 
