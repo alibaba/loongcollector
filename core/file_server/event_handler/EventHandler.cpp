@@ -23,6 +23,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeKeeper.h"
 #include "common/TimeUtil.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
@@ -63,6 +64,7 @@ DEFINE_FLAG_INT32(logreader_filerotate_remove_interval,
                   "when file is rotate, reader will be removed after seconds",
                   600);
 DEFINE_FLAG_INT32(rotate_overflow_error_interval, "second", 60);
+DEFINE_FLAG_INT32(push_log_to_processor_blocked_timeout, "second", 120);
 
 namespace logtail {
 
@@ -1161,7 +1163,8 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
     if (!logBuffer->rawBuffer.empty()) {
         reader->ReportMetrics(logBuffer->readLength);
         PipelineEventGroup group = LogFileReader::GenerateEventGroup(reader, logBuffer);
-        auto startTime = GetCurrentTimeInMilliSeconds();
+        auto startTime = dropIfBlocked ? TimeKeeper::GetInstance()->NowSec() : 0;
+        static int32_t lastAlarmTime = 0;
 
         while (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), 0, std::move(group))) // 10ms
         {
@@ -1169,18 +1172,24 @@ int32_t ModifyHandler::PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* lo
             if (pushRetry % 10 == 0)
                 LogInput::GetInstance()->TryReadEvents(false);
 
-            if (dropIfBlocked && GetCurrentTimeInMilliSeconds() - startTime > 120000) { // 2 minutes
-                LOG_ERROR(sLogger,
-                          ("push log to processor blocked, drop log", reader->GetHostLogPath())(
-                              "project", reader->GetProject())("logstore", reader->GetLogstore())(
-                              "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                              "log reader queue size", reader->GetReaderArray()->size()));
-                AlarmManager::GetInstance()->SendAlarmCritical(DROP_LOG_ALARM,
-                                                               "push log to processor blocked, drop log",
-                                                               reader->GetRegion(),
-                                                               reader->GetProject(),
-                                                               reader->GetConfigName(),
-                                                               reader->GetLogstore());
+            if (dropIfBlocked
+                && TimeKeeper::GetInstance()->NowSec() - startTime
+                    > INT32_FLAG(push_log_to_processor_blocked_timeout)) {
+                // To avoid sending alarm too frequently by multiple readers
+                auto nowTime = TimeKeeper::GetInstance()->NowSec();
+                if (nowTime - lastAlarmTime > INT32_FLAG(push_log_to_processor_blocked_timeout)) {
+                    lastAlarmTime = nowTime;
+                    LOG_ERROR(sLogger,
+                              ("push log to processor blocked, drop log", reader->GetHostLogPath())(
+                                  "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                  "config", mConfigName)("log reader queue size", reader->GetReaderArray()->size()));
+                    AlarmManager::GetInstance()->SendAlarmCritical(DROP_LOG_ALARM,
+                                                                   "push log to processor blocked, drop log",
+                                                                   reader->GetRegion(),
+                                                                   reader->GetProject(),
+                                                                   reader->GetConfigName(),
+                                                                   reader->GetLogstore());
+                }
                 break;
             }
         }
