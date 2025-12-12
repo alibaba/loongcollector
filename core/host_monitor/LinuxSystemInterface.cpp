@@ -102,15 +102,38 @@ bool LinuxSystemInterface::ReadSocketStat(const std::filesystem::path& path, uin
 
         for (auto const& line : sockstatLines) {
             if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
+                // Check field count first to avoid unnecessary warnings
+                // /proc/net/sockstat6 may have simplified format: "TCP6: inuse 15"
+                // while /proc/net/sockstat has full format: "TCP: inuse 25 orphan 0 tw 2 alloc 28 mem 4"
+                FastFieldParser parser(line);
+                size_t fieldCount = parser.GetFieldCount();
+
                 uint64_t twValue = 0;
                 uint64_t allocValue = 0;
-                if (!FastParse::GetFieldAs(line, 6, twValue)) {
-                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get tw value", line));
+
+                // Only try to parse tw and alloc if we have enough fields
+                // Full format needs at least 9 fields (0-8), simplified format may have only 3 fields (0-2)
+                if (fieldCount >= 7) {
+                    if (!FastParse::GetFieldAs(line, 6, twValue)) {
+                        LOG_WARNING(sLogger, ("ReadSocketStat, failed to get tw value", line));
+                    }
                 }
-                if (!FastParse::GetFieldAs(line, 8, allocValue)) {
-                    LOG_WARNING(sLogger, ("ReadSocketStat, failed to get alloc value", line));
+                if (fieldCount >= 9) {
+                    if (!FastParse::GetFieldAs(line, 8, allocValue)) {
+                        LOG_WARNING(sLogger, ("ReadSocketStat, failed to get alloc value", line));
+                    }
                 }
-                tcp += twValue + allocValue;
+                // For simplified format (e.g., TCP6: inuse 15), use inuse value as fallback
+                // For full format (9 fields), use tw + alloc
+                // If fieldCount is 7 or 8, we have tw but not alloc, fallback to inuse for accuracy
+                if (fieldCount < 9) {
+                    uint64_t inuseValue = 0;
+                    if (FastParse::GetFieldAs(line, 2, inuseValue)) {
+                        tcp += inuseValue;
+                    }
+                } else {
+                    tcp += twValue + allocValue;
+                }
             }
         }
     }
@@ -545,9 +568,6 @@ bool LinuxSystemInterface::GetProcessListInformationOnce(ProcessListInformation&
         auto it = std::filesystem::directory_iterator(
             PROCESS_DIR, std::filesystem::directory_options::skip_permission_denied, ec);
         while (it != std::filesystem::directory_iterator()) {
-#ifdef APSARA_UNIT_TEST_MAIN
-            sleep(2);
-#endif
             if (ec) {
                 LOG_WARNING(sLogger,
                             ("failed to iterate process directory", PROCESS_DIR)("skipping invalid directory entry",
@@ -1264,10 +1284,6 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
         return false;
     }
 
-#ifdef APSARA_UNIT_TEST_MAIN
-    sleep(2);
-#endif
-
     int count = 0;
 
     std::error_code ec; // 用于捕获错误码
@@ -1275,10 +1291,6 @@ bool LinuxSystemInterface::GetProcessOpenFilesOnce(pid_t pid, ProcessFd& process
         auto it = std::filesystem::directory_iterator(
             procFdPath, std::filesystem::directory_options::skip_permission_denied, ec);
         while (it != std::filesystem::directory_iterator()) {
-#ifdef APSARA_UNIT_TEST_MAIN
-            sleep(2);
-#endif
-
             if (ec) {
                 if (ec == std::errc::permission_denied) {
                     LOG_WARNING(sLogger, ("skipping fd due to permissions", procFdPath.string()));

@@ -32,6 +32,14 @@ namespace logtail {
 
 const std::string CPUCollector::sName = "cpu";
 
+bool CPUCollector::Init(HostMonitorContext& collectContext) {
+    if (!BaseCollector::Init(collectContext)) {
+        return false;
+    }
+    mJiffiesDeltaWarningCount = 0;
+    return true;
+}
+
 bool CPUCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
     CPUInformation cpuInfo;
     CPUPercent totalCpuPercent{};
@@ -117,7 +125,10 @@ bool CPUCollector::CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& currentC
     jiffiesDelta = currentJiffies - lastJiffies;
 
     if (jiffiesDelta <= 0) {
-        LOG_ERROR(sLogger, ("jiffies delta is negative", "skip"));
+        if (++mJiffiesDeltaWarningCount >= kWarningPrintInterval) {
+            LOG_ERROR(sLogger, ("jiffies delta is negative", "skip")("occurred_times", mJiffiesDeltaWarningCount));
+            mJiffiesDeltaWarningCount = 0;
+        }
         return false;
     }
 

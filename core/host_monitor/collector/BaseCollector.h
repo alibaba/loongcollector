@@ -41,6 +41,7 @@ public:
 
 protected:
     bool mValidState = true;
+    static const uint32_t kWarningPrintInterval = 10; // 警告打印频率（每发生 kWarningPrintInterval 次错误打印一次警告）
 };
 
 class CollectorInstance {
