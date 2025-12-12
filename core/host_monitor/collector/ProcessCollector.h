@@ -91,6 +91,7 @@ private:
     std::unordered_map<pid_t, double> mMinProcessNumThreads;
     std::unordered_map<pid_t, double> mMaxProcessNumThreads;
     std::unordered_map<pid_t, std::string> pidNameMap;
+    uint32_t mClearProcessCpuTimeCacheErrorCount = 0; // ClearProcessCpuTimeCache error warning 计数
 };
 
 } // namespace logtail

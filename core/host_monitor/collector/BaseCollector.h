@@ -41,6 +41,7 @@ public:
 
 protected:
     bool mValidState = true;
+    static const uint32_t kWarningPrintInterval = 10; // warning 打印间隔
 };
 
 class CollectorInstance {
