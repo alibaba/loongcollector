@@ -76,7 +76,7 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
     std::lock_guard<std::mutex> lock(mListenAddressToInputMapMutex);
     auto it = mListenAddressToInputMap.find(address);
     // generate a new service instance to get name
-    std::unique_ptr<T> service = std::make_unique<T>();
+    std::unique_ptr<T> service = std::make_unique<T>(address);
     if (it != mListenAddressToInputMap.end()) {
         if (it->second.mServer == nullptr || it->second.mService == nullptr) {
             // should never happen

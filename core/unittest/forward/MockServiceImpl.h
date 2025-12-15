@@ -21,7 +21,7 @@ namespace logtail {
 
 class MockServiceImpl : public BaseService, public LoongSuiteForwardService::CallbackService {
 public:
-    MockServiceImpl() = default;
+    explicit MockServiceImpl(const std::string& address) : BaseService(address) {}
     ~MockServiceImpl() override = default;
 
     bool Update(std::string configName, const Json::Value& config) override { return true; }
