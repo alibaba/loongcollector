@@ -274,10 +274,7 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
         return reader;
     }
     // all files have been read
-    {
-        lock_guard<mutex> lock(mUpdateMux);
-        mDeletedInputs.emplace(configName, idx);
-    }
+    mDeletedInputs.emplace(configName, idx);
     return LogFileReaderPtr();
 }
 
