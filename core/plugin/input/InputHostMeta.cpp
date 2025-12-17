@@ -50,6 +50,32 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
         mInterval = kMinInterval;
     }
 
+    // 读取 EnableProcessEntity 配置（默认 true）
+    mEnableProcessEntity = true;
+    if (!GetOptionalBoolParam(config, "EnableProcessEntity", mEnableProcessEntity, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mEnableProcessEntity,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    LOG_INFO(sLogger,
+             ("input_host_meta init", "")("enable_process_entity", mEnableProcessEntity)("config",
+                                                                                         mContext->GetConfigName()));
+
+    // 如果未启用进程实体采集，直接返回
+    if (!mEnableProcessEntity) {
+        LOG_INFO(sLogger,
+                 ("process entity collection disabled",
+                  "skip reading process entity config")("config", mContext->GetConfigName()));
+        return true;
+    }
+
     // 读取 FullReportInterval 配置（默认3600秒）
     mFullReportInterval = 3600;
     if (!GetOptionalUIntParam(config, "FullReportInterval", mFullReportInterval, errorMsg)) {
@@ -133,6 +159,14 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
 }
 
 bool InputHostMeta::Start() {
+    // 如果未启用进程实体采集，直接返回
+    if (!mEnableProcessEntity) {
+        LOG_INFO(sLogger,
+                 ("process entity collection disabled",
+                  "skip ProcessEntityRunner initialization")("config", mContext->GetConfigName()));
+        return true;
+    }
+
     // 初始化 ProcessEntityRunner
     ProcessEntityRunner::GetInstance()->Init();
 
@@ -159,6 +193,14 @@ bool InputHostMeta::Start() {
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
+    // 如果未启用进程实体采集，直接返回
+    if (!mEnableProcessEntity) {
+        LOG_INFO(sLogger,
+                 ("process entity collection disabled", "skip ProcessEntityRunner cleanup")("config",
+                                                                                            mContext->GetConfigName()));
+        return true;
+    }
+
     // 从 ProcessEntityRunner 移除配置
     ProcessEntityRunner::GetInstance()->RemoveConfig(mContext->GetConfigName());
 

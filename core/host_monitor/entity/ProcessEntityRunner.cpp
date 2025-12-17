@@ -172,8 +172,10 @@ void ProcessEntityRunner::RegisterConfig(const std::string& configName,
     auto it = mContexts.find(configName);
     if (it != mContexts.end()) {
         LOG_ERROR(sLogger,
-                  ("config already registered, cannot have multiple process entity inputs in same pipeline",
-                   configName)("inputIndex", inputIndex)("action", "reject registration"));
+                  ("config already registered",
+                   "cannot have multiple input_host_meta instances with EnableProcessEntity=true in same pipeline")(
+                      "configName", configName)("inputIndex", inputIndex)("action", "reject registration")(
+                      "suggestion", "set EnableProcessEntity=false for additional instances"));
         return; // 拒绝重复注册，避免覆盖已有配置
     }
 

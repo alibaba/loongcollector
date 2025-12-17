@@ -34,6 +34,10 @@ public:
 
 private:
     uint32_t mInterval = 0;
+
+    // 进程实体采集开关（默认启用）
+    bool mEnableProcessEntity = true;
+
     uint32_t mFullReportInterval = 3600;
     uint32_t mIncrementalInterval = 10;
 
