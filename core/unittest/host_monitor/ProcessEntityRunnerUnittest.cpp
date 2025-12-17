@@ -15,10 +15,13 @@
 #include <chrono>
 #include <fstream>
 #include <memory>
+#include <thread>
 
+#include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
 #include "host_monitor/entity/ProcessEntityRunner.h"
+#include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -40,6 +43,18 @@ public:
     void TestProcessPrimaryKeyHash();
     void TestProcessFilterConfig();
     void TestCollectContextTimeManagement();
+    void TestInitAndStop();
+    void TestRegisterAndRemoveConfig();
+    void TestRegisterConfigDuplicate();
+    void TestRemoveAllConfigs();
+    void TestSetFullReportInterval();
+    void TestTriggerFullReport();
+    void TestHasRegisteredPlugins();
+    void TestCheckClockRolling();
+    void TestGenerateProcessEntityEvent();
+    void TestCollectContextReset();
+    void TestCollectContextCalculateFirstCollectTime();
+    void TestIsCollectTaskValid();
 
 protected:
     void SetUp() override {
@@ -429,6 +444,311 @@ void ProcessEntityRunnerUnittest::TestCollectContextTimeManagement() {
     APSARA_TEST_TRUE(timeSinceLastFull >= fullReportInterval);
 }
 
+void ProcessEntityRunnerUnittest::TestInitAndStop() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    
+    // 测试 Init
+    runner->Init();
+    APSARA_TEST_TRUE(runner->mIsStarted);
+    
+    // 测试 Stop
+    runner->Stop();
+    APSARA_TEST_FALSE(runner->mIsStarted);
+}
+
+void ProcessEntityRunnerUnittest::TestRegisterAndRemoveConfig() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    
+    // 注册配置
+    runner->RegisterConfig("test_config_1", queueKey, 0, filterConfig, 10, 3600);
+    
+    // 验证配置已注册
+    APSARA_TEST_TRUE(runner->HasRegisteredPlugins());
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(1, runner->mContexts.size());
+        APSARA_TEST_TRUE(runner->mContexts.find("test_config_1") != runner->mContexts.end());
+    }
+    
+    // 移除配置
+    runner->RemoveConfig("test_config_1");
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(0, runner->mContexts.size());
+    }
+    APSARA_TEST_FALSE(runner->HasRegisteredPlugins());
+    
+    runner->Stop();
+}
+
+void ProcessEntityRunnerUnittest::TestRegisterConfigDuplicate() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    
+    // 第一次注册
+    runner->RegisterConfig("test_config_duplicate", queueKey, 0, filterConfig, 10, 3600);
+    
+    // 验证注册成功
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(1, runner->mContexts.size());
+    }
+    
+    // 第二次注册相同的 configName，应该被拒绝
+    runner->RegisterConfig("test_config_duplicate", queueKey, 1, filterConfig, 10, 3600);
+    
+    // 验证仍然只有一个配置（第二次注册被拒绝）
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(1, runner->mContexts.size());
+        // 验证 inputIndex 仍然是第一次注册的值（0）
+        APSARA_TEST_EQUAL(0, runner->mContexts["test_config_duplicate"]->mInputIndex);
+    }
+    
+    runner->RemoveConfig("test_config_duplicate");
+    runner->Stop();
+}
+
+void ProcessEntityRunnerUnittest::TestRemoveAllConfigs() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    
+    // 注册多个配置
+    runner->RegisterConfig("config1", queueKey, 0, filterConfig, 10, 3600);
+    runner->RegisterConfig("config2", queueKey, 1, filterConfig, 10, 3600);
+    runner->RegisterConfig("config3", queueKey, 2, filterConfig, 10, 3600);
+    
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(3, runner->mContexts.size());
+    }
+    
+    // 移除所有配置
+    runner->RemoveAllConfigs();
+    
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        APSARA_TEST_EQUAL(0, runner->mContexts.size());
+    }
+    APSARA_TEST_FALSE(runner->HasRegisteredPlugins());
+    
+    runner->Stop();
+}
+
+void ProcessEntityRunnerUnittest::TestSetFullReportInterval() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    
+    // 设置全量上报间隔
+    auto newInterval = std::chrono::seconds(7200);
+    runner->SetFullReportInterval(newInterval);
+    
+    APSARA_TEST_EQUAL(7200, runner->mFullReportInterval.count());
+}
+
+void ProcessEntityRunnerUnittest::TestTriggerFullReport() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    
+    // 注册配置
+    runner->RegisterConfig("test_trigger", queueKey, 0, filterConfig, 10, 3600);
+    
+    // 记录当前时间
+    auto beforeTrigger = std::chrono::steady_clock::now();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    
+    // 触发全量上报
+    runner->TriggerFullReport("test_trigger");
+    
+    // 验证 lastFullReportTime 被重置
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        auto context = runner->mContexts["test_trigger"];
+        // lastFullReportTime 应该被设置为一个很早的时间
+        APSARA_TEST_TRUE(context->lastFullReportTime < beforeTrigger);
+    }
+    
+    runner->RemoveConfig("test_trigger");
+    runner->Stop();
+}
+
+void ProcessEntityRunnerUnittest::TestHasRegisteredPlugins() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    // 初始状态：没有注册的插件
+    APSARA_TEST_FALSE(runner->HasRegisteredPlugins());
+    
+    // 注册一个配置
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    runner->RegisterConfig("test_has_plugin", queueKey, 0, filterConfig, 10, 3600);
+    
+    // 应该有注册的插件
+    APSARA_TEST_TRUE(runner->HasRegisteredPlugins());
+    
+    // 移除配置
+    runner->RemoveConfig("test_has_plugin");
+    
+    // 再次检查：没有注册的插件
+    APSARA_TEST_FALSE(runner->HasRegisteredPlugins());
+    
+    runner->Stop();
+}
+
+void ProcessEntityRunnerUnittest::TestCheckClockRolling() {
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    auto incrementalInterval = std::chrono::seconds(10);
+    auto fullReportInterval = std::chrono::seconds(3600);
+    
+    auto context = std::make_shared<ProcessEntityCollectContext>(
+        "test_clock_rolling", queueKey, 0, filterConfig, incrementalInterval, fullReportInterval);
+    
+    // 设置正常的时间
+    auto steadyTime = std::chrono::steady_clock::now();
+    time_t metricTime = time(nullptr);
+    context->SetTime(steadyTime, metricTime);
+    
+    // 正常情况：不应该检测到时钟跳跃
+    APSARA_TEST_FALSE(context->CheckClockRolling());
+    
+    // 模拟时钟跳跃：修改 metricTime，使其与 scheduleTime 不一致
+    // 将 metricTime 向前跳跃 120 秒（超过 60 秒阈值）
+    context->mMetricTime = metricTime + 120;
+    
+    // 应该检测到时钟跳跃
+    APSARA_TEST_TRUE(context->CheckClockRolling());
+}
+
+void ProcessEntityRunnerUnittest::TestGenerateProcessEntityEvent() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    
+    ProcessEntityInfo info;
+    info.pid = 12345;
+    info.startTime = 1000000;
+    info.startTimeUnix = time(nullptr) - 3600; // 1小时前启动
+    info.comm = "test_process";
+    info.exe = "/usr/bin/test";
+    info.cmdline = "/usr/bin/test --arg1 --arg2";
+    info.ppid = 1;
+    info.user = "testuser";
+    info.state = 'S';
+    
+    // 创建事件组
+    PipelineEventGroup group(std::make_shared<SourceBuffer>());
+    
+    // 生成事件（全量上报）
+    runner->GenerateProcessEntityEvent(&group, info, true);
+    
+    // 验证事件生成成功
+    APSARA_TEST_EQUAL(1, group.GetEvents().size());
+    
+    auto& event = group.GetEvents()[0];
+    APSARA_TEST_TRUE(event.Is<LogEvent>());
+    
+    auto& logEvent = event.Cast<LogEvent>();
+    
+    // 验证主键字段
+    auto pidValue = logEvent.GetContent(DEFAULT_CONTENT_KEY_PROCESS_PID);
+    APSARA_TEST_EQUAL("12345", pidValue.to_string());
+    
+    auto commValue = logEvent.GetContent(DEFAULT_CONTENT_KEY_PROCESS_COMM);
+    APSARA_TEST_EQUAL("test_process", commValue.to_string());
+    
+    auto ppidValue = logEvent.GetContent(DEFAULT_CONTENT_KEY_PROCESS_PPID);
+    APSARA_TEST_EQUAL("1", ppidValue.to_string());
+}
+
+void ProcessEntityRunnerUnittest::TestCollectContextReset() {
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    auto incrementalInterval = std::chrono::seconds(10);
+    auto fullReportInterval = std::chrono::seconds(3600);
+    
+    auto context = std::make_shared<ProcessEntityCollectContext>(
+        "test_reset", queueKey, 0, filterConfig, incrementalInterval, fullReportInterval);
+    
+    // 设置一些初始时间
+    auto initialScheduleTime = std::chrono::steady_clock::now();
+    time_t initialMetricTime = time(nullptr);
+    context->SetTime(initialScheduleTime, initialMetricTime);
+    
+    // 调用 Reset
+    context->Reset();
+    
+    // 验证时间被重新计算（应该对齐到下一个采集间隔）
+    APSARA_TEST_TRUE(context->GetScheduleTime() > initialScheduleTime);
+    APSARA_TEST_TRUE(context->GetMetricTime() > initialMetricTime);
+}
+
+void ProcessEntityRunnerUnittest::TestCollectContextCalculateFirstCollectTime() {
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    auto incrementalInterval = std::chrono::seconds(10);
+    auto fullReportInterval = std::chrono::seconds(3600);
+    
+    auto context = std::make_shared<ProcessEntityCollectContext>(
+        "test_calculate", queueKey, 0, filterConfig, incrementalInterval, fullReportInterval);
+    
+    auto steadyClockNow = std::chrono::steady_clock::now();
+    time_t metricTimeNow = time(nullptr);
+    
+    // 调用 CalculateFirstCollectTime
+    context->CalculateFirstCollectTime(metricTimeNow, steadyClockNow);
+    
+    // 验证首次采集时间被对齐到下一个采集间隔的整数倍
+    time_t firstMetricTime = context->GetMetricTime();
+    APSARA_TEST_TRUE(firstMetricTime >= metricTimeNow);
+    
+    // 验证时间对齐：首次采集时间应该是 incrementalInterval 的整数倍
+    APSARA_TEST_EQUAL(0, firstMetricTime % incrementalInterval.count());
+}
+
+void ProcessEntityRunnerUnittest::TestIsCollectTaskValid() {
+    auto runner = ProcessEntityRunner::GetInstance();
+    runner->Init();
+    
+    QueueKey queueKey = 123;
+    ProcessFilterConfig filterConfig;
+    
+    // 注册配置
+    runner->RegisterConfig("test_valid", queueKey, 0, filterConfig, 10, 3600);
+    
+    // 获取配置的启动时间
+    auto startTime = std::chrono::steady_clock::now();
+    {
+        std::lock_guard<std::mutex> lock(runner->mConfigMutex);
+        auto context = runner->mContexts["test_valid"];
+        startTime = context->mStartTime;
+    }
+    
+    // 验证任务有效
+    APSARA_TEST_TRUE(runner->IsCollectTaskValid(startTime, "test_valid"));
+    
+    // 验证无效的配置名
+    APSARA_TEST_FALSE(runner->IsCollectTaskValid(startTime, "invalid_config"));
+    
+    // 验证错误的启动时间
+    auto wrongStartTime = startTime - std::chrono::seconds(100);
+    APSARA_TEST_FALSE(runner->IsCollectTaskValid(wrongStartTime, "test_valid"));
+    
+    runner->RemoveConfig("test_valid");
+    runner->Stop();
+}
+
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestGetCurrentProcessPrimaryKeys);
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestGetProcessEntityInfo);
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestUpdateVariableAttributes);
@@ -442,6 +762,18 @@ UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestDetectChangesReused);
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestProcessPrimaryKeyHash);
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestProcessFilterConfig);
 UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestCollectContextTimeManagement);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestInitAndStop);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestRegisterAndRemoveConfig);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestRegisterConfigDuplicate);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestRemoveAllConfigs);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestSetFullReportInterval);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestTriggerFullReport);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestHasRegisteredPlugins);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestCheckClockRolling);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestGenerateProcessEntityEvent);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestCollectContextReset);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestCollectContextCalculateFirstCollectTime);
+UNIT_TEST_CASE(ProcessEntityRunnerUnittest, TestIsCollectTaskValid);
 
 } // namespace logtail
 
