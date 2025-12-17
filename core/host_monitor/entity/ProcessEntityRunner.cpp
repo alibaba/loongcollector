@@ -26,6 +26,7 @@
 #include "common/MachineInfoUtil.h"
 #include "common/ProcParser.h"
 #include "common/StringView.h"
+#include "common/TimeUtil.h"
 #include "common/timer/Timer.h"
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
@@ -724,8 +725,9 @@ void ProcessEntityRunner::GenerateProcessEntityEvent(PipelineEventGroup* group,
                                                      const ProcessEntityInfo& info,
                                                      bool isFullReport) {
     auto* event = group->AddLogEvent();
-    time_t now = time(nullptr);
-    event->SetTimestamp(now);
+    // 获取包含纳秒的时间戳
+    LogtailTime currentTime = GetCurrentLogtailTime();
+    event->SetTimestamp(currentTime.tv_sec, static_cast<uint32_t>(currentTime.tv_nsec));
 
     // 获取系统信息用于计算进程启动时间
     SystemInformation systemInfo;
@@ -765,8 +767,7 @@ void ProcessEntityRunner::GenerateProcessEntityEvent(PipelineEventGroup* group,
 
 
     // 运行时间（秒）- 实时计算
-    time_t currentTime = time(nullptr);
-    int64_t runningTimeSeconds = currentTime - info.startTimeUnix;
+    int64_t runningTimeSeconds = currentTime.tv_sec - info.startTimeUnix;
     if (runningTimeSeconds > 0) {
         event->SetContent("runtime_seconds", std::to_string(runningTimeSeconds));
     }
