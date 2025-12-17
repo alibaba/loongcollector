@@ -171,7 +171,10 @@ void ProcessEntityRunner::RegisterConfig(const std::string& configName,
 
     auto it = mContexts.find(configName);
     if (it != mContexts.end()) {
-        LOG_WARNING(sLogger, ("config already registered", configName)("will update", ""));
+        LOG_ERROR(sLogger,
+                  ("config already registered, cannot have multiple process entity inputs in same pipeline",
+                   configName)("inputIndex", inputIndex)("action", "reject registration"));
+        return; // 拒绝重复注册，避免覆盖已有配置
     }
 
     // 使用配置参数或默认值
