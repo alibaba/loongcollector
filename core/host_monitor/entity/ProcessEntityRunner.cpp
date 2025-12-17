@@ -45,12 +45,7 @@
 #endif
 
 // 配置flags
-DEFINE_FLAG_INT32(process_entity_full_report_interval_seconds, "process entity full report interval in seconds", 3600);
-DEFINE_FLAG_INT32(process_entity_incremental_interval_seconds,
-                  "process entity incremental collect interval in seconds",
-                  10);
 DEFINE_FLAG_INT32(process_entity_thread_pool_size, "thread pool size for process entity collection", 2);
-DEFINE_FLAG_INT32(process_entity_min_running_time_seconds, "minimum running time in seconds to collect a process", 5);
 
 namespace logtail {
 
@@ -112,8 +107,8 @@ bool ProcessEntityCollectContext::CheckClockRolling() {
 // ========== ProcessEntityRunner 方法实现 ==========
 
 ProcessEntityRunner::ProcessEntityRunner()
-    : mFullReportInterval(std::chrono::seconds(INT32_FLAG(process_entity_full_report_interval_seconds))),
-      mIncrementalInterval(std::chrono::seconds(INT32_FLAG(process_entity_incremental_interval_seconds))) {
+    : mFullReportInterval(std::chrono::seconds(3600)), // 默认全量上报间隔：1小时
+      mIncrementalInterval(std::chrono::seconds(10)) { // 默认增量采集间隔：10秒
 }
 
 void ProcessEntityRunner::Init() {
@@ -425,10 +420,10 @@ void ProcessEntityRunner::FullCollect(ProcessEntityCollectContextPtr context) {
         PushToQueue(context, std::move(group));
     }
 
-    LOG_INFO(sLogger,
-             ("full collect completed", context->mConfigName)("total_processes", currentPidMap.size())(
-                 "candidates_after_filter",
-                 candidateProcesses.size())("cached_processes", cache.size())("removed_processes", toRemove.size()));
+    LOG_DEBUG(sLogger,
+              ("full collect completed", context->mConfigName)("total_processes", currentPidMap.size())(
+                  "candidates_after_filter",
+                  candidateProcesses.size())("cached_processes", cache.size())("removed_processes", toRemove.size()));
 }
 
 void ProcessEntityRunner::IncrementalCollect(ProcessEntityCollectContextPtr context) {
@@ -448,9 +443,9 @@ void ProcessEntityRunner::IncrementalCollect(ProcessEntityCollectContextPtr cont
         return;
     }
 
-    LOG_INFO(sLogger,
-             ("incremental collect", context->mConfigName)("added", changes.added.size())(
-                 "removed", changes.removed.size())("reused", changes.reused.size()));
+    LOG_DEBUG(sLogger,
+              ("incremental collect", context->mConfigName)("added", changes.added.size())(
+                  "removed", changes.removed.size())("reused", changes.reused.size()));
 
     // 创建PipelineEventGroup
     PipelineEventGroup group(std::make_shared<SourceBuffer>());
