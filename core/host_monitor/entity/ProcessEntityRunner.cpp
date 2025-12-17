@@ -338,12 +338,12 @@ void ProcessEntityRunner::CollectProcessEntitiesOnce(ProcessEntityCollectContext
     bool needFullReport = (now - context->lastFullReportTime) >= context->mFullReportInterval;
 
     if (needFullReport) {
-        LOG_INFO(sLogger, ("performing full collect", context->mConfigName));
+        LOG_DEBUG(sLogger, ("performing full collect", context->mConfigName));
         FullCollect(context);
         context->lastFullReportTime = now;
         ADD_COUNTER(mFullReportTotal, 1);
     } else {
-        LOG_INFO(sLogger, ("performing incremental collect", context->mConfigName));
+        LOG_DEBUG(sLogger, ("performing incremental collect", context->mConfigName));
         // 增量采集
         IncrementalCollect(context);
         ADD_COUNTER(mIncrementalReportTotal, 1);
