@@ -385,6 +385,17 @@ extern const std::string METRIC_RUNNER_HOST_MONITOR_DROP_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS;
 
 /**********************************************************
+ *   process entity runner
+ **********************************************************/
+extern const std::string METRIC_RUNNER_FULL_REPORT_TOTAL;
+extern const std::string METRIC_RUNNER_INCREMENTAL_REPORT_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_ADDED_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_REMOVED_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_REUSED_TOTAL;
+extern const std::string METRIC_RUNNER_CACHED_PROCESS_COUNT;
+extern const std::string METRIC_RUNNER_COLLECT_LATENCY_MS;
+
+/**********************************************************
  *   system interface
  **********************************************************/
 extern const std::string METRIC_RUNNER_SYSTEM_OP_TOTAL;

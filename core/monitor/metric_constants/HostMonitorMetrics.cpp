@@ -44,4 +44,13 @@ const string METRIC_PLUGIN_NET_FAIL_TOTAL = "net_fail_total";
 const string METRIC_PLUGIN_PROCESS_FAIL_TOTAL = "process_fail_total";
 const string METRIC_PLUGIN_DISK_FAIL_TOTAL = "disk_fail_total";
 
+// Process entity runner metrics
+const string METRIC_RUNNER_FULL_REPORT_TOTAL = "full_report_total";
+const string METRIC_RUNNER_INCREMENTAL_REPORT_TOTAL = "incremental_report_total";
+const string METRIC_RUNNER_PROCESS_ADDED_TOTAL = "process_added_total";
+const string METRIC_RUNNER_PROCESS_REMOVED_TOTAL = "process_removed_total";
+const string METRIC_RUNNER_PROCESS_REUSED_TOTAL = "process_reused_total";
+const string METRIC_RUNNER_CACHED_PROCESS_COUNT = "cached_process_count";
+const string METRIC_RUNNER_COLLECT_LATENCY_MS = "collect_latency_ms";
+
 } // namespace logtail

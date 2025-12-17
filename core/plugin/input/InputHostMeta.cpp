@@ -20,8 +20,7 @@
 
 #include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
-#include "host_monitor/HostMonitorInputRunner.h"
-#include "host_monitor/collector/ProcessEntityCollector.h"
+#include "host_monitor/entity/ProcessEntityRunner.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -50,21 +49,119 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
                         "new interval", kMinInterval));
         mInterval = kMinInterval;
     }
+
+    // 读取 FullReportInterval 配置（默认3600秒）
+    mFullReportInterval = 3600;
+    if (!GetOptionalUIntParam(config, "FullReportInterval", mFullReportInterval, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mFullReportInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // 读取 IncrementalInterval 配置（默认10秒）
+    mIncrementalInterval = 10;
+    if (!GetOptionalUIntParam(config, "IncrementalInterval", mIncrementalInterval, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mIncrementalInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // 确保 IncrementalInterval 不小于最小值
+    if (mIncrementalInterval < kMinInterval) {
+        LOG_WARNING(sLogger,
+                    ("input host meta", "incremental interval is too small, set to min interval")(
+                        "original interval", mIncrementalInterval)("new interval", kMinInterval));
+        mIncrementalInterval = kMinInterval;
+    }
+
+    // 读取过滤配置（过滤逻辑始终应用）
+    if (!GetOptionalBoolParam(config, "ExcludeKernelThreads", mExcludeKernelThreads, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mExcludeKernelThreads,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    if (!GetOptionalUIntParam(config, "MinRunningTimeSeconds", mMinRunningTimeSeconds, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mMinRunningTimeSeconds,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    // 读取白名单
+    if (config.isMember("WhitelistPatterns") && config["WhitelistPatterns"].isArray()) {
+        for (const auto& pattern : config["WhitelistPatterns"]) {
+            if (pattern.isString()) {
+                mWhitelistPatterns.push_back(pattern.asString());
+            }
+        }
+    }
+
+    // 读取黑名单
+    if (config.isMember("BlacklistPatterns") && config["BlacklistPatterns"].isArray()) {
+        for (const auto& pattern : config["BlacklistPatterns"]) {
+            if (pattern.isString()) {
+                mBlacklistPatterns.push_back(pattern.asString());
+            }
+        }
+    }
+
     return true;
 }
 
 bool InputHostMeta::Start() {
-    HostMonitorInputRunner::GetInstance()->Init();
-    HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mContext->GetConfigName(),
-        {{ProcessEntityCollector::sName, mInterval, HostMonitorCollectType::kSingleValue}},
-        mContext->GetProcessQueueKey(),
-        mIndex);
+    // 初始化 ProcessEntityRunner
+    ProcessEntityRunner::GetInstance()->Init();
+
+    // 注册配置到 ProcessEntityRunner
+    ProcessFilterConfig filterConfig;
+    filterConfig.excludeKernelThreads = mExcludeKernelThreads;
+    filterConfig.minRunningTimeSeconds = mMinRunningTimeSeconds;
+    filterConfig.whitelistPatterns = mWhitelistPatterns;
+    filterConfig.blacklistPatterns = mBlacklistPatterns;
+
+    LOG_INFO(sLogger,
+             ("ProcessEntity filter config", "")("exclude_kernel_threads", filterConfig.excludeKernelThreads)(
+                 "min_running_time_seconds", filterConfig.minRunningTimeSeconds)("whitelist_patterns_count",
+                                                                                 filterConfig.whitelistPatterns.size())(
+                 "blacklist_patterns_count", filterConfig.blacklistPatterns.size()));
+
+    ProcessEntityRunner::GetInstance()->RegisterConfig(mContext->GetConfigName(),
+                                                       mContext->GetProcessQueueKey(),
+                                                       mIndex,
+                                                       filterConfig,
+                                                       mIncrementalInterval,
+                                                       mFullReportInterval);
     return true;
 }
 
 bool InputHostMeta::Stop(bool isPipelineRemoving) {
-    HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
+    // 从 ProcessEntityRunner 移除配置
+    ProcessEntityRunner::GetInstance()->RemoveConfig(mContext->GetConfigName());
+
     return true;
 }
 

@@ -552,6 +552,9 @@ bool ProcParser::ParseProcessStat(pid_t pid, const std::string& line, ProcessSta
     if (!StringTo(words[EnumProcessStat::tty_nr - offset], ps.tty)) {
         LOG_WARNING(sLogger, ("Invalid tty_nr", words[EnumProcessStat::tty_nr - offset]));
     }
+    if (!StringTo(words[EnumProcessStat::flags - offset], ps.flags)) {
+        LOG_WARNING(sLogger, ("Invalid flags", words[EnumProcessStat::flags - offset]));
+    }
     if (!StringTo(words[EnumProcessStat::minflt - offset], ps.minorFaults)) {
         LOG_WARNING(sLogger, ("Invalid minflt", words[EnumProcessStat::minflt - offset]));
     }
