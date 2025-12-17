@@ -41,7 +41,6 @@
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
-#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
@@ -62,7 +61,6 @@ DECLARE_FLAG_INT32(self_check_collector_interval);
 namespace logtail {
 
 HostMonitorInputRunner::HostMonitorInputRunner() {
-    RegisterCollector<ProcessEntityCollector>();
     RegisterCollector<CPUCollector>();
     RegisterCollector<SystemCollector>();
     RegisterCollector<MemCollector>();
