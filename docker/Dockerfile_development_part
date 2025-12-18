@@ -41,6 +41,7 @@ COPY --from=build /src/output/libGoPluginBase.so /usr/local/loongcollector/
 COPY --from=build /src/example_config/quick_start/loongcollector_config.json /usr/local/loongcollector/conf/instance_config/local/loongcollector_config.json
 COPY --from=build /src/core/build/go_pipeline/libGoPluginAdapter.so /usr/local/loongcollector/
 COPY --from=build /src/core/build/ebpf/driver/libeBPFDriver.so /usr/local/loongcollector/
+COPY --from=build /src/core/build/_thirdparty/coolbpf/src/profiler/release/libprofiler.so /usr/local/loongcollector/
 
 ENV HOST_OS=$HOST_OS \
     LOONGCOLLECTOR_VERSION=$VERSION \
