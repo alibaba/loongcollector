@@ -52,5 +52,7 @@ const string METRIC_RUNNER_PROCESS_REMOVED_TOTAL = "process_removed_total";
 const string METRIC_RUNNER_PROCESS_REUSED_TOTAL = "process_reused_total";
 const string METRIC_RUNNER_CACHED_PROCESS_COUNT = "cached_process_count";
 const string METRIC_RUNNER_COLLECT_LATENCY_MS = "collect_latency_ms";
+const string METRIC_RUNNER_FULL_COLLECT_LATENCY_MS = "full_collect_latency_ms";
+const string METRIC_RUNNER_INCREMENTAL_COLLECT_LATENCY_MS = "incremental_collect_latency_ms";
 
 } // namespace logtail

@@ -353,6 +353,8 @@ void ProcessEntityRunner::CollectProcessEntitiesOnce(ProcessEntityCollectContext
 }
 
 void ProcessEntityRunner::FullCollect(ProcessEntityCollectContextPtr context) {
+    auto startTime = std::chrono::steady_clock::now();
+
     auto& cache = context->processCache;
     const auto& filterConfig = context->mFilterConfig;
 
@@ -425,6 +427,13 @@ void ProcessEntityRunner::FullCollect(ProcessEntityCollectContextPtr context) {
         PushToQueue(context, std::move(group));
     }
 
+    // 记录全量采集耗时
+    auto endTime = std::chrono::steady_clock::now();
+    auto latencyNs = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+    if (mFullCollectLatencyMs) {
+        mFullCollectLatencyMs->Add(latencyNs);
+    }
+
     LOG_DEBUG(sLogger,
               ("full collect completed", context->mConfigName)("total_processes", currentPidMap.size())(
                   "candidates_after_filter",
@@ -432,6 +441,8 @@ void ProcessEntityRunner::FullCollect(ProcessEntityCollectContextPtr context) {
 }
 
 void ProcessEntityRunner::IncrementalCollect(ProcessEntityCollectContextPtr context) {
+    auto startTime = std::chrono::steady_clock::now();
+
     auto& cache = context->processCache;
     const auto& filterConfig = context->mFilterConfig;
 
@@ -514,6 +525,13 @@ void ProcessEntityRunner::IncrementalCollect(ProcessEntityCollectContextPtr cont
     if (group.GetEvents().size() > 0) {
         AddHostLabels(group);
         PushToQueue(context, std::move(group));
+    }
+
+    // 记录增量采集耗时
+    auto endTime = std::chrono::steady_clock::now();
+    auto latencyNs = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+    if (mIncrementalCollectLatencyMs) {
+        mIncrementalCollectLatencyMs->Add(latencyNs);
     }
 }
 
@@ -840,6 +858,8 @@ void ProcessEntityRunner::InitMetrics() {
     mProcessReusedTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_PROCESS_REUSED_TOTAL);
     mCachedProcessCount = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CACHED_PROCESS_COUNT);
     mCollectLatencyMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_COLLECT_LATENCY_MS);
+    mFullCollectLatencyMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_FULL_COLLECT_LATENCY_MS);
+    mIncrementalCollectLatencyMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_INCREMENTAL_COLLECT_LATENCY_MS);
 
     WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }

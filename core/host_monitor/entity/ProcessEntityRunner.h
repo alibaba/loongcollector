@@ -219,6 +219,8 @@ private:
     CounterPtr mProcessReusedTotal;
     IntGaugePtr mCachedProcessCount;
     TimeCounterPtr mCollectLatencyMs;
+    TimeCounterPtr mFullCollectLatencyMs;
+    TimeCounterPtr mIncrementalCollectLatencyMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessEntityRunnerUnittest;
