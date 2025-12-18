@@ -34,7 +34,7 @@ protected:
     }
 
     void SetUp() override {
-        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, sFlusherId, sCtx));
+        mQueue.reset(new SenderQueue(sCap, sLowWatermark, sHighWatermark, sKey, "", sFlusherId, sCtx));
         mQueue->SetConcurrencyLimiters({{"region", sConcurrencyLimiter}});
         mQueue->mRateLimiter = RateLimiter(100);
         mQueue->SetFeedback(&sFeedback);
@@ -174,8 +174,9 @@ void SenderQueueUnittest::TestGetAvailableItems() {
 }
 
 void SenderQueueUnittest::TestMetric() {
-    APSARA_TEST_EQUAL(5U, mQueue->mMetricsRecordRef->GetLabels()->size());
+    APSARA_TEST_EQUAL(6U, mQueue->mMetricsRecordRef->GetLabels()->size());
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PROJECT, ""));
+    APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_TARGET, ""));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_PIPELINE_NAME, "test_config"));
     APSARA_TEST_TRUE(mQueue->mMetricsRecordRef.HasLabel(METRIC_LABEL_KEY_COMPONENT_NAME,
                                                         METRIC_LABEL_VALUE_COMPONENT_NAME_SENDER_QUEUE));

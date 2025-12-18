@@ -18,6 +18,7 @@
 
 #include <atomic>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -45,6 +46,7 @@ public:
 
     bool IsFirstCheckConfigExecuted() const { return mIsFirstCheckConfigExecuted.load(); }
     void SetFirstCheckConfigExecuted(bool value) { mIsFirstCheckConfigExecuted.store(value); }
+    size_t GetPipelineCount() const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void ClearEnvironment() { mPipelineNameEntityMap.clear(); }
@@ -56,6 +58,7 @@ private:
 
     std::unique_ptr<TaskPipeline> BuildPipeline(TaskConfig&& config);
 
+    mutable std::shared_mutex mPipelineNameEntityMapMutex;
     std::unordered_map<std::string, std::unique_ptr<TaskPipeline>> mPipelineNameEntityMap;
 
     std::atomic<bool> mIsFirstCheckConfigExecuted{false};

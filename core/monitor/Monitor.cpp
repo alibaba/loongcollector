@@ -634,6 +634,7 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_KEY_OS_DETAIL, mOsDetail);
     labels.emplace_back(METRIC_LABEL_KEY_UUID, Application::GetInstance()->GetUUID());
     labels.emplace_back(METRIC_LABEL_KEY_VERSION, ILOGTAIL_VERSION);
+    labels.emplace_back(METRIC_LABEL_KEY_HOST_ID, InstanceIdentity::Instance()->GetEntity()->GetHostID().to_string());
 #ifdef __ENTERPRISE__
     if (!mEcsInstanceID.empty()) {
         labels.emplace_back(METRIC_LABEL_KEY_ECS_INSTANCE_ID, mEcsInstanceID);

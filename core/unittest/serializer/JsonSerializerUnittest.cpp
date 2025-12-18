@@ -420,6 +420,7 @@ BatchedEvents JsonSerializerUnittest::createBatchedSpanEvents() {
     spanEvent->SetTag(std::string("callType"), std::string("http-client"));
     spanEvent->SetTag(std::string("statusCode"), std::string("200"));
     spanEvent->SetTag(std::string("version"), std::string("HTTP1.1"));
+    spanEvent->SortTags();
     auto innerEvent = spanEvent->AddEvent();
     innerEvent->SetTag(std::string("innner-event-key-0"), std::string("inner-event-value-0"));
     innerEvent->SetTag(std::string("innner-event-key-1"), std::string("inner-event-value-1"));

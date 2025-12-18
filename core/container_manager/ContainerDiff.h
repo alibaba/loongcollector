@@ -31,9 +31,12 @@ namespace logtail {
 struct ContainerDiff {
     std::vector<std::shared_ptr<RawContainerInfo>> mAdded;
     std::vector<std::shared_ptr<RawContainerInfo>> mModified;
+
+    // 旧版本checkpoint中，只包含完整的rootfs+采集配置路径信息，因此这里需要额外字段记录
+    std::vector<std::pair<std::string, std::shared_ptr<RawContainerInfo>>> mLegacyCheckpointAdded;
     std::vector<std::string> mRemoved;
 
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
+    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty() && mLegacyCheckpointAdded.empty(); }
 
     std::string ToString() const {
         std::stringstream ss;
@@ -54,6 +57,14 @@ struct ContainerDiff {
         ss << "Removed: ";
         for (const auto& containerID : mRemoved) {
             ss << containerID << " ";
+        }
+        if (!mLegacyCheckpointAdded.empty()) {
+            ss << "LegacyCheckpointAdded: ";
+            for (const auto& pair : mLegacyCheckpointAdded) {
+                ss << "{" << "containerName:" << pair.second->mName << " ";
+                ss << "containerID:" << pair.second->mID << " ";
+                ss << "}" << " ";
+            }
         }
         return ss.str();
     }

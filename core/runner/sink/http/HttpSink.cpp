@@ -102,7 +102,8 @@ void HttpSink::Run() {
                           "wait time",
                           ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()
                                                                                - request->mEnqueTime)
-                                       .count()))("try cnt", ToString(request->mTryCnt)));
+                                       .count())
+                              + "ms")("try cnt", ToString(request->mTryCnt)));
             if (!AddRequestToClient(std::move(request))) {
                 continue;
             }
@@ -133,7 +134,6 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
                                    request->mResponse,
                                    headers,
                                    request->mTimeout,
-                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    false,
                                    std::nullopt,
@@ -200,7 +200,8 @@ void HttpSink::DoRun() {
                           "wait time",
                           ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()
                                                                                - request->mEnqueTime)
-                                       .count()))("try cnt", ToString(request->mTryCnt)));
+                                       .count())
+                              + "ms")("try cnt", ToString(request->mTryCnt)));
             if (AddRequestToClient(std::move(request))) {
                 ++runningHandlers;
                 ADD_GAUGE(mSendingItemsTotal, 1);
@@ -209,6 +210,9 @@ void HttpSink::DoRun() {
         }
         if (hasRequest) {
             continue;
+        }
+        if (runningHandlers == 0) {
+            break;
         }
 
         struct timeval timeout {
@@ -240,8 +244,8 @@ void HttpSink::DoRun() {
             LOG_ERROR(sLogger, ("failed to call curl_multi_fdset", "sleep 100ms")("errMsg", curl_multi_strerror(mc)));
         }
         if (maxfd == -1) {
-            // sleep min(timeout, 100ms) according to libcurl
-            int64_t sleepMs = (curlTimeout >= 0 && curlTimeout < 100) ? curlTimeout : 100;
+            // sleep min(timeout, 50ms) according to libcurl
+            int64_t sleepMs = (curlTimeout >= 0 && curlTimeout < 50) ? curlTimeout : 50;
             this_thread::sleep_for(chrono::milliseconds(sleepMs));
         } else {
             select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);

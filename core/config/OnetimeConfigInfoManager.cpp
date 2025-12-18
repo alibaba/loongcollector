@@ -52,6 +52,11 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoi
     return status;
 }
 
+size_t OnetimeConfigInfoManager::GetConfigCount() const {
+    lock_guard<mutex> lock(mMux);
+    return mConfigInfoMap.size();
+}
+
 bool OnetimeConfigInfoManager::UpdateConfig(
     const string& configName, ConfigType type, const filesystem::path& filepath, uint64_t hash, uint32_t expireTime) {
     lock_guard<mutex> lock(mMux);

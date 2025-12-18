@@ -189,6 +189,11 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
     return res;
 }
 
+size_t CollectionPipelineManager::GetPipelineCount() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    return mPipelineNameEntityMap.size();
+}
+
 void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
     for (auto& item : mInputRunners) {
         item->ClearUnusedCheckpoints();
@@ -240,9 +245,15 @@ void CollectionPipelineManager::FlushAllBatch() {
 bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& diff) {
     // private method, no need to lock mPipelineNameEntityMapMutex
     for (const auto& name : diff.mRemoved) {
-        string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        auto pipeline = mPipelineNameEntityMap[name];
+        if (pipeline) {
+            auto inputs = pipeline->GetConfig()["inputs"];
+            for (const auto& input : inputs) {
+                string inputType = input["Type"].asString();
+                if (inputType == "input_file" || inputType == "input_container_stdio") {
+                    return true;
+                }
+            }
         }
     }
     for (const auto& config : diff.mModified) {
@@ -250,11 +261,23 @@ bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& d
         if (inputType == "input_file" || inputType == "input_container_stdio") {
             return true;
         }
+        auto oldPipeline = mPipelineNameEntityMap[config.mName];
+        if (oldPipeline) {
+            const Json::Value& oldInputs = oldPipeline->GetConfig()["inputs"];
+            for (const auto& oldInput : oldInputs) {
+                string oldInputType = oldInput["Type"].asString();
+                if (oldInputType == "input_file" || oldInputType == "input_container_stdio") {
+                    return true;
+                }
+            }
+        }
     }
     for (const auto& config : diff.mAdded) {
-        string inputType = (*config.mInputs[0])["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        for (const auto& input : config.mInputs) {
+            string inputType = (*input)["Type"].asString();
+            if (inputType == "input_file" || inputType == "input_container_stdio") {
+                return true;
+            }
         }
     }
     return false;

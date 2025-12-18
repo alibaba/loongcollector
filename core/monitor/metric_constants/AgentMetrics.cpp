@@ -32,6 +32,7 @@ const string METRIC_LABEL_KEY_VERSION = "version";
 const string METRIC_LABEL_KEY_ECS_INSTANCE_ID = "ecs_instance_id";
 const string METRIC_LABEL_KEY_ECS_REGION_ID = "ecs_region_id";
 const string METRIC_LABEL_KEY_ECS_USER_ID = "ecs_user_id";
+const string METRIC_LABEL_KEY_HOST_ID = "host_id";
 
 // metric keys
 const string METRIC_AGENT_CPU = "cpu";

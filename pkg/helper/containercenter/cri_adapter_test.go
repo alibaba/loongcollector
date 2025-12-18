@@ -20,7 +20,7 @@ package containercenter
 import (
 	"testing"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 
 	"github.com/stretchr/testify/require"
 )
@@ -35,8 +35,8 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 		rootfsCache:     make(map[string]string),
 	}
 
-	container := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	container := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID: "1234567890abcde",
 		},
 	}

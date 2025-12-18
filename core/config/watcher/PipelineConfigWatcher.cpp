@@ -105,6 +105,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
 #ifdef __ENTERPRISE__
     const map<string, string>& builtInPipelines
         = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs();
+    mBuiltInPipelineCount = builtInPipelines.size();
 
     for (const auto& pipeline : builtInPipelines) {
         const string& pipelineName = pipeline.first;
@@ -182,6 +183,7 @@ void PipelineConfigWatcher::InsertBuiltInPipelines(CollectionConfigDiff& pDiff,
         }
     }
 #else
+    mBuiltInPipelineCount = 0;
     return;
 #endif
 }

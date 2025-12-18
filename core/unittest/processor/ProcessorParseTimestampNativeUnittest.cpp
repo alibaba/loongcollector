@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/JsonUtil.h"
 #include "common/TimeUtil.h"
@@ -37,6 +38,7 @@ public:
         setenv("TZ", "UTC", 1);
 #endif
         mContext.SetConfigName("project##config_0");
+        mContext.SetPipeline(mPipeline);
     }
 
     void TestInit();
@@ -49,6 +51,7 @@ public:
     void TestCheckTime();
 
     CollectionPipelineContext mContext;
+    CollectionPipeline mPipeline;
 };
 
 UNIT_TEST_CASE(ProcessorParseTimestampNativeUnittest, TestInit);

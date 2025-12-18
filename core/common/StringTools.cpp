@@ -418,5 +418,18 @@ std::string Trim(const std::string& str, const std::string& trimCharacters, bool
     return trimCopy(str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
 }
 
+std::string DoubleToString(double value) {
+    std::string result = std::to_string(value);
+    // Remove trailing zeros
+    size_t dotPos = result.find('.');
+    if (dotPos != std::string::npos) {
+        size_t lastNonZero = result.find_last_not_of('0');
+        if (lastNonZero >= dotPos) {
+            // If last non-zero char is the dot, remove it too
+            result.erase(lastNonZero == dotPos ? dotPos : lastNonZero + 1);
+        }
+    }
+    return result;
+}
 
 } // namespace logtail

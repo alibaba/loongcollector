@@ -30,7 +30,8 @@ public:
     void Insert(StringView key, StringView val) {
         auto iter = mInner.find(key);
         if (iter != mInner.end()) {
-            mAllocatedSize += val.size() - iter->second.size();
+            mAllocatedSize -= iter->second.size();
+            mAllocatedSize += val.size();
             iter->second = val;
         } else {
             mAllocatedSize += key.size() + val.size();
@@ -66,12 +67,19 @@ public:
     void Insert(StringView key, StringView val) {
         auto iter = std::find_if(mInner.begin(), mInner.end(), [key](const auto& item) { return item.first == key; });
         if (iter != mInner.end()) {
-            mAllocatedSize += val.size() - iter->second.size();
+            mAllocatedSize -= iter->second.size();
+            mAllocatedSize += val.size();
             iter->second = val;
         } else {
             mAllocatedSize += key.size() + val.size();
             mInner.emplace_back(key, val);
         }
+    }
+
+    void Append(StringView key, StringView val) {
+        // directly append to the end of the vector, without checking if the key already exists
+        mAllocatedSize += key.size() + val.size();
+        mInner.emplace_back(key, val);
     }
 
     void Erase(StringView key) {

@@ -160,8 +160,10 @@ private:
         uint64_t tcp = 0;
         for (const auto& line : lines) {
             if (FastParse::FieldStartsWith(line, 0, "TCP:") || FastParse::FieldStartsWith(line, 0, "TCP6:")) {
-                auto twValue = FastParse::GetFieldAs<uint64_t>(line, 6, 0);
-                auto allocValue = FastParse::GetFieldAs<uint64_t>(line, 8, 0);
+                uint64_t twValue = 0;
+                uint64_t allocValue = 0;
+                FastParse::GetFieldAs<uint64_t>(line, 6, twValue);
+                FastParse::GetFieldAs<uint64_t>(line, 8, allocValue);
                 tcp += twValue + allocValue;
             }
         }
@@ -290,9 +292,13 @@ void FastFieldParserBenchmark::TestLoadStatParsing() {
     // Fast版本
     auto parseLoadFast = [&]() -> vector<double> {
         vector<double> result;
-        result.push_back(FastParse::GetFieldAs<double>(loadLine, 0, 0.0));
-        result.push_back(FastParse::GetFieldAs<double>(loadLine, 1, 0.0));
-        result.push_back(FastParse::GetFieldAs<double>(loadLine, 2, 0.0));
+        double val0 = 0.0, val1 = 0.0, val2 = 0.0;
+        FastParse::GetFieldAs<double>(loadLine, 0, val0);
+        FastParse::GetFieldAs<double>(loadLine, 1, val1);
+        FastParse::GetFieldAs<double>(loadLine, 2, val2);
+        result.push_back(val0);
+        result.push_back(val1);
+        result.push_back(val2);
         return result;
     };
 
@@ -539,9 +545,9 @@ void FastFieldParserBenchmark::TestProcessCredParsing() {
                 auto nameField = parser.GetField(1);
                 name = string(nameField);
             } else if (firstField == "Uid:") {
-                uid = parser.GetFieldAs<uint64_t>(1, 0);
+                parser.GetFieldAs<uint64_t>(1, uid);
             } else if (firstField == "Gid:") {
-                gid = parser.GetFieldAs<uint64_t>(1, 0);
+                parser.GetFieldAs<uint64_t>(1, gid);
             }
         }
 
@@ -605,7 +611,11 @@ void FastFieldParserBenchmark::TestUptimeParsing() {
     };
 
     // Fast版本
-    auto parseUptimeFast = [](const string& line) -> double { return FastParse::GetFieldAs<double>(line, 0, 0.0); };
+    auto parseUptimeFast = [](const string& line) -> double {
+        double result = 0.0;
+        FastParse::GetFieldAs<double>(line, 0, result);
+        return result;
+    };
 
     // 验证正确性
     {
@@ -657,15 +667,28 @@ void FastFieldParserBenchmark::TestBatchFieldParsing() {
         vector<uint64_t> result;
         FastFieldParser parser(testLine);
         for (int i = 0; i < numFields; ++i) {
-            result.push_back(parser.GetFieldAs<uint64_t>(i, 0));
+            uint64_t value = 0;
+            parser.GetFieldAs<uint64_t>(i, value);
+            result.push_back(value);
         }
         return result;
     };
 
-    // Fast版本 - 批量调用（新优化）
+    // Fast版本 - 迭代器批量调用（优化版）
     auto parseBatch = [&]() -> vector<uint64_t> {
+        vector<uint64_t> result;
         FastFieldParser parser(testLine);
-        return parser.GetFieldsAs<uint64_t>(0, numFields, 0);
+        int count = 0;
+        for (auto field : parser) {
+            if (count >= numFields)
+                break;
+            uint64_t value = 0;
+            if (StringTo(field, value)) {
+                result.push_back(value);
+            }
+            count++;
+        }
+        return result;
     };
 
     // 验证正确性
@@ -710,7 +733,7 @@ void FastFieldParserBenchmark::TestBatchFieldParsing() {
 
     cout << "批量字段解析 (" << benchmarkIterations << " 次迭代, " << numFields << " 字段):\n";
     cout << "  逐个调用:        " << individualTime.count() << " μs (14次遍历)\n";
-    cout << "  批量调用:        " << batchTime.count() << " μs (1次遍历)\n";
+    cout << "  迭代器调用:      " << batchTime.count() << " μs (1次遍历)\n";
     cout << "  加速比:          " << fixed << setprecision(2) << speedup << "x\n";
     cout << "  校验和:          " << individualSum << " vs " << batchSum << "\n";
     cout << "  遍历减少:        " << fixed << setprecision(1) << (14.0 / 1.0) << "x (从14次到1次)\n";
@@ -738,9 +761,20 @@ void FastFieldParserBenchmark::TestProcessMemoryParsing() {
         return {0, 0, 0};
     };
 
-    // Fast版本 - 批量解析
+    // Fast版本 - 迭代器批量解析
     auto parseMemFast = [&]() -> tuple<uint64_t, uint64_t, uint64_t> {
-        auto memValues = FastParse::GetFieldsAs<uint64_t>(memLine, 0, 3, 0);
+        FastFieldParser parser(memLine);
+        vector<uint64_t> memValues;
+        int count = 0;
+        for (auto field : parser) {
+            if (count >= 3)
+                break;
+            uint64_t value = 0;
+            if (StringTo(field, value)) {
+                memValues.push_back(value);
+            }
+            count++;
+        }
 
         if (memValues.size() >= 3) {
             uint64_t size = memValues[0] * PAGE_SIZE;

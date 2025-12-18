@@ -557,8 +557,10 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                 if (!sendResult) {
                     time_t beginTime = time(nullptr);
                     while (true) {
-                        string host;
-                        auto response = SendBufferFileData(bufferMeta, logData, host);
+                        string domain;
+                        string ip;
+                        bool useIPFlag = false;
+                        auto response = SendBufferFileData(bufferMeta, logData, domain, ip, useIPFlag);
                         SendResult sendRes = SEND_OK;
                         if (response.mStatusCode != 200) {
                             sendRes = ConvertErrorCode(response.mErrorCode);
@@ -574,7 +576,8 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
-                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "domain", domain)("ip", ip)("useIPFlag", useIPFlag)("projectName",
+                                                                                                bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 }
                                 usleep(INT32_FLAG(send_retry_sleep_interval));
@@ -593,7 +596,8 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
-                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "domain", domain)("ip", ip)("useIPFlag", useIPFlag)("projectName",
+                                                                                                bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 usleep(INT32_FLAG(quota_exceed_wait_interval));
                                 break;
@@ -860,7 +864,9 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
 
 SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
                                                  const std::string& logData,
-                                                 std::string& host) {
+                                                 std::string& domain,
+                                                 std::string& ip,
+                                                 bool useIPFlag) {
     RateLimiter::FlowControl(bufferMeta.rawsize(), mSendLastTime, mSendLastByte, false);
     string region = bufferMeta.region();
 #ifdef __ENTERPRISE__
@@ -900,15 +906,16 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         region, bufferMeta.project(), GetEndpointMode(bufferMeta.endpointmode()));
     mCandidateHostsInfos.insert(info);
 
-    host = info->GetCurrentHost();
-    if (host.empty()) {
+    domain = info->GetCurrentHost();
+    if (domain.empty()) {
         SLSResponse response;
         response.mErrorCode = LOGE_REQUEST_ERROR;
         response.mErrorMsg = kNoHostErrorMsg;
         return response;
     }
 #else
-    host = bufferMeta.project() + "." + bufferMeta.endpoint();
+    domain = bufferMeta.project() + "." + bufferMeta.endpoint();
+    SLSClientManager::GetInstance()->GetCurrentEndpoint(domain, ip, useIPFlag);
 #endif
 
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(region);
@@ -929,7 +936,9 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                     accessKeySecret,
                                     secToken,
                                     type,
-                                    host,
+                                    domain,
+                                    ip,
+                                    useIPFlag,
                                     httpsFlag,
                                     bufferMeta.project(),
                                     bufferMeta.logstore(),
@@ -943,13 +952,35 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                        accessKeySecret,
                                        secToken,
                                        type,
-                                       host,
+                                       domain,
+                                       ip,
+                                       useIPFlag,
                                        httpsFlag,
                                        bufferMeta.project(),
                                        bufferMeta.logstore(),
                                        GetSLSCompressTypeString(bufferMeta.compresstype()),
                                        logData,
                                        bufferMeta.rawsize());
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST: {
+#ifdef __ENTERPRISE__
+            return PostMetricHostLogs(accessKeyId,
+                                      accessKeySecret,
+                                      secToken,
+                                      type,
+                                      domain,
+                                      httpsFlag,
+                                      GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                      dataType,
+                                      logData,
+                                      bufferMeta.rawsize());
+#else
+            LOG_WARNING(sLogger, ("metrics_host is not supported in community edition", ""));
+            // return 200 to avoid retry
+            SLSResponse response;
+            response.mStatusCode = 200;
+            return response;
+#endif
+        }
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS: {
@@ -960,7 +991,9 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
                                       accessKeySecret,
                                       secToken,
                                       type,
-                                      host,
+                                      domain,
+                                      ip,
+                                      useIPFlag,
                                       httpsFlag,
                                       bufferMeta.project(),
                                       GetSLSCompressTypeString(bufferMeta.compresstype()),

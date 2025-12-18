@@ -22,7 +22,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/containers/ocicrypt](https://pkg.go.dev/github.com/containers/ocicrypt?tab=licenses)
 - [github.com/coreos/go-systemd](https://pkg.go.dev/github.com/coreos/go-systemd?tab=licenses)
 - [github.com/coreos/pkg](https://pkg.go.dev/github.com/coreos/pkg?tab=licenses)
-- [github.com/docker/distribution](https://pkg.go.dev/github.com/docker/distribution?tab=licenses)
 - [github.com/docker/docker](https://pkg.go.dev/github.com/docker/docker?tab=licenses)
 - [github.com/docker/go-connections](https://pkg.go.dev/github.com/docker/go-connections?tab=licenses)
 - [github.com/docker/go-events](https://pkg.go.dev/github.com/docker/go-events?tab=licenses)
@@ -64,6 +63,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/xdg-go/pbkdf2](https://pkg.go.dev/github.com/xdg-go/pbkdf2?tab=licenses)
 - [github.com/xdg-go/scram](https://pkg.go.dev/github.com/xdg-go/scram?tab=licenses)
 - [github.com/xdg-go/stringprep](https://pkg.go.dev/github.com/xdg-go/stringprep?tab=licenses)
+- [github.com/apache/doris/sdk/go-doris-sdk](https://pkg.go.dev/github.com/apache/doris/sdk/go-doris-sdk?tab=licenses)
 - [github.com/apache/pulsar-client-go](https://pkg.go.dev/github.com/apache/pulsar-client-go?tab=licenses)
 - [github.com/AthenZ/athenz](https://pkg.go.dev/github.com/AthenZ/athenz?tab=licenses)
 - [github.com/ardielle/ardielle-go](https://pkg.go.dev/github.com/ardielle/ardielle-go?tab=licenses)
@@ -91,7 +91,6 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/go-openapi/jsonpointer](https://pkg.go.dev/github.com/go-openapi/jsonpointer?tab=licenses)
 - [github.com/go-openapi/jsonreference](https://pkg.go.dev/github.com/go-openapi/jsonreference?tab=licenses)
 - [github.com/go-openapi/swag](https://pkg.go.dev/github.com/go-openapi/swag?tab=licenses)
-- [github.com/google/gnostic](https://pkg.go.dev/github.com/google/gnostic?tab=licenses)
 - [github.com/grafana/loki-client-go](https://pkg.go.dev/github.com/grafana/loki-client-go?tab=licenses)
 - [github.com/mwitkow/go-conntrack](https://pkg.go.dev/github.com/mwitkow/go-conntrack?tab=licenses)
 - [sigs.k8s.io/json](https://pkg.go.dev/sigs.k8s.io/json?tab=licenses)
@@ -103,6 +102,11 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [cloud.google.com/go/compute/metadata](https://pkg.go.dev/cloud.google.com/go/compute/metadata?tab=licenses)
 - [github.com/VictoriaMetrics/metricsql](https://pkg.go.dev/github.com/VictoriaMetrics/metricsql?tab=licenses)
 - [google.golang.org/genproto/googleapis/rpc](https://pkg.go.dev/google.golang.org/genproto/googleapis/rpc?tab=licenses)
+- [github.com/distribution/reference](https://pkg.go.dev/github.com/distribution/reference?tab=licenses)
+- [github.com/go-logr/stdr](https://pkg.go.dev/github.com/go-logr/stdr?tab=licenses)
+- [github.com/google/gnostic-models](https://pkg.go.dev/github.com/google/gnostic-models?tab=licenses)
+- [github.com/moby/docker-image-spec](https://pkg.go.dev/github.com/moby/docker-image-spec?tab=licenses)
+- [go.opentelemetry.io/auto/sdk](https://pkg.go.dev/go.opentelemetry.io/auto/sdk?tab=licenses)
 
 ## BSD licenses
 
@@ -153,6 +157,10 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/munnerz/goautoneg](https://pkg.go.dev/github.com/munnerz/goautoneg?tab=licenses)
 - [github.com/pmezard/go-difflib](https://pkg.go.dev/github.com/pmezard/go-difflib?tab=licenses)
 - [github.com/gorilla/websocket](https://github.com/gorilla/websocket?tab=BSD-3-Clause-1-ov-file#readme)
+- [go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp](https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp?tab=licenses)
+- [go.opentelemetry.io/otel/metric](https://pkg.go.dev/go.opentelemetry.io/otel/metric?tab=licenses)
+- [github.com/mxk/go-flowrate](https://pkg.go.dev/github.com/mxk/go-flowrate?tab=licenses)
+- [gopkg.in/evanphx/json-patch.v4](https://pkg.go.dev/gopkg.in/evanphx/json-patch.v4?tab=licenses)
 
 ## MIT licenses
 
@@ -243,6 +251,9 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/go-playground/universal-translator](https://pkg.go.dev/github.com/go-playground/universal-translator?tab=licenses)
 - [github.com/go-playground/validator](https://pkg.go.dev/github.com/go-playground/validator?tab=licenses)
 - [github.com/leodido/go-urn](https://pkg.go.dev/github.com/leodido/go-urn?tab=licenses)
+- [github.com/felixge/httpsnoop](https://pkg.go.dev/github.com/felixge/httpsnoop?tab=licenses)
+- [github.com/fxamacker/cbor](https://pkg.go.dev/github.com/fxamacker/cbor?tab=licenses)
+- [github.com/x448/float16](https://pkg.go.dev/github.com/x448/float16?tab=licenses)
 
 ## ISC licenses
 

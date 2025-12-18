@@ -27,6 +27,7 @@ const string METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID = "flusher_plugin_id";
  *   queue
  **********************************************************/
 const string METRIC_LABEL_KEY_QUEUE_TYPE = "queue_type";
+const string METRIC_LABEL_KEY_TARGET = "target";
 const string METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED = "exactly_once_enabled";
 
 /**********************************************************

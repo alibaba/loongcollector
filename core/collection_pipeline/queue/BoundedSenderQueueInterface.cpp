@@ -14,18 +14,23 @@
 
 #include "collection_pipeline/queue/BoundedSenderQueueInterface.h"
 
-
 using namespace std;
 
 namespace logtail {
 
 FeedbackInterface* BoundedSenderQueueInterface::sFeedback = nullptr;
 
-BoundedSenderQueueInterface::BoundedSenderQueueInterface(
-    size_t cap, size_t low, size_t high, QueueKey key, const string& flusherId, const CollectionPipelineContext& ctx)
+BoundedSenderQueueInterface::BoundedSenderQueueInterface(size_t cap,
+                                                         size_t low,
+                                                         size_t high,
+                                                         QueueKey key,
+                                                         const string& target,
+                                                         const string& flusherId,
+                                                         const CollectionPipelineContext& ctx)
     : QueueInterface(key, cap, ctx), BoundedQueueInterface<std::unique_ptr<SenderQueueItem>>(key, cap, low, high, ctx) {
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_SENDER_QUEUE}});
     mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID, flusherId}});
+    mMetricsRecordRef.AddLabels({{METRIC_LABEL_KEY_TARGET, target}});
     mExtraBufferSize = mMetricsRecordRef.CreateIntGauge(METRIC_COMPONENT_QUEUE_EXTRA_BUFFER_SIZE);
     mFetchRejectedByRateLimiterTimesCnt
         = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_REJECTED_BY_RATE_LIMITER_TIMES_TOTAL);

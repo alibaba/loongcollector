@@ -83,6 +83,8 @@ public:
     PipelineEventGroup(const std::shared_ptr<SourceBuffer>& sourceBuffer, SourceBufferSet& extraSourceBuffers)
         : mSourceBuffer(sourceBuffer), mExtraSourceBuffers(extraSourceBuffers) {}
     ~PipelineEventGroup();
+    PipelineEventGroup(const PipelineEventGroup&) = delete;
+    PipelineEventGroup& operator=(const PipelineEventGroup&) = delete;
     PipelineEventGroup(PipelineEventGroup&&) noexcept;
     PipelineEventGroup& operator=(PipelineEventGroup&&) noexcept;
 
@@ -144,6 +146,8 @@ public:
 #endif
 
 private:
+    void destroy();
+
     GroupMetadata mMetadata; // Used to generate tag/log. Will not output.
     SizedMap mTags; // custom tags to output
     EventsContainer mEvents;

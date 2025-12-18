@@ -22,7 +22,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -71,10 +70,10 @@ type TestData struct {
 // convertTestContainerToDockerInfoDetail converts test container data to DockerInfoDetail
 func convertTestContainerToDockerInfoDetail(tc TestContainer) *DockerInfoDetail {
 	// Create container JSON
-	containerJSON := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+	containerJSON := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			ID: tc.ID,
-			State: &types.ContainerState{
+			State: &container.State{
 				Status: "running",
 			},
 		},
@@ -219,7 +218,7 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 	// Test case 1: Empty include filters should match all when no exclude filters
 	t.Run("empty_include_filters", func(t *testing.T) {
 		container := &DockerInfoDetail{
-			ContainerInfo: types.ContainerJSON{
+			ContainerInfo: container.InspectResponse{
 				Config: &container.Config{
 					Labels: map[string]string{"app": "test"},
 					Env:    []string{"KEY=value"},
@@ -250,7 +249,7 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 	// Test case 2: Include filters with no matches should fail
 	t.Run("include_filters_no_match", func(t *testing.T) {
 		container := &DockerInfoDetail{
-			ContainerInfo: types.ContainerJSON{
+			ContainerInfo: container.InspectResponse{
 				Config: &container.Config{
 					Labels: map[string]string{"app": "test"},
 					Env:    []string{"KEY=value"},
@@ -267,7 +266,7 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 	// Test case 3: Exclude filters that match should fail
 	t.Run("exclude_filters_match", func(t *testing.T) {
 		container := &DockerInfoDetail{
-			ContainerInfo: types.ContainerJSON{
+			ContainerInfo: container.InspectResponse{
 				Config: &container.Config{
 					Labels: map[string]string{"app": "test"},
 				},

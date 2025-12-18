@@ -16,18 +16,22 @@ package containercenter
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
+	"os"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
+	"github.com/docker/docker/api/types/image"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -162,7 +166,7 @@ func (info *K8SInfo) GetLabel(key string) string {
 }
 
 // ExtractK8sLabels only work for original docker container.
-func (info *K8SInfo) ExtractK8sLabels(containerInfo types.ContainerJSON) {
+func (info *K8SInfo) ExtractK8sLabels(containerInfo container.InspectResponse) {
 	// only pause container has k8s labels
 	if info.ContainerName == "POD" || info.ContainerName == "pause" {
 		info.mu.Lock()
@@ -241,7 +245,7 @@ func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
 
 type DockerInfoDetail struct {
 	StdoutPath       string
-	ContainerInfo    types.ContainerJSON
+	ContainerInfo    container.InspectResponse
 	ContainerNameTag map[string]string
 	K8SInfo          *K8SInfo
 	EnvConfigInfoMap map[string]*EnvConfigInfo
@@ -250,6 +254,7 @@ type DockerInfoDetail struct {
 
 	lastUpdateTime time.Time
 	deleteFlag     bool
+	metadataHash   string // Hash of container metadata for change detection
 }
 
 func (did *DockerInfoDetail) IDPrefix() string {
@@ -275,6 +280,10 @@ func (did *DockerInfoDetail) Status() string {
 		return did.ContainerInfo.State.Status
 	}
 	return ""
+}
+
+func (did *DockerInfoDetail) MetadataHash() string {
+	return did.metadataHash
 }
 
 func (did *DockerInfoDetail) IsTimeout() bool {
@@ -341,7 +350,7 @@ func (did *DockerInfoDetail) FindBestMatchedPath(pth string) (sourcePath, contai
 	// logger.Debugf(context.Background(), "FindBestMatchedPath for container %s, target path: %s, containerInfo: %+v", did.IDPrefix(), pth, did.ContainerInfo)
 
 	// check mounts
-	var bestMatchedMounts types.MountPoint
+	var bestMatchedMounts container.MountPoint
 	for _, mount := range did.ContainerInfo.Mounts {
 		// logger.Debugf("container(%s-%s) mount: source-%s destination-%s", did.IDPrefix(), did.ContainerInfo.Name, mount.Source, mount.Destination)
 		dst := mount.Destination
@@ -488,10 +497,10 @@ type ContainerCenter struct {
 }
 
 type ClientInterface interface {
-	ContainerList(ctx context.Context, options types.ContainerListOptions) ([]types.Container, error)
-	ImageInspectWithRaw(ctx context.Context, imageID string) (types.ImageInspect, []byte, error)
-	ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error)
-	Events(ctx context.Context, options types.EventsOptions) (<-chan events.Message, <-chan error)
+	ContainerList(ctx context.Context, options container.ListOptions) ([]container.Summary, error)
+	ImageInspectWithRaw(ctx context.Context, imageID string) (image.InspectResponse, []byte, error)
+	ContainerInspect(ctx context.Context, containerID string) (container.InspectResponse, error)
+	Events(ctx context.Context, options events.ListOptions) (<-chan events.Message, <-chan error)
 }
 
 type ContainerHelperInterface interface {
@@ -545,6 +554,30 @@ func (dc *ContainerCenter) lookupImageCache(id string) (string, bool) {
 	return imageName, ok
 }
 
+// computeContainerMetadataHash computes a hash for container's mutable metadata fields
+// For the same container ID, only State typically changes in Docker/K8s environments.
+// Other fields (env, labels, mounts) are immutable after container creation.
+func computeContainerMetadataHash(info *DockerInfoDetail) string {
+	if info == nil {
+		return ""
+	}
+
+	// For same container ID, typically only State changes
+	// Most other fields are immutable after container creation
+	var hashComponents []string
+
+	// Container status - the primary field that changes for same container ID
+	if info.ContainerInfo.State != nil {
+		hashComponents = append(hashComponents, info.ContainerInfo.State.Status)
+		hashComponents = append(hashComponents, strconv.Itoa(info.ContainerInfo.State.Pid))
+	}
+	// Compute FNV hash (non-cryptographic, suitable for change detection)
+	data := strings.Join(hashComponents, "|")
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(data))
+	return fmt.Sprintf("%x", h.Sum64())
+}
+
 func (dc *ContainerCenter) getImageName(id, defaultVal string) string {
 	if len(id) == 0 || dc.client == nil {
 		return defaultVal
@@ -566,7 +599,7 @@ func (dc *ContainerCenter) getImageName(id, defaultVal string) string {
 	return defaultVal
 }
 
-func (dc *ContainerCenter) getIPAddress(info types.ContainerJSON) string {
+func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 	if detail, ok := dc.getContainerDetail(info.ID); ok && detail != nil {
 		return detail.ContainerIP
 	}
@@ -579,10 +612,69 @@ func (dc *ContainerCenter) getIPAddress(info types.ContainerJSON) string {
 	return ""
 }
 
+// extractUpperDirFromProcMounts extracts upperdir from /proc/{pid}/mounts for containerd overlayfs
+// It reads /logtail_host/proc/{pid}/mounts and extracts upperdir=xxx from the overlay mount at root "/"
+// The /proc/{pid}/mounts file follows /etc/fstab format with 6 space-separated fields:
+// <device> <mount_point> <filesystem_type> <mount_options> <dump> <fsck>
+func extractUpperDirFromProcMounts(pid int) (string, error) {
+	// Read /proc/{pid}/mounts through /logtail_host mount point
+	mountsPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
+	content, err := os.ReadFile(filepath.Clean(mountsPath))
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", mountsPath, err)
+	}
+
+	// Parse content line by line following fstab format
+	lines := strings.Split(string(content), "\n")
+	for _, line := range lines {
+		// Skip empty lines
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
+			continue
+		}
+
+		// Parse fields using strings.Fields (handles multiple spaces correctly)
+		// Format: <device> <mount_point> <filesystem_type> <mount_options> <dump> <fsck>
+		fields := strings.Fields(line)
+		if len(fields) < 4 {
+			// Skip malformed lines
+			continue
+		}
+
+		mountPoint := fields[1]
+		fsType := fields[2]
+		mountOptions := fields[3]
+
+		// Match overlay filesystem mounted at root "/"
+		if fsType != "overlay" || mountPoint != "/" {
+			continue
+		}
+
+		// Parse mount_options to find upperdir=
+		// mount_options is comma-separated: rw,relatime,upperdir=/path,workdir=/path,...
+		options := strings.Split(mountOptions, ",")
+		for _, opt := range options {
+			opt = strings.TrimSpace(opt)
+			// Check if this option starts with "upperdir="
+			if strings.HasPrefix(opt, "upperdir=") {
+				upperDir := strings.TrimPrefix(opt, "upperdir=")
+				if len(upperDir) == 0 {
+					// Continue searching other lines in case there are multiple overlay mounts
+					continue
+				}
+				return upperDir, nil
+			}
+		}
+		// Continue searching other lines if upperdir not found in this mount options
+	}
+
+	return "", fmt.Errorf("no overlay mount found at root (/) in %s", mountsPath)
+}
+
 // CreateInfoDetail create DockerInfoDetail with docker.Container
-// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts
+// Container property used in this function : HostsPath, Config.Hostname, Name, Config.Image, Config.Env, Mounts, State.Pid
 // ContainerInfo.GraphDriver.Data["UpperDir"] Config.Labels
-func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
+func (dc *ContainerCenter) CreateInfoDetail(info container.InspectResponse, envConfigPrefix string, selfConfigFlag bool) *DockerInfoDetail {
 	// Generate Log Tags
 	containerNameTag := make(map[string]string)
 	k8sInfo := K8SInfo{}
@@ -639,7 +731,7 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 		containerNameTag["_container_ip_"] = ip
 	}
 
-	sortMounts := func(mounts []types.MountPoint) {
+	sortMounts := func(mounts []container.MountPoint) {
 		sort.Slice(mounts, func(i, j int) bool {
 			return mounts[i].Source < mounts[j].Source
 		})
@@ -676,15 +768,29 @@ func (dc *ContainerCenter) CreateInfoDetail(info types.ContainerJSON, envConfigP
 			did.DefaultRootPath = rootPath
 		}
 	}
+	// for docker v29+ with containerd storage driver (GraphDriver is empty)
+	if dc.client != nil && len(did.DefaultRootPath) == 0 && info.State != nil && info.State.Pid > 0 {
+		// Try to extract upperdir from /proc/{pid}/mounts for containerd overlayfs
+		upperDir, err := extractUpperDirFromProcMounts(info.State.Pid)
+		if err != nil {
+			logger.Debugf(context.Background(), "failed to extract upperdir from /proc/%d/mounts: %v", info.State.Pid, err)
+		} else if len(upperDir) > 0 {
+			did.DefaultRootPath = upperDir
+		}
+	}
 	// for cri-runtime
 	if criRuntimeWrapper != nil && info.HostConfig != nil && len(did.DefaultRootPath) == 0 {
 		did.DefaultRootPath = criRuntimeWrapper.lookupContainerRootfsAbsDir(info)
 	}
 	logger.Debugf(context.Background(), "container(id: %s, name: %s) default root path is %s", info.ID, info.Name, did.DefaultRootPath)
+
+	// Compute and store metadata hash for change detection
+	did.metadataHash = computeContainerMetadataHash(did)
+
 	return did
 }
 
-func formatContainerJSONPath(info *types.ContainerJSON) {
+func formatContainerJSONPath(info *container.InspectResponse) {
 	// for inner enterprise stdout scene, if path start with /.. , no format it
 	if !strings.HasPrefix(info.LogPath, "/..") {
 		info.LogPath = filepath.Clean(info.LogPath)
@@ -1100,7 +1206,7 @@ func (dc *ContainerCenter) fetchAll() error {
 	defer dc.containerStateLock.Unlock()
 	ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 	defer cancel()
-	containers, err := dc.client.ContainerList(ctx, types.ContainerListOptions{All: true})
+	containers, err := dc.client.ContainerList(ctx, container.ListOptions{All: true})
 	if err != nil {
 		dc.setLastError(err, "list container error")
 		return err
@@ -1108,12 +1214,12 @@ func (dc *ContainerCenter) fetchAll() error {
 	logger.Debug(context.Background(), "fetch all", containers)
 	var containerMap = make(map[string]*DockerInfoDetail)
 
-	for _, container := range containers {
-		var containerDetail types.ContainerJSON
+	for _, c := range containers {
+		var containerDetail container.InspectResponse
 		for idx := 0; idx < 3; idx++ {
 			ctx, cancel := getContextWithTimeout(defaultContextTimeout)
 			defer cancel()
-			if containerDetail, err = dc.client.ContainerInspect(ctx, container.ID); err == nil {
+			if containerDetail, err = dc.client.ContainerInspect(ctx, c.ID); err == nil {
 				break
 			}
 			time.Sleep(time.Second * 5)
@@ -1123,9 +1229,9 @@ func (dc *ContainerCenter) fetchAll() error {
 				continue
 			}
 			formatContainerJSONPath(&containerDetail)
-			containerMap[container.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
+			containerMap[c.ID] = dc.CreateInfoDetail(containerDetail, envConfigPrefix, false)
 		} else {
-			dc.setLastError(err, "inspect container error "+container.ID)
+			dc.setLastError(err, "inspect container error "+c.ID)
 		}
 	}
 	dc.updateContainers(containerMap)
@@ -1181,6 +1287,7 @@ func (dc *ContainerCenter) markRemove(containerID string) {
 		logger.Debugf(context.Background(), "mark remove container: id:%v\tname:%v\tcreated:%v\tstatus:%v detail=%+v",
 			container.IDPrefix(), container.ContainerInfo.Name, container.ContainerInfo.Created, container.Status(), container.ContainerInfo)
 		container.ContainerInfo.State.Status = ContainerStatusExited
+		computeContainerMetadataHash(container)
 		container.deleteFlag = true
 		container.lastUpdateTime = time.Now()
 		dc.refreshLastUpdateMapTime()
@@ -1255,7 +1362,7 @@ func (dc *ContainerCenter) eventListener() {
 	for {
 		logger.Info(context.Background(), "docker event listener", "start")
 		ctx, cancel := context.WithCancel(context.Background())
-		events, errors := dc.client.Events(ctx, types.EventsOptions{})
+		events, errors := dc.client.Events(ctx, events.ListOptions{})
 		breakFlag := false
 		for !breakFlag {
 			timer.Reset(EventListenerTimeout)

@@ -19,12 +19,12 @@ using namespace std;
 
 namespace logtail {
 
-class BoundedQueueParamUnittest : public testing::Test {
+class CountBoundedQueueParamUnittest : public testing::Test {
 public:
     void TestInit();
 };
 
-void BoundedQueueParamUnittest::TestInit() {
+void CountBoundedQueueParamUnittest::TestInit() {
     {
         BoundedQueueParam param(100);
         APSARA_TEST_EQUAL(param.GetCapacity(), 100U);
@@ -51,7 +51,7 @@ void BoundedQueueParamUnittest::TestInit() {
     }
 }
 
-UNIT_TEST_CASE(BoundedQueueParamUnittest, TestInit)
+UNIT_TEST_CASE(CountBoundedQueueParamUnittest, TestInit)
 
 } // namespace logtail
 

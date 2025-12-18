@@ -17,6 +17,7 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#include "common/StringTools.h"
 #include "constants/Constants.h"
 #include "constants/SpanConstants.h"
 #include "protobuf/sls/LogGroupSerializer.h"

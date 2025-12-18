@@ -95,7 +95,8 @@ public:
     bool WithinMaxDepth(const std::string& path) const;
 
     bool UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
-                                const CollectionPipelineContext*);
+                                const CollectionPipelineContext*,
+                                const std::string& basePathInCheckpoint = "");
     bool DeleteRawContainerInfo(const std::string& containerID);
 
     ContainerInfo* GetContainerPathByLogPath(const std::string& logPath) const;

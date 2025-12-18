@@ -62,8 +62,8 @@ func (p *ServiceDockerEvents) fire(c pipeline.Collector, event events.Message) {
 	key := make([]string, len(event.Actor.Attributes)+4)
 	value := make([]string, len(key))
 	value[0] = strconv.FormatInt(event.TimeNano, 10)
-	value[1] = event.Action
-	value[2] = event.Type
+	value[1] = string(event.Action)
+	value[2] = string(event.Type)
 	value[3] = event.Actor.ID
 	key[0] = "_time_nano_"
 	key[1] = "_action_"

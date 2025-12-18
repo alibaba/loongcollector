@@ -130,7 +130,7 @@ protected:
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
         FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
 
-        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
 
         // build a reader
         mReaderPtr = std::make_shared<LogFileReader>(gRootDir,

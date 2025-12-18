@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Build Core Unit Test
+name: Check Compatibility
 
 on:
   pull_request:
@@ -31,24 +31,37 @@ on:
       - 2.*
 
 jobs:
-  BuildCoreUT:
+  CheckCompatibility:
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 60
     strategy:
       matrix:
         runner: [arc-runner-set-ilogtail]
       fail-fast: true
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: 1.19.10
+      - name: Set up Go (pre-installed on runner)
+        run: |
+          # Go 已经预安装在 /usr/local/go，确保 PATH 包含 Go 二进制文件路径
+          echo "GOROOT=/usr/local/go" >> $GITHUB_ENV
+          echo "PATH=/usr/local/go/bin:$PATH" >> $GITHUB_ENV
+          
+          # 验证 Go 是否可用
+          if [ -f "/usr/local/go/bin/go" ]; then
+            echo "✅ Go 已安装在 /usr/local/go"
+            /usr/local/go/bin/go version
+          elif command -v go &> /dev/null; then
+            echo "✅ Go 已在 PATH 中可用"
+            go version
+          else
+            echo "❌ 错误: Go 未找到"
+            echo "请确保 Go 已安装在 /usr/local/go 或已添加到 PATH"
+            exit 1
+          fi
 
       - name: Check out code
         uses: actions/checkout@v4
         with:
           submodules: false
-          fetch-depth: 2
       
       - name: Set custom submodule URL and fetch
         run: |
@@ -58,37 +71,17 @@ jobs:
           cd $SUBMODULE_PATH
           echo "Current commit: $(git rev-parse HEAD)"
 
-      - name: Build Unit Test
+      - name: Check compatibility
         env:
-          BUILD_LOGTAIL: OFF
-          BUILD_LOGTAIL_UT: ON
-          ENABLE_COMPATIBLE_MODE: OFF
+          BUILD_LOGTAIL_UT: OFF
+          ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
-          WITHOUTGDB: ON
           MAKE_JOBS: 16
-          WITHSPL: ON
-          BUILD_TYPE: Debug
-        run: CURRENT_DIR=$(pwd) && sed -i "s|/src|$CURRENT_DIR|g" docker/Dockerfile_build && make core PATH_IN_DOCKER=$(pwd)
-
-      - name: Build Coverage Image
-        run: docker build -t unittest_coverage -f ./docker/Dockerfile_coverage .
-
-      - name: Unit Test
-        run: docker run --privileged -v /sys:/sys -v /:/logtail_host -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd) && make unittest_core"
-
-      - name: Unit Test Coverage
-        run: docker run -v $(pwd):$(pwd) unittest_coverage bash -c "cd $(pwd)/core && gcovr --gcov-ignore-parse-errors --merge-mode-functions=separate --gcov-ignore-errors=no_working_dir_found --root . --json coverage.json --json-summary-pretty --json-summary summary.json -e \".*\.pb\.cc\" -e \".*\.pb\.h\" -e \".*unittest.*\" -e \".*sdk.*\" -e \".*logger.*\" -e \".*config_server.*\" -e \".*go_pipeline.*\" -e \".*application.*\" -e \".*runner.*\" -e \".*_thirdparty.*\""
-
-      - name: Setup Python3.10
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Report code coverage
-        run: python3 tools/coverage-diff/main.py --path core/coverage.json --summary core/summary.json
+          WITHOUTGDB: ON
+        run: make dist && scripts/check_glibc.sh && scripts/check_cpu_instruction.sh && scripts/check_dependencies.sh
 
   actions-timeline:
-    needs: [BuildCoreUT]
+    needs: [CheckCompatibility]
     runs-on: ubuntu-latest
     permissions:
       actions: read

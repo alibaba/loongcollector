@@ -24,17 +24,12 @@
 #include <chrono>
 #include <filesystem>
 #include <string>
-#include <thread>
-
-#include "boost/algorithm/string.hpp"
-#include "boost/algorithm/string/split.hpp"
 
 #include "MetricValue.h"
-#include "common/StringTools.h"
-#include "common/TimeUtil.h"
+#include "common/StringView.h"
 #include "host_monitor/Constants.h"
-#include "host_monitor/LinuxSystemInterface.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/common/FastFieldParser.h"
 #include "logger/Logger.h"
 
@@ -193,22 +188,20 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
     metricEvent->SetTimestamp(processListInfo.collectTime, 0);
     metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
     auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
-    std::vector<std::string> vmNames = {
-        "vm_process_min",
-        "vm_process_max",
-        "vm_process_avg",
-    };
-    std::vector<double> vmValues = {
-        minVMProcessNum.vmProcessNum,
-        maxVMProcessNum.vmProcessNum,
-        avgVMProcessNum.vmProcessNum,
+    struct MetricDef {
+        StringView name;
+        double value;
+    } vmMetrics[] = {
+        {kVmProcessMin, minVMProcessNum.vmProcessNum},
+        {kVmProcessMax, maxVMProcessNum.vmProcessNum},
+        {kVmProcessAvg, avgVMProcessNum.vmProcessNum},
     };
     // vm的系统信息上传
-    for (size_t i = 0; i < vmNames.size(); i++) {
-        multiDoubleValues->SetValue(std::string(vmNames[i]),
-                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, vmValues[i]});
+    for (const auto& def : vmMetrics) {
+        multiDoubleValues->SetValue(def.name,
+                                    UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, def.value});
     }
-    metricEvent->SetTag(std::string("m"), std::string("system.processCount"));
+    metricEvent->SetTagNoCopy(kTagKeyM, kMetricSystemProcessCount);
 
     // 每个pid一条记录上报
     for (size_t i = 0; i < mTopN && i < pushMerticList.size(); i++) {
@@ -232,33 +225,36 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
 
         // cpu percent
         value = static_cast<double>(avgMetric.cpuPercent);
-        multiDoubleValuesEachPid->SetValue(std::string("process_cpu_avg"),
+        multiDoubleValuesEachPid->SetValue(kProcessCpuAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // mem percent
         value = static_cast<double>(avgMetric.memPercent);
-        multiDoubleValuesEachPid->SetValue(std::string("process_memory_avg"),
+        multiDoubleValuesEachPid->SetValue(kProcessMemoryAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // open file number
         value = static_cast<double>(avgMetric.fdNum);
-        multiDoubleValuesEachPid->SetValue(std::string("process_openfile_avg"),
+        multiDoubleValuesEachPid->SetValue(kProcessOpenfileAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
         // process number
         value = static_cast<double>(avgMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_avg"),
+        multiDoubleValuesEachPid->SetValue(kProcessNumberAvg,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(maxMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_max"),
+        multiDoubleValuesEachPid->SetValue(kProcessNumberMax,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
         value = static_cast<double>(minMetric.numThreads);
-        multiDoubleValuesEachPid->SetValue(std::string("process_number_min"),
+        multiDoubleValuesEachPid->SetValue(kProcessNumberMin,
                                            UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, value});
 
-        metricEventEachPid->SetTag("pid", std::to_string(pid));
-        metricEventEachPid->SetTag("name", processInfo.name);
-        metricEventEachPid->SetTag("user", processInfo.user);
-        metricEventEachPid->SetTag(std::string("m"), std::string("system.process"));
+        const StringBuffer& pidBuffer = groupPtr->GetSourceBuffer()->CopyString(std::to_string(pid));
+        const StringBuffer& nameBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.name);
+        const StringBuffer& userBuffer = groupPtr->GetSourceBuffer()->CopyString(processInfo.user);
+        metricEventEachPid->SetTagNoCopy(kTagKeyPid, StringView(pidBuffer.data, pidBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyName, StringView(nameBuffer.data, nameBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyUser, StringView(userBuffer.data, userBuffer.size));
+        metricEventEachPid->SetTagNoCopy(kTagKeyM, kMetricSystemProcess);
     }
 
     // 清空所有多值体系，因为有的pid后面可能会消失
@@ -469,9 +465,14 @@ bool ProcessCollector::GetProcessCpuInformation(const CollectTime& collectTime,
     information.sys = processTime.sys.count();
     information.total = processTime.total.count();
 
-    // calculate cpuPercent = (thisTotal - prevTotal)/HZ;
-    auto totalCPUDiff = static_cast<double>(information.total - prev->total) / SYSTEM_HERTZ;
-    information.percent = 100 * totalCPUDiff / (static_cast<double>(timeDiff) / SYSTEM_HERTZ); // 100%
+    // calculate cpuPercent = (thisTotal - prevTotal) / timeDiff * 100
+    // information.total is already in milliseconds, timeDiff is also in milliseconds
+    if (timeDiff > 0) {
+        auto totalCPUDiff = static_cast<double>(information.total - prev->total);
+        information.percent = 100.0 * totalCPUDiff / static_cast<double>(timeDiff);
+    } else {
+        information.percent = 0.0;
+    }
     cpuTimeCache[pid] = information;
     return true;
 }
@@ -485,10 +486,14 @@ bool ProcessCollector::GetProcessTime(time_t now, pid_t pid, ProcessTime& output
 
     output.startTime = processInfo.stat.startTicks;
 
-    output.cutime = std::chrono::milliseconds(processInfo.stat.cutimeTicks);
-    output.cstime = std::chrono::milliseconds(processInfo.stat.cstimeTicks);
-    output.user = std::chrono::milliseconds(processInfo.stat.utimeTicks + processInfo.stat.cutimeTicks);
-    output.sys = std::chrono::milliseconds(processInfo.stat.stimeTicks + processInfo.stat.cstimeTicks);
+    // Convert ticks to milliseconds: ticks * 1000 / SYSTEM_HERTZ
+    constexpr const uint64_t MILLISECOND = 1000;
+    output.cutime = std::chrono::milliseconds(processInfo.stat.cutimeTicks * MILLISECOND / SYSTEM_HERTZ);
+    output.cstime = std::chrono::milliseconds(processInfo.stat.cstimeTicks * MILLISECOND / SYSTEM_HERTZ);
+    output.user = std::chrono::milliseconds((processInfo.stat.utimeTicks + processInfo.stat.cutimeTicks) * MILLISECOND
+                                            / SYSTEM_HERTZ);
+    output.sys = std::chrono::milliseconds((processInfo.stat.stimeTicks + processInfo.stat.cstimeTicks) * MILLISECOND
+                                           / SYSTEM_HERTZ);
 
     output.total = std::chrono::milliseconds(output.user + output.sys);
 

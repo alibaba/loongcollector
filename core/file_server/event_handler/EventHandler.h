@@ -98,7 +98,7 @@ private:
                                             uint32_t exactlyonceConcurrency = 0,
                                             bool forceBeginingFlag = false);
 
-    int32_t PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer);
+    int32_t PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer, bool dropIfBlocked = false);
 
     void ForceReadLogAndPush(LogFileReaderPtr reader);
 
@@ -122,6 +122,7 @@ public:
     friend class ModifyHandlerUnittest;
     friend class ForceReadUnittest;
     friend class CreateModifyHandlerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 
@@ -179,6 +180,7 @@ public:
     friend class EventDispatcherTest;
     friend class SenderUnittest;
     friend class EventDispatcherContainerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 

@@ -74,8 +74,11 @@ private:
     void BufferWriterThread();
     void BufferSenderThread();
 
-    SLSResponse
-    SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta, const std::string& logData, std::string& host);
+    SLSResponse SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
+                                   const std::string& logData,
+                                   std::string& domain,
+                                   std::string& ip,
+                                   bool useIPFlag);
     bool SendToBufferFile(SenderQueueItem* dataPtr);
     bool LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSend);
     bool CreateNewFile();

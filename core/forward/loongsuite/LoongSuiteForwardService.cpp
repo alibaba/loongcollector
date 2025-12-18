@@ -126,7 +126,7 @@ void LoongSuiteForwardServiceImpl::ProcessForwardRequest(const LoongSuiteForward
         if (singleData.empty()) {
             continue;
         }
-        auto* event = eventGroup.AddRawEvent();
+        auto* event = eventGroup.AddRawEvent(true);
         event->SetContent(singleData);
         event->SetTimestamp(time(nullptr), 0);
     }
