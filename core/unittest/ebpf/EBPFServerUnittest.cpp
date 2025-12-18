@@ -113,6 +113,7 @@ protected:
         mConfig->mProfileProbeConfig.mProfileUploadDuration = 10;
         mConfig->mProcessProbeConfig.mEnableOOMDetect = false;
         ebpf::EBPFServer::GetInstance()->Init();
+        AppConfig::GetInstance()->mPurageContainerMode = false;
     }
 
     void TearDown() override {

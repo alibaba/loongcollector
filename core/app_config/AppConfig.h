@@ -552,6 +552,7 @@ public:
     friend class PollingPreservedDirDepthUnittest;
     friend class InputStaticFileUnittest;
     friend class LogInputReaderUnittest;
+    friend class eBPFServerUnittest;
 #endif
 };
 

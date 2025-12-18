@@ -137,7 +137,7 @@ void CpuProfilingManagerUnittest::TestHandleCpuProfilingEventSingleConfig() {
     // create queue
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-1");
-    ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(key, 0, ctx);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(key, 0, ctx);
     ProcessQueueManager::GetInstance()->EnablePop("test-1");
 
     // mock AddOrUpdateConfig
@@ -175,11 +175,11 @@ void CpuProfilingManagerUnittest::TestHandleCpuProfilingEventMultiConfig() {
     CollectionPipelineContext ctx;
     // queue 1
     ctx.SetConfigName("test-multi-1");
-    ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(key1, 0, ctx);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(key1, 0, ctx);
     ProcessQueueManager::GetInstance()->EnablePop("test-multi-1");
     // queue 2
     ctx.SetConfigName("test-multi-2");
-    ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(key2, 0, ctx);
+    ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(key2, 0, ctx);
     ProcessQueueManager::GetInstance()->EnablePop("test-multi-2");
 
     // mock AddOrUpdateConfig
