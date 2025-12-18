@@ -68,20 +68,6 @@ flushers:
     OnlyStdout: true
 ```
 
-### 禁用进程实体采集
-
-* 采集配置（仅采集其他主机元信息，不采集进程实体）
-
-```yaml
-enable: true
-inputs:
-  - Type: input_host_meta
-    EnableProcessEntity: false      # 禁用进程实体采集
-flushers:
-  - Type: flusher_stdout
-    OnlyStdout: true
-```
-
 ### 自定义配置
 
 * 采集配置（自定义过滤规则）
@@ -101,24 +87,6 @@ inputs:
       - "/usr/bin/python.*"
     ProcessBlacklist:
       - ".*test.*"                  # 排除测试进程
-flushers:
-  - Type: flusher_stdout
-    OnlyStdout: true
-```
-
-### 同一 pipeline 多实例配置
-
-* 采集配置（多个实例，但只有第一个启用进程实体采集）
-
-```yaml
-enable: true
-inputs:
-  - Type: input_host_meta           # 第一个实例：启用进程实体采集
-    EnableProcessEntity: true       
-    FullReportInterval: 3600
-    IncrementalInterval: 10
-  - Type: input_host_meta           # 第二个实例：禁用进程实体采集
-    EnableProcessEntity: false      # 必须设置为 false，否则会注册失败
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
@@ -149,6 +117,10 @@ flushers:
   
   // 运行时计算属性
   "runtime_seconds": "3600"
+
+  // host
+  "host_name": "xxxxHost"
+  "host_ip": "10.239.12.11"
 }
 ```
 
@@ -197,17 +169,11 @@ flushers:
 
 1. **进程实体采集开关**：通过设置 `EnableProcessEntity = false` 可以禁用进程实体采集，此时所有进程实体相关的配置参数（如 `FullReportInterval`、`IncrementalInterval`、过滤配置等）都将被忽略。
 
-2. **同一 pipeline 限制**：每个 pipeline 配置只能有一个启用了进程实体采集的 `input_host_meta` 实例（即 `EnableProcessEntity = true`）。如果在同一个 pipeline 中配置多个启用进程实体采集的实例，第二个及后续实例将被拒绝注册到 ProcessEntityRunner，并记录错误日志。如果需要在同一 pipeline 中配置多个 `input_host_meta` 实例，除第一个外，其他实例应设置 `EnableProcessEntity = false`。
+2. **内存占用**：进程缓存会永久保存已采集的进程信息，直到进程退出才清理。对于进程数量特别多的系统（>10000），建议适当调整过滤规则或考虑禁用进程实体采集。
 
-3. **内存占用**：进程缓存会永久保存已采集的进程信息，直到进程退出才清理。对于进程数量特别多的系统（>10000），建议适当调整过滤规则或考虑禁用进程实体采集。
+3. **时钟跳跃处理**：如果检测到系统时钟发生跳跃（>60秒），会自动重置采集调度时间，并记录告警日志。
 
-4. **PID 复用检测**：通过比较 PID 和 startTime 来检测 PID 复用。当旧进程退出且新进程复用相同 PID 时，会生成两个事件：
-   - 旧进程退出（从缓存中移除）
-   - 新进程启动（作为新进程采集）
-
-5. **时钟跳跃处理**：如果检测到系统时钟发生跳跃（>60秒），会自动重置采集调度时间，并记录告警日志。
-
-6. **性能考虑**：
+4. **性能考虑**：
    - 全量上报会读取所有进程的 `/proc/[pid]/stat` 和 `/proc/[pid]/status`，有一定性能开销
    - 增量采集只检测进程列表变化，性能开销较小
    - 建议根据实际需求调整 `FullReportInterval` 和 `IncrementalInterval`

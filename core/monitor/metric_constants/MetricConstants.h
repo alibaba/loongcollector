@@ -166,7 +166,7 @@ extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL;
 
 /**********************************************************
- *   all processor ????????????????Todo?????????????
+ * all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
  **********************************************************/
 extern const std::string& METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL;
@@ -176,7 +176,7 @@ extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL;
 
 /**********************************************************
- *   all flusher ????????????
+ * all flusher （所有发送插件通用指标）
  **********************************************************/
 extern const std::string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS;
 extern const std::string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL;
