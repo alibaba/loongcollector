@@ -1,0 +1,511 @@
+/*
+ * Copyright 2025 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "JournalConnection.h"
+
+#include "../JournalServer.h"
+#include "../reader/JournalFilter.h"
+#include "../reader/JournalReader.h"
+#include "JournalMonitor.h"
+#include "logger/Logger.h"
+
+using namespace std;
+
+namespace logtail {
+
+
+JournalConnection& JournalConnection::GetInstance() {
+    static JournalConnection sInstance;
+    return sInstance;
+}
+
+bool JournalConnection::Initialize() {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (mInitialized) {
+        return true;
+    }
+
+    LOG_INFO(sLogger, ("journal connection initializing", ""));
+    mInitialized = true;
+
+    return true;
+}
+
+void JournalConnection::Cleanup() {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (!mInitialized) {
+        return;
+    }
+
+    LOG_INFO(sLogger, ("journal connection cleaning up", "")("total_configs", mConfigs.size()));
+
+    // Close all readers of configs
+    for (auto& [key, configInfo] : mConfigs) {
+        if (configInfo.reader) {
+            configInfo.reader->Close();
+        }
+    }
+
+    mConfigs.clear();
+    mInitialized = false;
+}
+
+bool JournalConnection::AddConfig(const std::string& configName, const JournalConfig& config) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (!mInitialized) {
+        LOG_ERROR(sLogger, ("journal connection not initialized", ""));
+        return false;
+    }
+
+    // Save accumulated data from old reader if config already exists
+    bool hadOldReader = false;
+    bool savedHasPendingData = false;
+    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+    int savedAccumulatedEntryCount = 0;
+    std::chrono::steady_clock::time_point savedLastBatchTime;
+    std::string savedReaderCursor;
+    std::string oldSeekPosition;
+
+    if (mConfigs.find(configName) != mConfigs.end()) {
+        LOG_WARNING(sLogger, ("journal connection config already exists, will be replaced", "")("config", configName));
+        auto* monitor = JournalMonitor::GetInstance();
+        if (monitor) {
+            // Save old config's seekPosition for comparison
+            oldSeekPosition = mConfigs[configName].config.mSeekPosition;
+
+            // Save accumulated data BEFORE marking as closing
+            hadOldReader = monitor->SaveAccumulatedData(configName,
+                                                        savedHasPendingData,
+                                                        savedAccumulatedEventGroup,
+                                                        savedAccumulatedEntryCount,
+                                                        savedLastBatchTime);
+
+            // Save reader's current cursor position (only use if seekPosition unchanged)
+            auto oldReader = mConfigs[configName].reader;
+            if (oldReader && oldReader->IsOpen()) {
+                savedReaderCursor = oldReader->GetCursor();
+            }
+
+            monitor->MarkReaderAsClosing(configName);
+            monitor->RemoveReaderFromMonitoring(configName);
+
+            if (hadOldReader && savedHasPendingData) {
+                LOG_INFO(sLogger,
+                         ("journal connection preserved accumulated data during config replacement",
+                          "")("config", configName)("preserved_pending_data", savedHasPendingData)(
+                             "preserved_entry_count", savedAccumulatedEntryCount)("old_seek_position", oldSeekPosition)(
+                             "new_seek_position", config.mSeekPosition)("saved_cursor",
+                                                                        savedReaderCursor.empty() ? "none" : "yes"));
+            }
+        } else {
+            // If monitor is not available, close immediately (fallback for edge cases)
+            if (mConfigs[configName].reader) {
+                mConfigs[configName].reader->Close();
+            }
+        }
+    }
+
+    auto reader = std::make_shared<JournalReader>();
+
+    if (!initializeReader(reader, config, configName)) {
+        return false;
+    }
+
+    // - If seekPosition unchanged: use savedCursor for seamless continuation
+    // - If seekPosition changed: respect new config, ignore savedCursor
+    bool seekPositionChanged = hadOldReader && (oldSeekPosition != config.mSeekPosition);
+    std::string cursorToUse = seekPositionChanged ? "" : savedReaderCursor;
+
+    if (seekPositionChanged) {
+        LOG_INFO(sLogger,
+                 ("journal connection seekPosition changed, will use new seekPosition instead of savedCursor",
+                  "")("config", configName)("old_seek", oldSeekPosition)("new_seek", config.mSeekPosition)(
+                     "accumulated_data_will_be_sent_first", savedHasPendingData));
+    }
+
+    setupReaderPosition(reader, config, configName, cursorToUse);
+
+    ConfigInfo configInfo;
+    configInfo.mConfigName = configName;
+    configInfo.config = config;
+    configInfo.reader = reader;
+    configInfo.lastOpenTime = std::chrono::steady_clock::now(); // record open time
+
+    mConfigs[configName] = std::move(configInfo);
+
+    // Restore accumulated data to new reader if we had old reader with pending data
+    if (hadOldReader && savedHasPendingData) {
+        auto* monitor = JournalMonitor::GetInstance();
+        if (monitor) {
+            int newFD = monitor->AddReaderToMonitoring(reader, configName);
+            if (newFD >= 0) {
+                monitor->RestoreAccumulatedData(configName,
+                                                reader,
+                                                savedHasPendingData,
+                                                savedAccumulatedEventGroup,
+                                                savedAccumulatedEntryCount,
+                                                savedLastBatchTime);
+                LOG_INFO(sLogger,
+                         ("journal connection restored accumulated data to new reader",
+                          "")("config", configName)("fd", newFD)("restored_entry_count", savedAccumulatedEntryCount));
+            } else {
+                LOG_WARNING(sLogger,
+                            ("journal connection failed to add reader to monitoring after config replacement",
+                             "")("config", configName)("accumulated_data_lost", savedAccumulatedEntryCount));
+            }
+        }
+    }
+
+    LOG_INFO(sLogger,
+             ("journal connection config added with independent connection",
+              "")("config", configName)("total_configs", mConfigs.size()));
+
+    return true;
+}
+
+
+void JournalConnection::RemoveConfig(const std::string& configName) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (!mInitialized) {
+        return;
+    }
+
+    auto it = mConfigs.find(configName);
+    if (it != mConfigs.end()) {
+        mConfigs.erase(it);
+        LOG_INFO(sLogger,
+                 ("journal connection config removed, reader will be closed in CleanupClosedReaders",
+                  "")("config", configName)("remaining_configs", mConfigs.size()));
+    } else {
+        LOG_WARNING(sLogger, ("journal connection config not found for removal", "")("config", configName));
+    }
+}
+
+JournalConnection::Stats JournalConnection::GetStats() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    Stats stats;
+    stats.totalConfigs = mConfigs.size();
+    stats.activeConnections = 0;
+    stats.invalidConnections = 0;
+    stats.totalConnections = mConfigs.size();
+
+    for (const auto& [configKey, configInfo] : mConfigs) {
+        stats.connectionKeys.push_back(configKey);
+
+        if (configInfo.reader && configInfo.reader->IsOpen()) {
+            stats.activeConnections++;
+        } else {
+            stats.invalidConnections++;
+        }
+    }
+
+    return stats;
+}
+
+std::shared_ptr<JournalReader> JournalConnection::GetConnection(const std::string& configName) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    auto it = mConfigs.find(configName);
+    if (it != mConfigs.end()) {
+        return it->second.reader;
+    }
+
+    return nullptr;
+}
+
+size_t JournalConnection::GetConnectionCount() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+    return mConfigs.size();
+}
+
+JournalConfig JournalConnection::GetConfig(const std::string& configName) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    auto it = mConfigs.find(configName);
+    if (it != mConfigs.end()) {
+        return it->second.config;
+    }
+
+    return JournalConfig();
+}
+
+std::map<std::string, JournalConfig> JournalConnection::GetAllConfigs() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    std::map<std::string, JournalConfig> result;
+    for (const auto& [configKey, configInfo] : mConfigs) {
+        result[configInfo.mConfigName] = configInfo.config;
+    }
+
+    return result;
+}
+
+std::vector<std::string> JournalConnection::GetAllConfigNames() const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    std::vector<std::string> configNames;
+    configNames.reserve(mConfigs.size());
+    for (const auto& [configKey, configInfo] : mConfigs) {
+        configNames.push_back(configInfo.mConfigName);
+    }
+
+    return configNames;
+}
+
+void JournalConnection::RefreshConnectionsByInterval(const std::vector<std::string>& configNames,
+                                                     JournalMonitor& monitor) {
+    for (const auto& configName : configNames) {
+        if (ShouldRefreshConnection(configName)) {
+            refreshSingleConnectionAndSyncEpoll(configName, monitor);
+        }
+    }
+}
+
+bool JournalConnection::RecoverConnectionAndSyncEpoll(const std::string& configName, JournalMonitor* monitor) {
+    if (!monitor) {
+        LOG_WARNING(
+            sLogger,
+            ("journal connection monitor is null, cannot update epoll after refresh", "")("config", configName));
+        return false;
+    }
+
+    return refreshSingleConnectionAndSyncEpoll(configName, *monitor);
+}
+
+bool JournalConnection::refreshSingleConnectionAndSyncEpoll(const std::string& configName, JournalMonitor& monitor) {
+    // Step 1: Mark reader as closing and remove from epoll (prevents new operations)
+    monitor.MarkReaderAsClosing(configName);
+    monitor.RemoveReaderFromMonitoring(configName);
+
+    // Step 2: Save accumulated data BEFORE closing reader
+    bool savedHasPendingData = false;
+    std::shared_ptr<PipelineEventGroup> savedAccumulatedEventGroup = nullptr;
+    int savedAccumulatedEntryCount = 0;
+    std::chrono::steady_clock::time_point savedLastBatchTime;
+    bool hadOldReader = monitor.SaveAccumulatedData(
+        configName, savedHasPendingData, savedAccumulatedEventGroup, savedAccumulatedEntryCount, savedLastBatchTime);
+
+    // Step 3: Refresh connection (close and reopen reader, reapply filters, reseek)
+    if (!RefreshConnection(configName)) {
+        LOG_ERROR(sLogger, ("journal connection refresh failed", "")("config", configName));
+        return false;
+    }
+
+    // Step 4: Validate refreshed reader
+    auto refreshedReader = GetConnection(configName);
+    if (!refreshedReader || !refreshedReader->IsOpen()) {
+        LOG_ERROR(sLogger,
+                  ("journal connection refreshed reader is not available after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Step 5: Add reader back to epoll monitoring (create new FD mapping)
+    int newFD = monitor.AddReaderToMonitoring(refreshedReader, configName);
+    if (newFD < 0) {
+        LOG_WARNING(sLogger,
+                    ("journal connection failed to re-add reader to epoll after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Step 6: Restore accumulated data to the new MonitoredReader entry
+    if (hadOldReader) {
+        monitor.RestoreAccumulatedData(configName,
+                                       refreshedReader,
+                                       savedHasPendingData,
+                                       savedAccumulatedEventGroup,
+                                       savedAccumulatedEntryCount,
+                                       savedLastBatchTime);
+    }
+
+    return true;
+}
+
+bool JournalConnection::ShouldRefreshConnection(const std::string& configName) const {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    if (!mInitialized) {
+        return false;
+    }
+
+    auto it = mConfigs.find(configName);
+    if (it == mConfigs.end()) {
+        return false;
+    }
+
+    const auto& configInfo = it->second;
+    if (!configInfo.reader || !configInfo.reader->IsOpen()) {
+        return false;
+    }
+
+    // check if it's time to refresh
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - configInfo.lastOpenTime).count();
+    int resetInterval = configInfo.config.mResetIntervalSecond;
+
+    return elapsed >= resetInterval;
+}
+
+bool JournalConnection::RefreshConnection(const std::string& configName) {
+    std::lock_guard<std::mutex> lock(mMutex);
+
+    auto it = mConfigs.find(configName);
+    if (it == mConfigs.end()) {
+        LOG_WARNING(sLogger, ("journal connection config not found for refresh", "")("config", configName));
+        return false;
+    }
+
+    auto& configInfo = it->second;
+    if (!configInfo.reader) {
+        LOG_WARNING(sLogger, ("journal connection reader is null, cannot refresh", "")("config", configName));
+        return false;
+    }
+
+    std::string currentCursor;
+    if (configInfo.reader->IsOpen()) {
+        currentCursor = configInfo.reader->GetCursor();
+    }
+
+    configInfo.reader->Close();
+
+    // mJournalPaths is stored in the reader object and doesn't need to be reset,
+    if (!configInfo.reader->Open()) {
+        LOG_ERROR(sLogger, ("journal connection failed to reopen connection after refresh", "")("config", configName));
+        return false;
+    }
+
+    // Reapply filters: necessary because Close() clears all filters
+    auto filterConfig = buildFilterConfig(configInfo.config, configName);
+    if (!JournalFilter::ApplyAllFilters(configInfo.reader.get(), filterConfig)) {
+        LOG_ERROR(sLogger, ("journal connection failed to reapply filters after refresh", "")("config", configName));
+        configInfo.reader->Close();
+        return false;
+    }
+
+    setupReaderPosition(configInfo.reader, configInfo.config, configName, currentCursor);
+
+    // Epoll re-registration should be handled by JournalMonitor
+    configInfo.lastOpenTime = std::chrono::steady_clock::now();
+
+    LOG_INFO(sLogger,
+             ("journal connection connection refreshed successfully",
+              "")("config", configName)("interval", configInfo.config.mResetIntervalSecond));
+
+    return true;
+}
+
+JournalFilter::FilterConfig JournalConnection::buildFilterConfig(const JournalConfig& config,
+                                                                 const std::string& configName) {
+    JournalFilter::FilterConfig filterConfig;
+    filterConfig.mUnits = config.mUnits;
+    filterConfig.mIdentifiers = config.mIdentifiers;
+    filterConfig.mMatchPatterns = config.mMatchPatterns;
+    filterConfig.mEnableKernel = config.mKernel;
+    filterConfig.mConfigName = configName;
+    filterConfig.mConfigIndex = 0; // Always 0 for singleton journal input
+    return filterConfig;
+}
+
+bool JournalConnection::initializeReader(const std::shared_ptr<JournalReader>& reader,
+                                         const JournalConfig& config,
+                                         const std::string& configName) {
+    if (!reader) {
+        LOG_ERROR(sLogger, ("journal connection reader is null, cannot initialize", "")("config", configName));
+        return false;
+    }
+
+    if (!config.mJournalPaths.empty()) {
+        reader->SetJournalPaths(config.mJournalPaths);
+        LOG_INFO(sLogger,
+                 ("journal connection setting journal paths", "")("config", configName)("paths_count",
+                                                                                        config.mJournalPaths.size()));
+        for (const auto& path : config.mJournalPaths) {
+            LOG_INFO(sLogger, ("journal path", path));
+        }
+    }
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    // in test environment, even if Open fails, continue to add config
+    reader->Open(); // try to open, but do not check result
+#else
+    if (!reader->Open()) {
+        LOG_ERROR(sLogger, ("journal connection failed to open journal connection", "")("config", configName));
+        return false;
+    }
+#endif
+
+    auto filterConfig = buildFilterConfig(config, configName);
+    if (!JournalFilter::ApplyAllFilters(reader.get(), filterConfig)) {
+        LOG_ERROR(sLogger, ("journal connection failed to apply filters to connection", "")("config", configName));
+        reader->Close();
+        return false;
+    }
+
+    return true;
+}
+
+bool JournalConnection::setupReaderPosition(const std::shared_ptr<JournalReader>& reader,
+                                            const JournalConfig& config,
+                                            const std::string& configName,
+                                            const std::string& savedCursor) {
+    if (!reader || !reader->IsOpen()) {
+        LOG_WARNING(sLogger,
+                    ("journal connection reader is not open, cannot setup position", "")("config", configName));
+        return false;
+    }
+
+    // use saved cursor first
+    if (!savedCursor.empty()) {
+        if (reader->SeekCursor(savedCursor)) {
+            reader->Next();
+            LOG_DEBUG(sLogger, ("journal connection restored cursor", "")("config", configName)("cursor", savedCursor));
+            return true;
+        }
+        LOG_WARNING(sLogger,
+                    ("journal connection failed to restore cursor", "")("config", configName)("cursor", savedCursor));
+    }
+
+    // if no saved cursor or cursor recovery failed, use seek position in config
+    if (!config.mSeekPosition.empty()) {
+        bool seekSuccess = false;
+        if (config.mSeekPosition == "tail") {
+            seekSuccess = reader->SeekTail();
+            LOG_INFO(sLogger, ("journal connection seek to tail", "")("config", configName)("success", seekSuccess));
+
+            if (seekSuccess) {
+                reader->Previous();
+            }
+        } else {
+            seekSuccess = reader->SeekHead();
+            LOG_INFO(sLogger, ("journal connection seek to head", "")("config", configName)("success", seekSuccess));
+        }
+
+        if (!seekSuccess) {
+            LOG_WARNING(sLogger,
+                        ("journal connection failed to seek to position",
+                         "")("config", configName)("position", config.mSeekPosition));
+        }
+        return seekSuccess;
+    }
+
+    return true;
+}
+
+} // namespace logtail

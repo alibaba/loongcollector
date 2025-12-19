@@ -158,7 +158,8 @@ if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk apm/forward)
     endif()
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} journal_server journal_server/reader journal_server/manager journal_server/processor journal_server/common
+        ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
@@ -268,7 +269,10 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     all_link(${LOGTAIL_TARGET})
     common_link(${LOGTAIL_TARGET})
     target_link_libraries(${LOGTAIL_TARGET} provider)
+    
+    # Add systemd journal library linking
     if (LINUX)
+        link_systemd_journal(${LOGTAIL_TARGET})
         add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
     endif()
 endif()

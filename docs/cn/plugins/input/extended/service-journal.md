@@ -1,4 +1,4 @@
-# Journal数据
+#Journal数据
 
 ## 简介
 
@@ -44,8 +44,7 @@
 | ParseSyslogFacility | bool，`false` | 是否解析syslog日志的facility字段。 |
 | ParsePriority | bool，`false` | 是否解析Priority字段。|
 | UseJournalEventTime | bool，`false` | 是否使用Journal日志中的字段作为日志时间，即使用采集时间作为日志时间（实时日志采集一般相差3秒以内）。|
-| CursorFlushPeriodMs | Integer，`5000` | 日志读取检查点的刷新时间。 |
-| CursorSeekFallback | string，`SeekPositionTail` | 日志读取检查点回退的位置。 |
+| CursorSeekFallback | string，`head` | 日志读取检查点回退的位置（可选值为 `head` 或 `tail`）。 |
 | Identifiers | Array，其中value为String，`[]` | syslog标识符，可以添加到监视器。 |
 | MatchPatterns | Array，其中value为String，`[]` | 匹配规则，可以添加到监视器。 |
 
@@ -85,33 +84,37 @@ flushers:
 
 ```json
 {
-    "PRIORITY":"6",
-    "_GID":"0",
-    "_TRANSPORT":"syslog",
-    "_SYSTEMD_OWNER_UID":"0",
-    "_BOOT_ID":"bab**************54b",
-    "_PID":"21848",
-    "_MACHINE_ID":"************************",
-    "_CAP_EFFECTIVE":"3fffffffff",
-    "_COMM":"crond",
-    "_HOSTNAME":"iZj*****************1hZ",
-    "_SYSTEMD_SLICE":"user-0.slice",
-    "MESSAGE":"(root) CMD (/usr/lib64/sa/sa1 1 1)",
-    "_CMDLINE":"/usr/sbin/CROND -n",
-    "SYSLOG_FACILITY":"9",
-    "SYSLOG_IDENTIFIER":"CROND",
-    "_AUDIT_LOGINUID":"0",
-    "_SYSTEMD_SESSION":"3319",
-    "_UID":"0",
-    "_EXE":"/usr/sbin/crond",
-    "SYSLOG_PID":"21848",
-    "_AUDIT_SESSION":"3319",
-    "_SYSTEMD_CGROUP":"/user.slice/user-0.slice/session-3319.scope",
-    "_SYSTEMD_UNIT":"session-3319.scope",
-    "_SOURCE_REALTIME_TIMESTAMP":"1658823001526225",
-    "_realtime_timestamp_":"1658823001526482",
-    "_monotonic_timestamp_":"1637927744052",
-    "__time__":"1658823031"
+    "PRIORITY" : "6",
+                 "_GID" : "0",
+                          "_TRANSPORT" : "syslog",
+                                         "_SYSTEMD_OWNER_UID" : "0",
+                                                                "_BOOT_ID" : "bab**************54b",
+                                                                             "_PID" : "21848",
+                                                                                      "_MACHINE_ID"
+        : "************************",
+          "_CAP_EFFECTIVE" : "3fffffffff",
+                             "_COMM" : "crond",
+                                       "_HOSTNAME" : "iZj*****************1hZ",
+                                                     "_SYSTEMD_SLICE" : "user-0.slice",
+                                                                        "MESSAGE"
+        : "(root) CMD (/usr/lib64/sa/sa1 1 1)",
+          "_CMDLINE" : "/usr/sbin/CROND -n",
+                       "SYSLOG_FACILITY" : "9",
+                                           "SYSLOG_IDENTIFIER" : "CROND",
+                                                                 "_AUDIT_LOGINUID" : "0",
+                                                                                     "_SYSTEMD_SESSION" : "3319",
+                                                                                                          "_UID"
+        : "0",
+          "_EXE" : "/usr/sbin/crond",
+                   "SYSLOG_PID" : "21848",
+                                  "_AUDIT_SESSION" : "3319",
+                                                     "_SYSTEMD_CGROUP" : "/user.slice/user-0.slice/session-3319.scope",
+                                                                         "_SYSTEMD_UNIT" : "session-3319.scope",
+                                                                                           "_SOURCE_REALTIME_TIMESTAMP"
+        : "1658823001526225",
+          "_realtime_timestamp_" : "1658823001526482",
+                                   "_monotonic_timestamp_" : "1637927744052",
+                                                             "__time__" : "1658823031"
 }
 ```
 
@@ -154,15 +157,17 @@ flushers:
 
 ```json
 {
-    "MESSAGE":  "ejected connection from \"192.168.0.251:48914\" (error \"EOF\", ServerName "")",
-    "PRIORITY":  "informational",
-    "SYSLOG_IDENTIFIER":  "etcd",
-    "_EXE": "/opt/etcd-v3.3.8/etcd",
-    "_HOSTNAME":  "iZb*****************ueZ",
-    "_PID":  "10590",
-    "_SYSTEMD_UNIT":  "etcd.service",
-    "__source__":  "***.***.***.***",
-    "__tag__:__hostname__":  "logtail-ds-dp48x", 
-    "_realtime_timestamp_":  "1547975837008708",
+    "MESSAGE" : "ejected connection from \"192.168.0.251:48914\" (error \"EOF\", ServerName "
+                ")",
+                "PRIORITY" : "informational",
+                             "SYSLOG_IDENTIFIER" : "etcd",
+                                                   "_EXE" : "/opt/etcd-v3.3.8/etcd",
+                                                            "_HOSTNAME" : "iZb*****************ueZ",
+                                                                          "_PID" : "10590",
+                                                                                   "_SYSTEMD_UNIT" : "etcd.service",
+                                                                                                     "__source__"
+        : "***.***.***.***",
+          "__tag__:__hostname__" : "logtail-ds-dp48x",
+                                   "_realtime_timestamp_" : "1547975837008708",
 }
 ```

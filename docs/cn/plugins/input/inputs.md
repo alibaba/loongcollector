@@ -26,6 +26,7 @@
 | `input_process_security`<br>[进程安全数据](native/input-process-security.md)   | SLS 官方 | 进程安全数据采集。                    |
 | `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS 官方 | 导出自监控指标数据。                  |
 | `input_internal_alarms`<br>[自监控告警数据](native/input-internal-alarms.md)   | SLS 官方 | 导出自监控告警数据。                  |
+| `input_journal`<br>[Journal 数据](native/input_journal_zh.md) | SLS 官方 | 从原始的二进制文件中采集 Linux 系统的 Journal（systemd）日志。 |
 
 ### 扩展插件
 
@@ -50,7 +51,7 @@
 | `service_gpu_metric`<br>[GPU 数据](extended/service-gpu.md)                           | SLS 官方                                              | 支持收集英伟达 GPU 指标。                                                        |
 | `service_http_server`<br>[HTTP 数据](extended/service-http-server.md)                 | SLS 官方                                              | 接收来自 unix socket、http/https、tcp 的请求，并支持 sls 协议、otlp 等多种协议。 |
 | `service_input_example`<br>[ServiceInput 示例插件](extended/service-input-example.md) | SLS 官方                                              | ServiceInput 示例插件。                                                          |
-| `service_journal`<br>[Journal 数据](extended/service-journal.md)                      | SLS 官方                                              | 从原始的二进制文件中采集 Linux 系统的 Journal（systemd）日志。                   |
+| `service_journal`<br>[Journal 数据](extended/service-journal.md) | SLS 官方 | 从原始的二进制文件中采集 Linux 系统的 Journal（systemd）日志。
 | `service_kafka`<br>[Kafka](extended/service-kafka.md)                                 | SLS 官方                                              | 将 Kafka 数据输入到 iLogtail。                                                   |
 | `service_mock`<br>[Mock 数据-Service](extended/service-mock.md)                       | SLS 官方                                              | 生成 service 模拟数据的插件。                                                    |
 | `service_mssql`<br>[SqlServer 查询数据](extended/service-mssql.md)                    | SLS 官方                                              | 将 Sql Server 数据输入到 iLogtail。                                              |
