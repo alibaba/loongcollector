@@ -63,12 +63,14 @@ struct ProcessEntityInfo {
     std::string exe; // 可执行文件路径（不变，/proc/[pid]/exe）
     std::string cmdline; // 完整命令行（不变，/proc/[pid]/cmdline）
     std::vector<std::string> args; // 命令行参数（不变）
+    std::string language; // 编程语言（不变，TODO: 通过进程路径/依赖库识别，如 python/java/node 等）
 
     // ====== 可变属性（全量上报时重新读取） ======
     pid_t ppid = 0; // 父进程ID（会变：父进程退出后被收养）
     std::string user; // 用户名（会变：如nginx降权）
     char state = '\0'; // 进程状态（会变：R/S/D/Z/T等）
     bool isZombie = false; // 是否僵尸进程（状态为Z）
+    std::vector<uint16_t> listeningPorts; // 监听端口列表（会变：进程可动态开启/关闭端口， 通过 /proc/net/tcp 识别）
 
     // ====== 元数据 ======
     time_t firstObservedTime = 0; // 首次观察时间（Unix时间戳）
@@ -99,6 +101,10 @@ struct ProcessFilterConfig {
 
     // 是否排除内核线程，默认 true
     bool excludeKernelThreads = true;
+
+    // 是否采集监听端口，默认 false（性能开销较大）
+    // 注意：即使开启也只能在全量上报时采集，增量上报时不更新端口信息
+    bool enableListeningPorts = false;
 
     // 编译正则表达式（在配置加载时调用一次）
     // 返回 true 表示成功，false 表示有无效的正则表达式

@@ -16,7 +16,11 @@
 
 #include "host_monitor/collector/ProcessEntityCollector.h"
 
+#include <algorithm>
+#include <fstream>
 #include <regex>
+#include <sstream>
+#include <unordered_set>
 
 #include "common/ProcParser.h"
 #include "common/StringView.h"
@@ -279,6 +283,11 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
             info.lastReportTime = now;
             info.lastVariableUpdateTime = now;
             isNewProcess = true;
+        }
+
+        // 采集监听端口（仅在全量上报时，且配置开启的情况下）
+        if (mFilterConfig.enableListeningPorts) {
+            info.listeningPorts = SystemInterface::GetInstance()->GetProcessListeningPorts(pid);
         }
 
         // 进程过滤（可能抛出异常）
@@ -692,6 +701,18 @@ void ProcessEntityCollector::GenerateProcessEntityEvent(PipelineEventGroup* grou
     int64_t runningTimeSeconds = currentTime.tv_sec - info.startTimeUnix;
     if (runningTimeSeconds > 0) {
         event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_RUNTIME_SECONDS, std::to_string(runningTimeSeconds));
+    }
+
+    // 监听端口（可选，仅在全量采集且配置开启时才有值）
+    if (!info.listeningPorts.empty()) {
+        std::string portsStr;
+        for (size_t i = 0; i < info.listeningPorts.size(); ++i) {
+            if (i > 0) {
+                portsStr += ",";
+            }
+            portsStr += std::to_string(info.listeningPorts[i]);
+        }
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_LISTENING_PORTS, portsStr);
     }
 }
 

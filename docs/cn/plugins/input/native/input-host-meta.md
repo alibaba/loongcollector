@@ -33,6 +33,7 @@
 | MinRunningTimeSeconds | int, 20 | 最小运行时间过滤，单位为秒。运行时间小于此值的进程将被过滤。设置为 0 表示不过滤。 |
 | ProcessWhitelist | string array, [] | 进程白名单，支持正则表达式。匹配进程名（comm）或可执行文件路径（exe）。为空表示不过滤。 |
 | ProcessBlacklist | string array, [] | 进程黑名单，支持正则表达式。匹配进程名（comm）或可执行文件路径（exe）。为空表示不过滤。 |
+| EnableListeningPorts | bool, false | 是否采集进程监听端口。开启后会解析 `/proc/net/tcp` 和进程的 fd 信息，有一定性能开销。**注意**：仅在全量上报时采集，增量采集不更新端口信息。 |
 
 ### 采集模式说明
 
@@ -40,8 +41,8 @@
 - **触发时机**：启动后首次采集、之后每隔 `FullReportInterval` 秒
 - **采集内容**：
   - 所有符合过滤条件的进程
-  - 更新可变属性：ppid（父进程ID）、user（用户）、state（进程状态）
-  - 上报不变属性：pid、ktime、comm、exe、cmdline、args
+  - 更新可变属性：ppid（父进程ID）、user（用户）、state（进程状态）、listening_ports（监听端口，可选）
+  - 上报不变属性：pid、ktime、comm、exe、cmdline、args、language（语言，预留）
 - **用途**：确保数据完整性，修正可能的数据漂移
 
 #### 增量采集（Incremental Collection）
@@ -81,6 +82,7 @@ inputs:
     IncrementalInterval: 30         # 30秒增量采集一次
     ExcludeKernelThreads: true      # 排除内核线程
     MinRunningTimeSeconds: 60       # 只采集运行超过60秒的进程
+    EnableListeningPorts: true      # 采集进程监听端口（默认关闭）
     ProcessWhitelist:
       - "nginx"                     # 只采集 nginx 相关进程
       - "java"
@@ -114,6 +116,7 @@ flushers:
   "ppid": "1",
   "user": "www-data",
   "state": "S",
+  "listening_ports": "80,443,8080",  // 监听端口（仅在 EnableListeningPorts=true 时采集）
   
   // 运行时计算属性
   "runtime_seconds": "3600"
@@ -139,9 +142,13 @@ flushers:
 - `ppid`：父进程ID，来自 `/proc/[pid]/stat`
 - `user`：进程所属用户，来自 `/proc/[pid]/status`
 - `state`：进程状态（R/S/D/Z/T等），来自 `/proc/[pid]/stat`
+- `listening_ports`：监听端口列表（可选，仅在 `EnableListeningPorts=true` 时采集），逗号分隔，来自 `/proc/net/tcp` 和 `/proc/[pid]/fd`
 
 **运行时计算属性：**
 - `runtime_seconds`：进程运行时间（秒），实时计算
+
+**扩展属性（预留）：**
+- `language`：进程编程语言（如 python、java、nodejs），待实现
 
 
 ## 进程过滤机制
@@ -176,7 +183,14 @@ flushers:
 4. **性能考虑**：
    - 全量上报会读取所有进程的 `/proc/[pid]/stat` 和 `/proc/[pid]/status`，有一定性能开销
    - 增量采集只检测进程列表变化，性能开销较小
+   - **监听端口采集**：开启 `EnableListeningPorts` 会显著增加全量上报的开销（每个进程需读取 `/proc/[pid]/fd` 目录），建议按需开启
    - 建议根据实际需求调整 `FullReportInterval` 和 `IncrementalInterval`
    - 如果不需要进程实体采集，可以设置 `EnableProcessEntity = false` 来完全禁用
 
-7. **正则表达式**：白名单和黑名单支持标准的 C++ 正则表达式语法。无效的正则表达式会被记录警告日志并跳过。
+5. **监听端口采集说明**：
+   - 仅在全量上报时采集，增量采集不更新端口信息（端口变化不频繁，每小时更新一次足够）
+   - 需要读取 `/proc/net/tcp`、`/proc/net/tcp6` 和每个进程的 `/proc/[pid]/fd` 目录
+   - 对于进程数量多（>500）或 TCP 连接数多（>10000）的系统，可能增加 1-3 秒的采集延迟
+   - 只采集 LISTEN 状态的端口，自动去重并排序
+
+6. **正则表达式**：白名单和黑名单支持标准的 C++ 正则表达式语法。无效的正则表达式会被记录警告日志并跳过。

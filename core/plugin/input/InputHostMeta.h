@@ -47,6 +47,9 @@ private:
     std::vector<std::string> mWhitelistPatterns; // 默认为空，不空才过滤
     std::vector<std::string> mBlacklistPatterns; // 默认为空，不空才过滤
 
+    // 扩展属性采集开关
+    bool mEnableListeningPorts = false; // 默认关闭，监听端口采集（性能开销较大，只在全量上报时采集）
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputHostMetaUnittest;
 #endif

@@ -51,6 +51,7 @@ const string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE = "language";
 const string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID = "container_id";
 const string DEFAULT_CONTENT_KEY_PROCESS_STATE = "state";
 const string DEFAULT_CONTENT_KEY_PROCESS_RUNTIME_SECONDS = "runtime_seconds";
+const string DEFAULT_CONTENT_KEY_PROCESS_LISTENING_PORTS = "listening_ports";
 
 // link
 const string DEFAULT_CONTENT_KEY_SRC_DOMAIN = "__src_domain__";

@@ -170,6 +170,24 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
         }
     }
 
+    // 读取 EnableListeningPorts 配置（默认 false）
+    mEnableListeningPorts = false;
+    if (!GetOptionalBoolParam(config, "EnableListeningPorts", mEnableListeningPorts, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mEnableListeningPorts,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
+    LOG_INFO(sLogger,
+             ("input_host_meta process entity config", "")("enable_listening_ports",
+                                                           mEnableListeningPorts)("config", mContext->GetConfigName()));
+
     return true;
 }
 
@@ -191,12 +209,14 @@ bool InputHostMeta::Start() {
     filterConfig.minRunningTimeSeconds = mMinRunningTimeSeconds;
     filterConfig.whitelistPatterns = mWhitelistPatterns;
     filterConfig.blacklistPatterns = mBlacklistPatterns;
+    filterConfig.enableListeningPorts = mEnableListeningPorts;
 
     LOG_INFO(sLogger,
              ("ProcessEntity filter config", "")("exclude_kernel_threads", filterConfig.excludeKernelThreads)(
                  "min_running_time_seconds", filterConfig.minRunningTimeSeconds)("whitelist_patterns_count",
                                                                                  filterConfig.whitelistPatterns.size())(
-                 "blacklist_patterns_count", filterConfig.blacklistPatterns.size()));
+                 "blacklist_patterns_count", filterConfig.blacklistPatterns.size())("enable_listening_ports",
+                                                                                    filterConfig.enableListeningPorts));
 
     // 注册配置：ProcessEntityConfigManager 会将配置转发给 HostMonitorInputRunner
     ProcessEntityConfigManager::GetInstance()->RegisterConfig(mContext->GetConfigName(),

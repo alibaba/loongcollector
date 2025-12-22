@@ -48,6 +48,7 @@ extern const std::string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_STATE;
 extern const std::string DEFAULT_CONTENT_KEY_PROCESS_RUNTIME_SECONDS;
+extern const std::string DEFAULT_CONTENT_KEY_PROCESS_LISTENING_PORTS;
 
 // link
 extern const std::string DEFAULT_CONTENT_KEY_SRC_DOMAIN;
