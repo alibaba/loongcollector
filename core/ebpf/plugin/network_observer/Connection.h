@@ -159,7 +159,6 @@ public:
 
     void MarkConnDeleted() { mMetaFlags.fetch_or(kSFlagConnDeleted, std::memory_order_release); }
 
-
     static std::string gSelfPodName;
     static std::string gSelfPodIp;
 

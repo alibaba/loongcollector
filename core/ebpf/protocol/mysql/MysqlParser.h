@@ -17,18 +17,9 @@
 
 namespace logtail::ebpf {
 
-// MySQL协议常量定义
-constexpr uint8_t MYSQL_CMD_QUERY = 0x03;
-constexpr uint8_t MYSQL_CMD_STMT_PREPARE = 0x16;
-constexpr uint8_t MYSQL_RESPONSE_OK = 0x00;
-constexpr uint8_t MYSQL_RESPONSE_ERR = 0xff;
-constexpr uint8_t MYSQL_RESPONSE_EOF = 0xfe;
-
 namespace mysql {
 
 ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool forceSample = false);
-
-ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<MysqlRecord>& result);
 
 ParseState
 ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool closed, bool forceSample = false);

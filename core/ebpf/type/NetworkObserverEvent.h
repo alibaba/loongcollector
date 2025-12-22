@@ -131,47 +131,32 @@ public:
     HeadersMap mRespHeaderMap;
 };
 
+constexpr int64_t kSlowRequestThresholdMs = 500;
+
 class MysqlRecord : public L7Record {
 public:
     MysqlRecord(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail)
         : L7Record(conn, appDetail) {}
 
-    [[nodiscard]] virtual bool IsError() const override { return mErrorCode != 0; }
-    [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= 500; }
+    [[nodiscard]] virtual bool IsError() const override { return mCode != 0; }
+    [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= kSlowRequestThresholdMs; }
     void SetStatusCode(int code) { mCode = code; }
     [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
 
-    // 2025-08-07 spanName use real query ...
-    // metric use command type
-    [[nodiscard]] virtual const std::string& GetSpanName() { return mRealQuery; }
-    [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandType; }
-
-    void SetErrorCode(int errorCode) { mErrorCode = errorCode; }
-    int GetErrorCode() const { return mErrorCode; }
+    [[nodiscard]] virtual const std::string& GetSpanName() { return mSql; }
+    [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandName; }
     void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
     const std::string& GetErrorMessage() const { return mErrorMsg; }
     void SetSql(const std::string& sql) { mSql = sql; }
 
     const std::string& GetSql() const { return mSql; }
-
-    void SetSeqId(int seqId) { mSeqId = seqId; }
-    int GetSeqId() const { return mSeqId; }
-
-    void SetPacketLen(uint32_t packetLen) { mPacketLen = packetLen; }
-    uint32_t GetPacketLen() const { return mPacketLen; }
-    void SetCommand(uint32_t command) { mCommand = command; }
-    uint32_t GetCommand() const { return mCommand; }
+    void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
 
     // private:
     int mCode = 0;
-    int mErrorCode = 0;
     std::string mErrorMsg;
-    std::string mCommandType;
-    std::string mRealQuery;
+    std::string mCommandName;
     std::string mSql;
-    int mSeqId = 0;
-    uint32_t mPacketLen = 0;
-    uint32_t mCommand = 0;
 };
 
 class ConnStatsRecord : public CommonEvent {

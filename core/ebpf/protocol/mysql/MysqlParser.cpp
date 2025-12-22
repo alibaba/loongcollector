@@ -22,7 +22,6 @@
 #include "logger/Logger.h"
 
 namespace logtail::ebpf {
-
 std::vector<std::shared_ptr<L7Record>>
 MYSQLProtocolParser::Parse(struct conn_data_event_t* dataEvent,
                            const std::shared_ptr<Connection>& conn,
@@ -34,7 +33,7 @@ MYSQLProtocolParser::Parse(struct conn_data_event_t* dataEvent,
     auto spanId = GenerateSpanID();
 
     // slow request
-    if (record->GetLatencyMs() > 500 || appDetail->mSampler->ShouldSample(spanId)) {
+    if (record->GetLatencyMs() > kSlowRequestThresholdMs || appDetail->mSampler->ShouldSample(spanId)) {
         record->MarkSample();
     }
 
@@ -69,88 +68,105 @@ MYSQLProtocolParser::Parse(struct conn_data_event_t* dataEvent,
 
 namespace mysql {
 
-// MySQL协议解析相关函数实现
+
+// See https://dev.mysql.com/doc/dev/mysql-server/9.4.0/page_protocol_basic_packets.html
+constexpr int kPacketHeaderLength = 4;
+
+constexpr size_t kMysqlErrIndicatorSize = 1;
+constexpr size_t kMysqlErrCodeSize = 2;
+constexpr size_t kMysqlSqlStateMarkerSize = 1;
+constexpr size_t kMysqlSqlStateSize = 5;
+
+constexpr size_t kMySqlStatMarkerOffset = kMysqlErrIndicatorSize + kMysqlErrCodeSize + kMysqlSqlStateMarkerSize;
+
+// MySQL command type
+constexpr uint8_t MYSQL_CMD_QUERY = 0x03;
+// MySQL response status code
+constexpr uint8_t MYSQL_RESPONSE_OK = 0x00;
+constexpr uint8_t MYSQL_RESPONSE_ERR = 0xff;
+constexpr uint8_t MYSQL_RESPONSE_EOF = 0xfe;
+// Supported max SQL length
+constexpr size_t kMaxSqlLength = 256;
+
+
+std::string CommandName(uint32_t cmd) {
+    if (cmd == MYSQL_CMD_QUERY)
+        return "QUERY";
+    return std::to_string(cmd);
+}
+
+uint32_t ParsePacketLen(std::string_view& buf) {
+    // ref: https://dev.mysql.com/doc/dev/mysql-server/9.4.0/page_protocol_basic_packets.html
+    return (uint32_t)(uint8_t)buf[0] | ((uint32_t)(uint8_t)buf[1] << 8) | ((uint32_t)(uint8_t)buf[2] << 16);
+}
+
+
 ParseState ParseRequest(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool forceSample) {
-    if (buf.size() < 5) { // MySQL包头至少5字节
+    // 1 byte for Command Type
+    if (buf.size() < kPacketHeaderLength + 1) {
         return ParseState::kNeedsMoreData;
     }
 
-    uint32_t packetLen = (uint8_t)buf[0] | ((uint8_t)buf[1] << 8) | ((uint8_t)buf[2] << 16);
-    // 包序号（1字节）
-    uint8_t seqId = buf[3];
-    // 命令类型（1字节）
-    uint8_t command = buf[4];
-    result->SetSeqId(seqId);
-    result->SetPacketLen(packetLen);
-    result->SetCommand(command);
+    uint32_t packetLen = ParsePacketLen(buf);
+    uint8_t command = buf[kPacketHeaderLength];
+    result->SetCommandName(CommandName(command));
 
-    // 根据命令类型解析具体内容
-    switch (command) {
-        case MYSQL_CMD_QUERY:
-            if (packetLen > 1) {
-                size_t sqlLen = std::min(static_cast<size_t>(packetLen - 1), static_cast<size_t>(256));
-                sqlLen = std::min(sqlLen, buf.size() - 5);
-                std::string sql(buf.data() + 5, sqlLen);
-                result->SetSql(sql);
-            }
-            break;
-        default:
-            // 未知命令类型
-            break;
+    if (command != MYSQL_CMD_QUERY) {
+        return ParseState::kUnknown;
     }
+
+    if (packetLen == 0) {
+        return ParseState::kInvalid;
+    }
+
+    size_t availableData = buf.size() - kPacketHeaderLength - 1;
+    size_t sqlLen = std::min(static_cast<size_t>(packetLen - 1), kMaxSqlLength);
+    sqlLen = std::min(sqlLen, availableData);
+
+    std::string sql(buf.data() + kPacketHeaderLength + 1, sqlLen);
+    result->SetSql(sql);
     return ParseState::kSuccess;
 }
 
 ParseState ParseResponse(std::string_view& buf, std::shared_ptr<MysqlRecord>& result, bool closed, bool forceSample) {
-    if (buf.size() < 4) {
+    // 1 byte for status code
+    if (buf.size() < kPacketHeaderLength + 1) {
         return ParseState::kNeedsMoreData;
     }
 
-    // 解析MySQL包长度（3字节）
-    uint32_t packetLen = (uint8_t)buf[0] | (uint8_t)(buf[1] << 8) | (uint8_t)(buf[2] << 16);
+    uint32_t packetLen = ParsePacketLen(buf);
+    if (packetLen == 0) {
+        return ParseState::kInvalid;
+    }
 
-    uint8_t seqId = buf[3];
-    result->SetSeqId(seqId);
-    result->SetPacketLen(packetLen);
+    uint8_t statusCode = buf[4];
+    if (statusCode != MYSQL_RESPONSE_OK && statusCode != MYSQL_RESPONSE_EOF && statusCode != MYSQL_RESPONSE_ERR) {
+        return ParseState::kInvalid;
+    }
 
-    // 根据响应内容设置状态码等信息
-    if (packetLen > 0) {
-        uint8_t firstByte = buf[4];
+    if (statusCode == MYSQL_RESPONSE_EOF) {
+        statusCode = MYSQL_RESPONSE_OK;
+    }
 
-        if (firstByte == MYSQL_RESPONSE_OK) {
-            // OK packet
-            result->SetStatusCode(0); // OK
-        } else if (firstByte == MYSQL_RESPONSE_ERR) {
-            // ERR packet
-            result->SetStatusCode(1); // Error
-            if (packetLen >= 9) {
-                uint16_t errorCode = buf[5] | (buf[6] << 8);
-                result->SetErrorCode(errorCode);
+    result->SetStatusCode(statusCode);
+    // See https://dev.mysql.com/doc/dev/mysql-server/9.4.0/page_protocol_basic_err_packet.html
+    if (statusCode == MYSQL_RESPONSE_ERR) {
+        size_t errorMsgMinStart = kMysqlErrIndicatorSize + kMysqlErrCodeSize;
+        size_t errorMsgStart
+            = kMysqlErrIndicatorSize + kMysqlErrCodeSize + kMysqlSqlStateMarkerSize + kMysqlSqlStateSize;
 
-                // 提取错误消息
-                // ERR packet格式: header(4) + ERR byte(1) + error code(2) + SQL state marker('#')(1) + SQL state(5) +
-                // error message
-                if (buf.size() >= 13) { // 确保有足够的数据
-                    size_t errorMsgStart = 13; // 4(header) + 1(ERR) + 2(error code) + 1(marker) + 5(SQL state)
-                    if (buf[12] == '#') { // 检查SQL状态标记
-                        // 跳过SQL状态码
-                        errorMsgStart = 13;
-                    } else {
-                        // 没有SQL状态码，错误消息直接从第7字节开始
-                        errorMsgStart = 7; // 4(header) + 1(ERR) + 2(error code)
-                    }
-
-                    if (errorMsgStart < buf.size()) {
-                        std::string errorMsg(buf.data() + errorMsgStart, buf.size() - errorMsgStart);
-                        result->SetErrorMessage(errorMsg); // 需要在MysqlRecord中添加此方法
-                    }
-                }
-            }
-        } else if (firstByte == MYSQL_RESPONSE_EOF) {
-            // EOF packet
-            result->SetStatusCode(2); // EOF
+        if (packetLen <= errorMsgMinStart) {
+            return ParseState::kNeedsMoreData;
         }
-        // 其他类型的响应包...
+
+        if (buf[kPacketHeaderLength + kMySqlStatMarkerOffset] != '#') {
+            // No SQL state code, error message starts directly from the 7th byte
+            errorMsgStart = errorMsgMinStart;
+        }
+
+        std::string errorMsg(buf.data() + kPacketHeaderLength + errorMsgStart,
+                             buf.size() - errorMsgStart - kPacketHeaderLength);
+        result->SetErrorMessage(errorMsg);
     }
     return ParseState::kSuccess;
 }

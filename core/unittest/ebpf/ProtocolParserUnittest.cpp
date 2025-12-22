@@ -374,7 +374,6 @@ void ProtocolParserUnittest::TestParseMysqlQuery() {
     ParseState state = mysql::ParseRequest(buf, result);
 
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->mSeqId, 0);
     APSARA_TEST_EQUAL(result->mSql,
                       "\n"
                       "CREATE TABLE IF NOT EXISTS test_table (\n"
@@ -430,8 +429,7 @@ void ProtocolParserUnittest::TestParseMysqlResponse() {
     state = mysql::ParseResponse(buf2, result, false, true);
 
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 1); // Error状态码
-    APSARA_TEST_EQUAL(result->GetErrorCode(), 1040); // 错误码
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 255); // Error状态码
 
     // 测试不完整的MySQL响应包
     const std::vector<uint8_t> incompletePacket = {0x07, 0x00}; // 不完整的包头
@@ -454,8 +452,6 @@ UNIT_TEST_CASE(ProtocolParserUnittest, TestProtocolParserManager);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestHttpParserEdgeCases);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlQuery);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlResponse);
-
-
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestWithoutBodyBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, ResponseBenchmark);
