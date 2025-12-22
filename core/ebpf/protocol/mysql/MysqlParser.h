@@ -1,6 +1,7 @@
+// Copyright 2025 iLogtail Authors
 //
-// Created by shuyi on 2025/11/03.
-//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// ...
 
 #pragma once
 
