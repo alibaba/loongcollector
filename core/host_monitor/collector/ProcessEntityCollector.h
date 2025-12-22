@@ -31,6 +31,9 @@
 
 namespace logtail {
 
+// 前向声明
+class ProcessEntityConfigManager;
+
 // 进程主键（唯一标识）
 struct ProcessPrimaryKey {
     pid_t pid = 0;
@@ -131,9 +134,8 @@ private:
         std::vector<ProcessPrimaryKey> reused; // PID被复用的进程
     };
 
-    ProcessChanges
-    DetectChanges(const std::unordered_map<ProcessPrimaryKey, ProcessEntityInfo, ProcessPrimaryKeyHash>& oldCache,
-                  const std::unordered_map<pid_t, ProcessPrimaryKey>& currentPidMap);
+    ProcessChanges DetectChanges(const std::unordered_map<pid_t, ProcessPrimaryKey>& oldPidMap,
+                                 const std::unordered_map<pid_t, ProcessPrimaryKey>& currentPidMap);
 
     // 获取当前所有进程的主key信息
     std::unordered_map<pid_t, ProcessPrimaryKey> GetCurrentProcessPrimaryKeys(time_t now);
@@ -170,10 +172,12 @@ private:
     // 缓存:存储已采集的进程实体信息（永久保存，只在进程退出时清理）
     std::unordered_map<ProcessPrimaryKey, ProcessEntityInfo, ProcessPrimaryKeyHash> mProcessCache;
 
-    // 最后一次全量上报时间
-    std::chrono::steady_clock::time_point mLastFullReportTime;
+    // PID 索引：快速查找 pid -> ProcessPrimaryKey（与 mProcessCache 同步维护）
+    std::unordered_map<pid_t, ProcessPrimaryKey> mPidToKeyIndex;
 
-    // 是否为首次采集（首次采集时强制全量上报）
+    // 采集状态（使用 mutex 保护以防并发访问）
+    mutable std::mutex mStateMutex;
+    std::chrono::steady_clock::time_point mLastFullReportTime;
     bool mIsFirstCollect = true;
 
     // 指标 (静态，所有实例共享同一组指标)
@@ -191,6 +195,9 @@ private:
 
     // 初始化指标（线程安全，只执行一次）
     static void InitMetrics();
+
+    // 允许 ProcessEntityConfigManager 访问静态成员以支持动态配置更新
+    friend class ProcessEntityConfigManager;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessEntityCollectorUnittest;

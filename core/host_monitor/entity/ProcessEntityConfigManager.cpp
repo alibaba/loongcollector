@@ -134,6 +134,32 @@ void ProcessEntityConfigManager::SetFullReportInterval(std::chrono::seconds inte
     LOG_INFO(sLogger, ("updated default full report interval", interval.count()));
 }
 
+void ProcessEntityConfigManager::UpdateFullReportInterval(const std::string& configName,
+                                                          std::chrono::seconds interval) {
+    // 更新本地配置
+    {
+        std::lock_guard<std::mutex> lock(mConfigMutex);
+        auto it = mConfigs.find(configName);
+        if (it != mConfigs.end()) {
+            it->second.fullReportInterval = interval;
+        } else {
+            LOG_WARNING(sLogger, ("config not found, cannot update interval", configName));
+            return;
+        }
+    }
+
+    // 更新全局配置（线程安全，Collector 在下次 Collect 时会读取最新值）
+    {
+        std::lock_guard<std::mutex> lock(ProcessEntityCollector::sConfigMutex);
+        auto it = ProcessEntityCollector::sConfigs.find(configName);
+        if (it != ProcessEntityCollector::sConfigs.end()) {
+            it->second.fullReportInterval = interval;
+            LOG_INFO(sLogger,
+                     ("updated full report interval for config", configName)("new_interval", interval.count()));
+        }
+    }
+}
+
 void ProcessEntityConfigManager::TriggerFullReport(const std::string& configName) {
     ProcessEntityCollector::TriggerFullReport(configName);
 }

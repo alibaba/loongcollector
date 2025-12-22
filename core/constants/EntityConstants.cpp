@@ -49,6 +49,8 @@ const string DEFAULT_CONTENT_KEY_PROCESS_BINARY = "binary";
 const string DEFAULT_CONTENT_KEY_PROCESS_ARGUMENTS = "arguments";
 const string DEFAULT_CONTENT_KEY_PROCESS_LANGUAGE = "language";
 const string DEFAULT_CONTENT_KEY_PROCESS_CONTAINER_ID = "container_id";
+const string DEFAULT_CONTENT_KEY_PROCESS_STATE = "state";
+const string DEFAULT_CONTENT_KEY_PROCESS_RUNTIME_SECONDS = "runtime_seconds";
 
 // link
 const string DEFAULT_CONTENT_KEY_SRC_DOMAIN = "__src_domain__";

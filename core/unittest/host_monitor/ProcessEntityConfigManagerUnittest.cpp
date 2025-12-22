@@ -26,6 +26,7 @@
 #include "unittest/Unittest.h"
 
 using namespace std;
+// Note: namespace bfs = boost::filesystem is defined in unittest/Unittest.h
 
 namespace logtail {
 

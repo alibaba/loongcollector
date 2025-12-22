@@ -58,8 +58,11 @@ public:
     void RemoveConfig(const std::string& configName);
     void RemoveAllConfigs();
 
-    // 设置全量上报间隔(默认3600秒)
+    // 设置默认全量上报间隔（仅影响新注册的配置）
     void SetFullReportInterval(std::chrono::seconds interval);
+
+    // 动态修改已注册配置的全量上报间隔（线程安全）
+    void UpdateFullReportInterval(const std::string& configName, std::chrono::seconds interval);
 
     // 强制触发一次全量上报(用于测试)
     void TriggerFullReport(const std::string& configName);

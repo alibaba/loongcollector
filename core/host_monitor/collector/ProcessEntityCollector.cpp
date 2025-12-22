@@ -17,7 +17,6 @@
 #include "host_monitor/collector/ProcessEntityCollector.h"
 
 #include <regex>
-#include <sstream>
 
 #include "common/ProcParser.h"
 #include "common/StringView.h"
@@ -166,25 +165,39 @@ bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, Pipelin
     auto collectStartTime = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
 
-    // 检查是否有强制全量上报请求（用于测试）
+    // 从全局配置读取最新状态（线程安全）
     bool forceFullReport = false;
+    std::chrono::seconds currentFullReportInterval = mFullReportInterval; // 默认值
     {
         std::lock_guard<std::mutex> lock(sConfigMutex);
         auto it = sConfigs.find(mConfigName);
-        if (it != sConfigs.end() && it->second.forceFullReport) {
-            forceFullReport = true;
-            it->second.forceFullReport = false; // 重置标志
+        if (it != sConfigs.end()) {
+            if (it->second.forceFullReport) {
+                forceFullReport = true;
+                it->second.forceFullReport = false; // 重置标志
+            }
+            // 读取最新的全量上报间隔（支持动态修改）
+            currentFullReportInterval = it->second.fullReportInterval;
         }
     }
 
-    // 判断是否需要全量上报
-    bool needFullReport = mIsFirstCollect || forceFullReport || (now - mLastFullReportTime) >= mFullReportInterval;
+    // 判断是否需要全量上报（使用锁保护状态变量）
+    bool needFullReport = false;
+    {
+        std::lock_guard<std::mutex> lock(mStateMutex);
+        needFullReport = mIsFirstCollect || forceFullReport || (now - mLastFullReportTime) >= currentFullReportInterval;
+    }
 
     if (needFullReport) {
         LOG_DEBUG(sLogger, ("performing full collect", collectContext.mConfigName));
         FullCollect(collectContext, groupPtr);
-        mLastFullReportTime = now;
-        mIsFirstCollect = false;
+
+        // 更新状态（加锁保护）
+        {
+            std::lock_guard<std::mutex> lock(mStateMutex);
+            mLastFullReportTime = now;
+            mIsFirstCollect = false;
+        }
         ADD_COUNTER(sFullReportTotal, 1);
     } else {
         LOG_DEBUG(sLogger, ("performing incremental collect", collectContext.mConfigName));
@@ -217,50 +230,56 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
     // 获取当前所有进程的主key
     auto currentPidMap = GetCurrentProcessPrimaryKeys(now);
 
-    // 第一步：收集所有符合基本过滤条件的进程
-    std::vector<std::pair<ProcessPrimaryKey, ProcessEntityInfo>> candidateProcesses;
+    // 直接遍历，生成事件并更新缓存（避免中间存储）
+    size_t candidatesCount = 0;
 
     for (const auto& [pid, primaryKey] : currentPidMap) {
-        ProcessEntityInfo info;
-
         // 尝试从缓存获取
         auto cacheIt = mProcessCache.find(primaryKey);
         if (cacheIt != mProcessCache.end()) {
-            // 缓存命中：使用缓存的不变属性
-            info = cacheIt->second;
+            // 缓存命中：直接在缓存上更新可变属性（避免拷贝所有字符串成员）
+            ProcessEntityInfo& cachedInfo = cacheIt->second;
 
             // 全量上报时更新可变属性（ppid、user、state）
-            UpdateVariableAttributes(pid, now, info);
+            UpdateVariableAttributes(pid, now, cachedInfo);
+            cachedInfo.lastReportTime = now;
 
-            info.lastReportTime = now;
+            // 进程过滤
+            if (!ShouldCollectProcess(pid, cachedInfo)) {
+                continue;
+            }
+
+            // 直接生成事件（引用缓存，避免拷贝）
+            GenerateProcessEntityEvent(groupPtr, cachedInfo, true);
+
+            // 索引已存在，无需更新
         } else {
             // 新进程，获取实体信息（包含不变属性和初始值）
+            ProcessEntityInfo info;
             if (!GetProcessEntityInfo(pid, now, info)) {
                 continue;
             }
             info.firstObservedTime = now;
             info.lastReportTime = now;
             info.lastVariableUpdateTime = now;
+
+            // 进程过滤
+            if (!ShouldCollectProcess(pid, info)) {
+                continue;
+            }
+
+            // 直接生成事件（包含不变属性和可变属性）
+            GenerateProcessEntityEvent(groupPtr, info, true);
+
+            // 直接更新缓存和索引（永久保存，直到进程退出）
+            mProcessCache[primaryKey] = std::move(info);
+            mPidToKeyIndex[pid] = primaryKey;
         }
 
-        // 进程过滤
-        if (!ShouldCollectProcess(pid, info)) {
-            continue;
-        }
-
-        candidateProcesses.emplace_back(primaryKey, info);
+        ++candidatesCount;
     }
 
-    // 生成事件并更新缓存
-    for (const auto& [primaryKey, info] : candidateProcesses) {
-        // 生成事件（包含不变属性和可变属性）
-        GenerateProcessEntityEvent(groupPtr, info, true);
-
-        // 更新缓存（永久保存，直到进程退出）
-        mProcessCache[primaryKey] = info;
-    }
-
-    // 清理已退出的进程
+    // 清理已退出的进程（同步清理缓存和索引）
     std::vector<ProcessPrimaryKey> toRemove;
     for (const auto& [key, detail] : mProcessCache) {
         if (currentPidMap.find(key.pid) == currentPidMap.end()) {
@@ -270,11 +289,12 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
 
     for (const auto& key : toRemove) {
         mProcessCache.erase(key);
+        mPidToKeyIndex.erase(key.pid);
         ADD_COUNTER(sProcessRemovedTotal, 1);
     }
 
     // 添加主机标签
-    if (groupPtr->GetEvents().size() > 0) {
+    if (!groupPtr->GetEvents().empty()) {
         AddHostLabels(*groupPtr);
     }
 
@@ -287,8 +307,8 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
 
     LOG_DEBUG(sLogger,
               ("full collect completed", collectContext.mConfigName)("total_processes", currentPidMap.size())(
-                  "candidates_after_filter", candidateProcesses.size())("cached_processes", mProcessCache.size())(
-                  "removed_processes", toRemove.size()));
+                  "candidates_after_filter",
+                  candidatesCount)("cached_processes", mProcessCache.size())("removed_processes", toRemove.size()));
 }
 
 void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
@@ -298,8 +318,8 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
     // 获取当前所有进程的主key
     auto currentPidMap = GetCurrentProcessPrimaryKeys(now);
 
-    // 检测变化
-    auto changes = DetectChanges(mProcessCache, currentPidMap);
+    // 检测变化（使用维护的索引，避免重建）
+    auto changes = DetectChanges(mPidToKeyIndex, currentPidMap);
 
     if (changes.added.empty() && changes.removed.empty() && changes.reused.empty()) {
         // 没有变化,不生成事件
@@ -328,8 +348,10 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
         // 生成增量事件（实体属性不变，后续只需全量定期上报）
         GenerateProcessEntityEvent(groupPtr, info, false);
 
-        // 加入缓存（永久保存，直到进程退出）
-        mProcessCache[key] = info;
+        // 加入缓存和索引（永久保存，直到进程退出）
+        // 使用 emplace 避免默认构造（新增进程，键肯定不存在）
+        mProcessCache.emplace(key, std::move(info));
+        mPidToKeyIndex[key.pid] = key;
         ADD_COUNTER(sProcessAddedTotal, 1);
     }
 
@@ -351,19 +373,22 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
         // 生成增量事件
         GenerateProcessEntityEvent(groupPtr, info, false);
 
-        // 更新缓存（覆盖旧进程，存储新进程）
-        mProcessCache[key] = info;
+        // 更新缓存和索引（覆盖旧进程，存储新进程）
+        // 使用 emplace 避免默认构造（新键，startTime 不同）
+        mProcessCache.emplace(key, std::move(info));
+        mPidToKeyIndex[key.pid] = key;
         ADD_COUNTER(sProcessReusedTotal, 1);
     }
 
-    // 处理退出进程
+    // 处理退出进程（同步清理缓存和索引）
     for (const auto& key : changes.removed) {
         mProcessCache.erase(key);
+        mPidToKeyIndex.erase(key.pid);
         ADD_COUNTER(sProcessRemovedTotal, 1);
     }
 
     // 添加主机标签
-    if (groupPtr->GetEvents().size() > 0) {
+    if (!groupPtr->GetEvents().empty()) {
         AddHostLabels(*groupPtr);
     }
 
@@ -375,18 +400,12 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
     }
 }
 
-ProcessEntityCollector::ProcessChanges ProcessEntityCollector::DetectChanges(
-    const std::unordered_map<ProcessPrimaryKey, ProcessEntityInfo, ProcessPrimaryKeyHash>& oldCache,
-    const std::unordered_map<pid_t, ProcessPrimaryKey>& currentPidMap) {
+ProcessEntityCollector::ProcessChanges
+ProcessEntityCollector::DetectChanges(const std::unordered_map<pid_t, ProcessPrimaryKey>& oldPidMap,
+                                      const std::unordered_map<pid_t, ProcessPrimaryKey>& currentPidMap) {
     ProcessChanges changes;
 
-    // 构建旧的PID映射
-    std::unordered_map<pid_t, ProcessPrimaryKey> oldPidMap;
-    for (const auto& [key, detail] : oldCache) {
-        oldPidMap[key.pid] = key;
-    }
-
-    // 检测新增和PID复用
+    // 检测新增和PID复用（直接使用传入的索引，无需重建）
     for (const auto& [pid, currentKey] : currentPidMap) {
         auto it = oldPidMap.find(pid);
         if (it == oldPidMap.end()) {
@@ -464,17 +483,26 @@ bool ProcessEntityCollector::GetProcessEntityInfo(pid_t pid, time_t now, Process
     }
 
     // 获取cmdline（不变属性：进程启动时确定）
+    // 注意：/proc/[pid]/cmdline 使用 '\0' 分隔参数，GetProcessCmdlineString 读取整个文件作为一行
     ProcessCmdlineString cmdlineStr;
     if (SystemInterface::GetInstance()->GetProcessCmdlineString(now, pid, cmdlineStr)) {
         if (!cmdlineStr.cmdline.empty()) {
-            info.cmdline = cmdlineStr.cmdline[0];
-            // 解析参数
-            std::istringstream iss(info.cmdline);
-            std::string arg;
-            while (std::getline(iss, arg, '\0')) {
-                if (!arg.empty()) {
-                    info.args.push_back(arg);
+            info.cmdline = cmdlineStr.cmdline[0]; // 原始的 \0 分隔的字符串
+
+            // 直接遍历字符串解析参数（比 istringstream 更高效）
+            const std::string& rawCmdline = info.cmdline;
+            size_t start = 0;
+            for (size_t i = 0; i < rawCmdline.size(); ++i) {
+                if (rawCmdline[i] == '\0') {
+                    if (i > start) {
+                        info.args.push_back(rawCmdline.substr(start, i - start));
+                    }
+                    start = i + 1;
                 }
+            }
+            // 处理最后一个参数（如果字符串不以 '\0' 结尾）
+            if (start < rawCmdline.size()) {
+                info.args.push_back(rawCmdline.substr(start));
             }
         }
     }
@@ -598,13 +626,13 @@ void ProcessEntityCollector::GenerateProcessEntityEvent(PipelineEventGroup* grou
     }
 
     if (info.state != '\0') {
-        event->SetContent("state", std::string(1, info.state));
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_STATE, std::string(1, info.state));
     }
 
     // 运行时间（秒）- 实时计算
     int64_t runningTimeSeconds = currentTime.tv_sec - info.startTimeUnix;
     if (runningTimeSeconds > 0) {
-        event->SetContent("runtime_seconds", std::to_string(runningTimeSeconds));
+        event->SetContent(DEFAULT_CONTENT_KEY_PROCESS_RUNTIME_SECONDS, std::to_string(runningTimeSeconds));
     }
 }
 
