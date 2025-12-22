@@ -285,14 +285,14 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
             isNewProcess = true;
         }
 
-        // 采集监听端口（仅在全量上报时，且配置开启的情况下）
-        if (mFilterConfig.enableListeningPorts) {
-            info.listeningPorts = SystemInterface::GetInstance()->GetProcessListeningPorts(pid);
-        }
-
         // 进程过滤（可能抛出异常）
         if (!ShouldCollectProcess(pid, info)) {
             continue;
+        }
+
+        // 更新监听端口（可变属性）- 放在过滤之后，避免对会被过滤的进程浪费端口采集开销
+        if (mFilterConfig.enableListeningPorts) {
+            info.listeningPorts = SystemInterface::GetInstance()->GetProcessListeningPorts(pid);
         }
 
         // 生成事件（可能抛出异常）
@@ -377,6 +377,11 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
             continue;
         }
 
+        // 采集监听端口（新进程也需要端口信息）- 放在过滤之后
+        if (mFilterConfig.enableListeningPorts) {
+            info.listeningPorts = SystemInterface::GetInstance()->GetProcessListeningPorts(key.pid);
+        }
+
         // 生成增量事件（实体属性不变，后续只需全量定期上报）
         GenerateProcessEntityEvent(groupPtr, info, false);
 
@@ -405,6 +410,11 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
         // 进程过滤
         if (!ShouldCollectProcess(key.pid, info)) {
             continue;
+        }
+
+        // 采集监听端口（PID复用的新进程也需要端口信息）- 放在过滤之后
+        if (mFilterConfig.enableListeningPorts) {
+            info.listeningPorts = SystemInterface::GetInstance()->GetProcessListeningPorts(key.pid);
         }
 
         // 生成增量事件

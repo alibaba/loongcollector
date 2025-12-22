@@ -1401,9 +1401,14 @@ static std::vector<TcpConnection> ParseTcpTable(const std::filesystem::path& tcp
             continue;
         }
 
-        // 跳过中间字段，直接找到 inode（第10个字段）
+        // 跳过中间字段，直接找到 inode
+        // 实际字段（awk $1, $2, ...）:
+        //   $1:sl $2:local_address $3:rem_address $4:st $5-$9:中间字段 $10:inode
+        // 已读取: sl($1), local_address($2), rem_address($3), st($4)
+        // 需要跳过: $5-$9 (5个字段)
+        // 然后读取: inode($10)
         std::string temp;
-        for (int i = 0; i < 6; ++i) {
+        for (int i = 0; i < 5; ++i) { // 跳过 5 个字段
             if (!(iss >> temp)) {
                 break;
             }
