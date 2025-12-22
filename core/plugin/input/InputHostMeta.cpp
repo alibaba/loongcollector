@@ -20,7 +20,7 @@
 
 #include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
-#include "host_monitor/entity/ProcessEntityRunner.h"
+#include "host_monitor/entity/ProcessEntityConfigManager.h"
 #include "logger/Logger.h"
 
 namespace logtail {
@@ -137,18 +137,32 @@ bool InputHostMeta::Init(const Json::Value& config, Json::Value& optionalGoPipel
                               mContext->GetRegion());
     }
 
-    // 读取白名单
-    if (config.isMember("WhitelistPatterns") && config["WhitelistPatterns"].isArray()) {
-        for (const auto& pattern : config["WhitelistPatterns"]) {
+    // 读取白名单（支持新旧两种配置参数名）
+    // 优先使用 ProcessWhitelist（文档中的名称），向后兼容 WhitelistPatterns
+    const char* whitelistKey = nullptr;
+    if (config.isMember("ProcessWhitelist") && config["ProcessWhitelist"].isArray()) {
+        whitelistKey = "ProcessWhitelist";
+    } else if (config.isMember("WhitelistPatterns") && config["WhitelistPatterns"].isArray()) {
+        whitelistKey = "WhitelistPatterns";
+    }
+    if (whitelistKey != nullptr) {
+        for (const auto& pattern : config[whitelistKey]) {
             if (pattern.isString()) {
                 mWhitelistPatterns.push_back(pattern.asString());
             }
         }
     }
 
-    // 读取黑名单
-    if (config.isMember("BlacklistPatterns") && config["BlacklistPatterns"].isArray()) {
-        for (const auto& pattern : config["BlacklistPatterns"]) {
+    // 读取黑名单（支持新旧两种配置参数名）
+    // 优先使用 ProcessBlacklist（文档中的名称），向后兼容 BlacklistPatterns
+    const char* blacklistKey = nullptr;
+    if (config.isMember("ProcessBlacklist") && config["ProcessBlacklist"].isArray()) {
+        blacklistKey = "ProcessBlacklist";
+    } else if (config.isMember("BlacklistPatterns") && config["BlacklistPatterns"].isArray()) {
+        blacklistKey = "BlacklistPatterns";
+    }
+    if (blacklistKey != nullptr) {
+        for (const auto& pattern : config[blacklistKey]) {
             if (pattern.isString()) {
                 mBlacklistPatterns.push_back(pattern.asString());
             }
@@ -163,14 +177,14 @@ bool InputHostMeta::Start() {
     if (!mEnableProcessEntity) {
         LOG_INFO(sLogger,
                  ("process entity collection disabled",
-                  "skip ProcessEntityRunner initialization")("config", mContext->GetConfigName()));
+                  "skip ProcessEntityConfigManager initialization")("config", mContext->GetConfigName()));
         return true;
     }
 
-    // 初始化 ProcessEntityRunner
-    ProcessEntityRunner::GetInstance()->Init();
+    // 初始化 ProcessEntityConfigManager（内部会初始化 HostMonitorInputRunner）
+    ProcessEntityConfigManager::GetInstance()->Init();
 
-    // 注册配置到 ProcessEntityRunner
+    // 注册配置到 ProcessEntityConfigManager（内部会注册到 HostMonitorInputRunner）
     ProcessFilterConfig filterConfig;
     filterConfig.excludeKernelThreads = mExcludeKernelThreads;
     filterConfig.minRunningTimeSeconds = mMinRunningTimeSeconds;
@@ -183,12 +197,13 @@ bool InputHostMeta::Start() {
                                                                                  filterConfig.whitelistPatterns.size())(
                  "blacklist_patterns_count", filterConfig.blacklistPatterns.size()));
 
-    ProcessEntityRunner::GetInstance()->RegisterConfig(mContext->GetConfigName(),
-                                                       mContext->GetProcessQueueKey(),
-                                                       mIndex,
-                                                       filterConfig,
-                                                       mIncrementalInterval,
-                                                       mFullReportInterval);
+    // 注册配置：ProcessEntityConfigManager 会将配置转发给 HostMonitorInputRunner
+    ProcessEntityConfigManager::GetInstance()->RegisterConfig(mContext->GetConfigName(),
+                                                              mContext->GetProcessQueueKey(),
+                                                              mIndex,
+                                                              filterConfig,
+                                                              mIncrementalInterval,
+                                                              mFullReportInterval);
     return true;
 }
 
@@ -196,13 +211,13 @@ bool InputHostMeta::Stop(bool isPipelineRemoving) {
     // 如果未启用进程实体采集，直接返回
     if (!mEnableProcessEntity) {
         LOG_INFO(sLogger,
-                 ("process entity collection disabled", "skip ProcessEntityRunner cleanup")("config",
-                                                                                            mContext->GetConfigName()));
+                 ("process entity collection disabled",
+                  "skip ProcessEntityConfigManager cleanup")("config", mContext->GetConfigName()));
         return true;
     }
 
-    // 从 ProcessEntityRunner 移除配置
-    ProcessEntityRunner::GetInstance()->RemoveConfig(mContext->GetConfigName());
+    // 从 ProcessEntityConfigManager 移除配置
+    ProcessEntityConfigManager::GetInstance()->RemoveConfig(mContext->GetConfigName());
 
     return true;
 }

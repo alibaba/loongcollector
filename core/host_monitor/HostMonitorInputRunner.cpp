@@ -41,6 +41,7 @@
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
 #include "host_monitor/collector/ProcessCollector.h"
+#include "host_monitor/collector/ProcessEntityCollector.h"
 #include "host_monitor/collector/SystemCollector.h"
 #include "logger/Logger.h"
 #include "models/MetricEvent.h"
@@ -68,6 +69,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     RegisterCollector<ProcessCollector>();
     RegisterCollector<NetCollector>();
     RegisterCollector<GPUCollector>();
+    RegisterCollector<ProcessEntityCollector>(); // 注册 ProcessEntityCollector
 
     size_t threadPoolSize = 1;
     // threadPoolSize should be greater than 0
