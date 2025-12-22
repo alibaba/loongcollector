@@ -17,6 +17,7 @@
 #include "PluginRegistry.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "common/JsonUtil.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "plugin/input/InputHostMeta.h"
 #include "unittest/Unittest.h"
 
@@ -50,7 +51,7 @@ private:
 void InputHostMetaUnittest::TestName() {
     InputHostMeta input;
     std::string name = input.Name();
-    APSARA_TEST_EQUAL(name, "input_host_meta");
+    APSARA_TEST_EQUAL(name, std::string(kInputHostMeta));
 }
 
 void InputHostMetaUnittest::TestSupportAck() {
@@ -76,7 +77,7 @@ void InputHostMetaUnittest::OnSuccessfulInit() {
     input->CreateMetricsRecordRef("test", "1");
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
-    APSARA_TEST_EQUAL(input->sName, "input_host_meta");
+    APSARA_TEST_EQUAL(input->sName, std::string(kInputHostMeta));
 }
 
 void InputHostMetaUnittest::OnFailedInit() {

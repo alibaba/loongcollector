@@ -36,6 +36,7 @@
 #include "host_monitor/Constants.h"
 #include "host_monitor/HostMonitorTimerEvent.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
@@ -83,13 +84,23 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
 void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
                                              const std::vector<CollectorInfo>& newCollectorInfos,
                                              QueueKey processQueueKey,
-                                             size_t inputIndex) {
+                                             size_t inputIndex,
+                                             const std::string& inputType) {
     for (size_t i = 0; i < newCollectorInfos.size(); ++i) {
         const auto& collectorName = newCollectorInfos[i].name;
 
         if (mCollectorCreatorMap.find(collectorName) == mCollectorCreatorMap.end()) {
             LOG_ERROR(sLogger,
                       ("host monitor", "collector not supported")("config", configName)("collector", collectorName));
+            continue;
+        }
+
+        // ProcessEntityCollector 只能在 input_host_meta 中使用
+        if (collectorName == kCollectorProcessEntity && inputType == kInputHostMonitor) {
+            LOG_ERROR(sLogger,
+                      ("process_entity collector is not allowed in input_host_monitor",
+                       "process_entity can only be used in input_host_meta")("config", configName)(
+                          "input_type", inputType)("collector", collectorName));
             continue;
         }
         auto collector = mCollectorCreatorMap.at(collectorName)();

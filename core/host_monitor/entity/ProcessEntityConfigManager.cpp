@@ -17,6 +17,7 @@
 #include "host_monitor/entity/ProcessEntityConfigManager.h"
 
 #include "host_monitor/HostMonitorInputRunner.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/collector/ProcessEntityCollector.h"
 #include "logger/Logger.h"
 
@@ -89,10 +90,13 @@ void ProcessEntityConfigManager::RegisterConfig(const std::string& configName,
     CollectorInfo collectorInfo;
     collectorInfo.name = ProcessEntityCollector::sName;
     collectorInfo.interval = incrementalInterval;
+    // 使用 kSingleValue 类型，确保无论是增量采集还是全量采集，都会生成 数据 并上报
+    // 这与其他 host monitor 采集器（如 CPU、Memory）的 kMultiValue 类型不同
     collectorInfo.type = HostMonitorCollectType::kSingleValue;
 
     std::vector<CollectorInfo> collectorInfos = {collectorInfo};
-    HostMonitorInputRunner::GetInstance()->UpdateCollector(configName, collectorInfos, processQueueKey, inputIndex);
+    HostMonitorInputRunner::GetInstance()->UpdateCollector(
+        configName, collectorInfos, processQueueKey, inputIndex, std::string(kInputHostMeta));
 
     LOG_INFO(
         sLogger,

@@ -80,7 +80,8 @@ public:
     void UpdateCollector(const std::string& configName,
                          const std::vector<CollectorInfo>& newCollectorInfos,
                          QueueKey processQueueKey,
-                         size_t inputIndex);
+                         size_t inputIndex,
+                         const std::string& inputType = "");
     void RemoveCollector(const std::string& configName);
     void RemoveAllCollector();
 

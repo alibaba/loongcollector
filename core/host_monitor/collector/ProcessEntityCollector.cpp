@@ -24,6 +24,7 @@
 #include "constants/EntityConstants.h"
 #include "host_monitor/Constants.h"
 #include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/MetricManager.h"
@@ -36,7 +37,7 @@
 
 namespace logtail {
 
-const std::string ProcessEntityCollector::sName = "process_entity";
+const std::string ProcessEntityCollector::sName = std::string(kCollectorProcessEntity);
 
 // 静态成员初始化
 std::mutex ProcessEntityCollector::sConfigMutex;

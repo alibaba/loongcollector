@@ -20,6 +20,7 @@
 #include "common/ParamExtractor.h"
 #include "host_monitor/HostMonitorInputRunner.h"
 #include "host_monitor/collector/CPUCollector.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/collector/DiskCollector.h"
 #include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
@@ -29,7 +30,7 @@
 
 namespace logtail {
 
-const std::string InputHostMonitor::sName = "input_host_monitor";
+const std::string InputHostMonitor::sName = std::string(kInputHostMonitor);
 constexpr uint32_t kHostMonitorMinInterval = 5; // seconds
 constexpr uint32_t kHostMonitorDefaultInterval = 15; // seconds
 
@@ -187,7 +188,7 @@ bool InputHostMonitor::Start() {
         collectorInfos.push_back({collectorName, mInterval, HostMonitorCollectType::kMultiValue});
     }
     HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
+        mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex, sName);
     return true;
 }
 

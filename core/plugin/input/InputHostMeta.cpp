@@ -20,12 +20,13 @@
 
 #include "common/ParamExtractor.h"
 #include "constants/EntityConstants.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "host_monitor/entity/ProcessEntityConfigManager.h"
 #include "logger/Logger.h"
 
 namespace logtail {
 
-const std::string InputHostMeta::sName = "input_host_meta";
+const std::string InputHostMeta::sName = std::string(kInputHostMeta);
 const uint32_t kMinInterval = 5; // seconds
 const uint32_t kDefaultInterval = 15; // seconds
 
