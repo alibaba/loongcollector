@@ -54,7 +54,8 @@ MYSQLProtocolParser::Parse(struct conn_data_event_t* dataEvent,
             return {};
         }
         if (converger) {
-            converger->DoConverge(appDetail, ConvType::kSql, record->mSql);
+            std::string sql = record->GetSql();
+            converger->DoConverge(appDetail, ConvType::kSql, sql);
         }
     }
 

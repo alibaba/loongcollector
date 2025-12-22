@@ -374,7 +374,7 @@ void ProtocolParserUnittest::TestParseMysqlQuery() {
     ParseState state = mysql::ParseRequest(buf, result);
 
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->mSql,
+    APSARA_TEST_EQUAL(result->GetSql(),
                       "\n"
                       "CREATE TABLE IF NOT EXISTS test_table (\n"
                       "    id INT AUTO_INCREMENT PRIMARY KEY,\n"
