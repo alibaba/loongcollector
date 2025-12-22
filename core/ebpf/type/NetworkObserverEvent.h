@@ -152,7 +152,7 @@ public:
     const std::string& GetSql() const { return mSql; }
     void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
 
-    // private:
+private:
     int mCode = 0;
     std::string mErrorMsg;
     std::string mCommandName;
