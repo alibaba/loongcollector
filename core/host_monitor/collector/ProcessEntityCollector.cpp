@@ -57,45 +57,68 @@ TimeCounterPtr ProcessEntityCollector::sIncrementalCollectLatencyMs;
 
 // ========== ProcessFilterConfig 方法实现 ==========
 
+bool ProcessFilterConfig::IsSimplePattern(const std::string& pattern) {
+    // 判断模式是否为简单字符串（不包含正则表达式特殊字符）
+    // 简单模式可以使用 std::string::find 快速匹配，避免正则引擎开销
+    const char* regexSpecialChars = ".*+?[]{}()^$|\\";
+    return pattern.find_first_of(regexSpecialChars) == std::string::npos;
+}
+
 bool ProcessFilterConfig::CompileRegexes() {
     compiledBlacklistRegexes.clear();
     compiledWhitelistRegexes.clear();
+    simpleBlacklistPatterns.clear();
+    simpleWhitelistPatterns.clear();
 
-    // 编译黑名单正则表达式
+    // 处理黑名单：分离简单模式和复杂模式
     for (const auto& pattern : blacklistPatterns) {
-        try {
-            compiledBlacklistRegexes.emplace_back(pattern);
-        } catch (const std::regex_error& e) {
-            LOG_ERROR(sLogger,
-                      ("failed to compile blacklist regex pattern", pattern)("error", e.what())("code", e.code()));
-            return false;
+        if (IsSimplePattern(pattern)) {
+            // 简单模式：使用字符串查找
+            simpleBlacklistPatterns.push_back(pattern);
+        } else {
+            // 复杂模式：编译为正则表达式
+            try {
+                compiledBlacklistRegexes.emplace_back(pattern);
+            } catch (const std::regex_error& e) {
+                LOG_ERROR(sLogger,
+                          ("failed to compile blacklist regex pattern", pattern)("error", e.what())("code", e.code()));
+                return false;
+            }
         }
     }
 
-    // 编译白名单正则表达式
+    // 处理白名单：分离简单模式和复杂模式
     for (const auto& pattern : whitelistPatterns) {
-        try {
-            compiledWhitelistRegexes.emplace_back(pattern);
-        } catch (const std::regex_error& e) {
-            LOG_ERROR(sLogger,
-                      ("failed to compile whitelist regex pattern", pattern)("error", e.what())("code", e.code()));
-            return false;
+        if (IsSimplePattern(pattern)) {
+            // 简单模式：使用字符串查找
+            simpleWhitelistPatterns.push_back(pattern);
+        } else {
+            // 复杂模式：编译为正则表达式
+            try {
+                compiledWhitelistRegexes.emplace_back(pattern);
+            } catch (const std::regex_error& e) {
+                LOG_ERROR(sLogger,
+                          ("failed to compile whitelist regex pattern", pattern)("error", e.what())("code", e.code()));
+                return false;
+            }
         }
     }
 
-    LOG_INFO(sLogger,
-             ("compiled regex patterns", "")("blacklist_count", compiledBlacklistRegexes.size())(
-                 "whitelist_count", compiledWhitelistRegexes.size()));
+    LOG_INFO(
+        sLogger,
+        ("compiled filter patterns",
+         "")("blacklist_simple", simpleBlacklistPatterns.size())("blacklist_regex", compiledBlacklistRegexes.size())(
+            "whitelist_simple", simpleWhitelistPatterns.size())("whitelist_regex", compiledWhitelistRegexes.size()));
 
     return true;
 }
 
 // ========== ProcessEntityCollector 方法实现 ==========
 
-ProcessEntityCollector::ProcessEntityCollector()
-    : mFullReportInterval(std::chrono::seconds(3600)), // 默认全量上报间隔：1小时
-      mIsFirstCollect(true) {
-    mLastFullReportTime = std::chrono::steady_clock::now() - mFullReportInterval; // 立即触发第一次全量上报
+ProcessEntityCollector::ProcessEntityCollector() : mIsFirstCollect(true) {
+    // 设置初始时间为很久之前，以便立即触发第一次全量上报
+    constexpr std::chrono::seconds kDefaultFullReportInterval{3600}; // 1小时
+    mLastFullReportTime = std::chrono::steady_clock::now() - kDefaultFullReportInterval;
 }
 
 // 静态方法：注册全局配置
@@ -137,21 +160,19 @@ bool ProcessEntityCollector::Init(HostMonitorContext& collectContext) {
     // 初始化指标（线程安全，只执行一次）
     std::call_once(sMetricsInitFlag, &ProcessEntityCollector::InitMetrics);
 
-    // 从全局配置加载
+    // 从全局配置加载过滤配置
     {
         std::lock_guard<std::mutex> lock(sConfigMutex);
         auto it = sConfigs.find(mConfigName);
         if (it != sConfigs.end()) {
             mFilterConfig = it->second.filterConfig;
-            mFullReportInterval = it->second.fullReportInterval;
+            LOG_INFO(sLogger,
+                     ("ProcessEntityCollector initializing",
+                      "")("config", mConfigName)("full_report_interval", it->second.fullReportInterval.count()));
         } else {
             LOG_WARNING(sLogger, ("ProcessEntityCollector Init: config not found, using defaults", mConfigName));
         }
     }
-
-    LOG_INFO(sLogger,
-             ("ProcessEntityCollector initializing", "")("config", mConfigName)("full_report_interval",
-                                                                                mFullReportInterval.count()));
 
     return BaseCollector::Init(collectContext);
 }
@@ -165,11 +186,17 @@ bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, Pipelin
     auto collectStartTime = std::chrono::steady_clock::now();
     auto now = std::chrono::steady_clock::now();
 
-    // 从全局配置读取最新状态（线程安全）
-    bool forceFullReport = false;
-    std::chrono::seconds currentFullReportInterval = mFullReportInterval; // 默认值
+    // 合并锁操作：一次性读取全局配置和实例状态，减少锁开销
+    bool needFullReport = false;
     {
-        std::lock_guard<std::mutex> lock(sConfigMutex);
+        // 先获取全局配置锁，再获取实例状态锁（保持一致的加锁顺序）
+        std::lock_guard<std::mutex> configLock(sConfigMutex);
+        std::lock_guard<std::mutex> stateLock(mStateMutex);
+
+        bool forceFullReport = false;
+        std::chrono::seconds currentFullReportInterval{3600}; // 默认值：1小时
+
+        // 读取全局配置
         auto it = sConfigs.find(mConfigName);
         if (it != sConfigs.end()) {
             if (it->second.forceFullReport) {
@@ -179,12 +206,8 @@ bool ProcessEntityCollector::Collect(HostMonitorContext& collectContext, Pipelin
             // 读取最新的全量上报间隔（支持动态修改）
             currentFullReportInterval = it->second.fullReportInterval;
         }
-    }
 
-    // 判断是否需要全量上报（使用锁保护状态变量）
-    bool needFullReport = false;
-    {
-        std::lock_guard<std::mutex> lock(mStateMutex);
+        // 判断是否需要全量上报（在同一锁作用域内完成）
         needFullReport = mIsFirstCollect || forceFullReport || (now - mLastFullReportTime) >= currentFullReportInterval;
     }
 
@@ -234,46 +257,45 @@ void ProcessEntityCollector::FullCollect(HostMonitorContext& collectContext, Pip
     size_t candidatesCount = 0;
 
     for (const auto& [pid, primaryKey] : currentPidMap) {
+        ProcessEntityInfo info;
+        bool isNewProcess = false;
+
         // 尝试从缓存获取
         auto cacheIt = mProcessCache.find(primaryKey);
         if (cacheIt != mProcessCache.end()) {
-            // 缓存命中：直接在缓存上更新可变属性（避免拷贝所有字符串成员）
-            ProcessEntityInfo& cachedInfo = cacheIt->second;
+            // 缓存命中：拷贝一份以确保异常安全
+            info = cacheIt->second;
 
             // 全量上报时更新可变属性（ppid、user、state）
-            UpdateVariableAttributes(pid, now, cachedInfo);
-            cachedInfo.lastReportTime = now;
-
-            // 进程过滤
-            if (!ShouldCollectProcess(pid, cachedInfo)) {
-                continue;
-            }
-
-            // 直接生成事件（引用缓存，避免拷贝）
-            GenerateProcessEntityEvent(groupPtr, cachedInfo, true);
-
-            // 索引已存在，无需更新
+            UpdateVariableAttributes(pid, now, info);
+            info.lastReportTime = now;
         } else {
             // 新进程，获取实体信息（包含不变属性和初始值）
-            ProcessEntityInfo info;
             if (!GetProcessEntityInfo(pid, now, info)) {
                 continue;
             }
             info.firstObservedTime = now;
             info.lastReportTime = now;
             info.lastVariableUpdateTime = now;
+            isNewProcess = true;
+        }
 
-            // 进程过滤
-            if (!ShouldCollectProcess(pid, info)) {
-                continue;
-            }
+        // 进程过滤（可能抛出异常）
+        if (!ShouldCollectProcess(pid, info)) {
+            continue;
+        }
 
-            // 直接生成事件（包含不变属性和可变属性）
-            GenerateProcessEntityEvent(groupPtr, info, true);
+        // 生成事件（可能抛出异常）
+        GenerateProcessEntityEvent(groupPtr, info, true);
 
-            // 直接更新缓存和索引（永久保存，直到进程退出）
+        // 所有可能失败的操作都成功后，才更新缓存
+        if (isNewProcess) {
+            // 新进程：插入缓存和索引
             mProcessCache[primaryKey] = std::move(info);
             mPidToKeyIndex[pid] = primaryKey;
+        } else {
+            // 已有进程：更新缓存（使用 move 避免拷贝）
+            cacheIt->second = std::move(info);
         }
 
         ++candidatesCount;
@@ -350,7 +372,12 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
 
         // 加入缓存和索引（永久保存，直到进程退出）
         // 使用 emplace 避免默认构造（新增进程，键肯定不存在）
-        mProcessCache.emplace(key, std::move(info));
+        auto [it, inserted] = mProcessCache.emplace(key, std::move(info));
+        if (!inserted) {
+            LOG_WARNING(sLogger,
+                        ("process already in cache during add, this should not happen",
+                         "")("pid", key.pid)("startTime", key.startTime));
+        }
         mPidToKeyIndex[key.pid] = key;
         ADD_COUNTER(sProcessAddedTotal, 1);
     }
@@ -374,8 +401,14 @@ void ProcessEntityCollector::IncrementalCollect(HostMonitorContext& collectConte
         GenerateProcessEntityEvent(groupPtr, info, false);
 
         // 更新缓存和索引（覆盖旧进程，存储新进程）
-        // 使用 emplace 避免默认构造（新键，startTime 不同）
-        mProcessCache.emplace(key, std::move(info));
+        // PID 复用时，旧 key (pid, oldStartTime) 和新 key (pid, newStartTime) 不同
+        // 因此 emplace 应该成功插入新键
+        auto [it, inserted] = mProcessCache.emplace(key, std::move(info));
+        if (!inserted) {
+            LOG_WARNING(sLogger,
+                        ("process already in cache during reuse, this should not happen",
+                         "")("pid", key.pid)("startTime", key.startTime));
+        }
         mPidToKeyIndex[key.pid] = key;
         ADD_COUNTER(sProcessReusedTotal, 1);
     }
@@ -489,20 +522,23 @@ bool ProcessEntityCollector::GetProcessEntityInfo(pid_t pid, time_t now, Process
         if (!cmdlineStr.cmdline.empty()) {
             info.cmdline = cmdlineStr.cmdline[0]; // 原始的 \0 分隔的字符串
 
-            // 直接遍历字符串解析参数（比 istringstream 更高效）
-            const std::string& rawCmdline = info.cmdline;
-            size_t start = 0;
-            for (size_t i = 0; i < rawCmdline.size(); ++i) {
-                if (rawCmdline[i] == '\0') {
-                    if (i > start) {
-                        info.args.push_back(rawCmdline.substr(start, i - start));
+            // 早期退出：如果 cmdline 为空，不解析参数
+            if (!info.cmdline.empty()) {
+                // 直接遍历字符串解析参数（比 istringstream 更高效）
+                const std::string& rawCmdline = info.cmdline;
+                size_t start = 0;
+                for (size_t i = 0; i < rawCmdline.size(); ++i) {
+                    if (rawCmdline[i] == '\0') {
+                        if (i > start) {
+                            info.args.push_back(rawCmdline.substr(start, i - start));
+                        }
+                        start = i + 1;
                     }
-                    start = i + 1;
                 }
-            }
-            // 处理最后一个参数（如果字符串不以 '\0' 结尾）
-            if (start < rawCmdline.size()) {
-                info.args.push_back(rawCmdline.substr(start));
+                // 处理最后一个参数（如果字符串不以 '\0' 结尾）
+                if (start < rawCmdline.size()) {
+                    info.args.push_back(rawCmdline.substr(start));
+                }
             }
         }
     }
@@ -568,7 +604,14 @@ bool ProcessEntityCollector::ShouldCollectProcess(pid_t /* pid */, const Process
         }
     }
 
-    // 黑名单过滤（使用预编译的正则表达式，避免重复编译）
+    // 黑名单过滤（快速路径 + 正则表达式）
+    // 1. 快速路径：简单字符串匹配
+    for (const auto& pattern : mFilterConfig.simpleBlacklistPatterns) {
+        if (info.comm.find(pattern) != std::string::npos || info.exe.find(pattern) != std::string::npos) {
+            return false;
+        }
+    }
+    // 2. 慢路径：正则表达式匹配
     for (const auto& re : mFilterConfig.compiledBlacklistRegexes) {
         if (std::regex_search(info.comm, re) || std::regex_search(info.exe, re)) {
             return false;
@@ -576,14 +619,29 @@ bool ProcessEntityCollector::ShouldCollectProcess(pid_t /* pid */, const Process
     }
 
     // 白名单过滤（如果配置了白名单，则只采集匹配的）
-    if (!mFilterConfig.compiledWhitelistRegexes.empty()) {
+    if (!mFilterConfig.simpleWhitelistPatterns.empty() || !mFilterConfig.compiledWhitelistRegexes.empty()) {
         bool matched = false;
-        for (const auto& re : mFilterConfig.compiledWhitelistRegexes) {
-            if (std::regex_search(info.comm, re) || std::regex_search(info.exe, re)) {
-                matched = true;
-                break;
+
+        // 1. 快速路径：简单字符串匹配
+        if (!matched) {
+            for (const auto& pattern : mFilterConfig.simpleWhitelistPatterns) {
+                if (info.comm.find(pattern) != std::string::npos || info.exe.find(pattern) != std::string::npos) {
+                    matched = true;
+                    break;
+                }
             }
         }
+
+        // 2. 慢路径：正则表达式匹配（仅在快速路径未匹配时执行）
+        if (!matched) {
+            for (const auto& re : mFilterConfig.compiledWhitelistRegexes) {
+                if (std::regex_search(info.comm, re) || std::regex_search(info.exe, re)) {
+                    matched = true;
+                    break;
+                }
+            }
+        }
+
         if (!matched) {
             return false;
         }

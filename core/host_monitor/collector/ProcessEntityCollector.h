@@ -89,6 +89,10 @@ struct ProcessFilterConfig {
     std::vector<std::regex> compiledWhitelistRegexes;
     std::vector<std::regex> compiledBlacklistRegexes;
 
+    // 快速路径：简单字符串模式（不包含正则特殊字符）
+    std::vector<std::string> simpleWhitelistPatterns;
+    std::vector<std::string> simpleBlacklistPatterns;
+
     // 最小运行时间(秒):过滤掉运行时间过短的进程
     // 0 表示不过滤，默认 20 秒
     int64_t minRunningTimeSeconds = 20;
@@ -99,6 +103,10 @@ struct ProcessFilterConfig {
     // 编译正则表达式（在配置加载时调用一次）
     // 返回 true 表示成功，false 表示有无效的正则表达式
     bool CompileRegexes();
+
+private:
+    // 判断模式是否为简单字符串（不包含正则特殊字符）
+    static bool IsSimplePattern(const std::string& pattern);
 };
 
 class ProcessEntityCollector : public BaseCollector {
@@ -167,7 +175,7 @@ private:
     // 实例配置（从全局配置加载）
     std::string mConfigName; // 配置名称（用于查找全局配置）
     ProcessFilterConfig mFilterConfig;
-    std::chrono::seconds mFullReportInterval{3600};
+    // 注意：全量上报间隔不再缓存为成员变量，每次从全局配置动态读取以支持实时更新
 
     // 缓存:存储已采集的进程实体信息（永久保存，只在进程退出时清理）
     std::unordered_map<ProcessPrimaryKey, ProcessEntityInfo, ProcessPrimaryKeyHash> mProcessCache;
