@@ -27,7 +27,7 @@ function os() {
 MOD=${1:-mod}
 BUILDMODE=${2:-default}
 OUT_DIR=${3:-output}
-VERSION=${4:-0.0.1}
+VERSION=${4:-3.2.6}
 PLUGINS_CONFIG_FILE=${5:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${6:-${GO_MOD_FILE:-go.mod}}
 NAME=loongcollector
