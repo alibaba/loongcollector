@@ -114,7 +114,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
     APSARA_TEST_EQUAL_FATAL("test", configName);
 
-    runner->mThreadPool->Stop();
+    // Stop() 会处理 ThreadPool 的停止，不需要手动调用 mThreadPool->Stop()
     runner->Stop();
 }
 
