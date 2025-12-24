@@ -35,7 +35,8 @@ public:
     void TestHttpRecordTimestamps();
     void TestHttpRecordStatus();
     void TestAbstractNetRecord();
-
+    void TestMysqlRecordTimestamps();
+    void TestMysqlRecordStatus();
 
 protected:
     std::shared_ptr<AppDetail> createAppDetail() {
@@ -304,6 +305,41 @@ void NetworkObserverEventUnittest::TestHttpRecordStatus() {
     APSARA_TEST_EQUAL(record.GetRespHeaderMap().size(), 1UL);
 }
 
+void NetworkObserverEventUnittest::TestMysqlRecordTimestamps() {
+    auto conn = CreateTestTracker();
+    auto appDetail = createAppDetail();
+    MysqlRecord record(conn, appDetail);
+
+    record.SetStartTsNs(1000000);
+    record.SetEndTsNs(2000000);
+
+    APSARA_TEST_EQUAL(record.GetStartTimeStamp(), 1000000UL);
+    APSARA_TEST_EQUAL(record.GetEndTimeStamp(), 2000000UL);
+    APSARA_TEST_EQUAL(record.GetLatencyNs(), 1000000.0);
+    APSARA_TEST_EQUAL(record.GetLatencyMs(), 1.0);
+}
+
+void NetworkObserverEventUnittest::TestMysqlRecordStatus() {
+    auto conn = CreateTestTracker();
+    auto appDetail = createAppDetail();
+    MysqlRecord record(conn, appDetail);
+
+    record.SetStatusCode(0);
+    APSARA_TEST_FALSE(record.IsError());
+
+    record.SetStatusCode(0xff);
+    APSARA_TEST_TRUE(record.IsError());
+
+    record.SetStartTsNs(0);
+    record.SetEndTsNs(600000000); // 600ms
+    APSARA_TEST_TRUE(record.IsSlow());
+
+    std::string sql = "SELECT * from test_db;";
+    record.SetSql(sql);
+    APSARA_TEST_EQUAL(record.GetSql(), sql);
+}
+
+
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestConnId);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestConnIdHash);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestCaseInsensitiveLess);
@@ -317,6 +353,8 @@ UNIT_TEST_CASE(NetworkObserverEventUnittest, TestConnIdFromConnectId);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestHeadersMapCaseInsensitive);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestHttpRecordTimestamps);
 UNIT_TEST_CASE(NetworkObserverEventUnittest, TestHttpRecordStatus);
+UNIT_TEST_CASE(NetworkObserverEventUnittest, TestMysqlRecordTimestamps);
+UNIT_TEST_CASE(NetworkObserverEventUnittest, TestMysqlRecordStatus);
 
 } // namespace ebpf
 } // namespace logtail

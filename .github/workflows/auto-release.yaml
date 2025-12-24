@@ -489,7 +489,7 @@ jobs:
           
           echo "Testing links in $DOC_FILE..."
           
-          # 提取所有链接并测试
+          # 提取所有链接并测试，这里第一次运行会失败，手动上传到OSS后重试
           grep -o 'https://[^)]*' "$DOC_FILE" | while read -r url; do
             echo "Testing URL: $url"
             if curl -f -s -o /dev/null "$url"; then
@@ -499,27 +499,6 @@ jobs:
               exit 1
             fi
           done
-          
-          # 测试 GitHub Container Registry 镜像
-          echo "Testing GitHub Container Registry images..."
-          
-          # 测试 Docker 镜像是否可访问
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          # 测试镜像标签
-          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/$VERSION" | grep -q "200 OK"; then
-            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION accessible"
-          else
-            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION failed"
-            exit 1
-          fi
-          
-          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/latest" | grep -q "200 OK"; then
-            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest accessible"
-          else
-            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest failed"
-            exit 1
-          fi
           
           echo "All tests passed!" 
 

@@ -278,6 +278,7 @@ public:
             mFirstWatched = false;
         mLastFilePos = pos;
     }
+    void SetExpectedFileSize(int64_t size) { mExpectedFileSize = size; }
     void
     InitReader(bool tailExisted = false, FileReadPolicy policy = BACKWARD_TO_FIXED_POS, uint32_t eoConcurrency = 0);
 
@@ -500,6 +501,7 @@ protected:
     uint32_t mLastFileSignatureSize = 0;
     int64_t mLastFilePos = 0; // pos read and consumed, used for next read begin
     int64_t mLastFileSize = 0;
+    int64_t mExpectedFileSize = 0; //  expected file size limit, used for StaticFileServer reader
     time_t mLastMTime = 0;
     std::string mCache;
     // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found

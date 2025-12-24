@@ -113,6 +113,16 @@
                 "K8sPodRegex": "^frontend-.*"
             },
             "expected_matched_ids": []
+        },
+        {
+            "name": "k8s_pod_substring_regex",
+            "description": "测试 Pod 名称正则为子串时的匹配（如 nginx-app-deployment 匹配 nginx-app-deployment-12345-abcde）",
+            "filters": {
+                "K8sPodRegex": "nginx-app-deployment"
+            },
+            "expected_matched_ids": [
+                "nginx-app-deployment"
+            ]
         }
     ]
 }

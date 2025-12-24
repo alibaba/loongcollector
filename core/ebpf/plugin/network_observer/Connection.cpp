@@ -34,7 +34,10 @@ namespace logtail::ebpf {
 static constexpr StringView kExternalStr = "external";
 static constexpr StringView kLocalhostStr = "localhost";
 static constexpr StringView kHttpStr = "http";
+static constexpr StringView kMysqlStr = "mysql";
+static constexpr StringView kSqlStr = "sql";
 static constexpr StringView kRpc25Str = "25";
+static constexpr StringView kRpc60Str = "60";
 static constexpr StringView kRpc0Str = "0";
 static constexpr StringView kHttpClientStr = "http_client";
 static constexpr StringView kUnknownStr = "unknown";
@@ -124,6 +127,11 @@ void Connection::TryAttachL7Meta(support_role_e role, support_proto_e protocol) 
             mTags.SetNoCopy<kCallType>(kHttpStr);
             MarkL7MetaAttached();
         }
+    } else if (mProtocol == support_proto_e::ProtoMySQL) {
+        mTags.SetNoCopy<kRpcType>(kRpc60Str);
+        mTags.SetNoCopy<kCallKind>(kSqlStr);
+        mTags.SetNoCopy<kCallType>(kMysqlStr);
+        MarkL7MetaAttached();
     }
 }
 

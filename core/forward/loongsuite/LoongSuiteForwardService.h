@@ -24,6 +24,7 @@
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "forward/BaseService.h"
+#include "monitor/MetricManager.h"
 #include "protobuf/forward/loongsuite.grpc.pb.h"
 
 namespace logtail {
@@ -78,7 +79,7 @@ private:
 
 class LoongSuiteForwardServiceImpl : public BaseService, public LoongSuiteForwardService::CallbackService {
 public:
-    LoongSuiteForwardServiceImpl() = default;
+    LoongSuiteForwardServiceImpl(const std::string& address);
     ~LoongSuiteForwardServiceImpl() override = default;
 
     bool Update(std::string configName, const Json::Value& config) override;
@@ -98,6 +99,12 @@ private:
     mutable std::shared_mutex mMatchIndexMutex;
 
     RetryTimeController mRetryTimeController;
+
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInEventsTotal;
+    CounterPtr mInSizeBytes;
+    TimeCounterPtr mTotalDelayMs;
+    CounterPtr mDiscardedEventsTotal;
 
     bool AddToIndex(std::string& configName, ForwardConfig&& config, std::string& errorMsg);
     bool FindMatchingConfig(grpc::CallbackServerContext* context, std::shared_ptr<ForwardConfig>& config) const;
