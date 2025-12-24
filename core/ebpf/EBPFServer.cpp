@@ -212,13 +212,13 @@ void EBPFServer::Init() {
     if (!initUnifiedEpollMonitoring()) {
         return;
     }
+    mEBPFAdapter->Init(); // Idempotent
     mInited = true;
     mRunning = true;
 
     AsynCurlRunner::GetInstance()->Init();
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
     mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
-    mEBPFAdapter->Init(); // Idempotent
     LOG_INFO(sLogger, ("eBPF server", "started"));
 }
 
@@ -527,7 +527,12 @@ void EBPFServer::handleEpollEvents() {
         auto type = static_cast<PluginType>(mEpollEvents[i].data.u32);
 
         if (type == PluginType::PROCESS_SECURITY) {
-            mProcessCacheManager->ConsumePerfBufferData();
+            const int cnt = mProcessCacheManager->ConsumePerfBufferData();
+            if (cnt < 0) {
+                LOG_WARNING(sLogger, ("Event-driven consume failed for", magic_enum::enum_name(type))("ret", cnt));
+            } else {
+                LOG_DEBUG(sLogger, ("Event-driven consume for", magic_enum::enum_name(type))("cnt", cnt));
+            }
             continue;
         }
 
@@ -538,7 +543,11 @@ void EBPFServer::handleEpollEvents() {
         std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
         if (pluginState.mManager) {
             const int cnt = pluginState.mManager->ConsumePerfBufferData();
-            LOG_DEBUG(sLogger, ("Event-driven consume for", magic_enum::enum_name(type))("cnt", cnt));
+            if (cnt < 0) {
+                LOG_WARNING(sLogger, ("Event-driven consume failed for", magic_enum::enum_name(type))("ret", cnt));
+            } else {
+                LOG_DEBUG(sLogger, ("Event-driven consume for", magic_enum::enum_name(type))("cnt", cnt));
+            }
         }
     }
 }
