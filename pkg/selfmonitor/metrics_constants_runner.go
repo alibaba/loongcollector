@@ -53,3 +53,10 @@ const (
 	MetricRunnerK8sMetaHTTPAvgDelayMs   = "avg_delay_ms"
 	MetricRunnerK8sMetaHTTPMaxDelayMs   = "max_delay_ms"
 )
+
+// metric keys for go pipeline
+const (
+	MetricInputChannelSize   = "go_pipeline_input_channel_size"
+	MetricProcessChannelSize = "go_pipeline_process_channel_size"
+	MetricFlusherChannelSize = "go_pipeline_flusher_channel_size"
+)

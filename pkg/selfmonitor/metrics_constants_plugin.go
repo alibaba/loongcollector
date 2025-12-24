@@ -30,7 +30,8 @@ const (
 
 // label values
 const (
-	MetricLabelValueMetricCategoryPlugin = "plugin"
+	MetricLabelValueMetricCategoryPlugin     = "plugin"
+	MetricLabelValueMetricCategoryGoPipeline = "pipeline"
 )
 
 // metric keys
@@ -41,8 +42,12 @@ const (
 	MetricPluginOutEventsTotal      = "out_events_total"
 	MetricPluginOutEventGroupsTotal = "out_event_groups_total"
 	MetricPluginOutSizeBytes        = "out_size_bytes"
-	MetricPluginTotalDelayMs        = "total_delay_ms"
-	MetricPluginTotalProcessTimeMs  = "total_process_time_ms"
+
+	// for most plugins, ms is too large, can be 0 in most cases
+	MetricPluginTotalDelayMs       = "total_delay_ms"
+	MetricPluginTotalDelayNs       = "total_delay_ns"
+	MetricPluginTotalProcessTimeMs = "total_process_time_ms"
+	MetricPluginTotalProcessTimeNs = "total_process_time_ns"
 )
 
 /**********************************************************
