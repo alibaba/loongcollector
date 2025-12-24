@@ -80,6 +80,29 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     mThreadPool = std::make_unique<ThreadPool>(threadPoolSize);
 }
 
+HostMonitorInputRunner::~HostMonitorInputRunner() {
+    // Ensure stop thread is joined before destruction
+    {
+        std::lock_guard<std::mutex> lock(mStopThreadMutex);
+        if (mStopThread.joinable()) {
+            LOG_INFO(sLogger, ("HostMonitorInputRunner destructor", "waiting for stop thread to complete"));
+            mStopThread.join();
+        }
+    }
+    // Ensure thread pool is fully stopped before destruction
+    if (mThreadPool) {
+        try {
+            mThreadPool->Stop();
+        } catch (const std::exception& e) {
+            // Swallow exceptions in destructor to prevent std::terminate
+            LOG_ERROR(sLogger, ("ThreadPool stop exception in destructor", e.what()));
+        } catch (...) {
+            // Swallow exceptions in destructor to prevent std::terminate
+            LOG_ERROR(sLogger, ("ThreadPool stop unknown exception in destructor", ""));
+        }
+    }
+}
+
 void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
                                              const std::vector<CollectorInfo>& newCollectorInfos,
                                              QueueKey processQueueKey,
@@ -179,15 +202,34 @@ void HostMonitorInputRunner::Stop() {
     // Use a shared flag to track completion status
     auto completed = std::make_shared<std::atomic<bool>>(false);
 
-    // Start thread pool stop operation in detached thread
-    std::thread([this, completed]() {
-        try {
-            mThreadPool->Stop();
-            completed->store(true);
-        } catch (...) {
-            completed->store(true);
+    // First, join any existing stop thread from previous Stop() call
+    {
+        std::lock_guard<std::mutex> lock(mStopThreadMutex);
+        if (mStopThread.joinable()) {
+            LOG_INFO(sLogger, ("Stop", "joining previous stop thread"));
+            mStopThread.join();
         }
-    }).detach();
+    }
+
+    // Start thread pool stop operation in a joinable thread (not detached)
+    // This thread will be joined in destructor if Stop() times out
+    {
+        std::lock_guard<std::mutex> lock(mStopThreadMutex);
+        mStopThread = std::thread([this, completed]() {
+            try {
+                if (mThreadPool) {
+                    mThreadPool->Stop();
+                }
+                completed->store(true);
+            } catch (const std::exception& e) {
+                LOG_ERROR(sLogger, ("ThreadPool stop exception", e.what()));
+                completed->store(true);
+            } catch (...) {
+                LOG_ERROR(sLogger, ("ThreadPool stop unknown exception", ""));
+                completed->store(true);
+            }
+        });
+    }
 
     // Wait for completion or timeout
     auto start = std::chrono::steady_clock::now();
@@ -195,8 +237,16 @@ void HostMonitorInputRunner::Stop() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    if (!completed->load()) {
-        LOG_ERROR(sLogger, ("host monitor runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
+    if (completed->load()) {
+        // Stop completed successfully, join the thread now
+        LOG_INFO(sLogger, ("HostMonitorInputRunner", "stop completed successfully"));
+        std::lock_guard<std::mutex> lock(mStopThreadMutex);
+        if (mStopThread.joinable()) {
+            mStopThread.join();
+        }
+    } else {
+        LOG_ERROR(sLogger,
+                  ("host monitor runner stop timeout 3 seconds", "will wait in destructor to ensure thread safety"));
     }
 #endif
 }

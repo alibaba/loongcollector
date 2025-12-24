@@ -22,8 +22,10 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -98,7 +100,7 @@ public:
 
 private:
     HostMonitorInputRunner();
-    ~HostMonitorInputRunner() override = default;
+    ~HostMonitorInputRunner() override;
 
     template <typename T>
     void RegisterCollector() {
@@ -113,6 +115,8 @@ private:
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
     std::atomic_uint64_t mRunningPipelineCount = 0;
+    std::thread mStopThread; // Thread for async stop operation
+    std::mutex mStopThreadMutex; // Protect mStopThread access
 
     mutable std::shared_mutex mRegisteredCollectorMutex;
     std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;
