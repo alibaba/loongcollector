@@ -571,4 +571,8 @@ void SystemInterface::UpdateCacheMetrics(size_t cacheSizeBefore, size_t cacheSiz
     ADD_COUNTER(mCacheHitTotal, 1);
 }
 
+std::vector<uint16_t> SystemInterface::GetProcessListeningPorts(pid_t pid) {
+    return GetProcessListeningPortsOnce(pid);
+}
+
 } // namespace logtail

@@ -59,6 +59,7 @@ inline constexpr StringView DEFAULT_USER_ID_LABEL = "user_id";
 #else
 inline constexpr StringView DEFAULT_HOST_IP_LABEL = "host_ip";
 #endif
+inline constexpr StringView DEFAULT_HOST_NAME_LABEL = "host_name";
 const extern std::string NVSMI;
 const extern std::string LIB_DCGM;
 const extern std::filesystem::path NVIDIACTL;

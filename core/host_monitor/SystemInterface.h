@@ -735,6 +735,9 @@ public:
     bool GetNetInterfaceInformation(time_t now, NetInterfaceInformation& netInterfaceInfo);
     bool InitGPUCollector(const FieldMap& fieldMap);
     bool GetGPUInformation(time_t now, GPUInformation& gpuInfo);
+
+    // 获取进程监听端口（不使用缓存，直接调用）
+    std::vector<uint16_t> GetProcessListeningPorts(pid_t pid);
     explicit SystemInterface(size_t cacheSize = INT32_FLAG(system_interface_cache_queue_size))
         : mSystemInformationCache(),
           mCPUInformationCache(cacheSize),
@@ -794,6 +797,7 @@ private:
     virtual bool GetNetInterfaceInformationOnce(NetInterfaceInformation& netInterfaceInfo) = 0;
     virtual bool InitGPUCollectorOnce(const FieldMap& fieldMap) = 0;
     virtual bool GetGPUInformationOnce(GPUInformation& gpuInfo) = 0;
+    virtual std::vector<uint16_t> GetProcessListeningPortsOnce(pid_t pid) = 0;
 
     SystemInformation mSystemInformationCache;
     SystemInformationCache<CPUInformation> mCPUInformationCache;

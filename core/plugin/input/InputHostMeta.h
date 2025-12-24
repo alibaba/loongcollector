@@ -35,6 +35,21 @@ public:
 private:
     uint32_t mInterval = 0;
 
+    // 进程实体采集开关（默认启用）
+    bool mEnableProcessEntity = true;
+
+    uint32_t mFullReportInterval = 3600;
+    uint32_t mIncrementalInterval = 10;
+
+    // 过滤配置（始终应用过滤逻辑）
+    bool mExcludeKernelThreads = true; // 默认排除内核线程
+    uint32_t mMinRunningTimeSeconds = 20; // 默认过滤运行时间<20s的进程，0表示不过滤
+    std::vector<std::string> mWhitelistPatterns; // 默认为空，不空才过滤
+    std::vector<std::string> mBlacklistPatterns; // 默认为空，不空才过滤
+
+    // 扩展属性采集开关
+    bool mEnableListeningPorts = false; // 默认关闭，监听端口采集（性能开销较大，只在全量上报时采集）
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputHostMetaUnittest;
 #endif
