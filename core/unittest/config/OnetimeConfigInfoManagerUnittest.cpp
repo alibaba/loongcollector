@@ -96,8 +96,8 @@ void OnetimeConfigInfoManagerUnittest::TestLoadCheckpointFile() const {
         APSARA_TEST_TRUE(sManager->LoadCheckpointFile());
         APSARA_TEST_EQUAL(1U, sManager->mConfigExpireTimeCheckpoint.size());
         const auto& item = sManager->mConfigExpireTimeCheckpoint.at("test_config_1");
-        APSARA_TEST_EQUAL(1111111111111111U, item.first);
-        APSARA_TEST_EQUAL(1234567890U, item.second);
+        APSARA_TEST_EQUAL(1111111111111111U, std::get<0>(item));
+        APSARA_TEST_EQUAL(1234567890U, std::get<1>(item));
     }
 }
 
@@ -128,15 +128,15 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
 
     uint32_t expireTime = 0;
     APSARA_TEST_EQUAL(OnetimeConfigStatus::OLD,
-                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1, &expireTime));
+                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(2000000000U, expireTime);
     APSARA_TEST_EQUAL(OnetimeConfigStatus::OBSOLETE,
-                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2, &expireTime));
+                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(1000000000U, expireTime);
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
-                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4, &expireTime));
+                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
-                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_5", 10, &expireTime));
+                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_5", 10U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(1U, sManager->mConfigExpireTimeCheckpoint.size());
     APSARA_TEST_NOT_EQUAL(sManager->mConfigExpireTimeCheckpoint.end(),
                           sManager->mConfigExpireTimeCheckpoint.find("test_config_4"));
@@ -233,11 +233,11 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
 
     uint32_t expireTime = 0;
 
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1, &expireTime);
+    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1U, false, 0U, &expireTime);
     sManager->UpdateConfig(
         "test_config_1", ConfigType::Collection, filesystem::path("test_config/test_config_1.json"), 1, 2000000000);
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2, &expireTime);
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4, &expireTime);
+    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2U, false, 0U, &expireTime);
+    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4U, false, 0U, &expireTime);
     sManager->UpdateConfig(
         "test_config_3", ConfigType::Collection, filesystem::path("test_config/test_config_3.json"), 4, 2200000000);
     sManager->UpdateConfig(

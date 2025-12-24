@@ -62,7 +62,7 @@ public:
                   const MultilineOptions* multilineOpts,
                   const FileTagOptions* fileTagOpts,
                   const CollectionPipelineContext* ctx);
-    void RemoveInput(const std::string& configName, size_t idx);
+    void RemoveInput(const std::string& configName, size_t idx, bool shouldDeleteCheckpoint = true);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();

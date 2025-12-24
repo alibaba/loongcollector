@@ -161,7 +161,8 @@ bool InputStaticFile::Start() {
 }
 
 bool InputStaticFile::Stop(bool isPipelineRemoving) {
-    StaticFileServer::GetInstance()->RemoveInput(mContext->GetConfigName(), mIndex);
+    // when isPipelineRemoving is true, delete the checkpoint
+    StaticFileServer::GetInstance()->RemoveInput(mContext->GetConfigName(), mIndex, isPipelineRemoving);
 
     // Remove plugin metric manager
     FileServer::GetInstance()->RemovePluginMetricManager(mContext->GetConfigName());

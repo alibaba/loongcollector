@@ -68,6 +68,13 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
                                                                                      ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
+        // Save config name and collect input types before BuildPipeline moves config
+        const string configName = config.mName;
+        std::set<std::string> newInputTypes;
+        for (const auto& input : config.mInputs) {
+            newInputTypes.insert((*input)["Type"].asString());
+        }
+
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
             LOG_WARNING(sLogger,
@@ -86,38 +93,47 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
         }
         LOG_INFO(sLogger,
                  ("pipeline building for existing config succeeded",
-                  "stop the old pipeline and start the new one")("config", config.mName));
-        auto iter = mPipelineNameEntityMap.find(config.mName);
+                  "stop the old pipeline and start the new one")("config", configName));
+        auto iter = mPipelineNameEntityMap.find(configName);
 
         // Check if input type has changed to determine stop behavior
         bool shouldCompletelyStop = false;
         const Json::Value& oldConfig = iter->second->GetConfig();
         const Json::Value& oldInputs = oldConfig["inputs"];
 
-        std::set<std::string> newInputTypes;
         std::set<std::string> oldInputTypes;
-        for (const auto& input : config.mInputs) {
-            newInputTypes.insert((*input)["Type"].asString());
-        }
         for (const auto& oldInput : oldInputs) {
             oldInputTypes.insert(oldInput["Type"].asString());
         }
 
         if (newInputTypes != oldInputTypes) {
-            LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", config.mName));
+            LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", configName));
             shouldCompletelyStop = true;
+        }
+
+        // For onetime config, determine isRemoving based on mIsRunningBeforeStart
+        // mIsRunningBeforeStart == true (OLD/UPDATED) -> false (keep checkpoint for recovery)
+        // mIsRunningBeforeStart == false (NEW) -> true (remove checkpoint)
+        if (p->IsOnetime() && !shouldCompletelyStop) {
+            shouldCompletelyStop = !p->GetContext().IsOnetimePipelineRunningBeforeStart();
+            LOG_INFO(sLogger,
+                     ("onetime config",
+                      p->GetContext().IsOnetimePipelineRunningBeforeStart()
+                          ? "keep checkpoint for recovery"
+                          : "remove checkpoint")("config", configName));
         }
 
         iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-            mPipelineNameEntityMap[config.mName] = p;
+            mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
+        const string configName = config.mName;
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
@@ -134,13 +150,13 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             continue;
         }
         LOG_INFO(sLogger,
-                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
+                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", configName));
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-            mPipelineNameEntityMap[config.mName] = p;
+            mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 
