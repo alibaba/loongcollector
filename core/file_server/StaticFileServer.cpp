@@ -78,7 +78,7 @@ void StaticFileServer::ClearUnusedCheckpoints() {
     mIsUnusedCheckpointsCleared = true;
 }
 
-void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
+void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool shouldDeleteCheckpoint) {
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.erase(make_pair(configName, idx));
@@ -87,7 +87,9 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
         mInputFileTagConfigsMap.erase(make_pair(configName, idx));
         mDeletedInputs.emplace(configName, idx);
     }
-    InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);
+    if (shouldDeleteCheckpoint) {
+        InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);
+    }
 }
 
 void StaticFileServer::AddInput(const string& configName,

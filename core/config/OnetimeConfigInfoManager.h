@@ -31,6 +31,7 @@ enum class OnetimeConfigStatus {
     NEW,
     OLD,
     OBSOLETE,
+    UPDATED,
 };
 
 class OnetimeConfigInfoManager {
@@ -43,13 +44,17 @@ public:
         return &instance;
     }
 
-    OnetimeConfigStatus
-    GetOnetimeConfigStatusFromCheckpoint(const std::string& configName, uint64_t hash, uint32_t* expireTime);
+    OnetimeConfigStatus GetOnetimeConfigStatusFromCheckpoint(const std::string& configName,
+                                                             uint64_t hash,
+                                                             bool forceRerunWhenUpdate,
+                                                             uint64_t inputHash,
+                                                             uint32_t* expireTime);
     bool UpdateConfig(const std::string& configName,
                       ConfigType type,
                       const std::filesystem::path& filepath,
                       uint64_t hash,
-                      uint32_t expireTime);
+                      uint32_t expireTime,
+                      uint64_t inputHash = 0);
     bool RemoveConfig(const std::string& configName);
     void DeleteTimeoutConfigFiles();
     bool LoadCheckpointFile();
@@ -67,9 +72,14 @@ private:
         std::filesystem::path mFilepath;
         uint64_t mHash;
         uint32_t mExpireTime;
+        uint64_t mInputHash;
 
-        ConfigInfo(ConfigType type, const std::filesystem::path& filepath, uint64_t hash, uint32_t expireTime)
-            : mType(type), mFilepath(filepath), mHash(hash), mExpireTime(expireTime) {}
+        ConfigInfo(ConfigType type,
+                   const std::filesystem::path& filepath,
+                   uint64_t hash,
+                   uint32_t expireTime,
+                   uint64_t inputHash = 0)
+            : mType(type), mFilepath(filepath), mHash(hash), mExpireTime(expireTime), mInputHash(inputHash) {}
     };
 
     OnetimeConfigInfoManager();
@@ -80,7 +90,8 @@ private:
     // only accessed by main thread, however, for protection, we still add a lock
     mutable std::mutex mMux;
     std::map<std::string, ConfigInfo> mConfigInfoMap;
-    std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
+    // map: configName -> (configHash, expireTime, inputHash)
+    std::map<std::string, std::tuple<uint64_t, uint32_t, uint64_t>> mConfigExpireTimeCheckpoint;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;

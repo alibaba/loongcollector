@@ -15,6 +15,7 @@
 #include "config/PipelineConfig.h"
 
 #include "common/JsonUtil.h"
+#include "common/ParamExtractor.h"
 #include "config/OnetimeConfigInfoManager.h"
 #include "logger/Logger.h"
 
@@ -25,7 +26,8 @@ namespace logtail {
 static constexpr uint32_t minExpireTime = 600; // 10 minutes
 static constexpr uint32_t maxExpireTime = 604800; // 1 week
 
-static bool IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout) {
+static bool
+IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout, bool* forceRerunWhenUpdate) {
     const char* key = "ExcutionTimeout";
     auto it = global.find(key, key + strlen(key));
     if (it == nullptr) {
@@ -50,6 +52,15 @@ static bool IsOneTime(const string& configName, const Json::Value& global, uint3
                     ("param global.ExcutionTimeout is not of type uint",
                      "use maximum instead")("maximum", maxExpireTime)("config", configName));
     }
+    // Read ForceRerunWhenUpdate for onetime pipeline
+    if (forceRerunWhenUpdate != nullptr) {
+        // Set default value first (true)
+        *forceRerunWhenUpdate = true;
+        string errorMsg;
+        GetOptionalBoolParam(global, "ForceRerunWhenUpdate", *forceRerunWhenUpdate, errorMsg);
+        // If GetOptionalBoolParam returns false, it means type error, but we still use default value
+        // If parameter doesn't exist, GetOptionalBoolParam returns true and param keeps default value
+    }
     return true;
 }
 
@@ -59,14 +70,28 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }
 
-bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
+bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global, const Json::Value* inputs) {
     uint32_t timeout = 0;
-    if (!IsOneTime(mName, global, &timeout)) {
+    if (!IsOneTime(mName, global, &timeout, &mForceRerunWhenUpdate)) {
         return true;
     }
+
+    // Calculate input hash for onetime config
+    // Hash includes all inputs and ExcutionTimeout
+    uint64_t inputHash = 0;
+    if (inputs != nullptr) {
+        Json::Value inputHashValue(Json::objectValue);
+        // Add all inputs
+        inputHashValue["inputs"] = *inputs;
+        // Add ExcutionTimeout
+        inputHashValue["ExcutionTimeout"] = timeout;
+        inputHash = static_cast<uint64_t>(Hash(inputHashValue));
+        mInputHash = inputHash;
+    }
+
     uint32_t expireTime = 0;
     auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
-        mName, mConfigHash, &expireTime);
+        mName, mConfigHash, mForceRerunWhenUpdate, inputHash, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
             mOnetimeStartTime = expireTime - timeout;
@@ -77,6 +102,15 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
         case OnetimeConfigStatus::NEW:
             mOnetimeStartTime = time(nullptr);
             mOnetimeExpireTime = mOnetimeStartTime.value() + timeout;
+            return true;
+        case OnetimeConfigStatus::UPDATED:
+            // UPDATED状态表示配置hash改变但input hash未变，保持原有过期时间
+            mOnetimeStartTime = expireTime - timeout;
+            mOnetimeExpireTime = expireTime;
+            mIsRunningBeforeStart = true;
+            LOG_INFO(sLogger,
+                     ("config hash changed but input hash unchanged",
+                      "keep existing expire time")("expire time", expireTime)("config", mName));
             return true;
         case OnetimeConfigStatus::OBSOLETE: {
             error_code ec;
