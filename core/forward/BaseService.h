@@ -22,11 +22,15 @@ namespace logtail {
 
 class BaseService {
 public:
+    BaseService(const std::string& address) : mAddress(address) {}
     virtual ~BaseService() = default;
 
     virtual bool Update(std::string configName, const Json::Value& config) = 0;
     virtual bool Remove(std::string configName, const Json::Value& config) = 0;
     [[nodiscard]] virtual const std::string& Name() const = 0;
+
+protected:
+    std::string mAddress;
 };
 
 }; // namespace logtail

@@ -22,6 +22,7 @@ namespace logtail {
 // label keys
 const string METRIC_LABEL_KEY_COMPONENT_NAME = "component_name";
 const string METRIC_LABEL_KEY_FLUSHER_PLUGIN_ID = "flusher_plugin_id";
+const string METRIC_LABEL_KEY_SERVICE_ADDRESS = "service_address";
 
 /**********************************************************
  *   queue

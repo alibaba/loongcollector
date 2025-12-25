@@ -562,7 +562,7 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
         if (!matchedFlag) {
             for (const auto& pair : filter.mIncludeFields.mFieldsRegMap) {
                 auto it = labels.find(pair.first);
-                if (it != labels.end() && boost::regex_match(it->second, *pair.second)) {
+                if (it != labels.end() && boost::regex_search(it->second, *pair.second)) {
                     matchedFlag = true;
                     break;
                 }
@@ -585,7 +585,7 @@ bool IsMapLabelsMatch(const MatchCriteriaFilter& filter, const std::unordered_ma
     // 检查 exclude 正则
     for (const auto& pair : filter.mExcludeFields.mFieldsRegMap) {
         auto it = labels.find(pair.first);
-        if (it != labels.end() && boost::regex_match(it->second, *pair.second)) {
+        if (it != labels.end() && boost::regex_search(it->second, *pair.second)) {
             return false;
         }
     }
@@ -598,15 +598,15 @@ bool IsK8sFilterMatch(const K8sFilter& filter, const K8sInfo& k8sInfo) {
         return false;
     }
     // 匹配命名空间
-    if (filter.mNamespaceReg && !boost::regex_match(k8sInfo.mNamespace, *filter.mNamespaceReg)) {
+    if (filter.mNamespaceReg && !boost::regex_search(k8sInfo.mNamespace, *filter.mNamespaceReg)) {
         return false;
     }
     // 匹配 Pod 名称
-    if (filter.mPodReg && !boost::regex_match(k8sInfo.mPod, *filter.mPodReg)) {
+    if (filter.mPodReg && !boost::regex_search(k8sInfo.mPod, *filter.mPodReg)) {
         return false;
     }
     // 匹配容器名称
-    if (filter.mContainerReg && !boost::regex_match(k8sInfo.mContainerName, *filter.mContainerReg)) {
+    if (filter.mContainerReg && !boost::regex_search(k8sInfo.mContainerName, *filter.mContainerReg)) {
         return false;
     }
     // 确保 Labels 不为 nullptr，使用默认的空映射初始化
