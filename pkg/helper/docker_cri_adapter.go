@@ -61,6 +61,7 @@ type CRIRuntimeWrapper struct {
 	dockerCenter   *DockerCenter
 	nativeClient   *containerd.Client
 	client         cri.RuntimeServiceClient
+	clientConn     *grpc.ClientConn
 	runtimeVersion *cri.VersionResponse
 
 	containersLock sync.Mutex
@@ -98,6 +99,7 @@ func IsCRIStatusValid(criRuntimeEndpoint string) bool {
 		logger.Debug(context.Background(), "Dial", addr, "failed", err)
 		return false
 	}
+	defer conn.Close()
 
 	client := cri.NewRuntimeServiceClient(conn)
 	// check cri status
@@ -166,10 +168,10 @@ func parseEndpoint(endpoint string) (string, string, error) {
 	}
 }
 
-func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
+func newRuntimeServiceClient() (cri.RuntimeServiceClient, *grpc.ClientConn, error) {
 	addr, dailer, err := GetAddressAndDialer("unix://" + containerdUnixSocket)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
@@ -177,15 +179,15 @@ func newRuntimeServiceClient() (cri.RuntimeServiceClient, error) {
 
 	conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure(), grpc.WithDialer(dailer), grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(maxMsgSize)))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return cri.NewRuntimeServiceClient(conn), nil
+	return cri.NewRuntimeServiceClient(conn), conn, nil
 }
 
 // NewCRIRuntimeWrapper ...
 func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error) {
-	client, err := newRuntimeServiceClient()
+	client, conn, err := newRuntimeServiceClient()
 	if err != nil {
 		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
 		return nil, err
@@ -193,6 +195,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 
 	runtimeVersion, err := getCRIRuntimeVersion(client)
 	if err != nil {
+		conn.Close()
 		return nil, err
 	}
 
@@ -211,6 +214,7 @@ func NewCRIRuntimeWrapper(dockerCenter *DockerCenter) (*CRIRuntimeWrapper, error
 	return &CRIRuntimeWrapper{
 		dockerCenter:           dockerCenter,
 		client:                 client,
+		clientConn:             conn,
 		nativeClient:           containerdClient,
 		runtimeVersion:         runtimeVersion,
 		containers:             make(map[string]*innerContainerInfo),
