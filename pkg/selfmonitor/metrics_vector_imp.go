@@ -16,6 +16,7 @@ package selfmonitor
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -415,7 +416,8 @@ func (m *MetricVectorImpl[T]) WithLabels(labels ...LabelPair) T {
 }
 
 func (m *MetricVectorImpl[T]) Start() error {
-	return m.metricVector.Start()
+	m.metricVector.Start()
+	return nil
 }
 
 func (m *MetricVectorImpl[T]) Close() error {
@@ -455,7 +457,9 @@ func newMetricVector(option metricOption) *metricVector {
 	mv.cache = DefaultCacheFactory(mv)
 
 	if mv.metricExpiration > 0 && option.EnableGC() {
-		mv.Start()
+		if err := mv.Start(); err != nil {
+			log.Printf("start metric vector %v, failed: %v", option, err)
+		}
 	}
 	return mv
 }
@@ -476,11 +480,13 @@ func (v *metricVector) WithLabels(labels ...LabelPair) Metric {
 	return v.cache.WithLabelValues(*labelValues)
 }
 
-func (v *metricVector) Start() {
-	if v.metricExpiration > 0 {
-		go v.gc(v.metricExpiration)
+func (v *metricVector) Start() error {
+	if v.metricExpiration <= 0 {
+		return fmt.Errorf("metric vector %v is not started gc since expiration is %v", v.metricOption, v.metricExpiration)
 	}
-	return
+
+	go v.gc(v.metricExpiration)
+	return nil
 }
 
 func (v *metricVector) Collect() []Metric {
