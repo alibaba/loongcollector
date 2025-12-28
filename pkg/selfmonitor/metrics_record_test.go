@@ -97,11 +97,11 @@ func TestExportMetricRecordsWithDayamicLabels(t *testing.T) {
 	retryCount.Add(5)
 	flushFailure.Add(6)
 	flushLatency.Add(7)
-	flushStatusCodeCount.WithLabels(LabelPair{"status_code", "200"}).Add(8)
-	flushStatusCodeCount.WithLabels(LabelPair{"status_code", "400"}).Add(9)
-	flushErrorLevelCount.WithLabels(LabelPair{"level", "error"}, LabelPair{"reason", "timeout"}).Add(10)
-	flushErrorLevelCount.WithLabels(LabelPair{"level", "warn"}, LabelPair{"reason", "retry"}).Add(11)
-	flushErrorLevelCount.WithLabels(LabelPair{"level", "error"}, LabelPair{"reason", "dropped"}).Add(12)
+	flushStatusCodeCount.WithLabels(LabelPair{Key: "status_code", Value: "200"}).Add(8)
+	flushStatusCodeCount.WithLabels(LabelPair{Key: "status_code", Value: "400"}).Add(9)
+	flushErrorLevelCount.WithLabels(LabelPair{Key: "level", Value: "error"}, LabelPair{Key: "reason", Value: "timeout"}).Add(10)
+	flushErrorLevelCount.WithLabels(LabelPair{Key: "level", Value: "warn"}, LabelPair{Key: "reason", Value: "retry"}).Add(11)
+	flushErrorLevelCount.WithLabels(LabelPair{Key: "level", Value: "error"}, LabelPair{Key: "reason", Value: "dropped"}).Add(12)
 
 	results := metricsRecord.ExportMetricRecords()
 	assert.Len(t, results, 6)
@@ -171,7 +171,7 @@ func TestExportMetricRecordsWithNextHasEmptyLabels(t *testing.T) {
 	}
 	constMetricLabels := map[string]string{"RemoteURL": "http://localhost:8081"}
 	metric1 := NewCounterMetricVectorAndRegister(metricsRecord, "http_flusher_matched_events", constMetricLabels, []string{"test0"})
-	metric1.WithLabels(LabelPair{"test0", "value0"}).Add(1)
+	metric1.WithLabels(LabelPair{Key: "test0", Value: "value0"}).Add(1)
 
 	metric2 := NewCounterMetricVectorAndRegister(metricsRecord, "http_flusher_unmatched_events", constMetricLabels, nil).WithLabels()
 	metric2.Add(2)
@@ -227,7 +227,7 @@ func TestExportMetricRecordsWithPrevHasEmptyLabels(t *testing.T) {
 	metric2.Add(2)
 
 	metric1 := NewCounterMetricVectorAndRegister(metricsRecord, "http_flusher_matched_events", constMetricLabels, []string{"test0"})
-	metric1.WithLabels(LabelPair{"test0", "value0"}).Add(1)
+	metric1.WithLabels(LabelPair{Key: "test0", Value: "value0"}).Add(1)
 
 	results := metricsRecord.ExportMetricRecords()
 	assert.Len(t, results, 2)

@@ -476,11 +476,11 @@ func (v *metricVector) WithLabels(labels ...LabelPair) Metric {
 	return v.cache.WithLabelValues(*labelValues)
 }
 
-func (v *metricVector) Start() error {
+func (v *metricVector) Start() {
 	if v.metricExpiration > 0 {
 		go v.gc(v.metricExpiration)
 	}
-	return nil
+	return
 }
 
 func (v *metricVector) Collect() []Metric {
