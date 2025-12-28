@@ -343,13 +343,6 @@ func Test_NewCounterMetricAndRegister(t *testing.T) {
 	assert.Equal(t, 1.0, value.Value)
 }
 
-func withExpiration(expiration time.Duration) MetricOption {
-	return func(option metricOption) metricOption {
-		option.metricExpiration = expiration
-		return option
-	}
-}
-
 func TestMetricVectorDynamicLabelWithGC(t *testing.T) {
 	constLabels := map[string]string{
 		"constKey1": "constValue1",
@@ -357,37 +350,37 @@ func TestMetricVectorDynamicLabelWithGC(t *testing.T) {
 
 	counters := NewCounterMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	cumulativeCounter := NewCumulativeCounterMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	gauge := NewGaugeMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	latency := NewLatencyMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	avg := NewAverageMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	histogram := NewHistogramMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 	cumulativeHistogram := NewCumulativeHistogramMetricVector("test", constLabels, nil,
 		WithDynamicLabel(),
-		withExpiration(time.Second),
+		WithExpiration(time.Second),
 		WithGC(true),
 	)
 
@@ -476,7 +469,7 @@ func genAllTags(tagNum, dimension int) [][]LabelPair {
 	tags := make([][]LabelPair, tagNum)
 	for i := 0; i < tagNum; i++ {
 		for j := 0; j < dimension; j++ {
-			tags[i] = append(tags[i], LabelPair{fmt.Sprintf("tag%d", i), fmt.Sprintf("value%d-%d", i, j)})
+			tags[i] = append(tags[i], LabelPair{Key: fmt.Sprintf("tag%d", i), Value: fmt.Sprintf("value%d-%d", i, j)})
 		}
 	}
 	return tags
@@ -534,6 +527,7 @@ func TestMetricOverflow(t *testing.T) {
 		WithExpiration(time.Second),
 		WithCardinalityLimit(10),
 		WithOverflowKey("overflow2"),
+		WithGC(true),
 	)
 
 	for i := 0; i < 200; i++ {

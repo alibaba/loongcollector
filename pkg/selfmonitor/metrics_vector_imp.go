@@ -416,8 +416,7 @@ func (m *MetricVectorImpl[T]) WithLabels(labels ...LabelPair) T {
 }
 
 func (m *MetricVectorImpl[T]) Start() error {
-	m.metricVector.Start()
-	return nil
+	return m.metricVector.Start()
 }
 
 func (m *MetricVectorImpl[T]) Close() error {
