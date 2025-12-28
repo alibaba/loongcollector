@@ -609,13 +609,13 @@ func (v *MapCache) WithLabelValues(labelValues []string) Metric {
 		v.bytesPool.Put(buffer)
 
 		v.overflowInitOnce.Do(func() {
-			v.overflowMetric = newMetric(v.Type(), v, v.GetOverflowMetricLabels(), v.IsCumulative(), v.BucketBoundaries())
+			v.overflowMetric = newMetric(v.Type(), v, v.GetOverflowMetricLabels(), v.BucketBoundaries())
 		})
 		return v.overflowMetric
 	}
 
 	atomic.AddInt64(&v.currCardinality, 1)
-	newMetric := newMetric(v.Type(), v, labelValues, v.IsCumulative(), v.BucketBoundaries())
+	newMetric := newMetric(v.Type(), v, labelValues, v.BucketBoundaries())
 	acV, loaded = v.LoadOrStore(k, newMetric)
 	if loaded {
 		v.bytesPool.Put(buffer)

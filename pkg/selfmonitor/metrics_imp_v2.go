@@ -48,7 +48,7 @@ var defaultHistogramBucketsMs = []float64{
 	2, 4, 6, 8, 10, 50, 100, 200, 400, 800, 1000, 1400, 2000, 5000, 10_000, 15_000,
 }
 
-func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []string, isCumulative bool, bucketBoundaries []float64) Metric {
+func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []string, bucketBoundaries []float64) Metric {
 	switch metricType {
 	case CumulativeCounterType:
 		return newCumulativeCounter(metricSet, labelValues)
