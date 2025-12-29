@@ -135,6 +135,9 @@ bool CollectionConfig::Parse() {
                 sLogger, alarm, "global module is not of type object", noModule, mName, mProject, mLogstore, mRegion);
         }
         mGlobal = itr;
+        if (!GetExpireTimeIfOneTime(*mGlobal)) {
+            return false;
+        }
     }
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
@@ -160,17 +163,6 @@ bool CollectionConfig::Parse() {
     if (itr->empty()) {
         PARAM_ERROR_RETURN(
             sLogger, alarm, "mandatory inputs module has no plugin", noModule, mName, mProject, mLogstore, mRegion);
-    }
-
-    // Handle onetime config
-    // This is done after inputs validation, passing inputs itr to GetExpireTimeIfOneTime
-    if (mGlobal) {
-        // Call GetExpireTimeIfOneTime once with inputs json
-        // InputHash will be calculated inside GetExpireTimeIfOneTime
-        // ForceRerunWhenUpdate will be read inside IsOneTime function
-        if (!GetExpireTimeIfOneTime(*mGlobal, itr)) {
-            return false;
-        }
     }
 
     for (Json::Value::ArrayIndex i = 0; i < itr->size(); ++i) {

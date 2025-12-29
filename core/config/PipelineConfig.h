@@ -41,7 +41,7 @@ struct PipelineConfig {
     // if false, only rerun when input changes, otherwise update normally
     bool mForceRerunWhenUpdate = true;
     // input hash for onetime config (calculated during Parse, includes all inputs and ExcutionTimeout)
-    uint64_t mInputHash = 0;
+    uint64_t mInputsHash = 0;
 
     PipelineConfig(const std::string& name,
                    std::unique_ptr<Json::Value>&& detail,
@@ -53,7 +53,7 @@ struct PipelineConfig {
     virtual bool Parse() = 0;
 
 protected:
-    bool GetExpireTimeIfOneTime(const Json::Value& global, const Json::Value* inputs = nullptr);
+    bool GetExpireTimeIfOneTime(const Json::Value& global);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;
