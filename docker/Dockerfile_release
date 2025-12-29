@@ -33,6 +33,21 @@ RUN chown -R $(whoami) /usr/local/loongcollector/ && \
     chmod 755 /usr/local/loongcollector/loongcollector && \
     mkdir -p /usr/local/loongcollector/data/checkpoint
 
+# Install runtime dependencies (Kerberos/SASL libs for Kafka)
+RUN apt-get update && apt-get install -y \
+        libsasl2-2 \
+        libsasl2-modules \
+        libsasl2-modules-gssapi-mit \
+        libkrb5-3 \
+        libk5crypto3 \
+        libgssapi-krb5-2 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
+COPY --from=build /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
+COPY --from=build /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
+COPY --from=build /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
+
 WORKDIR /usr/local/loongcollector
 RUN mkdir -p /usr/local/loongcollector/conf/instance_config/local
 RUN mkdir -p /usr/local/loongcollector/log
