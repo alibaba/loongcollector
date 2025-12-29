@@ -61,6 +61,27 @@ OnetimeConfigInfoManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeC
 
 void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
     map<string, uint64_t> configHash;
+    map<string, uint64_t> inputsHash;
+
+    // Helper function to calculate inputsHash
+    auto calculateInputsHash = [](const Json::Value& root) -> uint64_t {
+        const char* inputsKey = "inputs";
+        const char* globalKey = "global";
+        const char* excutionTimeoutKey = "ExcutionTimeout";
+        const auto* inputsIt = root.find(inputsKey, inputsKey + strlen(inputsKey));
+        const auto* globalIt = root.find(globalKey, globalKey + strlen(globalKey));
+        if (inputsIt != nullptr && inputsIt->isArray() && globalIt != nullptr && globalIt->isObject()) {
+            const auto* timeoutIt = globalIt->find(excutionTimeoutKey, excutionTimeoutKey + strlen(excutionTimeoutKey));
+            if (timeoutIt != nullptr) {
+                Json::Value inputsHashValue(Json::objectValue);
+                inputsHashValue["inputs"] = *inputsIt;
+                inputsHashValue["ExcutionTimeout"] = *timeoutIt;
+                return static_cast<uint64_t>(Hash(inputsHashValue));
+            }
+        }
+        return 0;
+    };
+
     string unusedConfigDetail = R"({
         "global": {
             "ExcutionTimeout": 1400
@@ -80,6 +101,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
     string errorMsg;
     ParseJsonTable(unusedConfigDetail, root, errorMsg);
     configHash["unused_config.json"] = Hash(root);
+    inputsHash["unused_config.json"] = calculateInputsHash(root);
 
     // on restart
     {
@@ -152,12 +174,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             fout << configDetails[i];
         }
 
-        // compute config hash
+        // compute config hash and inputs hash
         for (size_t i = 0; i < configDetails.size(); ++i) {
             Json::Value root;
             string errorMsg;
             ParseJsonTable(configDetails[i], root, errorMsg);
             configHash[filenames[i]] = Hash(root);
+            inputsHash[filenames[i]] = calculateInputsHash(root);
         }
 
         // prepare checkpoint file
@@ -166,22 +189,30 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             fout << R"({
             "changed_config": {
                 "config_hash": 8279028812201817660,
-                "expire_time": 2000000000
+                "expire_time": 2000000000,
+                "inputs_hash": )"
+                    + ToString(inputsHash["changed_config.json"]) + R"(
             },
             "old_config": {
                 "config_hash": )"
                     + ToString(configHash["old_config.json"]) + R"(,
-                "expire_time": 2500000000
+                "expire_time": 2500000000,
+                "inputs_hash": )"
+                    + ToString(inputsHash["old_config.json"]) + R"(
             },
             "obsolete_config": {
                 "config_hash": )"
                     + ToString(configHash["obsolete_config.json"]) + R"(,
-                "expire_time": 1000000000
+                "expire_time": 1000000000,
+                "inputs_hash": )"
+                    + ToString(inputsHash["obsolete_config.json"]) + R"(
             },
             "unused_config": {
                 "config_hash": )"
                     + ToString(configHash["unused_config.json"]) + R"(,
-                "expire_time": 2200000000
+                "expire_time": 2200000000,
+                "inputs_hash": )"
+                    + ToString(inputsHash["unused_config.json"]) + R"(
             }
         })";
         }
@@ -278,6 +309,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             string errorMsg;
             ParseJsonTable(configDetails[i], root, errorMsg);
             configHash[filenames[i]] = Hash(root);
+            inputsHash[filenames[i]] = calculateInputsHash(root);
         }
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();

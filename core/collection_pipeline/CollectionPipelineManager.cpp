@@ -111,18 +111,6 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             shouldCompletelyStop = true;
         }
 
-        // For onetime config, determine isRemoving based on mIsRunningBeforeStart
-        // mIsRunningBeforeStart == true (OLD/UPDATED) -> false (keep checkpoint for recovery)
-        // mIsRunningBeforeStart == false (NEW) -> true (remove checkpoint)
-        if (p->IsOnetime() && !shouldCompletelyStop) {
-            shouldCompletelyStop = !p->GetContext().IsOnetimePipelineRunningBeforeStart();
-            LOG_INFO(sLogger,
-                     ("onetime config",
-                      p->GetContext().IsOnetimePipelineRunningBeforeStart()
-                          ? "keep checkpoint for recovery"
-                          : "remove checkpoint")("config", configName));
-        }
-
         iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);

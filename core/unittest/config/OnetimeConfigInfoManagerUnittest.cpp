@@ -107,19 +107,23 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
         fout << R"({
     "test_config_1": {
         "config_hash": 1,
-        "expire_time": 2000000000
+        "expire_time": 2000000000,
+        "inputs_hash": 0
     },
     "test_config_2": {
         "config_hash": 2,
-        "expire_time": 1000000000
+        "expire_time": 1000000000,
+        "inputs_hash": 0
     },
     "test_config_3": {
         "config_hash": 3,
-        "expire_time": 2500000000
+        "expire_time": 2500000000,
+        "inputs_hash": 0
     },
     "test_config_4": {
         "config_hash": 4,
-        "expire_time": 1800000000
+        "expire_time": 1800000000,
+        "inputs_hash": 100
     }
 })";
     }
@@ -127,19 +131,27 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
     APSARA_TEST_EQUAL(4U, sManager->mConfigExpireTimeCheckpoint.size());
 
     uint32_t expireTime = 0;
+    // test_config_1: hash and inputsHash both match, should return OLD
     APSARA_TEST_EQUAL(OnetimeConfigStatus::OLD,
                       sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(2000000000U, expireTime);
+    // test_config_2: hash matches but expired, should return OBSOLETE
     APSARA_TEST_EQUAL(OnetimeConfigStatus::OBSOLETE,
                       sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2U, false, 0U, &expireTime));
     APSARA_TEST_EQUAL(1000000000U, expireTime);
-    APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
+    // test_config_3: config_hash changed from 3 to 4, but inputsHash unchanged (both 0)
+    // forceRerunWhenUpdate is false, so should return UPDATED instead of NEW
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::UPDATED,
                       sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4U, false, 0U, &expireTime));
+    APSARA_TEST_EQUAL(2500000000U, expireTime);
+    // test_config_4: config_hash changed from 4 to 5, and inputsHash also changed (100 != 0)
+    // forceRerunWhenUpdate is false, but inputsHash mismatch, so should return NEW
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
+                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_4", 5U, false, 0U, &expireTime));
+    // test_config_5: not in checkpoint, should return NEW
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
                       sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_5", 10U, false, 0U, &expireTime));
-    APSARA_TEST_EQUAL(1U, sManager->mConfigExpireTimeCheckpoint.size());
-    APSARA_TEST_NOT_EQUAL(sManager->mConfigExpireTimeCheckpoint.end(),
-                          sManager->mConfigExpireTimeCheckpoint.find("test_config_4"));
+    APSARA_TEST_EQUAL(0U, sManager->mConfigExpireTimeCheckpoint.size());
 
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 0;
     sManager->ClearUnusedCheckpoints();
@@ -167,6 +179,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
         APSARA_TEST_EQUAL(1U, info.mHash);
         APSARA_TEST_EQUAL(1000000000U, info.mExpireTime);
+        APSARA_TEST_EQUAL(0U, info.mInputsHash);
     }
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_2");
@@ -174,6 +187,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_2.json"), info.mFilepath);
         APSARA_TEST_EQUAL(2U, info.mHash);
         APSARA_TEST_EQUAL(1500000000U, info.mExpireTime);
+        APSARA_TEST_EQUAL(0U, info.mInputsHash);
     }
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_3");
@@ -181,6 +195,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_3.json"), info.mFilepath);
         APSARA_TEST_EQUAL(3U, info.mHash);
         APSARA_TEST_EQUAL(4000000000U, info.mExpireTime);
+        APSARA_TEST_EQUAL(0U, info.mInputsHash);
     }
 
     // update
@@ -194,6 +209,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
         APSARA_TEST_EQUAL(1U, info.mHash);
         APSARA_TEST_EQUAL(1200000000U, info.mExpireTime);
+        APSARA_TEST_EQUAL(0U, info.mInputsHash);
     }
 
     // delete timeout config
@@ -252,12 +268,16 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
     APSARA_TEST_EQUAL(4U, res.size());
     APSARA_TEST_EQUAL(1U, res["test_config_1"]["config_hash"].asUInt64());
     APSARA_TEST_EQUAL(2000000000U, res["test_config_1"]["expire_time"].asUInt());
+    APSARA_TEST_EQUAL(0U, res["test_config_1"]["inputs_hash"].asUInt64());
     APSARA_TEST_EQUAL(4U, res["test_config_3"]["config_hash"].asUInt64());
     APSARA_TEST_EQUAL(2200000000U, res["test_config_3"]["expire_time"].asUInt());
+    APSARA_TEST_EQUAL(0U, res["test_config_3"]["inputs_hash"].asUInt64());
     APSARA_TEST_EQUAL(4U, res["test_config_4"]["config_hash"].asUInt64());
     APSARA_TEST_EQUAL(1800000000U, res["test_config_4"]["expire_time"].asUInt());
+    APSARA_TEST_EQUAL(0U, res["test_config_4"]["inputs_hash"].asUInt64());
     APSARA_TEST_EQUAL(5U, res["test_config_5"]["config_hash"].asUInt64());
     APSARA_TEST_EQUAL(2100000000U, res["test_config_5"]["expire_time"].asUInt());
+    APSARA_TEST_EQUAL(0U, res["test_config_5"]["inputs_hash"].asUInt64());
 }
 
 UNIT_TEST_CASE(OnetimeConfigInfoManagerUnittest, TestLoadCheckpointFile)

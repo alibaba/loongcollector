@@ -164,7 +164,6 @@ bool CollectionConfig::Parse() {
         PARAM_ERROR_RETURN(
             sLogger, alarm, "mandatory inputs module has no plugin", noModule, mName, mProject, mLogstore, mRegion);
     }
-
     for (Json::Value::ArrayIndex i = 0; i < itr->size(); ++i) {
         const Json::Value& plugin = (*itr)[i];
         if (!plugin.isObject()) {
