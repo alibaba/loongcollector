@@ -32,6 +32,7 @@ COPY_GIT_CONFIGS=${7:-${DOCKER_BUILD_COPY_GIT_CONFIGS:-true}}
 PLUGINS_CONFIG_FILE=${8:-${PLUGINS_CONFIG_FILE:-plugins.yml,external_plugins.yml}}
 GO_MOD_FILE=${9:-${GO_MOD_FILE:-go.mod}}
 PATH_IN_DOCKER=${10:-/src}
+WITH_LIBRDKAFKA=${11:-false}
 
 BUILD_TYPE=${BUILD_TYPE:-Release}
 BUILD_LOGTAIL=${BUILD_LOGTAIL:-ON}
@@ -128,6 +129,15 @@ function generateCopyScript() {
   echo 'echo -e "{\n}" > $BINDIR/conf/instance_config/local/loongcollector_config.json' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/conf/continuous_pipeline_config/local' >>$COPY_SCRIPT_FILE
   echo 'mkdir -p $BINDIR/conf/onetime_pipeline_config/local' >>$COPY_SCRIPT_FILE
+  
+  # Copy librdkafka SASL libraries if WITH_LIBRDKAFKA is enabled
+  if [ "$WITH_LIBRDKAFKA" = "true" ]; then
+    echo 'mkdir -p $BINDIR/libsasl2' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":/usr/lib64/libsasl2.so.3 $BINDIR/libsasl2/ 2>/dev/null || true' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":/usr/lib64/libsasl2.so.3.0.0 $BINDIR/libsasl2/ 2>/dev/null || true' >>$COPY_SCRIPT_FILE
+    echo 'docker cp "$id":/usr/lib64/sasl2 $BINDIR/libsasl2/ 2>/dev/null || true' >>$COPY_SCRIPT_FILE
+  fi
+  
   echo 'docker rm -v "$id"' >>$COPY_SCRIPT_FILE
 }
 

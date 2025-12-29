@@ -31,6 +31,7 @@ function arch() {
 OUT_DIR=${1:-output}
 DIST_DIR=${2:-dist}
 PACKAGE_DIR=${3:-loongcollector-0.0.1}
+WITH_LIBRDKAFKA=${4:-false}
 ROOTDIR=$(cd $(dirname "${BASH_SOURCE[0]}") && cd .. && pwd)
 ARCH=$(arch)
 
@@ -53,6 +54,11 @@ strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/loongcollector"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginAdapter.so"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginBase.so"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libeBPFDriver.so"
+
+# Copy librdkafka SASL libraries from output directory if WITH_LIBRDKAFKA is enabled
+if [ "$WITH_LIBRDKAFKA" = "true" ]; then
+  cp -r "${ROOTDIR}/${OUT_DIR}/libsasl2" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/" 2>/dev/null || true
+fi
 
 # pack dist dir
 cd "${ROOTDIR}/${DIST_DIR}"

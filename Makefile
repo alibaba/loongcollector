@@ -216,15 +216,17 @@ unittest_pluginmanager: clean import_plugins
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
 
+WITH_LIBRDKAFKA ?= false
+
 .PHONY: all
 all: clean import_plugins
-	./scripts/gen_build_scripts.sh all "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
+	./scripts/gen_build_scripts.sh all "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)" "$(WITH_LIBRDKAFKA)"
 	./scripts/docker_build.sh build "$(GENERATED_HOME)" "$(VERSION)" "$(BUILD_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 	./$(GENERATED_HOME)/gen_copy_docker.sh
 
 .PHONY: dist
 dist: all
-	./scripts/dist.sh "$(OUT_DIR)" "$(DIST_DIR)" "$(PACKAGE_DIR)"
+	./scripts/dist.sh "$(OUT_DIR)" "$(DIST_DIR)" "$(PACKAGE_DIR)" "$(WITH_LIBRDKAFKA)"
 
 $(DIST_FILE):
 	@echo 'loongcollector-$(VERSION) dist does not exist! Please download or run `make dist` first!'

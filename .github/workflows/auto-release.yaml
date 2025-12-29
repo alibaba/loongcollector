@@ -212,7 +212,7 @@ jobs:
             echo "Created mock package: dist/loongcollector-$VERSION.linux-${{ matrix.arch }}.tar.gz"
           else
             # 正常构建模式
-            make dist
+            make dist WITH_LIBRDKAFKA=true
           fi
           
           ls -la dist/
