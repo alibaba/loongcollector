@@ -17,7 +17,7 @@ make solib
 ### Build image
 
     - The default {DOCKER_REPOSITORY} is `aliyun/ilogtail`.
-    - The default {VERSION} is `2.0.0`.
+    - The default {VERSION} is `3.2.6`.
     - The default {DOCKER_PUSH} is `false`. When the option is configured as true, the built images would also be pushed to the {DOCKER_REPOSITORY} with {VERSION} tag.
 
     ```shell
@@ -32,7 +32,7 @@ If the features that you want to use only in Go part, such as collecting stdout 
 ### Build image
 
     - The default {DOCKER_REPOSITORY} is `aliyun/ilogtail`.
-    - The default {VERSION} is `2.0.0`.
+    - The default {VERSION} is `3.2.6`.
     - The default {DOCKER_PUSH} is `false`. When the option is configured as true, the built images would also be pushed to the {DOCKER_REPOSITORY} with {VERSION} tag.
 
     ```shell

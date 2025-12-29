@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM --platform=$TARGETPLATFORM centos:centos7.9.2009 AS build
-ARG VERSION=0.0.1
+ARG VERSION=3.2.6
 ARG TARGETPLATFORM
 WORKDIR /usr/local
 COPY dist/loongcollector-${VERSION}.linux-*.tar.gz .
@@ -43,7 +43,7 @@ RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
 RUN yum update -y && yum upgrade -y && yum -y clean all && rm -fr /var/cache && rm -rf /core.*
 
 ARG HOST_OS=Linux
-ARG VERSION=0.0.1
+ARG VERSION=3.2.6
 ARG TARGETPLATFORM
 
 COPY --from=build /usr/local/loongcollector-${VERSION} /usr/local/loongcollector

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM ubuntu:25.10 AS build
-ARG VERSION=0.0.1
+ARG VERSION=3.2.6
 ARG TARGETPLATFORM
 WORKDIR /usr/local
 # Copy the specific architecture package
@@ -25,7 +25,7 @@ FROM ubuntu:25.10 AS release
 ENV container=docker
 
 ARG HOST_OS=Linux
-ARG VERSION=0.0.1
+ARG VERSION=3.2.6
 ARG TARGETPLATFORM
 
 COPY --from=build /usr/local/loongcollector-${VERSION} /usr/local/loongcollector
