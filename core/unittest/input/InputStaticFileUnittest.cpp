@@ -501,9 +501,11 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileReaderConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(nullptr, sServer->GetMultilineConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileTagConfig("test_config", 0).first);
-        APSARA_TEST_EQUAL(sManager->mInputCheckpointMap.end(),
-                          sManager->mInputCheckpointMap.find(make_pair("test_config", 0)));
-        APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+        // When IsOnetimePipelineRunningBeforeStart is true, shouldDeleteCheckpoint is false,
+        // so checkpoint should still exist after Stop
+        APSARA_TEST_NOT_EQUAL(sManager->mInputCheckpointMap.end(),
+                              sManager->mInputCheckpointMap.find(make_pair("test_config", 0)));
+        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
     }
     filesystem::remove_all("test_logs");
 }
