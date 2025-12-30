@@ -360,13 +360,14 @@ bool CollectionPipeline::Init(CollectionConfig&& config) {
     // for symetry consideration, the following should be done on pipeline start. However, since it relies much on
     // config, it is more reasonable to do it here.
     if (mIsOnetime) {
-        // Use inputsHash calculated during CollectionConfig::Parse()
+        // Use inputsHash and excutionTimeout calculated during CollectionConfig::Parse()
         OnetimeConfigInfoManager::GetInstance()->UpdateConfig(mName,
                                                               ConfigType::Collection,
                                                               config.mFilePath,
                                                               config.mConfigHash,
                                                               config.mOnetimeExpireTime.value(),
-                                                              config.mInputsHash);
+                                                              config.mInputsHash,
+                                                              config.mExcutionTimeout);
     }
 
     WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,

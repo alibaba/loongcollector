@@ -34,14 +34,12 @@ struct PipelineConfig {
     std::filesystem::path mFilePath;
     uint32_t mCreateTime = 0;
     // valid for onetime config
+    uint32_t mExcutionTimeout = 0;
     std::optional<uint32_t> mOnetimeStartTime;
     std::optional<uint32_t> mOnetimeExpireTime;
-    bool mIsRunningBeforeStart = false;
-    // for onetime pipeline: if true, force rerun (delete+create) when config hash changes;
-    // if false, only rerun when input changes, otherwise update normally
-    bool mForceRerunWhenUpdate = true;
-    // input hash for onetime config (calculated during Parse, includes all inputs and ExcutionTimeout)
     uint64_t mInputsHash = 0;
+    bool mIsRunningBeforeStart = false;
+    bool mForceRerunWhenUpdate = true;
 
     PipelineConfig(const std::string& name,
                    std::unique_ptr<Json::Value>&& detail,

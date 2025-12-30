@@ -29,22 +29,43 @@ OnetimeConfigInfoManager::OnetimeConfigInfoManager()
     : mCheckpointFilePath(filesystem::path(GetAgentDataDir()) / "onetime_config_info.json") {
 }
 
-OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint(
-    const string& configName, uint64_t hash, bool forceRerunWhenUpdate, uint64_t inputsHash, uint32_t* expireTime) {
+OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint(const string& configName,
+                                                                                   uint64_t hash,
+                                                                                   bool forceRerunWhenUpdate,
+                                                                                   uint64_t inputsHash,
+                                                                                   uint32_t excutionTimeout,
+                                                                                   uint32_t* expireTime) {
     lock_guard<mutex> lock(mMux);
-    // Step 1: mConfigExpireTimeCheckpoint没有找到，设置为NEW
+    // Step 1: 从 mConfigExpireTimeCheckpoint 和 mConfigInfoMap 中查找
     auto it = mConfigExpireTimeCheckpoint.find(configName);
-    if (it == mConfigExpireTimeCheckpoint.end()) {
-        return OnetimeConfigStatus::NEW;
+    bool fromExpireTimeCheckpoint = (it != mConfigExpireTimeCheckpoint.end());
+
+    uint64_t checkpointHash = 0;
+    uint32_t checkpointExpireTime = 0;
+    uint64_t checkpointInputsHash = 0;
+    uint32_t checkpointExcutionTimeout = 0;
+
+    if (fromExpireTimeCheckpoint) {
+        // 从 mConfigExpireTimeCheckpoint 中找到，提取值
+        checkpointHash = std::get<0>(it->second);
+        checkpointExpireTime = std::get<1>(it->second);
+        checkpointInputsHash = std::get<2>(it->second);
+        checkpointExcutionTimeout = std::get<3>(it->second);
+    } else {
+        // 从 mConfigExpireTimeCheckpoint 中没有找到，尝试从 mConfigInfoMap 中查找
+        auto infoIt = mConfigInfoMap.find(configName);
+        if (infoIt != mConfigInfoMap.end()) {
+            checkpointHash = infoIt->second.mHash;
+            checkpointExpireTime = infoIt->second.mExpireTime;
+            checkpointInputsHash = infoIt->second.mInputsHash;
+            checkpointExcutionTimeout = infoIt->second.mExcutionTimeout;
+        } else {
+            return OnetimeConfigStatus::NEW;
+        }
     }
 
-    // Step 2: mConfigExpireTimeCheckpoint找到了，先设置为OLD
+    // Step 2: 找到了 checkpoint，先设置为 OLD
     OnetimeConfigStatus status = OnetimeConfigStatus::OLD;
-
-    // Extract values from checkpoint tuple: (configHash, expireTime, inputsHash)
-    uint64_t checkpointHash = std::get<0>(it->second);
-    uint32_t checkpointExpireTime = std::get<1>(it->second);
-    uint64_t checkpointInputsHash = std::get<2>(it->second);
 
     // Step 3: 如果hash一致，判断是否过期
     if (checkpointHash == hash) {
@@ -59,8 +80,8 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoi
         if (forceRerunWhenUpdate) {
             status = OnetimeConfigStatus::NEW;
         } else {
-            // Step 5: 如果mForceRerunWhenUpdate为false，检查input插件的hash是否一致
-            if (checkpointInputsHash == inputsHash) {
+            // Step 5: 如果mForceRerunWhenUpdate为false，检查input插件的hash和excutionTimeout是否都一致
+            if (checkpointInputsHash == inputsHash && checkpointExcutionTimeout == excutionTimeout) {
                 status = OnetimeConfigStatus::UPDATED;
                 // For UPDATED status, use expire time from checkpoint
                 if (expireTime) {
@@ -72,7 +93,10 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoi
         }
     }
 
-    mConfigExpireTimeCheckpoint.erase(it);
+    // 只有在从 mConfigExpireTimeCheckpoint 中找到的情况下才删除它
+    if (fromExpireTimeCheckpoint) {
+        mConfigExpireTimeCheckpoint.erase(it);
+    }
     return status;
 }
 
@@ -86,15 +110,16 @@ bool OnetimeConfigInfoManager::UpdateConfig(const string& configName,
                                             const filesystem::path& filepath,
                                             uint64_t hash,
                                             uint32_t expireTime,
-                                            uint64_t inputsHash) {
+                                            uint64_t inputsHash,
+                                            uint32_t excutionTimeout) {
     lock_guard<mutex> lock(mMux);
     auto it = mConfigInfoMap.find(configName);
     if (it != mConfigInfoMap.end()) {
         // on update
-        it->second = ConfigInfo(type, filepath, hash, expireTime, inputsHash);
+        it->second = ConfigInfo(type, filepath, hash, expireTime, inputsHash, excutionTimeout);
     } else {
         // on added
-        mConfigInfoMap.try_emplace(configName, type, filepath, hash, expireTime, inputsHash);
+        mConfigInfoMap.try_emplace(configName, type, filepath, hash, expireTime, inputsHash, excutionTimeout);
     }
     LOG_INFO(sLogger, ("onetime pipeline expire time", expireTime)("config", configName));
     return true;
@@ -221,9 +246,23 @@ bool OnetimeConfigInfoManager::LoadCheckpointFile() {
             }
             // inputsHash remains 0, which is the default
         }
+
+        uint32_t excutionTimeout = 0;
+        // excution_timeout is optional for backward compatibility
+        string excutionTimeoutErrorMsg;
+        if (!GetOptionalUIntParam(item, "excution_timeout", excutionTimeout, excutionTimeoutErrorMsg)) {
+            // If excution_timeout is present but invalid type, log warning and use 0 as default
+            if (!excutionTimeoutErrorMsg.empty()) {
+                LOG_WARNING(sLogger,
+                            ("checkpoint format invalid", "skip excution_timeout, use default 0")(
+                                "error msg", excutionTimeoutErrorMsg)("filepath",
+                                                                      mCheckpointFilePath.string())("config", config));
+            }
+            // excutionTimeout remains 0, which is the default
+        }
         {
             lock_guard<mutex> lock(mMux);
-            mConfigExpireTimeCheckpoint.try_emplace(config, hash, expireTime, inputsHash);
+            mConfigExpireTimeCheckpoint.try_emplace(config, hash, expireTime, inputsHash, excutionTimeout);
         }
     }
     return true;
@@ -242,6 +281,7 @@ void OnetimeConfigInfoManager::DumpCheckpointFile() const {
         itemJson["config_hash"] = std::get<0>(item);
         itemJson["expire_time"] = std::get<1>(item);
         itemJson["inputs_hash"] = std::get<2>(item);
+        itemJson["excution_timeout"] = std::get<3>(item);
     }
     for (const auto& [config, info] : mConfigInfoMap) {
         res[config] = Json::objectValue;
@@ -249,6 +289,7 @@ void OnetimeConfigInfoManager::DumpCheckpointFile() const {
         itemJson["config_hash"] = info.mHash;
         itemJson["expire_time"] = info.mExpireTime;
         itemJson["inputs_hash"] = info.mInputsHash;
+        itemJson["excution_timeout"] = info.mExcutionTimeout;
     }
     string errMsg;
     if (!UpdateFileContent(mCheckpointFilePath, res.toStyledString(), errMsg)) {

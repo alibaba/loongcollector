@@ -48,13 +48,15 @@ public:
                                                              uint64_t hash,
                                                              bool forceRerunWhenUpdate,
                                                              uint64_t inputsHash,
+                                                             uint32_t excutionTimeout,
                                                              uint32_t* expireTime);
     bool UpdateConfig(const std::string& configName,
                       ConfigType type,
                       const std::filesystem::path& filepath,
                       uint64_t hash,
                       uint32_t expireTime,
-                      uint64_t inputsHash = 0);
+                      uint64_t inputsHash,
+                      uint32_t excutionTimeout);
     bool RemoveConfig(const std::string& configName);
     void DeleteTimeoutConfigFiles();
     bool LoadCheckpointFile();
@@ -73,13 +75,20 @@ private:
         uint64_t mHash;
         uint32_t mExpireTime;
         uint64_t mInputsHash;
+        uint32_t mExcutionTimeout;
 
         ConfigInfo(ConfigType type,
                    const std::filesystem::path& filepath,
                    uint64_t hash,
                    uint32_t expireTime,
-                   uint64_t inputsHash = 0)
-            : mType(type), mFilepath(filepath), mHash(hash), mExpireTime(expireTime), mInputsHash(inputsHash) {}
+                   uint64_t inputsHash,
+                   uint32_t excutionTimeout)
+            : mType(type),
+              mFilepath(filepath),
+              mHash(hash),
+              mExpireTime(expireTime),
+              mInputsHash(inputsHash),
+              mExcutionTimeout(excutionTimeout) {}
     };
 
     OnetimeConfigInfoManager();
@@ -90,8 +99,8 @@ private:
     // only accessed by main thread, however, for protection, we still add a lock
     mutable std::mutex mMux;
     std::map<std::string, ConfigInfo> mConfigInfoMap;
-    // map: configName -> (configHash, expireTime, inputsHash)
-    std::map<std::string, std::tuple<uint64_t, uint32_t, uint64_t>> mConfigExpireTimeCheckpoint;
+    // map: configName -> (configHash, expireTime, inputsHash, excutionTimeout)
+    std::map<std::string, std::tuple<uint64_t, uint32_t, uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;

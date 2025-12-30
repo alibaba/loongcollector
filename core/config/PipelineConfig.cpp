@@ -68,48 +68,37 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
     : mName(name), mDetail(std::move(detail)), mFilePath(filepath) {
     mDetail->removeMember("enable");
     // Calculate inputs hash for onetime config
-    // Hash includes all inputs and ExcutionTimeout
     const char* inputsKey = "inputs";
-    const char* globalKey = "global";
-    const char* excutionTimeoutKey = "ExcutionTimeout";
     const auto* inputsIt = mDetail->find(inputsKey, inputsKey + strlen(inputsKey));
-    const auto* globalIt = mDetail->find(globalKey, globalKey + strlen(globalKey));
-    if (inputsIt != nullptr && inputsIt->isArray() && globalIt != nullptr && globalIt->isObject()) {
-        const auto* timeoutIt = globalIt->find(excutionTimeoutKey, excutionTimeoutKey + strlen(excutionTimeoutKey));
-        if (timeoutIt != nullptr) {
-            Json::Value inputsHashValue(Json::objectValue);
-            // Add all inputs
-            inputsHashValue["inputs"] = *inputsIt;
-            // Add ExcutionTimeout
-            inputsHashValue["ExcutionTimeout"] = *timeoutIt;
-            mInputsHash = static_cast<uint64_t>(Hash(inputsHashValue));
-        }
+    if (inputsIt != nullptr && inputsIt->isArray()) {
+        Json::Value inputsHashValue(Json::objectValue);
+        inputsHashValue["inputs"] = *inputsIt;
+        mInputsHash = static_cast<uint64_t>(Hash(inputsHashValue));
     }
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }
 
 bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
-    uint32_t timeout = 0;
-    if (!IsOneTime(mName, global, &timeout, &mForceRerunWhenUpdate)) {
+    if (!IsOneTime(mName, global, &mExcutionTimeout, &mForceRerunWhenUpdate)) {
         return true;
     }
     uint32_t expireTime = 0;
     auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
-        mName, mConfigHash, mForceRerunWhenUpdate, mInputsHash, &expireTime);
+        mName, mConfigHash, mForceRerunWhenUpdate, mInputsHash, mExcutionTimeout, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
-            mOnetimeStartTime = expireTime - timeout;
+            mOnetimeStartTime = expireTime - mExcutionTimeout;
             mOnetimeExpireTime = expireTime;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger, ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
             return true;
         case OnetimeConfigStatus::NEW:
             mOnetimeStartTime = time(nullptr);
-            mOnetimeExpireTime = mOnetimeStartTime.value() + timeout;
+            mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             return true;
         case OnetimeConfigStatus::UPDATED:
             // UPDATED状态表示配置hash改变但input hash未变，保持原有过期时间
-            mOnetimeStartTime = expireTime - timeout;
+            mOnetimeStartTime = expireTime - mExcutionTimeout;
             mOnetimeExpireTime = expireTime;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger,

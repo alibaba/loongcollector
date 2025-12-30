@@ -110,7 +110,10 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", configName));
             shouldCompletelyStop = true;
         }
-
+        if (p->IsOnetime()) {
+            // 更新旧 pipeline 的 isRunningBeforeStart 标志，用于后续的 checkpoint 管理，防止误删checkpoint
+            iter->second->GetContext().SetIsOnetimePipelineRunningBeforeStart(p->GetContext().IsOnetimePipelineRunningBeforeStart());
+        }
         iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);

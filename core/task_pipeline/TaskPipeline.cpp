@@ -39,8 +39,13 @@ bool TaskPipeline::Init(TaskConfig&& config) {
         return false;
     }
     if (mIsOnetime) {
-        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(
-            mName, ConfigType::Collection, config.mFilePath, config.mConfigHash, config.mOnetimeExpireTime.value());
+        OnetimeConfigInfoManager::GetInstance()->UpdateConfig(mName,
+                                                              ConfigType::Collection,
+                                                              config.mFilePath,
+                                                              config.mConfigHash,
+                                                              config.mOnetimeExpireTime.value(),
+                                                              config.mInputsHash,
+                                                              config.mExcutionTimeout);
     }
     return true;
 }

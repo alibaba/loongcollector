@@ -212,7 +212,7 @@ void StaticFileServer::ReadFiles() {
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
     FileFingerprint fingerprint;
     while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
-        filesystem::path filePath = fingerprint.mFilePath;
+        filesystem::path filePath = fingerprint.mFilePath.lexically_normal();
         string errMsg;
 
         // 检查文件是否存在，如果不存在或路径变了但 devinode 没变，尝试查找轮转后的文件
@@ -240,8 +240,22 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             continue;
         }
 
-        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(filePath.parent_path().string(),
-                                                                   filePath.filename().string(),
+        // 确保路径被正确规范化后再拆分
+        filePath = filePath.lexically_normal();
+        auto parentPath = filePath.parent_path();
+        auto fileName = filePath.filename();
+
+        // 验证路径拆分是否正确
+        if (fileName.empty()) {
+            LOG_ERROR(sLogger,
+                      ("invalid file path, filename is empty",
+                       "")("config", configName)("input idx", idx)("filepath", filePath.string()));
+            InputStaticFileCheckpointManager::GetInstance()->InvalidateCurrentFileCheckpoint(configName, idx);
+            continue;
+        }
+
+        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(parentPath.string(),
+                                                                   fileName.string(),
                                                                    fingerprint.mDevInode,
                                                                    GetFileReaderConfig(configName, idx),
                                                                    GetMultilineConfig(configName, idx),
@@ -271,6 +285,10 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             continue;
         }
         if (fingerprint.mOffset > 0) {
+            LOG_INFO(sLogger,
+                     ("set last file pos", fingerprint.mOffset)("config", configName)("input idx", idx)(
+                         "filepath", filePath.string())("dev", fingerprint.mDevInode.dev)("inode",
+                                                                                          fingerprint.mDevInode.inode));
             reader->SetLastFilePos(fingerprint.mOffset);
         }
         return reader;

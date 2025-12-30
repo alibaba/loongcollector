@@ -164,13 +164,10 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
 bool InputStaticFileCheckpointManager::DeleteCheckpoint(const string& configName, size_t idx) {
     lock_guard<mutex> lock(mUpdateMux);
     auto it = mInputCheckpointMap.find(make_pair(configName, idx));
-    if (it == mInputCheckpointMap.end()) {
-        // should not happen
-        return false;
+    if (it != mInputCheckpointMap.end()) {
+        it->second.SetAbort();
+        mInputCheckpointMap.erase(it);
     }
-    it->second.SetAbort();
-    // mDeletedInputs.emplace(configName, idx);
-    mInputCheckpointMap.erase(it);
 
     error_code ec;
     if (!filesystem::remove(mCheckpointRootPath / GetCheckpointFileName(configName, idx), ec)) {
@@ -337,13 +334,27 @@ bool InputStaticFileCheckpointManager::RetrieveCheckpointFromFile(const string& 
         // should not happen
         return false;
     }
+    filesystem::path checkpointFilePath = mCheckpointRootPath / GetCheckpointFileName(configName, idx);
+
+    // 先从 mCheckpointFileNamesOnInit 中查找（初始化时扫描的文件）
     auto it = mCheckpointFileNamesOnInit.find(make_pair(configName, idx));
-    if (it == mCheckpointFileNamesOnInit.end()) {
-        LOG_WARNING(sLogger, ("no checkpoint file found, config", configName)("input idx", idx));
-        return false;
+    if (it != mCheckpointFileNamesOnInit.end()) {
+        // 在初始化时扫描的文件列表中找到，移除它（避免重复加载）
+        mCheckpointFileNamesOnInit.erase(it);
+        return LoadCheckpointFile(checkpointFilePath, cpt);
     }
-    mCheckpointFileNamesOnInit.erase(it);
-    return LoadCheckpointFile(mCheckpointRootPath / GetCheckpointFileName(configName, idx), cpt);
+
+    // 如果 mCheckpointFileNamesOnInit 中没有，再检查文件系统（可能是 UPDATE 场景，文件在运行时存在）
+    error_code ec;
+    if (filesystem::exists(checkpointFilePath, ec)) {
+        return LoadCheckpointFile(checkpointFilePath, cpt);
+    }
+
+    // 两个地方都没有找到
+    LOG_WARNING(
+        sLogger,
+        ("no checkpoint file found, config", configName)("input idx", idx)("filepath", checkpointFilePath.string()));
+    return false;
 }
 
 
