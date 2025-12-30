@@ -136,29 +136,25 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
 
     uint32_t expireTime = 0;
     // test_config_1: hash and inputsHash both match, should return OLD
-    APSARA_TEST_EQUAL(
-        OnetimeConfigStatus::OLD,
-        sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1U, false, 0U, 3600U, &expireTime));
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::OLD,
+                      sManager->GetOnetimeConfigStatus("test_config_1", 1U, false, 0U, 3600U, &expireTime));
     APSARA_TEST_EQUAL(2000000000U, expireTime);
     // test_config_2: hash matches but expired, should return OBSOLETE
-    APSARA_TEST_EQUAL(
-        OnetimeConfigStatus::OBSOLETE,
-        sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2U, false, 0U, 1800U, &expireTime));
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::OBSOLETE,
+                      sManager->GetOnetimeConfigStatus("test_config_2", 2U, false, 0U, 1800U, &expireTime));
     APSARA_TEST_EQUAL(1000000000U, expireTime);
     // test_config_3: config_hash changed from 3 to 4, but inputsHash and excutionTimeout unchanged (0 and 7200)
     // forceRerunWhenUpdate is false, so should return UPDATED instead of NEW
-    APSARA_TEST_EQUAL(
-        OnetimeConfigStatus::UPDATED,
-        sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4U, false, 0U, 7200U, &expireTime));
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::UPDATED,
+                      sManager->GetOnetimeConfigStatus("test_config_3", 4U, false, 0U, 7200U, &expireTime));
     APSARA_TEST_EQUAL(2500000000U, expireTime);
     // test_config_4: config_hash changed from 4 to 5, and inputsHash also changed (100 != 0)
     // forceRerunWhenUpdate is false, but inputsHash mismatch, so should return NEW
-    APSARA_TEST_EQUAL(
-        OnetimeConfigStatus::NEW,
-        sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_4", 5U, false, 0U, 600U, &expireTime));
+    APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
+                      sManager->GetOnetimeConfigStatus("test_config_4", 5U, false, 0U, 600U, &expireTime));
     // test_config_5: not in checkpoint, should return NEW
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
-                      sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_5", 10U, false, 0U, 0U, &expireTime));
+                      sManager->GetOnetimeConfigStatus("test_config_5", 10U, false, 0U, 0U, &expireTime));
     APSARA_TEST_EQUAL(0U, sManager->mConfigExpireTimeCheckpoint.size());
 
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 0;
@@ -289,7 +285,7 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
 
     uint32_t expireTime = 0;
 
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_1", 1U, false, 0U, 3600U, &expireTime);
+    sManager->GetOnetimeConfigStatus("test_config_1", 1U, false, 0U, 3600U, &expireTime);
     sManager->UpdateConfig("test_config_1",
                            ConfigType::Collection,
                            filesystem::path("test_config/test_config_1.json"),
@@ -297,8 +293,8 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
                            2000000000,
                            0,
                            3600);
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_2", 2U, false, 0U, 1800U, &expireTime);
-    sManager->GetOnetimeConfigStatusFromCheckpoint("test_config_3", 4U, false, 0U, 7200U, &expireTime);
+    sManager->GetOnetimeConfigStatus("test_config_2", 2U, false, 0U, 1800U, &expireTime);
+    sManager->GetOnetimeConfigStatus("test_config_3", 4U, false, 0U, 7200U, &expireTime);
     sManager->UpdateConfig("test_config_3",
                            ConfigType::Collection,
                            filesystem::path("test_config/test_config_3.json"),

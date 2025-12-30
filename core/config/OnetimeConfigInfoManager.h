@@ -44,12 +44,12 @@ public:
         return &instance;
     }
 
-    OnetimeConfigStatus GetOnetimeConfigStatusFromCheckpoint(const std::string& configName,
-                                                             uint64_t hash,
-                                                             bool forceRerunWhenUpdate,
-                                                             uint64_t inputsHash,
-                                                             uint32_t excutionTimeout,
-                                                             uint32_t* expireTime);
+    OnetimeConfigStatus GetOnetimeConfigStatus(const std::string& configName,
+                                               uint64_t hash,
+                                               bool forceRerunWhenUpdate,
+                                               uint64_t inputsHash,
+                                               uint32_t excutionTimeout,
+                                               uint32_t* expireTime);
     bool UpdateConfig(const std::string& configName,
                       ConfigType type,
                       const std::filesystem::path& filepath,

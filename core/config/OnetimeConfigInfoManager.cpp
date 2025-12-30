@@ -29,12 +29,12 @@ OnetimeConfigInfoManager::OnetimeConfigInfoManager()
     : mCheckpointFilePath(filesystem::path(GetAgentDataDir()) / "onetime_config_info.json") {
 }
 
-OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatusFromCheckpoint(const string& configName,
-                                                                                   uint64_t hash,
-                                                                                   bool forceRerunWhenUpdate,
-                                                                                   uint64_t inputsHash,
-                                                                                   uint32_t excutionTimeout,
-                                                                                   uint32_t* expireTime) {
+OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatus(const string& configName, // Todo: change name
+                                                                     uint64_t hash,
+                                                                     bool forceRerunWhenUpdate,
+                                                                     uint64_t inputsHash,
+                                                                     uint32_t excutionTimeout,
+                                                                     uint32_t* expireTime) {
     lock_guard<mutex> lock(mMux);
     // Step 1: 从 mConfigExpireTimeCheckpoint 和 mConfigInfoMap 中查找
     auto it = mConfigExpireTimeCheckpoint.find(configName);
