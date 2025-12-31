@@ -22,6 +22,7 @@
 
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
+#include "common/TimeKeeper.h"
 #include "grpcpp/support/status.h"
 #include "logger/Logger.h"
 #include "models/PipelineEventGroup.h"
@@ -69,6 +70,20 @@ bool LoongSuiteForwardServiceImpl::Update(std::string configName, const Json::Va
     return true;
 }
 
+LoongSuiteForwardServiceImpl::LoongSuiteForwardServiceImpl(const std::string& address) : BaseService(address) {
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(mMetricsRecordRef,
+                                                        MetricCategory::METRIC_CATEGORY_COMPONENT,
+                                                        {
+                                                            {METRIC_LABEL_KEY_COMPONENT_NAME, "loongsuite_forward"},
+                                                            {METRIC_LABEL_KEY_SERVICE_ADDRESS, address},
+                                                        });
+    mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
+    mInSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
+    mTotalDelayMs = mMetricsRecordRef.CreateTimeCounter(METRIC_COMPONENT_TOTAL_DELAY_MS);
+    mDiscardedEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
+}
+
 bool LoongSuiteForwardServiceImpl::Remove(std::string configName, const Json::Value& config) {
     std::string errorMsg;
 
@@ -89,6 +104,9 @@ grpc::ServerUnaryReactor* LoongSuiteForwardServiceImpl::Forward(grpc::CallbackSe
                                                                 LoongSuiteForwardResponse* response) {
     auto* reactor = context->DefaultReactor();
     grpc::Status status(grpc::StatusCode::NOT_FOUND, "No matching config found for forward request");
+    ADD_COUNTER(mInEventsTotal, 1);
+    ADD_COUNTER(mInSizeBytes, request->data_size());
+    auto before = TimeKeeper::GetInstance()->NowMs();
 
     std::shared_ptr<ForwardConfig> config;
     if (FindMatchingConfig(context, config)) {
@@ -99,10 +117,13 @@ grpc::ServerUnaryReactor* LoongSuiteForwardServiceImpl::Forward(grpc::CallbackSe
         if (status.ok()) {
             mRetryTimeController.UpRetryTimes(config->configName);
         } else {
+            ADD_COUNTER(mDiscardedEventsTotal, 1);
             mRetryTimeController.DownRetryTimes(config->configName);
         }
+    } else {
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
     }
-
+    ADD_COUNTER(mTotalDelayMs, std::chrono::milliseconds(TimeKeeper::GetInstance()->NowMs() - before));
     reactor->Finish(status);
     return reactor;
 }

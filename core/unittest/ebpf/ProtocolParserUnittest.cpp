@@ -19,6 +19,7 @@
 
 #include "ebpf/protocol/ProtocolParser.h"
 #include "ebpf/protocol/http/HttpParser.h"
+#include "ebpf/protocol/mysql/MysqlParser.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
 
@@ -42,6 +43,9 @@ public:
     void ResponseBenchmark();
     void ResponseWithoutBodyBenchmark();
     void ChunkedResponseBenchmark();
+
+    void TestParseMysqlQuery();
+    void TestParseMysqlResponse();
 
 protected:
     void SetUp() override {}
@@ -220,6 +224,14 @@ void ProtocolParserUnittest::TestProtocolParserManager() {
     APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoHTTP));
 
     APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoHTTP));
+
+    APSARA_TEST_TRUE(manager.AddParser(support_proto_e::ProtoMySQL));
+
+    APSARA_TEST_TRUE(manager.AddParser(support_proto_e::ProtoMySQL));
+
+    APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoMySQL));
+
+    APSARA_TEST_TRUE(manager.RemoveParser(support_proto_e::ProtoMySQL));
 }
 
 void ProtocolParserUnittest::TestHttpParserEdgeCases() {
@@ -344,6 +356,92 @@ void ProtocolParserUnittest::ChunkedResponseBenchmark() {
     std::cout << "[response][chunked] elapsed: " << elapsed.count() << " seconds" << std::endl;
 }
 
+
+void ProtocolParserUnittest::TestParseMysqlQuery() {
+    const std::vector<uint8_t> rawPacket
+        = {0x8b, 0x00, 0x00, 0x00, 0x03, 0x0a, 0x43, 0x52, 0x45, 0x41, 0x54, 0x45, 0x20, 0x54, 0x41, 0x42, 0x4c, 0x45,
+           0x20, 0x49, 0x46, 0x20, 0x4e, 0x4f, 0x54, 0x20, 0x45, 0x58, 0x49, 0x53, 0x54, 0x53, 0x20, 0x74, 0x65, 0x73,
+           0x74, 0x5f, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x20, 0x28, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x69, 0x64, 0x20, 0x49,
+           0x4e, 0x54, 0x20, 0x41, 0x55, 0x54, 0x4f, 0x5f, 0x49, 0x4e, 0x43, 0x52, 0x45, 0x4d, 0x45, 0x4e, 0x54, 0x20,
+           0x50, 0x52, 0x49, 0x4d, 0x41, 0x52, 0x59, 0x20, 0x4b, 0x45, 0x59, 0x2c, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x6e,
+           0x61, 0x6d, 0x65, 0x20, 0x56, 0x41, 0x52, 0x43, 0x48, 0x41, 0x52, 0x28, 0x32, 0x35, 0x35, 0x29, 0x20, 0x4e,
+           0x4f, 0x54, 0x20, 0x4e, 0x55, 0x4c, 0x4c, 0x2c, 0x0a, 0x20, 0x20, 0x20, 0x20, 0x76, 0x61, 0x6c, 0x75, 0x65,
+           0x20, 0x49, 0x4e, 0x54, 0x20, 0x4e, 0x4f, 0x54, 0x20, 0x4e, 0x55, 0x4c, 0x4c, 0x0a, 0x29, 0x3b, 0x0a};
+    const std::string packet(rawPacket.begin(), rawPacket.end());
+    std::string_view buf(packet);
+    std::shared_ptr<MysqlRecord> result = std::make_shared<MysqlRecord>(nullptr, nullptr);
+
+    ParseState state = mysql::ParseRequest(buf, result);
+
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetSql(),
+                      "\n"
+                      "CREATE TABLE IF NOT EXISTS test_table (\n"
+                      "    id INT AUTO_INCREMENT PRIMARY KEY,\n"
+                      "    name VARCHAR(255) NOT NULL,\n"
+                      "    value INT NOT NULL\n"
+                      ");\n");
+    // 测试不完整的MySQL数据包
+    const std::string incompleteMysqlPacket = "...";
+    std::string_view buf2(incompleteMysqlPacket);
+    result = std::make_shared<MysqlRecord>(nullptr, nullptr);
+    state = mysql::ParseRequest(buf2, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+}
+
+void ProtocolParserUnittest::TestParseMysqlResponse() {
+    // 测试MySQL OK响应包
+    const std::vector<uint8_t> okPacket = {
+        0x07,
+        0x00,
+        0x00,
+        0x01, // 4字节头部：长度3字节(0x07) + 序号1字节(0x01)
+        0x00, // OK包标识 (0x00)
+        0x00,
+        0x00, // 受影响行数 (1)
+        0x00,
+        0x00, // 服务器状态
+        0x00,
+        0x00 // 警告计数
+    };
+    const std::string okPacketStr(okPacket.begin(), okPacket.end());
+    std::string_view buf(okPacketStr);
+    std::shared_ptr<MysqlRecord> result = std::make_shared<MysqlRecord>(nullptr, nullptr);
+
+    ParseState state = mysql::ParseResponse(buf, result, false, true);
+
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0); // OK状态码
+
+    // 测试MySQL ERR响应包
+    const std::vector<uint8_t> errPacket = {
+        0x17, 0x00, 0x00, 0x01, // 4字节头部：长度3字节(0x17) + 序号1字节(0x01)
+        0xff, // ERR包标识 (0xff)
+        0x10, 0x04, // 错误码 (1040)
+        0x48, 0x59, 0x30, 0x30, 0x30, // SQL状态 "HY000"
+        'T',  'o',  'o',  ' ',  'm',  'a', 'n', 'y', ' ', 'c',
+        'o',  'n',  'n',  'e',  'c',  't', 'i', 'o', 'n', 's' // 错误消息
+    };
+    const std::string errPacketStr(errPacket.begin(), errPacket.end());
+    std::string_view buf2(errPacketStr);
+    result = std::make_shared<MysqlRecord>(nullptr, nullptr);
+
+    state = mysql::ParseResponse(buf2, result, false, true);
+
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 255); // Error状态码
+
+    // 测试不完整的MySQL响应包
+    const std::vector<uint8_t> incompletePacket = {0x07, 0x00}; // 不完整的包头
+    const std::string incompletePacketStr(incompletePacket.begin(), incompletePacket.end());
+    std::string_view buf3(incompletePacketStr);
+    result = std::make_shared<MysqlRecord>(nullptr, nullptr);
+
+    state = mysql::ParseResponse(buf3, result, false, true);
+
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+}
+
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttp);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttpResponse);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttpHeaders);
@@ -352,10 +450,13 @@ UNIT_TEST_CASE(ProtocolParserUnittest, TestParseInvalidRequests);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParsePartialRequests);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestProtocolParserManager);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestHttpParserEdgeCases);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlQuery);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlResponse);
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestWithoutBodyBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, ResponseBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, ChunkedResponseBenchmark);
+
 
 } // namespace ebpf
 } // namespace logtail

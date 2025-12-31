@@ -234,6 +234,7 @@ extern const std::string METRIC_LABEL_KEY_EXACTLY_ONCE_ENABLED;
 extern const std::string METRIC_LABEL_KEY_QUEUE_TYPE;
 extern const std::string METRIC_LABEL_KEY_TARGET;
 extern const std::string METRIC_LABEL_KEY_GROUP_BATCH_ENABLED;
+extern const std::string METRIC_LABEL_KEY_SERVICE_ADDRESS;
 
 // label values
 extern const std::string METRIC_LABEL_VALUE_COMPONENT_NAME_BATCHER;

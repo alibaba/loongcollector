@@ -116,7 +116,7 @@ void FileServer::Resume(bool isConfigUpdate, bool isContainerUpdate) {
         ("file server resume", "starts")("isConfigUpdate", isConfigUpdate)("isContainerUpdate", isContainerUpdate));
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
-    if (isConfigUpdate) {
+    if (isConfigUpdate || isContainerUpdate) {
         EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
     }
     LogInput::GetInstance()->Resume();

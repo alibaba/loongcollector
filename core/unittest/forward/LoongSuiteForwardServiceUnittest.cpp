@@ -57,7 +57,7 @@ public:
 
 protected:
     void SetUp() override {
-        service = std::unique_ptr<LoongSuiteForwardServiceImpl>(new LoongSuiteForwardServiceImpl());
+        service = std::unique_ptr<LoongSuiteForwardServiceImpl>(new LoongSuiteForwardServiceImpl("0.0.0.0:50054"));
         // Initialize ProcessorRunner for testing
         ProcessorRunner::GetInstance()->Init();
     }

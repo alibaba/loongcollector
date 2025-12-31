@@ -90,7 +90,8 @@ void GrpcInputManagerUnittest::TestUpdateListenInputExistingAddressSameTypeUpdat
 }
 
 void GrpcInputManagerUnittest::TestUpdateListenInputExistingAddressDifferentTypeError() const {
-    MockServiceImpl mockService;
+    const std::string address = "0.0.0.0:50053";
+    MockServiceImpl mockService(address);
     auto* runner = GrpcInputManager::GetInstance();
     runner->Init();
     Json::Value config;
@@ -99,7 +100,6 @@ void GrpcInputManagerUnittest::TestUpdateListenInputExistingAddressDifferentType
     config["QueueKey"] = 1;
     config["InputIndex"] = 1;
     config["Protocol"] = "LoongSuite";
-    const std::string address = "0.0.0.0:50053";
     bool ret = runner->AddListenInput<LoongSuiteForwardServiceImpl>("configA", address, config);
     APSARA_TEST_TRUE_FATAL(ret);
     ret = runner->AddListenInput<MockServiceImpl>("configB", address, config);

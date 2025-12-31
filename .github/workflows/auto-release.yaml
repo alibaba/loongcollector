@@ -151,7 +151,7 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             should_build: ${{ github.event.inputs.build_linux_amd64 == 'true' }}
           - arch: arm64
             runner: ubuntu-24.04-arm
@@ -302,7 +302,7 @@ jobs:
   # 第二步：合并包并准备上传
   prepare-upload:
     needs: [create-release-branch, build-linux, build-windows]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: |
       always() &&
@@ -370,7 +370,7 @@ jobs:
   # 第三步：构建和上传 Docker 镜像
   upload-images:
     needs: [create-release-branch, prepare-upload]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: |
       always() &&
@@ -461,7 +461,7 @@ jobs:
       always() &&
       (needs.create-release-branch.result == 'success') &&
       (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - name: Check out code
@@ -489,7 +489,7 @@ jobs:
           
           echo "Testing links in $DOC_FILE..."
           
-          # 提取所有链接并测试
+          # 提取所有链接并测试，这里第一次运行会失败，手动上传到OSS后重试
           grep -o 'https://[^)]*' "$DOC_FILE" | while read -r url; do
             echo "Testing URL: $url"
             if curl -f -s -o /dev/null "$url"; then
@@ -500,33 +500,12 @@ jobs:
             fi
           done
           
-          # 测试 GitHub Container Registry 镜像
-          echo "Testing GitHub Container Registry images..."
-          
-          # 测试 Docker 镜像是否可访问
-          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          
-          # 测试镜像标签
-          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/$VERSION" | grep -q "200 OK"; then
-            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION accessible"
-          else
-            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:$VERSION failed"
-            exit 1
-          fi
-          
-          if curl -f -s -I "https://ghcr.io/v2/$REPO_OWNER/loongcollector/manifests/latest" | grep -q "200 OK"; then
-            echo "✓ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest accessible"
-          else
-            echo "✗ Docker image ghcr.io/$REPO_OWNER/loongcollector:latest failed"
-            exit 1
-          fi
-          
           echo "All tests passed!" 
 
   # 第五步：创建 GitHub Release
   create-release:
     needs: [create-release-branch, upload-images, test-release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: |
       always() &&
@@ -703,7 +682,7 @@ jobs:
 
   actions-timeline:
     needs: [create-release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
     steps:

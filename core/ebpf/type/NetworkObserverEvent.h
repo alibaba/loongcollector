@@ -23,6 +23,7 @@
 #include "ebpf/type/CommonDataEvent.h"
 #include "ebpf/type/table/AppTable.h"
 #include "ebpf/type/table/DataTable.h"
+#include "ebpf/type/table/DbTable.h"
 #include "ebpf/type/table/HttpTable.h"
 #include "ebpf/type/table/NetTable.h"
 #include "ebpf/type/table/StaticDataRow.h"
@@ -128,6 +129,34 @@ public:
     std::string mRespMsg;
     HeadersMap mReqHeaderMap;
     HeadersMap mRespHeaderMap;
+};
+
+constexpr int64_t kSlowRequestThresholdMs = 500;
+
+class MysqlRecord : public L7Record {
+public:
+    MysqlRecord(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail)
+        : L7Record(conn, appDetail) {}
+
+    [[nodiscard]] virtual bool IsError() const override { return mCode != 0; }
+    [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= kSlowRequestThresholdMs; }
+    void SetStatusCode(int code) { mCode = code; }
+    [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
+
+    [[nodiscard]] virtual const std::string& GetSpanName() { return mSql; }
+    [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandName; }
+    void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
+    const std::string& GetErrorMessage() const { return mErrorMsg; }
+    void SetSql(const std::string& sql) { mSql = sql; }
+
+    const std::string& GetSql() const { return mSql; }
+    void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
+
+private:
+    int mCode = 0;
+    std::string mErrorMsg;
+    std::string mCommandName;
+    std::string mSql;
 };
 
 class ConnStatsRecord : public CommonEvent {
