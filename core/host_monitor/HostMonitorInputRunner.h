@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -115,8 +116,7 @@ private:
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
     std::atomic_uint64_t mRunningPipelineCount = 0;
-    std::thread mStopThread; // Thread for async stop operation
-    std::mutex mStopThreadMutex; // Protect mStopThread access
+    std::future<void> mStopFuture; // Future for async stop operation (similar to EBPFServer/StaticFileServer)
 
     mutable std::shared_mutex mRegisteredCollectorMutex;
     std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;

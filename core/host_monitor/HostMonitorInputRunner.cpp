@@ -82,23 +82,26 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
 }
 
 HostMonitorInputRunner::~HostMonitorInputRunner() {
-    // Ensure stop thread is joined before destruction
-    {
-        std::lock_guard<std::mutex> lock(mStopThreadMutex);
-        if (mStopThread.joinable()) {
-            LOG_INFO(sLogger, ("HostMonitorInputRunner destructor", "waiting for stop thread to complete"));
-            mStopThread.join();
+    // Wait for async stop operation to complete (similar to EBPFServer destructor pattern)
+    if (mStopFuture.valid()) {
+        LOG_INFO(sLogger, ("HostMonitorInputRunner destructor", "waiting for stop operation to complete"));
+        try {
+            mStopFuture.wait(); // Block until async stop completes
+        } catch (const std::exception& e) {
+            // Swallow exceptions in destructor to prevent std::terminate
+            LOG_ERROR(sLogger, ("Stop future wait exception in destructor", e.what()));
+        } catch (...) {
+            LOG_ERROR(sLogger, ("Stop future wait unknown exception in destructor", ""));
         }
     }
-    // Ensure thread pool is fully stopped before destruction
+
+    // Backup: Ensure thread pool is stopped (in case Stop() was never called)
     if (mThreadPool) {
         try {
             mThreadPool->Stop();
         } catch (const std::exception& e) {
-            // Swallow exceptions in destructor to prevent std::terminate
             LOG_ERROR(sLogger, ("ThreadPool stop exception in destructor", e.what()));
         } catch (...) {
-            // Swallow exceptions in destructor to prevent std::terminate
             LOG_ERROR(sLogger, ("ThreadPool stop unknown exception in destructor", ""));
         }
     }
@@ -201,53 +204,37 @@ void HostMonitorInputRunner::Stop() {
 
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    // Use a shared flag to track completion status
-    auto completed = std::make_shared<std::atomic<bool>>(false);
-
-    // First, join any existing stop thread from previous Stop() call
-    {
-        std::lock_guard<std::mutex> lock(mStopThreadMutex);
-        if (mStopThread.joinable()) {
-            LOG_INFO(sLogger, ("Stop", "joining previous stop thread"));
-            mStopThread.join();
+    // Wait for any existing stop operation to complete first
+    if (mStopFuture.valid()) {
+        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
+        if (status != std::future_status::ready) {
+            LOG_WARNING(sLogger, ("Stop", "previous stop operation still running, waiting..."));
+            mStopFuture.wait();
         }
     }
 
-    // Start thread pool stop operation in a joinable thread (not detached)
-    // This thread will be joined in destructor if Stop() times out
-    {
-        std::lock_guard<std::mutex> lock(mStopThreadMutex);
-        mStopThread = std::thread([this, completed]() {
-            try {
-                if (mThreadPool) {
-                    mThreadPool->Stop();
-                }
-                completed->store(true);
-            } catch (const std::exception& e) {
-                LOG_ERROR(sLogger, ("ThreadPool stop exception", e.what()));
-                completed->store(true);
-            } catch (...) {
-                LOG_ERROR(sLogger, ("ThreadPool stop unknown exception", ""));
-                completed->store(true);
+    // Start ThreadPool stop operation asynchronously
+    mStopFuture = std::async(std::launch::async, [this]() {
+        try {
+            if (mThreadPool) {
+                mThreadPool->Stop();
             }
-        });
-    }
-
-    // Wait for completion or timeout
-    auto start = std::chrono::steady_clock::now();
-    while (!completed->load() && std::chrono::steady_clock::now() - start < std::chrono::seconds(5)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    if (completed->load()) {
-        // Stop completed successfully, join the thread now
-        LOG_INFO(sLogger, ("HostMonitorInputRunner", "stop completed successfully"));
-        std::lock_guard<std::mutex> lock(mStopThreadMutex);
-        if (mStopThread.joinable()) {
-            mStopThread.join();
+        } catch (const std::exception& e) {
+            LOG_ERROR(sLogger, ("ThreadPool stop exception", e.what()));
+        } catch (...) {
+            LOG_ERROR(sLogger, ("ThreadPool stop unknown exception", ""));
         }
+    });
+
+    // Wait for completion with timeout
+    std::future_status status = mStopFuture.wait_for(std::chrono::seconds(5));
+
+    if (status == std::future_status::ready) {
+        LOG_INFO(sLogger, ("HostMonitorInputRunner", "stop completed successfully"));
     } else {
-        LOG_ERROR(sLogger, ("host monitor runner stop timeout 5 seconds", "will exit process to ensure thread safety"));
+        // Timeout - force process exit to prevent undefined behavior
+        LOG_ERROR(sLogger,
+                  ("host monitor runner stop timeout 5 seconds", "force exit process to ensure thread safety"));
         Application::GetInstance()->SetSigTermSignalFlag(true);
     }
 #endif

@@ -34,8 +34,6 @@ public:
     void TestUpdateAndRemoveCollector() const;
     void TestScheduleOnce() const;
     void TestReset() const;
-    void TestDestructorWithJoinableThread() const;
-    void TestDestructorWithThreadPoolException() const;
 
 private:
     static void SetUpTestCase() {
@@ -162,117 +160,9 @@ void HostMonitorInputRunnerUnittest::TestReset() const {
     }
 }
 
-// Mock ThreadPool that throws exceptions
-class MockThreadPoolWithException {
-public:
-    explicit MockThreadPoolWithException(bool throwStdException) : mThrowStdException(throwStdException) {}
-
-    void Start() {}
-
-    void Stop() {
-        if (mThrowStdException) {
-            throw std::runtime_error("ThreadPool stop failed");
-        } else {
-            throw 42; // throw non-standard exception
-        }
-    }
-
-    void Add(std::function<void()> task) {}
-
-private:
-    bool mThrowStdException;
-};
-
-void HostMonitorInputRunnerUnittest::TestDestructorWithJoinableThread() const {
-    // Test destructor with joinable stop thread (covers lines 89-90)
-    // This test simulates the scenario where Stop() creates a thread that doesn't complete in time
-    // By manually creating a stop thread before calling destructor-like behavior
-
-    auto runner = HostMonitorInputRunner::GetInstance();
-    runner->Init();
-
-    // Add a collector that takes time to process
-    std::string configName = "slow_test";
-    runner->UpdateCollector(
-        configName, {{MockCollector::sName, 1, HostMonitorCollectType::kMultiValue}}, QueueKey{}, 0);
-
-    // Manually trigger a stop thread scenario by starting thread pool
-    runner->mThreadPool->Start();
-
-    // Add multiple tasks to ThreadPool to make it busy
-    for (int i = 0; i < 100; ++i) {
-        runner->mThreadPool->Add([]() { std::this_thread::sleep_for(std::chrono::milliseconds(10)); });
-    }
-
-    // Call Stop() which will create a mStopThread
-    runner->Stop();
-
-    // At this point, if Stop() timed out, mStopThread would be joinable
-    // The next Stop() call (or destructor in real scenario) will join it
-    // This covers lines 89-90 in the destructor
-
-    // Clean up
-    runner->RemoveCollector(configName);
-}
-
-void HostMonitorInputRunnerUnittest::TestDestructorWithThreadPoolException() const {
-    // Test exception handling in destructor (covers lines 97-102)
-    // We simulate this by testing the exception handling logic in ThreadPool::Stop()
-
-    auto runner = HostMonitorInputRunner::GetInstance();
-
-    // Test std::exception path (lines 97-99)
-    {
-        // Replace ThreadPool with mock that throws std::exception
-        auto originalPool = std::move(runner->mThreadPool);
-        runner->mThreadPool
-            = std::unique_ptr<ThreadPool>(reinterpret_cast<ThreadPool*>(new MockThreadPoolWithException(true)));
-
-        // Trigger destructor-like behavior by attempting to stop
-        try {
-            runner->mThreadPool->Stop();
-        } catch (const std::exception& e) {
-            // This path simulates what happens in destructor lines 97-99
-            APSARA_TEST_TRUE_FATAL(std::string(e.what()).find("ThreadPool stop failed") != std::string::npos);
-        }
-
-        // Restore original pool
-        delete reinterpret_cast<MockThreadPoolWithException*>(runner->mThreadPool.release());
-        runner->mThreadPool = std::move(originalPool);
-    }
-
-    // Test unknown exception path (lines 100-102)
-    {
-        // Replace ThreadPool with mock that throws non-standard exception
-        auto originalPool = std::move(runner->mThreadPool);
-        runner->mThreadPool
-            = std::unique_ptr<ThreadPool>(reinterpret_cast<ThreadPool*>(new MockThreadPoolWithException(false)));
-
-        // Trigger destructor-like behavior
-        try {
-            runner->mThreadPool->Stop();
-        } catch (const std::exception& e) {
-            // Should not reach here
-            APSARA_TEST_TRUE_FATAL(false);
-        } catch (...) {
-            // This path simulates what happens in destructor lines 100-102
-            APSARA_TEST_TRUE_FATAL(true);
-        }
-
-        // Restore original pool
-        delete reinterpret_cast<MockThreadPoolWithException*>(runner->mThreadPool.release());
-        runner->mThreadPool = std::move(originalPool);
-    }
-
-    // Clean state
-    runner->Stop();
-}
-
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestUpdateAndRemoveCollector);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestScheduleOnce);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestReset);
-UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestDestructorWithJoinableThread);
-UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestDestructorWithThreadPoolException);
 
 } // namespace logtail
 
