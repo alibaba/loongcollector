@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "application/Application.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/StringView.h"
@@ -197,6 +198,7 @@ void HostMonitorInputRunner::Stop() {
     if (!mIsStarted.exchange(false)) {
         return;
     }
+
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
     // Use a shared flag to track completion status
@@ -233,7 +235,7 @@ void HostMonitorInputRunner::Stop() {
 
     // Wait for completion or timeout
     auto start = std::chrono::steady_clock::now();
-    while (!completed->load() && std::chrono::steady_clock::now() - start < std::chrono::seconds(3)) {
+    while (!completed->load() && std::chrono::steady_clock::now() - start < std::chrono::seconds(5)) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
@@ -246,7 +248,8 @@ void HostMonitorInputRunner::Stop() {
         }
     } else {
         LOG_ERROR(sLogger,
-                  ("host monitor runner stop timeout 3 seconds", "will wait in destructor to ensure thread safety"));
+            ("host monitor runner stop timeout 5 seconds", "will exit process to ensure thread safety"));
+            Application::GetInstance()->SetSigTermSignalFlag(true);
     }
 #endif
 }
