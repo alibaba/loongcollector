@@ -245,27 +245,27 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
             APSARA_TEST_EQUAL(time(nullptr) + 3600U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
             APSARA_TEST_EQUAL(time(nullptr) + 7200U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["changed_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["changed_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
             APSARA_TEST_EQUAL(2500000000U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[2], item.mFilepath);
         }
-        APSARA_TEST_EQUAL(1U, sConfigManager->mConfigExpireTimeCheckpoint.size());
-        APSARA_TEST_NOT_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
-                              sConfigManager->mConfigExpireTimeCheckpoint.find("unused_config"));
+        APSARA_TEST_EQUAL(1U, sConfigManager->mConfigCheckpointMap.size());
+        APSARA_TEST_NOT_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
+                              sConfigManager->mConfigCheckpointMap.find("unused_config"));
     }
 
     // on update
@@ -340,25 +340,25 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
             APSARA_TEST_EQUAL(time(nullptr) + 1000U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
             APSARA_TEST_EQUAL(time(nullptr) + 1200U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["old_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("unused_config");
             APSARA_TEST_EQUAL(2200000000U, item.mExpireTime);
-            APSARA_TEST_EQUAL(configHash["unused_config.json"], item.mHash);
+            APSARA_TEST_EQUAL(configHash["unused_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / "unused_config.json", item.mFilepath);
         }
-        APSARA_TEST_EQUAL(0U, sConfigManager->mConfigExpireTimeCheckpoint.size());
+        APSARA_TEST_EQUAL(0U, sConfigManager->mConfigCheckpointMap.size());
     }
 }
 

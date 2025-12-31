@@ -146,8 +146,8 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
         APSARA_TEST_EQUAL(time(nullptr) + 3600U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
-        APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
-                          sConfigManager->mConfigExpireTimeCheckpoint.find("new_config"));
+        APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
+                          sConfigManager->mConfigCheckpointMap.find("new_config"));
     }
     {
         // old config
@@ -159,8 +159,8 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
         APSARA_TEST_EQUAL(2500000000U, config.mOnetimeExpireTime.value());
         APSARA_TEST_TRUE(config.mIsRunningBeforeStart);
-        APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
-                          sConfigManager->mConfigExpireTimeCheckpoint.find("old_config"));
+        APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
+                          sConfigManager->mConfigCheckpointMap.find("old_config"));
     }
     {
         // obsolete config, config file existed
@@ -170,8 +170,8 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
 
         ConfigMock config("obsolete_config_1", std::move(configJson), filepath);
         APSARA_TEST_FALSE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(sConfigManager->mConfigExpireTimeCheckpoint.end(),
-                          sConfigManager->mConfigExpireTimeCheckpoint.find("obsolete_config_1"));
+        APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
+                          sConfigManager->mConfigCheckpointMap.find("obsolete_config_1"));
         APSARA_TEST_FALSE(filesystem::exists("obsolete_config_1.json"));
     }
     {

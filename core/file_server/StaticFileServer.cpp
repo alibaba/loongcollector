@@ -78,7 +78,7 @@ void StaticFileServer::ClearUnusedCheckpoints() {
     mIsUnusedCheckpointsCleared = true;
 }
 
-void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool shouldDeleteCheckpoint) {
+void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool keepingCheckpoint) {
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.erase(make_pair(configName, idx));
@@ -87,7 +87,7 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool sh
         mInputFileTagConfigsMap.erase(make_pair(configName, idx));
         mDeletedInputs.emplace(configName, idx);
     }
-    if (shouldDeleteCheckpoint) {
+    if (!keepingCheckpoint) {
         InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);
     }
 }
@@ -179,7 +179,7 @@ void StaticFileServer::ReadFiles() {
                     }
 
                     auto logBuffer = make_unique<LogBuffer>();
-                    bool moreData = reader->ReadLog(*logBuffer, nullptr);
+                    bool moreData = reader->ReadLog(*logBuffer, nullptr, true);
                     auto group = LogFileReader::GenerateEventGroup(reader, logBuffer.get());
                     if (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), inputIdx, std::move(group))) {
                         // should not happend, since only one thread is pushing to the queue
@@ -240,22 +240,8 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             continue;
         }
 
-        // 确保路径被正确规范化后再拆分
-        filePath = filePath.lexically_normal();
-        auto parentPath = filePath.parent_path();
-        auto fileName = filePath.filename();
-
-        // 验证路径拆分是否正确
-        if (fileName.empty()) {
-            LOG_ERROR(sLogger,
-                      ("invalid file path, filename is empty",
-                       "")("config", configName)("input idx", idx)("filepath", filePath.string()));
-            InputStaticFileCheckpointManager::GetInstance()->InvalidateCurrentFileCheckpoint(configName, idx);
-            continue;
-        }
-
-        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(parentPath.string(),
-                                                                   fileName.string(),
+        LogFileReaderPtr reader(LogFileReader::CreateLogFileReader(filePath.parent_path().string(),
+                                                                   filePath.filename().string(),
                                                                    fingerprint.mDevInode,
                                                                    GetFileReaderConfig(configName, idx),
                                                                    GetMultilineConfig(configName, idx),

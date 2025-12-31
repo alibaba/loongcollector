@@ -31,13 +31,13 @@ struct PipelineConfig {
     std::string mName;
     std::unique_ptr<Json::Value> mDetail;
     uint64_t mConfigHash = 0;
+    uint64_t mInputsHash = 0;
     std::filesystem::path mFilePath;
     uint32_t mCreateTime = 0;
     // valid for onetime config
     uint32_t mExcutionTimeout = 0;
     std::optional<uint32_t> mOnetimeStartTime;
     std::optional<uint32_t> mOnetimeExpireTime;
-    uint64_t mInputsHash = 0;
     bool mIsRunningBeforeStart = false;
     bool mForceRerunWhenUpdate = true;
 

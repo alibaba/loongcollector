@@ -15,7 +15,6 @@
 #include "config/PipelineConfig.h"
 
 #include "common/JsonUtil.h"
-#include "common/ParamExtractor.h"
 #include "config/OnetimeConfigInfoManager.h"
 #include "logger/Logger.h"
 
@@ -56,10 +55,15 @@ IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout
     if (forceRerunWhenUpdate != nullptr) {
         // Set default value first (true)
         *forceRerunWhenUpdate = true;
-        string errorMsg;
-        GetOptionalBoolParam(global, "ForceRerunWhenUpdate", *forceRerunWhenUpdate, errorMsg);
-        // If GetOptionalBoolParam returns false, it means type error, but we still use default value
-        // If parameter doesn't exist, GetOptionalBoolParam returns true and param keeps default value
+        const char* key = "ForceRerunWhenUpdate";
+        const auto* it = global.find(key, key + strlen(key));
+        if (it != nullptr && it->isBool()) {
+            *forceRerunWhenUpdate = it->asBool();
+        } else if (it != nullptr && !it->isBool()) {
+            LOG_WARNING(sLogger,
+                        ("param global.ForceRerunWhenUpdate is not of type bool",
+                         "use default instead")("default", true)("config", configName));
+        }
     }
     return true;
 }
@@ -71,9 +75,7 @@ PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& det
     const char* inputsKey = "inputs";
     const auto* inputsIt = mDetail->find(inputsKey, inputsKey + strlen(inputsKey));
     if (inputsIt != nullptr && inputsIt->isArray()) {
-        Json::Value inputsHashValue(Json::objectValue);
-        inputsHashValue["inputs"] = *inputsIt;
-        mInputsHash = static_cast<uint64_t>(Hash(inputsHashValue));
+        mInputsHash = static_cast<uint64_t>(Hash(*inputsIt));
     }
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }

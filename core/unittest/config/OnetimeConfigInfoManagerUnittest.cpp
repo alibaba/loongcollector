@@ -94,10 +94,10 @@ void OnetimeConfigInfoManagerUnittest::TestLoadCheckpointFile() const {
 })";
         }
         APSARA_TEST_TRUE(sManager->LoadCheckpointFile());
-        APSARA_TEST_EQUAL(1U, sManager->mConfigExpireTimeCheckpoint.size());
-        const auto& item = sManager->mConfigExpireTimeCheckpoint.at("test_config_1");
-        APSARA_TEST_EQUAL(1111111111111111U, std::get<0>(item));
-        APSARA_TEST_EQUAL(1234567890U, std::get<1>(item));
+        APSARA_TEST_EQUAL(1U, sManager->mConfigCheckpointMap.size());
+        const auto& item = sManager->mConfigCheckpointMap.at("test_config_1");
+        APSARA_TEST_EQUAL(1111111111111111U, item.mConfigHash);
+        APSARA_TEST_EQUAL(1234567890U, item.mExpireTime);
     }
 }
 
@@ -132,7 +132,7 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
 })";
     }
     sManager->LoadCheckpointFile();
-    APSARA_TEST_EQUAL(4U, sManager->mConfigExpireTimeCheckpoint.size());
+    APSARA_TEST_EQUAL(4U, sManager->mConfigCheckpointMap.size());
 
     uint32_t expireTime = 0;
     // test_config_1: hash and inputsHash both match, should return OLD
@@ -155,11 +155,11 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
     // test_config_5: not in checkpoint, should return NEW
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
                       sManager->GetOnetimeConfigStatus("test_config_5", 10U, false, 0U, 0U, &expireTime));
-    APSARA_TEST_EQUAL(0U, sManager->mConfigExpireTimeCheckpoint.size());
+    APSARA_TEST_EQUAL(0U, sManager->mConfigCheckpointMap.size());
 
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 0;
     sManager->ClearUnusedCheckpoints();
-    APSARA_TEST_TRUE(sManager->mConfigExpireTimeCheckpoint.empty());
+    APSARA_TEST_TRUE(sManager->mConfigCheckpointMap.empty());
     sManager->ClearUnusedCheckpoints();
     INT32_FLAG(unused_checkpoints_clear_interval_sec) = 600;
 }
@@ -196,7 +196,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         const auto& info = sManager->mConfigInfoMap.at("test_config_1");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
-        APSARA_TEST_EQUAL(1U, info.mHash);
+        APSARA_TEST_EQUAL(1U, info.mConfigHash);
         APSARA_TEST_EQUAL(1000000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
         APSARA_TEST_EQUAL(3600U, info.mExcutionTimeout);
@@ -205,7 +205,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         const auto& info = sManager->mConfigInfoMap.at("test_config_2");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_2.json"), info.mFilepath);
-        APSARA_TEST_EQUAL(2U, info.mHash);
+        APSARA_TEST_EQUAL(2U, info.mConfigHash);
         APSARA_TEST_EQUAL(1500000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
         APSARA_TEST_EQUAL(1800U, info.mExcutionTimeout);
@@ -214,7 +214,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         const auto& info = sManager->mConfigInfoMap.at("test_config_3");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_3.json"), info.mFilepath);
-        APSARA_TEST_EQUAL(3U, info.mHash);
+        APSARA_TEST_EQUAL(3U, info.mConfigHash);
         APSARA_TEST_EQUAL(4000000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
         APSARA_TEST_EQUAL(7200U, info.mExcutionTimeout);
@@ -234,7 +234,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
         const auto& info = sManager->mConfigInfoMap.at("test_config_1");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
         APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
-        APSARA_TEST_EQUAL(1U, info.mHash);
+        APSARA_TEST_EQUAL(1U, info.mConfigHash);
         APSARA_TEST_EQUAL(1200000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
         APSARA_TEST_EQUAL(3600U, info.mExcutionTimeout);
@@ -281,7 +281,7 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
 })";
     }
     sManager->LoadCheckpointFile();
-    APSARA_TEST_EQUAL(4U, sManager->mConfigExpireTimeCheckpoint.size());
+    APSARA_TEST_EQUAL(4U, sManager->mConfigCheckpointMap.size());
 
     uint32_t expireTime = 0;
 
