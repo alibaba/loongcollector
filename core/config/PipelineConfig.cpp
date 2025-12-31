@@ -89,25 +89,28 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
         mName, mConfigHash, mForceRerunWhenUpdate, mInputsHash, mExcutionTimeout, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
+            // OLD状态表示是已经存在配置，保持原样
             mOnetimeStartTime = expireTime - mExcutionTimeout;
             mOnetimeExpireTime = expireTime;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger, ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
             return true;
         case OnetimeConfigStatus::NEW:
+            // NEW状态表示是新配置，或已有配置Rerun了
             mOnetimeStartTime = time(nullptr);
             mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             return true;
         case OnetimeConfigStatus::UPDATED:
-            // UPDATED状态表示配置hash改变但input hash未变，保持原有过期时间
-            mOnetimeStartTime = expireTime - mExcutionTimeout;
-            mOnetimeExpireTime = expireTime;
+            // UPDATED状态表示配置hash改变但input hash未变，保持原有checkpoint，但是更新过期时间
+            mOnetimeStartTime = time(nullptr);
+            mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger,
-                     ("config hash changed but inputs hash unchanged",
-                      "keep existing expire time")("expire time", expireTime)("config", mName));
+                     ("config hash changed but inputs hash unchanged", "keep existing checkpoint, update expire time")(
+                         "expire time", mOnetimeExpireTime.value())("config", mName));
             return true;
         case OnetimeConfigStatus::OBSOLETE: {
+            // OBSOLETE状态表示配置过期，删除配置文件
             error_code ec;
             if (filesystem::remove(mFilePath, ec)) {
                 LOG_INFO(sLogger,

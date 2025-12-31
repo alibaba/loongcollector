@@ -76,10 +76,6 @@ OnetimeConfigStatus OnetimeConfigInfoManager::GetOnetimeConfigStatus(const strin
             // Step 5: 如果mForceRerunWhenUpdate为false，检查input插件的hash和excutionTimeout是否都一致
             if (configInputsHash == inputsHash && configExcutionTimeout == excutionTimeout) {
                 status = OnetimeConfigStatus::UPDATED;
-                // For UPDATED status, use expire time from checkpoint
-                if (expireTime) {
-                    *expireTime = configExpireTime;
-                }
             } else {
                 status = OnetimeConfigStatus::NEW;
             }
