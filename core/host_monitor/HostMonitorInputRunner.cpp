@@ -247,9 +247,8 @@ void HostMonitorInputRunner::Stop() {
             mStopThread.join();
         }
     } else {
-        LOG_ERROR(sLogger,
-            ("host monitor runner stop timeout 5 seconds", "will exit process to ensure thread safety"));
-            Application::GetInstance()->SetSigTermSignalFlag(true);
+        LOG_ERROR(sLogger, ("host monitor runner stop timeout 5 seconds", "will exit process to ensure thread safety"));
+        Application::GetInstance()->SetSigTermSignalFlag(true);
     }
 #endif
 }
