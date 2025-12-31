@@ -1465,7 +1465,7 @@ void LogFileReader::SetReadBufferSize(int32_t bufSize) {
 bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback, bool isStaticFile) {
     // if the expected file size limit is set (StaticFileServer reader), use the smaller value
     int64_t effectiveFileSize = fileSize;
-    if (isStaticFile && mExpectedFileSize > 0) {
+    if (mExpectedFileSize > 0) {
         effectiveFileSize = std::min(fileSize, mExpectedFileSize);
         // if already read to the expected size, return false to indicate no more data
         if (mLastFilePos >= mExpectedFileSize) {
