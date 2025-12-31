@@ -116,7 +116,7 @@ private:
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
     std::atomic_uint64_t mRunningPipelineCount = 0;
-    std::future<void> mStopFuture; // Future for async stop operation (similar to EBPFServer/StaticFileServer)
+    std::future<void> mStopFuture; // Future for async stop operation 
 
     mutable std::shared_mutex mRegisteredCollectorMutex;
     std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;
