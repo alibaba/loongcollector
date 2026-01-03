@@ -16,7 +16,11 @@ package selfmonitor
 
 import (
 	"fmt"
+	"log"
+	"sort"
 	"sync"
+	"sync/atomic"
+	"time"
 	"unsafe"
 
 	"github.com/alibaba/ilogtail/pkg/helper/pool"
@@ -25,6 +29,7 @@ import (
 
 const (
 	defaultTagValue = "-"
+	minExpiration   = time.Minute * 5
 )
 
 var (
@@ -37,96 +42,109 @@ func SetMetricVectorCacheFactory(factory func(MetricSet) MetricVectorCache) {
 }
 
 type (
-	CumulativeCounterMetricVector = MetricVector[CounterMetric]
-	AverageMetricVector           = MetricVector[CounterMetric]
-	MaxMetricVector               = MetricVector[GaugeMetric]
-	CounterMetricVector           = MetricVector[CounterMetric]
-	GaugeMetricVector             = MetricVector[GaugeMetric]
-	LatencyMetricVector           = MetricVector[LatencyMetric]
-	StringMetricVector            = MetricVector[StringMetric]
+	CumulativeCounterMetricVector   = MetricVector[CounterMetric]
+	AverageMetricVector             = MetricVector[CounterMetric]
+	MaxMetricVector                 = MetricVector[GaugeMetric]
+	CounterMetricVector             = MetricVector[CounterMetric]
+	GaugeMetricVector               = MetricVector[GaugeMetric]
+	LatencyMetricVector             = MetricVector[LatencyMetric]
+	StringMetricVector              = MetricVector[StringMetric]
+	HistogramMetricVector           = MetricVector[HistogramMetric]
+	CumulativeHistogramMetricVector = MetricVector[HistogramMetric]
 )
 
-// Deprecated: use NewCounterMetricVector instead.
 // NewCumulativeCounterMetricVector creates a new CounterMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewCumulativeCounterMetricVector(metricName string, constLabels map[string]string, labelNames []string) CumulativeCounterMetricVector {
-	return NewMetricVector[CounterMetric](metricName, CumulativeCounterType, constLabels, labelNames)
+func NewCumulativeCounterMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) CumulativeCounterMetricVector {
+	return NewMetricVector[CounterMetric](metricName, CumulativeCounterType, constLabels, labelNames, opts...)
 }
 
 // NewCounterMetricVector creates a new DeltaMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewCounterMetricVector(metricName string, constLabels map[string]string, labelNames []string) CounterMetricVector {
-	return NewMetricVector[CounterMetric](metricName, CounterType, constLabels, labelNames)
+func NewCounterMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) CounterMetricVector {
+	return NewMetricVector[CounterMetric](metricName, CounterType, constLabels, labelNames, opts...)
 }
 
 // NewAverageMetricVector creates a new AverageMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewAverageMetricVector(metricName string, constLabels map[string]string, labelNames []string) AverageMetricVector {
-	return NewMetricVector[CounterMetric](metricName, AverageType, constLabels, labelNames)
+func NewAverageMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) AverageMetricVector {
+	return NewMetricVector[CounterMetric](metricName, AverageType, constLabels, labelNames, opts...)
 }
 
 // NewMaxMetricVector creates a new MaxMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewMaxMetricVector(metricName string, constLabels map[string]string, labelNames []string) MaxMetricVector {
-	return NewMetricVector[GaugeMetric](metricName, MaxType, constLabels, labelNames)
+func NewMaxMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) MaxMetricVector {
+	return NewMetricVector[GaugeMetric](metricName, MaxType, constLabels, labelNames, opts...)
 }
 
 // NewGaugeMetricVector creates a new GaugeMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewGaugeMetricVector(metricName string, constLabels map[string]string, labelNames []string) GaugeMetricVector {
-	return NewMetricVector[GaugeMetric](metricName, GaugeType, constLabels, labelNames)
+func NewGaugeMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) GaugeMetricVector {
+	return NewMetricVector[GaugeMetric](metricName, GaugeType, constLabels, labelNames, opts...)
 }
 
 // NewStringMetricVector creates a new StringMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewStringMetricVector(metricName string, constLabels map[string]string, labelNames []string) StringMetricVector {
-	return NewMetricVector[StringMetric](metricName, StringType, constLabels, labelNames)
+func NewStringMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) StringMetricVector {
+	return NewMetricVector[StringMetric](metricName, StringType, constLabels, labelNames, opts...)
 }
 
 // NewLatencyMetricVector creates a new LatencyMetricVector.
 // Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
-func NewLatencyMetricVector(metricName string, constLabels map[string]string, labelNames []string) LatencyMetricVector {
-	return NewMetricVector[LatencyMetric](metricName, LatencyType, constLabels, labelNames)
+func NewLatencyMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) LatencyMetricVector {
+	return NewMetricVector[LatencyMetric](metricName, LatencyType, constLabels, labelNames, opts...)
+}
+
+// NewHistogramMetricVector creates a new HistogramMetricVector.
+// Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
+func NewHistogramMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) HistogramMetricVector {
+	return NewMetricVector[HistogramMetric](metricName, HistogramType, constLabels, labelNames, opts...)
+}
+
+// NewCumulativeHistogramMetricVector creates a new CumulativeHistogramMetricVector.
+// Note that MetricVector doesn't expose Collect API by default. Plugins Developers should be careful to collect metrics manually.
+func NewCumulativeHistogramMetricVector(metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) CumulativeHistogramMetricVector {
+	return NewMetricVector[HistogramMetric](metricName, CumulativeHistogramType, constLabels, labelNames, opts...)
 }
 
 // NewCumulativeCounterMetricVectorAndRegister creates a new CounterMetricVector and register it to the MetricsRecord.
-func NewCumulativeCounterMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) CumulativeCounterMetricVector {
-	v := NewMetricVector[CounterMetric](metricName, CumulativeCounterType, constLabels, labelNames)
+func NewCumulativeCounterMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) CumulativeCounterMetricVector {
+	v := NewMetricVector[CounterMetric](metricName, CumulativeCounterType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
 
 // NewAverageMetricVectorAndRegister creates a new AverageMetricVector and register it to the MetricsRecord.
-func NewAverageMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) AverageMetricVector {
-	v := NewMetricVector[CounterMetric](metricName, AverageType, constLabels, labelNames)
+func NewAverageMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) AverageMetricVector {
+	v := NewMetricVector[CounterMetric](metricName, AverageType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
 
 // NewCounterMetricVectorAndRegister creates a new DeltaMetricVector and register it to the MetricsRecord.
-func NewCounterMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) CounterMetricVector {
-	v := NewMetricVector[CounterMetric](metricName, CounterType, constLabels, labelNames)
+func NewCounterMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) CounterMetricVector {
+	v := NewMetricVector[CounterMetric](metricName, CounterType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
 
 // NewGaugeMetricVectorAndRegister creates a new GaugeMetricVector and register it to the MetricsRecord.
-func NewGaugeMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) GaugeMetricVector {
-	v := NewMetricVector[GaugeMetric](metricName, GaugeType, constLabels, labelNames)
+func NewGaugeMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) GaugeMetricVector {
+	v := NewMetricVector[GaugeMetric](metricName, GaugeType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
 
 // NewLatencyMetricVectorAndRegister creates a new LatencyMetricVector and register it to the MetricsRecord.
-func NewLatencyMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) LatencyMetricVector {
-	v := NewMetricVector[LatencyMetric](metricName, LatencyType, constLabels, labelNames)
+func NewLatencyMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) LatencyMetricVector {
+	v := NewMetricVector[LatencyMetric](metricName, LatencyType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
 
 // NewStringMetricVectorAndRegister creates a new StringMetricVector and register it to the MetricsRecord.
-func NewStringMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string) StringMetricVector {
-	v := NewMetricVector[StringMetric](metricName, StringType, constLabels, labelNames)
+func NewStringMetricVectorAndRegister(mr *MetricsRecord, metricName string, constLabels map[string]string, labelNames []string, opts ...MetricOption) StringMetricVector {
+	v := NewMetricVector[StringMetric](metricName, StringType, constLabels, labelNames, opts...)
 	mr.RegisterMetricCollector(v)
 	return v
 }
@@ -224,6 +242,149 @@ type MetricVectorAndCollector[T Metric] interface {
 	MetricCollector
 }
 
+type metricOption struct {
+	name             string // metric name
+	desc             string
+	unit             string
+	metricType       SelfMetricType
+	constLabels      []LabelPair // constLabels is the labels that are not changed when the metric is created.
+	labelKeys        []string    // labelNames is the names of the labels. The values of the labels can be changed.
+	isDynamicLabel   bool
+	metricExpiration time.Duration
+	isCumulative     bool
+	bucketBoundaries []float64
+	cardinalityLimit int // 0 is unlimited
+	overflowKey      string
+	enableGC         bool
+}
+
+func (o metricOption) Desc() string {
+	return o.desc
+}
+
+func (o metricOption) Unit() string {
+	return o.unit
+}
+
+func (o metricOption) Name() string {
+	return o.name
+}
+
+func (o metricOption) Type() SelfMetricType {
+	return o.metricType
+}
+
+func (o metricOption) ConstLabels() []LabelPair {
+	return o.constLabels
+}
+
+func (o metricOption) LabelKeys() []string {
+	return o.labelKeys
+}
+
+func (o metricOption) IsLabelDynamic() bool {
+	return o.isDynamicLabel
+}
+
+func (o metricOption) Expiration() time.Duration {
+	return o.metricExpiration
+}
+
+func (o metricOption) IsCumulative() bool {
+	return o.isCumulative
+}
+
+func (o metricOption) BucketBoundaries() []float64 {
+	return o.bucketBoundaries
+}
+
+func (o metricOption) CardinalityLimit() int {
+	return o.cardinalityLimit
+}
+
+func (o metricOption) OverflowKey() string {
+	return o.overflowKey
+}
+
+func (o metricOption) EnableGC() bool {
+	return o.enableGC
+}
+
+func defaultMetricOption() metricOption {
+	return metricOption{
+		overflowKey: "overflow",
+		enableGC:    false,
+	}
+}
+
+type MetricOption func(option metricOption) metricOption
+
+func WithDynamicLabel() MetricOption {
+	return func(option metricOption) metricOption {
+		option.isDynamicLabel = true
+		return option
+	}
+}
+
+func WithExpiration(expiration time.Duration) MetricOption {
+	return func(option metricOption) metricOption {
+		option.metricExpiration = expiration
+		return option
+	}
+}
+
+func WithDesc(desc string) MetricOption {
+	return func(option metricOption) metricOption {
+		option.desc = desc
+		return option
+	}
+}
+
+func WithUnit(unit string) MetricOption {
+	return func(option metricOption) metricOption {
+		option.unit = unit
+		return option
+	}
+}
+
+func WithCumulative() MetricOption {
+	return func(option metricOption) metricOption {
+		option.isCumulative = true
+		return option
+	}
+}
+
+func WithBucketBoundaries(boundaries []float64) MetricOption {
+	return func(option metricOption) metricOption {
+		option.bucketBoundaries = boundaries
+		return option
+	}
+}
+
+func WithCardinalityLimit(limit int) MetricOption {
+	return func(option metricOption) metricOption {
+		if limit <= 0 {
+			return option
+		}
+		option.cardinalityLimit = limit
+		return option
+	}
+}
+
+func WithOverflowKey(key string) MetricOption {
+	return func(option metricOption) metricOption {
+		option.overflowKey = key
+		return option
+	}
+}
+
+func WithGC(enable bool) MetricOption {
+	return func(option metricOption) metricOption {
+		option.enableGC = enable
+		return option
+	}
+}
+
 type MetricVectorImpl[T Metric] struct {
 	*metricVector
 }
@@ -232,14 +393,48 @@ type MetricVectorImpl[T Metric] struct {
 // It returns a MetricVectorAndCollector, which is a MetricVector and a MetricCollector.
 // For plugin developers, they should use MetricVector APIs to create metrics.
 // For agent itself, it uses MetricCollector APIs to collect metrics.
-func NewMetricVector[T Metric](metricName string, metricType SelfMetricType, constLabels map[string]string, labelNames []string) MetricVectorAndCollector[T] {
+func NewMetricVector[T Metric](metricName string, metricType SelfMetricType, constLabels map[string]string, labelNames []string, opts ...MetricOption) MetricVectorAndCollector[T] {
+	options := defaultMetricOption()
+	options.name = metricName
+	options.metricType = metricType
+	options.labelKeys = labelNames
+	for k, v := range constLabels {
+		options.constLabels = append(options.constLabels, LabelPair{Key: k, Value: v})
+	}
+
+	for _, opt := range opts {
+		options = opt(options)
+	}
+
 	return &MetricVectorImpl[T]{
-		metricVector: newMetricVector(metricName, metricType, constLabels, labelNames),
+		metricVector: newMetricVector(options),
 	}
 }
 
 func (m *MetricVectorImpl[T]) WithLabels(labels ...LabelPair) T {
 	return m.metricVector.WithLabels(labels...).(T)
+}
+
+func (m *MetricVectorImpl[T]) Start() error {
+	return m.metricVector.Start()
+}
+
+func (m *MetricVectorImpl[T]) Close() error {
+	return m.metricVector.Close()
+}
+
+var (
+	_ MetricSet = (*metricVector)(nil)
+)
+
+type metricVector struct {
+	metricOption
+
+	indexPool pool.GenericPool[string] // index is []string, which is sorted according to labelNames.
+	labelPool pool.GenericPool[LabelPair]
+	cache     MetricVectorCache // collector is a map[string]Metric, key is the index of the metric.
+	close     chan struct{}
+	once      sync.Once
 }
 
 // MetricVectorCache is a cache for MetricVector.
@@ -251,51 +446,28 @@ type MetricVectorCache interface {
 	MetricCollector
 }
 
-type metricVector struct {
-	name        string // metric name
-	metricType  SelfMetricType
-	constLabels []LabelPair // constLabels is the labels that are not changed when the metric is created.
-	labelKeys   []string    // labelNames is the names of the labels. The values of the labels can be changed.
-
-	indexPool pool.GenericPool[string] // index is []string, which is sorted according to labelNames.
-	cache     MetricVectorCache        // collector is a map[string]Metric, key is the index of the metric.
-}
-
-func newMetricVector(
-	metricName string,
-	metricType SelfMetricType,
-	constLabels map[string]string,
-	labelNames []string,
-) *metricVector {
+func newMetricVector(option metricOption) *metricVector {
 	mv := &metricVector{
-		name:       metricName,
-		metricType: metricType,
-		labelKeys:  labelNames,
-		indexPool:  pool.NewGenericPool(func() []string { return make([]string, 0, 10) }),
+		metricOption: option,
+		indexPool:    pool.NewGenericPool(func() []string { return make([]string, 0, 10) }),
+		labelPool:    pool.NewGenericPool(func() []LabelPair { return make([]LabelPair, 0, 10) }),
+		close:        make(chan struct{}),
 	}
-
-	for k, v := range constLabels {
-		mv.constLabels = append(mv.constLabels, LabelPair{Key: k, Value: v})
-	}
-
 	mv.cache = DefaultCacheFactory(mv)
+
+	if mv.metricExpiration > 0 && option.EnableGC() {
+		if err := mv.Start(); err != nil {
+			log.Printf("start metric vector %v, failed: %v", option, err)
+		}
+	}
 	return mv
 }
 
-func (v *metricVector) Name() string {
-	return v.name
-}
-
-func (v *metricVector) Type() SelfMetricType {
-	return v.metricType
-}
-
-func (v *metricVector) ConstLabels() []LabelPair {
-	return v.constLabels
-}
-
 func (v *metricVector) LabelKeys() []string {
-	return v.labelKeys
+	if v.isDynamicLabel {
+		return nil
+	}
+	return v.metricOption.LabelKeys()
 }
 
 func (v *metricVector) WithLabels(labels ...LabelPair) Metric {
@@ -307,34 +479,82 @@ func (v *metricVector) WithLabels(labels ...LabelPair) Metric {
 	return v.cache.WithLabelValues(*labelValues)
 }
 
+func (v *metricVector) Start() error {
+	if v.metricExpiration <= 0 {
+		return fmt.Errorf("metric vector %v is not started gc since expiration is %v", v.metricOption, v.metricExpiration)
+	}
+
+	go v.gc(v.metricExpiration)
+	return nil
+}
+
 func (v *metricVector) Collect() []Metric {
 	return v.cache.Collect()
 }
 
+func (v *metricVector) Close() error {
+	v.once.Do(func() {
+		close(v.close)
+	})
+	return nil
+}
+
+func (v *metricVector) gc(metricExpiration time.Duration) {
+	gcInterval := time.Duration(float64(metricExpiration) * 0.25)
+	for {
+		select {
+		case <-v.close:
+			return
+		case <-time.After(gcInterval):
+			if gcer, ok := v.cache.(GCer); ok {
+				gcer.GC(metricExpiration)
+			}
+		}
+	}
+}
+
+type GCer interface {
+	GC(expiration time.Duration)
+}
+
 // buildLabelValues return the index
 func (v *metricVector) buildLabelValues(labels []LabelPair) (*[]string, error) {
-	if len(labels) > len(v.labelKeys) {
+	if !v.isDynamicLabel && len(labels) > len(v.labelKeys) {
 		return nil, fmt.Errorf("too many labels, expected %d, got %d. defined labels: %v",
 			len(v.labelKeys), len(labels), v.labelKeys)
 	}
 
 	index := v.indexPool.Get()
-	for range v.labelKeys {
-		*index = append(*index, defaultTagValue)
-	}
+	if !v.isDynamicLabel {
+		for range v.labelKeys {
+			*index = append(*index, defaultTagValue)
+		}
 
-	for d, tag := range labels {
-		if v.labelKeys[d] == tag.Key { // fast path
-			(*index)[d] = tag.Value
-		} else {
-			err := v.slowConstructIndex(index, tag)
-			if err != nil {
-				v.indexPool.Put(index)
-				return nil, err
+		for d, tag := range labels {
+			if v.labelKeys[d] == tag.Key { // fast path
+				(*index)[d] = tag.Value
+			} else {
+				err := v.slowConstructIndex(index, tag)
+				if err != nil {
+					v.indexPool.Put(index)
+					return nil, err
+				}
 			}
 		}
+	} else {
+		tmpLabels := v.labelPool.Get()
+		*tmpLabels = append(*tmpLabels, labels...)
+		sort.Slice(*tmpLabels, func(i, j int) bool {
+			return (*tmpLabels)[i].Key < (*tmpLabels)[j].Key
+		})
+		for _, tag := range *tmpLabels {
+			value := tag.Value
+			if value == "" {
+				value = defaultTagValue
+			}
+			*index = append(*index, tag.Key, value)
+		}
 	}
-
 	return index, nil
 }
 
@@ -348,7 +568,15 @@ func (v *metricVector) slowConstructIndex(index *[]string, tag LabelPair) error 
 	return fmt.Errorf("undefined label: %s in %v", tag.Key, v.labelKeys)
 }
 
+var (
+	_ GCer = (*MapCache)(nil)
+)
+
 type MapCache struct {
+	currCardinality  int64
+	overflowInitOnce sync.Once
+	overflowMetric   Metric
+
 	MetricSet
 	bytesPool pool.GenericPool[byte]
 	sync.Map
@@ -377,12 +605,37 @@ func (v *MapCache) WithLabelValues(labelValues []string) Metric {
 		return metric
 	}
 
-	newMetric := newMetric(v.Type(), v, labelValues)
+	if v.IsCardinalityLimitReached() {
+		v.bytesPool.Put(buffer)
+
+		v.overflowInitOnce.Do(func() {
+			v.overflowMetric = newMetric(v.Type(), v, v.GetOverflowMetricLabels(), v.BucketBoundaries())
+		})
+		return v.overflowMetric
+	}
+
+	atomic.AddInt64(&v.currCardinality, 1)
+	newMetric := newMetric(v.Type(), v, labelValues, v.BucketBoundaries())
 	acV, loaded = v.LoadOrStore(k, newMetric)
 	if loaded {
 		v.bytesPool.Put(buffer)
 	}
 	return acV.(Metric)
+}
+
+func (v *MapCache) GetOverflowMetricLabels() []string {
+	if v.IsLabelDynamic() {
+		return []string{v.OverflowKey(), "true"}
+	}
+	index := make([]string, len(v.LabelKeys()))
+	for i := range v.LabelKeys() {
+		index[i] = v.OverflowKey()
+	}
+	return index
+}
+
+func (v *MapCache) IsCardinalityLimitReached() bool {
+	return v.CardinalityLimit() > 0 && atomic.LoadInt64(&v.currCardinality) >= int64(v.CardinalityLimit())
 }
 
 func (v *MapCache) Collect() []Metric {
@@ -391,7 +644,28 @@ func (v *MapCache) Collect() []Metric {
 		res = append(res, value.(Metric))
 		return true
 	})
+
+	if v.overflowMetric != nil {
+		res = append(res, v.overflowMetric)
+	}
 	return res
+}
+
+type Expirable interface {
+	GetLastActiveTime() time.Time
+}
+
+func (v *MapCache) GC(expiration time.Duration) {
+	now := time.Now()
+	v.Range(func(key, value interface{}) bool {
+		if metric, ok := value.(Expirable); ok {
+			if metric.GetLastActiveTime().Add(expiration).Before(now) {
+				v.Delete(key)
+				atomic.AddInt64(&v.currCardinality, -1)
+			}
+		}
+		return true
+	})
 }
 
 func convertLabels(labels []*protocol.Log_Content) map[string]string {

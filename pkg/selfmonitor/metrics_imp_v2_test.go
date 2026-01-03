@@ -109,7 +109,10 @@ func TestStrMetricV2_Set(t *testing.T) {
 }
 
 func TestDelta(t *testing.T) {
-	ms := newMetricVector("test", CounterType, nil, nil)
+	option := defaultMetricOption()
+	option.name = "test"
+	option.metricType = CounterType
+	ms := newMetricVector(option)
 	delta := newDeltaCounter(ms, nil)
 
 	for i := 0; i < 1000; i++ {
@@ -125,4 +128,227 @@ func TestDelta(t *testing.T) {
 
 	assert.Equal(t, float64(100000), delta.Collect().Value)
 	assert.Equal(t, float64(0), delta.Collect().Value)
+}
+
+type mockMetricSet struct {
+	metricOption
+}
+
+func newMockMetricSet(name string) *mockMetricSet {
+	option := defaultMetricOption()
+	option.name = name
+	return &mockMetricSet{
+		metricOption: option,
+	}
+}
+
+func (m *mockMetricSet) ConstLabels() []LabelPair {
+	return m.constLabels
+}
+
+func (m *mockMetricSet) IsLabelDynamic() bool {
+	return m.isDynamicLabel
+}
+
+func (m *mockMetricSet) LabelKeys() []string {
+	return m.labelKeys
+}
+
+func (m *mockMetricSet) Name() string {
+	return m.name
+}
+
+func (m *mockMetricSet) Type() SelfMetricType {
+	return m.metricType
+}
+
+var _ MetricSet = (*mockMetricSet)(nil)
+
+func TestExpireable(t *testing.T) {
+	ms := newMockMetricSet("test")
+	d := newDeltaCounter(ms, nil)
+	e, ok := d.(Expirable)
+	assert.True(t, ok)
+	assert.False(t, e.GetLastActiveTime().IsZero())
+	last := e.GetLastActiveTime()
+	export := d.Export()
+	assert.Equal(t, "test", getMetriName(export))
+	last2 := e.GetLastActiveTime()
+	assert.Equal(t, last, last2)
+
+	d.Add(1)
+	export2 := d.Export()
+	assert.Equal(t, "1.0000", getMetricValue(export2))
+	last3 := e.GetLastActiveTime()
+	assert.False(t, last3.IsZero())
+	assert.NotEqual(t, last, last3)
+}
+
+func TestMetricDynamicLabel(t *testing.T) {
+	constLabels := map[string]string{
+		"constKey1": "constValue1",
+	}
+	counters := NewMetricVector[CounterMetric]("test", CounterType, constLabels, nil, WithDynamicLabel())
+	counters.WithLabels(LabelPair{
+		Key:   "key1",
+		Value: "value1",
+	}).Add(1)
+
+	counters.WithLabels(LabelPair{
+		Key:   "key2",
+		Value: "value2",
+	}).Add(3)
+
+	ms := counters.Collect()
+	assert.Equal(t, 2, len(ms))
+	for _, m := range ms {
+		event := m.ExportEvent()
+		assert.Equal(t, "test", event.GetName())
+		assert.Equal(t, "constValue1", event.GetTags().Get("constKey1"))
+		assert.Equal(t, 2, event.GetTags().Len())
+		if event.GetTags().Contains("key1") {
+			assert.Equal(t, "value1", event.GetTags().Get("key1"))
+			assert.Equal(t, 1.0, event.GetValue().GetSingleValue())
+		}
+		if event.GetTags().Contains("key2") {
+			assert.Equal(t, "value2", event.GetTags().Get("key2"))
+			assert.Equal(t, 3.0, event.GetValue().GetSingleValue())
+		}
+	}
+}
+
+func TestHistogram(t *testing.T) {
+	option := defaultMetricOption()
+	option.name = "test"
+	option.metricType = HistogramType
+	ms := newMetricVector(option)
+	histogram := newHistogram(ms, nil, nil)
+	valuesToObserve := []float64{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}
+	for _, v := range valuesToObserve {
+		histogram.Observe(v)
+	}
+	event := histogram.ExportEvent()
+	assert.Equal(t, "test", event.GetName())
+	assert.Equal(t, len(defaultHistogramBucketsMs)+1+2, event.GetValue().GetMultiValues().Len())
+
+	// (-Inf,2]=2, (10,50]=2, (100,200]=1, (1000,1400]=1, (10000,15000]=0, (1400,2000]=0, (15000,+Inf]=3, (2,4]=1, (200,400]=1, (2000,5000]=2, (4,6]=0, (400,800]=1, (50,100]=1, (5000,10000]=1, (6,8]=1, (8,10]=0, (800,1000]=0, count=17, sum=131071
+	expected := map[string]float64{
+		"(-Inf,2]":      2,
+		"(10,50]":       2,
+		"(100,200]":     1,
+		"(1000,1400]":   1,
+		"(10000,15000]": 0,
+		"(1400,2000]":   0,
+		"(15000,+Inf]":  3,
+		"(2,4]":         1,
+		"(200,400]":     1,
+		"(2000,5000]":   2,
+		"(4,6]":         0,
+		"(400,800]":     1,
+		"(50,100]":      1,
+		"(5000,10000]":  1,
+		"(6,8]":         1,
+		"(8,10]":        0,
+		"(800,1000]":    0,
+		"count":         17,
+		"sum":           131071,
+	}
+	for _, v := range event.GetValue().GetMultiValues().SortTo(nil) {
+		assert.Equal(t, expected[v.Key], v.Value)
+	}
+
+	event2 := histogram.ExportEvent()
+	expected2 := map[string]float64{
+		"(-Inf,2]":      0,
+		"(10,50]":       0,
+		"(100,200]":     0,
+		"(1000,1400]":   0,
+		"(10000,15000]": 0,
+		"(1400,2000]":   0,
+		"(15000,+Inf]":  0,
+		"(2,4]":         0,
+		"(200,400]":     0,
+		"(2000,5000]":   0,
+		"(4,6]":         0,
+		"(400,800]":     0,
+		"(50,100]":      0,
+		"(5000,10000]":  0,
+		"(6,8]":         0,
+		"(8,10]":        0,
+		"(800,1000]":    0,
+		"count":         0,
+		"sum":           0,
+	}
+	for _, v := range event2.GetValue().GetMultiValues().SortTo(nil) {
+		assert.Equal(t, expected2[v.Key], v.Value)
+	}
+}
+
+func TestCumulativeHistogram(t *testing.T) {
+	option := defaultMetricOption()
+	option.name = "test"
+	option.metricType = HistogramType
+	option.isCumulative = true
+	option.isDynamicLabel = true
+	ms := newMetricVector(option)
+	histogram := newCumulativeHistogram(ms, []string{"hello", "world"}, nil)
+	valuesToObserve := []float64{1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536}
+	for _, v := range valuesToObserve {
+		histogram.Observe(v)
+	}
+	event := histogram.ExportEvent()
+	assert.Equal(t, "test", event.GetName())
+	assert.Equal(t, len(defaultHistogramBucketsMs)+1+2, event.GetValue().GetMultiValues().Len())
+
+	// (-Inf,2]=2, (10,50]=2, (100,200]=1, (1000,1400]=1, (10000,15000]=0, (1400,2000]=0, (15000,+Inf]=3, (2,4]=1, (200,400]=1, (2000,5000]=2, (4,6]=0, (400,800]=1, (50,100]=1, (5000,10000]=1, (6,8]=1, (8,10]=0, (800,1000]=0, count=17, sum=131071
+	expected := map[string]float64{
+		"(-Inf,2]":      2,
+		"(10,50]":       2,
+		"(100,200]":     1,
+		"(1000,1400]":   1,
+		"(10000,15000]": 0,
+		"(1400,2000]":   0,
+		"(15000,+Inf]":  3,
+		"(2,4]":         1,
+		"(200,400]":     1,
+		"(2000,5000]":   2,
+		"(4,6]":         0,
+		"(400,800]":     1,
+		"(50,100]":      1,
+		"(5000,10000]":  1,
+		"(6,8]":         1,
+		"(8,10]":        0,
+		"(800,1000]":    0,
+		"count":         17,
+		"sum":           131071,
+	}
+	for _, v := range event.GetValue().GetMultiValues().SortTo(nil) {
+		assert.Equal(t, expected[v.Key], v.Value)
+	}
+
+	event2 := histogram.ExportEvent()
+	expected2 := map[string]float64{
+		"(-Inf,2]":      2,
+		"(10,50]":       2,
+		"(100,200]":     1,
+		"(1000,1400]":   1,
+		"(10000,15000]": 0,
+		"(1400,2000]":   0,
+		"(15000,+Inf]":  3,
+		"(2,4]":         1,
+		"(200,400]":     1,
+		"(2000,5000]":   2,
+		"(4,6]":         0,
+		"(400,800]":     1,
+		"(50,100]":      1,
+		"(5000,10000]":  1,
+		"(6,8]":         1,
+		"(8,10]":        0,
+		"(800,1000]":    0,
+		"count":         17,
+		"sum":           131071,
+	}
+	for _, v := range event2.GetValue().GetMultiValues().SortTo(nil) {
+		assert.Equal(t, expected2[v.Key], v.Value)
+	}
 }

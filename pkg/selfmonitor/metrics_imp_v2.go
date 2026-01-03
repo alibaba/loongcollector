@@ -16,12 +16,17 @@ package selfmonitor
 
 import (
 	"errors"
+	"log"
+	im "math"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/helper/math"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
@@ -39,7 +44,11 @@ var (
 	_ StringMetric  = (*errorStrMetric)(nil)
 )
 
-func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []string) Metric {
+var defaultHistogramBucketsMs = []float64{
+	2, 4, 6, 8, 10, 50, 100, 200, 400, 800, 1000, 1400, 2000, 5000, 10_000, 15_000,
+}
+
+func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []string, bucketBoundaries []float64) Metric {
 	switch metricType {
 	case CumulativeCounterType:
 		return newCumulativeCounter(metricSet, labelValues)
@@ -55,6 +64,10 @@ func newMetric(metricType SelfMetricType, metricSet MetricSet, labelValues []str
 		return newStringMetric(metricSet, labelValues)
 	case LatencyType:
 		return newLatency(metricSet, labelValues)
+	case HistogramType:
+		return newHistogram(metricSet, labelValues, bucketBoundaries)
+	case CumulativeHistogramType:
+		return newCumulativeHistogram(metricSet, labelValues, bucketBoundaries)
 	}
 	return newErrorMetric(metricType, errors.New("invalid metric type"))
 }
@@ -66,6 +79,19 @@ func newErrorMetric(metricType SelfMetricType, err error) Metric {
 		return newErrorStringMetric(err)
 	default:
 		return newErrorNumericMetric(err)
+	}
+}
+
+func createMetricEvent(series Series, metricType models.MetricType, value *models.MetricSingleValue) *models.Metric {
+	return &models.Metric{
+		Name:        series.Name(),
+		Description: series.Desc(),
+		Unit:        series.Unit(),
+		MetricType:  metricType,
+		Timestamp:   uint64(time.Now().UnixNano()),
+		Tags:        series.GetTags(),
+		Value:       value,
+		TypedValue:  models.NilTypedValues,
 	}
 }
 
@@ -85,10 +111,12 @@ func newCumulativeCounter(ms MetricSet, labelValues []string) CounterMetric {
 }
 
 func (c *cumulativeCounterImp) Add(delta int64) {
+	c.SetActive()
 	atomic.AddInt64(&c.value, delta)
 }
 
 func (c *cumulativeCounterImp) Collect() MetricValue[float64] {
+	c.ResetLastActiveTime()
 	value := atomic.LoadInt64(&c.value)
 	return MetricValue[float64]{Name: c.Name(), Value: float64(value)}
 }
@@ -105,6 +133,12 @@ func (c *cumulativeCounterImp) Serialize(log *protocol.Log) {
 func (c *cumulativeCounterImp) Export() map[string]string {
 	metricValue := c.Collect()
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (c *cumulativeCounterImp) ExportEvent() *models.Metric {
+	metricValue := c.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(c.Series, models.MetricTypeCounter, value)
 }
 
 func (c *cumulativeCounterImp) Type() SelfMetricType {
@@ -126,10 +160,12 @@ func newDeltaCounter(ms MetricSet, labelValues []string) CounterMetric {
 }
 
 func (c *counterImp) Add(delta int64) {
+	c.SetActive()
 	atomic.AddInt64(&c.value, delta)
 }
 
 func (c *counterImp) Collect() MetricValue[float64] {
+	c.ResetLastActiveTime()
 	value := atomic.SwapInt64(&c.value, 0)
 	return MetricValue[float64]{Name: c.Name(), Value: float64(value)}
 }
@@ -146,6 +182,12 @@ func (c *counterImp) Serialize(log *protocol.Log) {
 func (c *counterImp) Export() map[string]string {
 	metricValue := c.Collect()
 	return c.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (c *counterImp) ExportEvent() *models.Metric {
+	metricValue := c.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(c.Series, models.MetricTypeCounter, value)
 }
 
 func (c *counterImp) Type() SelfMetricType {
@@ -166,10 +208,12 @@ func newGauge(ms MetricSet, labelValues []string) GaugeMetric {
 }
 
 func (g *gaugeImp) Set(f float64) {
+	g.SetActive()
 	math.AtomicStoreFloat64(&g.value, f)
 }
 
 func (g *gaugeImp) Collect() MetricValue[float64] {
+	g.ResetLastActiveTime()
 	return MetricValue[float64]{Name: g.Name(), Value: math.AtomicLoadFloat64(&g.value)}
 }
 
@@ -185,6 +229,12 @@ func (g *gaugeImp) Serialize(log *protocol.Log) {
 func (g *gaugeImp) Export() map[string]string {
 	metricValue := g.Collect()
 	return g.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (g *gaugeImp) ExportEvent() *models.Metric {
+	metricValue := g.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(g.Series, models.MetricTypeGauge, value)
 }
 
 func (g *gaugeImp) Type() SelfMetricType {
@@ -209,6 +259,7 @@ func newAverage(ms MetricSet, labelValues []string) CounterMetric {
 }
 
 func (a *averageImp) Add(f int64) {
+	a.SetActive()
 	a.Lock()
 	defer a.Unlock()
 	a.value += f
@@ -216,6 +267,7 @@ func (a *averageImp) Add(f int64) {
 }
 
 func (a *averageImp) Collect() MetricValue[float64] {
+	a.ResetLastActiveTime()
 	a.RLock()
 	defer a.RUnlock()
 	if a.count == 0 {
@@ -244,6 +296,12 @@ func (a *averageImp) Export() map[string]string {
 	return a.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
 }
 
+func (a *averageImp) ExportEvent() *models.Metric {
+	metricValue := a.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(a.Series, models.MetricTypeGauge, value)
+}
+
 func (a *averageImp) Type() SelfMetricType {
 	return GaugeType
 }
@@ -264,6 +322,7 @@ func newMax(ms MetricSet, labelValues []string) GaugeMetric {
 }
 
 func (m *maxImp) Set(f float64) {
+	m.SetActive()
 	m.Lock()
 	defer m.Unlock()
 	if f > m.value {
@@ -272,6 +331,7 @@ func (m *maxImp) Set(f float64) {
 }
 
 func (m *maxImp) Collect() MetricValue[float64] {
+	m.ResetLastActiveTime()
 	m.RLock()
 	defer m.RUnlock()
 	metric := MetricValue[float64]{Name: m.Name(), Value: m.value}
@@ -282,6 +342,12 @@ func (m *maxImp) Collect() MetricValue[float64] {
 func (m *maxImp) Export() map[string]string {
 	metricValue := m.Collect()
 	return m.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value, 'f', 4, 64))
+}
+
+func (m *maxImp) ExportEvent() *models.Metric {
+	metricValue := m.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(m.Series, models.MetricTypeGauge, value)
 }
 
 func (m *maxImp) Type() SelfMetricType {
@@ -304,6 +370,7 @@ func newLatency(ms MetricSet, labelValues []string) LatencyMetric {
 }
 
 func (l *latencyImp) Observe(f float64) {
+	l.SetActive()
 	l.Lock()
 	defer l.Unlock()
 	l.count++
@@ -315,6 +382,7 @@ func (l *latencyImp) Record(d time.Duration) {
 }
 
 func (l *latencyImp) Collect() MetricValue[float64] {
+	l.ResetLastActiveTime()
 	l.Lock()
 	defer l.Unlock()
 	if l.count == 0 {
@@ -338,12 +406,151 @@ func (l *latencyImp) Serialize(log *protocol.Log) {
 }
 
 func (l *latencyImp) Export() map[string]string {
+	l.ResetLastActiveTime()
 	metricValue := l.Collect()
 	return l.Series.Export(metricValue.Name, strconv.FormatFloat(metricValue.Value/1000, 'f', 4, 64)) // ns to us
 }
 
+func (l *latencyImp) ExportEvent() *models.Metric {
+	metricValue := l.Collect()
+	value := &models.MetricSingleValue{Value: metricValue.Value}
+	return createMetricEvent(l.Series, models.MetricTypeGauge, value)
+}
+
 func (l *latencyImp) Type() SelfMetricType {
 	return GaugeType
+}
+
+type histogramImp struct {
+	sync.Mutex
+	isCumulative bool
+	Series
+
+	bucketCounts []uint64
+	count        uint64
+	sum          float64
+
+	bounds []float64
+}
+
+func newHistogram(ms MetricSet, labelValues []string, bounds []float64) HistogramMetric {
+	if len(bounds) == 0 {
+		bounds = defaultHistogramBucketsMs
+	}
+	h := &histogramImp{
+		Series:       newSeries(ms, labelValues),
+		bounds:       bounds,
+		bucketCounts: make([]uint64, len(bounds)+1),
+	}
+	return h
+}
+
+func newCumulativeHistogram(ms MetricSet, labelValues []string, bounds []float64) HistogramMetric {
+	if len(bounds) == 0 {
+		bounds = defaultHistogramBucketsMs
+	}
+	h := &histogramImp{
+		Series:       newSeries(ms, labelValues),
+		bounds:       bounds,
+		bucketCounts: make([]uint64, len(bounds)+1),
+		isCumulative: true,
+	}
+	return h
+}
+
+func (h *histogramImp) Observe(v float64) {
+	h.SetActive()
+	h.Lock()
+	defer h.Unlock()
+
+	h.count++
+	h.sum += v
+	// Binary search to find the value bucket index.
+	index := sort.SearchFloat64s(h.bounds, v)
+	h.bucketCounts[index]++
+}
+
+func (h *histogramImp) Get() []MetricValue[float64] {
+	res := make([]MetricValue[float64], 0, len(h.bucketCounts)+2)
+
+	h.Lock()
+	defer h.Unlock()
+
+	// for bucket bounds: [0, 5, 10], there are 4 bucket counts: (-inf, 0], (0, 5], (5, 10], (10, +inf]
+	for m := 0; m < len(h.bucketCounts); m++ {
+		lowerBound := im.Inf(-1)
+		upperBound := im.Inf(+1)
+		if m > 0 {
+			lowerBound = h.bounds[m-1]
+		}
+		if m < len(h.bounds) {
+			upperBound = h.bounds[m]
+		}
+		fieldName := ComposeBucketFieldName(lowerBound, upperBound, true)
+
+		count := h.bucketCounts[m]
+		res = append(res, MetricValue[float64]{Name: fieldName, Value: float64(count)})
+	}
+
+	res = append(res, MetricValue[float64]{Name: "count", Value: float64(h.count)})
+	res = append(res, MetricValue[float64]{Name: "sum", Value: h.sum})
+
+	if !h.isCumulative {
+		h.Clear()
+	}
+	return res
+}
+
+// ComposeBucketFieldName generates the bucket count field name for histogram metrics.
+func ComposeBucketFieldName(lower, upper float64, isPositive bool) string {
+	var sb strings.Builder
+	if !isPositive {
+		sb.WriteString("[")
+		sb.WriteString(strconv.FormatFloat(-upper, 'f', -1, 64))
+		sb.WriteString(",")
+		sb.WriteString(strconv.FormatFloat(-lower, 'f', -1, 64))
+		sb.WriteString(")")
+		return sb.String()
+	}
+	sb.WriteString("(")
+	sb.WriteString(strconv.FormatFloat(lower, 'f', -1, 64))
+	sb.WriteString(",")
+	sb.WriteString(strconv.FormatFloat(upper, 'f', -1, 64))
+	sb.WriteString("]")
+	return sb.String()
+}
+
+func (h *histogramImp) Clear() {
+	h.count = 0
+	h.sum = 0
+	for i := range h.bucketCounts {
+		h.bucketCounts[i] = 0
+	}
+}
+
+func (h *histogramImp) Export() map[string]string {
+	return map[string]string{}
+}
+
+func (h *histogramImp) ExportEvent() *models.Metric {
+	res := h.Get()
+	multiV := models.NewMetricMultiValue()
+	for _, v := range res {
+		multiV.Add(v.Name, v.Value)
+	}
+	return &models.Metric{
+		Name:        h.Name(),
+		Description: h.Desc(),
+		Unit:        h.Unit(),
+		MetricType:  models.MetricTypeHistogram,
+		Timestamp:   uint64(time.Now().UnixNano()),
+		Tags:        h.GetTags(),
+		Value:       multiV,
+	}
+}
+
+func (h *histogramImp) Type() SelfMetricType {
+	return HistogramType
 }
 
 // strMetricImp is a metric that represents a single string value.
@@ -361,12 +568,14 @@ func newStringMetric(ms MetricSet, labelValues []string) StringMetric {
 }
 
 func (s *strMetricImp) Set(str string) {
+	s.SetActive()
 	s.Lock()
 	defer s.Unlock()
 	s.value = str
 }
 
 func (s *strMetricImp) Collect() MetricValue[string] {
+	s.ResetLastActiveTime()
 	s.RLock()
 	defer s.RUnlock()
 	return MetricValue[string]{Name: s.Name(), Value: s.value}
@@ -388,13 +597,47 @@ func (s *strMetricImp) Export() map[string]string {
 	return s.Series.Export(metricValue.Name, metricValue.Value)
 }
 
+func (s *strMetricImp) ExportEvent() *models.Metric {
+	metricValue := s.Collect()
+	typedValue := models.NewMetricTypedValues()
+	typedValue.Add("value", &models.TypedValue{Type: models.ValueTypeString, Value: metricValue.Value})
+	return &models.Metric{
+		Name:        metricValue.Name,
+		Description: s.Desc(),
+		Unit:        s.Unit(),
+		MetricType:  models.MetricTypeUntyped,
+		Tags:        s.GetTags(),
+		TypedValue:  typedValue,
+	}
+}
+
 func (s *strMetricImp) Type() SelfMetricType {
 	return GaugeType
 }
 
 type Series struct {
+	active         int64
+	lastActiveTime int64
 	MetricSet
 	labelValues []string
+}
+
+func (s *Series) ResetLastActiveTime() {
+	if atomic.CompareAndSwapInt64(&s.active, 1, 0) {
+		s.setLastActiveTime(time.Now())
+	}
+}
+
+func (s *Series) GetLastActiveTime() time.Time {
+	return time.Unix(0, atomic.LoadInt64(&s.lastActiveTime))
+}
+
+func (s *Series) setLastActiveTime(t time.Time) {
+	atomic.StoreInt64(&s.lastActiveTime, t.UnixNano())
+}
+
+func (s *Series) SetActive() {
+	atomic.StoreInt64(&s.active, 1)
 }
 
 func newSeries(ms MetricSet, labelValues []string) Series {
@@ -405,8 +648,9 @@ func newSeries(ms MetricSet, labelValues []string) Series {
 	}
 
 	return Series{
-		MetricSet:   ms,
-		labelValues: indexToStore,
+		MetricSet:      ms,
+		labelValues:    indexToStore,
+		lastActiveTime: time.Now().UnixNano(),
 	}
 }
 
@@ -441,6 +685,27 @@ func (s Series) Export(metricName, metricValue string) map[string]string {
 	return ret
 }
 
+func (s Series) GetTags() models.Tags {
+	ret := make(map[string]string, len(s.ConstLabels())+len(s.labelValues))
+
+	for _, v := range s.ConstLabels() {
+		ret[v.Key] = v.Value
+	}
+
+	if !s.MetricSet.IsLabelDynamic() {
+		for i, v := range s.labelValues {
+			ret[s.LabelKeys()[i]] = v
+		}
+	} else {
+		for i := 0; i < len(s.labelValues); i += 2 {
+			k, v := s.labelValues[i], s.labelValues[i+1]
+			ret[k] = v
+		}
+	}
+
+	return models.NewTagsWithMap(ret)
+}
+
 /*
 Following are the metrics returned when WithLabel encountered an error.
 */
@@ -449,15 +714,15 @@ type errorNumericMetric struct {
 }
 
 func (e *errorNumericMetric) Add(f int64) {
-	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "add", e.err)
+	log.Printf("Add metric err: %v", e.err)
 }
 
 func (e *errorNumericMetric) Set(f float64) {
-	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	log.Printf("Set metric err: %v", e.err)
 }
 
 func (e *errorNumericMetric) Observe(f float64) {
-	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "observe", e.err)
+	log.Printf("Observe metric err: %v", e.err)
 }
 
 func (e *errorNumericMetric) Serialize(log *protocol.Log) {}
@@ -474,6 +739,10 @@ func (e *errorNumericMetric) Collect() MetricValue[float64] {
 	return MetricValue[float64]{Name: "", Value: 0}
 }
 
+func (e *errorNumericMetric) ExportEvent() *models.Metric {
+	return nil
+}
+
 func (e *errorNumericMetric) Clear() {}
 
 func newErrorNumericMetric(err error) *errorNumericMetric {
@@ -485,11 +754,15 @@ type errorStrMetric struct {
 }
 
 func (e errorStrMetric) Set(s string) {
-	// logger.Warning(context.Background(), "METRIC_WITH_LABEL_ALARM", "set", e.err)
+	log.Printf("Set Str metric err: %v", e.err)
 }
 
 func (e errorStrMetric) Collect() MetricValue[string] {
 	return MetricValue[string]{Name: "", Value: ""}
+}
+
+func (e errorStrMetric) ExportEvent() *models.Metric {
+	return nil
 }
 
 func newErrorStringMetric(err error) StringMetric {
