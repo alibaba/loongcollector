@@ -41,6 +41,7 @@ cp "${ROOTDIR}/${OUT_DIR}/loongcollector" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}
 cp "${ROOTDIR}/${OUT_DIR}/libGoPluginAdapter.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libGoPluginBase.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
 cp "${ROOTDIR}/${OUT_DIR}/libeBPFDriver.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
+cp "${ROOTDIR}/${OUT_DIR}/libprofiler.so" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}"
 mkdir -p "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/instance_config/local/"
 mkdir -p "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/continuous_pipeline_config/local/"
 cp "${ROOTDIR}/${OUT_DIR}/conf/instance_config/local/loongcollector_config.json" "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/conf/instance_config/local/"
@@ -53,6 +54,7 @@ strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/loongcollector"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginAdapter.so"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libGoPluginBase.so"
 strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libeBPFDriver.so"
+strip "${ROOTDIR}/${DIST_DIR}/${PACKAGE_DIR}/libprofiler.so"
 
 # pack dist dir
 cd "${ROOTDIR}/${DIST_DIR}"
