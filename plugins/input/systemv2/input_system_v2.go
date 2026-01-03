@@ -108,6 +108,10 @@ func (r *InputSystem) addMetric(collector pipeline.Collector, name string, label
 	collector.AddRawLog(helper.NewMetricLog(name, r.collectTime.UnixNano(), value, labels))
 }
 
+func (r *InputSystem) addMetricStringVal(collector pipeline.Collector, name string, labels *helper.MetricLabels, value string) {
+	collector.AddRawLog(helper.NewMetricLogStringVal(name, r.collectTime.UnixNano(), value, labels))
+}
+
 func (r *InputSystem) CollectCore(collector pipeline.Collector) {
 
 	// host info
