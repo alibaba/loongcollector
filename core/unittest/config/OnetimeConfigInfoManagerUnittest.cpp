@@ -145,9 +145,11 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
     APSARA_TEST_EQUAL(1000000000U, expireTime);
     // test_config_3: config_hash changed from 3 to 4, but inputsHash and excutionTimeout unchanged (0 and 7200)
     // forceRerunWhenUpdate is false, so should return UPDATED instead of NEW
+    // Note: For UPDATED status, expireTime is not set because PipelineConfig will recalculate it
+    expireTime = 0; // Reset to verify it's not set
     APSARA_TEST_EQUAL(OnetimeConfigStatus::UPDATED,
                       sManager->GetOnetimeConfigStatus("test_config_3", 4U, false, 0U, 7200U, &expireTime));
-    APSARA_TEST_EQUAL(2500000000U, expireTime);
+    APSARA_TEST_EQUAL(0U, expireTime); // expireTime should remain unchanged (not set) for UPDATED status
     // test_config_4: config_hash changed from 4 to 5, and inputsHash also changed (100 != 0)
     // forceRerunWhenUpdate is false, but inputsHash mismatch, so should return NEW
     APSARA_TEST_EQUAL(OnetimeConfigStatus::NEW,
