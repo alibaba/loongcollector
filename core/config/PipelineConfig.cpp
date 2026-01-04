@@ -53,8 +53,7 @@ IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout
     }
     // Read ForceRerunWhenUpdate for onetime pipeline
     if (forceRerunWhenUpdate != nullptr) {
-        // Set default value first (true)
-        *forceRerunWhenUpdate = true;
+        *forceRerunWhenUpdate = false;
         const char* key = "ForceRerunWhenUpdate";
         const auto* it = global.find(key, key + strlen(key));
         if (it != nullptr && it->isBool()) {
@@ -62,7 +61,7 @@ IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout
         } else if (it != nullptr && !it->isBool()) {
             LOG_WARNING(sLogger,
                         ("param global.ForceRerunWhenUpdate is not of type bool",
-                         "use default instead")("default", true)("config", configName));
+                         "use default instead")("default", false)("config", configName));
         }
     }
     return true;

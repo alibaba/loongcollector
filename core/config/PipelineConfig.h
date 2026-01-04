@@ -39,7 +39,7 @@ struct PipelineConfig {
     std::optional<uint32_t> mOnetimeStartTime;
     std::optional<uint32_t> mOnetimeExpireTime;
     bool mIsRunningBeforeStart = false;
-    bool mForceRerunWhenUpdate = true;
+    bool mForceRerunWhenUpdate = false;
 
     PipelineConfig(const std::string& name,
                    std::unique_ptr<Json::Value>&& detail,

@@ -33,7 +33,7 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | ---------- | ---------- | -------------- | ------------ | ---------- |
 |  ExcutionTimeout  |  uint  |  是  |  /  |  OneTime配置执行超时时间（秒）。取值范围：600～604800（10分钟～1周）。超过此时间配置将自动过期并被删除。  |
-|  ForceRerunWhenUpdate  |  bool  |  否  |  true  |  配置更新时是否强制重新执行。当配置文件的hash发生变化时：<ul><li>**true（默认）**：无论inputs配置是否变化，都会重新执行采集任务</li><li>**false**：如果inputs配置和ExcutionTimeout都未变化，则继续使用之前的过期时间，不重新执行；如果inputs配置或ExcutionTimeout发生变化，则重新执行</li></ul>该参数适用于需要在不改变inputs配置的情况下更新其他配置项（如processor、flusher等）的场景。  |
+|  ForceRerunWhenUpdate  |  bool  |  否  |  false  |  配置更新时是否强制重新执行。当配置文件的hash发生变化时：<ul><li>**true**：无论inputs配置是否变化，都会重新执行采集任务</li><li>**false（默认）**：如果inputs配置和ExcutionTimeout都未变化，则继续使用之前的过期时间，不重新执行；如果inputs配置或ExcutionTimeout发生变化，则重新执行</li></ul>该参数适用于需要在不改变inputs配置的情况下更新其他配置项（如processor、flusher等）的场景。  |
 
 ### 插件配置参数
 
