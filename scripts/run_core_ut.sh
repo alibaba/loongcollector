@@ -20,6 +20,7 @@ TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
 BLACKLIST_DIRS=(
     # "pipeline"
     # "host_monitor"
+    # "ebpf"
 )
 
 # Get CPU core count for parallel execution
