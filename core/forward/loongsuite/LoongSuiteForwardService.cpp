@@ -104,7 +104,7 @@ grpc::ServerUnaryReactor* LoongSuiteForwardServiceImpl::Forward(grpc::CallbackSe
                                                                 LoongSuiteForwardResponse* response) {
     auto* reactor = context->DefaultReactor();
     grpc::Status status(grpc::StatusCode::NOT_FOUND, "No matching config found for forward request");
-    
+
     // Check for null request
     if (!request) {
         status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "Invalid request");
@@ -113,7 +113,7 @@ grpc::ServerUnaryReactor* LoongSuiteForwardServiceImpl::Forward(grpc::CallbackSe
         reactor->Finish(status);
         return reactor;
     }
-    
+
     ADD_COUNTER(mInEventsTotal, 1);
     ADD_COUNTER(mInSizeBytes, request->data_size());
     auto before = TimeKeeper::GetInstance()->NowMs();
