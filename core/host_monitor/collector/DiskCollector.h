@@ -203,6 +203,10 @@ private:
     std::chrono::steady_clock::time_point mLastTime; // 上次获取磁盘信息的时间
     std::unordered_map<uint64_t, std::shared_ptr<IODev>> fileSystemCache;
     std::map<std::string, MetricCalculate<DeviceMetric>> mDeviceCalMap;
+    uint32_t mErrorWarningCount = 0; // collect disk error warning 计数
+    uint32_t mFirstTimeWarningCount = 0; // collect disk first time warning 计数
+    uint32_t mFrequencyWarningCount = 0; // collect disk too frequency warning 计数
+    uint32_t mQueueNotFiniteWarningCount = 0; // diskUsage.queue is not finite warning 计数
 };
 
 } // namespace logtail

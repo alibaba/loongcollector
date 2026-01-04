@@ -56,6 +56,7 @@ public:
     CPUCollector() = default;
     ~CPUCollector() override = default;
 
+    bool Init(HostMonitorContext& collectContext) override;
     bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override;
     [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
@@ -69,6 +70,7 @@ private:
     int cpuCount = 0;
     MetricCalculate<CPUPercent> mCalculate;
     CPUStat lastCpu{};
+    uint32_t mJiffiesDeltaWarningCount = 0; // jiffies delta is negative warning 计数
 };
 
 } // namespace logtail
