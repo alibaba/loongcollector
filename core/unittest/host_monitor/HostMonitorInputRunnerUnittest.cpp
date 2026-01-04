@@ -22,6 +22,7 @@
 #include "common/timer/Timer.h"
 #include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/HostMonitorInputRunner.h"
+#include "host_monitor/collector/CollectorConstants.h"
 #include "unittest/Unittest.h"
 #include "unittest/host_monitor/MockCollector.h"
 
@@ -34,6 +35,7 @@ public:
     void TestUpdateAndRemoveCollector() const;
     void TestScheduleOnce() const;
     void TestReset() const;
+    void TestProcessEntityCollectorRestriction() const;
 
 private:
     static void SetUpTestCase() {
@@ -160,9 +162,41 @@ void HostMonitorInputRunnerUnittest::TestReset() const {
     }
 }
 
+void HostMonitorInputRunnerUnittest::TestProcessEntityCollectorRestriction() const {
+    auto runner = HostMonitorInputRunner::GetInstance();
+    runner->Init();
+
+    // 测试1：input_host_monitor 不允许使用 process_entity collector
+    std::string configName1 = "test_host_monitor";
+    runner->UpdateCollector(configName1,
+                            {{std::string(kCollectorProcessEntity), 60, HostMonitorCollectType::kSingleValue}},
+                            QueueKey{},
+                            0,
+                            std::string(kInputHostMonitor));
+    // process_entity collector 不应该被注册
+    APSARA_TEST_FALSE_FATAL(runner->mRegisteredCollector.find({configName1, std::string(kCollectorProcessEntity)})
+                            != runner->mRegisteredCollector.end());
+
+    // 测试2：input_host_meta 允许使用 process_entity collector
+    std::string configName2 = "test_host_meta";
+    runner->UpdateCollector(configName2,
+                            {{std::string(kCollectorProcessEntity), 60, HostMonitorCollectType::kSingleValue}},
+                            QueueKey{},
+                            0,
+                            std::string(kInputHostMeta));
+    // process_entity collector 应该被注册
+    APSARA_TEST_TRUE_FATAL(runner->mRegisteredCollector.find({configName2, std::string(kCollectorProcessEntity)})
+                           != runner->mRegisteredCollector.end());
+
+    // 清理
+    runner->RemoveCollector(configName2);
+    runner->Stop();
+}
+
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestUpdateAndRemoveCollector);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestScheduleOnce);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestReset);
+UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestProcessEntityCollectorRestriction);
 
 } // namespace logtail
 
