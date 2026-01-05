@@ -377,6 +377,16 @@ jobs:
       (needs.create-release-branch.result == 'success') &&
       (needs.prepare-upload.result == 'success' || needs.prepare-upload.result == 'skipped')
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          df -hT $PWD
+
       - name: Check out code
         uses: actions/checkout@v4
         with:
