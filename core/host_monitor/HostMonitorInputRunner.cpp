@@ -82,7 +82,7 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
 }
 
 HostMonitorInputRunner::~HostMonitorInputRunner() {
-    // Wait for async stop operation to complete (similar to EBPFServer destructor pattern)
+    // Check again
     if (mStopFuture.valid()) {
         LOG_INFO(sLogger, ("HostMonitorInputRunner destructor", "waiting for stop operation to complete"));
         try {
@@ -227,14 +227,14 @@ void HostMonitorInputRunner::Stop() {
     });
 
     // Wait for completion with timeout
-    std::future_status status = mStopFuture.wait_for(std::chrono::seconds(5));
+    std::future_status status = mStopFuture.wait_for(std::chrono::seconds(3));
 
     if (status == std::future_status::ready) {
         LOG_INFO(sLogger, ("HostMonitorInputRunner", "stop completed successfully"));
     } else {
         // Timeout - force process exit to prevent undefined behavior
         LOG_ERROR(sLogger,
-                  ("host monitor runner stop timeout 5 seconds", "force exit process to ensure thread safety"));
+                  ("host monitor runner stop timeout 3 seconds", "force exit process to ensure thread safety"));
         Application::GetInstance()->SetSigTermSignalFlag(true);
     }
 #endif
