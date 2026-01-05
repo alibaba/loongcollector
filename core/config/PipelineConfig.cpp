@@ -25,7 +25,8 @@ namespace logtail {
 static constexpr uint32_t minExpireTime = 600; // 10 minutes
 static constexpr uint32_t maxExpireTime = 604800; // 1 week
 
-static bool IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout) {
+static bool
+IsOneTime(const string& configName, const Json::Value& global, uint32_t* timeout, bool* forceRerunWhenUpdate) {
     const char* key = "ExcutionTimeout";
     auto it = global.find(key, key + strlen(key));
     if (it == nullptr) {
@@ -50,35 +51,65 @@ static bool IsOneTime(const string& configName, const Json::Value& global, uint3
                     ("param global.ExcutionTimeout is not of type uint",
                      "use maximum instead")("maximum", maxExpireTime)("config", configName));
     }
+    // Read ForceRerunWhenUpdate for onetime pipeline
+    if (forceRerunWhenUpdate != nullptr) {
+        *forceRerunWhenUpdate = false;
+        const char* key = "ForceRerunWhenUpdate";
+        const auto* it = global.find(key, key + strlen(key));
+        if (it != nullptr && it->isBool()) {
+            *forceRerunWhenUpdate = it->asBool();
+        } else if (it != nullptr && !it->isBool()) {
+            LOG_WARNING(sLogger,
+                        ("param global.ForceRerunWhenUpdate is not of type bool",
+                         "use default instead")("default", false)("config", configName));
+        }
+    }
     return true;
 }
 
 PipelineConfig::PipelineConfig(const string& name, unique_ptr<Json::Value>&& detail, const filesystem::path& filepath)
     : mName(name), mDetail(std::move(detail)), mFilePath(filepath) {
     mDetail->removeMember("enable");
+    // Calculate inputs hash for onetime config
+    const char* inputsKey = "inputs";
+    const auto* inputsIt = mDetail->find(inputsKey, inputsKey + strlen(inputsKey));
+    if (inputsIt != nullptr && inputsIt->isArray()) {
+        mInputsHash = static_cast<uint64_t>(Hash(*inputsIt));
+    }
     mConfigHash = static_cast<uint64_t>(Hash(*mDetail));
 }
 
 bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
-    uint32_t timeout = 0;
-    if (!IsOneTime(mName, global, &timeout)) {
+    if (!IsOneTime(mName, global, &mExcutionTimeout, &mForceRerunWhenUpdate)) {
         return true;
     }
     uint32_t expireTime = 0;
-    auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatusFromCheckpoint(
-        mName, mConfigHash, &expireTime);
+    auto status = OnetimeConfigInfoManager::GetInstance()->GetOnetimeConfigStatus(
+        mName, mConfigHash, mForceRerunWhenUpdate, mInputsHash, mExcutionTimeout, &expireTime);
     switch (status) {
         case OnetimeConfigStatus::OLD:
-            mOnetimeStartTime = expireTime - timeout;
+            // OLD状态表示是已经存在配置，保持原样
+            mOnetimeStartTime = expireTime - mExcutionTimeout;
             mOnetimeExpireTime = expireTime;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger, ("recover config expire time from checkpoint, expire time", expireTime)("config", mName));
             return true;
         case OnetimeConfigStatus::NEW:
+            // NEW状态表示是新配置，或已有配置Rerun了
             mOnetimeStartTime = time(nullptr);
-            mOnetimeExpireTime = mOnetimeStartTime.value() + timeout;
+            mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
+            return true;
+        case OnetimeConfigStatus::UPDATED:
+            // UPDATED状态表示配置hash改变但input hash未变，保持原有checkpoint，但是更新过期时间
+            mOnetimeStartTime = time(nullptr);
+            mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
+            mIsRunningBeforeStart = true;
+            LOG_INFO(sLogger,
+                     ("config hash changed but inputs hash unchanged", "keep existing checkpoint, update expire time")(
+                         "expire time", mOnetimeExpireTime.value())("config", mName));
             return true;
         case OnetimeConfigStatus::OBSOLETE: {
+            // OBSOLETE状态表示配置过期，删除配置文件
             error_code ec;
             if (filesystem::remove(mFilePath, ec)) {
                 LOG_INFO(sLogger,

@@ -20,6 +20,7 @@ TARGET_ARTIFACT_PATH=${TARGET_ARTIFACT_PATH:-"./core/build/unittest"}
 BLACKLIST_DIRS=(
     # "pipeline"
     # "host_monitor"
+    # "ebpf"
 )
 
 # Get CPU core count for parallel execution
@@ -167,7 +168,10 @@ run_directory_tests() {
         local test_output=$(mktemp)
         # Run test and capture output to both temp file and output file in real-time
         # This ensures we can see partial output even if test times out
-        if ! "./$test_name" 2>&1 | tee "$test_output" >> "$output_file"; then
+        # Use PIPESTATUS to check the exit status of the test program, not tee
+        "./$test_name" 2>&1 | tee "$test_output" >> "$output_file"
+        local test_exit_status=${PIPESTATUS[0]}
+        if [ $test_exit_status -ne 0 ]; then
             local test_end=$(date +%s.%N)
             local test_duration=$(calc_duration "$test_start" "$test_end")
             {
@@ -565,12 +569,20 @@ main() {
                     local dir_name=$(basename "$test_dir")
                     # Extract failure section: find Start line and extract until next test or completion
                     # Use a simpler approach: find the line number and extract from there
-                    local start_line=$(grep -n "Start.*$test_name" "$output_file" 2>/dev/null | head -1 | cut -d: -f1)
-                    if [ -n "$start_line" ]; then
+                    local start_line=$(grep -n "\[$dir_name\] $failed_test Start" "$output_file" 2>/dev/null | head -1 | cut -d: -f1 | tr -d '[:space:]')
+                    if [ -z "$start_line" ]; then
+                        # Try alternative pattern
+                        start_line=$(grep -n "Start.*$test_name" "$output_file" 2>/dev/null | head -1 | cut -d: -f1 | tr -d '[:space:]')
+                    fi
+                    # Ensure start_line is a valid integer if not empty
+                    if [ -n "$start_line" ] && [ "$start_line" -gt 0 ] 2>/dev/null; then
                         # Check if this is a timeout case (no "End" marker)
-                        local has_end=$(grep -c "\[$dir_name\] $failed_test End" "$output_file" 2>/dev/null || echo "0")
-                        local has_timeout=$(grep -c "Directory timeout exceeded\|Directory.*Timeout" "$output_file" 2>/dev/null || echo "0")
+                        # Use tr to remove any whitespace/newlines from grep output
+                        local has_end=$(grep -c "\[$dir_name\] $failed_test End" "$output_file" 2>/dev/null | tr -d '[:space:]' || echo "0")
+                        local has_timeout=$(grep -c "Directory timeout exceeded\|Directory.*Timeout" "$output_file" 2>/dev/null | tr -d '[:space:]' || echo "0")
                         
+                        # Ensure has_end is a valid integer
+                        has_end=${has_end:-0}
                         if [ "$has_end" -eq 0 ]; then
                             # This might be a timeout case, extract from Start until timeout message, next test, or directory completion
                             # Include all output including any partial test output
@@ -583,7 +595,7 @@ main() {
                                     exit
                                 }
                                 # Stop at next test start (but not our own)
-                                if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !/Start.*test_name/) {
+                                if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !match($0, test_name)) {
                                     exit
                                 }
                                 # Stop at directory completion
@@ -593,25 +605,50 @@ main() {
                             }
                             ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
                         else
-                            # Normal failure case, extract from Start until next test or completion
-                            awk -v start="$start_line" -v test_name="$test_name" '
-                            NR >= start {
-                                print
-                                # Stop at next test start (but not our own)
-                                if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !/Start.*test_name/) {
-                                    exit
+                            # Normal failure case, extract from Start until "Failed" marker or next test or completion
+                            # Find the "Failed" line to ensure we capture all failure details
+                            local failed_line=$(grep -n "\[$dir_name\] $failed_test Failed" "$output_file" 2>/dev/null | head -1 | cut -d: -f1 | tr -d '[:space:]')
+                            # Ensure failed_line is a valid integer if not empty
+                            if [ -n "$failed_line" ] && [ "$failed_line" -gt 0 ] 2>/dev/null; then
+                                # Extract from Start to Failed line, then continue until next test or completion
+                                awk -v start="$start_line" -v failed="$failed_line" -v test_name="$test_name" -v dir_name="$dir_name" '
+                                NR >= start {
+                                    print
+                                    # After Failed line, continue until next test start or directory completion
+                                    if (NR >= failed) {
+                                        # Stop at next test start (but not our own)
+                                        if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !match($0, test_name)) {
+                                            exit
+                                        }
+                                        # Stop at directory completion
+                                        if (/========== Directory.*Completed/) {
+                                            exit
+                                        }
+                                    }
                                 }
-                                # Stop at directory completion
-                                if (/========== Directory.*Completed/) {
-                                    exit
+                                ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
+                            else
+                                # Fallback: extract from Start until next test or completion
+                                awk -v start="$start_line" -v test_name="$test_name" '
+                                NR >= start {
+                                    print
+                                    # Stop at next test start (but not our own)
+                                    if (NR > start && /Start.*\*\*\*\*\*\*\*\*\*\*/ && !match($0, test_name)) {
+                                        exit
+                                    }
+                                    # Stop at directory completion
+                                    if (/========== Directory.*Completed/) {
+                                        exit
+                                    }
                                 }
-                            }
-                            ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
+                                ' "$output_file" 2>/dev/null | sed 's/^/    /' || true
+                            fi
                         fi
                     else
                         # Fallback: show lines containing the test and failure info
-                        grep -A 200 "$test_name" "$output_file" 2>/dev/null | \
-                        grep -B 5 -A 200 "Failed\|timeout" | head -100 | sed 's/^/    /' || true
+                        # Extract from the test name pattern to get more context
+                        grep -B 10 -A 500 "$test_name\|Failed\|FAILED\|Failure" "$output_file" 2>/dev/null | \
+                        head -200 | sed 's/^/    /' || true
                     fi
                     break
                 fi

@@ -78,7 +78,7 @@ void StaticFileServer::ClearUnusedCheckpoints() {
     mIsUnusedCheckpointsCleared = true;
 }
 
-void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
+void StaticFileServer::RemoveInput(const string& configName, size_t idx, bool keepingCheckpoint) {
     {
         lock_guard<mutex> lock(mUpdateMux);
         mInputFileDiscoveryConfigsMap.erase(make_pair(configName, idx));
@@ -87,7 +87,9 @@ void StaticFileServer::RemoveInput(const string& configName, size_t idx) {
         mInputFileTagConfigsMap.erase(make_pair(configName, idx));
         mDeletedInputs.emplace(configName, idx);
     }
-    InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);
+    if (!keepingCheckpoint) {
+        InputStaticFileCheckpointManager::GetInstance()->DeleteCheckpoint(configName, idx);
+    }
 }
 
 void StaticFileServer::AddInput(const string& configName,
@@ -177,7 +179,7 @@ void StaticFileServer::ReadFiles() {
                     }
 
                     auto logBuffer = make_unique<LogBuffer>();
-                    bool moreData = reader->ReadLog(*logBuffer, nullptr);
+                    bool moreData = reader->ReadLog(*logBuffer, nullptr, true);
                     auto group = LogFileReader::GenerateEventGroup(reader, logBuffer.get());
                     if (!ProcessorRunner::GetInstance()->PushQueue(reader->GetQueueKey(), inputIdx, std::move(group))) {
                         // should not happend, since only one thread is pushing to the queue
@@ -210,7 +212,7 @@ void StaticFileServer::ReadFiles() {
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
     FileFingerprint fingerprint;
     while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
-        filesystem::path filePath = fingerprint.mFilePath;
+        filesystem::path filePath = fingerprint.mFilePath.lexically_normal();
         string errMsg;
 
         // 检查文件是否存在，如果不存在或路径变了但 devinode 没变，尝试查找轮转后的文件
@@ -269,6 +271,10 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
             continue;
         }
         if (fingerprint.mOffset > 0) {
+            LOG_INFO(sLogger,
+                     ("set last file pos", fingerprint.mOffset)("config", configName)("input idx", idx)(
+                         "filepath", filePath.string())("dev", fingerprint.mDevInode.dev)("inode",
+                                                                                          fingerprint.mDevInode.inode));
             reader->SetLastFilePos(fingerprint.mOffset);
         }
         return reader;
