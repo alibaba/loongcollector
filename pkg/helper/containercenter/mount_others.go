@@ -18,9 +18,18 @@
 package containercenter
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"strings"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+)
+
+const (
+	// HostModeNotMounted is a special value for DEFAULT_CONTAINER_HOST_PATH environment variable
+	// to indicate host mode direct collection without mount path prefix
+	HostModeNotMounted = "NOT_MOUNTED"
 )
 
 var DefaultLogtailMountPath string
@@ -76,9 +85,22 @@ func TryGetRealPath(path string) (string, fs.FileInfo) {
 
 func init() {
 	defaultPath := "/logtail_host"
-	_, err := os.Stat(defaultPath)
-	// only change default mount path when `/logtail_host` path exists.
-	if err == nil {
+
+	mountPath := os.Getenv("DEFAULT_CONTAINER_HOST_PATH")
+	if mountPath != "" {
+		// Special preserved: host mode direct collection
+		if mountPath == HostModeNotMounted {
+			DefaultLogtailMountPath = ""
+			logger.Infof(context.Background(), "running in host mode: no mount path prefix")
+		} else {
+			// User defined: if set mount path by user
+			DefaultLogtailMountPath = mountPath
+			logger.Infof(context.Background(), "running with custom mount path: %s", DefaultLogtailMountPath)
+		}
+	} else {
+		// Default: use standard container mode path, even host mode
 		DefaultLogtailMountPath = defaultPath
+		logger.Infof(context.Background(), "running with default mount path: %s", DefaultLogtailMountPath)
 	}
+
 }
