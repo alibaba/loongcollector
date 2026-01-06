@@ -450,7 +450,7 @@ void Application::Exit() {
 #if defined(__ENTERPRISE__) && defined(_MSC_VER)
     ReleaseWindowsSignalObject();
 #endif
-    if (IsExiting()) {
+    if (IsForceExit()) {
         LOG_WARNING(sLogger, ("force exit", "bye!"));
         _exit(1);
     }

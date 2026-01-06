@@ -41,6 +41,9 @@ public:
     void SetSigTermSignalFlag(bool flag) { mSigTermSignalFlag = flag; }
     bool IsExiting() { return mSigTermSignalFlag; }
 
+    void SetForceExitFlag(bool flag) { mForceExitFlag = flag; }
+    bool IsForceExit() { return mForceExitFlag; }
+
     std::string GetInstanceId() { return mInstanceId; }
     bool TryGetUUID();
     int32_t GetStartTime() { return mStartTime; }
@@ -70,6 +73,7 @@ private:
     std::string mInstanceId;
     int32_t mStartTime;
     std::atomic_bool mSigTermSignalFlag = false;
+    std::atomic_bool mForceExitFlag = false;
     JThread mUUIDThread;
     SpinLock mUUIDLock;
     std::string mUUID;

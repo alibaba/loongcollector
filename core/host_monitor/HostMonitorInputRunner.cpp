@@ -81,32 +81,6 @@ HostMonitorInputRunner::HostMonitorInputRunner() {
     mThreadPool = std::make_unique<ThreadPool>(threadPoolSize);
 }
 
-HostMonitorInputRunner::~HostMonitorInputRunner() {
-    // Check again
-    if (mStopFuture.valid()) {
-        LOG_INFO(sLogger, ("HostMonitorInputRunner destructor", "waiting for stop operation to complete"));
-        try {
-            mStopFuture.wait(); // Block until async stop completes
-        } catch (const std::exception& e) {
-            // Swallow exceptions in destructor to prevent std::terminate
-            LOG_ERROR(sLogger, ("Stop future wait exception in destructor", e.what()));
-        } catch (...) {
-            LOG_ERROR(sLogger, ("Stop future wait unknown exception in destructor", ""));
-        }
-    }
-
-    // Backup: Ensure thread pool is stopped (in case Stop() was never called)
-    if (mThreadPool) {
-        try {
-            mThreadPool->Stop();
-        } catch (const std::exception& e) {
-            LOG_ERROR(sLogger, ("ThreadPool stop exception in destructor", e.what()));
-        } catch (...) {
-            LOG_ERROR(sLogger, ("ThreadPool stop unknown exception in destructor", ""));
-        }
-    }
-}
-
 void HostMonitorInputRunner::UpdateCollector(const std::string& configName,
                                              const std::vector<CollectorInfo>& newCollectorInfos,
                                              QueueKey processQueueKey,
@@ -235,7 +209,7 @@ void HostMonitorInputRunner::Stop() {
         // Timeout - force process exit to prevent undefined behavior
         LOG_ERROR(sLogger,
                   ("host monitor runner stop timeout 3 seconds", "force exit process to ensure thread safety"));
-        Application::GetInstance()->SetSigTermSignalFlag(true);
+        Application::GetInstance()->SetForceExitFlag(true);
     }
 #endif
 }

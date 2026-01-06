@@ -101,7 +101,7 @@ public:
 
 private:
     HostMonitorInputRunner();
-    ~HostMonitorInputRunner() override;
+    ~HostMonitorInputRunner() override = default;
 
     template <typename T>
     void RegisterCollector() {
