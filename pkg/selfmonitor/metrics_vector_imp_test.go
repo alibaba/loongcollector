@@ -17,7 +17,9 @@ package selfmonitor
 import (
 	"fmt"
 	"strconv"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -339,4 +341,273 @@ func Test_NewCounterMetricAndRegister(t *testing.T) {
 	counter.Add(1)
 	value := counter.Collect()
 	assert.Equal(t, 1.0, value.Value)
+}
+
+func TestMetricVectorDynamicLabelWithGC(t *testing.T) {
+	constLabels := map[string]string{
+		"constKey1": "constValue1",
+	}
+
+	counters := NewCounterMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	cumulativeCounter := NewCumulativeCounterMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	gauge := NewGaugeMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	latency := NewLatencyMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	avg := NewAverageMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	histogram := NewHistogramMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+	cumulativeHistogram := NewCumulativeHistogramMetricVector("test", constLabels, nil,
+		WithDynamicLabel(),
+		WithExpiration(time.Second),
+		WithGC(true),
+	)
+
+	emitCount := 1000
+	index := int64(0)
+	allTags := genAllTags(3, 10)
+	for i := 0; i < emitCount; i++ {
+		counters.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+	ms := counters.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		cumulativeCounter.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+	ms = cumulativeCounter.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		gauge.WithLabels(genNextTags(allTags, &index)...).Set(1)
+	}
+	ms = gauge.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		latency.WithLabels(genNextTags(allTags, &index)...).Observe(1)
+	}
+	ms = latency.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		avg.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+	ms = avg.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		histogram.WithLabels(genNextTags(allTags, &index)...).Observe(1)
+	}
+	ms = histogram.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	for i := 0; i < emitCount; i++ {
+		cumulativeHistogram.WithLabels(genNextTags(allTags, &index)...).Observe(1)
+	}
+	ms = cumulativeHistogram.(MetricCollector).Collect()
+	assert.Len(t, ms, 1000)
+
+	time.Sleep(time.Second * 3)
+	ms = counters.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = cumulativeCounter.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = gauge.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = latency.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = avg.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = histogram.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+	ms = cumulativeHistogram.(MetricCollector).Collect()
+	assert.Len(t, ms, 0)
+}
+
+func genNextTags(allTagKVs [][]LabelPair, index *int64) []LabelPair {
+	tagNumber := len(allTagKVs)
+	tagDimension := len(allTagKVs[0])
+	if tagNumber == 0 || tagDimension == 0 {
+		return nil
+	}
+	tags := make([]LabelPair, tagNumber)
+	valueTotalIndex := atomic.AddInt64(index, 1) - 1
+
+	i := 0
+	for i < tagNumber {
+		currValueIdx := valueTotalIndex % int64(tagDimension)
+		tags[tagNumber-1-i] = allTagKVs[tagNumber-1-i][currValueIdx]
+		valueTotalIndex /= int64(len(allTagKVs[tagNumber-1-i]))
+		i++
+	}
+	return tags
+}
+
+func genAllTags(tagNum, dimension int) [][]LabelPair {
+	tags := make([][]LabelPair, tagNum)
+	for i := 0; i < tagNum; i++ {
+		for j := 0; j < dimension; j++ {
+			tags[i] = append(tags[i], LabelPair{Key: fmt.Sprintf("tag%d", i), Value: fmt.Sprintf("value%d-%d", i, j)})
+		}
+	}
+	return tags
+}
+
+func getTagNames(allTagKVs [][]LabelPair) (res []string) {
+	for _, innerSlice := range allTagKVs {
+		if len(innerSlice) > 0 {
+			res = append(res, innerSlice[0].Key)
+		}
+	}
+	return res
+}
+
+func TestMetricOverflow(t *testing.T) {
+	constLabels := map[string]string{
+		"constKey1": "constValue1",
+	}
+
+	allTags := genAllTags(2, 10) // 100
+
+	cumulativeCounter := NewCumulativeCounterMetricVector("test", constLabels, getTagNames(allTags),
+		WithExpiration(time.Second),
+		WithCardinalityLimit(1000),
+		WithGC(true),
+	)
+
+	index := int64(0)
+	for i := 0; i < 200; i++ {
+		cumulativeCounter.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms := cumulativeCounter.(MetricCollector).Collect()
+	assert.Len(t, ms, 100)
+
+	cumulativeCounterWithCardinalityLimit50 := NewCumulativeCounterMetricVector("test", constLabels, getTagNames(allTags),
+		WithExpiration(time.Second),
+		WithCardinalityLimit(10),
+		WithGC(true),
+	)
+
+	for i := 0; i < 200; i++ {
+		cumulativeCounterWithCardinalityLimit50.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms = cumulativeCounterWithCardinalityLimit50.(MetricCollector).Collect()
+	assert.Len(t, ms, 11)
+	last := ms[len(ms)-1]
+	lastEvent := last.ExportEvent()
+	assert.Equal(t, "test", lastEvent.GetName())
+	assert.Equal(t, "constValue1", lastEvent.GetTags().Get("constKey1"))
+	assert.Equal(t, "overflow", lastEvent.GetTags().Get("tag0"))
+
+	cumulativeCounterWithCardinalityLimit50AndExpiration := NewCumulativeCounterMetricVector("test", constLabels, getTagNames(allTags),
+		WithExpiration(time.Second),
+		WithCardinalityLimit(10),
+		WithOverflowKey("overflow2"),
+		WithGC(true),
+	)
+
+	for i := 0; i < 200; i++ {
+		cumulativeCounterWithCardinalityLimit50AndExpiration.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms2 := cumulativeCounterWithCardinalityLimit50AndExpiration.(MetricCollector).Collect()
+	assert.Len(t, ms2, 11)
+	last2 := ms2[len(ms2)-1]
+	lastEvent2 := last2.ExportEvent()
+	assert.Equal(t, "overflow2", lastEvent2.GetTags().Get("tag0"))
+
+	time.Sleep(time.Second * 3)
+	ms3 := cumulativeCounterWithCardinalityLimit50AndExpiration.(MetricCollector).Collect()
+	assert.Len(t, ms3, 1)
+	cardinality := cumulativeCounterWithCardinalityLimit50AndExpiration.(*MetricVectorImpl[CounterMetric]).cache.(*MapCache).currCardinality
+	assert.Equal(t, int64(0), cardinality)
+}
+
+func TestMetricWithDynamicLabelOverflow(t *testing.T) {
+	constLabels := map[string]string{
+		"constKey1": "constValue1",
+	}
+
+	allTags := genAllTags(2, 10) // 100
+
+	cumulativeCounter := NewCumulativeCounterMetricVector("test", constLabels, nil,
+		WithExpiration(time.Second),
+		WithCardinalityLimit(1000),
+		WithDynamicLabel(),
+	)
+
+	index := int64(0)
+	for i := 0; i < 200; i++ {
+		cumulativeCounter.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms := cumulativeCounter.(MetricCollector).Collect()
+	assert.Len(t, ms, 100)
+
+	cumulativeCounterWithCardinalityLimit50 := NewCumulativeCounterMetricVector("test", constLabels, getTagNames(allTags),
+		WithExpiration(time.Second),
+		WithCardinalityLimit(10),
+		WithDynamicLabel(),
+		WithGC(true),
+	)
+
+	for i := 0; i < 200; i++ {
+		cumulativeCounterWithCardinalityLimit50.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms = cumulativeCounterWithCardinalityLimit50.(MetricCollector).Collect()
+	assert.Len(t, ms, 11)
+	last := ms[len(ms)-1]
+	lastEvent := last.ExportEvent()
+	assert.Equal(t, "test", lastEvent.GetName())
+	assert.Equal(t, "constValue1", lastEvent.GetTags().Get("constKey1"))
+	assert.Equal(t, "true", lastEvent.GetTags().Get("overflow"))
+
+	cumulativeCounterWithCardinalityLimit50AndExpiration := NewCumulativeCounterMetricVector("test", constLabels, getTagNames(allTags),
+		WithExpiration(time.Second),
+		WithCardinalityLimit(10),
+		WithOverflowKey("overflow2"),
+		WithDynamicLabel(),
+		WithGC(true),
+	)
+
+	for i := 0; i < 200; i++ {
+		cumulativeCounterWithCardinalityLimit50AndExpiration.WithLabels(genNextTags(allTags, &index)...).Add(1)
+	}
+
+	ms2 := cumulativeCounterWithCardinalityLimit50AndExpiration.(MetricCollector).Collect()
+	assert.Len(t, ms2, 11)
+	last2 := ms2[len(ms2)-1]
+	lastEvent2 := last2.ExportEvent()
+	assert.Equal(t, "true", lastEvent2.GetTags().Get("overflow2"))
+
+	time.Sleep(time.Second * 3)
+	ms3 := cumulativeCounterWithCardinalityLimit50AndExpiration.(MetricCollector).Collect()
+	assert.Len(t, ms3, 1)
+	cardinality := cumulativeCounterWithCardinalityLimit50AndExpiration.(*MetricVectorImpl[CounterMetric]).cache.(*MapCache).currCardinality
+	assert.Equal(t, int64(0), cardinality)
 }

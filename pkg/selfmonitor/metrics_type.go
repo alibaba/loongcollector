@@ -14,6 +14,12 @@
 
 package selfmonitor
 
+import (
+	"time"
+
+	"github.com/alibaba/ilogtail/pkg/models"
+)
+
 type SelfMetricType int
 
 const (
@@ -32,12 +38,10 @@ const (
 	RateType // qps in the last window.
 	SummaryType
 	HistogramType
+	CumulativeHistogramType
 )
 
-type LabelPair struct {
-	Key   string
-	Value string
-}
+type LabelPair = models.KeyValue[string]
 
 type MetricValue[T string | float64] struct {
 	Name  string // Value Name, e.g. "cpu_usage"
@@ -51,9 +55,17 @@ type MetricValue[T string | float64] struct {
 // 3. LabelKeys is label Keys that may have different values, e.g., "status_code=200", "status_code=404".
 type MetricSet interface {
 	Name() string
+	Desc() string
+	Unit() string
 	Type() SelfMetricType
 	ConstLabels() []LabelPair
 	LabelKeys() []string
+	IsLabelDynamic() bool
+	Expiration() time.Duration
+	IsCumulative() bool
+	BucketBoundaries() []float64
+	CardinalityLimit() int
+	OverflowKey() string
 }
 
 // MetricCollector is the interface implemented by anything that can be used by iLogtail to collect metrics.
@@ -61,16 +73,28 @@ type MetricCollector interface {
 	Collect() []Metric
 }
 
+type Starter interface {
+	Start() error
+}
+
+type Closer interface {
+	Close() error
+}
+
 // MetricVector is a Collector to bundle metrics of the same name that differ in  their label values.
 // WithLabels will return a unique Metric that is bound to a set of label values.
 // If the labels contain label names that are not in the MetricSet, the Metric will be invalid.
 type MetricVector[T Metric] interface {
 	WithLabels(labels ...LabelPair) T
+
+	Starter
+	Closer
 }
 
 type Metric interface {
 	// Export as a map[string]string
 	Export() map[string]string
+	ExportEvent() *models.Metric
 	Type() SelfMetricType
 }
 
