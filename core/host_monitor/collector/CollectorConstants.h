@@ -20,6 +20,13 @@
 
 namespace logtail {
 
+// Input plugin names
+constexpr StringView kInputHostMeta("input_host_meta");
+constexpr StringView kInputHostMonitor("input_host_monitor");
+
+// Collector names
+constexpr StringView kCollectorProcessEntity("process_entity");
+
 // Common tag keys
 constexpr StringView kTagKeyM("m");
 constexpr StringView kTagKeyHostname("hostname");
