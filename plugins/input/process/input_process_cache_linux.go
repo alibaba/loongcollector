@@ -43,7 +43,7 @@ type processCacheLinux struct {
 }
 
 func findAllProcessCache(maxLabelLength int) ([]processCache, error) {
-	fs, err := procfs.NewFS(containercenter.GetMountedFilePath(procfs.DefaultMountPoint))
+	fs, err := procfs.NewFS(containercenter.GetMonitorFilePath(procfs.DefaultMountPoint))
 	if err != nil {
 		logger.Warning(context.Background(), "OPEN_PROCFS_ALARM", "error", err)
 		return nil, err

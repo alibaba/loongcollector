@@ -27,7 +27,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
-var DefaultLogtailMountPath string
+var DefaultLogtailMountPath string   // For container-related paths (stdout, files). Main mode: "/logtail_host" (will fail on default host mode)
+var DefaultLogtailMonitorPath string // For system monitoring (/proc). Auto-detects: "" on host, "/logtail_host" in container
+
+func GetMonitorFilePath(logPath string) string {
+	return GetMountedFilePathWithBasePath(DefaultLogtailMonitorPath, logPath)
+}
 
 func GetMountedFilePath(logPath string) string {
 	return GetMountedFilePathWithBasePath(DefaultLogtailMountPath, logPath)
@@ -80,7 +85,12 @@ func TryGetRealPath(path string) (string, fs.FileInfo) {
 
 func init() {
 	defaultPath := "/logtail_host"
-
+	// keep monitor path logic unchanged
+	_, err := os.Stat(defaultPath)
+	if err == nil {
+		DefaultLogtailMonitorPath = defaultPath
+	}
+	// as for stdout/file, using env to controll
 	mountPath, exists := os.LookupEnv(flags.LoongcollectorEnvPrefix + "DEFAULT_CONTAINER_HOST_PATH")
 	if exists {
 		// User defined: if set mount path by user
