@@ -18,24 +18,16 @@
 package systemv2
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
-
-	oldMountPath := containercenter.DefaultLogtailMountPath
-	if _, err := os.Stat(oldMountPath); err != nil {
-		oldMountPath = "" // Host mode: direct access to /proc
-	}
-
 	cxt := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs["metric_system_v2"]().(*InputSystem)
 	if _, err := p.Init(cxt); err != nil {
