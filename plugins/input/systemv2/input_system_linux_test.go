@@ -18,16 +18,27 @@
 package systemv2
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
+	// Save and restore DefaultLogtailMountPath
+	oldMountPath := containercenter.DefaultLogtailMountPath
+	defer func() { containercenter.DefaultLogtailMountPath = oldMountPath }()
+
+	// Set to empty for host mode if mount path doesn't exist
+	if _, err := os.Stat(containercenter.DefaultLogtailMountPath); err != nil {
+		containercenter.DefaultLogtailMountPath = ""
+	}
+
 	cxt := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs["metric_system_v2"]().(*InputSystem)
 	if _, err := p.Init(cxt); err != nil {
