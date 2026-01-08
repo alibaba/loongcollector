@@ -160,7 +160,17 @@ void HostMonitorInputRunner::RemoveAllCollector() {
 
 void HostMonitorInputRunner::Init() {
     if (mIsStarted.exchange(true)) {
+        LOG_WARNING(sLogger, ("Init", "already started"));
         return;
+    }
+
+    // Check if there is an ongoing Stop operation
+    if (mStopFuture.valid()) {
+        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
+        if (status != std::future_status::ready) {
+            LOG_WARNING(sLogger, ("Init", "stop operation in progress, waiting for completion"));
+            mStopFuture.wait(); // Block until Stop completes
+        }
     }
 
     InitMetrics();
@@ -173,12 +183,13 @@ void HostMonitorInputRunner::Init() {
 
 void HostMonitorInputRunner::Stop() {
     if (!mIsStarted.exchange(false)) {
+        LOG_INFO(sLogger, ("Stop", "already stopped"));
         return;
     }
 
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    // Wait for any existing stop operation to complete first
+    // Wait for any existing stop operation to complete first (should not happen, but be safe)
     if (mStopFuture.valid()) {
         std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
         if (status != std::future_status::ready) {
