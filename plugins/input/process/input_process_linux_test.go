@@ -20,14 +20,24 @@ package process
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestInputProcess_Collect(t *testing.T) {
+	// Save and restore DefaultLogtailMountPath
+	oldMountPath := containercenter.DefaultLogtailMountPath
+	defer func() { containercenter.DefaultLogtailMountPath = oldMountPath }()
+
+	// Set to empty for host mode if mount path doesn't exist
+	if _, err := os.Stat(containercenter.DefaultLogtailMountPath); err != nil {
+		containercenter.DefaultLogtailMountPath = ""
+	}
 	type conditions struct {
 		OpenFD bool
 		Thread bool
