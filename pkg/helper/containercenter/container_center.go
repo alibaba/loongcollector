@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dlclark/regexp2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/image"
@@ -74,13 +75,13 @@ type EnvConfigInfo struct {
 
 // K8SFilter used for find specific container
 type K8SFilter struct {
-	NamespaceReg     *regexp.Regexp
-	PodReg           *regexp.Regexp
-	ContainerReg     *regexp.Regexp
+	NamespaceReg     *regexp2.Regexp
+	PodReg           *regexp2.Regexp
+	ContainerReg     *regexp2.Regexp
 	IncludeLabels    map[string]string
 	ExcludeLabels    map[string]string
-	IncludeLabelRegs map[string]*regexp.Regexp
-	ExcludeLabelRegs map[string]*regexp.Regexp
+	IncludeLabelRegs map[string]*regexp2.Regexp
+	ExcludeLabelRegs map[string]*regexp2.Regexp
 	hashKey          uint64
 }
 
@@ -90,21 +91,21 @@ func CreateK8SFilter(ns, pod, container string, includeK8sLabels, excludeK8sLabe
 	var err error
 	var hashStrBuilder strings.Builder
 	if len(ns) > 0 {
-		if filter.NamespaceReg, err = regexp.Compile(ns); err != nil {
+		if filter.NamespaceReg, err = regexp2.Compile(ns, 0); err != nil {
 			return nil, err
 		}
 	}
 	hashStrBuilder.WriteString(ns)
 	hashStrBuilder.WriteString("$$$")
 	if len(pod) > 0 {
-		if filter.PodReg, err = regexp.Compile(pod); err != nil {
+		if filter.PodReg, err = regexp2.Compile(pod, 0); err != nil {
 			return nil, err
 		}
 	}
 	hashStrBuilder.WriteString(pod)
 	hashStrBuilder.WriteString("$$$")
 	if len(container) > 0 {
-		if filter.ContainerReg, err = regexp.Compile(container); err != nil {
+		if filter.ContainerReg, err = regexp2.Compile(container, 0); err != nil {
 			return nil, err
 		}
 	}
@@ -227,14 +228,20 @@ func (info *K8SInfo) IsMatch(filter *K8SFilter) bool {
 
 // innerMatch ...
 func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
-	if filter.NamespaceReg != nil && !filter.NamespaceReg.MatchString(info.Namespace) {
-		return false
+	if filter.NamespaceReg != nil {
+		if matched, _ := filter.NamespaceReg.MatchString(info.Namespace); !matched {
+			return false
+		}
 	}
-	if filter.PodReg != nil && !filter.PodReg.MatchString(info.Pod) {
-		return false
+	if filter.PodReg != nil {
+		if matched, _ := filter.PodReg.MatchString(info.Pod); !matched {
+			return false
+		}
 	}
-	if filter.ContainerReg != nil && !filter.ContainerReg.MatchString(info.ContainerName) {
-		return false
+	if filter.ContainerReg != nil {
+		if matched, _ := filter.ContainerReg.MatchString(info.ContainerName); !matched {
+			return false
+		}
 	}
 	// if labels is nil, create an empty map
 	if info.Labels == nil {
@@ -891,8 +898,8 @@ func (dc *ContainerCenter) setLastError(err error, msg string) {
 
 func isMapLabelsMatch(includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	labels map[string]string) bool {
 	if len(includeLabel) != 0 || len(includeLabelRegex) != 0 {
 		matchedFlag := false
@@ -905,9 +912,11 @@ func isMapLabelsMatch(includeLabel map[string]string,
 		// if matched, do not need check regex
 		if !matchedFlag {
 			for key, reg := range includeLabelRegex {
-				if dockerVal, ok := labels[key]; ok && reg.MatchString(dockerVal) {
-					matchedFlag = true
-					break
+				if dockerVal, ok := labels[key]; ok {
+					if matched, _ := reg.MatchString(dockerVal); matched {
+						matchedFlag = true
+						break
+					}
 				}
 			}
 		}
@@ -922,8 +931,10 @@ func isMapLabelsMatch(includeLabel map[string]string,
 		}
 	}
 	for key, reg := range excludeLabelRegex {
-		if dockerVal, ok := labels[key]; ok && reg.MatchString(dockerVal) {
-			return false
+		if dockerVal, ok := labels[key]; ok {
+			if matched, _ := reg.MatchString(dockerVal); matched {
+				return false
+			}
 		}
 	}
 	return true
@@ -931,15 +942,15 @@ func isMapLabelsMatch(includeLabel map[string]string,
 
 func isContainerLabelMatch(includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	info *DockerInfoDetail) bool {
 	return isMapLabelsMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info.ContainerInfo.Config.Labels)
 }
 
 func isMathEnvItem(env string,
 	staticEnv map[string]string,
-	regexEnv map[string]*regexp.Regexp) bool {
+	regexEnv map[string]*regexp2.Regexp) bool {
 	var envKey, envValue string
 	splitArray := strings.SplitN(env, "=", 2)
 	if len(splitArray) < 2 {
@@ -956,8 +967,10 @@ func isMathEnvItem(env string,
 	}
 
 	if len(regexEnv) > 0 {
-		if reg, ok := regexEnv[envKey]; ok && reg.MatchString(envValue) {
-			return true
+		if reg, ok := regexEnv[envKey]; ok {
+			if matched, _ := reg.MatchString(envValue); matched {
+				return true
+			}
 		}
 	}
 	return false
@@ -965,8 +978,8 @@ func isMathEnvItem(env string,
 
 func isContainerEnvMatch(includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	info *DockerInfoDetail) bool {
 
 	if len(includeEnv) != 0 || len(includeEnvRegex) != 0 {
@@ -996,12 +1009,12 @@ func isContainerEnvMatch(includeEnv map[string]string,
 func (dc *ContainerCenter) getAllAcceptedInfo(
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) map[string]*DockerInfoDetail {
 	containerMap := make(map[string]*DockerInfoDetail)
@@ -1022,12 +1035,12 @@ func (dc *ContainerCenter) getAllAcceptedInfoV2(
 	matchList map[string]*DockerInfoDetail,
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
 

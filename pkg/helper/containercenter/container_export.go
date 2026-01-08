@@ -17,10 +17,10 @@ package containercenter
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strings"
 	"time"
 
+	"github.com/dlclark/regexp2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	docker "github.com/docker/docker/client"
@@ -119,12 +119,12 @@ func GetContainerBySpecificInfo(filter func(*DockerInfoDetail) bool) (infoList [
 func GetContainerByAcceptedInfo(
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) map[string]*DockerInfoDetail {
 	return getContainerCenterInstance().getAllAcceptedInfo(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, includeEnv, excludeEnv, includeEnvRegex, excludeEnvRegex, k8sFilter)
@@ -154,12 +154,12 @@ func GetContainerByAcceptedInfoV2(
 	matchList map[string]*DockerInfoDetail,
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
 	return getContainerCenterInstance().getAllAcceptedInfoV2(
@@ -173,12 +173,12 @@ func GetDiffContainers(fullList map[string]struct{}) (fullAddedList, fullDeleted
 
 // SplitRegexFromMap extract regex from user config
 // regex must begin with ^ and end with $(we only check ^)
-func SplitRegexFromMap(input map[string]string) (staticResult map[string]string, regexResult map[string]*regexp.Regexp, err error) {
+func SplitRegexFromMap(input map[string]string) (staticResult map[string]string, regexResult map[string]*regexp2.Regexp, err error) {
 	staticResult = make(map[string]string)
-	regexResult = make(map[string]*regexp.Regexp)
+	regexResult = make(map[string]*regexp2.Regexp)
 	for key, value := range input {
 		if strings.HasPrefix(value, "^") {
-			reg, err := regexp.Compile(value)
+			reg, err := regexp2.Compile(value, 0)
 			if err != nil {
 				err = fmt.Errorf("key : %s, value : %s is not valid regex, err is %s", key, value, err.Error())
 				return input, nil, err

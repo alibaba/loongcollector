@@ -123,6 +123,16 @@
             "expected_matched_ids": [
                 "nginx-app-deployment"
             ]
+        },
+        {
+            "name": "k8s_pod_negative_lookahead",
+            "description": "测试负向前瞻正则（匹配 nginx 开头但不是 nginx-web 的 Pod）",
+            "filters": {
+                "K8sPodRegex": "^nginx-(?!web).*"
+            },
+            "expected_matched_ids": [
+                "nginx-app-deployment"
+            ]
         }
     ]
 }
