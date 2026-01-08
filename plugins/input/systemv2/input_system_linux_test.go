@@ -28,7 +28,6 @@ import (
 )
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
-
 	cxt := mock.NewEmptyContext("project", "store", "config")
 	p := pipeline.MetricInputs["metric_system_v2"]().(*InputSystem)
 	if _, err := p.Init(cxt); err != nil {
