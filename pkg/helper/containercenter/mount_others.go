@@ -85,20 +85,18 @@ func TryGetRealPath(path string) (string, fs.FileInfo) {
 
 func init() {
 	defaultPath := "/logtail_host"
-	// keep monitor path logic unchanged
-	_, err := os.Stat(defaultPath)
-	if err == nil {
+	// as for monitor, keep logic unchanged
+	if _, err := os.Stat(defaultPath); err == nil {
 		DefaultLogtailMonitorPath = defaultPath
 	}
-	// as for stdout/file, using env to controll
-	mountPath, exists := os.LookupEnv(flags.LoongcollectorEnvPrefix + "DEFAULT_CONTAINER_HOST_PATH")
-	if exists {
-		// User defined: if set mount path by user
-		DefaultLogtailMountPath = mountPath
-		logger.Infof(context.Background(), "running with custom mount path: %s", DefaultLogtailMountPath)
+
+	// as for stdout/file, using env to control
+	if val, exists := os.LookupEnv(flags.LoongcollectorEnvPrefix + "DEFAULT_CONTAINER_HOST_PATH"); exists {
+		DefaultLogtailMountPath = val
+	} else if val, exists := os.LookupEnv("default_container_host_path"); exists {
+		DefaultLogtailMountPath = val
 	} else {
-		// Default: use standard container mode path, even host mode
+		// default to /logtail_host, if host mode want to collect container stdout/file, env must exists
 		DefaultLogtailMountPath = defaultPath
-		logger.Infof(context.Background(), "running with default mount path: %s", DefaultLogtailMountPath)
 	}
 }
