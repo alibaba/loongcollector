@@ -165,38 +165,38 @@ void HostMonitorInputRunnerUnittest::TestReset() const {
 
 void HostMonitorInputRunnerUnittest::TestInitWithOngoingStop() const {
     auto runner = HostMonitorInputRunner::GetInstance();
-    
+
     // First, start the runner
     runner->Init();
     APSARA_TEST_TRUE_FATAL(runner->mIsStarted.load());
-    
+
     // Stop to reset state
     runner->Stop();
     APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
-    
+
     // Simulate an ongoing Stop operation by creating a future that takes time to complete
     // This will trigger the wait logic in Init()
     runner->mStopFuture = std::async(std::launch::async, []() {
         // Simulate a slow stop operation
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     });
-    
+
     // Verify the future is valid
     APSARA_TEST_TRUE_FATAL(runner->mStopFuture.valid());
-    
+
     // Now call Init() while the future is still running
     // This should trigger: wait for the stop operation to complete
     auto startTime = std::chrono::steady_clock::now();
     runner->Init();
     auto endTime = std::chrono::steady_clock::now();
-    
+
     // Verify that Init() waited for the stop operation
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
     APSARA_TEST_TRUE_FATAL(duration.count() >= 100); // Should have waited at least 100ms
-    
+
     // Verify runner is now started
     APSARA_TEST_TRUE_FATAL(runner->mIsStarted.load());
-    
+
     runner->Stop();
 }
 
