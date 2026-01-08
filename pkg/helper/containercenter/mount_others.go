@@ -18,13 +18,11 @@
 package containercenter
 
 import (
-	"context"
 	"io/fs"
 	"os"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 var DefaultLogtailMountPath string   // For container-related paths (stdout, files). Main mode: "/logtail_host" (will fail on default host mode)
