@@ -18,13 +18,13 @@
 package systemv2
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/plugins/test"
 	"github.com/alibaba/ilogtail/plugins/test/mock"
+
+	"testing"
 )
 
 func TestInputSystem_CollectOpenFD(t *testing.T) {
