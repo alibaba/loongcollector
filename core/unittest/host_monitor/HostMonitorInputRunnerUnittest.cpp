@@ -175,26 +175,31 @@ void HostMonitorInputRunnerUnittest::TestInitWithOngoingStop() const {
     APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
 
     // Simulate an ongoing Stop operation by creating a future that takes time to complete
-    // This will trigger the wait logic in Init()
     runner->mStopFuture = std::async(std::launch::async, []() {
         // Simulate a slow stop operation
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
     });
 
-    // Verify the future is valid
+    // Verify the future is valid and not ready
     APSARA_TEST_TRUE_FATAL(runner->mStopFuture.valid());
+    auto status = runner->mStopFuture.wait_for(std::chrono::seconds(0));
+    APSARA_TEST_TRUE_FATAL(status != std::future_status::ready);
 
     // Now call Init() while the future is still running
-    // This should trigger: wait for the stop operation to complete
-    auto startTime = std::chrono::steady_clock::now();
+    // According to new logic, Init() should return directly without waiting
     runner->Init();
-    auto endTime = std::chrono::steady_clock::now();
 
-    // Verify that Init() waited for the stop operation
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-    APSARA_TEST_TRUE_FATAL(duration.count() >= 100); // Should have waited at least 100ms
+    // Verify runner is NOT started (Init() aborted and reset mIsStarted to false)
+    APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
 
-    // Verify runner is now started
+    // Wait for the stop future to complete
+    runner->mStopFuture.wait();
+    APSARA_TEST_TRUE_FATAL(runner->mStopFuture.valid());
+    status = runner->mStopFuture.wait_for(std::chrono::seconds(0));
+    APSARA_TEST_TRUE_FATAL(status == std::future_status::ready);
+
+    // Now Init() should succeed since the stop future is ready
+    runner->Init();
     APSARA_TEST_TRUE_FATAL(runner->mIsStarted.load());
 
     runner->Stop();

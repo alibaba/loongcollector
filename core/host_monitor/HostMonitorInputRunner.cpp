@@ -164,12 +164,13 @@ void HostMonitorInputRunner::Init() {
         return;
     }
 
-    // Check if there is an ongoing Stop operation
+    // Check if there is an ongoing Stop operation, return directly
     if (mStopFuture.valid()) {
         std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
         if (status != std::future_status::ready) {
-            LOG_WARNING(sLogger, ("Init", "stop operation in progress, waiting for completion"));
-            mStopFuture.wait(); // Block until Stop completes
+            LOG_ERROR(sLogger, ("Init", "previous stop is not completed, return directly"));
+            mIsStarted.store(false); // Reset state since initialization is aborted
+            return;
         }
     }
 
