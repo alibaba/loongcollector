@@ -618,7 +618,7 @@ func (dc *ContainerCenter) getIPAddress(info container.InspectResponse) string {
 // <device> <mount_point> <filesystem_type> <mount_options> <dump> <fsck>
 func extractUpperDirFromProcMounts(pid int) (string, error) {
 	// Read /proc/{pid}/mounts through /logtail_host mount point
-	mountsPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
+	mountsPath := GetMonitorFilePath(fmt.Sprintf("/proc/%d/mounts", pid))
 	content, err := os.ReadFile(filepath.Clean(mountsPath))
 	if err != nil {
 		return "", fmt.Errorf("failed to read %s: %w", mountsPath, err)
@@ -820,6 +820,22 @@ func getContainerCenterInstance() *ContainerCenter {
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
+			// Check if mount path exists before entering retry loop, to skip default host mode
+			if DefaultLogtailMountPath != "" {
+				if _, err := os.Stat(DefaultLogtailMountPath); err != nil {
+					if os.IsNotExist(err) {
+						logger.Infof(context.Background(),
+							"container discovery skipped: mount path does not exist",
+							"mount_path", DefaultLogtailMountPath)
+					} else {
+						logger.Warningf(context.Background(),
+							"container discovery skipped: failed to check mount path",
+							"mount_path", DefaultLogtailMountPath, "error", err)
+					}
+					return // Exit goroutine, no infinite retry needed
+				}
+			}
+
 			retryCount := 0
 			for {
 				if containerFindingManager.Init() {

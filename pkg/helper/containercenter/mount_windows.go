@@ -95,6 +95,12 @@ func removeDriverLetter(filePath string) string {
 	return filePath
 }
 
+func GetMonitorFilePath(filePath string) string {
+	// On Windows, monitoring paths behave the same as mounted file paths
+	// e.g. container_center.go compiler can found GetMonitorFilePath in windows platform
+	return GetMountedFilePath(filePath)
+}
+
 func GetMountedFilePath(filePath string) string {
 	// No specific installed path, use driver C.
 	if *DockerInstallPath == "" {
