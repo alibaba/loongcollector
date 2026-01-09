@@ -13,7 +13,9 @@
 // limitations under the License.
 
 #include <chrono>
+#include <future>
 #include <memory>
+#include <thread>
 
 #include "ProcessQueueItem.h"
 #include "ProcessQueueManager.h"
@@ -34,6 +36,7 @@ public:
     void TestUpdateAndRemoveCollector() const;
     void TestScheduleOnce() const;
     void TestReset() const;
+    void TestInitWithOngoingStop() const;
 
 private:
     static void SetUpTestCase() {
@@ -114,7 +117,7 @@ void HostMonitorInputRunnerUnittest::TestScheduleOnce() const {
     APSARA_TEST_TRUE_FATAL(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
     APSARA_TEST_EQUAL_FATAL("test", configName);
 
-    runner->mThreadPool->Stop();
+    // Stop() 会处理 ThreadPool 的停止，不需要手动调用 mThreadPool->Stop()
     runner->Stop();
 }
 
@@ -160,9 +163,52 @@ void HostMonitorInputRunnerUnittest::TestReset() const {
     }
 }
 
+void HostMonitorInputRunnerUnittest::TestInitWithOngoingStop() const {
+    auto runner = HostMonitorInputRunner::GetInstance();
+
+    // First, start the runner
+    runner->Init();
+    APSARA_TEST_TRUE_FATAL(runner->mIsStarted.load());
+
+    // Stop to reset state
+    runner->Stop();
+    APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
+
+    // Simulate an ongoing Stop operation by creating a future that takes time to complete
+    runner->mStopFuture = std::async(std::launch::async, []() {
+        // Simulate a slow stop operation
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    });
+
+    // Verify the future is valid and not ready
+    APSARA_TEST_TRUE_FATAL(runner->mStopFuture.valid());
+    auto status = runner->mStopFuture.wait_for(std::chrono::seconds(0));
+    APSARA_TEST_TRUE_FATAL(status != std::future_status::ready);
+
+    // Now call Init() while the future is still running
+    // Init() will check mStopFuture first and return directly without modifying mIsStarted
+    runner->Init();
+
+    // Verify runner is NOT started (Init() detected ongoing stop and returned early)
+    APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
+
+    // Wait for the stop future to complete
+    runner->mStopFuture.wait();
+    APSARA_TEST_TRUE_FATAL(runner->mStopFuture.valid());
+    status = runner->mStopFuture.wait_for(std::chrono::seconds(0));
+    APSARA_TEST_TRUE_FATAL(status == std::future_status::ready);
+
+    // Now Init() should succeed since the stop future is ready
+    runner->Init();
+    APSARA_TEST_TRUE_FATAL(runner->mIsStarted.load());
+
+    runner->Stop();
+}
+
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestUpdateAndRemoveCollector);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestScheduleOnce);
 UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestReset);
+UNIT_TEST_CASE(HostMonitorInputRunnerUnittest, TestInitWithOngoingStop);
 
 } // namespace logtail
 

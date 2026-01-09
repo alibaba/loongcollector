@@ -181,13 +181,21 @@ bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPi
 }
 
 bool InputHostMonitor::Start() {
-    HostMonitorInputRunner::GetInstance()->Init();
+    auto* runner = HostMonitorInputRunner::GetInstance();
+    runner->Init();
+
+    // Check if runner is properly started before updating collectors
+    if (!runner->IsStarted()) {
+        LOG_ERROR(sLogger,
+                  ("start host monitor input failed", "runner not started")("config", mContext->GetConfigName()));
+        return false;
+    }
+
     std::vector<CollectorInfo> collectorInfos;
     for (const auto& collectorName : mCollectors) {
         collectorInfos.push_back({collectorName, mInterval, HostMonitorCollectType::kMultiValue});
     }
-    HostMonitorInputRunner::GetInstance()->UpdateCollector(
-        mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
+    runner->UpdateCollector(mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
     return true;
 }
 
