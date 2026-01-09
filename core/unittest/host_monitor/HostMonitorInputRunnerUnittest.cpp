@@ -186,10 +186,10 @@ void HostMonitorInputRunnerUnittest::TestInitWithOngoingStop() const {
     APSARA_TEST_TRUE_FATAL(status != std::future_status::ready);
 
     // Now call Init() while the future is still running
-    // According to new logic, Init() should return directly without waiting
+    // Init() will check mStopFuture first and return directly without modifying mIsStarted
     runner->Init();
 
-    // Verify runner is NOT started (Init() aborted and reset mIsStarted to false)
+    // Verify runner is NOT started (Init() detected ongoing stop and returned early)
     APSARA_TEST_FALSE_FATAL(runner->mIsStarted.load());
 
     // Wait for the stop future to complete

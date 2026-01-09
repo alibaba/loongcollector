@@ -159,19 +159,19 @@ void HostMonitorInputRunner::RemoveAllCollector() {
 }
 
 void HostMonitorInputRunner::Init() {
-    if (mIsStarted.exchange(true)) {
-        LOG_WARNING(sLogger, ("Init", "already started"));
-        return;
-    }
-
-    // Check if there is an ongoing Stop operation, return directly
+    // Check if there is an ongoing Stop operation first, before modifying state
     if (mStopFuture.valid()) {
         std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
         if (status != std::future_status::ready) {
             LOG_ERROR(sLogger, ("Init", "previous stop is not completed, return directly"));
-            mIsStarted.store(false); // Reset state since initialization is aborted
             return;
         }
+    }
+
+    // Check if already started and set to started atomically
+    if (mIsStarted.exchange(true)) {
+        LOG_WARNING(sLogger, ("Init", "already started"));
+        return;
     }
 
     InitMetrics();
