@@ -90,6 +90,7 @@ public:
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
+    bool IsStarted() const { return mIsStarted.load(); }
 
     bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& startTime,
                             const std::string& configName,
