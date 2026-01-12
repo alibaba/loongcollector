@@ -31,7 +31,6 @@ on:
       - 1.*
       - 2.*
       - 3.*
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.ref }}
