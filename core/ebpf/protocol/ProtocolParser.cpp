@@ -31,7 +31,7 @@ extern "C" {
 namespace logtail::ebpf {
 
 std::set<support_proto_e> ProtocolParserManager::AvaliableProtocolTypes() const {
-    return {support_proto_e::ProtoHTTP, support_proto_e::ProtoMySQL};
+    return {support_proto_e::ProtoHTTP, support_proto_e::ProtoMySQL, support_proto_e::ProtoRedis};
 }
 
 support_proto_e ProtocolStringToEnum(std::string protocol) {
@@ -40,6 +40,8 @@ support_proto_e ProtocolStringToEnum(std::string protocol) {
         return support_proto_e::ProtoHTTP;
     } else if (protocol == "MYSQL") {
         return support_proto_e::ProtoMySQL;
+    } else if (protocol == "REDIS") {
+        return support_proto_e::ProtoRedis;
     }
 
     return support_proto_e::ProtoUnknown;
