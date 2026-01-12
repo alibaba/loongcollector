@@ -17,17 +17,24 @@ name: Build Windows
 on:
   pull_request:
     paths-ignore:
+      - "changes/**"
+      - "config_server/**"
       - "docs/**"
       - "example_config/**"
-      - "docker/**"
       - "k8s_template/**"
-      - "changes/**"
       - "licenses/**"
+      - "test/**"
+      - "tools/**"
       - "CHANGELOG.md"
   push:
     branches:
       - main
-      - 1.*
+      - 3.*
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   BuildCoreWindows:

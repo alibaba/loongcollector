@@ -17,18 +17,25 @@ name: Static Check
 on:
   pull_request:
     paths-ignore:
+      - "changes/**"
+      - "config_server/**"
       - "docs/**"
       - "example_config/**"
-      - "docker/**"
       - "k8s_template/**"
-      - "changes/**"
-      - "licenses/**"
+      - "tools/**"
       - "CHANGELOG.md"
   push:
     branches:
       - main
       - 1.*
       - 2.*
+      - 3.*
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   LicensesCheck:
     env:

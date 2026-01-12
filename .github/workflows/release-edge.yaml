@@ -19,12 +19,20 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "changes/**"
+      - "config_server/**"
+      - "docs/**"
+      - "example_config/**"
+      - "k8s_template/**"
+      - "licenses/**"
+      - "test/**"
+      - "tools/**"
+      - "CHANGELOG.md"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # 第一步：构建不同架构的安装包
