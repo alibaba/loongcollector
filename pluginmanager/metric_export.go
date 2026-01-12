@@ -81,7 +81,7 @@ func GetGoCppProvidedMetrics() []map[string]string {
 func GetGoPluginMetrics() []map[string]string {
 	metrics := make([]map[string]string, 0)
 
-	// 收集所有有效的 Context 引用，避免在调用 ExportMetricRecords 期间 config 被删除导致的 crash
+	// 收集所有有效的 Context 引用，避免在调用 ExportMetricRecords 期间 config 被删除引发 crash
 	contexts := make([]pipeline.Context, 0)
 	LogtailConfigLock.RLock()
 	for _, config := range LogtailConfig {
