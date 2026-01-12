@@ -229,17 +229,29 @@ func (info *K8SInfo) IsMatch(filter *K8SFilter) bool {
 // innerMatch ...
 func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
 	if filter.NamespaceReg != nil {
-		if matched, _ := filter.NamespaceReg.MatchString(info.Namespace); !matched {
+		matched, err := filter.NamespaceReg.MatchString(info.Namespace)
+		if err != nil {
+			logger.Debug(context.Background(), "namespace regex match error", err, "namespace", info.Namespace, "pattern", filter.NamespaceReg.String())
+		}
+		if !matched {
 			return false
 		}
 	}
 	if filter.PodReg != nil {
-		if matched, _ := filter.PodReg.MatchString(info.Pod); !matched {
+		matched, err := filter.PodReg.MatchString(info.Pod)
+		if err != nil {
+			logger.Debug(context.Background(), "pod regex match error", err, "pod", info.Pod, "pattern", filter.PodReg.String())
+		}
+		if !matched {
 			return false
 		}
 	}
 	if filter.ContainerReg != nil {
-		if matched, _ := filter.ContainerReg.MatchString(info.ContainerName); !matched {
+		matched, err := filter.ContainerReg.MatchString(info.ContainerName)
+		if err != nil {
+			logger.Debug(context.Background(), "container regex match error", err, "container", info.ContainerName, "pattern", filter.ContainerReg.String())
+		}
+		if !matched {
 			return false
 		}
 	}
@@ -913,7 +925,11 @@ func isMapLabelsMatch(includeLabel map[string]string,
 		if !matchedFlag {
 			for key, reg := range includeLabelRegex {
 				if dockerVal, ok := labels[key]; ok {
-					if matched, _ := reg.MatchString(dockerVal); matched {
+					matched, err := reg.MatchString(dockerVal)
+					if err != nil {
+						logger.Debug(context.Background(), "include label regex match error", err, "key", key, "value", dockerVal, "pattern", reg.String())
+					}
+					if matched {
 						matchedFlag = true
 						break
 					}
@@ -932,7 +948,11 @@ func isMapLabelsMatch(includeLabel map[string]string,
 	}
 	for key, reg := range excludeLabelRegex {
 		if dockerVal, ok := labels[key]; ok {
-			if matched, _ := reg.MatchString(dockerVal); matched {
+			matched, err := reg.MatchString(dockerVal)
+			if err != nil {
+				logger.Debug(context.Background(), "exclude label regex match error", err, "key", key, "value", dockerVal, "pattern", reg.String())
+			}
+			if matched {
 				return false
 			}
 		}
@@ -968,7 +988,11 @@ func isMathEnvItem(env string,
 
 	if len(regexEnv) > 0 {
 		if reg, ok := regexEnv[envKey]; ok {
-			if matched, _ := reg.MatchString(envValue); matched {
+			matched, err := reg.MatchString(envValue)
+			if err != nil {
+				logger.Debug(context.Background(), "env regex match error", err, "key", envKey, "value", envValue, "pattern", reg.String())
+			}
+			if matched {
 				return true
 			}
 		}
