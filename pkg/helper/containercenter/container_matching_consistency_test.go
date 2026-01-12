@@ -18,10 +18,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"testing"
 
+	"github.com/dlclark/regexp2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,7 +101,7 @@ func convertTestContainerToDockerInfoDetail(tc TestContainer) *DockerInfoDetail 
 }
 
 // convertTestFiltersToGoFilters converts test filters to Go filter structures
-func convertTestFiltersToGoFilters(tf TestFilters) (map[string]string, map[string]string, map[string]*regexp.Regexp, map[string]*regexp.Regexp, map[string]string, map[string]string, map[string]*regexp.Regexp, map[string]*regexp.Regexp, *K8SFilter) {
+func convertTestFiltersToGoFilters(tf TestFilters) (map[string]string, map[string]string, map[string]*regexp2.Regexp, map[string]*regexp2.Regexp, map[string]string, map[string]string, map[string]*regexp2.Regexp, map[string]*regexp2.Regexp, *K8SFilter) {
 	// Container labels
 	includeLabel, includeLabelRegex, _ := SplitRegexFromMap(tf.IncludeContainerLabel)
 	excludeLabel, excludeLabelRegex, _ := SplitRegexFromMap(tf.ExcludeContainerLabel)
@@ -234,11 +234,11 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 
 		// Empty filters should match
 		result := isContainerLabelMatch(map[string]string{}, map[string]string{},
-			map[string]*regexp.Regexp{}, map[string]*regexp.Regexp{}, container)
+			map[string]*regexp2.Regexp{}, map[string]*regexp2.Regexp{}, container)
 		assert.True(t, result)
 
 		result = isContainerEnvMatch(map[string]string{}, map[string]string{},
-			map[string]*regexp.Regexp{}, map[string]*regexp.Regexp{}, container)
+			map[string]*regexp2.Regexp{}, map[string]*regexp2.Regexp{}, container)
 		assert.True(t, result)
 
 		k8sFilter, _ := CreateK8SFilter("", "", "", map[string]string{}, map[string]string{})
@@ -259,7 +259,7 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 
 		// Include filter that doesn't match should fail
 		result := isContainerLabelMatch(map[string]string{"nonexistent": "value"}, map[string]string{},
-			map[string]*regexp.Regexp{}, map[string]*regexp.Regexp{}, container)
+			map[string]*regexp2.Regexp{}, map[string]*regexp2.Regexp{}, container)
 		assert.False(t, result)
 	})
 
@@ -275,7 +275,7 @@ func TestContainerMatchingLogicValidation(t *testing.T) {
 
 		// Exclude filter that matches should fail
 		result := isContainerLabelMatch(map[string]string{}, map[string]string{"app": "test"},
-			map[string]*regexp.Regexp{}, map[string]*regexp.Regexp{}, container)
+			map[string]*regexp2.Regexp{}, map[string]*regexp2.Regexp{}, container)
 		assert.False(t, result)
 	})
 

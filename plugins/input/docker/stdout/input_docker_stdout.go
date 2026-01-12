@@ -20,6 +20,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dlclark/regexp2"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -159,10 +161,10 @@ type ServiceDockerStdout struct {
 	K8sContainerRegex     string            `comment:"the regular expression of kubernetes container to match containers."`
 
 	// export from ilogtail-trace component
-	IncludeLabelRegex map[string]*regexp.Regexp
-	ExcludeLabelRegex map[string]*regexp.Regexp
-	IncludeEnvRegex   map[string]*regexp.Regexp
-	ExcludeEnvRegex   map[string]*regexp.Regexp
+	IncludeLabelRegex map[string]*regexp2.Regexp
+	ExcludeLabelRegex map[string]*regexp2.Regexp
+	IncludeEnvRegex   map[string]*regexp2.Regexp
+	ExcludeEnvRegex   map[string]*regexp2.Regexp
 	K8sFilter         *containercenter.K8SFilter
 
 	// for tracker
