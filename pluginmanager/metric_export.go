@@ -95,7 +95,6 @@ func GetGoPluginMetrics() []map[string]string {
 	}
 	LogtailConfigLock.RUnlock()
 
-	// 即使其他 goroutine 删除了 config，我们已经有了 Context 的引用，不会丢失指标
 	for _, ctx := range contexts {
 		if ctx == nil {
 			continue
