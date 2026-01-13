@@ -467,11 +467,11 @@ bool FlusherSLS::Init(const Json::Value& config, Json::Value& optionalGoPipeline
         EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
             mRegion, {mEndpoint}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::APPEND);
     }
-    mCandidateHostsInfo
-        = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
+    mCandidateDomainsInfo
+        = EnterpriseSLSClientManager::GetInstance()->GetCandidateDomainsInfo(mRegion, mProject, mEndpointMode);
     LOG_INFO(mContext->GetLogger(),
              ("get candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
-                 "endpoint mode", EndpointModeToString(mCandidateHostsInfo->GetMode())));
+                 "endpoint mode", EndpointModeToString(mCandidateDomainsInfo->GetMode())));
 #else
     // Endpoint
     if (!GetMandatoryStringParam(config, "Endpoint", mEndpoint, errorMsg)) {
@@ -671,44 +671,23 @@ bool FlusherSLS::BuildRequest(SenderQueueItem* item, unique_ptr<HttpSinkRequest>
 
     auto data = static_cast<SLSSenderQueueItem*>(item);
 #ifdef __ENTERPRISE__
-    if (BOOL_FLAG(send_prefer_real_ip)) {
-        data->mCurrentDomain = EnterpriseSLSClientManager::GetInstance()->GetRealIp(mRegion);
-        if (data->mCurrentDomain.empty()) {
-            auto info
-                = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
-            if (mCandidateHostsInfo.get() != info.get()) {
-                LOG_INFO(sLogger,
-                         ("update candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
-                             "from", EndpointModeToString(mCandidateHostsInfo->GetMode()))(
-                             "to", EndpointModeToString(info->GetMode())));
-                mCandidateHostsInfo = info;
-            }
-            data->mCurrentDomain = mCandidateHostsInfo->GetCurrentHost();
-            data->mUseIPFlag = false;
-        } else {
-            data->mUseIPFlag = true;
-        }
-    } else {
-        // in case local region endpoint mode is changed, we should always check before sending
-        auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(mRegion, mProject, mEndpointMode);
-        if (mCandidateHostsInfo == nullptr) {
-            // TODO: temporarily used here, for send logtail alarm only, should be removed after alarm is refactored
-            mCandidateHostsInfo = info;
-        }
-        if (mCandidateHostsInfo.get() != info.get()) {
-            LOG_INFO(sLogger,
-                     ("update candidate hosts info, region", mRegion)("project", mProject)("logstore", mLogstore)(
-                         "from", EndpointModeToString(mCandidateHostsInfo->GetMode()))(
-                         "to", EndpointModeToString(info->GetMode())));
-            mCandidateHostsInfo = info;
-        }
-        data->mCurrentDomain = mCandidateHostsInfo->GetCurrentHost();
+    // in case local region endpoint mode is changed, we should always check before sending
+    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateDomainsInfo(mRegion, mProject, mEndpointMode);
+    if (mCandidateDomainsInfo == nullptr || mCandidateDomainsInfo.get() != info.get()) {
+        // TODO: temporarily used here, for send logtail alarm only, should be removed after alarm is refactored
+        mCandidateDomainsInfo = info;
+        LOG_INFO(sLogger,
+                 ("update candidate hosts info, region",
+                  mRegion)("project", mProject)("logstore", mLogstore)("mode", EndpointModeToString(info->GetMode())));
     }
-    if (data->mCurrentDomain.empty()) {
-        if (mCandidateHostsInfo->IsInitialized()) {
+    mCandidateDomainsInfo->GetCurrentEndpoint(
+        mRegion, mProject, mEndpointMode, data->mCurrentDomain, data->mCurrentIP, data->mUseIPFlag);
+
+    if ((data->mUseIPFlag && data->mCurrentIP.empty()) || (!data->mUseIPFlag && data->mCurrentDomain.empty())) {
+        if (mCandidateDomainsInfo->IsInitialized()) {
             GetRegionConcurrencyLimiter(mRegion)->OnFail(chrono::system_clock::now());
         }
-        *errMsg = "failed to get available host";
+        *errMsg = "failed to get available domain";
         *keepItem = true;
         return false;
     }
@@ -910,7 +889,8 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
         ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mLastSendTime).count()) + "ms")( \
         "total send time", \
         ToString(chrono::duration_cast<chrono::milliseconds>(curSystemTime - data->mFirstEnqueTime).count()) \
-            + "ms")("endpoint", data->mCurrentDomain)("is profile data", isProfileData)
+            + "ms")("endpoint", data->mCurrentDomain)("IP", data->mCurrentIP)("use IP flag", data->mUseIPFlag)( \
+        "is profile data", isProfileData)("response", response.GetBody<string>() ? *response.GetBody<string>() : "")
 
         switch (operation) {
             case OperationOnFail::RETRY_IMMEDIATELY:
@@ -952,9 +932,9 @@ void FlusherSLS::OnSendDone(const HttpResponse& response, SenderQueueItem* item)
     }
 #ifdef __ENTERPRISE__
     bool hasNetworkError = sendResult == SEND_NETWORK_ERROR;
-    EnterpriseSLSClientManager::GetInstance()->UpdateHostStatus(
-        mProject, mCandidateHostsInfo->GetMode(), hostname, !hasNetworkError);
-    mCandidateHostsInfo->SelectBestHost();
+    EnterpriseSLSClientManager::GetInstance()->UpdateDomainStatus(
+        mProject, mCandidateDomainsInfo->GetMode(), hostname, !hasNetworkError);
+    mCandidateDomainsInfo->SelectBestDomain();
 
     if (!hasNetworkError) {
         bool hasAuthError = sendResult == SEND_UNAUTHORIZED;

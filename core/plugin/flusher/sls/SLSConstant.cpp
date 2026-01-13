@@ -40,6 +40,7 @@ const string ACS_HEADER_PREFIX = "x-acs-";
 const string X_LOG_KEYPROVIDER = "x-log-keyprovider";
 const string X_LOG_APIVERSION = "x-log-apiversion";
 const string X_LOG_COMPRESSTYPE = "x-log-compresstype";
+const string X_LOG_PROJECT = "x-log-project";
 const string X_LOG_BODYRAWSIZE = "x-log-bodyrawsize";
 const string X_LOG_SIGNATUREMETHOD = "x-log-signaturemethod";
 const string X_LOG_MODE = "x-log-mode";

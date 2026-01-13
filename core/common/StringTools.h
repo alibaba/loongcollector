@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,9 @@ inline std::string ToString(bool value) {
 }
 std::string ToString(const std::vector<std::string>& vec);
 std::string ToString(const std::vector<std::filesystem::path>& vec);
+std::string ToString(const std::map<std::string, std::string>& map,
+                     const std::string& kvDelim = ": ",
+                     const std::string& pairDelim = "; ");
 
 template <typename T>
 std::string ToHexString(const T& value) {

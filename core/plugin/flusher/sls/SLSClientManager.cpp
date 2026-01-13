@@ -165,7 +165,17 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
     } else {
         path.append("/shards/route");
     }
+
     header[HOST] = domain;
+
+    // Only set X_LOG_PROJECT if domain doesn't already contain project prefix
+    // if disable_subdomain is set true, for custom domain and multi az, the host does not contain project, so we need
+    // to set X_LOG_PROJECT here to pass project to server. Server will use X_LOG_PROJECT to get the project info and
+    // may transfer the request to the other az.
+    if (!project.empty() && domain.find(project + ".") != 0) {
+        header[X_LOG_PROJECT] = project;
+    }
+
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();
     header[CONTENT_TYPE] = TYPE_LOG_PROTOBUF;
@@ -199,6 +209,8 @@ void PreparePostLogStoreLogsRequest(const string& accessKeyId,
 
     string signature = GetUrlSignature(HTTP_POST, path, header, parameterList, body, accessKeySecret);
     header[AUTHORIZATION] = LOG_HEADSIGNATURE_PREFIX + accessKeyId + ':' + signature;
+
+    LOG_DEBUG(sLogger, ("PreparePostLogStoreLogsRequest", "Prepare Header")("headers", ToString(header)));
 }
 
 void PreparePostHostMetricsRequest(const string& accessKeyId,
@@ -256,7 +268,6 @@ void PreparePostMetricStoreLogsRequest(const string& accessKeyId,
                                        map<string, string>& header) {
     path = METRICSTORES;
     path.append("/").append(project).append("/").append(logstore).append("/api/v1/write");
-
     header[HOST] = domain;
     header[USER_AGENT] = SLSClientManager::GetInstance()->GetUserAgent();
     header[DATE] = GetDateString();

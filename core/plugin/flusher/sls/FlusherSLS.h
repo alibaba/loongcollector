@@ -158,9 +158,9 @@ private:
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
 #ifdef __ENTERPRISE__
-    // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateHostsInfo.
-    // Otherwise, timeout machanisim must be emplyed to clean up unused CandidateHostsInfo.
-    std::shared_ptr<CandidateHostsInfo> mCandidateHostsInfo;
+    // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateDomainsInfo.
+    // Otherwise, timeout machanisim must be emplyed to clean up unused CandidateDomainsInfo.
+    std::shared_ptr<CandidateDomainsInfo> mCandidateDomainsInfo;
 #endif
 
     CounterPtr mSendCnt;

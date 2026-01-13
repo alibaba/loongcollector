@@ -84,7 +84,7 @@ static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
 static const string kAKErrorMsg = "can not get valid access key";
 #endif
 
-static const string kNoHostErrorMsg = "can not get available host";
+static const string kNoDomainErrorMsg = "can not get available domain";
 
 static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {
     switch (compressType) {
@@ -248,7 +248,7 @@ void DiskBufferWriter::BufferSenderThread() {
             }
         }
 #ifdef __ENTERPRISE__
-        mCandidateHostsInfos.clear();
+        mCandidateDomainsInfos.clear();
 #endif
         // mIsSendingBuffer = false;
         lock.lock();
@@ -571,7 +571,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                 break;
                             case SEND_NETWORK_ERROR:
                             case SEND_SERVER_ERROR:
-                                if (response.mErrorMsg != kNoHostErrorMsg) {
+                                if (response.mErrorMsg != kNoDomainErrorMsg) {
                                     LOG_WARNING(
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
@@ -902,15 +902,15 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
             region, {bufferMeta.endpoint()}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::APPEND);
     }
-    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(
+    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateDomainsInfo(
         region, bufferMeta.project(), GetEndpointMode(bufferMeta.endpointmode()));
-    mCandidateHostsInfos.insert(info);
+    mCandidateDomainsInfos.insert(info);
 
-    domain = info->GetCurrentHost();
-    if (domain.empty()) {
+    info->GetCurrentEndpoint(region, bufferMeta.project(), EndpointMode::DEFAULT, domain, ip, useIPFlag);
+    if ((useIPFlag && ip.empty()) || (!useIPFlag && domain.empty())) {
         SLSResponse response;
         response.mErrorCode = LOGE_REQUEST_ERROR;
-        response.mErrorMsg = kNoHostErrorMsg;
+        response.mErrorMsg = kNoDomainErrorMsg;
         return response;
     }
 #else
