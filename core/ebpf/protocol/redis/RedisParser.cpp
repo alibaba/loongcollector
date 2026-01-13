@@ -58,7 +58,7 @@ REDISProtocolParser::Parse(struct conn_data_event_t* dataEvent,
             return {};
         }
         if (converger) {
-            converger->DoConverge(appDetail, ConvType::kSql, record->mSql);
+            converger->DoConverge(appDetail, ConvType::kNoSql, record->GetSql());
         }
     }
 
