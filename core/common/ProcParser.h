@@ -90,6 +90,7 @@ struct ProcessStat {
     uint64_t majorFaults = 0;
     pid_t parentPid = 0;
     int tty = 0;
+    uint32_t flags = 0; // Process flags from /proc/[pid]/stat (field 9)
     int priority = 0;
     int nice = 0;
     int numThreads = 0;
@@ -235,6 +236,16 @@ public:
     std::string GetUserNameByUid(uid_t uid);
 
     std::unordered_set<int> GetAllPids();
+
+    // Kernel thread detection
+    // Checks if the PF_KTHREAD flag is set which identifies this process as a kernel thread
+    // See: https://github.com/torvalds/linux/commit/7b34e4283c685f5cc6ba6d30e939906eee0d4bcf
+    static bool IsKernelThread(uint32_t flags) {
+        constexpr uint32_t KTHREAD_FLAG = 0x00200000; // Kernel thread flag (PF_KTHREAD)
+        return (flags & KTHREAD_FLAG) == KTHREAD_FLAG;
+    }
+
+    static bool IsKernelThread(const ProcessStat& ps) { return IsKernelThread(ps.flags); }
 
 private:
     std::filesystem::path procPidPath(uint32_t pid, const std::string& subpath) const;

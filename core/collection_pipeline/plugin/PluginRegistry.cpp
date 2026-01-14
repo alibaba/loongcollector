@@ -174,7 +174,7 @@ void PluginRegistry::LoadStaticPlugins() {
     if (BOOL_FLAG(enable_ebpf_network_secure)) {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
-    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), false);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif

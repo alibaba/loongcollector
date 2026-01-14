@@ -166,7 +166,7 @@ extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_FAILED_TOTAL;
 extern const std::string METRIC_PLUGIN_EBPF_META_ATTACH_ROLLBACK_TOTAL;
 
 /**********************************************************
- *   all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
+ * all processor （所有解析类的处理插件通用指标。Todo：目前统计还不全、不准确）
  **********************************************************/
 extern const std::string& METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL;
@@ -176,7 +176,7 @@ extern const std::string METRIC_PLUGIN_OUT_FAILED_EVENT_GROUPS_TOTAL;
 extern const std::string METRIC_PLUGIN_OUT_SUCCESSFUL_EVENT_GROUPS_TOTAL;
 
 /**********************************************************
- *   all flusher （所有发送插件通用指标）
+ * all flusher （所有发送插件通用指标）
  **********************************************************/
 extern const std::string METRIC_PLUGIN_FLUSHER_TOTAL_PACKAGE_TIME_MS;
 extern const std::string METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL;
@@ -384,6 +384,19 @@ extern const std::string METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_HOST_MONITOR_OUT_ITEMS_SIZE;
 extern const std::string METRIC_RUNNER_HOST_MONITOR_DROP_ITEMS_TOTAL;
 extern const std::string METRIC_RUNNER_HOST_MONITOR_LATENCY_TIME_MS;
+
+/**********************************************************
+ *   process entity runner
+ **********************************************************/
+extern const std::string METRIC_RUNNER_FULL_REPORT_TOTAL;
+extern const std::string METRIC_RUNNER_INCREMENTAL_REPORT_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_ADDED_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_REMOVED_TOTAL;
+extern const std::string METRIC_RUNNER_PROCESS_REUSED_TOTAL;
+extern const std::string METRIC_RUNNER_CACHED_PROCESS_COUNT;
+extern const std::string METRIC_RUNNER_COLLECT_LATENCY_MS;
+extern const std::string METRIC_RUNNER_FULL_COLLECT_LATENCY_MS;
+extern const std::string METRIC_RUNNER_INCREMENTAL_COLLECT_LATENCY_MS;
 
 /**********************************************************
  *   system interface

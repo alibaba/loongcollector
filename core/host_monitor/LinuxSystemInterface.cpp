@@ -30,11 +30,15 @@ using namespace std::chrono;
 #include <pwd.h>
 #include <sys/statvfs.h>
 
+#include <algorithm>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/program_options.hpp>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
+#include <unordered_set>
 
 #include "common/FileSystemUtil.h"
 #include "common/StringTools.h"
@@ -1371,4 +1375,166 @@ bool LinuxSystemInterface::GetGPUInformationOnce(GPUInformation& gpuInfo) {
 
     return success;
 }
+
+// ========== 端口采集实现 ==========
+
+// TCP 连接信息结构
+struct TcpConnection {
+    uint32_t localAddr;
+    uint16_t localPort;
+    uint32_t remoteAddr;
+    uint16_t remotePort;
+    uint8_t state;
+    uint64_t inode;
+};
+
+// 解析 /proc/net/tcp 或 /proc/net/tcp6 文件
+static std::vector<TcpConnection> ParseTcpTable(const std::filesystem::path& tcpFile) {
+    std::vector<TcpConnection> connections;
+    std::ifstream file(tcpFile);
+    if (!file.is_open()) {
+        return connections;
+    }
+
+    std::string line;
+    std::getline(file, line); // 跳过表头
+
+    while (std::getline(file, line)) {
+        // 格式示例：
+        // sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+        //  0: 00000000:0CEA 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 ...
+
+        std::istringstream iss(line);
+        std::string sl, localAddrHex, remAddrHex, stHex;
+        uint64_t inode = 0;
+
+        // 读取字段
+        if (!(iss >> sl >> localAddrHex >> remAddrHex >> stHex)) {
+            continue;
+        }
+
+        // 跳过中间字段，直接找到 inode
+        // 实际字段（awk $1, $2, ...）:
+        //   $1:sl $2:local_address $3:rem_address $4:st $5-$9:中间字段 $10:inode
+        // 已读取: sl($1), local_address($2), rem_address($3), st($4)
+        // 需要跳过: $5-$9 (5个字段)
+        // 然后读取: inode($10)
+        std::string temp;
+        for (int i = 0; i < 5; ++i) { // 跳过 5 个字段
+            if (!(iss >> temp)) {
+                break;
+            }
+        }
+        if (!(iss >> inode)) {
+            continue;
+        }
+
+        // 解析地址和端口（格式：ADDR:PORT，十六进制）
+        size_t colonPos = localAddrHex.find(':');
+        if (colonPos == std::string::npos) {
+            continue;
+        }
+
+        TcpConnection conn;
+        try {
+            conn.localAddr = std::stoul(localAddrHex.substr(0, colonPos), nullptr, 16);
+            conn.localPort = std::stoul(localAddrHex.substr(colonPos + 1), nullptr, 16);
+
+            colonPos = remAddrHex.find(':');
+            if (colonPos != std::string::npos) {
+                conn.remoteAddr = std::stoul(remAddrHex.substr(0, colonPos), nullptr, 16);
+                conn.remotePort = std::stoul(remAddrHex.substr(colonPos + 1), nullptr, 16);
+            }
+
+            conn.state = std::stoul(stHex, nullptr, 16);
+            conn.inode = inode;
+
+            connections.push_back(conn);
+        } catch (const std::exception& e) {
+            // 解析失败，跳过该行
+            continue;
+        }
+    }
+
+    return connections;
+}
+
+// 获取进程的 socket inodes
+static std::unordered_set<uint64_t> GetProcessSocketInodes(pid_t pid) {
+    std::unordered_set<uint64_t> inodes;
+    std::filesystem::path fdDir = PROCESS_DIR / std::to_string(pid) / "fd";
+
+    try {
+        if (!std::filesystem::exists(fdDir)) {
+            return inodes;
+        }
+
+        for (const auto& entry : std::filesystem::directory_iterator(fdDir)) {
+            if (!entry.is_symlink()) {
+                continue;
+            }
+
+            // 读取符号链接目标（如：socket:[12345]）
+            std::error_code ec;
+            auto target = std::filesystem::read_symlink(entry.path(), ec);
+            if (ec) {
+                continue;
+            }
+
+            std::string targetStr = target.string();
+            if (targetStr.find("socket:[") == 0) {
+                // 提取 inode
+                size_t start = 8; // "socket:[" 长度
+                size_t end = targetStr.find(']', start);
+                if (end != std::string::npos) {
+                    try {
+                        uint64_t inode = std::stoull(targetStr.substr(start, end - start));
+                        inodes.insert(inode);
+                    } catch (const std::exception&) {
+                        continue;
+                    }
+                }
+            }
+        }
+    } catch (const std::filesystem::filesystem_error&) {
+        // 进程可能已退出，忽略错误
+    }
+
+    return inodes;
+}
+
+std::vector<uint16_t> LinuxSystemInterface::GetProcessListeningPortsOnce(pid_t pid) {
+    std::vector<uint16_t> ports;
+
+    // 步骤1：解析全局 TCP 连接表
+    auto tcpConnections = ParseTcpTable(PROCESS_DIR / PROCESS_NET_TCP);
+    auto tcp6Connections = ParseTcpTable(PROCESS_DIR / PROCESS_NET_TCP6);
+
+    // 合并 IPv4 和 IPv6 连接
+    tcpConnections.insert(tcpConnections.end(), tcp6Connections.begin(), tcp6Connections.end());
+
+    // 步骤2：获取进程的 socket inodes
+    auto socketInodes = GetProcessSocketInodes(pid);
+    if (socketInodes.empty()) {
+        return ports;
+    }
+
+    // 步骤3：匹配 inode 并提取 LISTEN 状态的端口
+    // TCP_LISTEN = 0x0A (十进制 10)
+    const uint8_t TCP_LISTEN = 0x0A;
+
+    std::unordered_set<uint16_t> uniquePorts; // 去重
+    for (const auto& conn : tcpConnections) {
+        if (conn.state == TCP_LISTEN && socketInodes.count(conn.inode) > 0) {
+            uniquePorts.insert(conn.localPort);
+        }
+    }
+
+    // 转换为有序列表
+    ports.assign(uniquePorts.begin(), uniquePorts.end());
+    std::sort(ports.begin(), ports.end());
+
+    return ports;
+}
+
 } // namespace logtail

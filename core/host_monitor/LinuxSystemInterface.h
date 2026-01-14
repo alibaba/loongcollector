@@ -56,6 +56,7 @@ private:
 
     bool InitGPUCollectorOnce(const FieldMap& fieldMap) override;
     bool GetGPUInformationOnce(GPUInformation& gpuInfo) override;
+    std::vector<uint16_t> GetProcessListeningPortsOnce(pid_t pid) override;
 
     uint64_t GetMemoryValue(char unit, uint64_t value);
     bool GetProcessCmdlineStringOnce(pid_t pid, ProcessCmdlineString& cmdline) override;
