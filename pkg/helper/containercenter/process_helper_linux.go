@@ -26,7 +26,7 @@ import (
 )
 
 func ContainerProcessAlive(pid int) bool {
-	procStatPath := GetMonitorFilePath(fmt.Sprintf("/proc/%d/stat", pid))
+	procStatPath := GetMountedFilePath(fmt.Sprintf("/proc/%d/stat", pid))
 	exist, err := util.PathExists(procStatPath)
 	if err != nil {
 		logger.Warning(context.Background(), "DETECT_CONTAINER_ALARM", "stat container proc path", procStatPath, "error", err)
