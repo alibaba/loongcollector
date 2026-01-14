@@ -160,12 +160,9 @@ void HostMonitorInputRunner::RemoveAllCollector() {
 
 void HostMonitorInputRunner::Init() {
     // Check if there is an ongoing Stop operation first, before modifying state
-    if (mStopFuture.valid()) {
-        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
-        if (status != std::future_status::ready) {
-            LOG_ERROR(sLogger, ("Init", "previous stop is not completed, return directly"));
-            return;
-        }
+    if (IsStopping()) {
+        LOG_ERROR(sLogger, ("Init", "previous stop is not completed, return directly"));
+        return;
     }
 
     // Check if already started and set to started atomically
@@ -190,13 +187,10 @@ void HostMonitorInputRunner::Stop() {
 
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    // Wait for any existing stop operation to complete first (should not happen, but be safe)
-    if (mStopFuture.valid()) {
-        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
-        if (status != std::future_status::ready) {
-            LOG_WARNING(sLogger, ("Stop", "previous stop operation still running, waiting..."));
-            mStopFuture.wait();
-        }
+    // If previous stop operation is still running, just return (avoid duplicate stop)
+    if (IsStopping()) {
+        LOG_WARNING(sLogger, ("Stop", "previous stop operation still running, return directly"));
+        return;
     }
 
     // Start ThreadPool stop operation asynchronously
@@ -224,6 +218,14 @@ void HostMonitorInputRunner::Stop() {
         Application::GetInstance()->SetForceExitFlag(true);
     }
 #endif
+}
+
+bool HostMonitorInputRunner::IsStopping() const {
+    if (mStopFuture.valid()) {
+        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
+        return status != std::future_status::ready;
+    }
+    return false;
 }
 
 bool HostMonitorInputRunner::ShouldRestart() {

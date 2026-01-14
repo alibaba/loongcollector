@@ -113,6 +113,7 @@ private:
     void PushQueue(CollectContextPtr context, PipelineEventGroup&& group);
     void PushNextTimerEvent(CollectContextPtr config);
     void AddHostLabels(PipelineEventGroup& group);
+    bool IsStopping() const;
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
