@@ -2,19 +2,15 @@
 
 LoongCollector 提供了指标接口，可以方便地为插件增加一些自监控指标，目前支持Counter，Gauge，String，Latency等类型。
 
-接口：
+接口及实现：
 
-<https://github.com/alibaba/loongcollector/blob/main/pkg/pipeline/self_metric.go>
-
-实现：
-
-<https://github.com/alibaba/loongcollector/blob/main/pkg/helper/self_metrics_vector_imp.go>
+<https://github.com/alibaba/loongcollector/blob/main/pkg/selfmonitor/metrics_vector_imp.go>
 
 用户使用时需要引入pkg/helper包：
 
 ```go
 import (
-    "github.com/alibaba/ilogtail/pkg/helper"
+    "github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 ```
 
@@ -31,12 +27,12 @@ type ProcessorRateLimit struct {
 }
 ```
 
-创建指标时，需要将其注册到 LoongCollector Context 的 MetricRecord 中，以便 LoongCollector 能够采集上报数据，在插件的Init方法中，调用context 的 GetMetricRecord()方法来获取MetricRecord，然后调用helper.New**XXX**MetricAndRegister函数去注册一个指标，例如：
+创建指标时，需要将其注册到 LoongCollector Context 的 MetricRecord 中，以便 LoongCollector 能够采集上报数据，在插件的Init方法中，调用context 的 GetMetricRecord()方法来获取MetricRecord，然后调用selfmonitor.New**XXX**MetricAndRegister函数去注册一个指标，例如：
 
 ```go
 metricsRecord := p.context.GetMetricRecord()
-p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginType))
-p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
+p.limitMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_limited", pluginType))
+p.processedMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, fmt.Sprintf("%v_processed", pluginType))
 ```
 
 用户在声明一个Metric时可以还额外注入一些插件级别的静态Label，这是一个可选参数，例如flusher_http就把RemoteURL等配置进行上报：
@@ -44,7 +40,7 @@ p.processedMetric = helper.NewCounterMetricAndRegister(metricsRecord, fmt.Sprint
 ```go
 metricsRecord := f.context.GetMetricRecord()
 metricLabels := f.buildLabels()
-f.matchedEvents = helper.NewCounterMetricAndRegister(metricsRecord, "http_flusher_matched_events", metricLabels...)
+f.matchedEvents = selfmonitor.NewCounterMetricAndRegister(metricsRecord, "http_flusher_matched_events", metricLabels...)
 ```
 
 ## 指标打点
@@ -70,15 +66,20 @@ sc.lastBinLogMetric.Set(string(r.NextLogName))
 
 ## 指标上报
 
-LoongCollector 会自动采集所有注册的指标，默认采集间隔为60s，然后通过default_flusher上报，数据格式为LogGroup，格式如下：
+LoongCollector 会自动采集所有注册的指标，默认采集间隔为60s，然后通过c++流水线上报，大致格式如下：
 
 ```json
-{"Logs":[{"Time":0,"Contents":[{"Key":"http_flusher_matched_events","Value":"2.0000"},{"Key":"__name__","Value":"http_flusher_matched_events"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]},{"Time":0,"Contents":[{"Key":"http_flusher_unmatched_events","Value":"0.0000"},{"Key":"__name__","Value":"http_flusher_unmatched_events"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]},{"Time":0,"Contents":[{"Key":"http_flusher_dropped_events","Value":"0.0000"},{"Key":"__name__","Value":"http_flusher_dropped_events"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]},{"Time":0,"Contents":[{"Key":"http_flusher_retry_count","Value":"2.0000"},{"Key":"__name__","Value":"http_flusher_retry_count"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]},{"Time":0,"Contents":[{"Key":"http_flusher_flush_failure_count","Value":"2.0000"},{"Key":"__name__","Value":"http_flusher_flush_failure_count"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]},{"Time":0,"Contents":[{"Key":"http_flusher_flush_latency_ns","Value":"2504448312.5000"},{"Key":"__name__","Value":"http_flusher_flush_latency_ns"},{"Key":"db","Value":"%{metadata.db}"},{"Key":"flusher_http_id","Value":"0"},{"Key":"RemoteURL","Value":"http://testeof.com/write"},{"Key":"project","Value":"p"},{"Key":"config_name","Value":"c"},{"Key":"plugins","Value":""},{"Key":"category","Value":"p"},{"Key":"source_ip","Value":"100.80.230.110"}]}],"Category":"","Topic":"","Source":"","MachineUUID":""}
+[]{
+{"counters":"{\"http_flusher_dropped_events\":\"3.0000\",\"http_flusher_flush_failure_count\":\"6.0000\",\"http_flusher_matched_events\":\"1.0000\",\"http_flusher_retry_count\":\"5.0000\",\"http_flusher_unmatched_events\":\"2.0000\"}","gauges":"{\"http_flusher_flush_latency_ns\":\"7.0000\"}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\"}"}
+{"counters":"{\"http_flusher_status_code_count\":\"8.0000\"}","gauges":"{}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\",\"status_code\":\"200\"}"}
+{"counters":"{\"http_flusher_status_code_count\":\"9.0000\"}","gauges":"{}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\",\"status_code\":\"400\"}"}
+{"counters":"{\"http_flusher_error_count\":\"10.0000\"}","gauges":"{}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\",\"level\":\"error\",\"reason\":\"timeout\"}"}
+{"counters":"{\"http_flusher_error_count\":\"11.0000\"}","gauges":"{}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\",\"level\":\"warn\",\"reason\":\"retry\"}"}
+{"counters":"{\"http_flusher_error_count\":\"12.0000\"}","gauges":"{}","labels":"{\"PluginId\":\"13\",\"PluginType\":\"flusher_http\",\"RemoteURL\":\"http://localhost:8081\",\"level\":\"error\",\"reason\":\"dropped\"}"}
+}
 ```
 
-一组LogGroup中会有多条Log，每一条Log都对应一条指标，其中`
-{"Key":"__name__","Value":"http_flusher_matched_events"}
-`是一个特殊的Label，代表指标的名字。
+每个map[string]string都会包含同label的多条指标序列。
 
 ## 高级功能
 
@@ -97,11 +98,11 @@ type FlusherHTTP struct {
 }
 ```
 
-声明并注册MetricVector时，可以使用helper.New**XXX**MetricVectorAndRegister方法，
+声明并注册MetricVector时，可以使用selfmonitor.New**XXX**MetricVectorAndRegister方法，
 需要将其带有哪些动态Label的Name也进行声明：
 
 ```go
-f.statusCodeStatistics = helper.NewCounterMetricVectorAndRegister(metricsRecord,
+f.statusCodeStatistics = selfmonitor.NewCounterMetricVectorAndRegister(metricsRecord,
     "http_flusher_status_code_count",
     map[string]string{"RemoteURL": f.RemoteURL},
     []string{"status_code"},
