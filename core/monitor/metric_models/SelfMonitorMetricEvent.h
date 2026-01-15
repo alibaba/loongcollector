@@ -40,7 +40,11 @@ using SelfMonitorMetricEventKey = int64_t;
 class SelfMonitorMetricEvent {
 public:
     SelfMonitorMetricEvent() = default;
+    ~SelfMonitorMetricEvent() = default;
     SelfMonitorMetricEvent(const SelfMonitorMetricEvent& event) = default;
+    SelfMonitorMetricEvent& operator=(const SelfMonitorMetricEvent& event) = default;
+    SelfMonitorMetricEvent(SelfMonitorMetricEvent&& event) = default;
+    SelfMonitorMetricEvent& operator=(SelfMonitorMetricEvent&& event) = default;
 
     explicit SelfMonitorMetricEvent(MetricsRecord* metricRecord);
     explicit SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);

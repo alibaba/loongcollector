@@ -18,12 +18,12 @@
 
 #include "json/json.h"
 
-#include "app_config/AppConfig.h"
 #include "common/CompressTools.h"
 #include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
 #include "logger/Logger.h"
 #include "plugin/flusher/sls/SLSClientManager.h"
+#include "protobuf/sls/sls_logs.pb.h"
 #ifdef __ENTERPRISE__
 #include "EnterpriseProfileSender.h"
 #endif

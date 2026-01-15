@@ -14,7 +14,6 @@
 
 #include "Monitor.h"
 
-#include "MetricRecord.h"
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
@@ -44,6 +43,7 @@
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/MetricManager.h"
 #include "monitor/SelfMonitorServer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "protobuf/sls/sls_logs.pb.h"
@@ -523,12 +523,14 @@ void LogtailMonitor::CheckScaledCpuUsageUpLimit() {
     // we can not scale up, otherwise, we can increase mScaledCpuUsageUpLimit by
     // mScaledCpuUsageStep.
     if (mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE == 0) {
-        if ((mScaledCpuUsageUpLimit + mScaledCpuUsageStep) >= (mCpuCores * machineCpuUsageThreshold))
+        if ((mScaledCpuUsageUpLimit + mScaledCpuUsageStep) >= (mCpuCores * machineCpuUsageThreshold)) {
             return;
+        }
         for (int32_t i = 0; i < CPU_STAT_FOR_SCALE_ARRAY_SIZE; ++i) {
             if ((mOsCpuArrayForScale[i] / machineCpuUsageThreshold) >= 0.95
-                || (mCpuArrayForScale[i] / mScaledCpuUsageUpLimit) < 0.6)
+                || (mCpuArrayForScale[i] / mScaledCpuUsageUpLimit) < 0.6) {
                 return;
+            }
         }
         mScaledCpuUsageUpLimit += mScaledCpuUsageStep;
         LOG_DEBUG(sLogger,

@@ -12,18 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MetricManager.h"
+#include "monitor/MetricManager.h"
 
-#include <set>
-
-#include "Monitor.h"
-#include "app_config/AppConfig.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
-#include "provider/Provider.h"
-
-
-using namespace sls_logs;
+#include "monitor/Monitor.h"
 using namespace std;
 
 namespace logtail {
@@ -155,12 +148,12 @@ void ReadMetrics::ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEve
     // c++ metrics
     MetricsRecord* tmp = mHead;
     while (tmp) {
-        metricEventList.emplace_back(SelfMonitorMetricEvent(tmp));
+        metricEventList.emplace_back(tmp);
         tmp = tmp->GetNext();
     }
     // go metrics
     for (auto metrics : mGoMetrics) {
-        metricEventList.emplace_back(SelfMonitorMetricEvent(move(metrics)));
+        metricEventList.emplace_back(metrics);
     }
 }
 
@@ -184,7 +177,7 @@ void ReadMetrics::UpdateMetrics() {
 #endif
     // 获取c++指标
     MetricsRecord* snapshot = WriteMetrics::GetInstance()->DoSnapshot();
-    MetricsRecord* toDelete;
+    MetricsRecord* toDelete = nullptr;
     {
         // Only lock when change head
         WriteLock lock(mReadWriteLock);
@@ -219,8 +212,8 @@ void ReadMetrics::UpdateGoCppProvidedMetrics(vector<map<string, string>>& metric
         return;
     }
 
-    for (auto metrics : metricsList) {
-        for (auto metric : metrics) {
+    for (auto& metrics : metricsList) {
+        for (auto& metric : metrics) {
             if (metric.first == METRIC_AGENT_MEMORY_GO) {
                 LoongCollectorMonitor::GetInstance()->SetAgentGoMemory(stoi(metric.second));
             }

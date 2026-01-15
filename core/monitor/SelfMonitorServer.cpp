@@ -16,8 +16,12 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "MetricConstants.h"
-#include "Monitor.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "constants/TagConstants.h"
+#include "logger/Logger.h"
+#include "monitor/AlarmManager.h"
+#include "monitor/Monitor.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -112,7 +116,7 @@ void SelfMonitorServer::SendMetrics() {
     // new pipeline
     vector<SelfMonitorMetricEvent> metricEventList;
     ReadMetrics::GetInstance()->ReadAsSelfMonitorMetricEvents(metricEventList);
-    PushSelfMonitorMetricEvents(metricEventList);
+    PushSelfMonitorMetricEvents(std::move(metricEventList));
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
@@ -137,8 +141,8 @@ bool SelfMonitorServer::ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& ev
     return true;
 }
 
-void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events) {
-    for (auto event : events) {
+void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>&& events) {
+    for (auto& event : events) {
         bool shouldSkip = false;
         if (event.mCategory == MetricCategory::METRIC_CATEGORY_AGENT) {
             LoongCollectorMonitor::GetInstance()->SetAgentMetric(event);
@@ -159,10 +163,9 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
             continue;
         }
 
-        if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
-            mSelfMonitorMetricEventMap[event.mKey].Merge(event);
-        } else {
-            mSelfMonitorMetricEventMap[event.mKey] = event;
+        auto [iter, inserted] = mSelfMonitorMetricEventMap.try_emplace(event.mKey, std::move(event));
+        if (!inserted) {
+            iter->second.Merge(event);
         }
     }
 }
