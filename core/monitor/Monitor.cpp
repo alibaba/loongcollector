@@ -24,33 +24,36 @@
 
 #include "common/EncodingConverter.h"
 #endif
+
 #include <fstream>
-#include <functional>
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
-#include "common/DevInode.h"
-#include "common/ExceptionBase.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
-#include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
 #include "file_server/event_handler/LogInput.h"
-#include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/MetricManager.h"
 #include "monitor/SelfMonitorServer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+
+#ifdef __ENTERPRISE__
+#include <functional>
+
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "common/DevInode.h"
+#include "common/ExceptionBase.h"
+#include "common/RuntimeUtil.h"
+#include "config/provider/EnterpriseConfigProvider.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
 #endif
 
 using namespace std;

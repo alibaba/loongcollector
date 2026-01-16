@@ -20,14 +20,12 @@
 #include <future>
 #include <string>
 
+#include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/Lock.h"
 #include "models/PipelineEventGroup.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
 
 namespace logtail {
-
-class CollectionPipelineContext;
-class LogEvent;
 
 class SelfMonitorServer {
 public:

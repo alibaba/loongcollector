@@ -14,25 +14,10 @@
 
 #include "ProfileSender.h"
 
-#include <unordered_set>
-
-#include "json/json.h"
-
-#include "common/CompressTools.h"
-#include "common/Flags.h"
 #include "common/LogtailCommonFlags.h"
-#include "logger/Logger.h"
-#include "plugin/flusher/sls/SLSClientManager.h"
-#include "protobuf/sls/sls_logs.pb.h"
-#ifdef __ENTERPRISE__
-#include "EnterpriseProfileSender.h"
-#endif
-// TODO: temporarily used
-#include "common/compression/CompressorFactory.h"
 
 using namespace std;
 
-DEFINE_FLAG_BOOL(send_running_status, "", true);
 DEFINE_FLAG_STRING(profile_project_name, "profile project_name for logtail", "");
 
 namespace logtail {
@@ -43,12 +28,8 @@ ProfileSender::ProfileSender()
 }
 
 ProfileSender* ProfileSender::GetInstance() {
-#ifdef __ENTERPRISE__
-    static ProfileSender* ptr = new EnterpriseProfileSender();
-#else
-    static ProfileSender* ptr = new ProfileSender();
-#endif
-    return ptr;
+    static auto* sInstance = new ProfileSender();
+    return sInstance;
 }
 
 string ProfileSender::GetDefaultProfileRegion() {
@@ -76,45 +57,26 @@ string ProfileSender::GetProfileProjectName(const string& region) {
     if (region.empty()) {
         return mDefaultProfileProjectName;
     }
-    auto iter = mRegionFlusherMap.find(region);
-    if (iter == mRegionFlusherMap.end()) {
+    auto iter = mRegionProjectNameMap.find(region);
+    if (iter == mRegionProjectNameMap.end()) {
         return mDefaultProfileProjectName;
     }
-    return iter->second.mProject;
+    return iter->second;
 }
 
 void ProfileSender::GetAllProfileRegion(vector<string>& allRegion) {
     ScopedSpinLock lock(mProfileLock);
-    if (mRegionFlusherMap.find(mDefaultProfileRegion) == mRegionFlusherMap.end()) {
+    if (mRegionProjectNameMap.find(mDefaultProfileRegion) == mRegionProjectNameMap.end()) {
         allRegion.push_back(mDefaultProfileRegion);
     }
-    for (auto iter = mRegionFlusherMap.begin(); iter != mRegionFlusherMap.end(); ++iter) {
+    for (auto iter = mRegionProjectNameMap.begin(); iter != mRegionProjectNameMap.end(); ++iter) {
         allRegion.push_back(iter->first);
     }
 }
 
 void ProfileSender::SetProfileProjectName(const string& region, const string& profileProject) {
     ScopedSpinLock lock(mProfileLock);
-    FlusherSLS& flusher = mRegionFlusherMap[region];
-    flusher.mProject = profileProject;
-    flusher.mRegion = region;
-    flusher.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    // logstore is given at send time
-    // TODO: temporarily used
-    flusher.mCompressor = CompressorFactory::GetInstance()->Create(
-        Json::Value(), CollectionPipelineContext(), "flusher_sls", "", CompressType::ZSTD);
-}
-
-FlusherSLS* ProfileSender::GetFlusher(const string& region) {
-    ScopedSpinLock lock(mProfileLock);
-    if (region.empty()) {
-        return &mRegionFlusherMap[mDefaultProfileRegion];
-    }
-    auto iter = mRegionFlusherMap.find(region);
-    if (iter == mRegionFlusherMap.end()) {
-        return &mRegionFlusherMap[mDefaultProfileRegion];
-    }
-    return &iter->second;
+    mRegionProjectNameMap[region] = profileProject;
 }
 
 bool ProfileSender::IsProfileData(const string& region, const string& project, const string& logstore) {
@@ -129,55 +91,6 @@ bool ProfileSender::IsProfileData(const string& region, const string& project, c
 #else
     return false;
 #endif
-}
-
-void ProfileSender::SendToProfileProject(const string& region, sls_logs::LogGroup& logGroup) {
-    if (0 == logGroup.category().compare("logtail_status_profile")) {
-        SendRunningStatus(logGroup);
-    }
-}
-
-void ProfileSender::SendRunningStatus(sls_logs::LogGroup& logGroup) {
-    if (!BOOL_FLAG(send_running_status)) {
-        return;
-    }
-
-    static int controlFeq = 0;
-
-    // every 12 hours
-    if (0 == logGroup.logs_size() || 0 != controlFeq++ % (60 * 12)) {
-        return;
-    }
-
-    string region = "cn-shanghai";
-    string project = "ilogtail-community-edition";
-    string logstore = "ilogtail-online";
-    string host = project + "." + region + ".log.aliyuncs.com";
-
-    Json::Value logtailStatus;
-    logtailStatus["__topic__"] = "logtail_status_profile";
-    unordered_set<string> selectedFields(
-        {"cpu", "mem", "version", "instance_key", "os", "os_detail", "load", "status", "metric_json", "plugin_stats"});
-    Json::Value status;
-    const sls_logs::Log& log = logGroup.logs(0);
-    for (int32_t conIdx = 0; conIdx < log.contents_size(); ++conIdx) {
-        const sls_logs::Log_Content& content = log.contents(conIdx);
-        const string& key = content.key();
-        const string& value = content.value();
-        if (selectedFields.find(key) != selectedFields.end()) {
-            status[key] = value;
-        }
-    }
-    logtailStatus["__logs__"][0] = status;
-    string logBody = logtailStatus.toStyledString();
-
-    string res;
-    if (!CompressLz4(logBody, res)) {
-        LOG_ERROR(sLogger, ("lz4 compress data", "fail"));
-        return;
-    }
-
-    PutWebTracking(host, true, logstore, "lz4", res, logBody.size());
 }
 
 } // namespace logtail

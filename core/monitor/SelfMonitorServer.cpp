@@ -16,7 +16,6 @@
 
 #include "monitor/SelfMonitorServer.h"
 
-#include "collection_pipeline/CollectionPipelineContext.h"
 #include "constants/TagConstants.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"

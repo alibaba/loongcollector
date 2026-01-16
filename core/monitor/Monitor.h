@@ -28,10 +28,6 @@
 #include <Windows.h>
 #endif
 
-namespace sls_logs {
-class LogGroup;
-}
-
 namespace logtail {
 #ifndef LOGTAIL_NO_TC_MALLOC
 extern time_t gLastTcmallocReleaseMemTime;
