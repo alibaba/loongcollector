@@ -3,7 +3,7 @@
 # 直接修改 CMake 生成的 Makefile
 # 使用方式：
 # mkdir -p core/build && cd core/build && cmake .. && cd -
-# ./analyze_build_time.sh core/build
+# ./scripts/analyze_build_time.sh core/build
 
 set -e
 

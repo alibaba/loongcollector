@@ -15,16 +15,15 @@
 #include "monitor/AlarmManager.h"
 
 #include "app_config/AppConfig.h"
-#include "collection_pipeline/queue/QueueKeyManager.h"
-#include "collection_pipeline/queue/SenderQueueManager.h"
-#include "common/LogtailCommonFlags.h"
+#include "common/Flags.h"
 #include "common/StringTools.h"
-#include "common/Thread.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
+#include "constants/TagConstants.h"
+#include "logger/Logger.h"
+#include "monitor/Monitor.h"
 #include "monitor/SelfMonitorServer.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);
@@ -32,7 +31,6 @@ DEFINE_FLAG_INT32(logtail_low_level_alarm_speed, "the speed(count/second) which 
 
 using namespace std;
 using namespace logtail;
-using namespace sls_logs;
 
 namespace logtail {
 
@@ -207,8 +205,9 @@ AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(cons
         int32_t now = time(NULL);
         std::vector<int32_t> lastUpdateTime;
         lastUpdateTime.resize(ALL_LOGTAIL_ALARM_NUM);
-        for (uint32_t i = 0; i < ALL_LOGTAIL_ALARM_NUM; ++i)
+        for (uint32_t i = 0; i < ALL_LOGTAIL_ALARM_NUM; ++i) {
             lastUpdateTime[i] = now - rand() % 180;
+        }
         mAllAlarmMap[region] = std::make_pair(pMapVec, lastUpdateTime);
         return pMapVec.get();
     }
@@ -240,8 +239,9 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         auto* messagePtr
             = new AlarmMessage(mMessageType[alarmType], levelStr, projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
-    } else
+    } else {
         alarmBufferVec[alarmType][key]->IncCount();
+    }
 }
 
 void AlarmManager::ForceToSend() {

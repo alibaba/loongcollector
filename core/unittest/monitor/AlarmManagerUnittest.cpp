@@ -12,19 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <atomic>
-#include <fstream>
-#include <list>
-#include <thread>
-
-#include "json/json.h"
-
-#include "AlarmManager.h"
+#include "monitor/AlarmManager.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
-
-static std::atomic_bool running(true);
 
 class AlarmManagerUnittest : public ::testing::Test {
 public:

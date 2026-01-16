@@ -16,15 +16,8 @@
 
 #pragma once
 
-#include <cstdint>
-#include <stdio.h>
-
 #include <atomic>
-#include <condition_variable>
-#include <future>
 #include <map>
-#include <memory>
-#include <string>
 #include <vector>
 
 #include "common/Lock.h"
@@ -137,8 +130,8 @@ struct AlarmMessage {
 class AlarmManager {
 public:
     static AlarmManager* GetInstance() {
-        static AlarmManager instance;
-        return &instance;
+        static AlarmManager sInstance;
+        return &sInstance;
     }
 
     void SendAlarmWarning(const AlarmType& alarmType,
