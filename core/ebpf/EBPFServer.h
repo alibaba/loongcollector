@@ -92,7 +92,7 @@ public:
                       uint32_t pluginIndex,
                       PluginType type,
                       const logtail::CollectionPipelineContext* ctx,
-                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                      const PluginOptions& options,
                       const PluginMetricManagerPtr& mgr);
 
     bool DisablePlugin(const std::string& pipelineName, PluginType type);
@@ -118,7 +118,7 @@ private:
                              uint32_t pluginIndex,
                              PluginType type,
                              const logtail::CollectionPipelineContext* ctx,
-                             const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
+                             const PluginOptions& options,
                              const PluginMetricManagerPtr& metricManager);
     EBPFServer();
 
