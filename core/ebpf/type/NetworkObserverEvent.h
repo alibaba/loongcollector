@@ -65,6 +65,11 @@ public:
     [[nodiscard]] virtual bool IsSlow() const = 0;
     [[nodiscard]] virtual int GetStatusCode() const = 0;
 
+    // Fill protocol-specific log fields into LogEvent
+    virtual void FillProtocolSpecificLogFields(LogEvent* logEvent) = 0;
+    // Fill protocol-specific span fields into SpanEvent
+    virtual void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) = 0;
+
     const std::array<uint64_t, 4>& GetTraceId() { return mTraceId; }
     const std::array<uint64_t, 2>& GetSpanId() { return mSpanId; }
     void SetTraceId(std::array<uint64_t, 4>&& traceId) { mTraceId = traceId; }
@@ -116,6 +121,27 @@ public:
     void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
     void SetMethod(const std::string& method) { mHttpMethod = method; }
 
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
+        logEvent->SetContent(kHTTPMethod.LogKey(), mHttpMethod);
+        logEvent->SetContent(kHTTPPath.LogKey(), mRealPath.size() ? mRealPath : mPath);
+        logEvent->SetContent(kHTTPVersion.LogKey(), mProtocolVersion);
+        logEvent->SetContent(kStatusCode.LogKey(), std::to_string(mCode));
+        logEvent->SetContent(kHTTPReqBody.LogKey(), mReqBody);
+        logEvent->SetContent(kHTTPRespBody.LogKey(), mRespBody);
+    }
+
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
+        spanEvent->SetTag(kRpc.SpanKey(), GetConvSpanName());
+        if (!isServer) {
+            spanEvent->SetTag(kEndpoint.SpanKey(), GetConvSpanName());
+        }
+        spanEvent->SetTag(kHTTPReqBody.SpanKey(), mReqBody);
+        spanEvent->SetTag(kHTTPRespBody.SpanKey(), mRespBody);
+        spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(mReqBodySize));
+        spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(mRespBodySize));
+        spanEvent->SetTag(kHTTPVersion.SpanKey(), mProtocolVersion);
+    }
+
     // private:
     int mCode = 0;
     size_t mReqBodySize = 0;
@@ -151,6 +177,63 @@ public:
 
     const std::string& GetSql() const { return mSql; }
     void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
+
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
+        logEvent->SetContent(kDBSystemName.LogKey(), "mysql");
+        logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mCode));
+        logEvent->SetContent(kDBStatement.LogKey(), mSql);
+    }
+
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
+        spanEvent->SetTag(kDBSystemName.SpanKey(), "mysql");
+        spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mCode));
+        spanEvent->SetTag(kDBStatement.SpanKey(), mSql);
+    }
+
+private:
+    int mCode = 0;
+    std::string mErrorMsg;
+    std::string mCommandName;
+    std::string mSql;
+};
+
+class RedisRecord : public L7Record {
+public:
+    RedisRecord(const std::shared_ptr<Connection>& conn, const std::shared_ptr<AppDetail>& appDetail)
+        : L7Record(conn, appDetail) {}
+
+    [[nodiscard]] virtual bool IsError() const override { return mCode != 0; }
+    [[nodiscard]] virtual bool IsSlow() const override { return GetLatencyMs() >= kSlowRequestThresholdMs; }
+    void SetStatusCode(int code) { mCode = code; }
+    [[nodiscard]] virtual int GetStatusCode() const override { return mCode; }
+
+    [[nodiscard]] virtual const std::string& GetSpanName() { return mSql; }
+    [[nodiscard]] virtual const std::string& GetConvSpanName() { return mCommandName; }
+    void SetErrorMessage(const std::string& errorMsg) { mErrorMsg = errorMsg; }
+    const std::string& GetErrorMessage() const { return mErrorMsg; }
+    void SetSql(const std::string& sql) { mSql = sql; }
+
+    const std::string& GetSql() const { return mSql; }
+    void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
+    const std::string& GetCommandName() { return mCommandName; }
+
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
+        logEvent->SetContent(kDBSystemName.LogKey(), "redis");
+        logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mCode));
+        logEvent->SetContent(kDBStatement.LogKey(), mSql);
+        if (!mErrorMsg.empty()) {
+            logEvent->SetContent(kDBResponseMessage.LogKey(), mErrorMsg);
+        }
+    }
+
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
+        spanEvent->SetTag(kDBSystemName.SpanKey(), "redis");
+        spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mCode));
+        spanEvent->SetTag(kDBStatement.SpanKey(), mSql);
+        if (!mErrorMsg.empty()) {
+            spanEvent->SetTag(kDBResponseMessage.SpanKey(), mErrorMsg);
+        }
+    }
 
 private:
     int mCode = 0;
