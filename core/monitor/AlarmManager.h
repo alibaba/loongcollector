@@ -202,10 +202,9 @@ private:
     std::atomic_int mLastLowLevelCount{0};
 
     // 启动期告警磁盘缓冲相关
-    // 检查是否应该将 alarm 写入文件，如果超过时间窗口会设置 stopWritingFile
+    void EnsureAlarmDiskBufferFileOpen();
+    void CloseAlarmDiskBufferFile();
     bool ShouldWriteAlarmToFile(bool alarmPipelineReady, bool& stopWritingFile);
-
-    // 写入 alarm 到文件（带去重统计）
     void WriteAlarmToFile(const std::string& region,
                           const std::string& alarmType,
                           const std::string& level,
@@ -214,20 +213,11 @@ private:
                           const std::string& category,
                           const std::string& config);
 
-
     std::atomic_bool mAlarmPipelineReady{false};
     std::atomic_bool mStopWritingFile{false};
     std::string mAlarmDiskBufferFilePath;
-    
-    // 文件句柄管理
     FILE* mAlarmDiskBufferFileHandle{nullptr};
     PTMutex mAlarmDiskBufferFileMutex;
-    
-    // 打开文件句柄（如果尚未打开）
-    void EnsureAlarmDiskBufferFileOpen();
-    
-    // 关闭文件句柄
-    void CloseAlarmDiskBufferFile();
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void ClearTestState();

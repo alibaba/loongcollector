@@ -254,8 +254,12 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         // 这里为了便于实现，不采取一个project字段里写多个project名的方式，避免索引等的调整
         if (!projects.empty()) {
             auto projectsVec = SplitString(projects, " ");
+            std::set<std::string> sentRegions;
             for (const auto& project : projectsVec) {
-                SendAlarm(alarmType, level, message, FlusherSLS::GetProjectRegion(project), project, config, category);
+                sentRegions.insert(FlusherSLS::GetProjectRegion(project));
+            }
+            for (const auto& region : sentRegions) {
+                SendAlarm(alarmType, level, message, region, projects, config, category);
             }
             return;
         }
