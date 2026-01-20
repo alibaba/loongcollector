@@ -42,7 +42,9 @@ DEFINE_FLAG_INT32(logtail_low_level_alarm_speed, "the speed(count/second) which 
 DEFINE_FLAG_INT32(logtail_startup_alarm_window_seconds,
                   "the time window in seconds for writing alarms to disk buffer during startup",
                   60);
-DEFINE_FLAG_INT32(logtail_startup_alarm_file_max_size_mb, "the maximum size in MB for the alarm disk buffer file", 10);
+DEFINE_FLAG_INT32(logtail_startup_alarm_file_max_size,
+                  "the maximum size in bytes for the alarm disk buffer file",
+                  10 * 1024 * 1024);
 DEFINE_FLAG_INT32(logtail_startup_alarm_file_min_level, "the minimum alarm level to write to disk buffer file", 1);
 
 using namespace std;
@@ -180,10 +182,7 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
                                        SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
         auto now = GetCurrentLogtailTime();
-        for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
-             ++mapIter) {
-            auto& messagePtr = mapIter->second;
-
+        for (auto& [_, messagePtr] : alarmMap) {
             LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
             logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
                                                                                        : now.tv_sec);
@@ -493,17 +492,15 @@ bool AlarmManager::ShouldWriteAlarmToFile(bool alarmPipelineReady, bool& stopWri
         std::error_code ec;
         const int64_t fileSize = std::filesystem::file_size(std::filesystem::path(mAlarmDiskBufferFilePath), ec);
         if (!ec) {
-            const int64_t maxSizeBytes
-                = static_cast<int64_t>(INT32_FLAG(logtail_startup_alarm_file_max_size_mb)) * 1024 * 1024;
+            const auto maxSizeBytes = static_cast<int64_t>(INT32_FLAG(logtail_startup_alarm_file_max_size));
             if (fileSize >= maxSizeBytes) {
                 if (!stopWritingFile) {
                     stopWritingFile = true;
-                    LOG_ERROR(
-                        sLogger,
-                        ("alarm disk buffer file size exceeds limit",
-                         ToString(INT32_FLAG(logtail_startup_alarm_file_max_size_mb))
-                             + "MB, stop writing alarm to file and discard all subsequent alarms")(
-                            "file_path", mAlarmDiskBufferFilePath)("file_size_mb", ToString(fileSize / 1024 / 1024)));
+                    LOG_ERROR(sLogger,
+                              ("alarm disk buffer file size exceeds limit",
+                               ToString(INT32_FLAG(logtail_startup_alarm_file_max_size))
+                                   + " bytes, stop writing alarm to file and discard all subsequent alarms")(
+                                  "file_path", mAlarmDiskBufferFilePath)("file_size_bytes", ToString(fileSize)));
                 }
                 return false;
             }
