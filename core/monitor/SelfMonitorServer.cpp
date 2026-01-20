@@ -202,17 +202,40 @@ void SelfMonitorServer::SendAlarms() {
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
     vector<PipelineEventGroup> pipelineEventGroupList;
-    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
-
     ReadLock lock(mAlarmPipelineMux);
     if (mAlarmPipelineCtx == nullptr) {
         return;
     }
+    QueueKey key = mAlarmPipelineCtx->GetProcessQueueKey();
+    size_t inputIndex = mAlarmInputIndex;
+    lock.unlock();
+
+    // 如果 AlarmPipeline 刚就绪，先处理文件
+    if (!AlarmManager::GetInstance()->CheckAndSetAlarmPipelineReady()) {
+        map<string, string> regionToRawJson;
+        if (AlarmManager::GetInstance()->ReadAlarmsFromFile(pipelineEventGroupList, regionToRawJson)) {
+            for (auto& group : pipelineEventGroupList) {
+                if (group.GetEvents().size() > 0) {
+                    string region = group.GetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION).to_string();
+                    if (!ProcessorRunner::GetInstance()->PushQueue(key, inputIndex, std::move(group))) {
+                        auto it = regionToRawJson.find(region);
+                        LOG_ERROR(sLogger,
+                                  ("send startup alarms from file", "failed")("region", region)(
+                                      "failed alarm json", it == regionToRawJson.end() ? "N/A" : it->second));
+                    }
+                }
+            }
+            AlarmManager::GetInstance()->DeleteAlarmFile();
+            return;
+        }
+    }
+
+    // 正常流程：从内存 buffer 获取 alarm
+    AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
     for (auto& pipelineEventGroup : pipelineEventGroupList) {
         if (pipelineEventGroup.GetEvents().size() > 0) {
-            ProcessorRunner::GetInstance()->PushQueue(
-                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
+            ProcessorRunner::GetInstance()->PushQueue(key, inputIndex, std::move(pipelineEventGroup));
         }
     }
 }
