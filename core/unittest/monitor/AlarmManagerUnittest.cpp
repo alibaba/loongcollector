@@ -19,9 +19,17 @@ namespace logtail {
 
 class AlarmManagerUnittest : public ::testing::Test {
 public:
-    void SetUp() {}
+    void SetUp() {
+        // 设置 AlarmPipeline 为就绪状态，这样告警会写入 buffer 而不是文件
+        AlarmManager::GetInstance()->mAlarmPipelineReady.store(true);
+        AlarmManager::GetInstance()->mAllAlarmMap.clear();
+    }
 
-    void TearDown() {}
+    void TearDown() {
+        // 清理状态
+        AlarmManager::GetInstance()->mAlarmPipelineReady.store(false);
+        AlarmManager::GetInstance()->mAllAlarmMap.clear();
+    }
 
     void TestSendAlarm();
     void TestFlushAllRegionAlarm();

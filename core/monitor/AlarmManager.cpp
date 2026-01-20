@@ -35,7 +35,7 @@
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 #include "monitor/SelfMonitorServer.h"
-#include "provider/Provider.h"
+#include "plugin/flusher/sls/FlusherSLS.h"
 
 DEFINE_FLAG_INT32(logtail_alarm_interval, "the interval of two same type alarm message", 30);
 DEFINE_FLAG_INT32(logtail_low_level_alarm_speed, "the speed(count/second) which logtail's low level alarm allow", 100);
@@ -193,6 +193,8 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
             logEvent->SetContent("os", OS_NAME);
             logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
+            logEvent->SetContent("instance_id", Application::GetInstance()->GetInstanceId());
+            logEvent->SetContent("hostname", LoongCollectorMonitor::mHostname);
             if (!messagePtr->mProjectName.empty()) {
                 logEvent->SetContent("project_name", messagePtr->mProjectName);
             }
@@ -246,9 +248,18 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
         return;
     }
 
-    // ignore alarm for profile data
-    if (GetProfileSender()->IsProfileData(region, projectName, category)) {
-        return;
+    if (projectName.empty()) {
+        string projects = FlusherSLS::GetAllProjects();
+        // 如果是进程级别的告警，可能有多个project，在记录的时候需要发送到每个project的region。
+        // 这里为了便于实现，不采取一个project字段里写多个project名的方式，避免索引等的调整
+        if (!projects.empty()) {
+            auto projectsVec = SplitString(projects, " ");
+            for (const auto& project : projectsVec) {
+                SendAlarm(alarmType, level, message, FlusherSLS::GetProjectRegion(project), project, config, category);
+            }
+            return;
+        }
+        // 空的project、region会自动发到default region，这种情况只能用instance_id查询。
     }
 
     // 如果 AlarmPipeline 已就绪，写 buffer；否则写文件（最多60s）
@@ -348,6 +359,11 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
         const auto& region = doc["region"];
         const auto& alarmType = doc["alarm_type"];
         const auto& level = doc["alarm_level"];
+        const auto& ipValue = doc["ip"];
+        const auto& osValue = doc["os"];
+        const auto& verValue = doc["ver"];
+        const auto& instanceIdValue = doc["instance_id"];
+        const auto& hostnameValue = doc["hostname"];
         const auto& projectName = doc.FindMember("project_name");
         const auto& category = doc.FindMember("category");
         const auto& config = doc.FindMember("config");
@@ -361,7 +377,6 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
             continue;
         }
 
-        // 构造 key
         std::string key = std::string(region.GetString()) + "_" + std::string(alarmType.GetString()) + "_";
         if (projectName != doc.MemberEnd() && projectName->value.IsString()) {
             key += projectName->value.GetString();
@@ -375,6 +390,11 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
             key += config->value.GetString();
         }
         key += "_" + std::string(level.GetString());
+        key += "_" + std::string(ipValue.GetString());
+        key += "_" + std::string(osValue.GetString());
+        key += "_" + std::string(verValue.GetString());
+        key += "_" + std::string(instanceIdValue.GetString());
+        key += "_" + std::string(hostnameValue.GetString());
 
         // 累加 count
         keyToCount[key]++;
@@ -425,17 +445,15 @@ bool AlarmManager::ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineE
         if (timestamp.IsInt64()) {
             logEvent->SetTimestamp(static_cast<time_t>(timestamp.GetInt64()));
         }
-        const std::string alarmTypeStr = doc["alarm_type"].GetString();
-        const std::string levelStr = doc["alarm_level"].GetString();
-        const std::string messageStr = message.IsString() ? std::string(message.GetString()) : "";
-        const std::string countStr = ToString(count);
-        logEvent->SetContent("alarm_type", alarmTypeStr);
-        logEvent->SetContent("alarm_level", levelStr);
-        logEvent->SetContent("alarm_message", messageStr);
-        logEvent->SetContent("alarm_count", countStr);
-        logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
-        logEvent->SetContent("os", OS_NAME);
-        logEvent->SetContent("ver", std::string(ILOGTAIL_VERSION));
+        logEvent->SetContent("alarm_type", std::string(doc["alarm_type"].GetString()));
+        logEvent->SetContent("alarm_level", std::string(doc["alarm_level"].GetString()));
+        logEvent->SetContent("alarm_message", std::string(message.IsString() ? std::string(message.GetString()) : ""));
+        logEvent->SetContent("alarm_count", ToString(count));
+        logEvent->SetContent("ip", std::string(doc["ip"].GetString()));
+        logEvent->SetContent("os", std::string(doc["os"].GetString()));
+        logEvent->SetContent("ver", std::string(doc["ver"].GetString()));
+        logEvent->SetContent("instance_id", std::string(doc["instance_id"].GetString()));
+        logEvent->SetContent("hostname", std::string(doc["hostname"].GetString()));
         const auto& projectName = doc.FindMember("project_name");
         if (projectName != doc.MemberEnd() && projectName->value.IsString()) {
             logEvent->SetContent("project_name", std::string(projectName->value.GetString()));
@@ -558,6 +576,16 @@ void AlarmManager::WriteAlarmToFile(const std::string& region,
     writer.String("1");
     writer.Key("timestamp");
     writer.Int64(time(nullptr));
+    writer.Key("ip");
+    writer.String(LoongCollectorMonitor::mIpAddr.c_str());
+    writer.Key("os");
+    writer.String(OS_NAME.c_str());
+    writer.Key("ver");
+    writer.String(ILOGTAIL_VERSION);
+    writer.Key("instance_id");
+    writer.String(Application::GetInstance()->GetInstanceId().c_str());
+    writer.Key("hostname");
+    writer.String(LoongCollectorMonitor::mHostname.c_str());
     if (!projectName.empty()) {
         writer.Key("project_name");
         writer.String(projectName.c_str());

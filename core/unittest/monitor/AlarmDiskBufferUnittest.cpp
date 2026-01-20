@@ -250,10 +250,10 @@ void AlarmDiskBufferUnittest::TestAlarmDeduplicationInFile() {
     bool hasData = AlarmManager::GetInstance()->ReadAlarmsFromFile(fileGroups, regionToRawJson);
     APSARA_TEST_TRUE(hasData);
     APSARA_TEST_EQUAL(1U, fileGroups.size());
-    
+
     int32_t totalEvents = CountAlarmsInPipelineEventGroups(fileGroups);
     APSARA_TEST_EQUAL(1, totalEvents); // 去重后只有 1 个事件
-    
+
     // 验证累加后的 count 是 3
     bool foundCount3 = false;
     for (const auto& group : fileGroups) {
