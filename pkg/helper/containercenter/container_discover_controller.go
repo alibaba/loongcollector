@@ -170,14 +170,6 @@ func (c *ContainerDiscoverManager) Init() bool {
 		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
 		criRuntimeWrapper = wrapper
 	}
-	if ok, err := util.PathExists(DefaultLogtailMountPath); err == nil {
-		if !ok {
-			logger.Info(context.Background(), "no docker mount path", "set empty")
-			DefaultLogtailMountPath = ""
-		}
-	} else {
-		logger.Warning(context.Background(), "check docker mount path error", err.Error())
-	}
 	c.enableCRIDiscover = criRuntimeWrapper != nil
 	c.enableDockerDiscover = containerCenterInstance.initClient() == nil
 	c.enableStaticDiscover = isStaticContainerInfoEnabled()
