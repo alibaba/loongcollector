@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.14
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
@@ -54,3 +54,4 @@ RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
     go env -w GOPROXY=https://goproxy.cn,direct"
 
 USER $USERNAME
+
