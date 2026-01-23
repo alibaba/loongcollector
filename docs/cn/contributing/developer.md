@@ -17,12 +17,12 @@ iLogtail 社区包含 Maintainer、Committer、Contributor、User 等角色，�
 
 **Committer**：是对 iLogtail 社区某些特定领域做出显著贡献的人。
 
-* 成为 Maintainer 的标准：
+* 成为 Committer 的标准：
   * 成为某个模块的专家，能够长时间地并持续性地贡献 Issue、PR （代码、测试用例、文档、案例）；
   * 参与重要 Feature 的讨论、设计、开发、测试；
   * 参与 Code Review。
 
-* 成为 Maintainer，您也将获得如下权利：
+* 成为 Committer，您也将获得如下权利：
   * 具有 iLogtail GitHub 仓库 Write 权限。
   * 参与 iLogtail 演进、发展的讨论，及核心模块设计评审等。
 
