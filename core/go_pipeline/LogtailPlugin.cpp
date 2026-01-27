@@ -288,7 +288,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin adapter
-        if (!loader.LoadDynLib("GoPluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginAdapterName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
             return mPluginValid;
         }
@@ -330,7 +330,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin base
-        if (!loader.LoadDynLib("GoPluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginBaseName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
             return mPluginValid;
         }
