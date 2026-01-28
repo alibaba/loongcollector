@@ -2536,7 +2536,8 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
             event->SetTimestamp(logtime, static_cast<uint32_t>(currentTimeNs % kNanoPerSeconds));
         } else {
             // When not auto-adjusting, use the full nanosecond timestamp
-            event->SetTimestamp(static_cast<time_t>(currentTimeNs / kNanoPerSeconds), static_cast<uint32_t>(currentTimeNs % kNanoPerSeconds));
+            event->SetTimestamp(static_cast<time_t>(currentTimeNs / kNanoPerSeconds),
+                                static_cast<uint32_t>(currentTimeNs % kNanoPerSeconds));
         }
     } else {
         // Use regular second timestamp
