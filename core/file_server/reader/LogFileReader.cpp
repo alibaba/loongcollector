@@ -2526,7 +2526,22 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
         logtime += GetTimeDelta();
     }
-    event->SetTimestamp(logtime);
+    // Check if nanosecond timestamp is enabled in global config
+    const GlobalConfig& globalConfig = reader->mReaderConfig.second->GetGlobalConfig();
+    if (globalConfig.mEnableTimestampNanosecond) {
+        // Use nanosecond precision timestamp
+        uint64_t currentTimeNs = GetCurrentTimeInNanoSeconds();
+        if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
+            // When auto-adjusting, use the adjusted second timestamp with current nanosecond part
+            event->SetTimestamp(logtime, static_cast<uint32_t>(currentTimeNs % kNanoPerSeconds));
+        } else {
+            // When not auto-adjusting, use the full nanosecond timestamp
+            event->SetTimestamp(static_cast<time_t>(currentTimeNs / kNanoPerSeconds), static_cast<uint32_t>(currentTimeNs % kNanoPerSeconds));
+        }
+    } else {
+        // Use regular second timestamp
+        event->SetTimestamp(logtime);
+    }
     event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
 
