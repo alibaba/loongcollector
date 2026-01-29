@@ -17,6 +17,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "app_config/AppConfig.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "logger/Logger.h"
@@ -552,6 +553,64 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
     GetSecurityProbeDefaultCallName(probeType, thisSecurityOption.mCallNames);
     mOptionList.emplace_back(std::move(thisSecurityOption));
     mProbeType = probeType;
+    return true;
+}
+
+bool CpuProfilingOption::Init(const Json::Value& config,
+                              const CollectionPipelineContext* mContext,
+                              const std::string& sName) {
+    std::string errorMsg;
+
+    if (!GetOptionalUIntParam(config, "CollectIntervalMs", mCollectIntervalMs, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "AppName", mAppName, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalStringParam(config, "Language", mLanguage, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg)) {
+        PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                             mContext->GetAlarm(),
+                             errorMsg,
+                             sName,
+                             mContext->GetConfigName(),
+                             mContext->GetProjectName(),
+                             mContext->GetLogstoreName(),
+                             mContext->GetRegion());
+    }
+
+    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
+        if (!mContainerDiscovery.Init(config, *mContext, sName)) {
+            return false;
+        }
+    }
+
     return true;
 }
 
