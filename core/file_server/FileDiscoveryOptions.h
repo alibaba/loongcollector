@@ -170,6 +170,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;
     friend class ModifyHandlerUnittest;
+    friend class ConfigManagerUnittest;
 #endif
 };
 

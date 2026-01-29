@@ -217,8 +217,6 @@ void CheckPointManager::LoadFileCheckPoint(const Json::Value& root) {
             int32_t idxInReaderArray = LogFileReader::CHECKPOINT_IDX_UNDEFINED;
             if (meta.isMember("resolved_file_name")) {
                 resolvedFilePath = meta["resolved_file_name"].asString();
-            } else {
-                resolvedFilePath = filePath; // for backward compatibility
             }
             if (meta.isMember("real_file_name")) {
                 realFilePath = meta["real_file_name"].asString();

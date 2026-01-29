@@ -569,7 +569,7 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
         DirCheckPointPtr dirCheckPoint;
         if (CheckPointManager::Instance()->GetDirCheckPoint(path, dirCheckPoint)) {
             // path had dircheckpoint means it was watched before, so it is valid
-            const set<string>& subdir = dirCheckPoint.get()->mSubDir;
+            auto subdir = dirCheckPoint.get()->mSubDir;
             for (const auto& it : subdir) {
                 RegisterHandlersWithinDepth(it, config, 0, maxDepth - 1);
             }
