@@ -16,22 +16,17 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <future>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
-#include "MetricManager.h"
-#include "MetricTypes.h"
+#include "monitor/metric_models/MetricRecord.h"
+#include "monitor/metric_models/SelfMonitorMetricEvent.h"
 
 #if defined(_MSC_VER)
 #include <Windows.h>
 #endif
-
-namespace sls_logs {
-class LogGroup;
-}
 
 namespace logtail {
 #ifndef LOGTAIL_NO_TC_MALLOC
