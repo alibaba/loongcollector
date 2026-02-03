@@ -32,6 +32,8 @@ LoongCollector is a key component of LoongSuite(Alibaba's unified observability 
 * [LoongSuite Java Agent](https://github.com/alibaba/loongsuite-java-agent): a process agent for Java applications.
 * Other upcoming language agent.
 
+The LoongSuite open-source community hosts monthly online sharing meetings. The meeting access link for each meeting will be posted to GitHub Discussions and shared in the DingTalk and WeChat groups within one week prior to the event. Recordings of past meetings are available on [Bilibili](https://space.bilibili.com/630680534/lists/1530630). 
+
 ### 🚀 Core Advantages
 
 - **⚡ High Performance**
