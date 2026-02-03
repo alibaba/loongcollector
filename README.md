@@ -183,7 +183,7 @@ We welcome contributions from the community! Here are some ways you can help:
 - **WeChat/DingTalk**: LoongCollector社区
 
 <div align="center">
-<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup.png" alt="Community QR Code" width="80%"/>
+<img src="https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/chatgroup/chatgroup_20260203.png" alt="Community QR Code" width="80%"/>
 </div>
 
 ### Other LoongSuite components's Community contact information
