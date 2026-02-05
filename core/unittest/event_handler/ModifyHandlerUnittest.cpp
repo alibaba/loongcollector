@@ -262,102 +262,102 @@ UNIT_TEST_CASE(ModifyHandlerUnittest, TestClearReaderWhenFileDeleted);
 
 void ModifyHandlerUnittest::TestHandleBasicCreateEvent() {
     LOG_INFO(sLogger, ("TestHandleBasicCreateEvent() begin", time(NULL)));
-    
+
     // Create a new file with matching pattern (test.log is the configured pattern)
     std::string newLogName = "test2.log";
     std::string newLogPath = gRootDir + PATH_SEPARATOR + newLogName;
     writeLog(newLogPath, "new log content\n");
-    
+
     // Get dev inode for the new file
     DevInode newDevInode = GetFileDevInode(newLogPath);
     APSARA_TEST_TRUE_FATAL(newDevInode.IsValid());
-    
+
     // Verify reader doesn't exist before create event
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.count(newDevInode), 0);
-    
+
     // Send CREATE event with ConfigName set to bypass IsMatch check
     Event createEvent(gRootDir, newLogName, EVENT_CREATE, 0, 0, newDevInode.dev, newDevInode.inode);
     createEvent.SetConfigName(mConfigName);
     mHandlerPtr->Handle(createEvent);
-    
+
     // Verify new reader is created and added to maps
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.count(newDevInode), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[newLogName].size(), 1);
-    
+
     // Verify the created reader has correct properties
     auto newReaderPtr = mHandlerPtr->mDevInodeReaderMap[newDevInode];
     APSARA_TEST_EQUAL_FATAL(newReaderPtr->GetHostLogPathFile(), newLogName);
     APSARA_TEST_TRUE_FATAL(newReaderPtr->GetDevInode().dev == newDevInode.dev);
     APSARA_TEST_TRUE_FATAL(newReaderPtr->GetDevInode().inode == newDevInode.inode);
-    
+
     LOG_INFO(sLogger, ("TestHandleBasicCreateEvent() end", time(NULL)));
 }
 
 void ModifyHandlerUnittest::TestHandleBasicDeleteEvent() {
     LOG_INFO(sLogger, ("TestHandleBasicDeleteEvent() begin", time(NULL)));
-    
+
     // Read log to end first
     Event modifyEvent(gRootDir, "", EVENT_MODIFY, 0);
     LogBuffer logbuf;
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->ReadLog(logbuf, &modifyEvent));
     APSARA_TEST_TRUE_FATAL(mReaderPtr->IsReadToEnd());
     APSARA_TEST_TRUE_FATAL(mReaderPtr->mLogFileOp.IsOpen());
-    
+
     // Verify reader exists before delete event
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 1);
-    
+
     // Actually delete the file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     bfs::remove(logPath);
-    
+
     // Send DELETE event
     Event deleteEvent(gRootDir, gLogName, EVENT_DELETE, 0);
     mHandlerPtr->Handle(deleteEvent);
-    
+
     // Verify file deleted flag is set
     APSARA_TEST_TRUE_FATAL(mReaderPtr->IsFileDeleted());
-    
+
     // Verify file descriptor is closed
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
-    
+
     // Verify reader is removed from maps when file is really deleted
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 0);
-    
+
     LOG_INFO(sLogger, ("TestHandleBasicDeleteEvent() end", time(NULL)));
 }
 
 void ModifyHandlerUnittest::TestHandleBasicModifyEvent() {
     LOG_INFO(sLogger, ("TestHandleBasicModifyEvent() begin", time(NULL)));
-    
+
     // Write additional data to the log file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     writeLog(logPath, "additional log line\n");
-    
+
     // Record initial file position
     int64_t initialPos = mReaderPtr->GetLastFilePos();
-    
+
     // Close file first if it's open (from SetUp)
     if (mReaderPtr->mLogFileOp.IsOpen()) {
         mReaderPtr->CloseFilePtr();
     }
-    
+
     // Verify file is closed before handling modify event
     APSARA_TEST_TRUE_FATAL(!mReaderPtr->mLogFileOp.IsOpen());
-    
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, mReaderPtr->mDevInode.dev, mReaderPtr->mDevInode.inode);
     mHandlerPtr->Handle(modifyEvent);
-    
+
     // Verify file was opened and read (file position advanced)
     APSARA_TEST_TRUE_FATAL(mReaderPtr->GetLastFilePos() > initialPos);
-    
+
     // Verify reader still exists in maps
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap[mReaderPtr->mDevInode], mReaderPtr);
-    
+
     LOG_INFO(sLogger, ("TestHandleBasicModifyEvent() end", time(NULL)));
 }
 
@@ -368,7 +368,7 @@ void ModifyHandlerUnittest::TestHandleBasicModifyEvent() {
 // CloseFilePtr() returns isDeleted=true (file path contains " (deleted)")
 void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleReaders() {
     LOG_INFO(sLogger, ("TestDoublePopFrontBugWhenFileDeletedWithMultipleReaders() begin", time(NULL)));
-    
+
     // This test reproduces a REAL bug where pop_front() is called twice:
     // 1. First time at line 850-852 when IsFileDeleted() && isDeleted
     // 2. Second time at line 931-932 because !hasMoreData && readerArray.size() > 1
@@ -385,74 +385,74 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
     //
     // We simulate the " (deleted)" suffix by manually setting mRealLogPath,
     // which mimics Linux's behavior when a file is deleted while fd is still open.
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create 3 rotated log files
-    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".2";  // oldest
+    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".2"; // oldest
     std::string logPath2 = gRootDir + PATH_SEPARATOR + gLogName + ".1";
-    std::string logPath3 = gRootDir + PATH_SEPARATOR + gLogName;         // newest
-    
+    std::string logPath3 = gRootDir + PATH_SEPARATOR + gLogName; // newest
+
     writeLog(logPath1, signature);
     writeLog(logPath2, signature);
     writeLog(logPath3, signature);
-    
+
     auto devInode1 = GetFileDevInode(logPath1);
     auto devInode2 = GetFileDevInode(logPath2);
     auto devInode3 = GetFileDevInode(logPath3);
-    
+
     // Create 3 readers with proper file names
     // Important: Use actual file names (test.log.2, test.log.1, test.log) not just gLogName
     auto reader1 = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName + ".2",  // Actual rotated file name
+                                                   gLogName + ".2", // Actual rotated file name
                                                    devInode1,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
     reader1->mLastFileSignatureSize = sigSize;
     reader1->mLastFileSignatureHash = sigHash;
-    reader1->mLastFilePos = signature.size();  // Already at end
+    reader1->mLastFilePos = signature.size(); // Already at end
     reader1->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader1", "path info")("mHostLogPath", reader1->GetHostLogPath())(
                  "mRealLogPath", reader1->mRealLogPath)("expected", logPath1));
-    
+
     auto reader2 = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName + ".1",  // Actual rotated file name
+                                                   gLogName + ".1", // Actual rotated file name
                                                    devInode2,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
     reader2->mLastFileSignatureSize = sigSize;
     reader2->mLastFileSignatureHash = sigHash;
-    reader2->mLastFilePos = signature.size();  // Already at end
+    reader2->mLastFilePos = signature.size(); // Already at end
     reader2->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader2", "path info")("mHostLogPath", reader2->GetHostLogPath())(
                  "mRealLogPath", reader2->mRealLogPath)("expected", logPath2));
-    
+
     auto reader3 = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName,  // Current active log file
+                                                   gLogName, // Current active log file
                                                    devInode3,
                                                    std::make_pair(&readerOpts, &ctx),
                                                    std::make_pair(&multilineOpts, &ctx),
                                                    std::make_pair(&tagOpts, &ctx));
     reader3->mLastFileSignatureSize = sigSize;
     reader3->mLastFileSignatureHash = sigHash;
-    reader3->mLastFilePos = signature.size();  // Already at end
+    reader3->mLastFilePos = signature.size(); // Already at end
     reader3->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader3", "path info")("mHostLogPath", reader3->GetHostLogPath())(
                  "mRealLogPath", reader3->mRealLogPath)("expected", logPath3));
-    
+
     // Build handler with 3 readers
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     // For rotated logs, all readers should use the same name in mNameReaderMap (base log name)
     // This simulates the real scenario where test.log.2, test.log.1, test.log all belong to same log file family
     LogFileReaderPtrArray readerArray{reader1, reader2, reader3};
@@ -460,35 +460,35 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
     reader1->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
     reader2->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
     reader3->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     // Update mHostLogPath for rotated files to point to the base log name
     // In real scenarios, mHostLogPath is the original pattern (test.log)
     // while mRealLogPath is the actual file (test.log.2)
     reader1->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
     reader2->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
     reader3->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
-    
+
     handlerPtr->mDevInodeReaderMap[devInode1] = reader1;
     handlerPtr->mDevInodeReaderMap[devInode2] = reader2;
     handlerPtr->mDevInodeReaderMap[devInode3] = reader3;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())(
-                 "reader1 real", reader1->mRealLogPath)("reader2 host", reader2->GetHostLogPath())(
-                 "reader2 real", reader2->mRealLogPath)("reader3 host", reader3->GetHostLogPath())(
-                 "reader3 real", reader3->mRealLogPath));
-    
+             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())("reader1 real",
+                                                                                           reader1->mRealLogPath)(
+                 "reader2 host", reader2->GetHostLogPath())("reader2 real", reader2->mRealLogPath)(
+                 "reader3 host", reader3->GetHostLogPath())("reader3 real", reader3->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 3);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 3);
-    
+
     // Mark reader1 as deleted (simulating DELETE event received earlier)
     reader1->SetFileDeleted(true);
-    
+
     // Open reader1's file, then delete it while keeping fd open
     APSARA_TEST_TRUE_FATAL(reader1->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader1->IsFileOpened());
-    
+
     // Delete the physical file
     // In production, Linux marks the fd path with " (deleted)" suffix
     // In test environment, this may not be reliably detected
@@ -497,29 +497,29 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
     // Check if file still exists on filesystem
     bool fileExists = bfs::exists(logPath1);
     LOG_INFO(sLogger,
-             ("File status", "after deletion")("file exists", fileExists)(
-                 "fd is open", reader1->IsFileOpened()));
-    
+             ("File status", "after deletion")("file exists", fileExists)("fd is open", reader1->IsFileOpened()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader1 deleted flag", reader1->IsFileDeleted())(
-                 "reader1 file opened", reader1->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader1 file opened", reader1->IsFileOpened())("reader array size",
+                                                                 handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode1.dev, devInode1.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // BUG VERIFICATION:
     // From the logs we can see BOTH deletion code paths are executed:
     // 1. Line 842: "close the file:current file has been read, and is marked deleted"
     // 2. Line 922: "close the file and move the corresponding reader to the rotator reader pool"
     //
     // The actual behavior depends on whether GetFilePath() returns path with "(deleted)" suffix:
-    // 
+    //
     // Case A: If "(deleted)" suffix is detected (Linux kernel 2.6.16+):
     //   - CloseFilePtr returns isDeleted=true
     //   - Line 851: First pop_front() executes - removes reader1
@@ -542,54 +542,54 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
         // Case A: "(deleted)" suffix was detected - BUG TRIGGERED!
         // Both pop_front() executed, causing wrong reader to be removed
         LOG_INFO(sLogger,
-                 ("BUG REPRODUCED", "deleted suffix detected")(
-                     "expected array size", 2)("actual array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                     "expected devInodeMap size", 2)("actual devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
+                 ("BUG REPRODUCED", "deleted suffix detected")("expected array size", 2)(
+                     "actual array size", handlerPtr->mNameReaderMap[gLogName].size())("expected devInodeMap size", 2)(
+                     "actual devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
                      "bug behavior", "reader2 removed from array but not from map"));
-        
+
         // The bug causes incorrect state:
         // - Array: only reader3 remains (reader1 and reader2 removed)
         // - Map: reader2 and reader3 remain (reader1 removed, reader2 NOT removed from map)
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);  // BUG: only 1 remains
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2);        // BUG: reader2 still in map
-        
+        APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1); // BUG: only 1 remains
+        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2); // BUG: reader2 still in map
+
         // Reader1 was deleted (first pop_front + erase)
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
-        
+
         // Reader2 - THE BUG:
-        // - Removed from array (second pop_front) 
+        // - Removed from array (second pop_front)
         // - But NOT removed from map (second erase tried to delete reader1 again)
         // This causes data loss + resource leak + state inconsistency
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);  // Still in map!
+        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1); // Still in map!
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode2), 0);
-        
+
         // Reader3 remains in both array and map
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode3), 1);
-        
+
         // Verify the remaining reader in array is reader3
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode3.inode);
-        
+
         LOG_INFO(sLogger,
-                 ("BUG CONFIRMED - Worse than expected!", "state inconsistency")(
-                     "issue", "reader2 removed from queue but leaked in map"));
+                 ("BUG CONFIRMED - Worse than expected!",
+                  "state inconsistency")("issue", "reader2 removed from queue but leaked in map"));
     } else {
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 2);
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2);
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
-        
+
         // Reader1 moved to rotatorMap (not deleted because isDeleted=false)
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
-        
+
         // Reader2 and Reader3 still exist
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
         APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode3), 1);
-        
+
         LOG_INFO(sLogger,
-                 ("Bug condition proven", "both code paths were entered")(
-                     "note", "If (deleted) suffix were detected, bug would trigger"));
+                 ("Bug condition proven",
+                  "both code paths were entered")("note", "If (deleted) suffix were detected, bug would trigger"));
     }
-    
+
     LOG_INFO(sLogger,
              ("TestDoublePopFrontBugWhenFileDeletedWithMultipleReaders() end",
               "Test passed - documents potential bug scenario"));
@@ -599,7 +599,7 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
 // This tests the new refactored code path where size > 1 is checked first
 void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     LOG_INFO(sLogger, ("TestFileDeletedWithTwoReaders_FileReallyDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has 2 readers (simulating one rotated file + current file)
     // - The first reader (oldest rotated file) is marked as deleted
@@ -611,21 +611,21 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     //   3. Call RemoveReaderFromArrayAndMap
     //   4. Call CloseFilePtr - detects file really deleted
     //   5. reader1 NOT added to rotator map (because file really deleted)
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create 2 log files (rotated scenario)
-    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".1";  // rotated file
-    std::string logPath2 = gRootDir + PATH_SEPARATOR + gLogName;         // current file
-    
+    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".1"; // rotated file
+    std::string logPath2 = gRootDir + PATH_SEPARATOR + gLogName; // current file
+
     writeLog(logPath1, signature);
     writeLog(logPath2, signature);
-    
+
     auto devInode1 = GetFileDevInode(logPath1);
     auto devInode2 = GetFileDevInode(logPath2);
-    
+
     // Create 2 readers
     auto reader1 = std::make_shared<LogFileReader>(gRootDir,
                                                    gLogName + ".1",
@@ -635,13 +635,13 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
                                                    std::make_pair(&tagOpts, &ctx));
     reader1->mLastFileSignatureSize = sigSize;
     reader1->mLastFileSignatureHash = sigHash;
-    reader1->mLastFilePos = signature.size();  // Already at end
+    reader1->mLastFilePos = signature.size(); // Already at end
     reader1->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader1", "path info")("mHostLogPath", reader1->GetHostLogPath())(
                  "mRealLogPath", reader1->mRealLogPath)("expected", logPath1));
-    
+
     auto reader2 = std::make_shared<LogFileReader>(gRootDir,
                                                    gLogName,
                                                    devInode2,
@@ -650,67 +650,68 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
                                                    std::make_pair(&tagOpts, &ctx));
     reader2->mLastFileSignatureSize = sigSize;
     reader2->mLastFileSignatureHash = sigHash;
-    reader2->mLastFilePos = signature.size();  // Already at end
+    reader2->mLastFilePos = signature.size(); // Already at end
     reader2->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader2", "path info")("mHostLogPath", reader2->GetHostLogPath())(
                  "mRealLogPath", reader2->mRealLogPath)("expected", logPath2));
-    
+
     // Build handler with 2 readers
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     // For rotated logs, all readers should use the same name in mNameReaderMap (base log name)
     LogFileReaderPtrArray readerArray{reader1, reader2};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader1->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
     reader2->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     // Update mHostLogPath for rotated file to point to the base log name
     reader1->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
     reader2->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
-    
+
     handlerPtr->mDevInodeReaderMap[devInode1] = reader1;
     handlerPtr->mDevInodeReaderMap[devInode2] = reader2;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())(
-                 "reader1 real", reader1->mRealLogPath)("reader2 host", reader2->GetHostLogPath())(
-                 "reader2 real", reader2->mRealLogPath));
-    
+             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())("reader1 real",
+                                                                                           reader1->mRealLogPath)(
+                 "reader2 host", reader2->GetHostLogPath())("reader2 real", reader2->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 2);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2);
-    
+
     // Mark reader1 as deleted (simulating DELETE event received earlier)
     reader1->SetFileDeleted(true);
-    
+
     // Open reader1's file
     APSARA_TEST_TRUE_FATAL(reader1->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader1->IsFileOpened());
-    
+
     // Physically delete the file while fd is still open
     // This simulates the real scenario where file is deleted from filesystem
     bfs::remove(logPath1);
-    
+
     bool fileExists = bfs::exists(logPath1);
-    LOG_INFO(sLogger,
-             ("File status", "file physically deleted")("file exists", fileExists)(
-                 "fd is open", reader1->IsFileOpened()));
-    
+    LOG_INFO(
+        sLogger,
+        ("File status", "file physically deleted")("file exists", fileExists)("fd is open", reader1->IsFileOpened()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader1 deleted flag", reader1->IsFileDeleted())(
-                 "reader1 file opened", reader1->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader1 file opened", reader1->IsFileOpened())("reader array size",
+                                                                 handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event to reader1
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode1.dev, devInode1.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (size > 1 checked first):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is true (size is 2)
@@ -721,36 +722,36 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     // 7. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 8. reader1 NOT added to mRotatorReaderMap (because file really deleted)
     // Result: reader1 removed completely, only reader2 remains in array
-    
+
     // After handling, we should have:
     // - Array size: 1 (only reader2 remains)
     // - DevInodeMap size: 1 (only reader2 remains)
     // - RotatorMap size: 0 (reader1 not added because file was really deleted)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Reader1 should be removed from devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
-    
+
     // Reader2 should remain in both array and map
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode2.inode);
-    
+
     // In this test scenario, the file was physically deleted via bfs::remove()
     // while the file descriptor was still open. This means CloseFilePtr should
     // detect the deletion and return isFileReallyDeleted = true.
     // Therefore, reader1 should NOT be added to mRotatorReaderMap.
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "size > 1 branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader1 completely removed (file really deleted), reader2 remains"));
-    
+
     LOG_INFO(sLogger, ("TestFileDeletedWithTwoReaders_FileReallyDeleted() end", "Test passed"));
 }
 
@@ -758,7 +759,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
 // This tests the new refactored code path where size > 1 is checked first
 void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
     LOG_INFO(sLogger, ("TestFileDeletedWithTwoReaders_FileNotDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has 2 readers (simulating one rotated file + current file)
     // - The first reader (oldest rotated file) is marked as deleted
@@ -770,21 +771,21 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
     //   3. Call RemoveReaderFromArrayAndMap
     //   4. Call CloseFilePtr - file still exists, isFileReallyDeleted = false
     //   5. reader1 added to rotator map and new event pushed
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create 2 log files (rotated scenario)
-    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".1";  // rotated file
-    std::string logPath2 = gRootDir + PATH_SEPARATOR + gLogName;         // current file
-    
+    std::string logPath1 = gRootDir + PATH_SEPARATOR + gLogName + ".1"; // rotated file
+    std::string logPath2 = gRootDir + PATH_SEPARATOR + gLogName; // current file
+
     writeLog(logPath1, signature);
     writeLog(logPath2, signature);
-    
+
     auto devInode1 = GetFileDevInode(logPath1);
     auto devInode2 = GetFileDevInode(logPath2);
-    
+
     // Create 2 readers
     auto reader1 = std::make_shared<LogFileReader>(gRootDir,
                                                    gLogName + ".1",
@@ -794,13 +795,13 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
                                                    std::make_pair(&tagOpts, &ctx));
     reader1->mLastFileSignatureSize = sigSize;
     reader1->mLastFileSignatureHash = sigHash;
-    reader1->mLastFilePos = signature.size();  // Already at end
+    reader1->mLastFilePos = signature.size(); // Already at end
     reader1->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader1", "path info")("mHostLogPath", reader1->GetHostLogPath())(
                  "mRealLogPath", reader1->mRealLogPath)("expected", logPath1));
-    
+
     auto reader2 = std::make_shared<LogFileReader>(gRootDir,
                                                    gLogName,
                                                    devInode2,
@@ -809,67 +810,67 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
                                                    std::make_pair(&tagOpts, &ctx));
     reader2->mLastFileSignatureSize = sigSize;
     reader2->mLastFileSignatureHash = sigHash;
-    reader2->mLastFilePos = signature.size();  // Already at end
+    reader2->mLastFilePos = signature.size(); // Already at end
     reader2->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader2", "path info")("mHostLogPath", reader2->GetHostLogPath())(
                  "mRealLogPath", reader2->mRealLogPath)("expected", logPath2));
-    
+
     // Build handler with 2 readers
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     // For rotated logs, all readers should use the same name in mNameReaderMap (base log name)
     LogFileReaderPtrArray readerArray{reader1, reader2};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader1->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
     reader2->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     // Update mHostLogPath for rotated file to point to the base log name
     reader1->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
     reader2->mHostLogPath = gRootDir + PATH_SEPARATOR + gLogName;
-    
+
     handlerPtr->mDevInodeReaderMap[devInode1] = reader1;
     handlerPtr->mDevInodeReaderMap[devInode2] = reader2;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())(
-                 "reader1 real", reader1->mRealLogPath)("reader2 host", reader2->GetHostLogPath())(
-                 "reader2 real", reader2->mRealLogPath));
-    
+             ("Setup complete", "reader paths")("reader1 host", reader1->GetHostLogPath())("reader1 real",
+                                                                                           reader1->mRealLogPath)(
+                 "reader2 host", reader2->GetHostLogPath())("reader2 real", reader2->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 2);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2);
-    
+
     // Mark reader1 as deleted (simulating DELETE event received earlier)
     reader1->SetFileDeleted(true);
-    
+
     // Open reader1's file
     APSARA_TEST_TRUE_FATAL(reader1->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader1->IsFileOpened());
-    
+
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where DELETE event was received but file still exists
-    
+
     bool fileExists = bfs::exists(logPath1);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
-                 "fd is open", reader1->IsFileOpened())(
-                 "deleted flag", reader1->IsFileDeleted()));
-    
+                 "fd is open", reader1->IsFileOpened())("deleted flag", reader1->IsFileDeleted()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader1 deleted flag", reader1->IsFileDeleted())(
-                 "reader1 file opened", reader1->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader1 file opened", reader1->IsFileOpened())("reader array size",
+                                                                 handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event to reader1
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode1.dev, devInode1.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (size > 1 checked first):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is true (size is 2)
@@ -881,36 +882,36 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
     //    - reader1 is added to mRotatorReaderMap
     //    - A new event is pushed for reader2
     // Result: reader1 moved to rotator map, only reader2 remains in array
-    
+
     // After handling, we should have:
     // - Array size: 1 (only reader2 remains)
     // - DevInodeMap size: 1 (only reader2 remains)
     // - RotatorMap size: 1 (reader1 moved to rotator map)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Reader1 should be removed from devInodeMap but added to rotatorMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
-    
+
     // Reader2 should remain in both array and map
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode2.inode);
-    
+
     // In this test scenario, the file was NOT physically deleted (file still exists).
     // Even though reader1 is marked as deleted, CloseFilePtr will detect that
     // the file still exists and return isFileReallyDeleted = false.
     // Therefore, reader1 should be moved to mRotatorReaderMap (not discarded).
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 1);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "size > 1 branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader1 moved to rotator map (file not really deleted), reader2 remains"));
-    
+
     LOG_INFO(sLogger, ("TestFileDeletedWithTwoReaders_FileNotDeleted() end", "Test passed"));
 }
 
@@ -918,7 +919,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
 // This tests the IsFileDeleted() branch when size == 1
 void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() {
     LOG_INFO(sLogger, ("TestFileDeletedWithSingleReader_FileReallyDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has only 1 reader (no rotation, single log file)
     // - The reader's file is marked as deleted
@@ -930,78 +931,79 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
     //   3. Call CloseFilePtr - detects file really deleted
     //   4. Because isFileReallyDeleted is true:
     //      - Call RemoveReaderFromArrayAndMap
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create single log file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     writeLog(logPath, signature);
-    
+
     auto devInode = GetFileDevInode(logPath);
-    
+
     // Create single reader
     auto reader = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName,
-                                                   devInode,
-                                                   std::make_pair(&readerOpts, &ctx),
-                                                   std::make_pair(&multilineOpts, &ctx),
-                                                   std::make_pair(&tagOpts, &ctx));
+                                                  gLogName,
+                                                  devInode,
+                                                  std::make_pair(&readerOpts, &ctx),
+                                                  std::make_pair(&multilineOpts, &ctx),
+                                                  std::make_pair(&tagOpts, &ctx));
     reader->mLastFileSignatureSize = sigSize;
     reader->mLastFileSignatureHash = sigHash;
-    reader->mLastFilePos = signature.size();  // Already at end
+    reader->mLastFilePos = signature.size(); // Already at end
     reader->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())(
                  "mRealLogPath", reader->mRealLogPath)("expected", logPath));
-    
+
     // Build handler with single reader
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     LogFileReaderPtrArray readerArray{reader};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     handlerPtr->mDevInodeReaderMap[devInode] = reader;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())(
-                 "reader real", reader->mRealLogPath));
-    
+             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())("reader real",
+                                                                                        reader->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Mark reader as deleted (simulating DELETE event received earlier)
     reader->SetFileDeleted(true);
-    
+
     // Open reader's file
     APSARA_TEST_TRUE_FATAL(reader->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
-    
+
     // Physically delete the file while fd is still open
     bfs::remove(logPath);
-    
+
     bool fileExists = bfs::exists(logPath);
-    LOG_INFO(sLogger,
-             ("File status", "file physically deleted")("file exists", fileExists)(
-                 "fd is open", reader->IsFileOpened()));
-    
+    LOG_INFO(
+        sLogger,
+        ("File status", "file physically deleted")("file exists", fileExists)("fd is open", reader->IsFileOpened()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader deleted flag", reader->IsFileDeleted())(
-                 "reader file opened", reader->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader file opened", reader->IsFileOpened())("reader array size",
+                                                               handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (IsFileDeleted branch):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is false (size is 1)
@@ -1010,29 +1012,29 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
     // 5. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 6. RemoveReaderFromArrayAndMap called - reader removed from array and map
     // Result: reader completely removed from both array and map
-    
+
     // After handling, we should have:
     // - Array size: 0 (reader removed)
     // - DevInodeMap size: 0 (reader removed)
     // - RotatorMap size: 0 (not added to rotator because file was really deleted)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 0);
-    
+
     // Reader should be removed from devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 0);
-    
+
     // Reader should NOT be in rotator map (because file was really deleted)
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "IsFileDeleted branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader completely removed when file was really deleted"));
-    
+
     LOG_INFO(sLogger, ("TestFileDeletedWithSingleReader_FileReallyDeleted() end", "Test passed"));
 }
 
@@ -1040,7 +1042,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
 // This tests the IsFileDeleted() branch when size == 1 but file still exists
 void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
     LOG_INFO(sLogger, ("TestFileDeletedWithSingleReader_FileNotDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has only 1 reader (no rotation, single log file)
     // - The reader's file is marked as deleted
@@ -1053,79 +1055,79 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
     //   4. Because isFileReallyDeleted is false:
     //      - Do NOT call RemoveReaderFromArrayAndMap
     //      - Reader remains in array/map (will wait for next event)
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create single log file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     writeLog(logPath, signature);
-    
+
     auto devInode = GetFileDevInode(logPath);
-    
+
     // Create single reader
     auto reader = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName,
-                                                   devInode,
-                                                   std::make_pair(&readerOpts, &ctx),
-                                                   std::make_pair(&multilineOpts, &ctx),
-                                                   std::make_pair(&tagOpts, &ctx));
+                                                  gLogName,
+                                                  devInode,
+                                                  std::make_pair(&readerOpts, &ctx),
+                                                  std::make_pair(&multilineOpts, &ctx),
+                                                  std::make_pair(&tagOpts, &ctx));
     reader->mLastFileSignatureSize = sigSize;
     reader->mLastFileSignatureHash = sigHash;
-    reader->mLastFilePos = signature.size();  // Already at end
+    reader->mLastFilePos = signature.size(); // Already at end
     reader->UpdateReaderManual();
-    
+
     LOG_INFO(sLogger,
              ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())(
                  "mRealLogPath", reader->mRealLogPath)("expected", logPath));
-    
+
     // Build handler with single reader
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     LogFileReaderPtrArray readerArray{reader};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     handlerPtr->mDevInodeReaderMap[devInode] = reader;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())(
-                 "reader real", reader->mRealLogPath));
-    
+             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())("reader real",
+                                                                                        reader->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Mark reader as deleted (simulating DELETE event received earlier)
     reader->SetFileDeleted(true);
-    
+
     // Open reader's file
     APSARA_TEST_TRUE_FATAL(reader->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
-    
+
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where DELETE event was received but file still exists
-    
+
     bool fileExists = bfs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
-                 "fd is open", reader->IsFileOpened())(
-                 "deleted flag", reader->IsFileDeleted()));
-    
+                 "fd is open", reader->IsFileOpened())("deleted flag", reader->IsFileDeleted()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader deleted flag", reader->IsFileDeleted())(
-                 "reader file opened", reader->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader file opened", reader->IsFileOpened())("reader array size",
+                                                               handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (IsFileDeleted branch):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is false (size is 1)
@@ -1134,29 +1136,29 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
     // 5. Because isFileReallyDeleted is false:
     //    - RemoveReaderFromArrayAndMap is NOT called
     // Result: reader remains in both array and map
-    
+
     // After handling, we should have:
     // - Array size: 1 (reader still exists)
     // - DevInodeMap size: 1 (reader still exists)
     // - RotatorMap size: 0 (not added to rotator)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Reader should remain in devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 1);
-    
+
     // Reader should NOT be in rotator map
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "IsFileDeleted branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader remains in array/map (file not really deleted, will wait for next event)"));
-    
+
     LOG_INFO(sLogger, ("TestFileDeletedWithSingleReader_FileNotDeleted() end", "Test passed"));
 }
 
@@ -1164,7 +1166,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
 // This tests the IsContainerStopped() branch when size == 1 and file is deleted
 void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDeleted() {
     LOG_INFO(sLogger, ("TestContainerStoppedWithSingleReader_FileReallyDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has only 1 reader (no rotation, single log file)
     // - The reader's container is stopped
@@ -1179,86 +1181,86 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
     //   6. Call CloseFilePtr - detects file really deleted
     //   7. Because isFileReallyDeleted is true:
     //      - Call RemoveReaderFromArrayAndMap
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create single log file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     writeLog(logPath, signature);
-    
+
     auto devInode = GetFileDevInode(logPath);
-    
+
     // Create single reader with container info
     auto reader = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName,
-                                                   devInode,
-                                                   std::make_pair(&readerOpts, &ctx),
-                                                   std::make_pair(&multilineOpts, &ctx),
-                                                   std::make_pair(&tagOpts, &ctx));
+                                                  gLogName,
+                                                  devInode,
+                                                  std::make_pair(&readerOpts, &ctx),
+                                                  std::make_pair(&multilineOpts, &ctx),
+                                                  std::make_pair(&tagOpts, &ctx));
     reader->mLastFileSignatureSize = sigSize;
     reader->mLastFileSignatureHash = sigHash;
-    reader->mLastFilePos = signature.size();  // Already at end
+    reader->mLastFilePos = signature.size(); // Already at end
     reader->UpdateReaderManual();
-    
+
     // Set container info - use the same container ID as in SetUp ("1")
     // and mark it as stopped
     reader->SetContainerStopped();
     reader->mContainerID = "1";
-    
+
     // Make sure the container in discoveryOpts is also marked as stopped
     // This ensures UpdateContainerInfo() won't think the container restarted
     stopContainer("1");
-    
-    LOG_INFO(sLogger,
-             ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())(
-                 "mRealLogPath", reader->mRealLogPath)("expected", logPath)(
-                 "container stopped", reader->IsContainerStopped()));
-    
+
+    LOG_INFO(
+        sLogger,
+        ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())("mRealLogPath", reader->mRealLogPath)(
+            "expected", logPath)("container stopped", reader->IsContainerStopped()));
+
     // Build handler with single reader
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     LogFileReaderPtrArray readerArray{reader};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     handlerPtr->mDevInodeReaderMap[devInode] = reader;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())(
-                 "reader real", reader->mRealLogPath));
-    
+             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())("reader real",
+                                                                                        reader->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Open reader's file
     APSARA_TEST_TRUE_FATAL(reader->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
-    
+
     // Physically delete the file while fd is still open
     bfs::remove(logPath);
-    
+
     bool fileExists = bfs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file physically deleted")("file exists", fileExists)(
-                 "fd is open", reader->IsFileOpened())(
-                 "container stopped", reader->IsContainerStopped()));
-    
+                 "fd is open", reader->IsFileOpened())("container stopped", reader->IsContainerStopped()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader container stopped", reader->IsContainerStopped())(
-                 "reader file opened", reader->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader file opened", reader->IsFileOpened())("reader array size",
+                                                               handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (IsContainerStopped branch):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is false (size is 1)
@@ -1270,29 +1272,29 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
     // 8. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 9. RemoveReaderFromArrayAndMap called - reader removed from array and map
     // Result: reader completely removed from both array and map
-    
+
     // After handling, we should have:
     // - Array size: 0 (reader removed)
     // - DevInodeMap size: 0 (reader removed)
     // - RotatorMap size: 0 (not added to rotator because file was really deleted)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 0);
-    
+
     // Reader should be removed from devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 0);
-    
+
     // Reader should NOT be in rotator map (because file was really deleted)
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "IsContainerStopped branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader completely removed when container stopped and file was really deleted"));
-    
+
     LOG_INFO(sLogger, ("TestContainerStoppedWithSingleReader_FileReallyDeleted() end", "Test passed"));
 }
 
@@ -1300,7 +1302,7 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
 // This tests the IsContainerStopped() branch when size == 1 but file still exists
 void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileNotDeleted() {
     LOG_INFO(sLogger, ("TestContainerStoppedWithSingleReader_FileNotDeleted() begin", time(NULL)));
-    
+
     // Test scenario:
     // - Queue has only 1 reader (no rotation, single log file)
     // - The reader's container is stopped
@@ -1316,86 +1318,86 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileNotDeleted(
     //   7. Because isFileReallyDeleted is false:
     //      - Do NOT call RemoveReaderFromArrayAndMap
     //      - Reader remains in array/map
-    
+
     std::string signature = "a sample log\n";
     auto sigSize = (uint32_t)signature.size();
     auto sigHash = (uint64_t)HashSignatureString(signature.c_str(), (size_t)sigSize);
-    
+
     // Create single log file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
     writeLog(logPath, signature);
-    
+
     auto devInode = GetFileDevInode(logPath);
-    
+
     // Create single reader with container info
     auto reader = std::make_shared<LogFileReader>(gRootDir,
-                                                   gLogName,
-                                                   devInode,
-                                                   std::make_pair(&readerOpts, &ctx),
-                                                   std::make_pair(&multilineOpts, &ctx),
-                                                   std::make_pair(&tagOpts, &ctx));
+                                                  gLogName,
+                                                  devInode,
+                                                  std::make_pair(&readerOpts, &ctx),
+                                                  std::make_pair(&multilineOpts, &ctx),
+                                                  std::make_pair(&tagOpts, &ctx));
     reader->mLastFileSignatureSize = sigSize;
     reader->mLastFileSignatureHash = sigHash;
-    reader->mLastFilePos = signature.size();  // Already at end
+    reader->mLastFilePos = signature.size(); // Already at end
     reader->UpdateReaderManual();
-    
+
     // Set container info - use the same container ID as in SetUp ("1")
     // and mark it as stopped
     reader->SetContainerStopped();
     reader->mContainerID = "1";
-    
+
     // Make sure the container in discoveryOpts is also marked as stopped
     // This ensures UpdateContainerInfo() won't think the container restarted
     stopContainer("1");
-    
-    LOG_INFO(sLogger,
-             ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())(
-                 "mRealLogPath", reader->mRealLogPath)("expected", logPath)(
-                 "container stopped", reader->IsContainerStopped()));
-    
+
+    LOG_INFO(
+        sLogger,
+        ("Created reader", "path info")("mHostLogPath", reader->GetHostLogPath())("mRealLogPath", reader->mRealLogPath)(
+            "expected", logPath)("container stopped", reader->IsContainerStopped()));
+
     // Build handler with single reader
     auto handlerPtr = std::make_shared<ModifyHandler>(mConfigName, mConfig);
-    
+
     LogFileReaderPtrArray readerArray{reader};
     handlerPtr->mNameReaderMap[gLogName] = readerArray;
     reader->SetReaderArray(&handlerPtr->mNameReaderMap[gLogName]);
-    
+
     handlerPtr->mDevInodeReaderMap[devInode] = reader;
-    
+
     LOG_INFO(sLogger,
-             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())(
-                 "reader real", reader->mRealLogPath));
-    
+             ("Setup complete", "reader path")("reader host", reader->GetHostLogPath())("reader real",
+                                                                                        reader->mRealLogPath));
+
     // Verify initial state
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Open reader's file
     APSARA_TEST_TRUE_FATAL(reader->UpdateFilePtr());
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
-    
+
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where container is stopped but file still exists
-    
+
     bool fileExists = bfs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
-                 "fd is open", reader->IsFileOpened())(
-                 "container stopped", reader->IsContainerStopped()));
-    
+                 "fd is open", reader->IsFileOpened())("container stopped", reader->IsContainerStopped()));
+
     LOG_INFO(sLogger,
              ("Test setup complete", "sending MODIFY event")("reader container stopped", reader->IsContainerStopped())(
-                 "reader file opened", reader->IsFileOpened())("reader array size", handlerPtr->mNameReaderMap[gLogName].size()));
-    
+                 "reader file opened", reader->IsFileOpened())("reader array size",
+                                                               handlerPtr->mNameReaderMap[gLogName].size()));
+
     // Send MODIFY event
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode.dev, devInode.inode);
     handlerPtr->Handle(modifyEvent);
-    
+
     LOG_INFO(sLogger,
              ("After Handle()", "checking results")("reader array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotatorMap size", handlerPtr->mRotatorReaderMap.size()));
-    
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
+                                                                            handlerPtr->mRotatorReaderMap.size()));
+
     // Expected behavior with new code (IsContainerStopped branch):
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is false (size is 1)
@@ -1407,29 +1409,29 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileNotDeleted(
     // 8. Because isFileReallyDeleted is false:
     //    - RemoveReaderFromArrayAndMap is NOT called
     // Result: reader remains in both array and map
-    
+
     // After handling, we should have:
     // - Array size: 1 (reader still exists)
     // - DevInodeMap size: 1 (reader still exists)
     // - RotatorMap size: 0 (not added to rotator)
-    
+
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
-    
+
     // Reader should remain in devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 1);
-    
+
     // Reader should NOT be in rotator map
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
-    
+
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "IsContainerStopped branch executed correctly")(
                  "array size", handlerPtr->mNameReaderMap[gLogName].size())(
-                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                 "rotator size", handlerPtr->mRotatorReaderMap.size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
                  "note", "reader remains in array/map (container stopped but file not really deleted)"));
-    
+
     LOG_INFO(sLogger, ("TestContainerStoppedWithSingleReader_FileNotDeleted() end", "Test passed"));
 }
 

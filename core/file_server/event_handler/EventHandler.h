@@ -67,7 +67,7 @@ private:
     void DeleteTimeoutReader();
     void DeleteTimeoutReader(int32_t timeoutInterval);
     void DeleteRollbackReader();
-    
+
     // Helper function to safely remove reader from array and map
     // Verifies that expectedReader matches array[0] before removal
     // Returns true if removal succeeded, false if reader mismatch detected
