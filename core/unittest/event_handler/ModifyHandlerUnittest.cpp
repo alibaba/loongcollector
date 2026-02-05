@@ -232,15 +232,17 @@ std::string ModifyHandlerUnittest::gRootDir;
 std::string ModifyHandlerUnittest::gLogName;
 
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleBasicCreateEvent);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleBasicDeleteEvent);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleBasicModifyEvent);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithTwoReaders_FileNotDeleted);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithSingleReader_FileNotDeleted);
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestContainerStoppedWithSingleReader_FileNotDeleted);
+#ifndef _MSC_VER // Windows cannot delete files while they are open
+UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleBasicDeleteEvent);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestDoublePopFrontBugWhenFileDeletedWithMultipleReaders);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithTwoReaders_FileReallyDeleted);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithTwoReaders_FileNotDeleted);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithSingleReader_FileReallyDeleted);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestFileDeletedWithSingleReader_FileNotDeleted);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestContainerStoppedWithSingleReader_FileReallyDeleted);
-UNIT_TEST_CASE(ModifyHandlerUnittest, TestContainerStoppedWithSingleReader_FileNotDeleted);
+#endif
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleContainerStoppedEventWhenNotReadToEnd);
 UNIT_TEST_CASE(ModifyHandlerUnittest, TestHandleModifyEventWhenContainerStopped);
