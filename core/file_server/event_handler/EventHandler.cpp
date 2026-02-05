@@ -523,11 +523,13 @@ void ModifyHandler::Handle(const Event& event) {
             // only set when reader array size is 1
             if (readerArray.size() == (size_t)1) {
                 readerArray[0]->SetFileDeleted(true);
-                LOG_INFO(sLogger,
-                         ("set file deleted, project", readerArray[0]->GetProject())("logstore", readerArray[0]->GetLogstore())(
-                             "config", mConfigName)("log reader queue name", readerArray[0]->GetHostLogPath())(
-                             "file device", readerArray[0]->GetDevInode().dev)("file inode", readerArray[0]->GetDevInode().inode)(
-                             "file size", readerArray[0]->GetFileSize()));
+                LOG_INFO(
+                    sLogger,
+                    ("set file deleted, project",
+                     readerArray[0]->GetProject())("logstore", readerArray[0]->GetLogstore())("config", mConfigName)(
+                        "log reader queue name", readerArray[0]->GetHostLogPath())("file device",
+                                                                                   readerArray[0]->GetDevInode().dev)(
+                        "file inode", readerArray[0]->GetDevInode().inode)("file size", readerArray[0]->GetFileSize()));
                 if (readerArray[0]->IsReadToEnd() || readerArray[0]->ShouldForceReleaseDeletedFileFd()) {
                     if (readerArray[0]->IsFileOpened()) {
                         LOG_INFO(
@@ -843,13 +845,14 @@ void ModifyHandler::Handle(const Event& event) {
             if (!hasMoreData) {
                 if (readerArrayPtr->size() > (size_t)1) {
                     LOG_INFO(sLogger,
-                        ("close the file and move the corresponding reader to the rotator reader pool",
-                         "current file has been read and more files are waiting in the log reader queue")(
-                            "project", reader->GetProject())("logstore", reader->GetLogstore())("config", mConfigName)(
-                            "log reader queue name", reader->GetHostLogPath())("log reader queue size",
-                                                                               readerArrayPtr->size() - 1)(
-                            "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                            "file size", reader->GetFileSize())("rotator reader pool size", mRotatorReaderMap.size() + 1));
+                             ("close the file and move the corresponding reader to the rotator reader pool",
+                              "current file has been read and more files are waiting in the log reader queue")(
+                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                 "log reader queue size", readerArrayPtr->size() - 1)(
+                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                 "file size", reader->GetFileSize())("rotator reader pool size",
+                                                                     mRotatorReaderMap.size() + 1));
                     // Force read remaining data before removal
                     ForceReadLogAndPush(reader);
                     // Use helper function to safely remove reader from array and map
@@ -862,24 +865,24 @@ void ModifyHandler::Handle(const Event& event) {
                         // need to push modify event again, but without dev inode
                         // use head dev + inode
                         Event* ev = new Event(event.GetSource(),
-                                            event.GetEventObject(),
-                                            event.GetType(),
-                                            event.GetWd(),
-                                            event.GetCookie(),
-                                            (*readerArrayPtr)[0]->GetDevInode().dev,
-                                            (*readerArrayPtr)[0]->GetDevInode().inode);
+                                              event.GetEventObject(),
+                                              event.GetType(),
+                                              event.GetWd(),
+                                              event.GetCookie(),
+                                              (*readerArrayPtr)[0]->GetDevInode().dev,
+                                              (*readerArrayPtr)[0]->GetDevInode().inode);
                         ev->SetConfigName(mConfigName);
                         LogInput::GetInstance()->PushEventQueue(ev);
-                    } 
+                    }
                 } else if (reader->IsFileDeleted()) {
                     bool isFileReallyDeleted = false;
                     reader->CloseFilePtr(isFileReallyDeleted);
                     LOG_INFO(sLogger,
-                        ("close the file", "current file has been read, and is marked deleted")(
-                            "project", reader->GetProject())("logstore", reader->GetLogstore())(
-                            "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                            "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
-                            "file size", reader->GetFileSize())("is file really deleted", isFileReallyDeleted));
+                             ("close the file", "current file has been read, and is marked deleted")(
+                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
+                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
+                                 "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                 "file size", reader->GetFileSize())("is file really deleted", isFileReallyDeleted));
                     if (isFileReallyDeleted) {
                         RemoveReaderFromArrayAndMap(reader, readerArrayPtr, &mDevInodeReaderMap);
                     }
@@ -897,13 +900,14 @@ void ModifyHandler::Handle(const Event& event) {
                         bool isFileReallyDeleted = false;
                         ForceReadLogAndPush(reader);
                         reader->CloseFilePtr(isFileReallyDeleted);
-                        LOG_INFO(sLogger,
+                        LOG_INFO(
+                            sLogger,
                             ("close the file",
                              "current file has been read, and the relative container has been stopped")(
                                 "project", reader->GetProject())("logstore", reader->GetLogstore())(
                                 "config", mConfigName)("log reader queue name", reader->GetHostLogPath())(
-                                "file device", reader->GetDevInode().dev)(
-                                "file inode", reader->GetDevInode().inode)("file size", reader->GetFileSize())("is file really deleted", isFileReallyDeleted));
+                                "file device", reader->GetDevInode().dev)("file inode", reader->GetDevInode().inode)(
+                                "file size", reader->GetFileSize())("is file really deleted", isFileReallyDeleted));
                         if (isFileReallyDeleted) {
                             RemoveReaderFromArrayAndMap(reader, readerArrayPtr, &mDevInodeReaderMap);
                         }
@@ -1150,76 +1154,47 @@ void ModifyHandler::DeleteRollbackReader() {
 }
 
 bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
-                                                 LogFileReaderPtrArray* readerArray,
-                                                 DevInodeLogFileReaderMap* devInodeMap) {
-    if (readerArray == nullptr || readerArray->size() == 0) {
-        LOG_ERROR(sLogger,
-                 ("Cannot remove reader", "array is null or empty")(
-                     "expected reader inode", expectedReader ? expectedReader->GetDevInode().inode : 0));
+                                                LogFileReaderPtrArray* readerArray,
+                                                DevInodeLogFileReaderMap* devInodeMap) {
+    if (readerArray == nullptr || readerArray->size() == 0 || !expectedReader) {
         return false;
     }
-    
-    if (!expectedReader) {
-        LOG_ERROR(sLogger, ("Cannot remove reader", "expectedReader is nullptr"));
-        return false;
-    }
-    
+
     // Get the current front reader
     LogFileReaderPtr actualFrontReader = (*readerArray)[0];
-    
+
     // CRITICAL CHECK: Verify expected reader matches array[0]
     if (actualFrontReader != expectedReader) {
         LOG_ERROR(sLogger,
-                 ("CRITICAL BUG DETECTED: Reader pointer mismatch!",
-                  "The expected reader is not the same as array[0]")(
-                     "expected reader inode", expectedReader->GetDevInode().inode)(
-                     "expected reader path", expectedReader->GetHostLogPath())(
-                     "actual array[0] inode", actualFrontReader->GetDevInode().inode)(
-                     "actual array[0] path", actualFrontReader->GetHostLogPath())(
-                     "array size", readerArray->size())(
-                     "This indicates pop_front was called before", "DO NOT remove to prevent wrong deletion"));
-        
+                  ("CRITICAL BUG DETECTED: Reader pointer mismatch!",
+                   "The expected reader is not the same as array[0]")("expected reader inode",
+                                                                      expectedReader->GetDevInode().inode)(
+                      "expected reader path", expectedReader->GetHostLogPath())("actual array[0] inode",
+                                                                                actualFrontReader->GetDevInode().inode)(
+                      "actual array[0] path", actualFrontReader->GetHostLogPath())("array size", readerArray->size())(
+                      "This indicates pop_front was called before", "DO NOT remove to prevent wrong deletion"));
+
         // Send alarm for critical bug
         AlarmManager::GetInstance()->SendAlarmCritical(
             INNER_PROFILE_ALARM,
-            string("Reader pointer mismatch detected! Expected inode: ")
-                + ToString(expectedReader->GetDevInode().inode)
+            string("Reader pointer mismatch detected! Expected inode: ") + ToString(expectedReader->GetDevInode().inode)
                 + " but array[0] is: " + ToString(actualFrontReader->GetDevInode().inode),
             expectedReader->GetRegion(),
             expectedReader->GetProject(),
             expectedReader->GetConfigName(),
             expectedReader->GetLogstore());
-        
-        return false;  // DO NOT remove to prevent data loss
+
+        return false; // DO NOT remove to prevent data loss
     }
-    
-    LOG_DEBUG(sLogger,
-             ("Removing reader from array and map", "")(
-                 "inode", expectedReader->GetDevInode().inode)(
-                 "path", expectedReader->GetHostLogPath())(
-                 "array size before", readerArray->size())(
-                 "map size before", devInodeMap->size()));
-    
     // Remove from array
     readerArray->pop_front();
-    
     // Remove from map
     size_t erasedCount = devInodeMap->erase(expectedReader->GetDevInode());
-    
-    if (erasedCount == 0) {
-        LOG_WARNING(sLogger,
-                   ("Reader was not in devInodeMap", "already removed or never added")(
-                       "inode", expectedReader->GetDevInode().inode)(
-                       "path", expectedReader->GetHostLogPath()));
-    }
-    
     LOG_DEBUG(sLogger,
-             ("Reader removed successfully", "")(
-                 "inode", expectedReader->GetDevInode().inode)(
-                 "array size after", readerArray->size())(
-                 "map size after", devInodeMap->size())(
-                 "erased from map", erasedCount));
-    
+              ("Reader removed successfully", "")("inode", expectedReader->GetDevInode().inode)(
+                  "array size after", readerArray->size())("map size after", devInodeMap->size())("erased from map",
+                                                                                                  erasedCount));
+
     return true;
 }
 
