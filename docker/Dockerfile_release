@@ -46,9 +46,9 @@ RUN if [ "$HOST_OS" = "Linux" ]; then \
     fi
 
 # Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.14 /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.14 /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
-COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.14 /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
+COPY --from=sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
 
 WORKDIR /usr/local/loongcollector
 RUN mkdir -p /usr/local/loongcollector/conf/instance_config/local
