@@ -12,21 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <atomic>
-#include <fstream>
-#include <list>
-#include <thread>
-
-#include "json/json.h"
-
-#include "MetricConstants.h"
-#include "MetricManager.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
-
-
-static std::atomic_bool running(true);
 
 
 class MetricManagerUnittest : public ::testing::Test {
