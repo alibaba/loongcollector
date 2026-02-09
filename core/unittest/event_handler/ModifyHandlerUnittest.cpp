@@ -226,6 +226,41 @@ private:
             }
         }
     }
+
+    // Helper function to verify the invariant relationships between three maps:
+    // 1. Sum of all values' sizes in mNameReaderMap == size of mDevInodeReaderMap
+    // 2. mDevInodeReaderMap and mRotatorReaderMap have no intersection (disjoint sets)
+    void VerifyMapInvariants(const std::shared_ptr<ModifyHandler>& handlerPtr,
+                             size_t expectedActiveReaderSize,
+                             size_t expectedRotatorMapSize,
+                             const std::string& testContext = "") {
+        // Calculate actual sizes
+        size_t actualNameReaderMapTotalSize = 0;
+        for (const auto& pair : handlerPtr->mNameReaderMap) {
+            actualNameReaderMapTotalSize += pair.second.size();
+        }
+        size_t actualDevInodeMapSize = handlerPtr->mDevInodeReaderMap.size();
+        size_t actualRotatorMapSize = handlerPtr->mRotatorReaderMap.size();
+
+        // Verify expected values
+        APSARA_TEST_EQUAL_FATAL(actualNameReaderMapTotalSize, expectedActiveReaderSize);
+        APSARA_TEST_EQUAL_FATAL(actualDevInodeMapSize, expectedActiveReaderSize);
+        APSARA_TEST_EQUAL_FATAL(actualRotatorMapSize, expectedRotatorMapSize);
+
+        // Invariant 1: sum of reader arrays should equal devInodeMap size
+        APSARA_TEST_EQUAL_FATAL(actualNameReaderMapTotalSize, actualDevInodeMapSize);
+
+        // Invariant 2: mDevInodeReaderMap and mRotatorReaderMap should have no intersection
+        for (const auto& devInodePair : handlerPtr->mDevInodeReaderMap) {
+            APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInodePair.first), 0);
+        }
+
+        LOG_INFO(sLogger,
+                 ("Map invariants verified", testContext)("nameReaderMap total size", actualNameReaderMapTotalSize)(
+                     "devInodeMap size", actualDevInodeMapSize)("rotatorMap size", actualRotatorMapSize)(
+                     "invariant 1", "nameReaderMap total == devInodeMap size: PASS")(
+                     "invariant 2", "devInodeMap ∩ rotatorMap = ∅: PASS"));
+    }
 };
 
 std::string ModifyHandlerUnittest::gRootDir;
@@ -506,7 +541,7 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
                  "reader1 file opened", reader1->IsFileOpened())("reader array size",
                                                                  handlerPtr->mNameReaderMap[gLogName].size()));
 
-    // Send MODIFY event
+    // Send MODIFY event to reader1
     Event modifyEvent(gRootDir, gLogName, EVENT_MODIFY, 0, 0, devInode1.dev, devInode1.inode);
     handlerPtr->Handle(modifyEvent);
 
@@ -515,86 +550,67 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
                  "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotatorMap size",
                                                                             handlerPtr->mRotatorReaderMap.size()));
 
-    // BUG VERIFICATION:
-    // From the logs we can see BOTH deletion code paths are executed:
-    // 1. Line 842: "close the file:current file has been read, and is marked deleted"
-    // 2. Line 922: "close the file and move the corresponding reader to the rotator reader pool"
+    // Expected behavior (OLD buggy code before fix):
+    // 1. hasMoreData = false (already at end)
+    // 2. IsFileDeleted() is true (we set it)
+    // 3. CloseFilePtr() returns isDeleted = true (file was deleted from filesystem)
+    // 4. Enter first if-branch at line 850: pop_front() is called - removes reader1
+    // 5. Break from switch statement
+    // 6. Continue to line 919: readerArrayPtr->size() > 1 is still true (size is now 2)
+    // 7. Enter second if-branch at line 931: pop_front() is called AGAIN - removes reader2
+    // 8. Result: TWO readers removed instead of ONE (the double pop_front bug)
     //
-    // The actual behavior depends on whether GetFilePath() returns path with "(deleted)" suffix:
-    //
-    // Case A: If "(deleted)" suffix is detected (Linux kernel 2.6.16+):
-    //   - CloseFilePtr returns isDeleted=true
-    //   - Line 851: First pop_front() executes - removes reader1
-    //   - Line 931: Second pop_front() executes - removes reader2 (BUG!)
-    //   - Result: TWO readers removed, only reader3 remains
-    //   - Test will FAIL at assertion checking array size
-    //
-    // Case B: If "(deleted)" suffix is NOT detected (older kernel or special fs):
-    //   - CloseFilePtr returns isDeleted=false
-    //   - Line 851: First pop_front() does NOT execute
-    //   - Line 931: Second pop_front() executes - removes reader1 to rotatorMap
-    //   - Result: ONE reader moved to rotator, reader2 and reader3 remain
-    //   - Test will PASS but documents the potential bug
-    //
-    // Either way, this test proves both code paths are reachable and the bug exists.
+    // Expected behavior (NEW fixed code after refactoring):
+    // 1. hasMoreData = false (already at end)
+    // 2. Check readerArrayPtr->size() > 1 first (size is 3, condition is true)
+    // 3. Enter the size > 1 branch first (higher priority)
+    // 4. ForceReadLogAndPush called
+    // 5. RemoveReaderFromArrayAndMap called - reader1 removed from array and map
+    // 6. CloseFilePtr called - detects file was deleted
+    // 7. isFileReallyDeleted = true (file physically deleted from filesystem)
+    // 8. reader1 NOT added to mRotatorReaderMap (because file really deleted)
+    // 9. The IsFileDeleted branch is NOT entered (because we break after size > 1 branch)
+    // Result: ONLY reader1 removed, reader2 and reader3 remain (bug fixed)
 
-    // hasBug为true时复现问题场景
-    bool hasBug = false;
-    if (hasBug) {
-        // Case A: "(deleted)" suffix was detected - BUG TRIGGERED!
-        // Both pop_front() executed, causing wrong reader to be removed
-        LOG_INFO(sLogger,
-                 ("BUG REPRODUCED", "deleted suffix detected")("expected array size", 2)(
-                     "actual array size", handlerPtr->mNameReaderMap[gLogName].size())("expected devInodeMap size", 2)(
-                     "actual devInodeMap size", handlerPtr->mDevInodeReaderMap.size())(
-                     "bug behavior", "reader2 removed from array but not from map"));
+    // After handling, we should have:
+    // - Active readers: 2 (reader2 and reader3 remain, reader1 removed)
+    // - RotatorMap size: 0 (reader1 not added because file was really deleted)
 
-        // The bug causes incorrect state:
-        // - Array: only reader3 remains (reader1 and reader2 removed)
-        // - Map: reader2 and reader3 remain (reader1 removed, reader2 NOT removed from map)
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1); // BUG: only 1 remains
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2); // BUG: reader2 still in map
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 2, 0, "After handling MODIFY event");
 
-        // Reader1 was deleted (first pop_front + erase)
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
+    // Verify specific reader states
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 2);
 
-        // Reader2 - THE BUG:
-        // - Removed from array (second pop_front)
-        // - But NOT removed from map (second erase tried to delete reader1 again)
-        // This causes data loss + resource leak + state inconsistency
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1); // Still in map!
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode2), 0);
+    // Reader1 should be completely removed from both devInodeMap and rotatorMap
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
 
-        // Reader3 remains in both array and map
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode3), 1);
+    // Reader2 and Reader3 should still exist in both array and devInodeMap
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode3), 1);
 
-        // Verify the remaining reader in array is reader3
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode3.inode);
+    // Verify the remaining readers in the array are reader2 and reader3
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode2.inode);
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][1]->GetDevInode().inode, devInode3.inode);
 
-        LOG_INFO(sLogger,
-                 ("BUG CONFIRMED - Worse than expected!",
-                  "state inconsistency")("issue", "reader2 removed from queue but leaked in map"));
-    } else {
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 2);
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 2);
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
+    // In this test scenario, the file was physically deleted via bfs::remove()
+    // while the file descriptor was still open. With the refactored code, the
+    // size > 1 condition is checked first, preventing the double pop_front bug.
+    // CloseFilePtr should detect the deletion and return isFileReallyDeleted = true.
+    // Therefore, reader1 should NOT be added to mRotatorReaderMap.
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
 
-        // Reader1 moved to rotatorMap (not deleted because isDeleted=false)
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
-
-        // Reader2 and Reader3 still exist
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
-        APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode3), 1);
-
-        LOG_INFO(sLogger,
-                 ("Bug condition proven",
-                  "both code paths were entered")("note", "If (deleted) suffix were detected, bug would trigger"));
-    }
+    LOG_INFO(sLogger,
+             ("Test result", "success")("behavior", "size > 1 branch executed first, preventing double pop_front bug")(
+                 "array size", handlerPtr->mNameReaderMap[gLogName].size())(
+                 "devInodeMap size", handlerPtr->mDevInodeReaderMap.size())("rotator size",
+                                                                            handlerPtr->mRotatorReaderMap.size())(
+                 "note", "Only reader1 removed (file really deleted), reader2 and reader3 remain - bug fixed"));
 
     LOG_INFO(sLogger,
              ("TestDoublePopFrontBugWhenFileDeletedWithMultipleReaders() end",
-              "Test passed - documents potential bug scenario"));
+              "Test passed - verifies bug fix with refactored code"));
 }
 
 // Test case for file deleted with queue length = 2 - File Really Deleted scenario
@@ -726,15 +742,18 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     // Result: reader1 removed completely, only reader2 remains in array
 
     // After handling, we should have:
-    // - Array size: 1 (only reader2 remains)
-    // - DevInodeMap size: 1 (only reader2 remains)
+    // - Active readers: 1 (only reader2 remains)
     // - RotatorMap size: 0 (reader1 not added because file was really deleted)
 
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 1, 0, "After handling MODIFY event");
 
-    // Reader1 should be removed from devInodeMap
+    // Verify specific reader states
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
+
+    // Reader1 should be completely removed from both devInodeMap and rotatorMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
+    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
 
     // Reader2 should remain in both array and map
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
@@ -744,8 +763,6 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     // while the file descriptor was still open. This means CloseFilePtr should
     // detect the deletion and return isFileReallyDeleted = true.
     // Therefore, reader1 should NOT be added to mRotatorReaderMap.
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode1), 0);
 
     LOG_INFO(sLogger,
              ("Test result", "success")("behavior", "size > 1 branch executed correctly")(
