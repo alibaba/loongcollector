@@ -1176,7 +1176,7 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
 
         // Send alarm for critical bug
         AlarmManager::GetInstance()->SendAlarmCritical(
-            INNER_PROFILE_ALARM,
+            DISCARD_DATA_ALARM,
             string("Reader pointer mismatch detected! Expected inode: ") + ToString(expectedReader->GetDevInode().inode)
                 + " but array[0] is: " + ToString(actualFrontReader->GetDevInode().inode),
             expectedReader->GetRegion(),
