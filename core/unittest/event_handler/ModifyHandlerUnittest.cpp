@@ -321,6 +321,9 @@ void ModifyHandlerUnittest::TestHandleBasicCreateEvent() {
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.count(newDevInode), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[newLogName].size(), 1);
 
+    // Verify map invariants: 2 active readers (original + new), 0 rotator
+    VerifyMapInvariants(mHandlerPtr, 2, 0, "After CREATE event");
+
     // Verify the created reader has correct properties
     auto newReaderPtr = mHandlerPtr->mDevInodeReaderMap[newDevInode];
     APSARA_TEST_EQUAL_FATAL(newReaderPtr->GetHostLogPathFile(), newLogName);
@@ -362,6 +365,9 @@ void ModifyHandlerUnittest::TestHandleBasicDeleteEvent() {
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 0);
 
+    // Verify map invariants: 0 active readers, 0 rotator
+    VerifyMapInvariants(mHandlerPtr, 0, 0, "After DELETE event");
+
     LOG_INFO(sLogger, ("TestHandleBasicDeleteEvent() end", time(NULL)));
 }
 
@@ -394,6 +400,9 @@ void ModifyHandlerUnittest::TestHandleBasicModifyEvent() {
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mNameReaderMap[gLogName].size(), 1);
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap[mReaderPtr->mDevInode], mReaderPtr);
+
+    // Verify map invariants: 1 active reader, 0 rotator
+    VerifyMapInvariants(mHandlerPtr, 1, 0, "After MODIFY event");
 
     LOG_INFO(sLogger, ("TestHandleBasicModifyEvent() end", time(NULL)));
 }
@@ -903,12 +912,14 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
     // Result: reader1 moved to rotator map, only reader2 remains in array
 
     // After handling, we should have:
-    // - Array size: 1 (only reader2 remains)
-    // - DevInodeMap size: 1 (only reader2 remains)
+    // - Active readers: 1 (only reader2 remains)
     // - RotatorMap size: 1 (reader1 moved to rotator map)
 
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 1, 1, "After handling MODIFY event");
+
+    // Verify specific reader states
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
 
     // Reader1 should be removed from devInodeMap but added to rotatorMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode1), 0);
@@ -1033,18 +1044,17 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
     // Result: reader completely removed from both array and map
 
     // After handling, we should have:
-    // - Array size: 0 (reader removed)
-    // - DevInodeMap size: 0 (reader removed)
+    // - Active readers: 0 (reader removed)
     // - RotatorMap size: 0 (not added to rotator because file was really deleted)
 
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 0, 0, "After handling MODIFY event");
+
+    // Verify specific reader states
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 0);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 0);
 
-    // Reader should be removed from devInodeMap
+    // Reader should be completely removed from both devInodeMap and rotatorMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 0);
-
-    // Reader should NOT be in rotator map (because file was really deleted)
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
 
     LOG_INFO(sLogger,
@@ -1157,18 +1167,19 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
     // Result: reader remains in both array and map
 
     // After handling, we should have:
-    // - Array size: 1 (reader still exists)
-    // - DevInodeMap size: 1 (reader still exists)
+    // - Active readers: 1 (reader still exists)
     // - RotatorMap size: 0 (not added to rotator)
 
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 1, 0, "After handling MODIFY event");
+
+    // Verify specific reader states
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
 
     // Reader should remain in devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 1);
 
     // Reader should NOT be in rotator map
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
 
     LOG_INFO(sLogger,
@@ -1293,18 +1304,17 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
     // Result: reader completely removed from both array and map
 
     // After handling, we should have:
-    // - Array size: 0 (reader removed)
-    // - DevInodeMap size: 0 (reader removed)
+    // - Active readers: 0 (reader removed)
     // - RotatorMap size: 0 (not added to rotator because file was really deleted)
 
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 0, 0, "After handling MODIFY event");
+
+    // Verify specific reader states
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 0);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 0);
 
-    // Reader should be removed from devInodeMap
+    // Reader should be completely removed from both devInodeMap and rotatorMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 0);
-
-    // Reader should NOT be in rotator map (because file was really deleted)
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
 
     LOG_INFO(sLogger,
@@ -1430,18 +1440,19 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileNotDeleted(
     // Result: reader remains in both array and map
 
     // After handling, we should have:
-    // - Array size: 1 (reader still exists)
-    // - DevInodeMap size: 1 (reader still exists)
+    // - Active readers: 1 (reader still exists)
     // - RotatorMap size: 0 (not added to rotator)
 
+    // Verify map invariants and expected sizes
+    VerifyMapInvariants(handlerPtr, 1, 0, "After handling MODIFY event");
+
+    // Verify specific reader states
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName].size(), 1);
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.size(), 1);
 
     // Reader should remain in devInodeMap
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode), 1);
 
     // Reader should NOT be in rotator map
-    APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.size(), 0);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mRotatorReaderMap.count(devInode), 0);
 
     LOG_INFO(sLogger,
