@@ -17,10 +17,13 @@ package regex
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/pingcap/check"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/plugins/test"
@@ -131,5 +134,106 @@ func (s *processorTestSuite) TestNotMatch(c *check.C) {
 		logArray[0] = logPb
 		outLogs := s.processor.ProcessLogs(logArray)
 		c.Assert(len(outLogs), check.Equals, 0)
+	}
+}
+
+func TestFilterEvent(t *testing.T) {
+	timeNow := uint64(time.Now().UnixNano())
+	tests := []struct {
+		group   *models.PipelineGroupEvents
+		include map[string]string
+		exclude map[string]string
+		want    *models.PipelineGroupEvents
+	}{
+		{
+			group: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world1"), models.NewTagsWithMap(map[string]string{
+						"tag1": "xxxxx",
+					}), timeNow),
+					models.NewSimpleLog([]byte("hello world2"), models.NewTagsWithMap(map[string]string{
+						"tag1": "yyyyy",
+					}), timeNow),
+				},
+			},
+			exclude: map[string]string{
+				"content": `hello\sworld1`,
+			},
+			want: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world2"), models.NewTagsWithMap(map[string]string{
+						"tag1": "yyyyy",
+					}), timeNow),
+				},
+			},
+		},
+		{
+			group: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world1"), models.NewTagsWithMap(map[string]string{
+						"tag1": "xxxxx",
+					}), timeNow),
+					models.NewSimpleLog([]byte("hello world2"), models.NewTagsWithMap(map[string]string{
+						"tag1": "yyyyy",
+					}), timeNow),
+				},
+			},
+			include: map[string]string{
+				"content": `hello\sworld1`,
+			},
+			want: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world1"), models.NewTagsWithMap(map[string]string{
+						"tag1": "xxxxx",
+					}), timeNow),
+				},
+			},
+		},
+		{
+			group: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world1"), models.NewTagsWithMap(map[string]string{
+						"tag1": "xxxxx",
+					}), timeNow),
+					models.NewSimpleLog([]byte("hello world2"), models.NewTagsWithMap(map[string]string{
+						"tag1": "yyyyy",
+					}), timeNow),
+				},
+			},
+			include: map[string]string{
+				"tag1": `xxx`,
+			},
+			want: &models.PipelineGroupEvents{
+				Group: models.NewGroup(models.NewMetadata(), models.NewTags()),
+				Events: []models.PipelineEvent{
+					models.NewSimpleLog([]byte("hello world1"), models.NewTagsWithMap(map[string]string{
+						"tag1": "xxxxx",
+					}), timeNow),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		p := &ProcessorRegexFilter{
+			Include: test.include,
+			Exclude: test.exclude,
+		}
+		err := p.Init(mock.NewEmptyContext("p", "l", "c"))
+		assert.Nil(t, err)
+
+		ctx := pipeline.NewObservePipelineConext(10)
+		p.Process(test.group, ctx)
+		select {
+		case <-time.After(time.Second * 10):
+			assert.Fail(t, "should got data returned by processor")
+		case data := <-ctx.Collector().Observe():
+			assert.Equal(t, test.want, data)
+		}
 	}
 }
