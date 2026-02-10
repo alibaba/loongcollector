@@ -2,6 +2,7 @@ package rfc3164
 
 import (
 	"bytes"
+	"math"
 	"time"
 
 	"github.com/jeromer/syslogparser"
@@ -213,41 +214,41 @@ func (p *Parser) parseHostname() (string, error) {
 
 // http://tools.ietf.org/html/rfc3164#section-4.1.3
 func (p *Parser) parseTag() (string, error) {
+
 	var b byte
-	var endOfTag bool
-	var bracketOpen bool
 	var tag []byte
 	var err error
-	var found bool
+	var enough bool
 
-	from := p.cursor
+	previous := p.cursor
+	// "The TAG is a string of ABNF alphanumeric characters that MUST NOT exceed 32 characters."
+	limit := int(
+		math.Min(
+			float64(p.l),
+			float64(p.cursor+32),
+		),
+	)
 
-	for {
+	for p.cursor < limit {
 		b = p.buff[p.cursor]
-		bracketOpen = (b == '[')
-		endOfTag = (b == ':' || b == ' ')
 
-		// XXX : parse PID ?
-		if bracketOpen {
-			tag = p.buff[from:p.cursor]
-			found = true
-		}
-
-		if endOfTag {
-			if !found {
-				tag = p.buff[from:p.cursor]
-				found = true
-			}
-
+		if b == ' ' {
 			p.cursor++
 			break
 		}
 
+		if b == '[' || b == ']' || b == ':' || enough {
+			enough = true
+			p.cursor++
+			continue
+		}
+
+		tag = append(tag, b)
 		p.cursor++
 	}
 
-	if (p.cursor < p.l) && (p.buff[p.cursor] == ' ') {
-		p.cursor++
+	if len(tag) == 0 {
+		p.cursor = previous
 	}
 
 	return string(tag), err
