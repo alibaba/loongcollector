@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
@@ -163,10 +162,8 @@ func (r *InputSystem) CollectOpenFD(collector pipeline.Collector) {
 		logger.Warning(r.context.GetRuntimeContext(), "FILENR_PATTERN_ALARM", "want", 3, "got", len(parts))
 		return
 	}
-	allocated, _ := strconv.ParseFloat(string(parts[0]), 64)
-	maximum, _ := strconv.ParseFloat(string(parts[2]), 64)
-	r.addMetric(collector, "fd_allocated", &r.commonLabels, allocated)
-	r.addMetric(collector, "fd_max", &r.commonLabels, maximum)
+	r.addMetricStringVal(collector, "fd_allocated", &r.commonLabels, string(parts[0]))
+	r.addMetricStringVal(collector, "fd_max", &r.commonLabels, string(parts[2]))
 }
 
 // CollectDiskUsage use `/proc/1/mounts` to find the device rather than `proc/self/mounts`
