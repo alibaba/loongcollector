@@ -1139,10 +1139,9 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
             DROP_LOG_ALARM,
             string("Reader pointer mismatch detected! Expected inode: ") + ToString(expectedReader->GetDevInode().inode)
                 + " but array[0] is: " + ToString(actualFrontReader->GetDevInode().inode),
-            expectedReader->GetRegion(),
             expectedReader->GetProject(),
-            expectedReader->GetConfigName(),
-            expectedReader->GetLogstore());
+            expectedReader->GetLogstore(),
+            expectedReader->GetRegion());
     }
     // Remove from array
     readerArray->pop_front();
