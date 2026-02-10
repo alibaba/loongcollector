@@ -839,7 +839,7 @@ void ModifyHandler::Handle(const Event& event) {
                         // need to push modify event again, but without dev inode
                         // use head dev + inode
                         Event* ev = new Event(event.GetSource(),
-                                              event.GetEventObject(),
+                                              event.GetObject(),
                                               event.GetType(),
                                               event.GetWd(),
                                               event.GetCookie(),
@@ -1135,8 +1135,7 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
                       "actual array[0] path", actualFrontReader->GetHostLogPath())("array size", readerArray->size())(
                       "This indicates pop_front was called before", "DO NOT remove to prevent wrong deletion"));
 
-        // Send alarm for critical bug
-        AlarmManager::GetInstance()->SendAlarmCritical(
+        LogtailAlarm::GetInstance()->SendAlarm(
             DROP_LOG_ALARM,
             string("Reader pointer mismatch detected! Expected inode: ") + ToString(expectedReader->GetDevInode().inode)
                 + " but array[0] is: " + ToString(actualFrontReader->GetDevInode().inode),
