@@ -86,12 +86,12 @@ void LogFileOperatorUnittest::SetUpTestCase() {
     srand(time(NULL));
     gRootDir = GetProcessExecutionDir();
     gRootDir += "LogFileOperatorUnittest";
-    bfs::remove_all(gRootDir);
-    bfs::create_directories(gRootDir);
+    fs::remove_all(gRootDir);
+    fs::create_directories(gRootDir);
 }
 
 void LogFileOperatorUnittest::TearDownTestCase() {
-    bfs::remove_all(gRootDir);
+    fs::remove_all(gRootDir);
 }
 
 std::string LogFileOperatorUnittest::GenerateData(size_t lines, size_t line_size) {
@@ -137,7 +137,7 @@ void LogFileOperatorUnittest::TestOpen() {
     // non fuse, file no existed & existed
     {
         std::string file = gRootDir + PATH_SEPARATOR + gTestFile;
-        bfs::remove(file);
+        fs::remove(file);
 
         LogFileOperator logFileOp;
 

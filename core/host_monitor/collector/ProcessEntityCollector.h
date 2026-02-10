@@ -21,7 +21,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <boost/filesystem.hpp>
 #include <memory>
 #include <string>
 #include <unordered_map>

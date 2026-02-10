@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
@@ -69,13 +68,13 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        filesystem::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
 
     void SetUp() override {
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
         // create a file for reader
         std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
         writeLog(logPath, "a sample log\n");
@@ -161,7 +160,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        filesystem::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -818,7 +817,7 @@ void ModifyHandlerUnittest::TestClearReaderWhenFileDeleted() {
     // Actually delete the file while file descriptor is still open
     // This simulates the real scenario where file is deleted but fd is held
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
-    bfs::remove(logPath);
+    fs::remove(logPath);
 
     // Verify reader exists before handling event
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);

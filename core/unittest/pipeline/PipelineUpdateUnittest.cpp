@@ -414,7 +414,7 @@ private:
 
     bool isFileServerStart = false;
 
-    filesystem::path filepath = "/path/to/test";
+    fs::path filepath = "/path/to/test";
 };
 
 void PipelineUpdateUnittest::TestFileServerStart() {

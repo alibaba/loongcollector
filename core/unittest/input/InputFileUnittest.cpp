@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -71,7 +70,7 @@ void InputFileUnittest::OnSuccessfulInit() {
     unique_ptr<InputFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
@@ -194,7 +193,7 @@ void InputFileUnittest::OnEnableContainerDiscovery() {
     unique_ptr<InputFile> input;
     Json::Value configJson, optionalGoPipelineJson, optionalGoPipeline;
     string configStr, optionalGoPipelineStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     string filePathStr = NormalizeNativePath(filePath.string());
 
     configStr = R"(
@@ -267,7 +266,7 @@ void InputFileUnittest::TestCreateInnerProcessors() {
     unique_ptr<InputFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
@@ -473,7 +472,7 @@ void InputFileUnittest::OnPipelineUpdate() {
     InputFile input;
     input.SetContext(ctx);
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
 
     configStr = R"(

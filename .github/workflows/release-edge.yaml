@@ -28,6 +28,7 @@ on:
       - "test/**"
       - "tools/**"
       - "CHANGELOG.md"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

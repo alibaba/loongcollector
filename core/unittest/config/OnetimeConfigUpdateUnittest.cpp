@@ -37,7 +37,7 @@ protected:
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
-        filesystem::create_directories(mConfigDir);
+        fs::create_directories(mConfigDir);
         PipelineConfigWatcher::GetInstance()->AddSource(mConfigDir.string());
     }
 
@@ -46,15 +46,15 @@ protected:
         // PipelineManagerMock::GetInstance()->ClearEnvironment();
         PipelineConfigWatcher::GetInstance()->ClearEnvironment();
         sConfigManager->Clear();
-        filesystem::remove_all(mConfigDir);
+        fs::remove_all(mConfigDir);
         error_code ec;
-        filesystem::remove(sConfigManager->mCheckpointFilePath, ec);
+        fs::remove(sConfigManager->mCheckpointFilePath, ec);
     }
 
 private:
     static OnetimeConfigInfoManager* sConfigManager;
 
-    filesystem::path mConfigDir = "continuous_pipeline_config";
+    fs::path mConfigDir = "continuous_pipeline_config";
 };
 
 OnetimeConfigInfoManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigInfoManager::GetInstance();
@@ -304,13 +304,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         })"};
         vector<string> filenames = {"new_config.json", "old_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            filesystem::path filePath = mConfigDir / filenames[i];
+            fs::path filePath = mConfigDir / filenames[i];
             ofstream fout(filePath, ios::binary);
             fout << configDetails[i];
             fout.close();
             // 强制更新文件修改时间
-            filesystem::file_time_type newTime = filesystem::file_time_type::clock::now();
-            filesystem::last_write_time(filePath, newTime);
+            fs::file_time_type newTime = fs::file_time_type::clock::now();
+            fs::last_write_time(filePath, newTime);
             // 添加一个小延迟确保文件系统更新
             this_thread::sleep_for(chrono::milliseconds(10));
         }
@@ -319,7 +319,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             fout << unusedConfigDetail;
             fout.close();
         }
-        filesystem::remove(mConfigDir / "changed_config.json");
+        fs::remove(mConfigDir / "changed_config.json");
 
         // compute config hash, inputs hash and excution timeout
         for (size_t i = 0; i < configDetails.size(); ++i) {

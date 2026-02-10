@@ -45,14 +45,13 @@ const std::string PATH_SEPARATOR = "\\";
 #endif
 
 std::string ParentPath(const std::string& path) {
-    boost::filesystem::path p(path);
+    std::filesystem::path p(path);
     return p.parent_path().string();
 }
 
 bool CheckExistance(const std::string& path) {
-    boost::system::error_code ec;
-    boost::filesystem::path p(path);
-    return boost::filesystem::exists(p, ec);
+    std::error_code ec;
+    return std::filesystem::exists(path, ec);
 }
 
 bool Mkdirs(const std::string& dirPath) {
@@ -62,7 +61,7 @@ bool Mkdirs(const std::string& dirPath) {
     if (errno != ENOENT) {
         return false;
     }
-    boost::filesystem::path p(dirPath);
+    std::filesystem::path p(dirPath);
     if (!p.has_parent_path()) {
         return false;
     }
@@ -89,16 +88,18 @@ bool Mkdir(const std::string& dirPath) {
 }
 
 bool IsRelativePath(const std::string& path) {
-    boost::filesystem::path checkPointFilePath(path);
+    std::filesystem::path checkPointFilePath(path);
     return checkPointFilePath.is_relative();
 }
 
 std::string AbsolutePath(const std::string& path, const std::string& basepath) {
+    // TODO: test and use std::filesystem::absolute(path, basepath).lexically_normal().string() instead
     return boost::filesystem::absolute(path, basepath).string();
 }
 
 std::string NormalizePath(const std::string& path) {
     boost::filesystem::path abs(path);
+    // TODO: std::filesystem::path does not have filename_is_dot() and filename_is_dot_dot()
     if (abs.filename_is_dot() || abs.filename_is_dot_dot()) {
         abs.remove_filename();
     }
@@ -272,9 +273,9 @@ bool WriteFile(const std::string& fileName, const std::string& content, std::str
 }
 
 bool IsAccessibleDirectory(const std::string& dirPath) {
-    boost::filesystem::directory_iterator end;
+    std::filesystem::directory_iterator end;
     try {
-        boost::filesystem::directory_iterator dirIter(dirPath);
+        std::filesystem::directory_iterator dirIter(dirPath);
         return (dirIter != end);
     } catch (...) {
         return false;

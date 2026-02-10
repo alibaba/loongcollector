@@ -390,7 +390,7 @@ bool NormalizeTopicRegFormat(std::string& topicFormat) {
 }
 
 bool isRootDirectory(const std::string& pathStr) {
-    boost::filesystem::path path(pathStr);
+    std::filesystem::path path(pathStr);
     return path.has_root_directory() && !path.has_parent_path();
 }
 
@@ -399,7 +399,7 @@ void RemoveFilePathTrailingSlash(std::string& filePath) {
         return;
     }
     boost::filesystem::path path(filePath);
-    path.remove_trailing_separator();
+    path.remove_trailing_separator(); // std::filesystem::path does not have this method
     filePath = path.string();
 }
 

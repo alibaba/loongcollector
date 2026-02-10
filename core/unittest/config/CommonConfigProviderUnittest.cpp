@@ -88,7 +88,7 @@ public:
     void SetUp() override {
         if (BOOL_FLAG(logtail_mode)) {
             mRootDir = GetProcessExecutionDir();
-            bfs::create_directories(mRootDir);
+            fs::create_directories(mRootDir);
             ilogtailConfigPath = mRootDir + PS + STRING_FLAG(ilogtail_config);
             std::ofstream fout(ilogtailConfigPath.c_str());
             fout << "" << std::endl;
@@ -96,8 +96,8 @@ public:
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();
-            bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
-            bfs::remove_all(provider.mInstanceSourceDir.string());
+            fs::remove_all(provider.mContinuousPipelineConfigDir.string());
+            fs::remove_all(provider.mInstanceSourceDir.string());
         } else {
             CreateAgentDir();
             ilogtailConfigPath = GetAgentConfDir() + "/instance_config/local/loongcollector_config.json";
@@ -108,8 +108,8 @@ public:
             MockCommonConfigProvider provider;
             provider.Init("common_v2");
             provider.Stop();
-            bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
-            bfs::remove_all(provider.mInstanceSourceDir.string());
+            fs::remove_all(provider.mContinuousPipelineConfigDir.string());
+            fs::remove_all(provider.mInstanceSourceDir.string());
         }
     }
 
@@ -118,8 +118,8 @@ public:
         MockCommonConfigProvider provider;
         provider.Init("common_v2");
         provider.Stop();
-        bfs::remove_all(provider.mContinuousPipelineConfigDir.string());
-        bfs::remove_all(provider.mInstanceSourceDir.string());
+        fs::remove_all(provider.mContinuousPipelineConfigDir.string());
+        fs::remove_all(provider.mInstanceSourceDir.string());
     }
 
     void TestInit();

@@ -42,7 +42,7 @@ public:
 protected:
     static void SetUpTestCase() {
         PluginRegistry::GetInstance()->LoadPlugins();
-        sManager->mCheckpointRootPath = filesystem::path("./input_static_file");
+        sManager->mCheckpointRootPath = fs::path("./input_static_file");
     }
 
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
@@ -52,14 +52,14 @@ protected:
         ctx.SetConfigName("test_config");
         p.mPluginID.store(0);
         ctx.SetPipeline(p);
-        filesystem::create_directories(sManager->mCheckpointRootPath);
+        fs::create_directories(sManager->mCheckpointRootPath);
     }
 
     void TearDown() override {
         sServer->Clear();
         sManager->ClearUnusedCheckpoints();
         sManager->mInputCheckpointMap.clear();
-        filesystem::remove_all(sManager->mCheckpointRootPath);
+        fs::remove_all(sManager->mCheckpointRootPath);
     }
 
 private:
@@ -77,7 +77,7 @@ void InputStaticFileUnittest::OnSuccessfulInit() {
     unique_ptr<InputStaticFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
 
     // only mandatory param
@@ -145,7 +145,7 @@ void InputStaticFileUnittest::OnFailedInit() {
     unique_ptr<InputStaticFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
 
     // file path not existed
@@ -192,7 +192,7 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
     unique_ptr<InputStaticFile> input;
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
     {
         // no multiline
@@ -395,13 +395,13 @@ void InputStaticFileUnittest::TestCreateInnerProcessors() {
 
 void InputStaticFileUnittest::OnPipelineUpdate() {
     // prepare logs
-    filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{"./test_logs/test_file_1.log"};
+    fs::create_directories("test_logs");
+    vector<fs::path> files{"./test_logs/test_file_1.log"};
     { ofstream fout(files[0]); }
 
     Json::Value configJson, optionalGoPipeline;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("./test_logs/*.log");
+    fs::path filePath = fs::absolute("./test_logs/*.log");
     filePath = NormalizeNativePath(filePath.string());
     {
         // new config
@@ -426,8 +426,8 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_EQUAL(&input.mFileTag, sServer->GetFileTagConfig("test_config", 0).first);
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
         APSARA_TEST_EQUAL(1U, cpt.mFileCheckpoints.size());
-        APSARA_TEST_EQUAL(filesystem::absolute(files[0]).lexically_normal(), cpt.mFileCheckpoints[0].mFilePath);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+        APSARA_TEST_EQUAL(fs::absolute(files[0]).lexically_normal(), cpt.mFileCheckpoints[0].mFilePath);
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
 
         APSARA_TEST_TRUE(input.Stop(true));
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileDiscoveryConfig("test_config", 0).first);
@@ -436,7 +436,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileTagConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(sManager->mInputCheckpointMap.end(),
                           sManager->mInputCheckpointMap.find(make_pair("test_config", 0)));
-        APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+        APSARA_TEST_FALSE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
     }
     {
         // old config
@@ -494,7 +494,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
         APSARA_TEST_EQUAL(1U, cpt.mFileCheckpoints.size());
         APSARA_TEST_EQUAL("./test_logs/test_file_2.log", cpt.mFileCheckpoints[0].mFilePath.string());
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
 
         APSARA_TEST_TRUE(input.Stop(true));
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileDiscoveryConfig("test_config", 0).first);
@@ -503,9 +503,9 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_EQUAL(nullptr, sServer->GetFileTagConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(sManager->mInputCheckpointMap.end(),
                           sManager->mInputCheckpointMap.find(make_pair("test_config", 0)));
-        APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+        APSARA_TEST_FALSE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
     }
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void InputStaticFileUnittest::TestGetFiles() {
@@ -515,9 +515,9 @@ void InputStaticFileUnittest::TestGetFiles() {
     // wildcard dir
     {
         // invalid base dir
-        filesystem::create_directories("invalid_dir");
+        fs::create_directories("invalid_dir");
 
-        filesystem::path filePath = filesystem::absolute("test_logs/*/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/*/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -528,13 +528,13 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove_all("invalid_dir");
+        fs::remove_all("invalid_dir");
     }
     {
         // non-existing const subdir
-        filesystem::create_directories("test_logs/dir");
+        fs::create_directories("test_logs/dir");
 
-        filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/*/invalid_dir/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -545,14 +545,14 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
     {
         // invalid const subdir
-        filesystem::create_directories("test_logs/dir");
+        fs::create_directories("test_logs/dir");
         { ofstream fout("test_logs/dir/invalid_dir"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/*/invalid_dir/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/*/invalid_dir/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -563,18 +563,18 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
     {
         // the last subdir before ** is const
-        filesystem::create_directories("test_logs/dir1/dir/valid_dir");
-        filesystem::create_directories("test_logs/dir2/dir/valid_dir");
-        filesystem::create_directories("test_logs/unmatched_dir");
+        fs::create_directories("test_logs/dir1/dir/valid_dir");
+        fs::create_directories("test_logs/dir2/dir/valid_dir");
+        fs::create_directories("test_logs/unmatched_dir");
         { ofstream fout("test_logs/invalid_dir"); }
         { ofstream fout("test_logs/dir1/dir/valid_dir/test1.log"); }
         { ofstream fout("test_logs/dir2/dir/valid_dir/test2.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/dir*/dir/valid_dir/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/dir*/dir/valid_dir/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -585,18 +585,18 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
     {
         // the last subdir before ** is wildcard
-        filesystem::create_directories("test_logs/dir1");
-        filesystem::create_directories("test_logs/dir2");
-        filesystem::create_directories("test_logs/unmatched_dir");
+        fs::create_directories("test_logs/dir1");
+        fs::create_directories("test_logs/dir2");
+        fs::create_directories("test_logs/unmatched_dir");
         { ofstream fout("test_logs/invalid_dir"); }
         { ofstream fout("test_logs/dir1/test1.log"); }
         { ofstream fout("test_logs/dir2/test2.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/dir*/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/dir*/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -607,14 +607,14 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
     // recursive dir search
     {
         // non-existing base path
-        filesystem::create_directories("invalid_dir");
+        fs::create_directories("invalid_dir");
 
-        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -625,13 +625,13 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove_all("invalid_dir");
+        fs::remove_all("invalid_dir");
     }
     {
         // invalid base path
         { ofstream fout("test_logs"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -642,12 +642,12 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_TRUE(input.GetFiles().empty());
 
-        filesystem::remove("test_logs");
+        fs::remove("test_logs");
     }
     {
         // normal
-        filesystem::create_directories("test_logs/dir1/dir2");
-        filesystem::create_directories("test_logs/exclude_dir");
+        fs::create_directories("test_logs/dir1/dir2");
+        fs::create_directories("test_logs/exclude_dir");
         { ofstream fout("test_logs/test0.log"); }
         { ofstream fout("test_logs/exclude_file.log"); }
         { ofstream fout("test_logs/dir1/test1.log"); }
@@ -655,9 +655,9 @@ void InputStaticFileUnittest::TestGetFiles() {
         { ofstream fout("test_logs/dir1/exclude_filepath.log"); }
         { ofstream fout("test_logs/dir1/dir2/test2.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
-        filesystem::path excludeFilePath = filesystem::absolute("test_logs/dir*/exlcude_filepath.log");
-        filesystem::path excludeDir = filesystem::absolute("test_logs/exclude*");
+        fs::path filePath = fs::absolute("test_logs/**/*.log");
+        fs::path excludeFilePath = fs::absolute("test_logs/dir*/exlcude_filepath.log");
+        fs::path excludeDir = fs::absolute("test_logs/exclude*");
         filePath = NormalizeNativePath(filePath.string());
         excludeFilePath = NormalizeNativePath(excludeFilePath.string());
         excludeDir = NormalizeNativePath(excludeDir.string());
@@ -674,17 +674,17 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_EQUAL(2U, input.GetFiles().size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
     {
         // loop caused by symlink
-        filesystem::create_directories("test_logs/dir1/dir2");
-        filesystem::path symlinkTarget = filesystem::absolute("test_logs/dir1");
+        fs::create_directories("test_logs/dir1/dir2");
+        fs::path symlinkTarget = fs::absolute("test_logs/dir1");
         symlinkTarget = NormalizeNativePath(symlinkTarget.string());
-        filesystem::create_directory_symlink(symlinkTarget, "test_logs/dir1/dir2/dir3");
+        fs::create_directory_symlink(symlinkTarget, "test_logs/dir1/dir2/dir3");
         { ofstream fout("test_logs/dir1/test.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/**/*.log");
         filePath = NormalizeNativePath(filePath.string());
         Json::Value configJson;
         configJson["FilePaths"].append(Json::Value(filePath.string()));
@@ -696,7 +696,7 @@ void InputStaticFileUnittest::TestGetFiles() {
         input.CommitMetricsRecordRef();
         APSARA_TEST_EQUAL(1U, input.GetFiles().size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
 }
 
@@ -709,14 +709,14 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
     // This test ensures that filename() is used instead of stem() for directory matching
     // stem() would strip everything after the dot, causing match failure
     {
-        filesystem::create_directories("test_logs/app.v1/subdir");
-        filesystem::create_directories("test_logs/app.v2/subdir");
-        filesystem::create_directories("test_logs/notstem");
+        fs::create_directories("test_logs/app.v1/subdir");
+        fs::create_directories("test_logs/app.v2/subdir");
+        fs::create_directories("test_logs/notstem");
         { ofstream fout("test_logs/app.v1/subdir/test1.log"); }
         { ofstream fout("test_logs/app.v2/subdir/test2.log"); }
         { ofstream fout("test_logs/notstem/test3.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/app.*/subdir/*.log");
+        fs::path filePath = fs::absolute("test_logs/app.*/subdir/*.log");
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -735,17 +735,17 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         auto files = input->GetFiles();
         APSARA_TEST_EQUAL(2U, files.size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
 
     // Test 2: Directory with multiple dots using ** pattern
     {
-        filesystem::create_directories("test_logs/release.2024.01.15/logs");
-        filesystem::create_directories("test_logs/release.2024.01.16/logs");
+        fs::create_directories("test_logs/release.2024.01.15/logs");
+        fs::create_directories("test_logs/release.2024.01.16/logs");
         { ofstream fout("test_logs/release.2024.01.15/logs/app.log"); }
         { ofstream fout("test_logs/release.2024.01.16/logs/app.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/release.*/logs/**/*.log");
+        fs::path filePath = fs::absolute("test_logs/release.*/logs/**/*.log");
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -764,15 +764,15 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         auto files = input->GetFiles();
         APSARA_TEST_EQUAL(2U, files.size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
 
     // Test 3: Exact directory name with dot
     {
-        filesystem::create_directories("test_logs/node_modules.backup/lib");
+        fs::create_directories("test_logs/node_modules.backup/lib");
         { ofstream fout("test_logs/node_modules.backup/lib/test.log"); }
 
-        filesystem::path filePath = filesystem::absolute("test_logs/node_modules.backup/lib/*.log");
+        fs::path filePath = fs::absolute("test_logs/node_modules.backup/lib/*.log");
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -790,7 +790,7 @@ void InputStaticFileUnittest::TestDirectoryNameWithDot() {
         auto files = input->GetFiles();
         APSARA_TEST_EQUAL(1U, files.size());
 
-        filesystem::remove_all("test_logs");
+        fs::remove_all("test_logs");
     }
 }
 

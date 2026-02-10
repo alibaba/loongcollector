@@ -14,7 +14,6 @@
 
 #include <cstdio>
 
-#include <filesystem>
 #include <fstream>
 
 #include "common/DevInode.h"
@@ -31,17 +30,17 @@ namespace logtail {
 class LogFileReaderResolvedPathUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
-        logPathDir = (std::filesystem::path(GetProcessExecutionDir()) / "LogFileReaderResolvedPathUnittest").string();
-        if (std::filesystem::exists(logPathDir)) {
-            std::filesystem::remove_all(logPathDir);
+        logPathDir = (fs::path(GetProcessExecutionDir()) / "LogFileReaderResolvedPathUnittest").string();
+        if (fs::exists(logPathDir)) {
+            fs::remove_all(logPathDir);
         }
-        std::filesystem::create_directories(logPathDir);
+        fs::create_directories(logPathDir);
         AppConfig::GetInstance()->SetLoongcollectorConfDir(logPathDir);
     }
 
     static void TearDownTestCase() {
-        if (std::filesystem::exists(logPathDir)) {
-            std::filesystem::remove_all(logPathDir);
+        if (fs::exists(logPathDir)) {
+            fs::remove_all(logPathDir);
         }
     }
 
@@ -84,7 +83,7 @@ std::string LogFileReaderResolvedPathUnittest::logPathDir;
 void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathNormalFile() {
     // Test that ResolveHostLogPath works correctly for normal files
     const std::string fileName = "normal_file.log";
-    const std::string filePath = (std::filesystem::path(logPathDir) / fileName).string();
+    const std::string filePath = (fs::path(logPathDir) / fileName).string();
 
     // Create a test file
     std::ofstream(filePath) << "test content\n";
@@ -102,7 +101,7 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathNormalFile() {
     APSARA_TEST_EQUAL_FATAL(reader.mResolvedHostLogPath, filePath);
 
     // Clean up
-    std::filesystem::remove(filePath);
+    fs::remove(filePath);
 }
 
 void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathSymbolicLink() {
@@ -110,14 +109,14 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathSymbolicLink() {
     // Test that ResolveHostLogPath correctly resolves symbolic links
     const std::string realFileName = "real_file.log";
     const std::string linkName = "link_to_file.log";
-    const std::string realFilePath = (std::filesystem::path(logPathDir) / realFileName).string();
-    const std::string linkPath = (std::filesystem::path(logPathDir) / linkName).string();
+    const std::string realFilePath = (fs::path(logPathDir) / realFileName).string();
+    const std::string linkPath = (fs::path(logPathDir) / linkName).string();
 
     // Create a real file
     std::ofstream(realFilePath) << "test content\n";
 
     // Create a symbolic link
-    std::filesystem::create_symlink(realFilePath, linkPath);
+    fs::create_symlink(realFilePath, linkPath);
 
     LogFileReader reader(logPathDir,
                          linkName,
@@ -132,15 +131,15 @@ void LogFileReaderResolvedPathUnittest::TestResolveHostLogPathSymbolicLink() {
     APSARA_TEST_EQUAL_FATAL(reader.mResolvedHostLogPath, realFilePath);
 
     // Clean up
-    std::filesystem::remove(linkPath);
-    std::filesystem::remove(realFilePath);
+    fs::remove(linkPath);
+    fs::remove(realFilePath);
 #endif
 }
 
 void LogFileReaderResolvedPathUnittest::TestCheckFileSignatureWithZeroSizeAndDifferentPath() {
     // Test the fix: when signature size is 0 and paths differ, CheckFileSignatureAndOffset should return false
     const std::string fileName = "empty_file.log";
-    const std::string filePath = (std::filesystem::path(logPathDir) / fileName).string();
+    const std::string filePath = (fs::path(logPathDir) / fileName).string();
 
     // Create an empty file
     std::ofstream(filePath) << "";
@@ -167,13 +166,13 @@ void LogFileReaderResolvedPathUnittest::TestCheckFileSignatureWithZeroSizeAndDif
     APSARA_TEST_FALSE_FATAL(result);
 
     // Clean up
-    std::filesystem::remove(filePath);
+    fs::remove(filePath);
 }
 
 void LogFileReaderResolvedPathUnittest::TestCheckFileSignatureWithZeroSizeAndSamePath() {
     // Test that when signature size is 0 but paths are the same, the check continues normally
     const std::string fileName = "empty_file2.log";
-    const std::string filePath = (std::filesystem::path(logPathDir) / fileName).string();
+    const std::string filePath = (fs::path(logPathDir) / fileName).string();
 
     // Create an empty file
     std::ofstream(filePath) << "";
@@ -200,7 +199,7 @@ void LogFileReaderResolvedPathUnittest::TestCheckFileSignatureWithZeroSizeAndSam
     (void)reader.CheckFileSignatureAndOffset(false);
 
     // Clean up
-    std::filesystem::remove(filePath);
+    fs::remove(filePath);
 }
 
 void LogFileReaderResolvedPathUnittest::TestCopyTruncateUpgradeIssue() {
@@ -210,16 +209,16 @@ void LogFileReaderResolvedPathUnittest::TestCopyTruncateUpgradeIssue() {
     // 也应该能够检测并修复路径，继续正常采集，而不是持续返回 false
 
     // 1. 创建目录结构：真实目录和软链接目录
-    const std::string realDir = (std::filesystem::path(logPathDir) / "real_logs").string();
-    const std::string linkDir = (std::filesystem::path(logPathDir) / "link_logs").string();
+    const std::string realDir = (fs::path(logPathDir) / "real_logs").string();
+    const std::string linkDir = (fs::path(logPathDir) / "link_logs").string();
     const std::string fileName = "app.log";
-    const std::string realFilePath = (std::filesystem::path(realDir) / fileName).string();
-    const std::string linkFilePath = (std::filesystem::path(linkDir) / fileName).string();
-    std::filesystem::create_directories(realDir);
-    if (std::filesystem::exists(linkDir)) {
-        std::filesystem::remove(linkDir);
+    const std::string realFilePath = (fs::path(realDir) / fileName).string();
+    const std::string linkFilePath = (fs::path(linkDir) / fileName).string();
+    fs::create_directories(realDir);
+    if (fs::exists(linkDir)) {
+        fs::remove(linkDir);
     }
-    std::filesystem::create_symlink(realDir, linkDir);
+    fs::create_symlink(realDir, linkDir);
 
     // 2. 创建初始文件并写入内容
     std::ofstream(realFilePath) << "initial log content\nline 2\nline 3\n";
@@ -276,10 +275,10 @@ void LogFileReaderResolvedPathUnittest::TestCopyTruncateUpgradeIssue() {
 
     // 清理
     CheckPointManager::Instance()->RemoveAllCheckPoint();
-    std::filesystem::remove(linkFilePath);
-    std::filesystem::remove(realFilePath);
-    std::filesystem::remove(linkDir);
-    std::filesystem::remove_all(realDir);
+    fs::remove(linkFilePath);
+    fs::remove(realFilePath);
+    fs::remove(linkDir);
+    fs::remove_all(realDir);
 #endif
 }
 

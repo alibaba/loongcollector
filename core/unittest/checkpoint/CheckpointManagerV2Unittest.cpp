@@ -34,16 +34,16 @@ const auto kDevInode = DevInode(100, 1000);
 class CheckpointManagerV2Unittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
-        kTestRootDir = (bfs::path(GetProcessExecutionDir()) / "CheckpointManagerV2Unittest").string();
-        if (bfs::exists(kTestRootDir)) {
-            bfs::remove_all(kTestRootDir);
+        kTestRootDir = (fs::path(GetProcessExecutionDir()) / "CheckpointManagerV2Unittest").string();
+        if (fs::exists(kTestRootDir)) {
+            fs::remove_all(kTestRootDir);
         }
-        bfs::create_directories(kTestRootDir);
+        fs::create_directories(kTestRootDir);
         AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
         INT32_FLAG(logtail_checkpoint_check_gc_interval_sec) = 1;
     }
 
-    static void TearDownTestCase() { bfs::remove_all(kTestRootDir); }
+    static void TearDownTestCase() { fs::remove_all(kTestRootDir); }
 
     void TestBaseMethod();
 

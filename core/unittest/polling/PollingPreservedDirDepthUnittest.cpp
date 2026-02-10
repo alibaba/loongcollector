@@ -1,6 +1,5 @@
 
 #include <chrono> // Include the <chrono> header for sleep_for
-#include <filesystem>
 #include <thread> // Include the <thread> header for this_thread
 
 #include "json/json.h"
@@ -97,8 +96,8 @@ public:
         INT32_FLAG(check_not_exist_file_dir_round) = 1;
         INT32_FLAG(polling_check_timeout_interval) = 0;
         AppConfig::GetInstance()->mCheckPointFilePath = GetProcessExecutionDir() + gCheckpoint;
-        if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+        if (fs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
+            fs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         LoongCollectorMonitor::GetInstance()->Init();
         FlusherRunner::GetInstance()->Init(); // reference: Application::Start
@@ -122,13 +121,13 @@ public:
     }
 
     void SetUp() override {
-        if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+        if (fs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
+            fs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
-        if (bfs::exists(gRootDir)) {
-            filesystem::remove_all(gRootDir);
+        if (fs::exists(gRootDir)) {
+            fs::remove_all(gRootDir);
         }
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
     }
 
     void TearDown() override {
@@ -143,9 +142,9 @@ public:
         PollingModify::GetInstance()->ClearCache();
         CheckPointManager::Instance()->RemoveAllCheckPoint();
         // PollingEventQueue::GetInstance()->Clear();
-        filesystem::remove_all(gRootDir);
-        if (bfs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
-            filesystem::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
+        fs::remove_all(gRootDir);
+        if (fs::exists(AppConfig::GetInstance()->mCheckPointFilePath)) {
+            fs::remove_all(AppConfig::GetInstance()->mCheckPointFilePath);
         }
         FileServer::GetInstance()->Resume();
     }
@@ -180,7 +179,7 @@ private:
         LOG_DEBUG(sLogger, ("Generate log", testFile));
         auto pos = testFile.rfind(PATH_SEPARATOR);
         auto dir = testFile.substr(0, pos);
-        bfs::create_directories(dir);
+        fs::create_directories(dir);
         ofstream ofs(testFile, std::ios::app);
         ofs << "0\n";
     }

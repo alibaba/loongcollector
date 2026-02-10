@@ -38,15 +38,15 @@ protected:
     void SetUp() override {
         sManager = InputStaticFileCheckpointManager::GetInstance();
         sServer = StaticFileServer::GetInstance();
-        sManager->mCheckpointRootPath = filesystem::path("./input_static_file");
-        filesystem::create_directories(sManager->mCheckpointRootPath);
+        sManager->mCheckpointRootPath = fs::path("./input_static_file");
+        fs::create_directories(sManager->mCheckpointRootPath);
     }
 
     void TearDown() override {
         sServer->Clear();
         sManager->ClearUnusedCheckpoints();
         sManager->mInputCheckpointMap.clear();
-        filesystem::remove_all(sManager->mCheckpointRootPath);
+        fs::remove_all(sManager->mCheckpointRootPath);
     }
 
 private:
@@ -56,9 +56,8 @@ private:
 
 void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     // prepare test log
-    filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{
-        "./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
+    fs::create_directories("test_logs");
+    vector<fs::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
     vector<string> contents{string(500, 'a') + "\n", string(500, 'b') + "\n", string(500, 'c') + "\n"};
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
@@ -83,7 +82,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     ctx.SetConfigName("test_config");
     ctx.SetPipeline(p);
 
-    filesystem::path filePath = filesystem::absolute("./test_logs/*.log");
+    fs::path filePath = fs::absolute("./test_logs/*.log");
     string configStr = R"(
         {
             "Type": "input_static_file_onetime",
@@ -101,7 +100,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     input.CommitMetricsRecordRef();
     input.Start();
 
-    vector<filesystem::path> cptFiles;
+    vector<fs::path> cptFiles;
     for (const auto& item : sManager->mInputCheckpointMap.at(make_pair("test_config", 0)).mFileCheckpoints) {
         cptFiles.push_back(item.mFilePath);
     }
@@ -118,7 +117,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     sManager->UpdateCurrentFileCheckpoint("test_config", 0, 501);
     {
         // file 2 not existed && file 3 signature changed
-        filesystem::remove(cptFiles[1]);
+        fs::remove(cptFiles[1]);
         {
             ofstream fout(cptFiles[2], ios::binary);
             fout << string(10, 'd') << "\n";
@@ -138,7 +137,7 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     APSARA_TEST_EQUAL(0U, sServer->mDeletedInputs.size());
 
     input.Stop(true);
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void StaticFileServerUnittest::TestUpdateInputs() const {
@@ -191,8 +190,8 @@ void StaticFileServerUnittest::TestClearUnusedCheckpoints() const {
 
 void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     // prepare test log
-    filesystem::create_directories("test_logs");
-    filesystem::path testFile = filesystem::absolute("./test_logs/test_file.log");
+    fs::create_directories("test_logs");
+    fs::path testFile = fs::absolute("./test_logs/test_file.log");
     string content = string(5000, 'a') + "\n";
     {
         ofstream fout(testFile, ios::binary);
@@ -207,7 +206,7 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     ctx.SetConfigName("test_config");
     ctx.SetPipeline(p);
 
-    optional<vector<filesystem::path>> filesOpt({testFile});
+    optional<vector<fs::path>> filesOpt({testFile});
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
@@ -230,14 +229,14 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
 
     sServer->RemoveInput("test_config", 0);
     sServer->UpdateInputs();
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void StaticFileServerUnittest::TestFileRotationDetection() const {
     // prepare test log
-    filesystem::create_directories("test_logs");
-    filesystem::path originalFile = filesystem::absolute("test_logs/test_file.log");
-    filesystem::path rotatedFile = filesystem::absolute("test_logs/test_file.log.1");
+    fs::create_directories("test_logs");
+    fs::path originalFile = fs::absolute("test_logs/test_file.log");
+    fs::path rotatedFile = fs::absolute("test_logs/test_file.log.1");
     string content = string(2000, 'a') + "\n";
 
     // Create original file and get its devinode
@@ -257,7 +256,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     ctx.SetConfigName("test_config");
     ctx.SetPipeline(p);
 
-    optional<vector<filesystem::path>> filesOpt({originalFile});
+    optional<vector<fs::path>> filesOpt({originalFile});
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
@@ -268,7 +267,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     sServer->UpdateInputs();
 
     // Rotate file: move original to rotated (this preserves devinode), create new file
-    filesystem::rename(originalFile, rotatedFile);
+    fs::rename(originalFile, rotatedFile);
     // Verify rotated file has the same devinode
     auto rotatedDevInode = GetFileDevInode(rotatedFile.string());
     APSARA_TEST_EQUAL(originalDevInode, rotatedDevInode);
@@ -288,7 +287,7 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
 
     sServer->RemoveInput("test_config", 0);
     sServer->UpdateInputs();
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 UNIT_TEST_CASE(StaticFileServerUnittest, TestGetNextAvailableReader)

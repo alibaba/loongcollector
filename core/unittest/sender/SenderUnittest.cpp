@@ -798,7 +798,7 @@ protected:
 
     void MockUserConfigJsonForMarkOffset() {
         // remove old suer_log_config.json
-        bfs::remove_all(STRING_FLAG(user_log_config));
+        fs::remove_all(STRING_FLAG(user_log_config));
 
         // construct json
         Json::Value root;
@@ -863,10 +863,10 @@ public:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "SenderUnittest";
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
 
         auto const sysConfDir = gRootDir + PATH_SEPARATOR + ".ilogtail" + PATH_SEPARATOR;
-        bfs::create_directories(sysConfDir);
+        fs::create_directories(sysConfDir);
         AppConfig::GetInstance()->SetLoongcollectorConfDir(sysConfDir);
         sCptM = CheckpointManagerV2::GetInstance();
         sQueueM = ExactlyOnceQueueManager::GetInstance();
@@ -880,7 +880,7 @@ public:
     {
         StopMockSendThread();
         try {
-            bfs::remove_all(gRootDir);
+            fs::remove_all(gRootDir);
         } catch (...) {
         }
     }
@@ -894,7 +894,7 @@ public:
                    int32_t expireTime = 0,
                    int32_t clientDisableRetry = 0) {
         // Test and enable container mode (if the special local file is existing).
-        if (bfs::exists("LogtailContainerModeTest")) {
+        if (fs::exists("LogtailContainerModeTest")) {
             cout << "replace with container config" << endl;
             ReplaceWithContainerModeConfig();
         }
@@ -921,7 +921,7 @@ public:
             PTScopedLock lock(gBufferLogGroupsLock);
             gBufferLogGroups.clear();
         }
-        bfs::remove("loongcollector_config.json");
+        fs::remove("loongcollector_config.json");
         {
             fsutil::Dir dir(gRootDir);
             dir.Open();
@@ -929,13 +929,13 @@ public:
             while ((entry = dir.ReadNext(false))) {
                 auto fullPath = gRootDir + PATH_SEPARATOR + entry.Name();
                 auto targetPath = gRootDir + PATH_SEPARATOR + ".." + PATH_SEPARATOR + entry.Name();
-                bfs::rename(fullPath, targetPath);
-                bfs::remove_all(targetPath);
+                fs::rename(fullPath, targetPath);
+                fs::remove_all(targetPath);
             }
         }
         sCptM->close();
-        bfs::remove_all(gRootDir);
-        bfs::create_directories(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+        fs::remove_all(gRootDir);
+        fs::create_directories(AppConfig::GetInstance()->GetLoongcollectorConfDir());
         sCptM->open();
         if (gEnableExactlyOnce) {
             clearGlobalResource();
@@ -1059,7 +1059,7 @@ public:
         gDispatchThreadId = nullptr;
 
         sCptM->close();
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         PollingDirFile::GetInstance()->ClearCache();
         PollingModify::GetInstance()->ClearCache();
 
@@ -2694,7 +2694,7 @@ public:
 
         gGlobalMarkOffsetTestFlag = true;
         std::string dir = gRootDir + "MarkOffsetTest";
-        bfs::create_directories(dir);
+        fs::create_directories(dir);
         auto& PS = PATH_SEPARATOR;
 
         // test
@@ -2750,7 +2750,7 @@ public:
         PrintMapInfo();
 
         LOG_INFO(sLogger, ("rotate b.log and write new b.log", ""));
-        bfs::rename(std::string(dir + PS + "b.log").c_str(), std::string(dir + PS + "b.log.1").c_str());
+        fs::rename(std::string(dir + PS + "b.log").c_str(), std::string(dir + PS + "b.log.1").c_str());
         for (int round = 0; round < 10; ++round) {
             OneJob(100, dir, "b", true, time(NULL));
             usleep(200 * 1000);
@@ -2790,7 +2790,7 @@ public:
         PrintMapInfo();
 
         LOG_INFO(sLogger, ("rotate c.log and write new c.log", ""));
-        bfs::rename(std::string(dir + PS + "c.log").c_str(), std::string(dir + PS + "c.log.1").c_str());
+        fs::rename(std::string(dir + PS + "c.log").c_str(), std::string(dir + PS + "c.log.1").c_str());
         for (int round = 0; round < 10; ++round) {
             OneJob(100, dir, "c", true, time(NULL));
             usleep(200 * 1000);
@@ -2805,7 +2805,7 @@ public:
         APSARA_TEST_EQUAL(m3.size(), 3);
 
         LOG_INFO(sLogger, ("delete c.log", ""));
-        bfs::remove(std::string(dir + PS + "c.log").c_str());
+        fs::remove(std::string(dir + PS + "c.log").c_str());
         sleep(11);
         LOG_INFO(sLogger, ("print map info", "after deleting c.log"));
         PrintMapInfo();
@@ -2824,7 +2824,7 @@ public:
 
         // case clean up
         CaseCleanUp();
-        bfs::remove_all(dir);
+        fs::remove_all(dir);
         gGlobalMarkOffsetTestFlag = false;
         BOOL_FLAG(default_global_fuse_mode) = bakDefaultGlobalFuseMode;
         BOOL_FLAG(default_global_mark_offset_flag) = bakDefaultGlobalMarkOffsetFlag;
@@ -2921,7 +2921,7 @@ void SenderUnittest::TestExactlyOnceDataSendSequence() {
     CaseSetUp(false, true, true, 1, false, -1, 0, 900);
 
     std::string dir = gRootDir + PATH_SEPARATOR + "ExactlyOnceDataSendSequence";
-    bfs::create_directories(dir);
+    fs::create_directories(dir);
 
     LOG_INFO(sLogger, ("write a.log", dir));
     const size_t kRound = 3;
@@ -2990,7 +2990,7 @@ void SenderUnittest::TestExactlyOncePartialBlockConcurrentSend() {
     CaseSetUp(false, true, true, 1, false, -1, 0, 900);
 
     std::string dir = gRootDir + PATH_SEPARATOR + "ExactlyOncePartialBlockConcurrentSend";
-    bfs::create_directories(dir);
+    fs::create_directories(dir);
 
     auto globalRangeCheckpoints2HashKeySet = [](std::vector<std::string>* hashKeys = nullptr) {
         std::set<std::string> hashKeySet;
@@ -3093,7 +3093,7 @@ void SenderUnittest::TestExactlyOnceCompleteBlockConcurrentSend() {
     CaseSetUp(false, true, true, 1, false, -1, 0, 900);
 
     std::string dir = gRootDir + PATH_SEPARATOR + "ExactlyOnceCompleteBlockConcurrentSend";
-    bfs::create_directories(dir);
+    fs::create_directories(dir);
 
     auto globalRangeCheckpoints2HashKeySet = [](std::vector<std::string>* hashKeys = nullptr) {
         std::set<std::string> hashKeySet;

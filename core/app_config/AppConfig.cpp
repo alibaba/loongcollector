@@ -20,7 +20,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include "boost/filesystem.hpp"
 #include "json/value.h"
 
 #include "RuntimeUtil.h"
@@ -522,10 +521,10 @@ string GetLegacyUserLocalConfigFilePath() {
 
 string GetExactlyOnceCheckpoint() {
     if (BOOL_FLAG(logtail_mode)) {
-        auto fp = boost::filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+        auto fp = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
         return (fp / "checkpoint_v2").string();
     } else {
-        auto fp = boost::filesystem::path(GetAgentDataDir());
+        auto fp = filesystem::path(GetAgentDataDir());
         return (fp / "exactly_once_checkpoint").string();
     }
 }
@@ -1662,9 +1661,6 @@ bool AppConfig::IsInInotifyBlackList(const std::string& path) const {
     return rst;
 }
 
-// TODO: Use Boost instead.
-// boost::filesystem::directory_iterator end;
-// try { boost::filesystem::directory_iterator(path); } catch (...) { // failed } // OK
 void AppConfig::SetLoongcollectorConfDir(const std::string& dirPath) {
     mLoongcollectorConfDir = dirPath;
     if (dirPath.back() != '/' && dirPath.back() != '\\') {

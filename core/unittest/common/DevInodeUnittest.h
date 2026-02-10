@@ -28,24 +28,24 @@ protected:
 
 public:
     static void SetUpTestCase() {
-        bfs::path rootPath(GetProcessExecutionDir());
+        fs::path rootPath(GetProcessExecutionDir());
         rootPath /= "DevInodeUnittestDir";
         mRootDir = rootPath.string();
-        EXPECT_TRUE(bfs::create_directories(rootPath));
+        EXPECT_TRUE(fs::create_directories(rootPath));
     }
 
-    static void TearDownTestCase() { EXPECT_TRUE(bfs::remove_all(bfs::path(mRootDir))); }
+    static void TearDownTestCase() { EXPECT_TRUE(fs::remove_all(fs::path(mRootDir))); }
 };
 
 std::string DevInodeUnittest::mRootDir;
 
 TEST_F(DevInodeUnittest, TestGetFileDevInode) {
-    bfs::path testRoot(mRootDir + "/TestGetFileDevInode");
-    ASSERT_TRUE(bfs::create_directories(testRoot));
+    fs::path testRoot(mRootDir + "/TestGetFileDevInode");
+    ASSERT_TRUE(fs::create_directories(testRoot));
     std::string subFileName = "file";
     std::string subDirName = "dir";
     std::ofstream((testRoot / subFileName).string());
-    bfs::create_directory(testRoot / subDirName);
+    fs::create_directory(testRoot / subDirName);
 
     auto fileDevInode = GetFileDevInode((testRoot / subFileName).string());
     EXPECT_TRUE(fileDevInode.IsValid());

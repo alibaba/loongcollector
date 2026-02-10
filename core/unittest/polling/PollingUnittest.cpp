@@ -338,10 +338,10 @@ public:
                    bool hasEndpoint = false,
                    int projectNum = 1,
                    bool hasTopic = false) {
-        if (bfs::exists(gRootDir)) {
-            bfs::remove_all(gRootDir);
+        if (fs::exists(gRootDir)) {
+            fs::remove_all(gRootDir);
         }
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
         WriteConfigJson(isFilter, hasAliuid, hasEndpoint, projectNum, hasTopic);
         commonCaseSetUp();
     }
@@ -351,7 +351,7 @@ public:
             PTScopedLock lock(gBufferLogGroupsLock);
             gBufferLogGroups.clear();
         }
-        bfs::remove(STRING_FLAG(ilogtail_config));
+        fs::remove(STRING_FLAG(ilogtail_config));
         AppConfig::GetInstance()->LoadAppConfig(STRING_FLAG(ilogtail_config));
         APSARA_TEST_TRUE_FATAL(ConfigManager::GetInstance()->LoadConfig(STRING_FLAG(user_log_config)));
         sleep(1);
@@ -362,7 +362,7 @@ public:
         PollingDirFile::GetInstance()->ClearCache();
         PollingModify::GetInstance()->ClearCache();
         PollingEventQueue::GetInstance()->Clear();
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
     }
 
     void TestPollingDirFile() {
@@ -391,7 +391,7 @@ public:
         string disableFileName = "job.xlog";
 
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::create_directories(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::create_directories(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
 
         for (int round = 0; round < 10; ++round) {
@@ -452,13 +452,13 @@ public:
         APSARA_TEST_EQUAL(PollingEventQueue::GetInstance()->mEventQueue.size(), (size_t)0);
 
         for (int prjIndex = 0; prjIndex < 3; ++prjIndex) {
-            bfs::remove_all(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::remove_all(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
         sleep(5);
         APSARA_TEST_EQUAL(PollingEventQueue::GetInstance()->mEventQueue.size(), (size_t)3);
         APSARA_TEST_EQUAL(PollingDirFile::GetInstance()->mDirCacheMap.size(), (size_t)6);
         APSARA_TEST_EQUAL(PollingDirFile::GetInstance()->mFileCacheMap.size(), (size_t)5);
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         sleep(5);
 
 
@@ -525,7 +525,7 @@ public:
 #endif
 
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::create_directories(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::create_directories(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
 
         for (int round = 0; round < 10; ++round) {
@@ -613,7 +613,7 @@ public:
         INT32_FLAG(max_file_not_exist_times) = 1;
 
         for (int prjIndex = 0; prjIndex < 3; ++prjIndex) {
-            bfs::remove_all(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::remove_all(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
         sleep(5);
         APSARA_TEST_EQUAL(PollingEventQueue::GetInstance()->mEventQueue.size(), (size_t)3);
@@ -624,7 +624,7 @@ public:
 #endif
 
 
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         sleep(5);
 #if defined(__linux__)
         APSARA_TEST_EQUAL(PollingEventQueue::GetInstance()->mEventQueue.size(), (size_t)8 + 1); // lnk.log has event
@@ -1062,7 +1062,7 @@ public:
 
         // Create subdirectories and files.
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::create_directories(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::create_directories(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
         for (int round = 0; round < 10; ++round) {
             for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
@@ -1154,7 +1154,7 @@ public:
         INT32_FLAG(max_file_not_exist_times) = 1;
         sleep(1);
         for (int prjIndex = 0; prjIndex < 3; ++prjIndex) {
-            bfs::remove_all(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::remove_all(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
         sleep(10);
         for (int prjIndex = 0; prjIndex < 3; ++prjIndex) {
@@ -1167,7 +1167,7 @@ public:
 
         // Delete root directory, all cache will be cleared and delete events
         // of files can be found.
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         sleep(10);
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
             auto evt = PollingEventQueue::GetInstance()->FindEvent(
@@ -1221,7 +1221,7 @@ public:
 
         LOG_INFO(sLogger, ("Create directories and logs", ""));
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::create_directories(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::create_directories(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
         for (int round = 0; round < 10; ++round) {
             for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
@@ -1360,7 +1360,7 @@ public:
         string disableFileName = "job.xlog";
 
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::create_directories(bfs::path(gRootDir) / logFileDirs[prjIndex]);
+            fs::create_directories(fs::path(gRootDir) / logFileDirs[prjIndex]);
         }
 
         for (int round = 0; round < 10; ++round) {
@@ -1419,7 +1419,7 @@ public:
         APSARA_TEST_EQUAL(PollingModify::GetInstance()->mModifyCacheMap.size(), (size_t)8);
 
         for (int prjIndex = 0; prjIndex < 8; ++prjIndex) {
-            bfs::remove_all(bfs::path(gRootDir) / logFileDirs[prjIndex] / logFileNames[prjIndex]);
+            fs::remove_all(fs::path(gRootDir) / logFileDirs[prjIndex] / logFileNames[prjIndex]);
         }
 
         sleep(10);
@@ -1487,7 +1487,7 @@ public:
         LOG_INFO(sLogger, ("TestPollingFileDeleted() end", time(NULL)));
     }
 
-    void testPollingWindowsRootPathCaseSetUp(bool enable, bool wildcard, std::vector<bfs::path>& directories);
+    void testPollingWindowsRootPathCaseSetUp(bool enable, bool wildcard, std::vector<fs::path>& directories);
     void testPollingWindowsRootPathCaseCleanUp();
 
     void TestPollingWindowsRootPath();
@@ -1512,18 +1512,18 @@ const std::string kDirPrefix = "logtailtestdir";
 
 void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
                                                           bool wildcard,
-                                                          std::vector<bfs::path>& directories) {
-    if (bfs::exists(gRootDir)) {
-        bfs::remove_all(gRootDir);
+                                                          std::vector<fs::path>& directories) {
+    if (fs::exists(gRootDir)) {
+        fs::remove_all(gRootDir);
     }
-    bfs::create_directories(gRootDir);
+    fs::create_directories(gRootDir);
 
     {
         fsutil::Dir dir(kRootPath);
         ASSERT_TRUE(dir.Open());
         while (fsutil::Entry e = dir.ReadNext()) {
             if ((e.IsRegFile() && EndWith(e.Name(), kFileExt)) || (e.IsDir() && StartWith(e.Name(), kDirPrefix))) {
-                bfs::remove_all(kRootPath + PATH_SEPARATOR + e.Name());
+                fs::remove_all(kRootPath + PATH_SEPARATOR + e.Name());
             }
         }
     }
@@ -1553,20 +1553,20 @@ void PollingUnittest::testPollingWindowsRootPathCaseSetUp(bool enable,
     sleep(INT32_FLAG(dirfile_check_interval_ms) / 1000 * 2);
 
     // Subdirectories: d1, d2, d3, d3/d4, d3/d4/d5/d6, 2 files in each directory.
-    directories = std::vector<bfs::path>{bfs::path(kRootPath + PATH_SEPARATOR),
-                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "1"),
-                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "2"),
-                                         bfs::path(kRootPath + PATH_SEPARATOR) / bfs::path(kDirPrefix + "3")};
+    directories = std::vector<fs::path>{fs::path(kRootPath + PATH_SEPARATOR),
+                                        fs::path(kRootPath + PATH_SEPARATOR) / fs::path(kDirPrefix + "1"),
+                                        fs::path(kRootPath + PATH_SEPARATOR) / fs::path(kDirPrefix + "2"),
+                                        fs::path(kRootPath + PATH_SEPARATOR) / fs::path(kDirPrefix + "3")};
     {
-        bfs::path p = directories.back();
+        fs::path p = directories.back();
         for (size_t idx = 4; idx <= 6; ++idx) {
             p /= (kDirPrefix + std::to_string(idx));
             directories.push_back(p);
         }
     }
     for (auto& d : directories) {
-        if (!bfs::exists(d)) {
-            bfs::create_directories(d);
+        if (!fs::exists(d)) {
+            fs::create_directories(d);
         }
     }
     sleep(1);
@@ -1594,7 +1594,7 @@ void PollingUnittest::testPollingWindowsRootPathCaseCleanUp() {
 
 void PollingUnittest::TestPollingWindowsRootPath() {
     LOG_INFO(sLogger, ("TestPollingWindowsRootPath() begin", time(NULL)));
-    std::vector<bfs::path> directories;
+    std::vector<fs::path> directories;
     testPollingWindowsRootPathCaseSetUp(false, false, directories);
 
     auto eventQueue = PollingEventQueue::GetInstance();
@@ -1609,7 +1609,7 @@ APSARA_UNIT_TEST_CASE(PollingUnittest, TestPollingWindowsRootPath, 0);
 
 void PollingUnittest::TestPollingWindowsRootPathNew() {
     LOG_INFO(sLogger, ("TestPollingWindowsRootPathNew() begin", time(NULL)));
-    std::vector<bfs::path> directories;
+    std::vector<fs::path> directories;
     testPollingWindowsRootPathCaseSetUp(true, false, directories);
 
     auto eventQueue = PollingEventQueue::GetInstance();
@@ -1652,7 +1652,7 @@ APSARA_UNIT_TEST_CASE(PollingUnittest, TestPollingWindowsRootPathNew, 0);
 
 void PollingUnittest::TestPollingWindowsWildcardRootPath() {
     LOG_INFO(sLogger, ("TestPollingWindowsWildcardRootPath() begin", time(NULL)));
-    std::vector<bfs::path> directories;
+    std::vector<fs::path> directories;
     testPollingWindowsRootPathCaseSetUp(false, true, directories);
 
     auto eventQueue = PollingEventQueue::GetInstance();
@@ -1667,7 +1667,7 @@ APSARA_UNIT_TEST_CASE(PollingUnittest, TestPollingWindowsWildcardRootPath, 0);
 
 void PollingUnittest::TestPollingWindowsWildcardRootPathNew() {
     LOG_INFO(sLogger, ("TestPollingWindowsWildcardRootPathNew() begin", time(NULL)));
-    std::vector<bfs::path> directories;
+    std::vector<fs::path> directories;
     testPollingWindowsRootPathCaseSetUp(true, true, directories);
 
     auto eventQueue = PollingEventQueue::GetInstance();

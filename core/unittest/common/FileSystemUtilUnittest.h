@@ -33,17 +33,17 @@ protected:
     // Because file system operation can't lock any files or dirs, so it
     // is important to test if the test root directory can be removed.
     // Use mTestRoot to record the test root directory of each case.
-    bfs::path mTestRoot;
+    fs::path mTestRoot;
 
     void SetUp() {
         auto testCaseName = ::testing::UnitTest::GetInstance()->current_test_info()->test_case_name();
-        mTestRoot = bfs::path(mRootDir) / testCaseName;
-        ASSERT_TRUE(bfs::create_directories(mTestRoot));
+        mTestRoot = fs::path(mRootDir) / testCaseName;
+        ASSERT_TRUE(fs::create_directories(mTestRoot));
     }
     void TearDown() {
         // Delete the whole folder to prove that Dir will not locking any files or dirs.
         try {
-            bfs::remove_all(mTestRoot);
+            fs::remove_all(mTestRoot);
         } catch (...) {
             ASSERT_TRUE(false);
         }
@@ -51,13 +51,13 @@ protected:
 
 public:
     static void SetUpTestCase() {
-        bfs::path rootPath(GetProcessExecutionDir());
+        fs::path rootPath(GetProcessExecutionDir());
         rootPath /= "CommonUnittest";
-        bfs::remove_all(rootPath);
-        EXPECT_TRUE(bfs::create_directories(rootPath));
+        fs::remove_all(rootPath);
+        EXPECT_TRUE(fs::create_directories(rootPath));
         mRootDir = rootPath.string();
     }
-    static void TearDownTestCase() { EXPECT_TRUE(bfs::remove_all(mRootDir)); }
+    static void TearDownTestCase() { EXPECT_TRUE(fs::remove_all(mRootDir)); }
 };
 
 std::string FileSystemUtilUnittest::mRootDir;
@@ -98,9 +98,9 @@ TEST_F(FileSystemUtilUnittest, TestDirNormal) {
     for (auto& f : hiddenFiles)
         std::ofstream((mTestRoot / f).string());
     for (auto& d : subDirs)
-        bfs::create_directory(mTestRoot / d);
+        fs::create_directory(mTestRoot / d);
     for (auto& d : hiddenDirs)
-        bfs::create_directory(mTestRoot / d);
+        fs::create_directory(mTestRoot / d);
 
     // Use Dir to iterate it.
     fsutil::Dir rootDir(mTestRoot.string());
@@ -118,7 +118,7 @@ TEST_F(FileSystemUtilUnittest, TestDirNormal) {
             // Delete the first file to prove that iteration will not lock the file.
             static bool isFirstFile = true;
             if (isFirstFile) {
-                EXPECT_TRUE(bfs::remove(mTestRoot / entry.Name()));
+                EXPECT_TRUE(fs::remove(mTestRoot / entry.Name()));
                 isFirstFile = false;
             }
         } else {
@@ -132,7 +132,7 @@ TEST_F(FileSystemUtilUnittest, TestDirNormal) {
 #ifndef _MSC_VER
 TEST_F(FileSystemUtilUnittest, TestDirSymbolic) {
     { std::ofstream((mTestRoot / "f1").string()); }
-    bfs::create_directory(mTestRoot / "d1");
+    fs::create_directory(mTestRoot / "d1");
     std::map<std::string, std::string> symbolics = {{"s1", "f1"}, {"s2", "d1"}};
     for (auto& s : symbolics) {
         system(boost::str(boost::format("ln -s %s %s") % (mTestRoot / s.second) % (mTestRoot / s.first)).c_str());
@@ -171,7 +171,7 @@ TEST_F(FileSystemUtilUnittest, TestCheckExistance) {
     std::string subFileName = "file";
     std::string subDirName = "dir";
     std::ofstream((mTestRoot / subFileName).string());
-    bfs::create_directory(mTestRoot / subDirName);
+    fs::create_directory(mTestRoot / subDirName);
 
     EXPECT_TRUE(CheckExistance((mTestRoot / subFileName).string()));
     EXPECT_TRUE(CheckExistance((mTestRoot / subDirName).string()));
@@ -200,7 +200,7 @@ TEST_F(FileSystemUtilUnittest, TestPathStat_stat) {
 
     {
         auto dirPath = ((mTestRoot / "dir")).string();
-        EXPECT_TRUE(bfs::create_directory(dirPath));
+        EXPECT_TRUE(fs::create_directory(dirPath));
         fsutil::PathStat stat;
         EXPECT_TRUE(fsutil::PathStat::stat(dirPath, stat));
         DevInode devInode = stat.GetDevInode();
@@ -299,13 +299,13 @@ TEST_F(FileSystemUtilUnittest, TestFileReadOnlyOpen) {
     // After closing, the file is no more existing.
     auto* file = FileReadOnlyOpen(filePath.c_str(), "r");
     EXPECT_TRUE(file != nullptr);
-    EXPECT_TRUE(bfs::remove(filePath));
+    EXPECT_TRUE(fs::remove(filePath));
     std::vector<char> buffer(fileContent.length(), '\0');
     auto nbytes = fread(buffer.data(), sizeof(char), fileContent.length(), file);
     EXPECT_EQ(nbytes, fileContent.length());
     EXPECT_EQ(std::string(buffer.data(), nbytes), fileContent);
     fclose(file);
-    EXPECT_FALSE(bfs::exists(filePath));
+    EXPECT_FALSE(fs::exists(filePath));
 }
 
 TEST_F(FileSystemUtilUnittest, TestFileWriteOnlyOpen) {
@@ -352,9 +352,9 @@ TEST_F(FileSystemUtilUnittest, TestFileWriteOnlyOpen) {
         in.close();
         fclose(cfile);
         // Delete the file.
-        EXPECT_TRUE(bfs::remove(filePath));
+        EXPECT_TRUE(fs::remove(filePath));
         fclose(file);
-        EXPECT_FALSE(bfs::exists(filePath));
+        EXPECT_FALSE(fs::exists(filePath));
     }
 
     // Case #2: File is existing, open will truncate it.
@@ -404,9 +404,9 @@ TEST_F(FileSystemUtilUnittest, TestFileAppendOpen) {
         EXPECT_EQ(std::string(buffer.data(), buffer.size()), fileContent + fileContent);
         fclose(in);
         // Delete the file.
-        EXPECT_TRUE(bfs::remove(filePath));
+        EXPECT_TRUE(fs::remove(filePath));
         fclose(file);
-        EXPECT_FALSE(bfs::exists(filePath));
+        EXPECT_FALSE(fs::exists(filePath));
     }
 
     // Case #3: Open existing file, check its cursor position.

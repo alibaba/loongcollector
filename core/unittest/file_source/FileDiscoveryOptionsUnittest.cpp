@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -48,9 +47,9 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     unique_ptr<FileDiscoveryOptions> config;
     Json::Value configJson;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
-    filesystem::path ex1, ex2, ex3, ex4, ex5;
+    fs::path ex1, ex2, ex3, ex4, ex5;
 
     // only mandatory param
     configStr = R"(
@@ -124,9 +123,9 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_FALSE(config->mAllowingIncludedByMultiConfigs);
 
     // ExcludeFilePaths
-    ex1 = filesystem::path(".") / "test" / "a.log"; // not absolute
-    ex2 = filesystem::current_path() / "**" / "b.log"; // ML
-    ex3 = filesystem::absolute(ex1);
+    ex1 = fs::path(".") / "test" / "a.log"; // not absolute
+    ex2 = fs::current_path() / "**" / "b.log"; // ML
+    ex3 = fs::absolute(ex1);
     ex2 = NormalizeNativePath(ex2.string());
     ex3 = NormalizeNativePath(ex3.string());
     configStr = R"(
@@ -149,7 +148,7 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
 
     // ExcludeFiles
     ex1 = "a.log";
-    ex2 = filesystem::current_path() / "b.log"; // has path separator
+    ex2 = fs::current_path() / "b.log"; // has path separator
     ex2 = NormalizeNativePath(ex2.string());
     configStr = R"(
         {
@@ -168,11 +167,11 @@ void FileDiscoveryOptionsUnittest::OnSuccessfulInit() const {
     APSARA_TEST_TRUE(config->mHasBlacklist);
 
     // ExcludeDirs
-    ex1 = filesystem::path(".") / "test"; // not absolute
-    ex2 = filesystem::current_path() / "**" / "test"; // ML
-    ex3 = filesystem::current_path() / "a*"; // *
-    ex4 = filesystem::current_path() / "a?"; // ?
-    ex5 = filesystem::absolute(ex1);
+    ex1 = fs::path(".") / "test"; // not absolute
+    ex2 = fs::current_path() / "**" / "test"; // ML
+    ex3 = fs::current_path() / "a*"; // *
+    ex4 = fs::current_path() / "a?"; // ?
+    ex5 = fs::absolute(ex1);
     ex2 = NormalizeNativePath(ex2.string());
     ex3 = NormalizeNativePath(ex3.string());
     ex4 = NormalizeNativePath(ex4.string());
@@ -217,7 +216,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     unique_ptr<FileDiscoveryOptions> config;
     Json::Value configJson;
     string configStr, errorMsg;
-    filesystem::path filePath = filesystem::absolute("*.log");
+    fs::path filePath = fs::absolute("*.log");
     filePath = NormalizeNativePath(filePath.string());
 
     // no FilePaths
@@ -260,7 +259,7 @@ void FileDiscoveryOptionsUnittest::OnFailedInit() const {
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
 
     // invalid filepath
-    filePath = filesystem::current_path();
+    filePath = fs::current_path();
     filePath = NormalizeNativePath(filePath.string());
     configStr = R"(
         {
@@ -277,17 +276,17 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     unique_ptr<FileDiscoveryOptions> config;
     Json::Value configJson;
     CollectionPipelineContext ctx;
-    filesystem::path filePath;
+    fs::path filePath;
 
     // no wildcard
-    filePath = filesystem::path(".") / "test" / "*.log";
+    filePath = fs::path(".") / "test" / "*.log";
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
 
-    filesystem::path expectedBasePath = filesystem::current_path() / "test";
+    fs::path expectedBasePath = fs::current_path() / "test";
     expectedBasePath = NormalizeNativePath(expectedBasePath.string());
     APSARA_TEST_EQUAL(1U, config->GetBasePathInfos().size());
     APSARA_TEST_EQUAL(expectedBasePath.string(), config->GetBasePathInfos()[0].basePath);
@@ -295,17 +294,17 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     configJson.clear();
 
     // with wildcard */?
-    filePath = filesystem::path(".") / "*" / "test" / "?" / "*.log";
+    filePath = fs::path(".") / "*" / "test" / "?" / "*.log";
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(0, config->mMaxDirSearchDepth);
-    filesystem::path expectedBasePath1 = filesystem::current_path() / "*" / "test" / "?";
-    filesystem::path expectedWildcard0 = filesystem::current_path();
-    filesystem::path expectedWildcard1 = filesystem::current_path() / "*";
-    filesystem::path expectedWildcard2 = filesystem::current_path() / "*" / "test";
-    filesystem::path expectedWildcard3 = filesystem::current_path() / "*" / "test" / "?";
+    fs::path expectedBasePath1 = fs::current_path() / "*" / "test" / "?";
+    fs::path expectedWildcard0 = fs::current_path();
+    fs::path expectedWildcard1 = fs::current_path() / "*";
+    fs::path expectedWildcard2 = fs::current_path() / "*" / "test";
+    fs::path expectedWildcard3 = fs::current_path() / "*" / "test" / "?";
     expectedBasePath1 = NormalizeNativePath(expectedBasePath1.string());
     expectedWildcard0 = NormalizeNativePath(expectedWildcard0.string());
     expectedWildcard1 = NormalizeNativePath(expectedWildcard1.string());
@@ -327,14 +326,14 @@ void FileDiscoveryOptionsUnittest::TestFilePaths() const {
     configJson.clear();
 
     // with wildcard **
-    filePath = filesystem::path(".") / "*" / "test" / "**" / "*.log";
+    filePath = fs::path(".") / "*" / "test" / "**" / "*.log";
     configJson["FilePaths"].append(Json::Value(filePath.string()));
     configJson["MaxDirSearchDepth"] = Json::Value(1);
     config.reset(new FileDiscoveryOptions());
     APSARA_TEST_TRUE(config->Init(configJson, ctx, pluginType));
     APSARA_TEST_EQUAL(1, config->mMaxDirSearchDepth);
 
-    filesystem::path expectedBasePath2 = filesystem::current_path() / "*" / "test";
+    fs::path expectedBasePath2 = fs::current_path() / "*" / "test";
     expectedBasePath2 = NormalizeNativePath(expectedBasePath2.string());
     APSARA_TEST_EQUAL(1U, config->GetBasePathInfos().size());
     APSARA_TEST_EQUAL(expectedBasePath2.string(), config->GetBasePathInfos()[0].basePath);
@@ -349,7 +348,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Test 1: Direct root path collection without AllowingCollectingFilesInRootDir flag
     // Expected: Init should succeed but mAllowingCollectingFilesInRootDir should be false
     {
-        filesystem::path filePath = "C:\\*.log";
+        fs::path filePath = "C:\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -367,7 +366,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Flag should be enabled only when enable_root_path_collection is true
     {
         BOOL_FLAG(enable_root_path_collection) = true;
-        filesystem::path filePath = "C:\\*.log";
+        fs::path filePath = "C:\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -389,7 +388,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Test 3: Multi-level path with wildcard at root (C:\*\logs\*.log)
     // Expected: Should parse correctly and set base path to C:\*\logs
     {
-        filesystem::path filePath = "C:\\*\\logs\\*.log";
+        fs::path filePath = "C:\\*\\logs\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -411,7 +410,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Should work when both config and global flag are enabled
     {
         BOOL_FLAG(enable_root_path_collection) = true;
-        filesystem::path filePath = "C:\\*\\logs\\*.log";
+        fs::path filePath = "C:\\*\\logs\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -432,7 +431,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Test 5: Recursive search from root (C:\**\*.log)
     // Expected: Should parse correctly with ** at root
     {
-        filesystem::path filePath = "C:\\**\\*.log";
+        fs::path filePath = "C:\\**\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -454,7 +453,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsRootPathCollection() const {
     // Expected: Should work with flag enabled
     {
         BOOL_FLAG(enable_root_path_collection) = true;
-        filesystem::path filePath = "D:\\**\\*.log";
+        fs::path filePath = "D:\\**\\*.log";
         filePath = NormalizeNativePath(filePath.string());
         configStr = R"(
                 {
@@ -483,7 +482,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     // Linux Test 1: Chinese path in FilePaths
     // Expected: Should successfully parse Chinese path
     {
-        filesystem::path filePath = filesystem::absolute("测试目录/**/*.log");
+        fs::path filePath = fs::absolute("测试目录/**/*.log");
         configStr = R"(
                 {
                     "FilePaths": []
@@ -501,8 +500,8 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     // Linux Test 2: Chinese directory in ExcludeDirs
     // Expected: Should successfully add Chinese directory to blacklist
     {
-        filesystem::path filePath = filesystem::absolute("日志/**/*.log");
-        filesystem::path excludeDir = filesystem::absolute("日志/黑名单");
+        fs::path filePath = fs::absolute("日志/**/*.log");
+        fs::path excludeDir = fs::absolute("日志/黑名单");
         configStr = R"(
                 {
                     "FilePaths": [],
@@ -521,7 +520,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     // Linux Test 3: Chinese filename in ExcludeFiles
     // Expected: Should successfully add Chinese filename to blacklist
     {
-        filesystem::path filePath = filesystem::absolute("logs/*.log");
+        fs::path filePath = fs::absolute("logs/*.log");
         configStr = R"(
                 {
                     "FilePaths": [],
@@ -546,7 +545,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         try {
             // UTF-8: "测试目录"
             string chineseDir = "\xE6\xB5\x8B\xE8\xAF\x95\xE7\x9B\xAE\xE5\xBD\x95";
-            filesystem::path basePath = filesystem::current_path();
+            fs::path basePath = fs::current_path();
             string fullPath = basePath.string() + "\\" + chineseDir + "\\**\\*.log";
             configStr = R"(
                     {
@@ -574,7 +573,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
                             ("Chinese path test", "SKIPPED - encoding conversion not supported on this system"));
             }
         } catch (const std::exception& e) {
-            // Encoding conversion or filesystem operation failed
+            // Encoding conversion or fs operation failed
             LOG_WARNING(sLogger, ("Chinese path test", "SKIPPED - exception")("error", e.what()));
         }
     }
@@ -584,7 +583,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
             // UTF-8: "日志" and "黑名单"
             string chineseLog = "\xE6\x97\xA5\xE5\xBF\x97";
             string chineseBlacklist = "\xE9\xBB\x91\xE5\x90\x8D\xE5\x8D\x95";
-            filesystem::path basePath = filesystem::current_path();
+            fs::path basePath = fs::current_path();
             string fullPath = basePath.string() + "\\" + chineseLog + "\\**\\*.log";
             string excludePath = basePath.string() + "\\" + chineseLog + "\\" + chineseBlacklist;
             configStr = R"(
@@ -618,7 +617,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         try {
             // UTF-8: "混合"
             string chineseMixed = "\xE6\xB7\xB7\xE5\x90\x88";
-            filesystem::path basePath = filesystem::current_path();
+            fs::path basePath = fs::current_path();
             string fullPath = basePath.string() + "\\" + chineseMixed + "\\*.log";
             // UTF-8: "排除.log" and "测试.log"
             string excludeFile1 = "\xE6\x8E\x92\xE9\x99\xA4.log";
@@ -660,7 +659,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         try {
             // UTF-8: "文档"
             string chineseDoc = "\xE6\x96\x87\xE6\xA1\xA3";
-            filesystem::path basePath = filesystem::current_path();
+            fs::path basePath = fs::current_path();
             string fullPath = basePath.string() + "\\" + chineseDoc + "\\*.log";
             // UTF-8: "排除文件.log"
             string excludeFileName = "\xE6\x8E\x92\xE9\x99\xA4\xE6\x96\x87\xE4\xBB\xB6.log";
@@ -696,8 +695,8 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
     }
     // Windows Test 5: ASCII paths (baseline test to ensure basic functionality)
     {
-        filesystem::path filePath = filesystem::absolute("test_logs\\**\\*.log");
-        filesystem::path excludeDir = filesystem::absolute("test_logs\\exclude");
+        fs::path filePath = fs::absolute("test_logs\\**\\*.log");
+        fs::path excludeDir = fs::absolute("test_logs\\exclude");
         filePath = NormalizeNativePath(filePath.string());
         excludeDir = NormalizeNativePath(excludeDir.string());
         configStr = R"(
@@ -711,7 +710,7 @@ void FileDiscoveryOptionsUnittest::TestChinesePathMatching() const {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         configJson["ExcludeDirs"].append(Json::Value(excludeDir.string()));
-        filesystem::path excludeFile = filesystem::absolute("test_logs\\exclude.log");
+        fs::path excludeFile = fs::absolute("test_logs\\exclude.log");
         excludeFile = NormalizeNativePath(excludeFile.string());
         configJson["ExcludeFilePaths"].append(Json::Value(excludeFile.string()));
         config.reset(new FileDiscoveryOptions());
@@ -751,7 +750,7 @@ void FileDiscoveryOptionsUnittest::TestWindowsDriveLetterCaseInsensitive() const
     // Test 2: ExcludeDirs with lowercase drive letter
     // Expected: Should correctly add to blacklist regardless of case
     {
-        filesystem::path filePath = filesystem::absolute("test_logs\\*.log");
+        fs::path filePath = fs::absolute("test_logs\\*.log");
         string upperFilePath = filePath.string();
         if (upperFilePath.size() >= 2 && upperFilePath[1] == ':') {
             upperFilePath[0] = toupper(upperFilePath[0]);
@@ -779,8 +778,8 @@ void FileDiscoveryOptionsUnittest::TestWindowsDriveLetterCaseInsensitive() const
     // Test 3: ExcludeFilePaths with different drive letter case
     // Expected: Should correctly handle regardless of case
     {
-        filesystem::path filePath = filesystem::absolute("test_files\\*.log");
-        filesystem::path excludeFile = filesystem::absolute("test_files\\exclude.log");
+        fs::path filePath = fs::absolute("test_files\\*.log");
+        fs::path excludeFile = fs::absolute("test_files\\exclude.log");
         string filePathStr = filePath.string();
         string excludeFileStr = excludeFile.string();
         // Make drive letters different case
@@ -826,9 +825,9 @@ void FileDiscoveryOptionsUnittest::TestWindowsDriveLetterCaseInsensitive() const
     // Test 5: Mixed case in base path and multiple blacklists
     // Expected: All path operations should be case-insensitive for drive letters
     {
-        filesystem::path filePath = filesystem::absolute("multi_test\\**\\*.log");
-        filesystem::path excludeDir = filesystem::absolute("multi_test\\exclude_dir");
-        filesystem::path excludeFile = filesystem::absolute("multi_test\\exclude.log");
+        fs::path filePath = fs::absolute("multi_test\\**\\*.log");
+        fs::path excludeDir = fs::absolute("multi_test\\exclude_dir");
+        fs::path excludeFile = fs::absolute("multi_test\\exclude.log");
         string filePathStr = filePath.string();
         string excludeDirStr = excludeDir.string();
         string excludeFileStr = excludeFile.string();
