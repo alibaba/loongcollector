@@ -59,6 +59,12 @@ var (
 	emptyMetricValue = &EmptyMetricValue{}
 )
 
+const (
+	intValueBytes    = 4
+	longValueBytes   = 8
+	doubleValueBytes = 8
+)
+
 type MetricValue interface {
 	IsSingleValue() bool
 
@@ -261,26 +267,17 @@ func (m *Metric) GetSize() int64 {
 	size += longValueBytes // timestamp
 	size += longValueBytes // observed timestamp
 
-	// also check the length here, otherwise nil tags Iterator will cause 1 allocation.
 	if m.Tags != nil && m.Tags.Len() > 0 {
-		for k, v := range m.Tags.Iterator() {
-			size += int64(len(k)) // tag name
-			size += int64(len(v)) // tag value
-		}
+		size += int64(m.Tags.Size())
 	}
 
 	if m.Value != nil {
 		if m.Value.IsSingleValue() {
 			size += doubleValueBytes
 		} else {
-			for k := range m.Value.GetMultiValues().Iterator() {
-				size += int64(len(k))    // field name
-				size += doubleValueBytes // field value
-			}
+			size += int64(m.Value.GetMultiValues().Size())
 		}
 	}
-
-	// also check the length here, otherwise nil tags Iterator will cause 1 allocation.
 	if m.TypedValue != nil && m.TypedValue.Len() > 0 {
 		for k, v := range m.TypedValue.Iterator() {
 			size += int64(len(k))                          // field name
