@@ -28,6 +28,7 @@ namespace logtail::ebpf {
 enum class ConvType {
     kUrl,
     kSql,
+    kNoSql,
 };
 
 class Converger {

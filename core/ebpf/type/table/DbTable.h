@@ -42,4 +42,12 @@ constexpr DataElement kDBResponseStatusCode = {
     "db response status code", // description or display name
 };
 
+constexpr DataElement kDBResponseMessage = {
+    "db_response_message",
+    "db_response_message", // metric
+    "db.response.message", // span
+    "db.response.message", // log
+    "db response message", // description or display name
+};
+
 } // namespace logtail::ebpf
