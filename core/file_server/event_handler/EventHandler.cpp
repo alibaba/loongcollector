@@ -1183,8 +1183,6 @@ bool ModifyHandler::RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
             expectedReader->GetProject(),
             expectedReader->GetConfigName(),
             expectedReader->GetLogstore());
-
-        return false; // DO NOT remove to prevent data loss
     }
     // Remove from array
     readerArray->pop_front();
