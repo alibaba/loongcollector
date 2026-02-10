@@ -126,6 +126,10 @@ void StreamScraper::PushEventGroup(PipelineEventGroup&& eGroup) const {
     }
 }
 
+void StreamScraper::ClearEventGroup() {
+    mEventGroup.MutableEvents().clear();
+}
+
 void StreamScraper::SendMetrics() {
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC,
                             ToString(mScrapeTimestampMilliSec));
@@ -150,7 +154,11 @@ void StreamScraper::SetAutoMetricMeta(double scrapeDurationSeconds, bool upState
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_STATE, scrapeState);
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC,
                             ToString(mScrapeTimestampMilliSec));
-    mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(mScrapeSamplesScraped));
+    if (upState) {
+        mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(mScrapeSamplesScraped));
+    } else {
+        mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SAMPLES_SCRAPED, ToString(0));
+    }
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_DURATION, ToString(scrapeDurationSeconds));
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_RESPONSE_SIZE, ToString(mRawSize));
     mEventGroup.SetMetadata(EventGroupMetaKey::PROMETHEUS_UP_STATE, ToString(upState));
