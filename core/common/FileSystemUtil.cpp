@@ -27,8 +27,6 @@
 #endif
 #include <fstream>
 
-#include "boost/filesystem.hpp"
-
 #include "EncodingConverter.h"
 #include "RuntimeUtil.h"
 #include "StringTools.h"
@@ -93,17 +91,14 @@ bool IsRelativePath(const std::string& path) {
 }
 
 std::string AbsolutePath(const std::string& path, const std::string& basepath) {
-    // TODO: test and use std::filesystem::absolute(path, basepath).lexically_normal().string() instead
-    return boost::filesystem::absolute(path, basepath).string();
-}
-
-std::string NormalizePath(const std::string& path) {
-    boost::filesystem::path abs(path);
-    // TODO: std::filesystem::path does not have filename_is_dot() and filename_is_dot_dot()
-    if (abs.filename_is_dot() || abs.filename_is_dot_dot()) {
-        abs.remove_filename();
+    if (path.empty()) {
+        return basepath;
     }
-    return abs.string();
+    std::filesystem::path p(path);
+    if (p.is_absolute()) {
+        return p.string();
+    }
+    return (std::filesystem::path(basepath) / p).string();
 }
 
 int FSeek(FILE* stream, int64_t offset, int origin) {

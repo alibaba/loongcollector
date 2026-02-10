@@ -480,6 +480,58 @@ TEST_F(FileSystemUtilUnittest, TestPathJoin) {
 #endif
 }
 
+TEST_F(FileSystemUtilUnittest, TestAbsolutePath) {
+    // Expected values are based on boost::filesystem::absolute results.
+
+    // Case 1: relative path "." with basepath
+    {
+        std::string result = AbsolutePath(".", "/usr/local/ilogtail");
+        EXPECT_EQ(result, "/usr/local/ilogtail/.");
+    }
+
+    // Case 2: relative path "./a.txt" with basepath
+    {
+        std::string result = AbsolutePath("./a.txt", "/usr/local/ilogtail");
+        EXPECT_EQ(result, "/usr/local/ilogtail/./a.txt");
+    }
+
+    // Case 3: relative path without dot prefix
+    {
+        std::string result = AbsolutePath("a/b.txt", "/home/user");
+        EXPECT_EQ(result, "/home/user/a/b.txt");
+    }
+
+    // Case 4: absolute path should be returned as-is
+    {
+        std::string result = AbsolutePath("/already/absolute", "/some/base");
+        EXPECT_EQ(result, "/already/absolute");
+    }
+
+    // Case 5: basepath with trailing slash
+    {
+        std::string result = AbsolutePath("file.txt", "/base/path/");
+        EXPECT_EQ(result, "/base/path/file.txt");
+    }
+
+    // Case 6: empty path
+    {
+        std::string result = AbsolutePath("", "/base/path");
+        EXPECT_EQ(result, "/base/path");
+    }
+
+    // Case 7: path with ".." component (no normalization expected)
+    {
+        std::string result = AbsolutePath("../sibling/file.txt", "/base/path");
+        EXPECT_EQ(result, "/base/path/../sibling/file.txt");
+    }
+
+    // Case 8: root path "/" as basepath
+    {
+        std::string result = AbsolutePath("data", "/");
+        EXPECT_EQ(result, "/data");
+    }
+}
+
 TEST_F(FileSystemUtilUnittest, TestReadFileContent) {
     auto filePath = (mTestRoot / "file").string();
 
