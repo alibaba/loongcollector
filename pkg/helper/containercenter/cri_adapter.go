@@ -25,7 +25,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/containerd/typeurl"
+
+	"runtime"
+
 	"github.com/containerd/containerd"
+	eventtypes "github.com/containerd/containerd/api/events"
 	containerdcriserver "github.com/containerd/containerd/pkg/cri/server"
 	"github.com/docker/docker/api/types/container"
 
@@ -36,6 +41,7 @@ import (
 const (
 	maxMsgSize            = 1024 * 1024 * 16
 	defaultContextTimeout = time.Second * 10
+	defaultContainerType  = "container"
 )
 
 var criRuntimeWrapper *CRIRuntimeWrapper
@@ -317,6 +323,96 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 	return nil
 }
 
+func (cw *CRIRuntimeWrapper) getContainerType(containerID string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	containerInfo, err := cw.nativeClient.ContainerService().Get(ctx, containerID)
+	if err != nil {
+		return "", err
+	}
+	return containerInfo.Labels["io.cri-containerd.kind"], nil
+}
+func (cw *CRIRuntimeWrapper) containerdEventListener() {
+	errorCount := 0
+	defer criRuntimeRecover()
+	timer := time.NewTimer(EventListenerTimeout)
+	for {
+		logger.Info(context.Background(), "containerd event listener", "start")
+		ctx, cancel := context.WithCancel(context.Background())
+		events, clientErr := cw.nativeClient.EventService().Subscribe(ctx, `topic~="/tasks/start|/tasks/delete"`)
+		breakFlag := false
+		for !breakFlag {
+			timer.Reset(EventListenerTimeout)
+			select {
+			case event, ok := <-events:
+				if !ok {
+					logger.Errorf(context.Background(), "CONTAINERD_EVENT_ALARM", "containerd event listener stop")
+					errorCount++
+					breakFlag = true
+					break
+				}
+				logger.Debug(context.Background(), "containerd event captured", event)
+				errorCount = 0
+				evt, err := typeurl.UnmarshalAny(event.Event)
+				if err != nil {
+					logger.Errorf(context.Background(), "CONTAINERD_EVENT_ALARM", "containerd event listener error: %v", err)
+					errorCount++
+					breakFlag = true
+					break
+				}
+				var cType string
+				switch ev := evt.(type) {
+				case *eventtypes.TaskStart:
+					cType, err = cw.getContainerType(ev.ContainerID)
+					if err != nil {
+						logger.Errorf(context.Background(), "CONTAINERD_EVENT_ALARM", "containerd event listener error: %v", err)
+						errorCount++
+						breakFlag = true
+						break
+					}
+					if cType == defaultContainerType {
+						logger.Debugf(context.Background(), "containerd task event create container %v", ev.ContainerID)
+						_ = cw.fetchOne(ev.ContainerID)
+					} else {
+						continue
+					}
+				case *eventtypes.TaskDelete:
+					cType, err = cw.getContainerType(ev.ContainerID)
+					if err != nil {
+						logger.Errorf(context.Background(), "CONTAINERD_EVENT_ALARM", "containerd event listener error: %v", err)
+						errorCount++
+						breakFlag = true
+						break
+					}
+					if cType == defaultContainerType {
+						logger.Debugf(context.Background(), "containerd task event delete container %v", ev.ContainerID)
+						cw.containerCenter.markRemove(ev.ContainerID)
+					} else {
+						continue
+					}
+				default:
+				}
+			case err := <-clientErr:
+				logger.Error(context.Background(), "CONTAINERD_EVENT_ALARM", "containerd event listener error", err)
+				breakFlag = true
+			case <-timer.C:
+				logger.Errorf(context.Background(), "CONTAINERD_EVENT_ALARM", "no containerd event in 1 hour. Reset event listener")
+				breakFlag = true
+			}
+		}
+		cancel()
+		if errorCount > 10 && containerCenterInstance != nil {
+			logger.Info(context.Background(), "containerd listener fails and docker wrapper is valid", "stop containerd listener")
+			break
+		}
+		// if always error, sleep 300 secs
+		if errorCount > 30 {
+			time.Sleep(time.Duration(300) * time.Second)
+		} else {
+			time.Sleep(time.Duration(10) * time.Second)
+		}
+	}
+}
 func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 	ticker := time.NewTicker(DefaultSyncContainersPeriod)
 	for {
@@ -573,6 +669,13 @@ func (cw *CRIRuntimeWrapper) getContainerUpperDir(containerid, snapshotter strin
 	return ""
 }
 
+func criRuntimeRecover() {
+	if err := recover(); err != nil {
+		trace := make([]byte, 2048)
+		runtime.Stack(trace, true)
+		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "containerd runtime error", err, "stack", string(trace))
+	}
+}
 func init() {
 	containerdSockPathStr := os.Getenv("CONTAINERD_SOCK_PATH")
 	if len(containerdSockPathStr) > 0 {
