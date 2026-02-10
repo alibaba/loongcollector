@@ -21,6 +21,7 @@
 #include "json/json.h"
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "container_manager/ContainerDiscoveryOptions.h"
 #include "ebpf/include/export.h"
 
 namespace logtail::ebpf {
@@ -47,6 +48,23 @@ public:
     std::vector<SecurityOption> mOptionList;
     SecurityProbeType mProbeType;
 };
+
+/////////////////////  /////////////////////
+
+class CpuProfilingOption {
+public:
+    bool Init(const Json::Value& config, const CollectionPipelineContext* mContext, const std::string& sName);
+
+    uint32_t mCollectIntervalMs = 0; // 0 means use default
+    std::vector<std::string> mCmdlines;
+    std::string mAppName;
+    // Since ebpf may collect mulit-language profiling data,
+    // the language field should be set by user.
+    std::string mLanguage = "java";
+    ContainerDiscoveryOptions mContainerDiscovery;
+};
+
+using PluginOptions = std::variant<SecurityOptions*, ObserverNetworkOption*, CpuProfilingOption*>;
 
 ///////////////////// Process Level Config /////////////////////
 

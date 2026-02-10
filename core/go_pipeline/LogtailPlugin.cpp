@@ -277,7 +277,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
-
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
         return true;

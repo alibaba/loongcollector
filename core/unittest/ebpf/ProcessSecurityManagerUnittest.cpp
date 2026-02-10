@@ -43,9 +43,7 @@ void ProcessSecurityManagerUnittest::TestProcessSecurityManagerEventHandling() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
 
     // 测试EXECVE事件
     auto execveEvent = std::make_shared<ProcessEvent>(1234, 5678, KernelEventType::PROCESS_EXECVE_EVENT, 799);
@@ -74,9 +72,7 @@ void ProcessSecurityManagerUnittest::TestProcessSecurityManagerErrorHandling() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
     APSARA_TEST_EQUAL(manager->HandleEvent(validEvent), 0);
 
     manager->Destroy();
@@ -88,9 +84,7 @@ void ProcessSecurityManagerUnittest::TestProcessSecurityManagerAggregation() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config");
     SecurityOptions options;
-    APSARA_TEST_EQUAL(
-        manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options)),
-        0);
+    APSARA_TEST_EQUAL(manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options)), 0);
 
     // 创建多个相关的进程事件
     std::vector<std::shared_ptr<ProcessEvent>> events;
