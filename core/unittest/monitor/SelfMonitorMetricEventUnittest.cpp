@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "MetricConstants.h"
-#include "MetricRecord.h"
-#include "Monitor.h"
-#include "monitor/MetricManager.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/Monitor.h"
+#include "monitor/metric_constants/MetricConstants.h"
+#include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
 #include "unittest/Unittest.h"
 

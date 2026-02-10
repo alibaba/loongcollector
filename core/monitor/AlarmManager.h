@@ -16,14 +16,8 @@
 
 #pragma once
 
-#include <cstdint>
-#include <stdio.h>
-
 #include <atomic>
-#include <condition_variable>
-#include <future>
 #include <map>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -137,8 +131,8 @@ struct AlarmMessage {
 class AlarmManager {
 public:
     static AlarmManager* GetInstance() {
-        static AlarmManager instance;
-        return &instance;
+        static AlarmManager sInstance;
+        return &sInstance;
     }
 
     void SendAlarmWarning(const AlarmType& alarmType,
@@ -171,11 +165,23 @@ public:
 
     void FlushAllRegionAlarm(std::vector<PipelineEventGroup>& pipelineEventGroupList);
 
+    // 检查并设置 AlarmPipeline 就绪状态
+    // 如果之前未就绪，设置为就绪并返回 false（表示第一次就绪，需要处理文件）
+    // 如果已经就绪，返回 true（表示之前已经就绪过，不需要处理文件）
+    bool CheckAndSetAlarmPipelineReady();
+
+    // 从启动期落盘文件读取 alarm 并构造 PipelineEventGroup，同时返回按 region 分组的原始 JSON 字符串（用换行符连接）
+    bool ReadAlarmsFromFile(std::vector<PipelineEventGroup>& pipelineEventGroupList,
+                            std::map<std::string, std::string>& regionToRawJson);
+
+    // 发送文件数据成功后，通知删除文件）
+    void DeleteAlarmFile();
+
 private:
     using AlarmVector = std::vector<std::map<std::string, std::unique_ptr<AlarmMessage>>>;
 
     AlarmManager();
-    ~AlarmManager() = default;
+    ~AlarmManager();
 
     void SendAlarm(const AlarmType& alarmType,
                    const AlarmLevel& level,
@@ -195,8 +201,29 @@ private:
     std::atomic_int mLastLowLevelTime{0};
     std::atomic_int mLastLowLevelCount{0};
 
+    // 启动期告警磁盘缓冲相关
+    void EnsureAlarmDiskBufferFileOpen();
+    void CloseAlarmDiskBufferFile();
+    bool ShouldWriteAlarmToFile(bool alarmPipelineReady, bool& stopWritingFile);
+    void WriteAlarmToFile(const std::string& region,
+                          const std::string& alarmType,
+                          const std::string& level,
+                          const std::string& message,
+                          const std::string& projectName,
+                          const std::string& category,
+                          const std::string& config);
+
+    std::atomic_bool mAlarmPipelineReady{false};
+    std::atomic_bool mStopWritingFile{false};
+    std::string mAlarmDiskBufferFilePath;
+    FILE* mAlarmDiskBufferFileHandle{nullptr};
+    PTMutex mAlarmDiskBufferFileMutex;
+
 #ifdef APSARA_UNIT_TEST_MAIN
+    void ClearTestState();
+
     friend class AlarmManagerUnittest;
+    friend class AlarmDiskBufferUnittest;
 #endif
 };
 

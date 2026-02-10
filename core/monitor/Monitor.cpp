@@ -14,7 +14,6 @@
 
 #include "Monitor.h"
 
-#include "MetricRecord.h"
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
@@ -25,32 +24,36 @@
 
 #include "common/EncodingConverter.h"
 #endif
+
 #include <fstream>
-#include <functional>
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
-#include "collection_pipeline/CollectionPipelineManager.h"
-#include "common/DevInode.h"
-#include "common/ExceptionBase.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/MachineInfoUtil.h"
-#include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
 #include "constants/Constants.h"
 #include "file_server/event_handler/LogInput.h"
-#include "go_pipeline/LogtailPlugin.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
+#include "monitor/MetricManager.h"
 #include "monitor/SelfMonitorServer.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
+
+#ifdef __ENTERPRISE__
+#include <functional>
+
+#include "collection_pipeline/CollectionPipelineManager.h"
+#include "common/DevInode.h"
+#include "common/ExceptionBase.h"
+#include "common/RuntimeUtil.h"
+#include "config/provider/EnterpriseConfigProvider.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "protobuf/sls/sls_logs.pb.h"
 #include "provider/Provider.h"
 #include "runner/FlusherRunner.h"
-#ifdef __ENTERPRISE__
-#include "config/provider/EnterpriseConfigProvider.h"
 #endif
 
 using namespace std;
@@ -523,12 +526,14 @@ void LogtailMonitor::CheckScaledCpuUsageUpLimit() {
     // we can not scale up, otherwise, we can increase mScaledCpuUsageUpLimit by
     // mScaledCpuUsageStep.
     if (mCpuArrayForScaleIdx % CPU_STAT_FOR_SCALE_ARRAY_SIZE == 0) {
-        if ((mScaledCpuUsageUpLimit + mScaledCpuUsageStep) >= (mCpuCores * machineCpuUsageThreshold))
+        if ((mScaledCpuUsageUpLimit + mScaledCpuUsageStep) >= (mCpuCores * machineCpuUsageThreshold)) {
             return;
+        }
         for (int32_t i = 0; i < CPU_STAT_FOR_SCALE_ARRAY_SIZE; ++i) {
             if ((mOsCpuArrayForScale[i] / machineCpuUsageThreshold) >= 0.95
-                || (mCpuArrayForScale[i] / mScaledCpuUsageUpLimit) < 0.6)
+                || (mCpuArrayForScale[i] / mScaledCpuUsageUpLimit) < 0.6) {
                 return;
+            }
         }
         mScaledCpuUsageUpLimit += mScaledCpuUsageStep;
         LOG_DEBUG(sLogger,

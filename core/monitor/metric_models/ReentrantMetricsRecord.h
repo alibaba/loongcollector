@@ -17,7 +17,7 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "MetricManager.h"
+#include "monitor/MetricManager.h"
 
 namespace logtail {
 

@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <atomic>
-#include <fstream>
-#include <list>
-#include <thread>
-
-#include "json/json.h"
-
-#include "AlarmManager.h"
+#include "monitor/AlarmManager.h"
 #include "unittest/Unittest.h"
 
 namespace logtail {
 
-static std::atomic_bool running(true);
-
 class AlarmManagerUnittest : public ::testing::Test {
 public:
-    void SetUp() {}
+    void SetUp() {
+        // 设置 AlarmPipeline 为就绪状态，这样告警会写入 buffer 而不是文件
+        AlarmManager::GetInstance()->mAlarmPipelineReady.store(true);
+        AlarmManager::GetInstance()->mAllAlarmMap.clear();
+    }
 
-    void TearDown() {}
+    void TearDown() {
+        // 清理状态
+        AlarmManager::GetInstance()->mAlarmPipelineReady.store(false);
+        AlarmManager::GetInstance()->mAllAlarmMap.clear();
+    }
 
     void TestSendAlarm();
     void TestFlushAllRegionAlarm();
