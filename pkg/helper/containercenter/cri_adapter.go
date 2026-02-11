@@ -333,6 +333,17 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 	}
 }
 
+func (cw *CRIRuntimeWrapper) containerShouldMarkRemove(innerContainer *innerContainerInfo) bool {
+	if ForceReleaseDeletedFileFDTimeout > 0 {
+		if innerContainer.Status == ContainerStatusExited {
+			return true
+		}
+	} else if innerContainer.State == ContainerStateContainerExited {
+		return true
+	}
+	return false
+}
+
 func (cw *CRIRuntimeWrapper) syncContainers() error {
 	cw.containersLock.Lock()
 	defer cw.containersLock.Unlock()
@@ -376,7 +387,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 
 	// delete container
 	for oldID, c := range cw.containers {
-		if _, ok := newContainers[oldID]; !ok || c.State == ContainerStateContainerExited {
+		if _, ok := newContainers[oldID]; !ok || cw.containerShouldMarkRemove(c) {
 			logger.Debug(context.Background(), "cri sync containers remove", oldID)
 			cw.containerCenter.markRemove(oldID)
 			delete(cw.containers, oldID)

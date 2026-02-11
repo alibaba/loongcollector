@@ -237,6 +237,17 @@ func (c *ContainerDiscoverManager) Init() bool {
 		}
 	}
 	logger.Info(context.Background(), "init docker center, max fetchOne count per second", MaxFetchOneTriggerPerSecond)
+	{
+		timeoutSec := int(ForceReleaseDeletedFileFDTimeout.Seconds())
+		if err := util.InitFromEnvInt("force_release_deleted_file_fd_timeout", &timeoutSec, timeoutSec); err != nil {
+			c.LogAlarm(err, "initialize env FORCE_RELEASE_DELETED_FILE_FD_TIMEOUT error")
+		}
+		// Support -1 (disabled), 0 (immediate), or positive values
+		if timeoutSec >= -1 && timeoutSec <= 3600 {
+			ForceReleaseDeletedFileFDTimeout = time.Duration(timeoutSec) * time.Second
+		}
+	}
+	logger.Info(context.Background(), "init docker center, force release deleted file fd timeout", ForceReleaseDeletedFileFDTimeout.String())
 
 	var err error
 	if c.enableDockerDiscover {
