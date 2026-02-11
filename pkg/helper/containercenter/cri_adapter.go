@@ -334,7 +334,7 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 }
 
 func (cw *CRIRuntimeWrapper) containerShouldMarkRemove(innerContainer *innerContainerInfo) bool {
-	if ForceReleaseDeletedFileFDTimeout > 0 {
+	if ForceReleaseDeletedFileFDTimeout >= 0 {
 		if innerContainer.Status == ContainerStatusExited {
 			return true
 		}
