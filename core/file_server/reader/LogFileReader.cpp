@@ -321,9 +321,8 @@ void LogFileReader::SetContainerStopped() {
 bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
     time_t now = time(NULL);
     return INT32_FLAG(force_release_deleted_file_fd_timeout) >= 0
-        && ((IsFileDeleted() && now - GetDeletedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout))
-            || (IsContainerStopped()
-                && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout)));
+        && (IsContainerStopped()
+            && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout));
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
@@ -1096,9 +1095,7 @@ bool LogFileReader::UpdateFilePtr() {
         //    It will be removed while the new file has modify event. The reader is still the head of readerArray,
         //    thus it will be open again for reading.
         // However, if the user explicitly set a delete timeout. We should not revert the flag.
-        if (INT32_FLAG(force_release_deleted_file_fd_timeout) < 0) {
-            SetFileDeleted(false);
-        }
+        SetFileDeleted(false);
         if (GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize() > INT32_FLAG(max_reader_open_files)) {
             LOG_ERROR(sLogger,
                       ("open file failed, opened fd exceed limit, too many open files",
