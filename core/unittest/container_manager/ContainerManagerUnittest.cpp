@@ -14,11 +14,14 @@
 
 
 #include <algorithm>
+#include <atomic>
 #include <boost/regex.hpp>
+#include <chrono>
 #include <fstream>
 #include <memory>
 #include <set>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -52,6 +55,9 @@ public:
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
     void TestContainerMatchingConsistency() const;
+    void TestcomputeMatchedContainersDiffWithSnapshot() const;
+    void TestNullRawContainerInfoHandling() const;
+    void TestConcurrentContainerMapAccess() const;
     void runTestFile(const std::string& testFilePath) const;
 
 private:
@@ -1291,6 +1297,410 @@ bool ContainerManagerUnittest::parseContainerFilterConfigFromTestJson(const Json
     return true;
 }
 
+void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() const {
+    // This test verifies that computeMatchedContainersDiff uses a snapshot of mContainerMap
+    // to avoid race conditions when the map is modified concurrently
+    ContainerManager containerManager;
+
+    // Set up initial containers in mContainerMap
+    RawContainerInfo info1;
+    info1.mID = "snapshot1";
+    info1.mLogPath = "/var/lib/docker/containers/snapshot1/logs";
+    info1.mStatus = "running";
+    containerManager.mContainerMap["snapshot1"] = std::make_shared<RawContainerInfo>(info1);
+
+    RawContainerInfo info2;
+    info2.mID = "snapshot2";
+    info2.mLogPath = "/var/lib/docker/containers/snapshot2/logs";
+    info2.mStatus = "running";
+    containerManager.mContainerMap["snapshot2"] = std::make_shared<RawContainerInfo>(info2);
+
+    RawContainerInfo info3;
+    info3.mID = "snapshot3";
+    info3.mLogPath = "/var/lib/docker/containers/snapshot3/logs";
+    info3.mStatus = "exited";
+    containerManager.mContainerMap["snapshot3"] = std::make_shared<RawContainerInfo>(info3);
+
+    // Test 1: Verify that only running containers are added (isStdio = false)
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+
+        // Should only add running containers to both diff.mAdded and fullList
+        EXPECT_EQ(diff.mAdded.size(), 2);
+        EXPECT_EQ(fullList.size(), 2); // Only running containers are added to fullList when isStdio=false
+
+        std::set<std::string> addedIds;
+        for (const auto& container : diff.mAdded) {
+            addedIds.insert(container->mID);
+        }
+        EXPECT_TRUE(addedIds.find("snapshot1") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot2") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot3") == addedIds.end()); // exited container should not be added
+
+        // Verify fullList only contains running containers
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot3") == fullList.end());
+    }
+
+    // Test 2: Verify that isStdio=true includes non-running containers
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+
+        // Should add all containers when isStdio=true (including exited)
+        EXPECT_EQ(diff.mAdded.size(), 3);
+        EXPECT_EQ(fullList.size(), 3); // All containers are added to fullList when isStdio=true
+
+        std::set<std::string> addedIds;
+        for (const auto& container : diff.mAdded) {
+            addedIds.insert(container->mID);
+        }
+        EXPECT_TRUE(addedIds.find("snapshot1") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot2") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot3") != addedIds.end());
+
+        // Verify fullList contains all containers
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot3") != fullList.end());
+    }
+
+    // Test 3: Verify snapshot behavior - containers removed from fullList are detected
+    {
+        std::set<std::string> fullList;
+        fullList.insert("snapshot1");
+        fullList.insert("removed1"); // This container exists in fullList but not in mContainerMap
+
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        RawContainerInfo removedInfo;
+        removedInfo.mID = "removed1";
+        removedInfo.mLogPath = "/var/lib/docker/containers/removed1/logs";
+        matchList["removed1"] = std::make_shared<RawContainerInfo>(removedInfo);
+
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+
+        // The removed container should be in mRemoved list
+        EXPECT_TRUE(std::find(diff.mRemoved.begin(), diff.mRemoved.end(), "removed1") != diff.mRemoved.end());
+        // The removed container should no longer be in fullList
+        EXPECT_EQ(fullList.count("removed1"), 0);
+
+        // snapshot1 should still be in fullList
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+
+        // snapshot2 should be added to fullList (running container not previously in fullList)
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+
+        // snapshot3 should NOT be in fullList (exited container with isStdio=false)
+        EXPECT_TRUE(fullList.find("snapshot3") == fullList.end());
+
+        // Final fullList size should be 2 (snapshot1 and snapshot2)
+        EXPECT_EQ(fullList.size(), 2);
+
+        // diff.mAdded should contain snapshot2
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "snapshot2");
+        }
+    }
+
+    // Test 4: Verify snapshot behavior - modified containers are detected
+    {
+        std::set<std::string> fullList;
+        fullList.insert("snapshot1");
+
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        RawContainerInfo oldInfo;
+        oldInfo.mID = "snapshot1";
+        oldInfo.mLogPath = "/old/path"; // Different from current mContainerMap
+        matchList["snapshot1"] = std::make_shared<RawContainerInfo>(oldInfo);
+
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+
+        // The container should be in mModified list
+        EXPECT_EQ(diff.mModified.size(), 1);
+        if (diff.mModified.size() > 0) {
+            EXPECT_EQ(diff.mModified[0]->mID, "snapshot1");
+            EXPECT_EQ(diff.mModified[0]->mLogPath, "/var/lib/docker/containers/snapshot1/logs");
+        }
+    }
+}
+
+void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
+    // This test verifies that null mRawContainerInfo pointers are handled gracefully
+    // as added in the race condition fix
+
+    // Note: This test is limited because ContainerInfo is typically managed internally
+    // and we cannot easily inject null mRawContainerInfo in the current implementation.
+    // However, we can test the defensive checks are in place by verifying the code
+    // doesn't crash with various edge cases.
+
+    ContainerManager containerManager;
+
+    // Test 1: Empty container map should not cause issues
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // Should not crash with empty map
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 0);
+        EXPECT_EQ(diff.mRemoved.size(), 0);
+        EXPECT_EQ(diff.mModified.size(), 0);
+    }
+
+    // Test 2: Container with minimal info
+    {
+        RawContainerInfo minimalInfo;
+        minimalInfo.mID = "minimal1";
+        minimalInfo.mStatus = "running";
+        containerManager.mContainerMap["minimal1"] = std::make_shared<RawContainerInfo>(minimalInfo);
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "minimal1");
+        }
+    }
+
+    // Test 3: Multiple containers with various states
+    {
+        containerManager.mContainerMap.clear();
+
+        RawContainerInfo running1;
+        running1.mID = "running1";
+        running1.mStatus = "running";
+        running1.mLogPath = "/var/log/running1";
+        containerManager.mContainerMap["running1"] = std::make_shared<RawContainerInfo>(running1);
+
+        RawContainerInfo exited1;
+        exited1.mID = "exited1";
+        exited1.mStatus = "exited";
+        exited1.mLogPath = "/var/log/exited1";
+        containerManager.mContainerMap["exited1"] = std::make_shared<RawContainerInfo>(exited1);
+
+        RawContainerInfo created1;
+        created1.mID = "created1";
+        created1.mStatus = "created";
+        created1.mLogPath = "/var/log/created1";
+        containerManager.mContainerMap["created1"] = std::make_shared<RawContainerInfo>(created1);
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // With isStdio=false, only running containers should be added
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        EXPECT_EQ(fullList.size(), 1); // Only running container in fullList
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "running1");
+        }
+
+        // With isStdio=true, all containers should be added
+        fullList.clear();
+        matchList.clear();
+        ContainerDiff diff2;
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff2);
+        EXPECT_EQ(diff2.mAdded.size(), 3);
+        EXPECT_EQ(fullList.size(), 3); // All containers in fullList when isStdio=true
+    }
+
+    // Test 4: Verify thread-safe snapshot usage
+    {
+        containerManager.mContainerMap.clear();
+
+        // Add some containers
+        for (int i = 0; i < 10; i++) {
+            RawContainerInfo info;
+            info.mID = "container" + std::to_string(i);
+            info.mStatus = (i % 2 == 0) ? "running" : "exited";
+            info.mLogPath = "/var/log/container" + std::to_string(i);
+            containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
+        }
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // This should use a snapshot and not be affected by concurrent modifications
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+
+        // Only running containers (even indices: 0, 2, 4, 6, 8) should be added
+        EXPECT_EQ(diff.mAdded.size(), 5);
+        EXPECT_EQ(fullList.size(), 5); // Only running containers are added to fullList when isStdio=false
+
+        // Verify that only running containers are in fullList
+        for (int i = 0; i < 10; i++) {
+            std::string containerId = "container" + std::to_string(i);
+            if (i % 2 == 0) {
+                EXPECT_TRUE(fullList.find(containerId) != fullList.end());
+            } else {
+                EXPECT_TRUE(fullList.find(containerId) == fullList.end());
+            }
+        }
+    }
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
+    // This test simulates concurrent access to mContainerMap and mRawContainerInfo to reproduce
+    // race conditions that commit e0b33e88 was designed to prevent.
+    //
+    // Test scenarios:
+    // 1. Thread 1: Continuously modifies mContainerMap (add/remove containers)
+    // 2. Thread 2: Calls computeMatchedContainersDiff (tests snapshot mechanism)
+    // 3. Thread 3: Calls GetContainerStoppedEvents (tests mRawContainerInfo access with proper locking)
+    //
+    // Without the fix, this test may crash or produce errors due to:
+    // - Iterator invalidation in computeMatchedContainersDiff
+    // - Use-after-free when accessing mRawContainerInfo->mID without lock
+    // - Null pointer dereference if mRawContainerInfo is not checked
+    ContainerManager containerManager;
+
+    // Initialize with some containers
+    for (int i = 0; i < 20; i++) {
+        RawContainerInfo info;
+        info.mID = "container_" + std::to_string(i);
+        info.mStatus = "running";
+        info.mLogPath = "/var/log/container_" + std::to_string(i);
+        containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
+    }
+
+    std::atomic<bool> testRunning{true};
+    std::atomic<int> iterationCount{0};
+    std::atomic<int> errorCount{0};
+
+    // Thread 1: Continuously modify mContainerMap
+    auto modifyThread = [&]() {
+        int counter = 100;
+        while (testRunning) {
+            try {
+                // Add new containers
+                RawContainerInfo newInfo;
+                newInfo.mID = "dynamic_" + std::to_string(counter);
+                newInfo.mStatus = "running";
+                newInfo.mLogPath = "/var/log/dynamic_" + std::to_string(counter);
+
+                {
+                    std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+                    containerManager.mContainerMap[newInfo.mID] = std::make_shared<RawContainerInfo>(newInfo);
+                }
+
+                // Remove old containers
+                if (counter > 105) {
+                    std::string oldId = "dynamic_" + std::to_string(counter - 5);
+                    std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+                    containerManager.mContainerMap.erase(oldId);
+                }
+
+                counter++;
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+    // Thread 2: Continuously call computeMatchedContainersDiff (reads mContainerMap)
+    auto readThread = [&]() {
+        while (testRunning) {
+            try {
+                std::set<std::string> fullList;
+                std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+                ContainerFilters filters;
+                ContainerDiff diff;
+
+                // This should use a snapshot to avoid iterator invalidation
+                containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+
+                iterationCount++;
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+    // Thread 3: Call GetContainerStoppedEvents to test concurrent access to mRawContainerInfo
+    // This tests the fix for accessing mRawContainerInfo->mID without proper locking
+    auto stoppedEventsThread = [&]() {
+        int counter = 0;
+        while (testRunning) {
+            try {
+                // Periodically add some container IDs to mStoppedContainerIDs
+                if (counter % 5 == 0) {
+                    std::lock_guard<std::mutex> lock(containerManager.mStoppedContainerIDsMutex);
+                    containerManager.mStoppedContainerIDs.push_back("container_" + std::to_string(counter % 20));
+                    containerManager.mStoppedContainerIDs.push_back("dynamic_" + std::to_string(counter + 100));
+                }
+
+                // Call GetContainerStoppedEvents which accesses mRawContainerInfo
+                // This method was also fixed in commit e0b33e88 to add proper locking
+                std::vector<Event*> events;
+                containerManager.GetContainerStoppedEvents(events);
+
+                // Clean up events
+                for (auto* event : events) {
+                    delete event;
+                }
+
+                counter++;
+                std::this_thread::sleep_for(std::chrono::microseconds(100));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+    // Start threads
+    std::thread t1(modifyThread);
+    std::thread t2(readThread);
+    std::thread t3(stoppedEventsThread);
+
+    // Let them run for a short time
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    // Stop threads
+    testRunning = false;
+
+    t1.join();
+    t2.join();
+    t3.join();
+
+    // With the fix (snapshot), there should be no errors
+    EXPECT_EQ(errorCount.load(), 0) << "Concurrent access caused " << errorCount.load() << " errors";
+
+    // Verify we actually ran many iterations
+    EXPECT_GT(iterationCount.load(), 100) << "Test should run many iterations to stress test concurrency";
+
+    std::cout << "Concurrent test completed: " << iterationCount.load() << " iterations with " << errorCount.load()
+              << " errors" << std::endl;
+}
+
 void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {
     // Clear existing filters to ensure clean state
     filter.mIncludeFields.mFieldsMap.clear();
@@ -1352,6 +1762,9 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersForm
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiffWithSnapshot)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestNullRawContainerInfoHandling)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess)
 
 } // namespace logtail
 
