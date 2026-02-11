@@ -138,6 +138,12 @@ void ContainerManager::ApplyContainerDiffs() {
             if (containerInfos) {
                 const auto& basePathInfos = options->GetBasePathInfos();
                 for (const auto& info : *containerInfos) {
+                    // Protect access to mRawContainerInfo with lock
+                    std::lock_guard<std::mutex> lock(mContainerMapMutex);
+                    if (!info.mRawContainerInfo) {
+                        continue;
+                    }
+                    
                     // Validate array size consistency
                     if (info.mRealBaseDirs.size() != basePathInfos.size()) {
                         LOG_WARNING(
@@ -282,8 +288,12 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerInfoMap;
     const auto& containerInfos = options->GetContainerInfo();
     if (containerInfos) {
+        // Create a local copy of shared_ptrs to avoid accessing them under potential concurrent modification
+        std::lock_guard<std::mutex> lock(mContainerMapMutex);
         for (const auto& info : *containerInfos) {
-            containerInfoMap[info.mRawContainerInfo->mID] = info.mRawContainerInfo;
+            if (info.mRawContainerInfo) {
+                containerInfoMap[info.mRawContainerInfo->mID] = info.mRawContainerInfo;
+            }
         }
     }
     std::vector<std::string> removedList;
@@ -493,6 +503,11 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
                 continue;
             }
             for (auto& info : *containerInfos) {
+                // Protect access to mRawContainerInfo with lock
+                std::lock_guard<std::mutex> lock(mContainerMapMutex);
+                if (!info.mRawContainerInfo) {
+                    continue;
+                }
                 if (info.mRawContainerInfo->mID == containerId) {
                     // 为每个真实路径生成停止事件
                     for (const auto& realBaseDir : info.mRealBaseDirs) {
@@ -586,9 +601,16 @@ void ContainerManager::computeMatchedContainersDiff(
     const ContainerFilters& filters,
     bool isStdio,
     ContainerDiff& diff) {
+    // Create a local snapshot of mContainerMap to avoid race conditions
+    std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerMapSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(mContainerMapMutex);
+        containerMapSnapshot = mContainerMap;
+    }
+
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
-        if (mContainerMap.find(*it) == mContainerMap.end()) {
+        if (containerMapSnapshot.find(*it) == containerMapSnapshot.end()) {
             std::string id = *it; // 复制一份，避免 erase 后引用失效
             it = fullContainerIDList.erase(it); // 删除元素并移到下一个
             if (matchList.find(id) != matchList.end()) {
@@ -601,7 +623,7 @@ void ContainerManager::computeMatchedContainersDiff(
 
     // 更新匹配的容器状态
     for (auto& pair : matchList) {
-        if (auto it = mContainerMap.find(pair.first); it != mContainerMap.end()) {
+        if (auto it = containerMapSnapshot.find(pair.first); it != containerMapSnapshot.end()) {
             // 更新为最新的 info
             if (*pair.second != *it->second) {
                 diff.mModified.push_back(it->second);
@@ -610,7 +632,7 @@ void ContainerManager::computeMatchedContainersDiff(
     }
 
     // 添加新容器
-    for (const auto& pair : mContainerMap) {
+    for (const auto& pair : containerMapSnapshot) {
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             if (!isStdio && pair.second->mStatus != "running") {
@@ -1052,8 +1074,16 @@ void ContainerManager::updateContainerInfoPointersInAllConfigs() {
 
         // Update RawContainerInfo pointers for each container in this config
         for (auto& containerInfo : *containerInfos) {
-            const std::string& containerId = containerInfo.mRawContainerInfo->mID;
+            // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
             std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            
+            // Safely get container ID under lock protection
+            if (!containerInfo.mRawContainerInfo) {
+                LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
+                continue;
+            }
+            
+            const std::string containerId = containerInfo.mRawContainerInfo->mID;
             auto it = mContainerMap.find(containerId);
             if (it != mContainerMap.end()) {
                 // Update the pointer to point to the new RawContainerInfo object
@@ -1082,10 +1112,18 @@ void ContainerManager::updateContainerInfoPointersForContainers(const std::vecto
 
         // Update RawContainerInfo pointers only for the specified container IDs
         for (auto& containerInfo : *containerInfos) {
-            const std::string& containerId = containerInfo.mRawContainerInfo->mID;
+            // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
+            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            
+            // Safely get container ID under lock protection
+            if (!containerInfo.mRawContainerInfo) {
+                LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
+                continue;
+            }
+            
+            const std::string containerId = containerInfo.mRawContainerInfo->mID;
             // Check if this container ID is in the list of updated containers
             if (std::find(containerIDs.begin(), containerIDs.end(), containerId) != containerIDs.end()) {
-                std::lock_guard<std::mutex> lock(mContainerMapMutex);
                 auto it = mContainerMap.find(containerId);
                 if (it != mContainerMap.end()) {
                     // Update the pointer to point to the new RawContainerInfo object
