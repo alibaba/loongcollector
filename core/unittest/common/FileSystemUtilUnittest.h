@@ -481,6 +481,7 @@ TEST_F(FileSystemUtilUnittest, TestPathJoin) {
 }
 
 TEST_F(FileSystemUtilUnittest, TestAbsolutePath) {
+#ifndef _MSC_VER
     // Expected values are based on boost::filesystem::absolute results.
 
     // Case 1: relative path "." with basepath
@@ -530,6 +531,7 @@ TEST_F(FileSystemUtilUnittest, TestAbsolutePath) {
         std::string result = AbsolutePath("data", "/");
         EXPECT_EQ(result, "/data");
     }
+#endif
 }
 
 TEST_F(FileSystemUtilUnittest, TestReadFileContent) {

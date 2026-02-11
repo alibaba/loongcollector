@@ -712,7 +712,6 @@ private:
     friend class LogFileReaderUnittest;
     friend class LogMultiBytesUnittest;
     friend class ExactlyOnceReaderUnittest;
-    friend class SenderUnittest;
     friend class AppConfigUnittest;
     friend class ModifyHandlerUnittest;
     friend class LogSplitUnittest;

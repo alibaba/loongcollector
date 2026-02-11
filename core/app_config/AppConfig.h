@@ -35,8 +35,6 @@ extern const int32_t kDefaultMaxSendBytePerSec;
 extern const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION;
 extern const int32_t MIN_SEND_REQUEST_CONCURRENCY;
 extern const int32_t MAX_SEND_REQUEST_CONCURRENCY;
-extern const uint32_t CONCURRENCY_STATISTIC_THRESHOLD;
-extern const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS;
 extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
 extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
 extern const std::string LOONGCOLLECTOR_ENV_PREFIX;
@@ -62,12 +60,10 @@ std::string GetLocalEventDataFileName();
 std::string GetInotifyWatcherDirsDumpFileName();
 std::string GetAgentLoggersPrefix();
 std::string GetAgentLogName();
-std::string GetObserverEbpfHostPath();
 std::string GetSendBufferFileNamePrefix();
 std::string GetLegacyUserLocalConfigFilePath();
 std::string GetExactlyOnceCheckpoint();
 std::string GetContinuousPipelineConfigDir();
-std::string GetPipelineConfigDir();
 std::string GetPluginLogName();
 std::string GetVersionTag();
 std::string GetGoPluginCheckpoint();
@@ -110,7 +106,6 @@ private:
 
     DoubleBuffer<std::vector<sls_logs::LogTag>> mFileTags;
     std::string mFileTagsDir;
-    DoubleBuffer<std::map<std::string, std::string>> mAgentAttrs;
 
     Json::Value mFileTagsJson;
 
@@ -118,13 +113,6 @@ private:
 
     // loongcollector_config.json content for rebuild
     std::string mIlogtailConfigJson;
-
-    // syslog
-    // std::string mStreamLogAddress;
-    // uint32_t mStreamLogTcpPort;
-    // uint32_t mStreamLogPoolSizeInMb;
-    // uint32_t mStreamLogRcvLenPerCall;
-    // bool mOpenStreamLog;
 
     // performance
     float mCpuUsageUpLimit;
@@ -140,8 +128,6 @@ private:
     float mScaledCpuUsageUpLimit;
 
     // sender
-    int32_t mMaxHoldedDataSize;
-    int32_t mMaxBufferNum;
     int32_t mBytePerSec;
     int32_t mMaxBytePerSec;
     int32_t mNumOfBufferFile;
@@ -153,31 +139,17 @@ private:
     // checkpoint
     std::string mCheckPointFilePath;
 
-    // local config
-    // std::string mMappingConfigPath;
-
-
     int32_t mMaxMultiConfigSize;
     bool mAcceptMultiConfigFlag;
     bool mIgnoreDirInodeChanged;
 
-    // std::string mUserConfigPath;
-    // std::string mUserLocalConfigPath;
-    // std::string mUserLocalConfigDirPath;
-    // std::string mUserLocalYamlConfigDirPath;
-    // std::string mUserRemoteYamlConfigDirPath;
     bool mLogParseAlarmFlag;
     std::string mProcessExecutionDir;
     std::string mWorkingDir;
 
-    // std::string mContainerMountConfigPath;
     std::string mConfigIP;
     std::string mConfigHostName;
-    // std::string mAlipayZone;
     int32_t mSystemBootTime = -1;
-
-    // used to get log config instead of mConfigIp if set, eg: "127.0.0.1.fuse",
-    // std::string mCustomizedConfigIP;
 
     // config file path to save docker file cmd info
     std::string mDockerFilePathConfig;
@@ -225,13 +197,6 @@ private:
     std::string mBindInterface;
 
 
-    // /**
-    //  * @brief Load ConfigServer, DataServer and network interface
-    //  *
-    //  * @param confJson
-    //  */
-    // virtual void LoadAddrConfig(const Json::Value& confJson) = 0;
-
     /**
      * @brief Auto scale buffer, file and network parameters according to mem limit.
      *
@@ -259,7 +224,6 @@ private:
      * @param confJson json value to append to
      */
     void LoadIncludeConfig(Json::Value& confJson);
-    // void LoadSyslogConf(const Json::Value& confJson);
 
     void DumpAllFlagsToMap(std::unordered_map<std::string, std::string>& flagMap);
     void ReadFlagsFromMap(const std::unordered_map<std::string, std::string>& flagMap);
@@ -287,7 +251,6 @@ private:
      */
     void LoadResourceConf(const Json::Value& confJson);
     void LoadOtherConf(const Json::Value& confJson);
-    // void LoadGlobalFuseConf(const Json::Value& confJson);
     void SetIlogtailConfigJson(const std::string& configJson) {
         std::lock_guard<std::mutex> lock(mAppConfigLock);
         mIlogtailConfigJson = configJson;
@@ -392,31 +355,12 @@ public:
 
     std::string GetFileTagsDir() { return mFileTagsDir; }
 
-    // Agent属性相关，获取从文件中来的attrs
-    std::map<std::string, std::string>& GetAgentAttrs() { return mAgentAttrs.getReadBuffer(); }
-    // 更新从文件中来的attrs
-    void UpdateAgentAttrs();
-
     // Legacy:获取各种参数
     bool NoInotify() const { return mNoInotify; }
 
     bool IsInInotifyBlackList(const std::string& path) const;
 
     bool IsLogParseAlarmValid() const { return mLogParseAlarmFlag; }
-
-    // std::string GetDefaultRegion() const;
-
-    // void SetDefaultRegion(const std::string& region);
-
-    // uint32_t GetStreamLogTcpPort() const { return mStreamLogTcpPort; }
-
-    // const std::string& GetStreamLogAddress() const { return mStreamLogAddress; }
-
-    // uint32_t GetStreamLogPoolSizeInMb() const { return mStreamLogPoolSizeInMb; }
-
-    // uint32_t GetStreamLogRcvLenPerCall() const { return mStreamLogRcvLenPerCall; }
-
-    // bool GetOpenStreamLog() const { return mOpenStreamLog; }
 
     std::string GetIlogtailConfigJson() {
         std::lock_guard<std::mutex> lock(mAppConfigLock);
@@ -425,11 +369,7 @@ public:
 
     bool IsAcceptMultiConfig() const { return mAcceptMultiConfigFlag; }
 
-    void SetAcceptMultiConfig(bool flag) { mAcceptMultiConfigFlag = flag; }
-
     int32_t GetMaxMultiConfigSize() const { return mMaxMultiConfigSize; }
-
-    void SetMaxMultiConfigSize(int32_t maxSize) { mMaxMultiConfigSize = maxSize; }
 
     const std::string& GetCheckPointFilePath() const { return mCheckPointFilePath; }
 
@@ -438,10 +378,6 @@ public:
     bool IsResourceAutoScale() const { return mResourceAutoScale; }
 
     int64_t GetMemUsageUpLimit() const { return mMemUsageUpLimit; }
-
-    int32_t GetMaxHoldedDataSize() const { return mMaxHoldedDataSize; }
-
-    uint32_t GetMaxBufferNum() const { return mMaxBufferNum; }
 
     int32_t GetMaxBytePerSec() const { return mMaxBytePerSec; }
 
@@ -465,18 +401,6 @@ public:
 
     int32_t GetProcessThreadCount() const { return mProcessThreadCount; }
 
-    // const std::string& GetMappingConfigPath() const { return mMappingConfigPath; }
-
-    // const std::string& GetUserConfigPath() const { return mUserConfigPath; }
-
-    // const std::string& GetLocalUserConfigPath() const { return mUserLocalConfigPath; }
-
-    // const std::string& GetLocalUserConfigDirPath() const { return mUserLocalConfigDirPath; }
-
-    // const std::string& GetLocalUserYamlConfigDirPath() const { return mUserLocalYamlConfigDirPath; }
-
-    // const std::string& GetRemoteUserYamlConfigDirPath() const { return mUserRemoteYamlConfigDirPath; }
-
     bool IgnoreDirInodeChanged() const { return mIgnoreDirInodeChanged; }
 
     void SetProcessExecutionDir(const std::string& dir) { mProcessExecutionDir = dir; }
@@ -487,11 +411,7 @@ public:
 
     const std::string& GetWorkingDir() const { return mWorkingDir; }
 
-    // const std::string& GetContainerMountConfigPath() const { return mContainerMountConfigPath; }
-
     const std::string& GetConfigIP() const { return mConfigIP; }
-
-    // const std::string& GetCustomizedConfigIp() const { return mCustomizedConfigIP; }
 
     const std::string& GetConfigHostName() const { return mConfigHostName; }
 
@@ -509,8 +429,6 @@ public:
 
     int32_t GetForceQuitReadTimeout() const { return mForceQuitReadTimeout; }
 
-    // const std::string& GetAlipayZone() const { return mAlipayZone; }
-
     // If @dirPath is not accessible, GetProcessExecutionDir will be set.
     void SetLoongcollectorConfDir(const std::string& dirPath);
 
@@ -519,8 +437,6 @@ public:
     inline bool IsHostIPReplacePolicyEnabled() const { return mEnableHostIPReplace; }
 
     inline bool IsResponseVerificationEnabled() const { return mEnableResponseVerification; }
-
-    // EndpointAddressType GetConfigServerAddressNetType() const { return mConfigServerAddressNetType; }
 
     inline bool EnableCheckpointSyncWrite() const { return mEnableCheckpointSyncWrite; }
 
@@ -534,10 +450,6 @@ public:
     const std::string& GetBindInterface() const { return mBindInterface; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class SenderUnittest;
-    friend class ConfigUpdatorUnittest;
-    friend class MultiServerConfigUpdatorUnitest;
-    friend class UtilUnittest;
     friend class AppConfigUnittest;
     friend class PipelineUnittest;
     friend class InputFileUnittest;

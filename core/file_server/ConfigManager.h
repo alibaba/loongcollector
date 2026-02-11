@@ -565,15 +565,11 @@ private:
     void CleanEnviroments();
 
     friend class EventDispatcherTest;
-    friend class SenderUnittest;
-    friend class UtilUnittest;
-    friend class ConfigUpdatorUnittest;
     friend class ConfigMatchUnittest;
     friend class FuxiSceneUnittest;
     friend class SymlinkInotifyTest;
     friend class LogFilterUnittest;
     friend class FuseFileUnittest;
-    friend class MultiServerConfigUpdatorUnitest;
     friend class CreateModifyHandlerUnittest;
     friend class ProcessorDesensitizeNativeUnittest;
     friend class ConfigContainerUnittest;

@@ -70,7 +70,6 @@ DECLARE_FLAG_INT32(merge_log_count_limit);
 DECLARE_FLAG_INT32(first_read_endure_bytes);
 DECLARE_FLAG_STRING(ilogtail_config);
 DECLARE_FLAG_STRING(user_log_config);
-DECLARE_FLAG_INT32(max_buffer_num);
 DECLARE_FLAG_INT32(sls_host_update_interval);
 DECLARE_FLAG_INT32(max_client_send_error_count);
 DECLARE_FLAG_INT32(client_disable_send_retry_interval);
