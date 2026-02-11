@@ -243,7 +243,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 			c.LogAlarm(err, "initialize env FORCE_RELEASE_DELETED_FILE_FD_TIMEOUT error")
 		}
 		// Support -1 (disabled), 0 (immediate), or positive values
-		if timeoutSec >= -1 && timeoutSec <= 3600 {
+		if timeoutSec >= -1 {
 			ForceReleaseDeletedFileFDTimeout = time.Duration(timeoutSec) * time.Second
 		}
 	}
