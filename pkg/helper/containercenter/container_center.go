@@ -51,6 +51,7 @@ const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(120)
+var ForceReleaseDeletedFileFDTimeout = time.Second * time.Duration(-1) // -1 means disabled, use stat-based detection
 var EventListenerTimeout = time.Second * time.Duration(3600)
 var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
@@ -307,9 +308,19 @@ func (did *DockerInfoDetail) MetadataHash() string {
 
 func (did *DockerInfoDetail) IsTimeout() bool {
 	nowTime := time.Now()
-	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout ||
-		(did.deleteFlag && nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout) {
+	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout {
 		return true
+	}
+	if !did.deleteFlag {
+		return false
+	}
+
+	if ForceReleaseDeletedFileFDTimeout >= 0 {
+		if nowTime.Sub(did.lastUpdateTime) >= ForceReleaseDeletedFileFDTimeout {
+			return true
+		} else if nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout {
+			return true
+		}
 	}
 	return false
 }
