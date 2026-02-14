@@ -53,32 +53,51 @@ protected:
         fs::remove_all(sManager->mCheckpointRootPath);
     }
 
+    // Inserts config into server maps and mAddedInputs without calling Init() (no Run() thread).
+    static void AddInputWithoutStartingThread(StaticFileServer* srv,
+                                              const string& configName,
+                                              size_t idx,
+                                              FileDiscoveryOptions* discoveryOpts,
+                                              const FileReaderOptions* fileReaderOpts,
+                                              const MultilineOptions* multilineOpts,
+                                              const FileTagOptions* fileTagOpts,
+                                              unordered_map<string, FileCheckpoint::ContainerMeta>& fileContainerMetas,
+                                              const CollectionPipelineContext* ctx);
+
 private:
     InputStaticFileCheckpointManager* sManager;
     StaticFileServer* sServer;
 };
 
+void StaticFileServerUnittest::AddInputWithoutStartingThread(StaticFileServer* srv,
+                                                            const string& configName,
+                                                            size_t idx,
+                                                            FileDiscoveryOptions* discoveryOpts,
+                                                            const FileReaderOptions* fileReaderOpts,
+                                                            const MultilineOptions* multilineOpts,
+                                                            const FileTagOptions* fileTagOpts,
+                                                            unordered_map<string, FileCheckpoint::ContainerMeta>& fileContainerMetas,
+                                                            const CollectionPipelineContext* ctx) {
+    lock_guard<mutex> lock(srv->mUpdateMux);
+    auto configInfo = make_pair(configName, idx);
+    srv->mInputFileDiscoveryConfigsMap.try_emplace(configInfo, make_pair(discoveryOpts, ctx));
+    srv->mFileContainerMetaMap.try_emplace(configInfo, fileContainerMetas);
+    srv->mInputFileReaderConfigsMap.try_emplace(configInfo, make_pair(fileReaderOpts, ctx));
+    srv->mInputMultilineConfigsMap.try_emplace(configInfo, make_pair(multilineOpts, ctx));
+    srv->mInputFileTagConfigsMap.try_emplace(configInfo, make_pair(fileTagOpts, ctx));
+    srv->mAddedInputs.emplace(configInfo, ctx);
+}
+
 void StaticFileServerUnittest::TestGetNextAvailableReader() const {
-    // prepare test log
+    sServer->Stop(); // no Run() thread so test is deterministic
     fs::create_directories("test_logs");
     vector<fs::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
     vector<string> contents{string(500, 'a') + "\n", string(500, 'b') + "\n", string(500, 'c') + "\n"};
-    vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
-        {
-            ofstream fout(files[i], ios::binary);
-            fout << contents[i];
-        }
-        auto& item = fingerprints.emplace_back();
-        item.mFilePath = files[i];
-        item.mDevInode = GetFileDevInode(files[i].string());
-        item.mSignatureSize = contents[i].size() > 1024 ? 1024 : contents[i].size();
-        item.mSignatureHash
-            = HashSignatureString(contents[i].substr(0, item.mSignatureSize).c_str(), item.mSignatureSize);
-        item.mSize = contents[i].size();
+        ofstream fout(files[i], ios::binary);
+        fout << contents[i];
     }
 
-    // build input
     CollectionPipeline p;
     p.mName = "test_config";
     p.mPluginID.store(0);
@@ -102,7 +121,17 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     input.CreateMetricsRecordRef(InputFile::sName, "1");
     input.Init(configJson, optionalGoPipeline);
     input.CommitMetricsRecordRef();
-    input.Start();
+    std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
+    ctx.SetIsOnetimePipelineRunningBeforeStart(true);
+    AddInputWithoutStartingThread(sServer,
+                                  "test_config",
+                                  0,
+                                  &input.mFileDiscovery,
+                                  &input.mFileReader,
+                                  &input.mMultiline,
+                                  &input.mFileTag,
+                                  emptyFileContainerMetas,
+                                  &ctx);
     sServer->UpdateInputs();
 
     vector<fs::path> cptFiles;
@@ -112,21 +141,12 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
 
     auto reader = sServer->GetNextAvailableReader("test_config", 0);
     auto const& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    // Run() may have already consumed all files; if so skip the rest of the scenario (status can be FINISHED or ABORT)
-    if (reader == nullptr
-        && (cpt.mStatus == StaticFileReadingStatus::FINISHED || cpt.mStatus == StaticFileReadingStatus::ABORT)) {
-        input.Stop(true);
-        fs::remove_all("test_logs");
-        return;
-    }
-
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
     APSARA_TEST_EQUAL(StaticFileReadingStatus::RUNNING, cpt.mStatus);
     APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
 
     sManager->UpdateCurrentFileCheckpoint("test_config", 0, 501);
     {
-        // file 2 not existed && file 3 signature changed
         fs::remove(cptFiles[1]);
         {
             ofstream fout(cptFiles[2], ios::binary);
@@ -146,11 +166,11 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     APSARA_TEST_EQUAL(0U, sServer->mPipelineNameReadersMap.size());
     APSARA_TEST_EQUAL(0U, sServer->mDeletedInputs.size());
 
-    input.Stop(true);
     fs::remove_all("test_logs");
 }
 
 void StaticFileServerUnittest::TestUpdateInputs() const {
+    sServer->Stop(); // ensure Run() is not running so this test is deterministic
     FileDiscoveryOptions emptyDiscoveryOpts;
     CollectionPipeline emptyPipeline;
     CollectionPipelineContext ctx;
@@ -159,33 +179,28 @@ void StaticFileServerUnittest::TestUpdateInputs() const {
     ctx.SetIsOnetimePipelineRunningBeforeStart(true);
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
 
-    // new config (Run() may consume some of mAddedInputs before we run UpdateInputs())
-    sServer->AddInput(
-        "test_config_1", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
+    AddInputWithoutStartingThread(
+        sServer, "test_config_1", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
     ctx.SetConfigName("test_config_2");
-    sServer->AddInput(
-        "test_config_2", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
-    sServer->AddInput(
-        "test_config_2", 1, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
+    AddInputWithoutStartingThread(
+        sServer, "test_config_2", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
+    AddInputWithoutStartingThread(
+        sServer, "test_config_2", 1, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
     sServer->UpdateInputs();
-    APSARA_TEST_TRUE(sServer->mPipelineNameReadersMap.size() >= 2U && sServer->mPipelineNameReadersMap.size() <= 3U);
-    const bool hadConfig1 = (sServer->mPipelineNameReadersMap.count("test_config_1") == 1U);
-    APSARA_TEST_TRUE(sServer->mPipelineNameReadersMap.count("test_config_2") >= 1U
-                     && sServer->mPipelineNameReadersMap.count("test_config_2") <= 2U);
+    APSARA_TEST_EQUAL(3U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_EQUAL(2U, sServer->mPipelineNameReadersMap.count("test_config_2"));
+    APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_1"));
     APSARA_TEST_TRUE(sServer->mAddedInputs.empty());
     APSARA_TEST_TRUE(sServer->HasRegisteredPlugins());
 
     // update config
     sServer->RemoveInput("test_config_2", 0);
     sServer->RemoveInput("test_config_2", 1);
-    sServer->AddInput(
-        "test_config_2", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
+    AddInputWithoutStartingThread(
+        sServer, "test_config_2", 0, &emptyDiscoveryOpts, nullptr, nullptr, nullptr, emptyFileContainerMetas, &ctx);
     sServer->UpdateInputs();
-    const size_t expectedSize = hadConfig1 ? 2U : 1U;
-    APSARA_TEST_EQUAL(expectedSize, sServer->mPipelineNameReadersMap.size());
-    if (hadConfig1) {
-        APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_1"));
-    }
+    APSARA_TEST_EQUAL(2U, sServer->mPipelineNameReadersMap.size());
+    APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_1"));
     APSARA_TEST_EQUAL(1U, sServer->mPipelineNameReadersMap.count("test_config_2"));
     APSARA_TEST_TRUE(sServer->mDeletedInputs.empty());
     APSARA_TEST_TRUE(sServer->mAddedInputs.empty());
@@ -216,7 +231,7 @@ void StaticFileServerUnittest::TestClearUnusedCheckpoints() const {
 }
 
 void StaticFileServerUnittest::TestSetExpectedFileSize() const {
-    // prepare test log
+    sServer->Stop();
     fs::create_directories("test_logs");
     fs::path testFile = fs::absolute("./test_logs/test_file.log");
     string content = string(5000, 'a') + "\n";
@@ -225,7 +240,6 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
         fout << content;
     }
 
-    // build input
     CollectionPipeline p;
     p.mName = "test_config";
     p.mPluginID.store(0);
@@ -246,25 +260,18 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
 
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
     ctx.SetIsOnetimePipelineRunningBeforeStart(true);
-    sServer->AddInput("test_config",
-                      0,
-                      &input.mFileDiscovery,
-                      &input.mFileReader,
-                      &input.mMultiline,
-                      &input.mFileTag,
-                      emptyFileContainerMetas,
-                      &ctx);
+    AddInputWithoutStartingThread(sServer,
+                                  "test_config",
+                                  0,
+                                  &input.mFileDiscovery,
+                                  &input.mFileReader,
+                                  &input.mMultiline,
+                                  &input.mFileTag,
+                                  emptyFileContainerMetas,
+                                  &ctx);
     sServer->UpdateInputs();
 
     auto reader = sServer->GetNextAvailableReader("test_config", 0);
-    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    if (reader == nullptr
-        && (cpt.mStatus == StaticFileReadingStatus::FINISHED || cpt.mStatus == StaticFileReadingStatus::ABORT)) {
-        sServer->RemoveInput("test_config", 0);
-        sServer->UpdateInputs();
-        fs::remove_all("test_logs");
-        return;
-    }
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
 
     FileFingerprint fingerprint;
@@ -277,13 +284,12 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
 }
 
 void StaticFileServerUnittest::TestFileRotationDetection() const {
-    // prepare test log
+    sServer->Stop();
     fs::create_directories("test_logs");
     fs::path originalFile = fs::absolute("test_logs/test_file.log");
     fs::path rotatedFile = fs::absolute("test_logs/test_file.log.1");
     string content = string(2000, 'a') + "\n";
 
-    // Create original file and get its devinode
     DevInode originalDevInode;
     {
         ofstream fout(originalFile, ios::binary);
@@ -292,7 +298,6 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     originalDevInode = GetFileDevInode(originalFile.string());
     APSARA_TEST_TRUE(originalDevInode.IsValid());
 
-    // build input
     CollectionPipeline p;
     p.mName = "test_config";
     p.mPluginID.store(0);
@@ -313,14 +318,15 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
 
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
     ctx.SetIsOnetimePipelineRunningBeforeStart(true);
-    sServer->AddInput("test_config",
-                      0,
-                      &input.mFileDiscovery,
-                      &input.mFileReader,
-                      &input.mMultiline,
-                      &input.mFileTag,
-                      emptyFileContainerMetas,
-                      &ctx);
+    AddInputWithoutStartingThread(sServer,
+                                  "test_config",
+                                  0,
+                                  &input.mFileDiscovery,
+                                  &input.mFileReader,
+                                  &input.mMultiline,
+                                  &input.mFileTag,
+                                  emptyFileContainerMetas,
+                                  &ctx);
     sServer->UpdateInputs();
 
     fs::rename(originalFile, rotatedFile);
@@ -335,14 +341,6 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     APSARA_TEST_NOT_EQUAL(originalDevInode, newFileDevInode);
 
     auto reader = sServer->GetNextAvailableReader("test_config", 0);
-    const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
-    if (reader == nullptr
-        && (cpt.mStatus == StaticFileReadingStatus::FINISHED || cpt.mStatus == StaticFileReadingStatus::ABORT)) {
-        sServer->RemoveInput("test_config", 0);
-        sServer->UpdateInputs();
-        fs::remove_all("test_logs");
-        return;
-    }
     APSARA_TEST_NOT_EQUAL(nullptr, reader);
     APSARA_TEST_EQUAL(rotatedFile, reader->GetHostLogPath());
 
