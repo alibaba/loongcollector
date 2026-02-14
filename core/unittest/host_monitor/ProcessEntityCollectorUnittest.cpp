@@ -38,7 +38,7 @@ public:
 
 protected:
     void SetUp() override {
-        bfs::create_directories("./1");
+        fs::create_directories("./1");
         ofstream ofs("./1/stat", std::ios::trunc);
         ofs << "1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600 171 18446744073709551615 "
                "4194304 4238788 140727020025920 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 6336016 6337300 21442560 "
@@ -50,8 +50,8 @@ protected:
     }
 
     void TearDown() override {
-        bfs::remove_all("./1");
-        bfs::remove_all("./stat");
+        fs::remove_all("./1");
+        fs::remove_all("./stat");
     }
 };
 

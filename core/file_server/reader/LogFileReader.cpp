@@ -31,7 +31,6 @@
 #include <random>
 #include <sstream>
 
-#include "boost/filesystem.hpp"
 #include "boost/regex.hpp"
 #include "rapidjson/document.h"
 
@@ -512,7 +511,7 @@ bool LogFileReader::validatePrimaryCheckpoint(const PrimaryCheckpointPB& cpt) {
                 return false;
             }
 
-            auto dirPath = boost::filesystem::path(filePath).parent_path();
+            auto dirPath = std::filesystem::path(filePath).parent_path();
             const auto searchResult = SearchFilePathByDevInodeInDirectory(dirPath.string(), 0, mDevInode, nullptr);
             if (!searchResult) {
                 LOG_WARNING(sLogger, METHOD_LOG_PATTERN("can not find file with dev inode", mDevInode.inode));

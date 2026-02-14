@@ -38,7 +38,7 @@ protected:
 };
 
 bool GPUCollectorUnittest::CheckGPUExist() const {
-    if (!std::filesystem::exists(NVIDIACTL)) {
+    if (!fs::exists(NVIDIACTL)) {
         return false;
     }
 

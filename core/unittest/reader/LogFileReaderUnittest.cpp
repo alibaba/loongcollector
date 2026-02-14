@@ -993,16 +993,16 @@ protected:
         }
         gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderHoleUnittest";
         gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
-        bfs::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
     void SetUp() override {
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
         mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
         mMultilineOpts.mMode = MultilineOptions::Mode::CUSTOM;
     }
-    void TearDown() override { bfs::remove_all(gRootDir); }
+    void TearDown() override { fs::remove_all(gRootDir); }
 
     static std::string gRootDir;
     static std::string gLogName;

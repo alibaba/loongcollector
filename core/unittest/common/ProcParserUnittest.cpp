@@ -15,7 +15,6 @@
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <cstdint>
 
-#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -71,22 +70,22 @@ public:
 
 protected:
     void SetUp() override {
-        mTestRoot = std::filesystem::path(GetProcessExecutionDir()) / "ProcParserUnittestDir";
+        mTestRoot = fs::path(GetProcessExecutionDir()) / "ProcParserUnittestDir";
         mProcDir = mTestRoot / "proc";
-        std::filesystem::create_directories(mProcDir);
+        fs::create_directories(mProcDir);
         mParser = std::make_unique<ProcParser>(mTestRoot.string());
     }
 
-    void TearDown() override { std::filesystem::remove_all(mTestRoot); }
+    void TearDown() override { fs::remove_all(mTestRoot); }
 
-    void WriteStringWithNulls(const std::filesystem::path& path, const char* data, size_t size) {
+    void WriteStringWithNulls(const fs::path& path, const char* data, size_t size) {
         std::ofstream ofs(path, std::ios::binary);
         ofs.write(data, size);
     }
 
     void CreateProcTestFiles(int pid) {
         auto pidDir = mProcDir / std::to_string(pid);
-        std::filesystem::create_directories(pidDir);
+        fs::create_directories(pidDir);
 
         // Create cmdline file with null separators
         const char cmdline[] = {'t', 'e',  's', 't', ' ', 'p', 'r',  'o', 'g', 'r', 'a',
@@ -117,22 +116,22 @@ protected:
             << "0::/docker/1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
         // Create exe symlink
-        std::filesystem::create_directories(mTestRoot / "usr" / "bin");
+        fs::create_directories(mTestRoot / "usr" / "bin");
         std::ofstream(mTestRoot / "usr" / "bin" / "test_program") << "test program binary";
-        std::filesystem::create_symlink(mTestRoot / "usr" / "bin" / "test_program", pidDir / "exe");
+        fs::create_symlink(mTestRoot / "usr" / "bin" / "test_program", pidDir / "exe");
 
         // Create cwd symlink
-        std::filesystem::create_directories(mTestRoot / "home" / "user");
-        std::filesystem::create_symlink(mTestRoot / "home" / "user", pidDir / "cwd");
+        fs::create_directories(mTestRoot / "home" / "user");
+        fs::create_symlink(mTestRoot / "home" / "user", pidDir / "cwd");
 
         // Create ns directory and net symlink
-        std::filesystem::create_directories(pidDir / "ns");
-        std::filesystem::create_symlink("net:[4026531992]", pidDir / "ns" / "net");
+        fs::create_directories(pidDir / "ns");
+        fs::create_symlink("net:[4026531992]", pidDir / "ns" / "net");
     }
 
     void CreateProcTestFile(int pid, const std::string& filename, const std::string& cgroupContent) {
         auto pidDir = mProcDir / std::to_string(pid);
-        std::filesystem::create_directories(pidDir);
+        fs::create_directories(pidDir);
         std::ofstream(pidDir / filename) << cgroupContent;
     }
 
@@ -149,8 +148,8 @@ protected:
     }
 
 private:
-    std::filesystem::path mTestRoot;
-    std::filesystem::path mProcDir;
+    fs::path mTestRoot;
+    fs::path mProcDir;
     std::unique_ptr<ProcParser> mParser;
 };
 

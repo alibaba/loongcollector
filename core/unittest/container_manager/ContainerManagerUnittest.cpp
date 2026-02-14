@@ -608,9 +608,9 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormat() const {
     EXPECT_FALSE(foundImageName);
 
     // Verify config diffs are created
-    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find("##1.0##config1")
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(std::string("##1.0##config1"), size_t(0)))
                 != containerManager.mConfigContainerDiffMap.end());
-    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find("##1.0##config2")
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(std::string("##1.0##config2"), size_t(0)))
                 != containerManager.mConfigContainerDiffMap.end());
 }
 
@@ -691,10 +691,10 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithTags() c
     EXPECT_TRUE(foundContainerIp);
     EXPECT_TRUE(foundPodUid);
 
-    // Verify config diff is created
-    EXPECT_TRUE(
-        containerManager.mConfigContainerDiffMap.find("##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test")
-        != containerManager.mConfigContainerDiffMap.end());
+    // Verify config diff is created (key is pair<configName, inputIndex>, inputIndex defaults to 0)
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(
+                    std::string("##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test"), size_t(0)))
+                != containerManager.mConfigContainerDiffMap.end());
 }
 
 void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithMounts() const {

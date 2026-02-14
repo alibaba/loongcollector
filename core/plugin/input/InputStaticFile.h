@@ -16,18 +16,15 @@
 
 #pragma once
 
-#include <cstdint>
-
-#include <filesystem>
-#include <set>
-#include <vector>
+#include <string>
+#include <unordered_map>
 
 #include "collection_pipeline/plugin/interface/Input.h"
-#include "common/DevInode.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/checkpoint/FileCheckpoint.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
@@ -36,6 +33,10 @@ namespace logtail {
 class InputStaticFile : public Input {
 public:
     static const std::string sName;
+
+    static bool DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                             const CollectionPipelineContext*,
+                                             const FileDiscoveryOptions*);
 
     const std::string& Name() const override { return sName; }
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
@@ -54,17 +55,9 @@ private:
     PluginMetricManagerPtr mPluginMetricManager;
     IntGaugePtr mMonitorFileTotal;
 
-    void GetValidBaseDirs(const BasePathInfo& pathInfo,
-                          const std::filesystem::path& dir,
-                          uint32_t depth,
-                          std::vector<std::filesystem::path>& filepaths) const;
-    std::vector<std::filesystem::path> GetFiles() const;
-    void GetFiles(const std::filesystem::path& dir,
-                  uint32_t depth,
-                  const BasePathInfo* pathInfo,
-                  const std::string* containerBaseDir,
-                  std::set<DevInode>& visitedDir,
-                  std::vector<std::filesystem::path>& files) const;
+    // 文件路径到容器元信息的映射（容器场景下使用）
+    std::unordered_map<std::string, FileCheckpoint::ContainerMeta> mFileContainerMetaMap;
+
     bool CreateInnerProcessors();
 
 #ifdef APSARA_UNIT_TEST_MAIN

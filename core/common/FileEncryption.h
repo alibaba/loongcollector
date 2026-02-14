@@ -66,10 +66,6 @@ private:
 
     static const int32_t FIRST_KEY_VERSION;
     static const std::string FIRST_KEY_VALUE;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class SenderUnittest;
-#endif
 };
 } // namespace logtail
 

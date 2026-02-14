@@ -48,7 +48,7 @@ public:
 
 protected:
     void SetUp() override {
-        bfs::create_directories("./1");
+        fs::create_directories("./1");
         ofstream ofs1("./stat", std::ios::trunc);
         ofs1 << "btime 1731142542\n";
         ofs1 << "cpu  1195061569 1728645 418424132 203670447952 14723544 0 773400 0 0 0\n";
@@ -59,7 +59,7 @@ protected:
         ofs1.close();
 
         PROCESS_DIR = ".";
-        bfs::create_directories("./1");
+        fs::create_directories("./1");
         ofstream ofs2("./1/stat", std::ios::trunc);
         ofs2 << "1 (cat) R 0 1 1 34816 1 4194560 1110 0 0 0 1 1 0 0 20 0 1 0 18938584 4505600 171 18446744073709551615 "
                 "4194304 4238788 140727020025920 0 0 0 0 0 0 0 0 0 17 3 0 0 0 0 0 6336016 6337300 21442560 "
@@ -68,9 +68,9 @@ protected:
     }
 
     void TearDown() override {
-        bfs::remove_all("./1");
-        bfs::remove_all("./stat");
-        bfs::remove_all("./net");
+        fs::remove_all("./1");
+        fs::remove_all("./stat");
+        fs::remove_all("./net");
     }
 };
 
@@ -168,9 +168,9 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOnce() const {
     int pid = 2;
     std::string mTestDir = "./tmp";
     PROCESS_DIR = mTestDir;
-    bfs::create_directories(mTestDir);
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid));
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
+    fs::create_directories(mTestDir);
+    fs::create_directories(mTestDir + "/" + std::to_string(pid));
+    fs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
     ProcessFd processFd;
 
     // 创建5个测试文件作为文件描述符目标
@@ -178,7 +178,7 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOnce() const {
         std::string targetFile = mTestDir + "/target" + std::to_string(i);
         std::ofstream ofs(targetFile); // 创建空文件
         // 创建文件描述符符号链接 (0,1,2,3,4)
-        bfs::create_symlink(targetFile, mTestDir + "/" + std::to_string(pid) + "/fd/" + std::to_string(i));
+        fs::create_symlink(targetFile, mTestDir + "/" + std::to_string(pid) + "/fd/" + std::to_string(i));
     }
 
     // 启动单独线程执行文件读取
@@ -196,12 +196,12 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOnce() const {
 
     sleep(1);
     // 删除
-    bfs::remove_all(mTestDir + "/" + std::to_string(pid) + "/fd/4");
+    fs::remove_all(mTestDir + "/" + std::to_string(pid) + "/fd/4");
 
     // 等待获取进程列表操作完成
     t.join();
 
-    bfs::remove_all(mTestDir);
+    fs::remove_all(mTestDir);
     PROCESS_DIR = ".";
 };
 
@@ -209,9 +209,9 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOncePermissionDenied()
     int pid = 3;
     std::string mTestDir = "./tmp_permission";
     PROCESS_DIR = mTestDir;
-    bfs::create_directories(mTestDir);
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid));
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
+    fs::create_directories(mTestDir);
+    fs::create_directories(mTestDir + "/" + std::to_string(pid));
+    fs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
 
     // 设置目录权限为无读取权限（如果可能）
     // 注意：在某些系统上可能无法完全模拟权限拒绝，但至少测试代码不会崩溃
@@ -221,7 +221,7 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOncePermissionDenied()
     // 主要验证不会崩溃
     (void)result; // 标记变量为已使用，避免编译警告
 
-    bfs::remove_all(mTestDir);
+    fs::remove_all(mTestDir);
     PROCESS_DIR = ".";
 };
 
@@ -229,9 +229,9 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOnceFilesystemError() 
     int pid = 4;
     std::string mTestDir = "./tmp_fs_error";
     PROCESS_DIR = mTestDir;
-    bfs::create_directories(mTestDir);
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid));
-    bfs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
+    fs::create_directories(mTestDir);
+    fs::create_directories(mTestDir + "/" + std::to_string(pid));
+    fs::create_directories(mTestDir + "/" + std::to_string(pid) + "/fd");
 
     ProcessFd processFd;
     // 测试文件系统错误的情况
@@ -240,7 +240,7 @@ void LinuxSystemInterfaceUnittest::TestGetProcessOpenFilesOnceFilesystemError() 
     // 应该能处理文件系统错误，不会崩溃
     (void)result; // 标记变量为已使用，避免编译警告
 
-    bfs::remove_all(mTestDir);
+    fs::remove_all(mTestDir);
     PROCESS_DIR = ".";
 };
 
@@ -249,7 +249,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpNormalCase() const {
     // Create test directory structure
     std::string testDir = "./test_tcp";
     PROCESS_DIR = testDir;
-    bfs::create_directories(testDir + "/net");
+    fs::create_directories(testDir + "/net");
 
     // Create /proc/net/tcp with normal format
     // Format: sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode
@@ -285,7 +285,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpNormalCase() const {
     APSARA_TEST_EQUAL_FATAL(2, tcpStateCount[TCP_LISTEN]); // 2 connections in LISTEN state
 
     // Cleanup
-    bfs::remove_all(testDir);
+    fs::remove_all(testDir);
     PROCESS_DIR = ".";
 }
 
@@ -293,7 +293,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpFileNotExist() const {
     // Test when TCP files don't exist
     std::string testDir = "./test_tcp_nofile";
     PROCESS_DIR = testDir;
-    bfs::create_directories(testDir);
+    fs::create_directories(testDir);
     // Don't create net directory
 
     std::vector<uint64_t> tcpStateCount(TCP_CLOSING + 1, 0);
@@ -306,7 +306,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpFileNotExist() const {
     }
 
     // Cleanup
-    bfs::remove_all(testDir);
+    fs::remove_all(testDir);
     PROCESS_DIR = ".";
 }
 
@@ -314,7 +314,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpMalformedLines() const {
     // Test handling of malformed lines
     std::string testDir = "./test_tcp_malformed";
     PROCESS_DIR = testDir;
-    bfs::create_directories(testDir + "/net");
+    fs::create_directories(testDir + "/net");
 
     ofstream ofs(testDir + "/net/tcp", std::ios::trunc);
     ofs << "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
@@ -335,7 +335,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpMalformedLines() const {
     APSARA_TEST_EQUAL_FATAL(1, tcpStateCount[TCP_LISTEN]);
 
     // Cleanup
-    bfs::remove_all(testDir);
+    fs::remove_all(testDir);
     PROCESS_DIR = ".";
 }
 
@@ -343,7 +343,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpAllStates() const {
     // Test all valid TCP states (TCP_ESTABLISHED=1 to TCP_CLOSING=11)
     std::string testDir = "./test_tcp_allstates";
     PROCESS_DIR = testDir;
-    bfs::create_directories(testDir + "/net");
+    fs::create_directories(testDir + "/net");
 
     ofstream ofs(testDir + "/net/tcp", std::ios::trunc);
     ofs << "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
@@ -381,7 +381,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpAllStates() const {
     APSARA_TEST_EQUAL_FATAL(1, tcpStateCount[TCP_CLOSING]);
 
     // Cleanup
-    bfs::remove_all(testDir);
+    fs::remove_all(testDir);
     PROCESS_DIR = ".";
 }
 
@@ -389,7 +389,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpInvalidStates() const {
     // Test handling of invalid state values (out of range)
     std::string testDir = "./test_tcp_invalid";
     PROCESS_DIR = testDir;
-    bfs::create_directories(testDir + "/net");
+    fs::create_directories(testDir + "/net");
 
     ofstream ofs(testDir + "/net/tcp", std::ios::trunc);
     ofs << "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n";
@@ -416,7 +416,7 @@ void LinuxSystemInterfaceUnittest::TestReadProcNetTcpInvalidStates() const {
     }
 
     // Cleanup
-    bfs::remove_all(testDir);
+    fs::remove_all(testDir);
     PROCESS_DIR = ".";
 }
 

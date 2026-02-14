@@ -380,7 +380,7 @@ void Application::Start() { // GCOVR_EXCL_START
         EventDispatcher::GetInstance()->DumpCheckPointPeriod(curTime);
 
         if (curTime - lastContainerCheckTime >= 3) {
-            if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+            if (ContainerManager::GetInstance()->CheckFileServerContainerDiffs()) {
                 FileServer::GetInstance()->Pause();
                 FileServer::GetInstance()->Resume(false, true);
             }

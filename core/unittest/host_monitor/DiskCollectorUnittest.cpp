@@ -89,7 +89,7 @@ void DiskCollectorUnittest::TestGetSystemUptimeInformation() const {
 }
 
 void DiskCollectorUnittest::TestGetDiskSerialIdInformation() const {
-    bfs::create_directories("./vdb");
+    fs::create_directories("./vdb");
     std::string diskName = "vdb";
     SerialIdInformation serialIdInfo;
 
@@ -148,8 +148,8 @@ void DiskCollectorUnittest::GetDiskStateInformation() const {
 
 void DiskCollectorUnittest::TestCollect() const {
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    bfs::create_directories("./vdb");
-    bfs::create_directories("./vda");
+    fs::create_directories("./vdb");
+    fs::create_directories("./vda");
     PROCESS_DIR = ".";
     auto collector = DiskCollector();
 

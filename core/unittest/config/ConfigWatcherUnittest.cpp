@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include <algorithm>
-#include <filesystem>
 #include <fstream>
 
 #include "collection_pipeline/CollectionPipelineManager.h"
@@ -58,12 +57,12 @@ protected:
     }
 
 private:
-    static const filesystem::path configDir;
-    static const filesystem::path instanceConfigDir;
+    static const fs::path configDir;
+    static const fs::path instanceConfigDir;
 };
 
-const filesystem::path ConfigWatcherUnittest::configDir = "./continuous_pipeline_config";
-const filesystem::path ConfigWatcherUnittest::instanceConfigDir = "./instance_config";
+const fs::path ConfigWatcherUnittest::configDir = "./continuous_pipeline_config";
+const fs::path ConfigWatcherUnittest::instanceConfigDir = "./instance_config";
 
 void ConfigWatcherUnittest::InvalidConfigDirFound() const {
     {
@@ -79,7 +78,7 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_FALSE(diff.first.HasDiff());
         APSARA_TEST_FALSE(diff.second.HasDiff());
-        filesystem::remove_all("continuous_pipeline_config");
+        fs::remove_all("continuous_pipeline_config");
     }
     {
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
@@ -88,15 +87,15 @@ void ConfigWatcherUnittest::InvalidConfigDirFound() const {
         { ofstream fout("instance_config"); }
         diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_FALSE(diff.HasDiff());
-        filesystem::remove_all("instance_config");
+        fs::remove_all("instance_config");
     }
 }
 
 void ConfigWatcherUnittest::InvalidConfigFileFound() const {
     {
-        filesystem::create_directories(configDir);
+        fs::create_directories(configDir);
 
-        filesystem::create_directories(configDir / "dir");
+        fs::create_directories(configDir / "dir");
         { ofstream fout(configDir / "unsupported_extenstion.zip"); }
         { ofstream fout(configDir / "empty_file.json"); }
         {
@@ -110,12 +109,12 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
 #endif
         APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
         APSARA_TEST_FALSE(diff.second.HasDiff());
-        filesystem::remove_all(configDir);
+        fs::remove_all(configDir);
     }
     {
-        filesystem::create_directories(instanceConfigDir);
+        fs::create_directories(instanceConfigDir);
 
-        filesystem::create_directories(instanceConfigDir / "dir");
+        fs::create_directories(instanceConfigDir / "dir");
         { ofstream fout(instanceConfigDir / "unsupported_extenstion.zip"); }
         { ofstream fout(instanceConfigDir / "empty_file.json"); }
         {
@@ -124,7 +123,7 @@ void ConfigWatcherUnittest::InvalidConfigFileFound() const {
         }
         InstanceConfigDiff diff = InstanceConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_FALSE(diff.HasDiff());
-        filesystem::remove_all(instanceConfigDir);
+        fs::remove_all(instanceConfigDir);
     }
 }
 
@@ -133,9 +132,9 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         PipelineConfigWatcher::GetInstance()->AddSource("dir1");
         PipelineConfigWatcher::GetInstance()->AddSource("dir2");
 
-        filesystem::create_directories("continuous_pipeline_config");
-        filesystem::create_directories("dir1");
-        filesystem::create_directories("dir2");
+        fs::create_directories("continuous_pipeline_config");
+        fs::create_directories("dir1");
+        fs::create_directories("dir2");
 
         {
             ofstream fout("dir1/config.json");
@@ -163,17 +162,17 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         APSARA_TEST_TRUE(diff.first.HasDiff());
         APSARA_TEST_EQUAL(1U + builtinPipelineCnt, diff.first.mAdded.size());
 
-        filesystem::remove_all("dir1");
-        filesystem::remove_all("dir2");
-        filesystem::remove_all("continuous_pipeline_config");
+        fs::remove_all("dir1");
+        fs::remove_all("dir2");
+        fs::remove_all("continuous_pipeline_config");
     }
     {
         InstanceConfigWatcher::GetInstance()->AddSource("dir1");
         InstanceConfigWatcher::GetInstance()->AddSource("dir2");
 
-        filesystem::create_directories("instance_config");
-        filesystem::create_directories("dir1");
-        filesystem::create_directories("dir2");
+        fs::create_directories("instance_config");
+        fs::create_directories("dir1");
+        fs::create_directories("dir2");
 
         {
             ofstream fout("dir1/config.json");
@@ -191,14 +190,14 @@ void ConfigWatcherUnittest::DuplicateConfigs() const {
         APSARA_TEST_TRUE(diff.HasDiff());
         APSARA_TEST_EQUAL(1U, diff.mAdded.size());
 
-        filesystem::remove_all("dir1");
-        filesystem::remove_all("dir2");
-        filesystem::remove_all("instance_config");
+        fs::remove_all("dir1");
+        fs::remove_all("dir2");
+        fs::remove_all("instance_config");
     }
 }
 
 void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
-    filesystem::create_directories("continuous_pipeline_config");
+    fs::create_directories("continuous_pipeline_config");
     size_t builtinPipelineCnt = 0;
 #ifdef __ENTERPRISE__
     builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
@@ -258,11 +257,11 @@ void ConfigWatcherUnittest::IgnoreNewLowerPrioritySingletonConfig() const {
     APSARA_TEST_TRUE(std::find(diff2.first.mIgnored.begin(), diff2.first.mIgnored.end(), std::string("b"))
                      != diff2.first.mIgnored.end());
 
-    filesystem::remove_all("continuous_pipeline_config");
+    fs::remove_all("continuous_pipeline_config");
 }
 
 void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
-    filesystem::create_directories("continuous_pipeline_config");
+    fs::create_directories("continuous_pipeline_config");
     size_t builtinPipelineCnt = 0;
 #ifdef __ENTERPRISE__
     builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
@@ -338,11 +337,11 @@ void ConfigWatcherUnittest::IgnoreModifiedLowerPrioritySingletonConfig() const {
     APSARA_TEST_TRUE(std::find(diff2.first.mIgnored.begin(), diff2.first.mIgnored.end(), std::string("b"))
                      != diff2.first.mIgnored.end());
 
-    filesystem::remove_all("continuous_pipeline_config");
+    fs::remove_all("continuous_pipeline_config");
 }
 
 void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig() const {
-    filesystem::create_directories("continuous_pipeline_config");
+    fs::create_directories("continuous_pipeline_config");
     size_t builtinPipelineCnt = 0;
 #ifdef __ENTERPRISE__
     builtinPipelineCnt += EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
@@ -425,7 +424,7 @@ void ConfigWatcherUnittest::HigherPriorityOverrideLowerPrioritySingletonConfig()
                                   [](const CollectionConfig& c) { return c.mName == "a"; })
                      != diff2.first.mAdded.end());
 
-    filesystem::remove_all("continuous_pipeline_config");
+    fs::remove_all("continuous_pipeline_config");
 }
 
 UNIT_TEST_CASE(ConfigWatcherUnittest, InvalidConfigDirFound)

@@ -203,4 +203,12 @@ void BuildAndSortPathItems(const std::unordered_map<std::string, FileDiscoveryCo
                            std::vector<PathItem>& outSortedPaths,
                            std::vector<PathItem>& outWildcardPaths);
 
+// 为 ContainerInfo 设置多路径对应的容器真实路径（与 FileDiscoveryOptions::GetBasePathInfos 一一对应），供 input_file /
+// input_static_file_onetime 等复用
+bool SetContainerBaseDirs(ContainerInfo& containerInfo, const FileDiscoveryOptions* fileDiscovery);
+// 计算单个配置路径在容器中的映射路径
+bool SetContainerBaseDirForPath(const ContainerInfo& containerInfo,
+                                const std::string& logPath,
+                                std::string& outRealBaseDir);
+
 } // namespace logtail
