@@ -26,6 +26,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/ParamExtractor.h"
 #include "common/StringTools.h"
+#include "logger/Logger.h"
 
 using namespace std;
 
@@ -795,6 +796,75 @@ size_t FileDiscoveryOptions::GetRealBaseDirIndex(const ContainerInfo* containerI
     return bestMatchIndex;
 }
 
+// 为 ContainerInfo 设置多个真实路径，与 FileDiscoveryOptions 的多路径对应
+bool SetContainerBaseDirs(ContainerInfo& containerInfo, const FileDiscoveryOptions* fileDiscovery) {
+    if (!containerInfo.mRealBaseDirs.empty()) {
+        return true; // 已经设置过
+    }
+
+    if (!fileDiscovery || containerInfo.mRawContainerInfo == nullptr) {
+        return false;
+    }
+
+    const auto& pathInfos = fileDiscovery->GetBasePathInfos();
+    bool hasSuccess = false;
+
+    // 为每个配置路径计算对应的容器真实路径
+    for (const auto& pathInfo : pathInfos) {
+        string logPath = pathInfo.hasWildcard() ? pathInfo.wildcardPaths[0] : pathInfo.basePath;
+
+        // 计算该路径在容器中的映射
+        string realBaseDir;
+        if (SetContainerBaseDirForPath(containerInfo, logPath, realBaseDir)) {
+            containerInfo.mRealBaseDirs.push_back(realBaseDir);
+            hasSuccess = true;
+        } else {
+            // 映射失败，存储空字符串以保持索引对应
+            LOG_WARNING(sLogger,
+                        ("failed to map container path", "path mapping failed for this config path")(
+                            "container id", containerInfo.mRawContainerInfo->mID)("log path", logPath));
+            containerInfo.mRealBaseDirs.push_back("");
+        }
+    }
+
+    return hasSuccess;
+}
+
+// 计算单个配置路径在容器中的映射路径（不修改 containerInfo）
+bool SetContainerBaseDirForPath(const ContainerInfo& containerInfo, const string& logPath, string& outRealBaseDir) {
+    if (containerInfo.mRawContainerInfo == nullptr) {
+        return false;
+    }
+
+    size_t pthSize = logPath.size();
+    size_t size = containerInfo.mRawContainerInfo->mMounts.size();
+    size_t bestMatchedMountsIndex = size;
+
+    // ParseByJSONObj 确保 Destination、Source、mUpperDir 不会以\或者/结尾
+    for (size_t i = 0; i < size; ++i) {
+        StringView dst = containerInfo.mRawContainerInfo->mMounts[i].mDestination;
+        size_t dstSize = dst.size();
+
+        if (StartWith(logPath, dst)
+            && (pthSize == dstSize || (pthSize > dstSize && (logPath[dstSize] == '/' || logPath[dstSize] == '\\')))
+            && (bestMatchedMountsIndex == size
+                || containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size() < dstSize)) {
+            bestMatchedMountsIndex = i;
+        }
+    }
+    if (bestMatchedMountsIndex < size) {
+        outRealBaseDir = STRING_FLAG(default_container_host_path)
+            + containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mSource
+            + logPath.substr(containerInfo.mRawContainerInfo->mMounts[bestMatchedMountsIndex].mDestination.size());
+    } else {
+        outRealBaseDir
+            = STRING_FLAG(default_container_host_path) + containerInfo.mRawContainerInfo->mUpperDir + logPath;
+    }
+    LOG_INFO(sLogger,
+             ("set container base dir for path",
+              logPath)("real dir", outRealBaseDir)("container id", containerInfo.mRawContainerInfo->mID));
+    return true;
+}
 
 bool FileDiscoveryOptions::UpdateRawContainerInfo(const std::shared_ptr<RawContainerInfo>& rawContainerInfo,
                                                   const CollectionPipelineContext* ctx,

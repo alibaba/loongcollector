@@ -439,7 +439,7 @@ public:
 
     // std::string GetAllProjectsSet();
 
-    void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
+    void GetFileServerContainerStoppedEvents(std::vector<Event*>& eventVec);
 
 
     /**

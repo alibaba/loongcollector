@@ -24,6 +24,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/ContainerInfo.h"
+#include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "plugin/input/InputFile.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -503,7 +504,6 @@ void InputFileUnittest::OnPipelineUpdate() {
 }
 
 void InputFileUnittest::TestSetContainerBaseDir() {
-    InputFile inputFile;
     ContainerInfo containerInfo;
 
     // Create RawContainerInfo object
@@ -519,28 +519,27 @@ void InputFileUnittest::TestSetContainerBaseDir() {
 
     std::string outRealBaseDir;
 
-    ASSERT_TRUE(inputFile.SetContainerBaseDirForPath(containerInfo, "/data2/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data2/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/UpperDir/data2/log", outRealBaseDir);
 
     outRealBaseDir = "";
-    ASSERT_TRUE(inputFile.SetContainerBaseDirForPath(containerInfo, "/data1/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data1/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source1/log", outRealBaseDir);
 
     outRealBaseDir = "";
-    ASSERT_TRUE(inputFile.SetContainerBaseDirForPath(containerInfo, "/data1/data2/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data1/data2/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source2/log", outRealBaseDir);
 
     outRealBaseDir = "";
-    ASSERT_TRUE(inputFile.SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source3/log", outRealBaseDir);
 
     outRealBaseDir = "";
-    ASSERT_TRUE(inputFile.SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/data4/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/data4/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source4/log", outRealBaseDir);
 
     outRealBaseDir = "";
-    ASSERT_TRUE(
-        inputFile.SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/data4/data5/log", outRealBaseDir));
+    ASSERT_TRUE(SetContainerBaseDirForPath(containerInfo, "/data1/data2/data3/data4/data5/log", outRealBaseDir));
     APSARA_TEST_EQUAL(STRING_FLAG(default_container_host_path) + "/source4/data5/log", outRealBaseDir);
 }
 

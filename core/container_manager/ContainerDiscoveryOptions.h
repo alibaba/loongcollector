@@ -137,6 +137,7 @@ struct MatchedContainerInfo {
     std::string PathExistInputContainerIDs;
     std::string SourceAddress;
     std::string InputType;
+    std::string InputIndex;
     std::string InputIsContainerFile;
     std::string FlusherType;
     std::string FlusherTargetAddress;
@@ -151,6 +152,7 @@ struct MatchedContainerInfo {
         ss << "PathExistInputContainerIDs: " << PathExistInputContainerIDs << std::endl;
         ss << "SourceAddress: " << SourceAddress << std::endl;
         ss << "InputType: " << InputType << std::endl;
+        ss << "InputIndex: " << InputIndex << std::endl;
         ss << "InputIsContainerFile: " << InputIsContainerFile << std::endl;
         ss << "FlusherType: " << FlusherType << std::endl;
         ss << "FlusherTargetAddress: " << FlusherTargetAddress << std::endl;

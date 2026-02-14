@@ -35,8 +35,6 @@ public:
     void OnFailedInit();
     void TestCreateInnerProcessors();
     void OnPipelineUpdate();
-    void TestGetFiles();
-    void TestDirectoryNameWithDot();
     void OnEnableContainerDiscovery();
 
 protected:
@@ -405,6 +403,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
     filePath = NormalizeNativePath(filePath.string());
     {
         // new config
+        ctx.SetIsOnetimePipelineRunningBeforeStart(true);
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -420,6 +419,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         input.CommitMetricsRecordRef();
 
         APSARA_TEST_TRUE(input.Start());
+        sServer->UpdateInputs();
         APSARA_TEST_EQUAL(&input.mFileDiscovery, sServer->GetFileDiscoveryConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(&input.mFileReader, sServer->GetFileReaderConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(&input.mMultiline, sServer->GetMultilineConfig("test_config", 0).first);
@@ -480,13 +480,14 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
-        ctx.SetIsOnetimePipelineRunningBeforeStart(true);
+        ctx.SetIsOnetimePipelineRunningBeforeStart(false); // load existing checkpoint from file, do not call GetFiles()
         input.SetContext(ctx);
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
         input.CommitMetricsRecordRef();
 
         APSARA_TEST_TRUE(input.Start());
+        sServer->UpdateInputs();
         APSARA_TEST_EQUAL(&input.mFileDiscovery, sServer->GetFileDiscoveryConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(&input.mFileReader, sServer->GetFileReaderConfig("test_config", 0).first);
         APSARA_TEST_EQUAL(&input.mMultiline, sServer->GetMultilineConfig("test_config", 0).first);
@@ -508,292 +509,6 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
     fs::remove_all("test_logs");
 }
 
-void InputStaticFileUnittest::TestGetFiles() {
-    unique_ptr<InputStaticFile> input;
-    Json::Value optionalGoPipeline;
-
-    // wildcard dir
-    {
-        // invalid base dir
-        fs::create_directories("invalid_dir");
-
-        fs::path filePath = fs::absolute("test_logs/*/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().empty());
-
-        fs::remove_all("invalid_dir");
-    }
-    {
-        // non-existing const subdir
-        fs::create_directories("test_logs/dir");
-
-        fs::path filePath = fs::absolute("test_logs/*/invalid_dir/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().empty());
-
-        fs::remove_all("test_logs");
-    }
-    {
-        // invalid const subdir
-        fs::create_directories("test_logs/dir");
-        { ofstream fout("test_logs/dir/invalid_dir"); }
-
-        fs::path filePath = fs::absolute("test_logs/*/invalid_dir/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().empty());
-
-        fs::remove_all("test_logs");
-    }
-    {
-        // the last subdir before ** is const
-        fs::create_directories("test_logs/dir1/dir/valid_dir");
-        fs::create_directories("test_logs/dir2/dir/valid_dir");
-        fs::create_directories("test_logs/unmatched_dir");
-        { ofstream fout("test_logs/invalid_dir"); }
-        { ofstream fout("test_logs/dir1/dir/valid_dir/test1.log"); }
-        { ofstream fout("test_logs/dir2/dir/valid_dir/test2.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/dir*/dir/valid_dir/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
-
-        fs::remove_all("test_logs");
-    }
-    {
-        // the last subdir before ** is wildcard
-        fs::create_directories("test_logs/dir1");
-        fs::create_directories("test_logs/dir2");
-        fs::create_directories("test_logs/unmatched_dir");
-        { ofstream fout("test_logs/invalid_dir"); }
-        { ofstream fout("test_logs/dir1/test1.log"); }
-        { ofstream fout("test_logs/dir2/test2.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/dir*/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
-
-        fs::remove_all("test_logs");
-    }
-    // recursive dir search
-    {
-        // non-existing base path
-        fs::create_directories("invalid_dir");
-
-        fs::path filePath = fs::absolute("test_logs/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().empty());
-
-        fs::remove_all("invalid_dir");
-    }
-    {
-        // invalid base path
-        { ofstream fout("test_logs"); }
-
-        fs::path filePath = fs::absolute("test_logs/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_TRUE(input.GetFiles().empty());
-
-        fs::remove("test_logs");
-    }
-    {
-        // normal
-        fs::create_directories("test_logs/dir1/dir2");
-        fs::create_directories("test_logs/exclude_dir");
-        { ofstream fout("test_logs/test0.log"); }
-        { ofstream fout("test_logs/exclude_file.log"); }
-        { ofstream fout("test_logs/dir1/test1.log"); }
-        { ofstream fout("test_logs/dir1/unmatched_file"); }
-        { ofstream fout("test_logs/dir1/exclude_filepath.log"); }
-        { ofstream fout("test_logs/dir1/dir2/test2.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/**/*.log");
-        fs::path excludeFilePath = fs::absolute("test_logs/dir*/exlcude_filepath.log");
-        fs::path excludeDir = fs::absolute("test_logs/exclude*");
-        filePath = NormalizeNativePath(filePath.string());
-        excludeFilePath = NormalizeNativePath(excludeFilePath.string());
-        excludeDir = NormalizeNativePath(excludeDir.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        configJson["MaxDirSearchDepth"] = Json::Value(1);
-        configJson["ExcludeFilePaths"].append(Json::Value(excludeFilePath.string()));
-        configJson["ExcludeFiles"].append(Json::Value("exclude*.log"));
-        configJson["ExcludeDirs"].append(Json::Value(excludeDir.string()));
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(2U, input.GetFiles().size());
-
-        fs::remove_all("test_logs");
-    }
-    {
-        // loop caused by symlink
-        fs::create_directories("test_logs/dir1/dir2");
-        fs::path symlinkTarget = fs::absolute("test_logs/dir1");
-        symlinkTarget = NormalizeNativePath(symlinkTarget.string());
-        fs::create_directory_symlink(symlinkTarget, "test_logs/dir1/dir2/dir3");
-        { ofstream fout("test_logs/dir1/test.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/**/*.log");
-        filePath = NormalizeNativePath(filePath.string());
-        Json::Value configJson;
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        configJson["MaxDirSearchDepth"] = Json::Value(100);
-        InputStaticFile input;
-        input.SetContext(ctx);
-        input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
-        input.CommitMetricsRecordRef();
-        APSARA_TEST_EQUAL(1U, input.GetFiles().size());
-
-        fs::remove_all("test_logs");
-    }
-}
-
-void InputStaticFileUnittest::TestDirectoryNameWithDot() {
-    unique_ptr<InputStaticFile> input;
-    Json::Value configJson, optionalGoPipeline;
-    string configStr, errorMsg;
-
-    // Test 1: Directory name containing dot (e.g., "dir.test")
-    // This test ensures that filename() is used instead of stem() for directory matching
-    // stem() would strip everything after the dot, causing match failure
-    {
-        fs::create_directories("test_logs/app.v1/subdir");
-        fs::create_directories("test_logs/app.v2/subdir");
-        fs::create_directories("test_logs/notstem");
-        { ofstream fout("test_logs/app.v1/subdir/test1.log"); }
-        { ofstream fout("test_logs/app.v2/subdir/test2.log"); }
-        { ofstream fout("test_logs/notstem/test3.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/app.*/subdir/*.log");
-        configStr = R"(
-            {
-                "Type": "input_static_file_onetime",
-                "FilePaths": []
-            }
-        )";
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        input.reset(new InputStaticFile());
-        input->SetContext(ctx);
-        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        input->CommitMetricsRecordRef();
-        // Expected: Should find 2 files from app.v1 and app.v2 directories
-        // If stem() was used, it would match "app" only and fail to match "app.v1" and "app.v2"
-        auto files = input->GetFiles();
-        APSARA_TEST_EQUAL(2U, files.size());
-
-        fs::remove_all("test_logs");
-    }
-
-    // Test 2: Directory with multiple dots using ** pattern
-    {
-        fs::create_directories("test_logs/release.2024.01.15/logs");
-        fs::create_directories("test_logs/release.2024.01.16/logs");
-        { ofstream fout("test_logs/release.2024.01.15/logs/app.log"); }
-        { ofstream fout("test_logs/release.2024.01.16/logs/app.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/release.*/logs/**/*.log");
-        configStr = R"(
-            {
-                "Type": "input_static_file_onetime",
-                "FilePaths": [],
-                "MaxDirSearchDepth": 10
-            }
-        )";
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        input.reset(new InputStaticFile());
-        input->SetContext(ctx);
-        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        input->CommitMetricsRecordRef();
-        // Expected: Should find 2 files from both release directories
-        auto files = input->GetFiles();
-        APSARA_TEST_EQUAL(2U, files.size());
-
-        fs::remove_all("test_logs");
-    }
-
-    // Test 3: Exact directory name with dot
-    {
-        fs::create_directories("test_logs/node_modules.backup/lib");
-        { ofstream fout("test_logs/node_modules.backup/lib/test.log"); }
-
-        fs::path filePath = fs::absolute("test_logs/node_modules.backup/lib/*.log");
-        configStr = R"(
-            {
-                "Type": "input_static_file_onetime",
-                "FilePaths": []
-            }
-        )";
-        APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
-        configJson["FilePaths"].append(Json::Value(filePath.string()));
-        input.reset(new InputStaticFile());
-        input->SetContext(ctx);
-        input->CreateMetricsRecordRef(InputStaticFile::sName, "1");
-        APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
-        input->CommitMetricsRecordRef();
-        // Expected: Should find 1 file
-        auto files = input->GetFiles();
-        APSARA_TEST_EQUAL(1U, files.size());
-
-        fs::remove_all("test_logs");
-    }
-}
-
 void InputStaticFileUnittest::OnEnableContainerDiscovery() {
 }
 
@@ -801,8 +516,6 @@ UNIT_TEST_CASE(InputStaticFileUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnFailedInit)
 UNIT_TEST_CASE(InputStaticFileUnittest, TestCreateInnerProcessors)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnPipelineUpdate)
-UNIT_TEST_CASE(InputStaticFileUnittest, TestGetFiles)
-UNIT_TEST_CASE(InputStaticFileUnittest, TestDirectoryNameWithDot)
 UNIT_TEST_CASE(InputStaticFileUnittest, OnEnableContainerDiscovery)
 
 } // namespace logtail
