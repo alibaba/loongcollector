@@ -67,8 +67,6 @@ private:
     void incrementallyUpdateContainersSnapshot();
 
     bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
-    void updateContainerInfoPointersInAllConfigs();
-    void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
     computeMatchedContainersDiff(std::set<std::string>& fullContainerIDList,
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
@@ -92,7 +90,8 @@ private:
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    uint32_t mLastUpdateTime = 0;
+    uint32_t mLastIncrementalUpdateTime = 0;
+    uint32_t mLastFullUpdateTime = 0;
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};
