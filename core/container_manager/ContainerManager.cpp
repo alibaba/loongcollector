@@ -376,9 +376,6 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
 
     if (hasChanges) {
         mLastUpdateTime = time(nullptr);
-        if (updatedContainerIDs.size() > 0) {
-            updateContainerInfoPointersForContainers(updatedContainerIDs);
-        }
     }
 }
 
