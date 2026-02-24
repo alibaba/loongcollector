@@ -138,8 +138,6 @@ void ContainerManager::ApplyContainerDiffs() {
             if (containerInfos) {
                 const auto& basePathInfos = options->GetBasePathInfos();
                 for (const auto& info : *containerInfos) {
-                    // Protect access to mRawContainerInfo with lock
-                    std::lock_guard<std::mutex> lock(mContainerMapMutex);
                     if (!info.mRawContainerInfo) {
                         continue;
                     }
@@ -181,21 +179,6 @@ void ContainerManager::ApplyContainerDiffs() {
     mConfigContainerDiffMap.clear();
 }
 
-void ContainerManager::sendAllMatchedContainerInfo() {
-    std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-
-    for (auto& pair : nameConfigMap) {
-        FileDiscoveryOptions* options = pair.second.first;
-        if (options->IsContainerDiscoveryEnabled()) {
-            if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
-                && options->GetContainerDiscoveryOptions().mMatchedContainerInfo) {
-                configResults.push_back(options->GetContainerDiscoveryOptions().mMatchedContainerInfo);
-            }
-        }
-    }
-    sendMatchedContainerInfo(configResults);
-}
 
 bool ContainerManager::CheckContainerDiffForAllConfig() {
     if (!mIsRunning) {
@@ -215,18 +198,40 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
     return isUpdate;
 }
 
+
+// logtail_containers 自监控数据上报逻辑
+void ContainerManager::sendAllMatchedContainerInfo() {
+    std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
+    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+
+    for (auto& pair : nameConfigMap) {
+        FileDiscoveryOptions* options = pair.second.first;
+        if (options->IsContainerDiscoveryEnabled()) {
+            if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
+                && options->GetContainerDiscoveryOptions().mMatchedContainerInfo) {
+                configResults.push_back(options->GetContainerDiscoveryOptions().mMatchedContainerInfo);
+            }
+        }
+    }
+    sendMatchedContainerInfo(configResults);
+}
+
+// logtail_containers 自监控数据上报逻辑
 void ContainerManager::UpdateMatchedContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex) {
     WriteLock lock(mMatchedContainerInfoPipelineMux);
     mMatchedContainerInfoPipelineCtx = ctx;
     mMatchedContainerInfoInputIndex = inputIndex;
 }
 
+
+// logtail_containers 自监控数据上报逻辑
 void ContainerManager::RemoveMatchedContainerInfoPipeline() {
     WriteLock lock(mMatchedContainerInfoPipelineMux);
     mMatchedContainerInfoPipelineCtx = nullptr;
     mMatchedContainerInfoInputIndex = 0;
 }
 
+// logtail_containers 自监控数据上报逻辑
 void ContainerManager::sendMatchedContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults) {
     ReadLock lock(mMatchedContainerInfoPipelineMux);
     if (mMatchedContainerInfoPipelineCtx == nullptr) {
@@ -281,37 +286,47 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                                       const CollectionPipelineContext* ctx) {
     // If this config's container update time is newer than or equal to global update time,
     // return the cached result if it exists
-    if (options->GetLastContainerUpdateTime() > mLastUpdateTime) {
+    bool refrashAllContainers = false;
+    if (options->GetLastContainerUpdateTime() <= mLastFullUpdateTime) {
+        refrashAllContainers = true;
+    } else if (options->GetLastContainerUpdateTime() <= mLastIncrementalUpdateTime) {
+        refrashAllContainers = false;
+    } else {
         return false;
     }
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerInfoMap;
-    const auto& containerInfos = options->GetContainerInfo();
-    if (containerInfos) {
-        // Create a local copy of shared_ptrs to avoid accessing them under potential concurrent modification
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        for (const auto& info : *containerInfos) {
-            if (info.mRawContainerInfo) {
-                containerInfoMap[info.mRawContainerInfo->mID] = info.mRawContainerInfo;
-            }
-        }
-    }
     std::vector<std::string> removedList;
     std::vector<std::string> matchAddedList;
     ContainerDiff diff;
-    computeMatchedContainersDiff(*(options->GetFullContainerList()),
-                                 containerInfoMap,
-                                 options->GetContainerDiscoveryOptions().mContainerFilters,
-                                 options->GetContainerDiscoveryOptions().mIsStdio,
-                                 diff);
+    if (refrashAllContainers) {
+        options->GetFullContainerList()->clear();
+        computeMatchedContainersDiff(*(options->GetFullContainerList()),
+                                     containerInfoMap,
+                                     options->GetContainerDiscoveryOptions().mContainerFilters,
+                                     options->GetContainerDiscoveryOptions().mIsStdio,
+                                     diff);
+    } else {
+        const auto& containerInfos = options->GetContainerInfo();
+        if (containerInfos) {
+            for (const auto& info : *containerInfos) {
+                containerInfoMap[info.mRawContainerInfo->mID] = info.mRawContainerInfo;
+            }
+        }
+        computeMatchedContainersDiff(*(options->GetFullContainerList()),
+                                     containerInfoMap,
+                                     options->GetContainerDiscoveryOptions().mContainerFilters,
+                                     options->GetContainerDiscoveryOptions().mIsStdio,
+                                     diff);
+    }
 
     LOG_DEBUG(
         sLogger,
         ("diff", diff.ToString())("configName", ctx->GetConfigName())(
             "containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())(
-            "fullContainerList", options->GetFullContainerList()->size())("containerInfos", containerInfos->size())(
-            "lastConfigContainerUpdateTime", options->GetLastContainerUpdateTime())("mLastUpdateTime",
-                                                                                    mLastUpdateTime));
+            "fullContainerList", options->GetFullContainerList()->size())("containerInfoMap", containerInfoMap.size())(
+            "lastConfigContainerUpdateTime", options->GetLastContainerUpdateTime())(
+            "mLastFullUpdateTime", mLastFullUpdateTime)("mLastIncrementalUpdateTime", mLastIncrementalUpdateTime));
 
     // Update the config's container update time when there are changes
     options->SetLastContainerUpdateTime(time(nullptr));
@@ -375,7 +390,7 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
     }
 
     if (hasChanges) {
-        mLastUpdateTime = time(nullptr);
+        mLastIncrementalUpdateTime = time(nullptr);
     }
 }
 
@@ -409,10 +424,8 @@ void ContainerManager::refreshAllContainersSnapshot() {
         std::lock_guard<std::mutex> lock(mContainerMapMutex);
         mContainerMap.swap(tmpContainerMap);
     }
-    mLastUpdateTime = time(nullptr);
+    mLastFullUpdateTime = time(nullptr);
 
-    // Update container info pointers in all configs to point to the new RawContainerInfo objects
-    updateContainerInfoPointersInAllConfigs();
     tmpContainerMap.clear();
 }
 
@@ -504,7 +517,6 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
             }
             for (auto& info : *containerInfos) {
                 // Protect access to mRawContainerInfo with lock
-                std::lock_guard<std::mutex> lock(mContainerMapMutex);
                 if (!info.mRawContainerInfo) {
                     continue;
                 }
@@ -519,7 +531,7 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
                             eventVec.push_back(pStoppedEvent);
                         }
                     }
-                    info.mRawContainerInfo->mStopped = true;
+                    info.mRawContainerInfo->mStopped.store(true);
                     LOG_DEBUG(sLogger, ("generate stop event, containerId", containerId)("configName", itr->first));
                 }
             }
@@ -601,7 +613,7 @@ void ContainerManager::computeMatchedContainersDiff(
     const ContainerFilters& filters,
     bool isStdio,
     ContainerDiff& diff) {
-    // Create a local snapshot of mContainerMap to avoid race conditions
+    // Create a local snapshot of mContainerMap to avoid holding the lock for extended period
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerMapSnapshot;
     {
         std::lock_guard<std::mutex> lock(mContainerMapMutex);
@@ -669,7 +681,7 @@ static Json::Value SerializeRawContainerInfo(const std::shared_ptr<RawContainerI
     v["Name"] = Json::Value(info->mName);
     v["UpperDir"] = Json::Value(info->mUpperDir);
     v["LogPath"] = Json::Value(info->mLogPath);
-    v["Stopped"] = Json::Value(info->mStopped);
+    v["Stopped"] = Json::Value(info->mStopped.load());
     v["Status"] = Json::Value(info->mStatus);
 
     // mounts
@@ -739,7 +751,7 @@ static std::shared_ptr<RawContainerInfo> DeserializeRawContainerInfo(const Json:
         info->mLogPath = v["LogPath"].asString();
     }
     if (v.isMember("Stopped") && v["Stopped"].isBool()) {
-        info->mStopped = v["Stopped"].asBool();
+        info->mStopped.store(v["Stopped"].asBool());
     }
     if (v.isMember("Status") && v["Status"].isString()) {
         info->mStatus = v["Status"].asString();
@@ -1056,85 +1068,6 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             }
         }
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));
-    }
-}
-
-void ContainerManager::updateContainerInfoPointersInAllConfigs() {
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (const auto& configPair : nameConfigMap) {
-        FileDiscoveryOptions* options = configPair.second.first;
-        if (!options->IsContainerDiscoveryEnabled()) {
-            continue;
-        }
-
-        const auto& containerInfos = options->GetContainerInfo();
-        if (!containerInfos) {
-            continue;
-        }
-
-        // Update RawContainerInfo pointers for each container in this config
-        for (auto& containerInfo : *containerInfos) {
-            // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
-
-            // Safely get container ID under lock protection
-            if (!containerInfo.mRawContainerInfo) {
-                LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
-                continue;
-            }
-
-            const std::string containerId = containerInfo.mRawContainerInfo->mID;
-            auto it = mContainerMap.find(containerId);
-            if (it != mContainerMap.end()) {
-                // Update the pointer to point to the new RawContainerInfo object
-                containerInfo.mRawContainerInfo = it->second;
-            } else {
-                // Container no longer exists in the global map, this should not happen
-                // but log a warning if it does
-                LOG_WARNING(sLogger, ("container not found in global map during pointer update", containerId));
-            }
-        }
-    }
-}
-
-void ContainerManager::updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs) {
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (const auto& configPair : nameConfigMap) {
-        FileDiscoveryOptions* options = configPair.second.first;
-        if (!options->IsContainerDiscoveryEnabled()) {
-            continue;
-        }
-
-        const auto& containerInfos = options->GetContainerInfo();
-        if (!containerInfos) {
-            continue;
-        }
-
-        // Update RawContainerInfo pointers only for the specified container IDs
-        for (auto& containerInfo : *containerInfos) {
-            // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
-
-            // Safely get container ID under lock protection
-            if (!containerInfo.mRawContainerInfo) {
-                LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
-                continue;
-            }
-
-            const std::string containerId = containerInfo.mRawContainerInfo->mID;
-            // Check if this container ID is in the list of updated containers
-            if (std::find(containerIDs.begin(), containerIDs.end(), containerId) != containerIDs.end()) {
-                auto it = mContainerMap.find(containerId);
-                if (it != mContainerMap.end()) {
-                    // Update the pointer to point to the new RawContainerInfo object
-                    containerInfo.mRawContainerInfo = it->second;
-                } else {
-                    // Container no longer exists in the global map, this should not happen
-                    // but log a warning if it does
-                    LOG_WARNING(sLogger, ("container not found in global map during pointer update", containerId));
-                }
-            }
-        }
     }
 }
 
