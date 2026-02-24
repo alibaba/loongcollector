@@ -143,7 +143,7 @@ void ContainerManager::ApplyContainerDiffs() {
                     if (!info.mRawContainerInfo) {
                         continue;
                     }
-                    
+
                     // Validate array size consistency
                     if (info.mRealBaseDirs.size() != basePathInfos.size()) {
                         LOG_WARNING(
@@ -376,6 +376,9 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
 
     if (hasChanges) {
         mLastUpdateTime = time(nullptr);
+        if (updatedContainerIDs.size() > 0) {
+            updateContainerInfoPointersForContainers(updatedContainerIDs);
+        }
     }
 }
 
@@ -1076,13 +1079,13 @@ void ContainerManager::updateContainerInfoPointersInAllConfigs() {
         for (auto& containerInfo : *containerInfos) {
             // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
             std::lock_guard<std::mutex> lock(mContainerMapMutex);
-            
+
             // Safely get container ID under lock protection
             if (!containerInfo.mRawContainerInfo) {
                 LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
                 continue;
             }
-            
+
             const std::string containerId = containerInfo.mRawContainerInfo->mID;
             auto it = mContainerMap.find(containerId);
             if (it != mContainerMap.end()) {
@@ -1114,13 +1117,13 @@ void ContainerManager::updateContainerInfoPointersForContainers(const std::vecto
         for (auto& containerInfo : *containerInfos) {
             // Lock must be acquired BEFORE accessing mRawContainerInfo to prevent use-after-free
             std::lock_guard<std::mutex> lock(mContainerMapMutex);
-            
+
             // Safely get container ID under lock protection
             if (!containerInfo.mRawContainerInfo) {
                 LOG_WARNING(sLogger, ("null mRawContainerInfo in container info", ""));
                 continue;
             }
-            
+
             const std::string containerId = containerInfo.mRawContainerInfo->mID;
             // Check if this container ID is in the list of updated containers
             if (std::find(containerIDs.begin(), containerIDs.end(), containerId) != containerIDs.end()) {
