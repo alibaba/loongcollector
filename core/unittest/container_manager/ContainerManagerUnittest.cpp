@@ -33,6 +33,8 @@
 #include "common/RuntimeUtil.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "container_manager/ContainerManager.h"
+#include "file_server/FileDiscoveryOptions.h"
+#include "file_server/FileServer.h"
 #include "unittest/Unittest.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
 
@@ -1568,18 +1570,26 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
 
 void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
     // This test simulates concurrent access to mContainerMap and mRawContainerInfo to reproduce
-    // race conditions that commit e0b33e88 was designed to prevent.
+    // race conditions related to container lifecycle management.
     //
     // Test scenarios:
-    // 1. Thread 1: Continuously modifies mContainerMap (add/remove containers)
-    // 2. Thread 2: Calls computeMatchedContainersDiff (tests snapshot mechanism)
-    // 3. Thread 3: Calls GetContainerStoppedEvents (tests mRawContainerInfo access with proper locking)
+    // 1. Thread 1: Continuously calls refreshAllContainersSnapshot() and incrementallyUpdateContainersSnapshot()
+    //              (simulates real Polling thread behavior, updates mContainerMap with new RawContainerInfo)
+    // 2. Thread 2: Calls CheckContainerDiffForAllConfig() and ApplyContainerDiffs()
+    //              (simulates FileServer::Resume() behavior, can trigger GetCustomExternalTags crash)
+    // 3. Thread 3: Calls GetContainerStoppedEvents()
+    //              (tests mRawContainerInfo access with proper locking)
     //
-    // Without the fix, this test may crash or produce errors due to:
-    // - Iterator invalidation in computeMatchedContainersDiff
-    // - Use-after-free when accessing mRawContainerInfo->mID without lock
+    // This test can expose race conditions including:
+    // - Iterator invalidation when mContainerMap is modified during iteration
+    // - Use-after-free when accessing RawContainerInfo fields (mEnv, mK8sInfo.mLabels) after container replacement
+    // - Concurrent access to unordered_map fields without proper synchronization (in GetCustomExternalTags)
+    // - Concurrent access to mConfigContainerDiffMap without proper locking
     // - Null pointer dereference if mRawContainerInfo is not checked
     ContainerManager containerManager;
+
+    // Set running state so CheckContainerDiffForAllConfig can execute
+    containerManager.mIsRunning = true;
 
     // Initialize with some containers
     for (int i = 0; i < 20; i++) {
@@ -1590,31 +1600,108 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
         containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
     }
 
+    // Setup FileServer with a test config to enable CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("test_concurrent_config");
+
+    // Create FileDiscoveryOptions with container discovery enabled
+    Json::Value inputConfigJson;
+    inputConfigJson["FilePaths"].append("/tmp/test/*.log");
+    inputConfigJson["ContainerFilters"]["IncludeEnv"]["ENV_KEY_1"] = "";
+    inputConfigJson["ContainerFilters"]["IncludeK8sLabel"]["app"] = "";
+    inputConfigJson["ExternalEnvTag"]["ENV_KEY_1"] = "custom_env_tag";
+    inputConfigJson["ExternalK8sLabelTag"]["app"] = "custom_k8s_tag";
+
+    FileDiscoveryOptions* discoveryOpts = new FileDiscoveryOptions();
+    discoveryOpts->Init(inputConfigJson, ctx, "test");
+    discoveryOpts->SetEnableContainerDiscoveryFlag(true);
+    discoveryOpts->SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+    discoveryOpts->SetFullContainerList(std::make_shared<std::set<std::string>>());
+    discoveryOpts->SetDeduceAndSetContainerBaseDirFunc(
+        [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
+            containerInfo.mRealBaseDirs.push_back("/tmp/test");
+            return true;
+        });
+
+    // Add config to FileServer so CheckContainerDiffForAllConfig can find it
+    FileServer::GetInstance()->AddFileDiscoveryConfig("test_concurrent_config", discoveryOpts, &ctx);
+
     std::atomic<bool> testRunning{true};
     std::atomic<int> iterationCount{0};
     std::atomic<int> errorCount{0};
 
-    // Thread 1: Continuously modify mContainerMap
+    // Thread 1: Continuously call refreshAllContainersSnapshot and incrementallyUpdateContainersSnapshot
+    // This simulates the real polling thread behavior
     auto modifyThread = [&]() {
         int counter = 100;
         while (testRunning) {
             try {
-                // Add new containers
-                RawContainerInfo newInfo;
-                newInfo.mID = "dynamic_" + std::to_string(counter);
-                newInfo.mStatus = "running";
-                newInfo.mLogPath = "/var/log/dynamic_" + std::to_string(counter);
-
-                {
-                    std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
-                    containerManager.mContainerMap[newInfo.mID] = std::make_shared<RawContainerInfo>(newInfo);
-                }
-
-                // Remove old containers
-                if (counter > 105) {
-                    std::string oldId = "dynamic_" + std::to_string(counter - 5);
-                    std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
-                    containerManager.mContainerMap.erase(oldId);
+                // Alternate between full refresh and incremental updates
+                if (counter % 2 == 0) {
+                    // Simulate refreshAllContainersSnapshot with dynamic container data
+                    std::string allMeta = R"({
+                        "All": [
+                            {
+                                "ID": "container_0",
+                                "Name": "test_container_0",
+                                "Status": "running",
+                                "LogPath": "/var/lib/docker/containers/container_0/logs",
+                                "UpperDir": "/var/lib/docker/overlay2/container_0/diff",
+                                "Env": {
+                                    "ENV_KEY_1": "value1",
+                                    "ENV_KEY_2": "value2"
+                                },
+                                "K8sInfo": {
+                                    "Namespace": "default",
+                                    "Pod": "test-pod",
+                                    "Labels": {
+                                        "app": "test",
+                                        "version": "v1"
+                                    }
+                                }
+                            },
+                            {
+                                "ID": "dynamic_)"
+                        + std::to_string(counter) + R"(",
+                                "Name": "dynamic_container",
+                                "Status": "running",
+                                "LogPath": "/var/lib/docker/containers/dynamic/logs",
+                                "UpperDir": "/var/lib/docker/overlay2/dynamic/diff"
+                            }
+                        ]
+                    })";
+                    LogtailPluginMock::GetInstance()->SetUpContainersMeta(allMeta);
+                    containerManager.refreshAllContainersSnapshot();
+                } else {
+                    // Simulate incrementallyUpdateContainersSnapshot with dynamic updates
+                    std::string diffMeta = R"({
+                        "Update": [
+                            {
+                                "ID": "dynamic_)"
+                        + std::to_string(counter) + R"(",
+                                "Name": "updated_container",
+                                "Status": "running",
+                                "LogPath": "/var/lib/docker/containers/updated/logs",
+                                "UpperDir": "/var/lib/docker/overlay2/updated/diff",
+                                "Env": {
+                                    "UPDATED_ENV": "new_value"
+                                },
+                                "K8sInfo": {
+                                    "Namespace": "default",
+                                    "Pod": "updated-pod",
+                                    "Labels": {
+                                        "app": "updated"
+                                    }
+                                }
+                            }
+                        ],
+                        "Delete": ["old_container_)"
+                        + std::to_string(counter - 10) + R"("],
+                        "Stop": ["container_)"
+                        + std::to_string(counter % 20) + R"("]
+                    })";
+                    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffMeta);
+                    containerManager.incrementallyUpdateContainersSnapshot();
                 }
 
                 counter++;
@@ -1625,17 +1712,19 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
         }
     };
 
-    // Thread 2: Continuously call computeMatchedContainersDiff (reads mContainerMap)
+    // Thread 2: Continuously call CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    // This simulates the real FileServer::Resume() behavior
     auto readThread = [&]() {
         while (testRunning) {
             try {
-                std::set<std::string> fullList;
-                std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
-                ContainerFilters filters;
-                ContainerDiff diff;
-
-                // This should use a snapshot to avoid iterator invalidation
-                containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+                // Check container diffs for all configs (fills mConfigContainerDiffMap)
+                bool hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+                LOG_INFO(sLogger, ("CheckContainerDiffForAllConfig", hasUpdate));
+                // Apply the diffs (reads and clears mConfigContainerDiffMap)
+                // This is where GetCustomExternalTags gets called and may crash
+                // When thread 1 replaces RawContainerInfo in mContainerMap, the old info's
+                // mEnv and mK8sInfo.mLabels may be accessed here causing use-after-free
+                containerManager.ApplyContainerDiffs();
 
                 iterationCount++;
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
@@ -1690,6 +1779,10 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
     t1.join();
     t2.join();
     t3.join();
+
+    // Cleanup FileServer config
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig("test_concurrent_config");
+    delete discoveryOpts;
 
     // With the fix (snapshot), there should be no errors
     EXPECT_EQ(errorCount.load(), 0) << "Concurrent access caused " << errorCount.load() << " errors";
