@@ -47,7 +47,9 @@ public:
 
     // for plugin
     FileDiscoveryConfig GetFileDiscoveryConfig(const std::string& name) const;
-    std::unordered_map<std::string, FileDiscoveryConfig> GetAllFileDiscoveryConfigs() const;
+    const std::unordered_map<std::string, FileDiscoveryConfig>& GetAllFileDiscoveryConfigs() const {
+        return mPipelineNameFileDiscoveryConfigsMap;
+    }
     void
     AddFileDiscoveryConfig(const std::string& name, FileDiscoveryOptions* opts, const CollectionPipelineContext* ctx);
     void RemoveFileDiscoveryConfig(const std::string& name);
