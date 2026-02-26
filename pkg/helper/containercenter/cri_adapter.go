@@ -333,6 +333,9 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 	}
 }
 
+// innerContainer.Status is get by pid check, if the pid is not alive, status is ContainerStatusExited
+// innerContainer.State is get by cri-runtime list containers, if the container is exited, state is ContainerStateContainerExited
+// if ForceReleaseDeletedFileFDTimeout is set, we should mark the container as removed if pid is not alive
 func (cw *CRIRuntimeWrapper) containerShouldMarkRemove(innerContainer *innerContainerInfo) bool {
 	if ForceReleaseDeletedFileFDTimeout >= 0 {
 		if innerContainer.Status == ContainerStatusExited {

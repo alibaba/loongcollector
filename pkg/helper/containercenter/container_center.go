@@ -318,7 +318,9 @@ func (did *DockerInfoDetail) IsTimeout() bool {
 	if ForceReleaseDeletedFileFDTimeout >= 0 {
 		if nowTime.Sub(did.lastUpdateTime) >= ForceReleaseDeletedFileFDTimeout {
 			return true
-		} else if nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout {
+		}
+	} else {
+		if nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout {
 			return true
 		}
 	}
