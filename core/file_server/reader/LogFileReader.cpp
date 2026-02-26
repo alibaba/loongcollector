@@ -1088,13 +1088,7 @@ bool LogFileReader::UpdateFilePtr() {
     // move last update time before check IsValidToPush
     mLastUpdateTime = time(nullptr);
     if (mLogFileOp.IsOpen() == false) {
-        // In several cases we should revert file deletion flag:
-        // 1. File is appended after deletion. This happens when app is still logging, but a user deleted the log file.
-        // 2. File was rename/moved, but is rename/moved back later.
-        // 3. Log rotated. But iLogtail's logic will not remove the reader from readerArray on delete event.
-        //    It will be removed while the new file has modify event. The reader is still the head of readerArray,
-        //    thus it will be open again for reading.
-        // However, if the user explicitly set a delete timeout. We should not revert the flag.
+        // we may have mislabeled the deleted flag and then closed fd. Correct it here.
         SetFileDeleted(false);
         if (GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize() > INT32_FLAG(max_reader_open_files)) {
             LOG_ERROR(sLogger,
