@@ -1626,12 +1626,12 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
     mDiscoveryOpts = FileDiscoveryOptions();
     mDiscoveryOpts.Init(inputConfigJson, ctx, "test");
     mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
-    
+
     // Initialize ContainerDiscoveryOptions separately
     ContainerDiscoveryOptions containerDiscoveryOpts;
     containerDiscoveryOpts.Init(inputConfigJson, ctx, "test");
     mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(containerDiscoveryOpts));
-    
+
     mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
     mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
     mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
