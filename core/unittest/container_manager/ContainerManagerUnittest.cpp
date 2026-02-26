@@ -13,6 +13,8 @@
 // limitations under the License.
 
 
+#include <cstdlib>
+
 #include <algorithm>
 #include <atomic>
 #include <boost/regex.hpp>
@@ -20,6 +22,7 @@
 #include <fstream>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -59,13 +62,19 @@ public:
     void TestContainerMatchingConsistency() const;
     void TestcomputeMatchedContainersDiffWithSnapshot() const;
     void TestNullRawContainerInfoHandling() const;
-    void TestConcurrentContainerMapAccess() const;
+    void TestConcurrentContainerMapAccess_T1T2();
+    void TestConcurrentContainerMapAccess_T1T3();
+    void TestConcurrentContainerMapAccess_T1T2T3();
     void runTestFile(const std::string& testFilePath) const;
 
 private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    CollectionPipelineContext ctx;
+
     void parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const;
     bool parseContainerFilterConfigFromTestJson(const Json::Value& filterJson, ContainerFilterConfig& config) const;
     std::string findTestDataDirectory() const;
+    void runConcurrentContainerMapAccessTest(bool enableT2, bool enableT3, const std::string& testName);
 };
 
 void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
@@ -1568,16 +1577,18 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
     }
 }
 
-void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
+void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2,
+                                                                   bool enableT3,
+                                                                   const std::string& testName) {
     // This test simulates concurrent access to mContainerMap and mRawContainerInfo to reproduce
     // race conditions related to container lifecycle management.
     //
     // Test scenarios:
     // 1. Thread 1: Continuously calls refreshAllContainersSnapshot() and incrementallyUpdateContainersSnapshot()
     //              (simulates real Polling thread behavior, updates mContainerMap with new RawContainerInfo)
-    // 2. Thread 2: Calls CheckContainerDiffForAllConfig() and ApplyContainerDiffs()
+    // 2. Thread 2 (optional): Calls CheckContainerDiffForAllConfig() and ApplyContainerDiffs()
     //              (simulates FileServer::Resume() behavior, can trigger GetCustomExternalTags crash)
-    // 3. Thread 3: Calls GetContainerStoppedEvents()
+    // 3. Thread 3 (optional): Calls GetContainerStoppedEvents()
     //              (tests mRawContainerInfo access with proper locking)
     //
     // This test can expose race conditions including:
@@ -1601,8 +1612,7 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
     }
 
     // Setup FileServer with a test config to enable CheckContainerDiffForAllConfig and ApplyContainerDiffs
-    CollectionPipelineContext ctx;
-    ctx.SetConfigName("test_concurrent_config");
+    ctx.SetConfigName(testName);
 
     // Create FileDiscoveryOptions with container discovery enabled
     Json::Value inputConfigJson;
@@ -1612,19 +1622,19 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
     inputConfigJson["ExternalEnvTag"]["ENV_KEY_1"] = "custom_env_tag";
     inputConfigJson["ExternalK8sLabelTag"]["app"] = "custom_k8s_tag";
 
-    FileDiscoveryOptions* discoveryOpts = new FileDiscoveryOptions();
-    discoveryOpts->Init(inputConfigJson, ctx, "test");
-    discoveryOpts->SetEnableContainerDiscoveryFlag(true);
-    discoveryOpts->SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
-    discoveryOpts->SetFullContainerList(std::make_shared<std::set<std::string>>());
-    discoveryOpts->SetDeduceAndSetContainerBaseDirFunc(
+    mDiscoveryOpts = FileDiscoveryOptions();
+    mDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+    mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+    mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+    mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
         [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
             containerInfo.mRealBaseDirs.push_back("/tmp/test");
             return true;
         });
 
     // Add config to FileServer so CheckContainerDiffForAllConfig can find it
-    FileServer::GetInstance()->AddFileDiscoveryConfig("test_concurrent_config", discoveryOpts, &ctx);
+    FileServer::GetInstance()->AddFileDiscoveryConfig(testName, &mDiscoveryOpts, &ctx);
 
     std::atomic<bool> testRunning{true};
     std::atomic<int> iterationCount{0};
@@ -1636,76 +1646,69 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
         int counter = 100;
         while (testRunning) {
             try {
-                // Alternate between full refresh and incremental updates
-                if (counter % 2 == 0) {
-                    // Simulate refreshAllContainersSnapshot with dynamic container data
-                    std::string allMeta = R"({
-                        "All": [
-                            {
-                                "ID": "container_0",
-                                "Name": "test_container_0",
-                                "Status": "running",
-                                "LogPath": "/var/lib/docker/containers/container_0/logs",
-                                "UpperDir": "/var/lib/docker/overlay2/container_0/diff",
-                                "Env": {
-                                    "ENV_KEY_1": "value1",
-                                    "ENV_KEY_2": "value2"
-                                },
-                                "K8sInfo": {
-                                    "Namespace": "default",
-                                    "Pod": "test-pod",
-                                    "Labels": {
-                                        "app": "test",
-                                        "version": "v1"
-                                    }
-                                }
-                            },
-                            {
-                                "ID": "dynamic_)"
-                        + std::to_string(counter) + R"(",
-                                "Name": "dynamic_container",
-                                "Status": "running",
-                                "LogPath": "/var/lib/docker/containers/dynamic/logs",
-                                "UpperDir": "/var/lib/docker/overlay2/dynamic/diff"
-                            }
-                        ]
-                    })";
-                    LogtailPluginMock::GetInstance()->SetUpContainersMeta(allMeta);
+                // Alternate between full refresh and incremental updates (with some randomness)
+                if (counter % 2 == 0 || rand() % 3 == 0) {
+                    // Simulate refreshAllContainersSnapshot with subset of existing containers
+                    // This triggers RawContainerInfo object replacement for selected containers
+                    // Only update 5 containers per refresh to avoid huge JSON string building
+                    std::ostringstream metaBuilder;
+                    metaBuilder << R"({"All": [)";
+
+                    // Include 5 rotating containers with updated metadata
+                    for (int i = 0; i < 5; i++) {
+                        int containerId = (counter + i) % 20;
+                        if (i > 0)
+                            metaBuilder << ",";
+                        metaBuilder << R"({"ID": "container_)" << containerId << R"(", "Name": "test_container_)"
+                                    << containerId << R"(", "Status": "running")"
+                                    << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
+                                    << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
+                                    << R"(/diff")"
+                                    << R"(, "Env": {"ENV_KEY_1": "value_)" << counter << R"(", "COUNTER": ")" << counter
+                                    << R"("})"
+                                    << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
+                                    << R"(", "Labels": {"app": "app_)" << (counter % 5) << R"(", "version": "v)"
+                                    << (counter % 3) << R"("}}})";
+                    }
+
+                    metaBuilder << R"(]})";
+
+                    LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder.str());
                     containerManager.refreshAllContainersSnapshot();
                 } else {
-                    // Simulate incrementallyUpdateContainersSnapshot with dynamic updates
-                    std::string diffMeta = R"({
-                        "Update": [
-                            {
-                                "ID": "dynamic_)"
-                        + std::to_string(counter) + R"(",
-                                "Name": "updated_container",
-                                "Status": "running",
-                                "LogPath": "/var/lib/docker/containers/updated/logs",
-                                "UpperDir": "/var/lib/docker/overlay2/updated/diff",
-                                "Env": {
-                                    "UPDATED_ENV": "new_value"
-                                },
-                                "K8sInfo": {
-                                    "Namespace": "default",
-                                    "Pod": "updated-pod",
-                                    "Labels": {
-                                        "app": "updated"
-                                    }
-                                }
-                            }
-                        ],
-                        "Delete": ["old_container_)"
-                        + std::to_string(counter - 10) + R"("],
-                        "Stop": ["container_)"
-                        + std::to_string(counter % 20) + R"("]
-                    })";
-                    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffMeta);
+                    // Simulate incrementallyUpdateContainersSnapshot with updates to existing containers
+                    // Update 2-3 existing containers to trigger RawContainerInfo replacement
+                    std::ostringstream diffBuilder;
+                    diffBuilder << R"({"Update": [)";
+
+                    int numUpdates = 2 + (counter % 2);
+                    for (int i = 0; i < numUpdates; i++) {
+                        int containerId = (counter + i) % 20;
+                        if (i > 0)
+                            diffBuilder << ",";
+                        diffBuilder << R"({"ID": "container_)" << containerId << R"(", "Name": "test_container_)"
+                                    << containerId << R"(", "Status": "running")"
+                                    << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
+                                    << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
+                                    << R"(/diff")"
+                                    << R"(, "Env": {"ENV_KEY_1": "incremental_)" << counter
+                                    << R"(", "UPDATED_ENV": "new_)" << counter << R"("})"
+                                    << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
+                                    << R"(", "Labels": {"app": "incremental_)" << counter
+                                    << R"(", "updated": "true"}}})";
+                    }
+
+                    diffBuilder << R"(], "Delete": ["old_container_)" << (counter - 50) << R"("], "Stop": ["container_)"
+                                << (counter % 20) << R"("]})";
+
+                    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder.str());
                     containerManager.incrementallyUpdateContainersSnapshot();
                 }
 
                 counter++;
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+                // Random sleep interval (80-200us) to create more timing variations
+                std::this_thread::sleep_for(std::chrono::microseconds(80 + rand() % 120));
             } catch (const std::exception& e) {
                 errorCount++;
             }
@@ -1715,11 +1718,14 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
     // Thread 2: Continuously call CheckContainerDiffForAllConfig and ApplyContainerDiffs
     // This simulates the real FileServer::Resume() behavior
     auto readThread = [&]() {
+        // Random initial delay (0-50ms) to vary thread interleaving
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 50));
+
         while (testRunning) {
             try {
                 // Check container diffs for all configs (fills mConfigContainerDiffMap)
-                bool hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-                LOG_INFO(sLogger, ("CheckContainerDiffForAllConfig", hasUpdate));
+                containerManager.CheckContainerDiffForAllConfig();
+
                 // Apply the diffs (reads and clears mConfigContainerDiffMap)
                 // This is where GetCustomExternalTags gets called and may crash
                 // When thread 1 replaces RawContainerInfo in mContainerMap, the old info's
@@ -1727,7 +1733,9 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
                 containerManager.ApplyContainerDiffs();
 
                 iterationCount++;
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
+
+                // Random sleep interval (50-150us) to create more varied race conditions
+                std::this_thread::sleep_for(std::chrono::microseconds(50 + rand() % 100));
             } catch (const std::exception& e) {
                 errorCount++;
             }
@@ -1736,7 +1744,12 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
 
     // Thread 3: Call GetContainerStoppedEvents to test concurrent access to mRawContainerInfo
     // This tests the fix for accessing mRawContainerInfo->mID without proper locking
+
+
     auto stoppedEventsThread = [&]() {
+        // Random initial delay (0-80ms) to vary thread interleaving
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 80));
+
         int counter = 0;
         while (testRunning) {
             try {
@@ -1758,40 +1771,70 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess() const {
                 }
 
                 counter++;
-                std::this_thread::sleep_for(std::chrono::microseconds(100));
+                iterationCount++;
+
+                // Random sleep interval (80-180us) to create more varied race conditions
+                std::this_thread::sleep_for(std::chrono::microseconds(80 + rand() % 100));
             } catch (const std::exception& e) {
                 errorCount++;
             }
         }
     };
 
-    // Start threads
+
+    // Start threads based on configuration
     std::thread t1(modifyThread);
-    std::thread t2(readThread);
-    std::thread t3(stoppedEventsThread);
+    std::unique_ptr<std::thread> t2;
+    std::unique_ptr<std::thread> t3;
+
+    if (enableT2) {
+        t2 = std::make_unique<std::thread>(readThread);
+    }
+    if (enableT3) {
+        t3 = std::make_unique<std::thread>(stoppedEventsThread);
+    }
 
     // Let them run for a short time
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 
     // Stop threads
     testRunning = false;
 
     t1.join();
-    t2.join();
-    t3.join();
+    if (t2) {
+        t2->join();
+    }
+    if (t3) {
+        t3->join();
+    }
 
     // Cleanup FileServer config
-    FileServer::GetInstance()->RemoveFileDiscoveryConfig("test_concurrent_config");
-    delete discoveryOpts;
-
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);
     // With the fix (snapshot), there should be no errors
     EXPECT_EQ(errorCount.load(), 0) << "Concurrent access caused " << errorCount.load() << " errors";
 
     // Verify we actually ran many iterations
     EXPECT_GT(iterationCount.load(), 100) << "Test should run many iterations to stress test concurrency";
 
-    std::cout << "Concurrent test completed: " << iterationCount.load() << " iterations with " << errorCount.load()
-              << " errors" << std::endl;
+    std::string threadConfig = "T1";
+    if (enableT2)
+        threadConfig += "+T2";
+    if (enableT3)
+        threadConfig += "+T3";
+    std::cout << "Concurrent test (" << threadConfig << ") completed: " << iterationCount.load() << " iterations with "
+              << errorCount.load() << " errors" << std::endl;
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T2() {
+    runConcurrentContainerMapAccessTest(true, false, "test_concurrent_config_t1t2");
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T3() {
+    runConcurrentContainerMapAccessTest(false, true, "test_concurrent_config_t1t3");
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T2T3() {
+    runConcurrentContainerMapAccessTest(true, true, "test_concurrent_config_t1t2t3");
 }
 
 void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {
@@ -1857,7 +1900,9 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiffWithSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestNullRawContainerInfoHandling)
-UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T3)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2T3)
 
 } // namespace logtail
 

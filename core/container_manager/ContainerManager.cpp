@@ -100,6 +100,7 @@ void ContainerManager::pollingLoop() {
 }
 
 void ContainerManager::ApplyContainerDiffs() {
+    WriteLock lock(mFileDiscoveryConfigsRWLock);
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     for (auto& pair : mConfigContainerDiffMap) {
@@ -185,6 +186,8 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
         return false;
     }
     bool isUpdate = false;
+
+    WriteLock lock(mFileDiscoveryConfigsRWLock);
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
         FileDiscoveryOptions* options = itr->second.first;
@@ -202,14 +205,17 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
 // logtail_containers 自监控数据上报逻辑
 void ContainerManager::sendAllMatchedContainerInfo() {
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
-    auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+    {
+        ReadLock lock(mFileDiscoveryConfigsRWLock);
+        auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
 
-    for (auto& pair : nameConfigMap) {
-        FileDiscoveryOptions* options = pair.second.first;
-        if (options->IsContainerDiscoveryEnabled()) {
-            if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
-                && options->GetContainerDiscoveryOptions().mMatchedContainerInfo) {
-                configResults.push_back(options->GetContainerDiscoveryOptions().mMatchedContainerInfo);
+        for (auto& pair : nameConfigMap) {
+            FileDiscoveryOptions* options = pair.second.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta
+                    && options->GetContainerDiscoveryOptions().mMatchedContainerInfo) {
+                    configResults.push_back(options->GetContainerDiscoveryOptions().mMatchedContainerInfo);
+                }
             }
         }
     }
@@ -300,7 +306,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     std::vector<std::string> matchAddedList;
     ContainerDiff diff;
     if (refrashAllContainers) {
-        options->GetFullContainerList()->clear();
+        options->SetFullContainerList(std::make_shared<std::set<std::string>>());
         computeMatchedContainersDiff(*(options->GetFullContainerList()),
                                      containerInfoMap,
                                      options->GetContainerDiscoveryOptions().mContainerFilters,
@@ -494,7 +500,6 @@ std::string ContainerManager::joinContainerIDs(const std::vector<std::string>& c
 }
 
 void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
-    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     std::vector<std::string> stoppedContainerIDs;
     {
         std::lock_guard<std::mutex> lock(mStoppedContainerIDsMutex);
@@ -505,17 +510,23 @@ void ContainerManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) 
     }
     LOG_INFO(sLogger, ("stoppedContainerIDs", ToString(stoppedContainerIDs)));
 
+    ReadLock lock(mFileDiscoveryConfigsRWLock);
+    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     for (const auto& containerId : stoppedContainerIDs) {
         for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
             const FileDiscoveryOptions* options = itr->second.first;
             if (!options->IsContainerDiscoveryEnabled()) {
                 continue;
             }
-            const auto& containerInfos = options->GetContainerInfo();
-            if (!containerInfos) {
+            // Capture a local shared_ptr snapshot to protect against concurrent modifications
+            // by ApplyContainerDiffs (which may call UpdateRawContainerInfo/DeleteRawContainerInfo)
+            auto containerInfosSnapshot = options->GetContainerInfo();
+            if (!containerInfosSnapshot) {
                 continue;
             }
-            for (auto& info : *containerInfos) {
+            // Now iterate the snapshot - even if options->mContainerInfos is modified by another thread,
+            // our snapshot's reference count keeps the underlying vector alive
+            for (auto& info : *containerInfosSnapshot) {
                 // Protect access to mRawContainerInfo with lock
                 if (!info.mRawContainerInfo) {
                     continue;
@@ -1056,15 +1067,18 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             mContainerMap.swap(tmp);
         }
         // Apply containers to all existing configs
-        auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
+        {
+            WriteLock lock(mFileDiscoveryConfigsRWLock);
+            auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
 
-        LOG_DEBUG(sLogger, ("recover containers to nameConfigMap", nameConfigMap.size()));
+            LOG_DEBUG(sLogger, ("recover containers to nameConfigMap", nameConfigMap.size()));
 
-        std::vector<std::shared_ptr<RawContainerInfo>> allContainers;
-        for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-            FileDiscoveryOptions* options = itr->second.first;
-            if (options->IsContainerDiscoveryEnabled()) {
-                checkContainerDiffForOneConfig(options, itr->second.second);
+            std::vector<std::shared_ptr<RawContainerInfo>> allContainers;
+            for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
+                FileDiscoveryOptions* options = itr->second.first;
+                if (options->IsContainerDiscoveryEnabled()) {
+                    checkContainerDiffForOneConfig(options, itr->second.second);
+                }
             }
         }
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));

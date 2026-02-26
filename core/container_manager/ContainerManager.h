@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
@@ -87,6 +88,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
+    mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
