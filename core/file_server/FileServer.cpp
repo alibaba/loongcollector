@@ -144,6 +144,12 @@ FileDiscoveryConfig FileServer::GetFileDiscoveryConfig(const string& name) const
     return make_pair(nullptr, nullptr);
 }
 
+// 获取所有文件发现配置（返回拷贝以保证线程安全）
+std::unordered_map<std::string, FileDiscoveryConfig> FileServer::GetAllFileDiscoveryConfigs() const {
+    ReadLock lock(mReadWriteLock);
+    return mPipelineNameFileDiscoveryConfigsMap;
+}
+
 // 添加文件发现配置
 void FileServer::AddFileDiscoveryConfig(const string& name,
                                         FileDiscoveryOptions* opts,
