@@ -246,6 +246,14 @@ func (c *ContainerDiscoverManager) Init() bool {
 		if timeoutSec >= -1 {
 			ForceReleaseDeletedFileFDTimeout = time.Duration(timeoutSec) * time.Second
 		}
+		// FORCE_RELEASE_STOP_CONTAINER_FILE 不再推荐使用, 仅用于兼容历史版本行为, 设置为 True 等价于 force_release_deleted_file_fd_timeout = 0
+		forceReleaseStopContainerFile := false
+		if err := util.InitFromEnvBool("FORCE_RELEASE_STOP_CONTAINER_FILE", &forceReleaseStopContainerFile, forceReleaseStopContainerFile); err != nil {
+			c.LogAlarm(err, "initialize env FORCE_RELEASE_STOP_CONTAINER_FILE error")
+		}
+		if forceReleaseStopContainerFile {
+			ForceReleaseDeletedFileFDTimeout = time.Duration(0)
+		}
 	}
 	logger.Info(context.Background(), "init docker center, force release deleted file fd timeout", ForceReleaseDeletedFileFDTimeout.String())
 
