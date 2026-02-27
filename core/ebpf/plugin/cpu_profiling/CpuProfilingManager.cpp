@@ -231,11 +231,11 @@ static void addContentToEvent(LogEvent* event,
     event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
-    jsonLabels += "{\"__name__\": \"";
+    jsonLabels += R"({"__name__": ")";
     jsonLabels += appName;
-    jsonLabels += "\", \"thread\": \"";
+    jsonLabels += R"(", "thread": ")";
     jsonLabels += comm;
-    jsonLabels += "\"}";
+    jsonLabels += R"("})";
     event->SetContent(kLabels.LogKey(), jsonLabels);
 }
 
