@@ -21,11 +21,11 @@
 #include <string>
 #include <vector>
 
-#include "boost/regex.hpp"
-
+#include "logger/Logger.h"
 #include "app_config/AppConfig.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
+#include "common/StringTools.h"
 
 namespace logtail {
 namespace ebpf {
@@ -49,9 +49,13 @@ private:
             return true;
         }
         for (auto& regex : mRegexs) {
-            // TODO: Use BoostRegexMatch()
-            if (boost::regex_match(cmdline, regex)) {
+            std::string exception;
+            if (BoostRegexMatch(cmdline.c_str(), cmdline.size(), regex, exception)) {
                 return true;
+            } else {
+                if (!exception.empty()) {
+                    LOG_ERROR(sLogger, ("regex_match in ProcessDiscoveryManager fail", exception));
+                }
             }
         }
         return false;
