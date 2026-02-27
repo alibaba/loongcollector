@@ -187,7 +187,11 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
 
         auto stack = line.substr(pos1 + 1, pos3 - pos1 - 1);
         auto cntStr = line.substr(pos3 + 1, pos2 - pos3 - 1);
-        uint32_t cnt = std::stoul(cntStr);
+        uint32_t cnt;
+        if (!StringTo(cntStr, cnt)) {
+            LOG_ERROR(sLogger, ("Invalid count value", cntStr)("line", line));
+            continue;
+        }
         auto traceId = line.substr(pos2 + 1);
         if (traceId == "null") {
             traceId = "";
