@@ -32,8 +32,6 @@ struct ProcessEntry {
 };
 
 inline void ListAllProcesses(ProcParser& procParser, std::vector<ProcessEntry>& procOut) {
-    assert(procOut.empty());
-
     auto pids = procParser.GetAllPids();
     for (const auto& pid : pids) {
         auto cmdline = procParser.GetPIDCmdline(pid);

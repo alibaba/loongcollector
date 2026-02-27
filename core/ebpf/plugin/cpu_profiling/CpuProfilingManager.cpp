@@ -132,14 +132,20 @@ int CpuProfilingManager::AddOrUpdateConfig(const CollectionPipelineContext* cont
 
 int CpuProfilingManager::RemoveConfig(const std::string& configName) {
     auto it = mConfigNameToKey.find(configName);
-    assert(it != mConfigNameToKey.end());
+    if (it == mConfigNameToKey.end()) {
+        LOG_WARNING(sLogger, ("CpuProfilingManager", "config not found")("config", configName));
+        return 1;
+    }
     auto key = it->second;
     mConfigNameToKey.erase(it);
 
     ProcessDiscoveryManager::GetInstance()->RemoveDiscovery(configName);
 
-    [[maybe_unused]] auto hit = mConfigInfoMap.erase(key);
-    assert(hit);
+    auto hit = mConfigInfoMap.erase(key);
+    if (hit == 0) {
+        LOG_WARNING(sLogger, ("CpuProfilingManager", "config info not found when remove")("config", configName));
+        return 1;
+    }
 
     LOG_DEBUG(sLogger, ("CpuProfilingManager", "remove config")("config", configName));
 
