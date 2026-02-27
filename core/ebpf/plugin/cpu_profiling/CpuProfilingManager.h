@@ -71,7 +71,6 @@ public:
     PluginType GetPluginType() override { return PluginType::CPU_PROFILING; }
 
     std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
-        assert(false);
         return nullptr;
     }
 
@@ -85,7 +84,6 @@ public:
 
 protected:
     int update([[maybe_unused]] const PluginOptions& options) override {
-        assert(false);
         return 0;
     }
 
