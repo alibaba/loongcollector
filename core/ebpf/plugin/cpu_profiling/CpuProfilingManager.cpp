@@ -200,7 +200,7 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
             stackVec.push_back(func);
         }
 
-        result.push_back(std::make_tuple(std::move(stackVec), cnt, traceId));
+        result.emplace_back(std::make_tuple(std::move(stackVec), cnt, traceId));
     }
 }
 
@@ -276,7 +276,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
 
     std::string commStr(comm);
 
-    for (auto& key : targets) {
+    for (const auto& key : targets) {
         auto it = mConfigInfoMap.find(key);
         if (it == mConfigInfoMap.end()) {
             continue;
