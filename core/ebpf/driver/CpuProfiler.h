@@ -58,9 +58,14 @@ namespace ebpf {
 class CpuProfiler {
 public:
     CpuProfiler() = default;
-
+    
+    CpuProfiler(const CpuProfiler&) = delete;
+    CpuProfiler& operator=(const CpuProfiler&) = delete;
+    CpuProfiler(CpuProfiler&&) = delete;
+    CpuProfiler& operator=(CpuProfiler&&) = delete;
+    
     ~CpuProfiler() { Stop(); }
-
+    
     void Start(livetrace_profiler_read_cb_ctx_t handler, void* ctx, std::optional<std::string> hostRootPath) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
