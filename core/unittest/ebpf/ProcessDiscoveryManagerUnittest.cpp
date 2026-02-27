@@ -16,6 +16,7 @@
 
 #include <mutex>
 
+#include "app_config/AppConfig.h"
 #include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
 #include "unittest/Unittest.h"
 
@@ -30,6 +31,9 @@ public:
     void TestUpdateConfig();
     void TestRemoveConfig();
     void TestCheckConfigExist();
+
+protected:
+    void SetUp() override { AppConfig::GetInstance()->mPurageContainerMode = false; }
 };
 
 void ProcessDiscoveryManagerUnittest::TestStartAndStop() {

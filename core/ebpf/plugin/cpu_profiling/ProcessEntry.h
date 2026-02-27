@@ -28,14 +28,14 @@ struct ProcessEntry {
     std::string mContainerId;
 
     ProcessEntry(uint32_t pid, std::string cmdline, std::string containerId)
-        : mPid(pid), mCmdline(std::move(cmdline)), mContainerId(containerId) {}
+        : mPid(pid), mCmdline(std::move(cmdline)), mContainerId(std::move(containerId)) {}
 };
 
-inline void ListAllProcesses(ProcParser& procParser, std::vector<ProcessEntry>& proc_out) {
-    assert(proc_out.empty());
+inline void ListAllProcesses(ProcParser& procParser, std::vector<ProcessEntry>& procOut) {
+    assert(procOut.empty());
 
     auto pids = procParser.GetAllPids();
-    for (auto& pid : pids) {
+    for (const auto& pid : pids) {
         auto cmdline = procParser.GetPIDCmdline(pid);
         if (cmdline.empty()) {
             continue; // process exit or no perm
@@ -47,7 +47,7 @@ inline void ListAllProcesses(ProcParser& procParser, std::vector<ProcessEntry>& 
         // ok if containerId is empty
         procParser.GetPIDDockerId(pid, containerId);
 
-        proc_out.emplace_back(pid, std::move(cmdline), std::move(containerId));
+        procOut.emplace_back(pid, std::move(cmdline), std::move(containerId));
     }
 }
 

@@ -202,7 +202,7 @@ static void addContentToEvent(LogEvent* event,
                               const std::vector<std::string>& fullStack,
                               const std::string& appName,
                               const std::string& comm,
-                              uint32_t val_ns) {
+                              uint32_t valNs) {
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 
@@ -226,7 +226,7 @@ static void addContentToEvent(LogEvent* event,
     event->SetContentNoCopy(kType.LogKey(), StringView(CpuProfilingManager::kProfileCpuValue));
     event->SetContentNoCopy(kTypeCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     event->SetContentNoCopy(kUnits.LogKey(), StringView(CpuProfilingManager::kNanosecondsValue));
-    event->SetContent(kVal.LogKey(), std::to_string(val_ns));
+    event->SetContent(kVal.LogKey(), std::to_string(valNs));
     event->SetContentNoCopy(kValueTypes.LogKey(), StringView(CpuProfilingManager::kCpuValue));
     event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     // {"__name__": "xxx", "thread": "comm"}
