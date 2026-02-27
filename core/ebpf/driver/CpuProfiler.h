@@ -98,7 +98,11 @@ public:
 
     void UpdatePids(std::unordered_set<uint32_t> newPids) {
         std::lock_guard<std::mutex> lock(mMutex);
-        assert(mProfiler != nullptr);
+        if (mProfiler == nullptr) {
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[CpuProfiler][UpdatePids] profiler is not initialized, cannot update pids");
+            return;
+        }
 
         std::unordered_set<uint32_t> toAdd, toRemove;
         compareSets(newPids, toAdd, toRemove);
@@ -128,7 +132,11 @@ public:
 
     void Poll() {
         std::lock_guard<std::mutex> lock(mMutex);
-        assert(mProfiler != nullptr && mHandler != nullptr);
+        if (mProfiler == nullptr || mHandler == nullptr) {
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
+                     "[CpuProfiler][Poll] profiler is not initialized or handler is null, cannot poll");
+            return;
+        }
         if (mPids.empty()) {
             return;
         }

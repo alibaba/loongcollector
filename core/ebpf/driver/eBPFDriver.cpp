@@ -403,8 +403,6 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
         }
         case logtail::ebpf::PluginType::CPU_PROFILING: {
             auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
-            assert(config != nullptr);
-            assert(config->mHandler != nullptr);
             gCpuProfiler->Start(config->mHandler, config->mCtx, std::move(config->mHostRootPath));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler started\n");
             break;
@@ -563,8 +561,6 @@ int update_plugin(logtail::ebpf::PluginConfig* arg) {
         }
         case logtail::ebpf::PluginType::CPU_PROFILING: {
             auto* config = std::get_if<logtail::ebpf::CpuProfilingConfig>(&arg->mConfig);
-            assert(config != nullptr);
-
             gCpuProfiler->UpdatePids(std::move(config->mPids));
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "cpu profiling: profiler pids updated\n");
             break;
