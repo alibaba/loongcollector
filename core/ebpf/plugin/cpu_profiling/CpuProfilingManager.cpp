@@ -291,19 +291,10 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
 
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(eventGroup.Copy(), info.mPluginIndex);
-
-        int maxRetry = 5;
-        for (int retry = 0; retry < maxRetry; ++retry) {
-            if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(info.mQueueKey, std::move(item))) {
-                break;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (retry == maxRetry - 1) {
-                LOG_WARNING(sLogger,
-                            ("configName", info.mPipelineCtx->GetConfigName())("pluginIdx", info.mPluginIndex)(
-                                "[CpuProfilingEvent] push queue failed!", ""));
-                // TODO: Alarm discard data
-            }
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(info.mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", info.mPipelineCtx->GetConfigName())("pluginIdx", info.mPluginIndex)(
+                            "[CpuProfilingEvent] push queue failed!", ""));
         }
     }
 };
