@@ -37,23 +37,24 @@ struct ProcessDiscoveryConfig {
     bool mFullDiscovery = false;
 
     bool IsMatch(const std::string& cmdline, const std::string& containerId, bool isContainerMode) {
-        auto checkCmdlines = [&] {
-            if (mFullDiscovery) {
+        if (isContainerMode) {
+            return mContainerIds.find(containerId) != mContainerIds.end() && checkCmdlines(cmdline);
+        }
+        return checkCmdlines(cmdline);
+    }
+
+private:
+    bool checkCmdlines(const std::string& cmdline) {
+        if (mFullDiscovery) {
+            return true;
+        }
+        for (auto& regex : mRegexs) {
+            // TODO: Use BoostRegexMatch()
+            if (boost::regex_match(cmdline, regex)) {
                 return true;
             }
-            for (auto& regex : mRegexs) {
-                if (boost::regex_match(cmdline, regex)) {
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        if (isContainerMode) {
-            return mContainerIds.find(containerId) != mContainerIds.end() && checkCmdlines();
-        } else {
-            return checkCmdlines();
         }
+        return false;
     }
 };
 
@@ -83,8 +84,8 @@ public:
     ~ProcessDiscoveryManager() { Stop(); }
 
     static ProcessDiscoveryManager* GetInstance() {
-        static ProcessDiscoveryManager instance;
-        return &instance;
+        static ProcessDiscoveryManager sInstance;
+        return &sInstance;
     }
 
     void Start(NotifyFn fn);
