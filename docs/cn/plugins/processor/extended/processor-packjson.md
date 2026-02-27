@@ -16,7 +16,7 @@
 
 | 参数              | 类型   | 是否必选 | 参数说明                                    |
 | ----------------- | ------ | -------- | ------------------------------------------- |
-| Type              | String | 是       | 插件类型，固定为`processor_packjson`。      |
+| Type              | string | 是       | 插件类型，固定为`processor_packjson`。      |
 | SourceKeys        | array  | 是       | 字符串数组，需要打包的 key。                |
 | DestKey           | string | 是       | 目标 key。                                  |
 | KeepSource        | bool   | 否       | 是否保留源字段，默认为 true。               |

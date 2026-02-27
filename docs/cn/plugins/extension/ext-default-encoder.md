@@ -18,8 +18,8 @@
 
 | 参数          | 类型     | 是否必选 | 说明                                                                                                        |
 |-------------|--------|------|-----------------------------------------------------------------------------------------------------------|
-| Format      | String | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/master/pkg/protocol/encoder/common/comon.go) |
-| SeriesLimit | Int    | 否    | 触发序列化时序切片的最大长度，默认 1000，仅针对 Format=prometheus 时有效                                                          |
+| Format      | string | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/master/pkg/protocol/encoder/common/comon.go) |
+| SeriesLimit | int    | 否    | 触发序列化时序切片的最大长度，默认 1000，仅针对 Format=prometheus 时有效                                                          |
 
 ## 样例
 

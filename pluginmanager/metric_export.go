@@ -18,8 +18,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -79,11 +80,28 @@ func GetGoCppProvidedMetrics() []map[string]string {
 // go 插件指标，直接输出
 func GetGoPluginMetrics() []map[string]string {
 	metrics := make([]map[string]string, 0)
+
+	// 收集所有有效的 Context 引用，避免在调用 ExportMetricRecords 期间 config 被删除引发 crash
+	contexts := make([]pipeline.Context, 0)
 	LogtailConfigLock.RLock()
 	for _, config := range LogtailConfig {
-		metrics = append(metrics, config.Context.ExportMetricRecords()...)
+		if config == nil {
+			continue
+		}
+		if config.Context == nil {
+			continue
+		}
+		contexts = append(contexts, config.Context)
 	}
 	LogtailConfigLock.RUnlock()
+
+	for _, ctx := range contexts {
+		if ctx == nil {
+			continue
+		}
+		metrics = append(metrics, ctx.ExportMetricRecords()...)
+	}
+
 	return metrics
 }
 
@@ -94,9 +112,9 @@ func GetAgentStat() []map[string]string {
 	// key is the metric key in runtime/metrics, value is agent's metric key
 	metricNames := map[string]string{
 		// mem. Memory occupied by live objects and dead objects that have not yet been marked free by the garbage collector.
-		"/memory/classes/heap/objects:bytes": helper.MetricAgentMemoryGo,
+		"/memory/classes/heap/objects:bytes": selfmonitor.MetricAgentMemoryGo,
 		// go routines cnt. Count of live goroutines.
-		"/sched/goroutines:goroutines": helper.MetricAgentGoRoutinesTotal,
+		"/sched/goroutines:goroutines": selfmonitor.MetricAgentGoRoutinesTotal,
 	}
 
 	// metrics to read from runtime/metrics

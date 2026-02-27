@@ -42,11 +42,10 @@ public:
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
-    bool SupportAck() const override { return true; }
+    QueueType GetProcessQueueType() const override { return QueueType::COUNT_BOUNDED; }
 
     FileDiscoveryOptions mFileDiscovery;
     bool mEnableContainerDiscovery = false;
-    ContainerDiscoveryOptions mContainerDiscovery;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
     FileTagOptions mFileTag;
@@ -58,8 +57,14 @@ public:
 
 private:
     bool CreateInnerProcessors();
-    static bool SetContainerBaseDir(ContainerInfo& containerInfo, const std::string& logPath);
-    static std::string GetLogPath(const FileDiscoveryOptions* fileDiscovery);
+
+    // 为 ContainerInfo 设置多个真实路径，与 FileDiscoveryOptions 的多路径对应
+    static bool SetContainerBaseDirs(ContainerInfo& containerInfo, const FileDiscoveryOptions* fileDiscovery);
+
+    // 计算单个配置路径在容器中的映射路径（不修改 containerInfo）
+    static bool SetContainerBaseDirForPath(const ContainerInfo& containerInfo,
+                                           const std::string& logPath,
+                                           std::string& outRealBaseDir);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputFileUnittest;

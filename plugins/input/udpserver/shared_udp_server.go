@@ -102,7 +102,7 @@ func (s *SharedUDPServer) dispatcher(logs []*protocol.Log) {
 
 func (s *SharedUDPServer) logErr(errStr string) {
 	if time.Since(s.lastLog).Seconds() > 10 {
-		logger.Error(s.udp.context.GetRuntimeContext(), "MULTI_HTTP_SERVER_ALARM", "not exist dispatch key", errStr)
+		logger.Warning(s.udp.context.GetRuntimeContext(), "MULTI_HTTP_SERVER_ALARM", "not exist dispatch key", errStr)
 		s.lastLog = time.Now()
 	}
 }

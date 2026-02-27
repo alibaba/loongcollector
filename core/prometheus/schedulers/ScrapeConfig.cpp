@@ -1,6 +1,8 @@
 
 #include "prometheus/schedulers/ScrapeConfig.h"
 
+#include <chrono>
+#include <mutex>
 #include <string>
 
 #include "json/value.h"
@@ -22,6 +24,7 @@ ScrapeConfig::ScrapeConfig()
       mHonorLabels(false),
       mHonorTimestamps(true),
       mScheme("http"),
+      mHostOnlyMode(false),
       mFollowRedirects(true),
       mEnableTLS(false),
       mMaxScrapeSizeBytes(0),
@@ -190,6 +193,23 @@ bool ScrapeConfig::InitStaticConfig(const Json::Value& scrapeConfig) {
             return false;
         }
     }
+
+    if (scrapeConfig.isMember(prometheus::HOST_ONLY_MODE) && scrapeConfig[prometheus::HOST_ONLY_MODE].isBool()) {
+        mHostOnlyMode = scrapeConfig[prometheus::HOST_ONLY_MODE].asBool();
+    }
+
+    if (mHostOnlyMode) {
+        if (scrapeConfig.isMember(prometheus::STATIC_CONFIGS) && scrapeConfig[prometheus::STATIC_CONFIGS].isArray()) {
+            if (!InitHostOnlyMode(scrapeConfig[prometheus::STATIC_CONFIGS]) || mHostOnlyConfigs.empty()) {
+                LOG_ERROR(sLogger, ("init host only mode failed", ""));
+                return false;
+            }
+        } else {
+            LOG_ERROR(sLogger, ("static configs is not set or invalid", ""));
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -230,8 +250,16 @@ bool ScrapeConfig::InitBasicAuth(const Json::Value& basicAuth) {
     }
 
     auto token = username + ":" + password;
-    auto token64 = Base64Enconde(token);
+    auto token64 = Base64Encode(token);
     mRequestHeaders[prometheus::A_UTHORIZATION] = prometheus::BASIC_PREFIX + token64;
+
+    {
+        lock_guard<mutex> lock(mAuthMutex);
+        mAuthType = prometheus::BASIC_PREFIX;
+        mBasicNamePath = usernameFile;
+        mBasicPasswordPath = passwordFile;
+    }
+
     return true;
 }
 
@@ -261,25 +289,73 @@ bool ScrapeConfig::InitAuthorization(const Json::Value& authorization) {
     }
 
     if (!credentialsFile.empty() && !ReadFile(credentialsFile, credentials)) {
-        LOG_ERROR(sLogger, ("authorization read file error", ""));
+        LOG_ERROR(sLogger, ("authorization read file error", mBearerTokenPath));
         return false;
+    }
+
+    {
+        lock_guard<mutex> lock(mAuthMutex);
+        mAuthType = type;
+        mBearerTokenPath = credentialsFile;
     }
 
     mRequestHeaders[prometheus::A_UTHORIZATION] = type + " " + credentials;
     return true;
 }
 
+// the return value is true if the authorization is updated
+bool ScrapeConfig::UpdateAuthorization() {
+    lock_guard<mutex> lock(mAuthMutex);
+    auto currTime = chrono::system_clock::now();
+    if (mAuthType.empty() || chrono::duration_cast<chrono::minutes>(currTime - mLastUpdateTime).count() < 5) {
+        return false;
+    }
+    mLastUpdateTime = currTime;
+    LOG_INFO(sLogger, (mJobName, "starte update authorization"));
+
+    string credentials;
+    if (mAuthType == prometheus::BASIC_PREFIX) {
+        if (mBasicNamePath.empty() || mBasicPasswordPath.empty()) {
+            return false;
+        }
+        string username;
+        string password;
+        if (!ReadFile(mBasicNamePath, username)) {
+            LOG_ERROR(sLogger, ("read username_file failed, username_file", mBasicNamePath));
+            return false;
+        }
+
+        if (!ReadFile(mBasicPasswordPath, password)) {
+            LOG_ERROR(sLogger, ("read password_file failed, password_file", mBasicPasswordPath));
+            return false;
+        }
+        credentials = prometheus::BASIC_PREFIX + Base64Encode(username + ":" + password);
+    } else {
+        if (mBearerTokenPath.empty()) {
+            return false;
+        }
+        if (!ReadFile(mBearerTokenPath, credentials)) {
+            LOG_ERROR(sLogger, ("authorization read file error", mBearerTokenPath));
+            return false;
+        }
+        credentials = mAuthType + " " + credentials;
+    }
+    if (credentials.empty() || credentials == mRequestHeaders[prometheus::A_UTHORIZATION]) {
+        return false;
+    }
+    mRequestHeaders[prometheus::A_UTHORIZATION] = credentials;
+    LOG_INFO(sLogger, (mJobName, "authorization updated"));
+    return true;
+}
+
 bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
     static auto sScrapeProtocolsHeaders = std::map<string, string>{
-        {prometheus::PrometheusProto,
-         "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited"},
         {prometheus::PrometheusText0_0_4, "text/plain;version=0.0.4"},
         {prometheus::OpenMetricsText0_0_1, "application/openmetrics-text;version=0.0.1"},
         {prometheus::OpenMetricsText1_0_0, "application/openmetrics-text;version=1.0.0"},
     };
     static auto sDefaultScrapeProtocols = vector<string>{
         prometheus::PrometheusText0_0_4,
-        prometheus::PrometheusProto,
         prometheus::OpenMetricsText0_0_1,
         prometheus::OpenMetricsText1_0_0,
     };
@@ -307,23 +383,25 @@ bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
         return true;
     };
 
-    auto validateScrapeProtocols = [](const vector<string>& scrapeProtocols) {
+    auto validateScrapeProtocols = [](const vector<string>& scrapeProtocols) -> vector<string> {
         set<string> dups;
+        vector<string> validScrapeProtocols;
         for (const auto& scrapeProtocol : scrapeProtocols) {
             if (!sScrapeProtocolsHeaders.count(scrapeProtocol)) {
-                LOG_ERROR(sLogger,
-                          ("unknown scrape protocol prometheusproto", scrapeProtocol)(
-                              "supported",
-                              "[OpenMetricsText0.0.1 OpenMetricsText1.0.0 PrometheusProto PrometheusText0.0.4]"));
-                return false;
+                LOG_WARNING(sLogger,
+                            ("unknown scrape protocol prometheusproto", scrapeProtocol)(
+                                "supported", "[OpenMetricsText0.0.1 OpenMetricsText1.0.0 PrometheusText0.0.4]"));
+                continue;
             }
             if (dups.count(scrapeProtocol)) {
-                LOG_ERROR(sLogger, ("duplicated protocol in scrape_protocols", scrapeProtocol));
-                return false;
+                LOG_WARNING(sLogger, ("duplicated protocol in scrape_protocols", scrapeProtocol));
+                continue;
             }
             dups.insert(scrapeProtocol);
+            validScrapeProtocols.push_back(scrapeProtocol);
         }
-        return true;
+
+        return validScrapeProtocols;
     };
 
     vector<string> tmpScrapeProtocols;
@@ -332,12 +410,10 @@ bool ScrapeConfig::InitScrapeProtocols(const Json::Value& scrapeProtocols) {
         return false;
     }
 
+    tmpScrapeProtocols = validateScrapeProtocols(tmpScrapeProtocols);
     // if scrape_protocols is empty, use default protocols
     if (tmpScrapeProtocols.empty()) {
         tmpScrapeProtocols = sDefaultScrapeProtocols;
-    }
-    if (!validateScrapeProtocols(tmpScrapeProtocols)) {
-        return false;
     }
 
     auto weight = tmpScrapeProtocols.size() + 1;
@@ -426,6 +502,42 @@ bool ScrapeConfig::InitExternalLabels(const Json::Value& externalLabels) {
     std::sort(mExternalLabels.begin(), mExternalLabels.end(), [](const auto& lhs, const auto& rhs) {
         return lhs.first < rhs.first;
     });
+    return true;
+}
+
+
+bool ScrapeConfig::InitHostOnlyMode(const Json::Value& hostOnlyConfigs) {
+    for (const auto& tmp : hostOnlyConfigs) {
+        auto tmpHostOnlyConfig = HostOnlyConfig();
+        if (tmp.isMember(prometheus::TARGETS) && tmp[prometheus::TARGETS].isArray()) {
+            for (const auto& target : tmp[prometheus::TARGETS]) {
+                if (target.isString()) {
+                    tmpHostOnlyConfig.mTargets.emplace(target.asString());
+                } else {
+                    LOG_ERROR(sLogger, ("target config error", ""));
+                    return false;
+                }
+            }
+        }
+        if (tmp.isMember(prometheus::LABELS) && tmp[prometheus::LABELS].isObject()) {
+            set<string> dups;
+            const auto& tmpLabels = tmp[prometheus::LABELS];
+            for (auto& key : tmpLabels.getMemberNames()) {
+                if (tmpLabels[key].isString()) {
+                    if (dups.find(key) != dups.end()) {
+                        LOG_ERROR(sLogger, ("duplicated key in static labels", key));
+                        return false;
+                    }
+                    dups.insert(key);
+                    tmpHostOnlyConfig.mLabels.Set(key, tmpLabels[key].asString());
+                } else {
+                    LOG_ERROR(sLogger, ("static labels config error", ""));
+                    return false;
+                }
+            }
+        }
+        mHostOnlyConfigs.emplace_back(std::move(tmpHostOnlyConfig));
+    }
     return true;
 }
 

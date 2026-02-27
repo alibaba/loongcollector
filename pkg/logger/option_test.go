@@ -69,7 +69,7 @@ func TestOptionErrorLevel(t *testing.T) {
 	excludeFlag()
 	clean()
 	initTestLogger(OptionErrorLevel)
-	Warning(context.Background(), "line")
+	Warning(context.Background(), "line", "")
 	assert.True(t, readLog(0) == "")
 	Error(context.Background(), "ALARM", "line")
 	assert.True(t, readLog(0) != "")

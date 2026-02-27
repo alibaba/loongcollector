@@ -57,7 +57,7 @@ func (r *InputGpuMetric) Collect(collector pipeline.Collector) error {
 func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 	err := gonvml.Initialize()
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "GPU_NVML_INIT_ALARM", "Couldn't initialize nvml, error", err)
+		logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_INIT_ALARM", "Couldn't initialize nvml, error", err)
 		return err
 	}
 	defer gonvml.Shutdown()
@@ -77,7 +77,7 @@ func (r *InputGpuMetric) Start(collector pipeline.Collector) error {
 		case <-timer.C:
 			err := r.CollectGpuMetric()
 			if err != nil {
-				logger.Error(r.context.GetRuntimeContext(), "GPU_NVML_COLLECT_ALARM", "GPU collect metric error", err)
+				logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_COLLECT_ALARM", "GPU collect metric error", err)
 				return nil
 			}
 			timer.Reset(time.Duration(r.CollectIntervalMs) * time.Millisecond)
@@ -89,7 +89,7 @@ func (r *InputGpuMetric) CollectGpuMetric() error {
 	t := time.Now()
 	numDevices, err := gonvml.DeviceCount()
 	if err != nil {
-		logger.Error(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_COUNT_ALARM", "GPU DeviceCount error", err)
+		logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_COUNT_ALARM", "GPU DeviceCount error", err)
 		return err
 	}
 
@@ -100,7 +100,7 @@ func (r *InputGpuMetric) CollectGpuMetric() error {
 
 		device, err := gonvml.DeviceHandleByIndex(index)
 		if err != nil {
-			logger.Error(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_INDEX_ALARM", "GPU DeviceHandleByIndex", index, "error", err)
+			logger.Warning(r.context.GetRuntimeContext(), "GPU_NVML_DEVICE_INDEX_ALARM", "GPU DeviceHandleByIndex", index, "error", err)
 			return err
 		}
 		powerUsage, _ := device.PowerUsage()

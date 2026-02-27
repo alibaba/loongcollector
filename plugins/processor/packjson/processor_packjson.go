@@ -82,7 +82,7 @@ func (p *ProcessorPackjson) processLog(log *protocol.Log) {
 	}
 	newValue, err := json.Marshal(packMap)
 	if err != nil {
-		logger.Errorf(p.context.GetRuntimeContext(), "PACK_JSON_ALARM", "package json error %v packMap: %v", err, packMap)
+		logger.Warningf(p.context.GetRuntimeContext(), "PACK_JSON_ALARM", "package json error %v packMap: %v", err, packMap)
 		return
 	}
 	newContent := &protocol.Log_Content{

@@ -12,16 +12,16 @@
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | - | - | - | - |
-| SourceKey | String | 是 | 原始字段名。 |
-| SourceFormat | String | 是 | 原始时间的格式。 |
-| SourceLocation | Int | 否 | 原始时间的时区。参数值为空时，表示iLogtail所在主机或容器的时区。 |
-| DestKey | String | 是 | 解析后的目标字段。 |
-| DestFormat | String | 是 | 解析后的时间格式。 |
-| DestLocation | Int | 否 | 解析后的时区。参数值为空时，表示本机时区。 |
-| SetTime | Boolean | 否 | 是否将解析后的时间设置为日志时间。true（默认值）：是。false：否。 |
-| KeepSource | Boolean | 否 | 被解析后的日志中是否保留原始字段。true（默认值）：保留。false：不保留。 |
-| NoKeyError | Boolean | 否 | 原始日志中无您所指定的原始字段时，系统是否报错。true（默认值）：报错。false：不报错。 |
-| AlarmIfFail | Boolean | 否 | 提取日志时间失败，系统是否报错。true（默认值）：报错。false：不报错。 |
+| SourceKey | string | 是 | 原始字段名。 |
+| SourceFormat | string | 是 | 原始时间的格式。 |
+| SourceLocation | int | 否 | 原始时间的时区。参数值为空时，表示iLogtail所在主机或容器的时区。 |
+| DestKey | string | 是 | 解析后的目标字段。 |
+| DestFormat | string | 是 | 解析后的时间格式。 |
+| DestLocation | int | 否 | 解析后的时区。参数值为空时，表示本机时区。 |
+| SetTime | bool | 否 | 是否将解析后的时间设置为日志时间。true（默认值）：是。false：否。 |
+| KeepSource | bool | 否 | 被解析后的日志中是否保留原始字段。true（默认值）：保留。false：不保留。 |
+| NoKeyError | bool | 否 | 原始日志中无您所指定的原始字段时，系统是否报错。true（默认值）：报错。false：不报错。 |
+| AlarmIfFail | bool | 否 | 提取日志时间失败，系统是否报错。true（默认值）：报错。false：不报错。 |
 
 **注意** SourceFormat 和 DestFormat 的格式需要符合 [Go 时间中的 layout](https://pkg.go.dev/time#Layout)。Go 中采用基于规则的方法对时间格式进行解析，例如，时间格式中 "1" 的时间单位为月份，"15" 的时间单位为小时。因此，为了避免解析失败，推荐选择 Go 中的时间原点 "2006-01-02 15:04:05" 作为 SourceFormat 和 DestFormat 的样例时间。
 或者采用以下的标准时间格式：

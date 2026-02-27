@@ -63,6 +63,25 @@ func AddLocalConfig(ctx context.Context, configName, c string) (context.Context,
 	return ctx, nil
 }
 
+func AddOnetimePipelineLocalConfig(ctx context.Context, configName, c string) (context.Context, error) {
+	c = completeConfigWithFlusher(c)
+	if setup.Env.GetType() == "docker-compose" {
+		if _, err := os.Stat(config.OnetimeConfigDir); os.IsNotExist(err) {
+			if err = os.MkdirAll(config.OnetimeConfigDir, 0750); err != nil {
+				return ctx, err
+			}
+		} else if err != nil {
+			return ctx, err
+		}
+		filePath := fmt.Sprintf("%s/%s.yaml", config.OnetimeConfigDir, configName)
+		err := os.WriteFile(filePath, []byte(c), 0600)
+		if err != nil {
+			return ctx, err
+		}
+	}
+	return ctx, nil
+}
+
 func RemoveAllLocalConfig(ctx context.Context) (context.Context, error) {
 	command := fmt.Sprintf("cd %s && rm -rf *.yaml", config.TestConfig.LocalConfigDir)
 	if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
@@ -121,6 +140,22 @@ func RemoveHTTPConfig(ctx context.Context, configName string) (context.Context, 
 		}
 	} else {
 		return ctx, fmt.Errorf("env is not docker-compose")
+	}
+	return ctx, nil
+}
+
+func RemoveLocalConfig(ctx context.Context, configName string) (context.Context, error) {
+	if setup.Env.GetType() == "docker-compose" {
+		filePath := fmt.Sprintf("%s/%s.yaml", config.ConfigDir, configName)
+		if err := os.Remove(filePath); err != nil {
+			return ctx, err
+		}
+	} else {
+		command := fmt.Sprintf(`cd %s && rm -f %s.yaml`, config.TestConfig.LocalConfigDir, configName)
+		if _, err := setup.Env.ExecOnLoongCollector(command); err != nil {
+			return ctx, err
+		}
+		time.Sleep(5 * time.Second)
 	}
 	return ctx, nil
 }

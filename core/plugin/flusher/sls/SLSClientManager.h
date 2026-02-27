@@ -22,15 +22,16 @@
 #include <optional>
 #include <string>
 
+#include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "common/dns/DNSCache.h"
 #include "plugin/flusher/sls/SLSResponse.h"
+#include "plugin/flusher/sls/StaticCredentialsProvider.h"
 
 namespace logtail {
 
 class SLSClientManager {
 public:
-    enum class AuthType { ANONYMOUS, AK };
-
     virtual ~SLSClientManager() = default;
     SLSClientManager(const SLSClientManager&) = delete;
     SLSClientManager& operator=(const SLSClientManager&) = delete;
@@ -42,8 +43,34 @@ public:
 
     const std::string& GetUserAgent() const { return mUserAgent; }
 
-    virtual bool
-    GetAccessKey(const std::string& aliuid, AuthType& type, std::string& accessKeyId, std::string& accessKeySecret);
+    void GetCurrentEndpoint(const std::string& project,
+                            const std::string& rawDomain,
+                            std::string& domain,
+                            std::string& ip,
+                            bool& useIPFlag) const {
+        domain = project + "." + rawDomain;
+        GetCurrentEndpoint(domain, ip, useIPFlag);
+    }
+
+    void GetCurrentEndpoint(const std::string& domain, std::string& ip, bool& useIPFlag) const {
+        if (AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled()) {
+            static DnsCache* dnsCache = DnsCache::GetInstance();
+            if (dnsCache->GetIPFromDnsCache(domain, ip)) {
+                useIPFlag = true;
+            } else {
+                useIPFlag = false;
+            }
+        } else {
+            useIPFlag = false;
+        }
+    }
+
+    virtual bool GetAccessKey(const std::string& aliuid,
+                              AuthType& type,
+                              std::string& accessKeyId,
+                              std::string& accessKeySecret,
+                              std::string& secToken,
+                              std::string& errorMsg);
 
     virtual bool UsingHttps(const std::string& region) const { return true; }
 
@@ -56,18 +83,23 @@ protected:
     std::string mUserAgent;
 
 private:
+    std::unique_ptr<CredentialsProvider> mCredentialsProvider;
+
     virtual void GenerateUserAgent();
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SLSClientManagerUnittest;
+    friend class FlusherSLSUnittest;
 #endif
 };
 
 void PreparePostLogStoreLogsRequest(const std::string& accessKeyId,
                                     const std::string& accessKeySecret,
-                                    SLSClientManager::AuthType type,
-                                    const std::string& host,
-                                    bool isHostIp,
+                                    const std::string& secToken,
+                                    AuthType type,
+                                    const std::string& domain,
+                                    const std::string& ip,
+                                    bool useIP,
                                     const std::string& project,
                                     const std::string& logstore,
                                     const std::string& compressType,
@@ -79,11 +111,23 @@ void PreparePostLogStoreLogsRequest(const std::string& accessKeyId,
                                     std::string& path,
                                     std::string& query,
                                     std::map<std::string, std::string>& header);
+void PreparePostHostMetricsRequest(const std::string& accessKeyId,
+                                   const std::string& accessKeySecret,
+                                   const std::string& secToken,
+                                   AuthType type,
+                                   const std::string& compressType,
+                                   RawDataType dataType,
+                                   const std::string& body,
+                                   size_t rawSize,
+                                   std::string& path,
+                                   std::map<std::string, std::string>& header);
 void PreparePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                        const std::string& accessKeySecret,
-                                       SLSClientManager::AuthType type,
-                                       const std::string& host,
-                                       bool isHostIp,
+                                       const std::string& secToken,
+                                       AuthType type,
+                                       const std::string& domain,
+                                       const std::string& ip,
+                                       bool useIP,
                                        const std::string& project,
                                        const std::string& logstore,
                                        const std::string& compressType,
@@ -93,22 +137,25 @@ void PreparePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                        std::map<std::string, std::string>& header);
 void PreparePostAPMBackendRequest(const std::string& accessKeyId,
                                   const std::string& accessKeySecret,
-                                  SLSClientManager::AuthType type,
-                                  const std::string& host,
-                                  bool isHostIp,
+                                  const std::string& secToken,
+                                  AuthType type,
+                                  const std::string& domain,
+                                  const std::string& ip,
+                                  bool useIP,
                                   const std::string& project,
-                                  const std::string& logstore,
                                   const std::string& compressType,
                                   RawDataType dataType,
                                   const std::string& body,
                                   size_t rawSize,
                                   const std::string& path,
-                                  std::string& query,
                                   std::map<std::string, std::string>& header);
 SLSResponse PostLogStoreLogs(const std::string& accessKeyId,
                              const std::string& accessKeySecret,
-                             SLSClientManager::AuthType type,
-                             const std::string& host,
+                             const std::string& secToken,
+                             AuthType type,
+                             const std::string& domain,
+                             const std::string& ip,
+                             bool useIP,
                              bool httpsFlag,
                              const std::string& project,
                              const std::string& logstore,
@@ -119,26 +166,42 @@ SLSResponse PostLogStoreLogs(const std::string& accessKeyId,
                              const std::string& shardHashKey);
 SLSResponse PostMetricStoreLogs(const std::string& accessKeyId,
                                 const std::string& accessKeySecret,
-                                SLSClientManager::AuthType type,
-                                const std::string& host,
+                                const std::string& secToken,
+                                AuthType type,
+                                const std::string& domain,
+                                const std::string& ip,
+                                bool useIP,
                                 bool httpsFlag,
                                 const std::string& project,
                                 const std::string& logstore,
                                 const std::string& compressType,
                                 const std::string& body,
                                 size_t rawSize);
-SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
+SLSResponse PostMetricHostLogs(const std::string& accessKeyId,
                                const std::string& accessKeySecret,
-                               SLSClientManager::AuthType type,
+                               const std::string& secToken,
+                               AuthType type,
                                const std::string& host,
                                bool httpsFlag,
+                               const std::string& compressType,
+                               RawDataType dataType,
+                               const std::string& body,
+                               size_t rawSize);
+SLSResponse PostAPMBackendLogs(const std::string& accessKeyId,
+                               const std::string& accessKeySecret,
+                               const std::string& secToken,
+                               AuthType type,
+                               const std::string& domain,
+                               const std::string& ip,
+                               bool useIP,
+                               bool httpsFlag,
                                const std::string& project,
-                               const std::string& logstore,
                                const std::string& compressType,
                                RawDataType dataType,
                                const std::string& body,
                                size_t rawSize,
-                               const std::string& subpath);
+                               const std::string& subpath,
+                               std::map<std::string, std::string>& header);
 SLSResponse PutWebTracking(const std::string& host,
                            bool httpsFlag,
                            const std::string& logstore,

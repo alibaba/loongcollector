@@ -34,25 +34,9 @@ func TestE2EOnDockerCompose(t *testing.T) {
 		Options: &godog.Options{
 			Format:    "pretty",
 			Paths:     []string{featurePath},
-			Tags:      "@e2e && @docker-compose && ~@ebpf",
+			Tags:      "@e2e && @docker-compose && ~@ebpf && ~@disabled",
 			TestingT:  t,
 			Randomize: -1,
-		},
-	}
-	if suite.Run() != 0 {
-		t.Fail()
-	}
-}
-
-func TestE2EOnDockerComposeCore(t *testing.T) {
-	suite := godog.TestSuite{
-		Name:                "E2EOnDockerCompose",
-		ScenarioInitializer: engine.ScenarioInitializer,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{"test_cases"},
-			Tags:     "@e2e-core && @docker-compose && ~@ebpf",
-			TestingT: t,
 		},
 	}
 	if suite.Run() != 0 {
@@ -67,7 +51,7 @@ func TestE2EOnDockerComposePerformance(t *testing.T) {
 		Options: &godog.Options{
 			Format:   "pretty",
 			Paths:    []string{"test_cases"},
-			Tags:     "@e2e-performance && @docker-compose && ~@ebpf",
+			Tags:     "@e2e-performance && @docker-compose && ~@ebpf && ~@disabled",
 			TestingT: t,
 		},
 	}

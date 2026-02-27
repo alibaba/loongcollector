@@ -18,8 +18,12 @@
 #if defined(__linux__)
 #include <asm/param.h>
 #include <unistd.h>
+
+#include "host_monitor/HostMonitorInputRunner.h"
 #elif defined(_MSC_VER)
 #include <Psapi.h>
+
+#include "common/EncodingConverter.h"
 #endif
 #include <fstream>
 #include <functional>
@@ -61,8 +65,14 @@ string LoongCollectorMonitor::mHostname;
 string LoongCollectorMonitor::mIpAddr;
 string LoongCollectorMonitor::mOsDetail;
 string LoongCollectorMonitor::mUsername;
+string LoongCollectorMonitor::mEcsInstanceID;
+string LoongCollectorMonitor::mEcsRegionID;
+string LoongCollectorMonitor::mEcsUserID;
 int32_t LoongCollectorMonitor::mSystemBootTime = -1;
 string LoongCollectorMonitor::mStartTime;
+#ifndef LOGTAIL_NO_TC_MALLOC
+time_t gLastTcmallocReleaseMemTime = 0;
+#endif
 
 inline void CpuStat::Reset() {
 #if defined(__linux__)
@@ -201,6 +211,9 @@ void LogtailMonitor::Monitor() {
                 if (1 == mMemStat.mViolateNum) {
                     LOG_DEBUG(sLogger, ("Memory is upper limit", "run gabbage collection."));
                     LogInput::GetInstance()->SetForceClearFlag(true);
+#ifndef LOGTAIL_NO_TC_MALLOC
+                    gLastTcmallocReleaseMemTime = 0;
+#endif
                 }
                 // CalCpuLimit and CalMemLimit will check if the number of violation (CPU
                 // or memory exceeds limit) // is greater or equal than limits (
@@ -226,6 +239,12 @@ void LogtailMonitor::Monitor() {
                     if (!DumpMonitorInfo(monitorTime))
                         LOG_ERROR(sLogger, ("Fail to dump monitor info", ""));
                 }
+#if defined(__linux__)
+                if (HostMonitorInputRunner::GetInstance()->ShouldRestart()) {
+                    mShouldSuicide.store(true);
+                    break;
+                }
+#endif
             }
         }
     }
@@ -245,7 +264,7 @@ bool LogtailMonitor::SendStatusProfile(bool suicide) {
     if (lastReadEventTime > 0
         && (now.tv_sec - lastReadEventTime > AppConfig::GetInstance()->GetForceQuitReadTimeout())) {
         LOG_ERROR(sLogger, ("last read event time is too old", lastReadEventTime)("prepare force exit", ""));
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmCritical(
             LOGTAIL_CRASH_ALARM, "last read event time is too old: " + ToString(lastReadEventTime) + " force exit");
         AlarmManager::GetInstance()->ForceToSend();
         sleep(10);
@@ -592,6 +611,11 @@ LoongCollectorMonitor::LoongCollectorMonitor() {
     mIpAddr = GetHostIp();
     mOsDetail = GetOsDetail();
     mUsername = GetUsername();
+#ifdef __ENTERPRISE__
+    mEcsInstanceID = InstanceIdentity::Instance()->GetEntity()->GetEcsInstanceID().to_string();
+    mEcsRegionID = InstanceIdentity::Instance()->GetEntity()->GetEcsRegionID().to_string();
+    mEcsUserID = InstanceIdentity::Instance()->GetEntity()->GetEcsUserID().to_string();
+#endif
 }
 
 LoongCollectorMonitor::~LoongCollectorMonitor() {
@@ -610,6 +634,18 @@ void LoongCollectorMonitor::Init() {
     labels.emplace_back(METRIC_LABEL_KEY_OS_DETAIL, mOsDetail);
     labels.emplace_back(METRIC_LABEL_KEY_UUID, Application::GetInstance()->GetUUID());
     labels.emplace_back(METRIC_LABEL_KEY_VERSION, ILOGTAIL_VERSION);
+    labels.emplace_back(METRIC_LABEL_KEY_HOST_ID, InstanceIdentity::Instance()->GetEntity()->GetHostID().to_string());
+#ifdef __ENTERPRISE__
+    if (!mEcsInstanceID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_INSTANCE_ID, mEcsInstanceID);
+    }
+    if (!mEcsRegionID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_REGION_ID, mEcsRegionID);
+    }
+    if (!mEcsUserID.empty()) {
+        labels.emplace_back(METRIC_LABEL_KEY_ECS_USER_ID, mEcsUserID);
+    }
+#endif
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, []() -> std::string { return FlusherSLS::GetAllProjects(); });
 #ifdef __ENTERPRISE__
@@ -619,7 +655,7 @@ void LoongCollectorMonitor::Init() {
         return EnterpriseConfigProvider::GetInstance()->GetUserDefinedIdSet();
     });
 #endif
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_AGENT, std::move(labels), std::move(dynamicLabels));
     // init value
     mAgentCpu = mMetricsRecordRef.CreateDoubleGauge(METRIC_AGENT_CPU);
@@ -628,6 +664,8 @@ void LoongCollectorMonitor::Init() {
     mAgentGoRoutinesTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_GO_ROUTINES_TOTAL);
     mAgentOpenFdTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_OPEN_FD_TOTAL);
     mAgentConfigTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_PIPELINE_CONFIG_TOTAL);
+    mAgentHostMonitorTotal = mMetricsRecordRef.CreateIntGauge(METRIC_AGENT_HOST_MONITOR_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 void LoongCollectorMonitor::Stop() {

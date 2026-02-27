@@ -23,8 +23,8 @@
 #include "collection_pipeline/batch/BatchStatus.h"
 #include "collection_pipeline/batch/BatchedEvents.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
+#include "common/StringView.h"
 #include "models/PipelineEventGroup.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

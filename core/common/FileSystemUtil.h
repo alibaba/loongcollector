@@ -35,21 +35,17 @@
 // Filesystem utility.
 namespace logtail {
 
+constexpr size_t kDefaultMaxFileSize = 1024 * 1024; // 1 MB
 // Separator of path, use std::string to concat with const char *.
 extern const std::string PATH_SEPARATOR;
 
 // PathJoin concats base and sub (by adding necessary path separator).
 // NOTE: the implementation is not elegant for better performance (backward).
 inline std::string PathJoin(const std::string& base, const std::string& sub) {
-    // Only Windows can collect root path, so linux do as old way.
-#if defined(__linux__)
-    return base + PATH_SEPARATOR + sub;
-#elif defined(_MSC_VER)
-    if (!BOOL_FLAG(enable_root_path_collection) || base.back() != PATH_SEPARATOR[0]) {
+    if (!base.empty() && base.back() != PATH_SEPARATOR[0]) {
         return base + PATH_SEPARATOR + sub;
     }
     return base + sub;
-#endif
 }
 
 std::string ParentPath(const std::string& path);
@@ -86,8 +82,17 @@ int64_t FTell(FILE* stream);
 // TrimLastSeperator removes last path separator unless @path is equal to '/'.
 void TrimLastSeperator(std::string& path);
 
-// ReadFileContent reads all content of @fileName to @content.
-bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize = 8192);
+enum class FileReadResult {
+    kError = -1, // 发生错误
+    kOK = 0, // 文件成功读取完毕
+    kTruncated = 1 // 文件被截断（超过最大大小限制）
+};
+
+// ReadFileContent reads up to maxFileSize content of @fileName to @content.
+// Cannot garantee the content is complete if the file is changed during reading.
+FileReadResult ReadFileContent(const std::string& fileName,
+                               std::string& content,
+                               uint64_t maxFileSize = std::numeric_limits<uint64_t>::max());
 
 int GetLines(std::istream& is,
              bool enableEmptyLine,
@@ -104,6 +109,7 @@ int GetFileLines(const std::filesystem::path& filename,
 
 // OverwriteFile overwrides @fileName with @content.
 bool OverwriteFile(const std::string& fileName, const std::string& content);
+bool UpdateFileContent(const std::filesystem::path& filepath, const std::string& content, std::string& errMsg);
 
 bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg);
 
@@ -134,6 +140,21 @@ std::string GetFdPath(int fd);
 typedef int mode_t;
 #endif
 void Chmod(const char* filePath, mode_t mode);
+
+// ConvertAndNormalizeNativePath converts a UTF-8 encoded path/name string to the native platform format.
+// On Windows: Converts UTF-8 to ACP (ANSI Code Page) and normalizes the drive letter to uppercase.
+// On Linux: Returns the path as-is (UTF-8 is the native encoding).
+// This function should be used for paths from configuration files (UTF-8 encoded).
+// Example: "c:\测试\文件.txt" -> "C:\测试\文件.txt" (Windows, with proper encoding)
+//          "*.log" or "文件名.log" -> properly encoded for the platform
+std::string ConvertAndNormalizeNativePath(const std::string& path);
+
+// NormalizeNativePath normalizes a path that is already in native encoding.
+// On Windows: Only normalizes the drive letter to uppercase (no encoding conversion).
+// On Linux: Returns the path as-is.
+// This function should be used for paths from filesystem APIs (already in native encoding).
+// Example: "c:\测试\文件.txt" -> "C:\测试\文件.txt" (Windows, no encoding change)
+std::string NormalizeNativePath(const std::string& path);
 
 namespace fsutil {
 

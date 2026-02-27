@@ -77,15 +77,4 @@ const string LOG_RESERVED_KEY_TOPIC = "__topic__";
 const string LOG_RESERVED_KEY_MACHINE_UUID = "__machine_uuid__";
 const string LOG_RESERVED_KEY_PACKAGE_ID = "__pack_id__";
 
-////////////////////////// METRIC ////////////////////////
-const string DEFAULT_METRIC_TAG_NAMESPACE = "namespace";
-const string DEFAULT_METRIC_TAG_POD_NAME = "pod_name";
-const string DEFAULT_METRIC_TAG_POD_UID = "pod_uid";
-const string DEFAULT_METRIC_TAG_CONTAINER_NAME = "container_name";
-const string DEFAULT_METRIC_TAG_CONTAINER_IP = "container_ip";
-const string DEFAULT_METRIC_TAG_IMAGE_NAME = "image_name";
-
-////////////////////////// TRACE ////////////////////////
-
-
 } // namespace logtail

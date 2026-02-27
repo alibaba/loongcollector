@@ -25,9 +25,9 @@
 #include "json/json.h"
 #endif
 
+#include "common/StringView.h"
 #include "common/memory/SourceBuffer.h"
 #include "models/PipelineEvent.h"
-#include "models/StringView.h"
 
 namespace logtail {
 
@@ -67,7 +67,7 @@ struct UntypedMultiDoubleValues {
 
     std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesBegin() const;
     std::map<StringView, UntypedMultiDoubleValue>::const_iterator ValuesEnd() const;
-    size_t ValusSize() const;
+    size_t ValuesSize() const;
 
     size_t DataSize() const;
     void ResetPipelineEvent(PipelineEvent* ptr) { mMetricEventPtr = ptr; }

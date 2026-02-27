@@ -65,6 +65,19 @@ private:
                            int* unmatchLines);
     StringView GetNextLine(StringView log, size_t begin);
 
+    bool HasStartPattern() const { return !mStartPatternReg.empty(); }
+    bool HasContinuePattern() const { return !mContinuePatternReg.empty(); }
+    bool HasEndPattern() const { return !mEndPatternReg.empty(); }
+    const boost::regex& GetStartPatternReg() const;
+    const boost::regex& GetContinuePatternReg() const;
+    const boost::regex& GetEndPatternReg() const;
+
+    // boost::regex object shared by multi-thread leads to performance degradation. Therefore, each thread should be
+    // allocated a different copy.
+    std::vector<boost::regex> mStartPatternReg;
+    std::vector<boost::regex> mContinuePatternReg;
+    std::vector<boost::regex> mEndPatternReg;
+
     CounterPtr mMatchedEventsTotal;
     CounterPtr mMatchedLinesTotal;
     CounterPtr mUnmatchedLinesTotal;

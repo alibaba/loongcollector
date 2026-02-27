@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <condition_variable>
 #include <future>
 #include <memory>
@@ -23,6 +24,7 @@
 #include <queue>
 
 #include "common/timer/TimerEvent.h"
+#include "monitor/metric_models/MetricRecord.h"
 
 namespace logtail {
 
@@ -34,6 +36,7 @@ struct TimerEventCompare {
 
 class Timer {
 public:
+    ~Timer();
     Timer(const Timer&) = delete;
     Timer(Timer&&) = delete;
     Timer& operator=(const Timer&) = delete;
@@ -45,13 +48,13 @@ public:
     void Init();
     void Stop();
     void PushEvent(std::unique_ptr<TimerEvent>&& e);
+    void InitMetrics();
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
 #endif
 
 private:
     Timer() = default;
-    ~Timer() = default;
     void Run();
 
     mutable std::mutex mQueueMux;
@@ -59,9 +62,15 @@ private:
         mQueue;
 
     std::future<void> mThreadRes;
-    mutable std::mutex mThreadRunningMux;
-    bool mIsThreadRunning = false;
+    std::atomic_bool mIsThreadRunning = false;
     mutable std::condition_variable mCV;
+
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mInItemsTotal;
+    CounterPtr mOutItemsTotal;
+    IntGaugePtr mQueueItemsTotal;
+    TimeCounterPtr mLatencyTimeMs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TimerUnittest;

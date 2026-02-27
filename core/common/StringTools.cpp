@@ -30,6 +30,8 @@ using namespace std;
 
 namespace logtail {
 
+const std::string kSpaceChars = " \f\n\r\t\v";
+
 std::string ToLowerCaseString(const std::string& orig) {
     auto copy = orig;
     std::transform(copy.begin(), copy.end(), copy.begin(), ::tolower);
@@ -70,9 +72,47 @@ std::string ToString(const std::vector<std::string>& vec) {
     return ret;
 }
 
-template <>
-bool StringTo<bool>(const std::string& str) {
-    return str == "true";
+std::string ToString(const std::vector<std::filesystem::path>& vec) {
+    if (vec.empty()) {
+        return "";
+    }
+    size_t size = 0;
+    {
+        auto iter = vec.begin();
+        size += iter->string().size();
+        ++iter;
+        for (; iter != vec.end(); ++iter) {
+            size += 1 + iter->string().size();
+        }
+    }
+    std::string ret;
+    ret.reserve(size);
+    {
+        auto iter = vec.begin();
+        ret.append(iter->string());
+        ++iter;
+        for (; iter != vec.end(); ++iter) {
+            ret.push_back(',');
+            ret.append(iter->string());
+        }
+    }
+    return ret;
+}
+
+std::string
+ToString(const std::map<std::string, std::string>& map, const std::string& kvDelim, const std::string& pairDelim) {
+    if (map.empty()) {
+        return "";
+    }
+    std::string ret;
+    for (const auto& kv : map) {
+        ret += kv.first + kvDelim + kv.second + pairDelim;
+    }
+    // Remove trailing pairDelim
+    if (!ret.empty() && ret.size() >= pairDelim.size()) {
+        ret.erase(ret.size() - pairDelim.size());
+    }
+    return ret;
 }
 
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim) {
@@ -365,10 +405,47 @@ void RemoveFilePathTrailingSlash(std::string& filePath) {
 
 bool IsInt(const char* sz) {
     bool ok = (sz != nullptr && *sz != '\0');
-    for (auto* it = sz; ok && *it; ++it) {
+    for (const auto* it = sz; ok && *it; ++it) {
         ok = (0 != std::isdigit(*it));
     }
     return ok;
+}
+
+template <typename UnaryPredicate>
+std::string trimCopy(const std::string& str, UnaryPredicate pred, bool left, bool right) {
+    size_t end = str.size();
+    size_t st = 0;
+    const char* val = str.data();
+
+    if (left) {
+        while (st < end && pred(val[st])) {
+            st++;
+        }
+    }
+    if (right) {
+        while (st < end && pred(val[end - 1])) {
+            end--;
+        }
+    }
+    return (0 < st || end < str.size()) ? str.substr(st, end - st) : str;
+}
+
+std::string Trim(const std::string& str, const std::string& trimCharacters, bool trimLeft, bool trimRight) {
+    return trimCopy(str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
+}
+
+std::string DoubleToString(double value) {
+    std::string result = std::to_string(value);
+    // Remove trailing zeros
+    size_t dotPos = result.find('.');
+    if (dotPos != std::string::npos) {
+        size_t lastNonZero = result.find_last_not_of('0');
+        if (lastNonZero >= dotPos) {
+            // If last non-zero char is the dot, remove it too
+            result.erase(lastNonZero == dotPos ? dotPos : lastNonZero + 1);
+        }
+    }
+    return result;
 }
 
 } // namespace logtail

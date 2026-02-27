@@ -14,12 +14,12 @@
 
 | 参数                     | 类型      | 是否必选 | 说明                                                                                                                                                                                   |
 |------------------------|---------|------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| SourceKey              | String  | 是    | 原始字段名。                                                                                                                                                                               |
-| Format                 | String  | 是    | 转换后的格式（枚举类型）。共有三类：protobuf, json, protojson                                                                                                                                          |
-| NoKeyError             | Boolean | 否    | 当没有对应字段时，是否报错。默认值为false                                                                                                                                                              |
-| TraceIDNeedDecode      | Boolean | 否    | 是否对TraceID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将TraceID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。           |
-| SpanIDNeedDecode       | Boolean | 否    | 是否对SpanID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将SpanID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。             |
-| ParentSpanIDNeedDecode | Boolean | 否    | 是否对ParentSpanID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将ParentSpanID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。 |
+| SourceKey              | string  | 是    | 原始字段名。                                                                                                                                                                               |
+| Format                 | string  | 是    | 转换后的格式（枚举类型）。共有三类：protobuf, json, protojson                                                                                                                                          |
+| NoKeyError             | bool | 否    | 当没有对应字段时，是否报错。默认值为false                                                                                                                                                              |
+| TraceIDNeedDecode      | bool | 否    | 是否对TraceID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将TraceID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。           |
+| SpanIDNeedDecode       | bool | 否    | 是否对SpanID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将SpanID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。             |
+| ParentSpanIDNeedDecode | bool | 否    | 是否对ParentSpanID做一次Base64 Encode。默认值为false，当Format为protojson时，需要考虑将当前值改为True。具体原因如下：protojson转换时将ParentSpanID数据Base64 Decode转码，而ProtoJson格式存在没有对TraceID做Base64 Encode转码的情况，这样会导致转换失败。 |
 
 ## 样例
 

@@ -29,7 +29,7 @@ void PollingEventQueue::PushEvent(const std::vector<Event*>& eventVec) {
     for (size_t i = 0; i < eventVec.size(); ++i) {
         Event* pEvent = eventVec[i];
         LOG_DEBUG(sLogger,
-                  ("Polling Event", ToString((int)pEvent->GetType()))(pEvent->GetSource(), pEvent->GetObject_())(
+                  ("Polling Event", ToString((int)pEvent->GetType()))(pEvent->GetSource(), pEvent->GetEventObject())(
                       ToString(pEvent->GetDev()), ToString(pEvent->GetInode())));
     }
     int32_t tryTime = 0;
@@ -46,10 +46,10 @@ void PollingEventQueue::PushEvent(const std::vector<Event*>& eventVec) {
             LOG_ERROR(sLogger, ("Push polling event blocked, drop event", eventVec.size()));
             for (size_t i = 0; i < eventVec.size(); ++i) {
                 Event* pEvent = eventVec[i];
-                LOG_INFO(
-                    sLogger,
-                    ("Drop polling Event", ToString((int)pEvent->GetType()))(pEvent->GetSource(), pEvent->GetObject_())(
-                        ToString(pEvent->GetDev()), ToString(pEvent->GetInode())));
+                LOG_INFO(sLogger,
+                         ("Drop polling Event", ToString((int)pEvent->GetType()))(
+                             pEvent->GetSource(), pEvent->GetEventObject())(ToString(pEvent->GetDev()),
+                                                                            ToString(pEvent->GetInode())));
                 delete pEvent;
             }
             break;
@@ -71,7 +71,7 @@ PollingEventQueue::~PollingEventQueue() {
 
 void PollingEventQueue::PushEvent(Event* pEvent) {
     LOG_DEBUG(sLogger,
-              ("Polling Event", ToString((int)pEvent->GetType()))(pEvent->GetSource(), pEvent->GetObject_())(
+              ("Polling Event", ToString((int)pEvent->GetType()))(pEvent->GetSource(), pEvent->GetEventObject())(
                   ToString(pEvent->GetDev()), ToString(pEvent->GetInode())));
     int32_t tryTime = 0;
     do {
@@ -86,7 +86,7 @@ void PollingEventQueue::PushEvent(Event* pEvent) {
         if (++tryTime == 1000) {
             // drop event
             LOG_ERROR(sLogger,
-                      ("Push polling event blocked, drop event", pEvent->GetSource() + "/" + pEvent->GetObject_()));
+                      ("Push polling event blocked, drop event", pEvent->GetSource() + "/" + pEvent->GetEventObject()));
             delete pEvent;
             break;
         }
@@ -106,7 +106,7 @@ Event* PollingEventQueue::FindEvent(const std::string& src, const std::string& o
     std::lock_guard<std::mutex> lock(mQueueLock);
     for (auto iter = mEventQueue.begin(); iter != mEventQueue.end(); ++iter) {
         Event* pEvt = *iter;
-        if (pEvt->GetSource() == src && pEvt->GetObject_() == obj
+        if (pEvt->GetSource() == src && pEvt->GetEventObject() == obj
             && (-1 == eventType || pEvt->GetType() == static_cast<logtail::EventType>(eventType))) {
             return pEvt;
         }
@@ -118,7 +118,7 @@ Event* PollingEventQueue::FindEvent(const std::string& src, const std::string& o
     std::lock_guard<std::mutex> lock(mQueueLock);
     for (auto iter = mEventQueue.begin(); iter != mEventQueue.end(); ++iter) {
         Event* pEvt = *iter;
-        if (pEvt->GetSource() == src && pEvt->GetObject_() == obj && pEvt->GetDev() == dev
+        if (pEvt->GetSource() == src && pEvt->GetEventObject() == obj && pEvt->GetDev() == dev
             && pEvt->GetInode() == inode) {
             return pEvt;
         }

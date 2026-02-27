@@ -1,0 +1,229 @@
+{
+    "containers": [
+        {
+            "id": "nginx-frontend",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-frontend-pod",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx-frontend",
+                    "app.kubernetes.io/version": "1.20",
+                    "app.kubernetes.io/component": "web"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "nginx-backend",
+            "labels": {
+                "app": "nginx"
+            },
+            "env": [
+                "APP_NAME=nginx"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "nginx-backend-pod",
+                "container_name": "nginx",
+                "labels": {
+                    "app.kubernetes.io/name": "nginx-backend",
+                    "app.kubernetes.io/version": "1.21",
+                    "app.kubernetes.io/component": "api"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "redis-cache",
+            "labels": {
+                "app": "redis"
+            },
+            "env": [
+                "APP_NAME=redis"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "redis-cache-pod",
+                "container_name": "redis",
+                "labels": {
+                    "app.kubernetes.io/name": "redis",
+                    "app.kubernetes.io/version": "6.2",
+                    "app.kubernetes.io/component": "cache"
+                },
+                "paused_container": false
+            }
+        },
+        {
+            "id": "mysql-db",
+            "labels": {
+                "app": "mysql"
+            },
+            "env": [
+                "APP_NAME=mysql"
+            ],
+            "k8s": {
+                "namespace": "default",
+                "pod": "mysql-db-pod",
+                "container_name": "mysql",
+                "labels": {
+                    "app.kubernetes.io/name": "mysql",
+                    "app.kubernetes.io/version": "8.0"
+                },
+                "paused_container": false
+            }
+        }
+    ],
+    "test_cases": [
+        {
+            "name": "include_k8s_label_exact_match",
+            "description": "测试 Pod 标签精确匹配",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "nginx-frontend"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend"
+            ]
+        },
+        {
+            "name": "include_k8s_label_key_only",
+            "description": "测试只检查标签键存在（value 为空）",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/component": ""
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend",
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_k8s_label_regex_value",
+            "description": "测试标签值正则匹配（以 ^ 开头）",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "^nginx-.*"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend"
+            ]
+        },
+        {
+            "name": "include_k8s_label_multiple_conditions",
+            "description": "测试多个标签条件（OR 关系）",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "nginx-frontend",
+                    "app.kubernetes.io/component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "redis-cache"
+            ]
+        },
+        {
+            "name": "include_k8s_label_partial_match",
+            "description": "测试部分标签匹配",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/version": "^1\\..*"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-frontend",
+                "nginx-backend"
+            ]
+        },
+        {
+            "name": "include_k8s_label_no_labels",
+            "description": "测试容器无标签的情况",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "nonexistent.label": "value"
+                }
+            },
+            "expected_matched_ids": []
+        },
+        {
+            "name": "exclude_k8s_label_exact_match",
+            "description": "测试排除特定标签的 Pod",
+            "filters": {
+                "ExcludeK8sLabel": {
+                    "app.kubernetes.io/name": "nginx-frontend"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-backend",
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_k8s_label_key_only",
+            "description": "测试排除包含特定键的 Pod（value 为空）",
+            "filters": {
+                "ExcludeK8sLabel": {
+                    "app.kubernetes.io/component": ""
+                }
+            },
+            "expected_matched_ids": [
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_k8s_label_regex_value",
+            "description": "测试排除标签值正则匹配的 Pod",
+            "filters": {
+                "ExcludeK8sLabel": {
+                    "app.kubernetes.io/name": "^nginx-.*"
+                }
+            },
+            "expected_matched_ids": [
+                "redis-cache",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_k8s_label_multiple_conditions",
+            "description": "测试多个排除条件（OR 关系）",
+            "filters": {
+                "ExcludeK8sLabel": {
+                    "app.kubernetes.io/name": "nginx-frontend",
+                    "app.kubernetes.io/component": "cache"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-backend",
+                "mysql-db"
+            ]
+        },
+        {
+            "name": "exclude_k8s_label_combined_with_include",
+            "description": "测试排除和包含标签的组合使用",
+            "filters": {
+                "IncludeK8sLabel": {
+                    "app.kubernetes.io/name": "^nginx-.*"
+                },
+                "ExcludeK8sLabel": {
+                    "app.kubernetes.io/component": "web"
+                }
+            },
+            "expected_matched_ids": [
+                "nginx-backend"
+            ]
+        }
+    ]
+}

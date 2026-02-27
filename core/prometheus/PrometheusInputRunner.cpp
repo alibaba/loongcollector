@@ -58,12 +58,13 @@ PrometheusInputRunner::PrometheusInputRunner()
     DynamicMetricLabels dynamicLabels;
     dynamicLabels.emplace_back(METRIC_LABEL_KEY_PROJECT, [this]() -> std::string { return this->GetAllProjects(); });
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels), std::move(dynamicLabels));
 
     mPromRegisterState = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_CLIENT_REGISTER_STATE);
     mPromJobNum = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_JOBS_TOTAL);
     mPromRegisterRetryTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_CLIENT_REGISTER_RETRY_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 /// @brief receive scrape jobs from input plugins and update scrape jobs
@@ -87,14 +88,19 @@ void PrometheusInputRunner::UpdateScrapeInput(std::shared_ptr<TargetSubscriberSc
                                chrono::duration_cast<chrono::milliseconds>(currSystemTime.time_since_epoch()).count());
     auto firstExecTime = chrono::steady_clock::now() + chrono::milliseconds(randSleepMilliSec);
     auto firstSubscribeTime = currSystemTime + chrono::milliseconds(randSleepMilliSec);
-    targetSubscriber->SetFirstExecTime(firstExecTime, firstSubscribeTime);
+    targetSubscriber->CalculateFirstExecTime(firstExecTime, firstSubscribeTime);
     // 1. add subscriber to mTargetSubscriberSchedulerMap
     {
         WriteLock lock(mSubscriberMapRWLock);
         mTargetSubscriberSchedulerMap[targetSubscriber->GetId()] = targetSubscriber;
     }
     // 2. build Ticker Event and add it to Timer
-    targetSubscriber->ScheduleNext();
+    // if host only mode, build target subscriber directly, otherwise build scrape scheduler
+    if (targetSubscriber->IsHostOnlyMode()) {
+        targetSubscriber->ScheduleHostOnlyTargets();
+    } else {
+        targetSubscriber->ScheduleNext();
+    }
     {
         ReadLock lock(mSubscriberMapRWLock);
         SET_GAUGE(mPromJobNum, mTargetSubscriberSchedulerMap.size());
@@ -139,6 +145,7 @@ void PrometheusInputRunner::Init() {
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "register"));
     // only register when operator exist
+    // empty service host means in host only mode
     if (!mServiceHost.empty()) {
         mIsThreadRunning.store(true);
         mThreadRes = std::async(launch::async, [this]() {
@@ -169,7 +176,9 @@ void PrometheusInputRunner::Init() {
                             if (tmpStr.empty()) {
                                 mUnRegisterMs = 0;
                             } else {
-                                mUnRegisterMs.store(StringTo<uint64_t>(tmpStr));
+                                uint64_t unRegisterMs{};
+                                StringTo(tmpStr, unRegisterMs);
+                                mUnRegisterMs.store(unRegisterMs);
                                 // adjust unRegisterMs to scrape targets for zero-cost
                                 mUnRegisterMs -= 1000;
                                 LOG_INFO(sLogger, ("unRegisterMs", ToString(mUnRegisterMs)));
@@ -200,11 +209,6 @@ void PrometheusInputRunner::Stop() {
     if (mThreadRes.valid()) {
         mThreadRes.wait_for(chrono::seconds(1));
     }
-
-#ifndef APSARA_UNIT_TEST_MAIN
-    LOG_INFO(sLogger, ("PrometheusInputRunner", "stop asyn curl runner"));
-    AsynCurlRunner::GetInstance()->Stop();
-#endif
 
     LOG_INFO(sLogger, ("PrometheusInputRunner", "cancel all target subscribers"));
     CancelAllTargetSubscriber();

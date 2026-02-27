@@ -1,0 +1,76 @@
+/*
+ * Copyright 2025 iLogtail Authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include "host_monitor/SystemInterface.h"
+#include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/MetricCalculate.h"
+
+namespace logtail {
+
+extern const uint32_t kHostMonitorMinInterval;
+extern const uint32_t kHostMonitorDefaultInterval;
+
+struct CPUPercent {
+    double sys;
+    double user;
+    double wait;
+    double idle;
+    double other;
+    double total;
+
+    // Define the field descriptors
+    static inline const FieldName<CPUPercent> CPUMetricFields[] = {
+        FIELD_ENTRY(CPUPercent, sys),
+        FIELD_ENTRY(CPUPercent, user),
+        FIELD_ENTRY(CPUPercent, wait),
+        FIELD_ENTRY(CPUPercent, idle),
+        FIELD_ENTRY(CPUPercent, other),
+        FIELD_ENTRY(CPUPercent, total),
+    };
+
+    // Define the enumerate function for your metric type
+    static void enumerate(const std::function<void(const FieldName<CPUPercent, double>&)>& callback) {
+        for (const auto& field : CPUMetricFields) {
+            callback(field);
+        }
+    }
+};
+
+class CPUCollector : public BaseCollector {
+public:
+    CPUCollector() = default;
+    ~CPUCollector() override = default;
+
+    bool Init(HostMonitorContext& collectContext) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
+
+    static const std::string sName;
+    const std::string& Name() const override { return sName; }
+
+private:
+    bool CalculateCPUPercent(CPUPercent& cpuPercent, CPUStat& cpu);
+
+private:
+    int cpuCount = 0;
+    MetricCalculate<CPUPercent> mCalculate;
+    CPUStat lastCpu{};
+    uint32_t mJiffiesDeltaWarningCount = 0; // jiffies delta is negative warning 计数
+};
+
+} // namespace logtail

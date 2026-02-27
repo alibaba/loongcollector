@@ -22,6 +22,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 
 class curl_slist;
@@ -58,7 +59,7 @@ size_t DefaultWriteCallback(char* buffer, size_t size, size_t nmemb, void* data)
 class HttpResponse {
     friend void* CreateCurlHandler(const std::string& method,
                                    bool httpsFlag,
-                                   const std::string& host,
+                                   const std::string& endpoint,
                                    int32_t port,
                                    const std::string& url,
                                    const std::string& queryString,
@@ -67,7 +68,6 @@ class HttpResponse {
                                    HttpResponse& response,
                                    curl_slist*& headers,
                                    uint32_t timeout,
-                                   bool replaceHostWithIp,
                                    const std::string& intf,
                                    bool followRedirects,
                                    const std::optional<CurlTLS>& tls,

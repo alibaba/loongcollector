@@ -17,23 +17,23 @@ package pluginmanager
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorWrapperV2 struct {
 	ProcessorWrapper
 	Processor pipeline.ProcessorV2
 
-	inEventGroupsTotal  pipeline.CounterMetric
-	outEventGroupsTotal pipeline.CounterMetric
+	inEventGroupsTotal  selfmonitor.CounterMetric
+	outEventGroupsTotal selfmonitor.CounterMetric
 }
 
 func (wrapper *ProcessorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
-	wrapper.inEventGroupsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginInEventGroupsTotal)
-	wrapper.outEventGroupsTotal = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginOutEventGroupsTotal)
+	wrapper.inEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginInEventGroupsTotal)
+	wrapper.outEventGroupsTotal = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginOutEventGroupsTotal)
 
 	return wrapper.Processor.Init(wrapper.Config.Context)
 }
@@ -42,17 +42,14 @@ func (wrapper *ProcessorWrapperV2) Process(in *models.PipelineGroupEvents, conte
 	startTime := time.Now().UnixMilli()
 
 	wrapper.inEventGroupsTotal.Add(1)
-	wrapper.inEventsTotal.Add(int64(len(in.Events)))
-	for _, event := range in.Events {
-		wrapper.inSizeBytes.Add(event.GetSize())
-	}
+	wrapper.inEventsTotal.Add(in.GetEventCount())
+	wrapper.inSizeBytes.Add(in.GetSize())
 
 	wrapper.Processor.Process(in, context)
 
 	wrapper.outEventGroupsTotal.Add(1)
-	wrapper.outEventsTotal.Add(int64(len(in.Events)))
-	for _, event := range in.Events {
-		wrapper.outSizeBytes.Add(event.GetSize())
-	}
+	wrapper.outEventsTotal.Add(in.GetEventCount())
+	wrapper.outSizeBytes.Add(in.GetSize())
+
 	wrapper.totalProcessTimeMs.Add(time.Now().UnixMilli() - startTime)
 }

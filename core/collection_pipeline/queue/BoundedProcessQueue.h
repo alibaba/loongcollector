@@ -18,8 +18,8 @@
 
 #include <cstdint>
 
+#include <deque>
 #include <memory>
-#include <queue>
 #include <vector>
 
 #include "collection_pipeline/queue/BoundedQueueInterface.h"
@@ -37,20 +37,20 @@ public:
 
     bool Push(std::unique_ptr<ProcessQueueItem>&& item) override;
     bool Pop(std::unique_ptr<ProcessQueueItem>& item) override;
-    void SetPipelineForItems(const std::shared_ptr<CollectionPipeline>& p) const override;
 
     void SetUpStreamFeedbacks(std::vector<FeedbackInterface*>&& feedbacks);
 
-private:
-    size_t Size() const override { return mQueue.size(); }
-
-    void GiveFeedback() const override;
-
+protected:
     std::deque<std::unique_ptr<ProcessQueueItem>> mQueue;
     std::vector<FeedbackInterface*> mUpStreamFeedbacks;
 
+private:
+    void GiveFeedback() const override;
+    virtual void AddSize(ProcessQueueItem* item) = 0;
+    virtual void SubSize(ProcessQueueItem* item) = 0;
+
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class BoundedProcessQueueUnittest;
+    friend class CountBoundedProcessQueueUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class ExactlyOnceQueueManagerUnittest;
     friend class PipelineUnittest;

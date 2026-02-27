@@ -98,7 +98,7 @@ func (d *Decoder) parseInputMeta(req *http.Request) (*profile.Input, profile.For
 	n := q.Get("name")
 	key, err := segment.ParseKey(n)
 	if err != nil {
-		logger.Error(context.Background(), AlarmType, "invalid name", n)
+		logger.Warning(context.Background(), AlarmType, "invalid name", n)
 		return nil, "", fmt.Errorf("pyroscope protocol get name err: %w", err)
 	}
 	name := key.AppName()
@@ -125,7 +125,7 @@ func (d *Decoder) parseInputMeta(req *http.Request) (*profile.Input, profile.For
 	if sr := q.Get("sampleRate"); sr != "" {
 		sampleRate, err := strconv.Atoi(sr)
 		if err != nil {
-			logger.Error(context.Background(), AlarmType, "invalid sampleRate", sr)
+			logger.Warning(context.Background(), AlarmType, "invalid sampleRate", sr)
 		} else {
 			input.Metadata.SampleRate = uint32(sampleRate)
 		}

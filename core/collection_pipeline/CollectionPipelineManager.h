@@ -52,11 +52,12 @@ public:
     void StopAllPipelines();
     void ClearAllPipelines();
     std::vector<std::string> GetAllConfigNames() const;
-
+    void ClearInputUnusedCheckpoints();
     // for shennong only
     const std::unordered_map<std::string, std::shared_ptr<CollectionPipeline>>& GetAllPipelines() const {
         return mPipelineNameEntityMap;
     }
+    size_t GetPipelineCount() const;
 
 private:
     CollectionPipelineManager() = default;
@@ -82,6 +83,8 @@ private:
     friend class CommonConfigProviderUnittest;
     friend class FlusherUnittest;
     friend class PipelineUnittest;
+    friend class PipelineUpdateUnittest;
+    friend class PollingPreservedDirDepthUnittest;
 #endif
 };
 

@@ -3,8 +3,8 @@
 
 #include <string>
 
+#include "common/StringView.h"
 #include "common/http/HttpResponse.h"
-#include "models/StringView.h"
 
 namespace logtail {
 

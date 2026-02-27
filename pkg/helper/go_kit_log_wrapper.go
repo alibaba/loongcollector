@@ -19,6 +19,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -53,6 +54,6 @@ func (g *goKitLogWrapper) Log(params ...interface{}) error {
 			return nil
 		}
 	}
-	logger.Warning(g.context.GetRuntimeContext(), g.alarmType, params...)
+	logger.Warning(g.context.GetRuntimeContext(), selfmonitor.AlarmType(g.alarmType), params...)
 	return nil
 }

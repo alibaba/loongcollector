@@ -14,6 +14,9 @@
 
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 
+#include <cstddef>
+
+#include "Flags.h"
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "collection_pipeline/limiter/RateLimiter.h"
@@ -25,6 +28,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
@@ -80,7 +84,7 @@ static sls_logs::EndpointMode GetEndpointMode(EndpointMode mode) {
 static const string kAKErrorMsg = "can not get valid access key";
 #endif
 
-static const string kNoHostErrorMsg = "can not get available host";
+static const string kNoDomainErrorMsg = "can not get available domain";
 
 static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compressType) {
     switch (compressType) {
@@ -100,6 +104,7 @@ static const string& GetSLSCompressTypeString(sls_logs::SlsCompressType compress
 }
 
 const int32_t DiskBufferWriter::BUFFER_META_BASE_SIZE = 65536;
+const size_t DiskBufferWriter::BUFFER_META_MAX_SIZE = 1 * 1024 * 1024;
 
 void DiskBufferWriter::Init() {
     mBufferDivideTime = time(NULL);
@@ -159,7 +164,7 @@ bool DiskBufferWriter::PushToDiskBuffer(SenderQueueItem* item, uint32_t retryTim
     LOG_WARNING(sLogger,
                 ("failed to add sender queue item to disk buffer writer", "queue is full")("action", "discard data")(
                     "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mFlusher->GetQueueKey())));
-    AlarmManager::GetInstance()->SendAlarm(
+    AlarmManager::GetInstance()->SendAlarmCritical(
         DISCARD_DATA_ALARM,
         "failed to add sender queue item to disk buffer writer: queue is full\taction: discard data",
         flusher->mRegion,
@@ -218,13 +223,10 @@ void DiskBufferWriter::BufferSenderThread() {
             if (FileEncryption::CheckHeader(fileName, kvMap)) {
                 int32_t keyVersion = -1;
                 if (kvMap.find(STRING_FLAG(file_encryption_field_key_version)) != kvMap.end()) {
-                    try {
-                        keyVersion = StringTo<int32_t>(kvMap[STRING_FLAG(file_encryption_field_key_version)]);
-                    } catch (...) {
+                    if (!StringTo(kvMap[STRING_FLAG(file_encryption_field_key_version)], keyVersion)) {
                         LOG_ERROR(sLogger,
                                   ("convert key_version to int32_t fail",
                                    kvMap[STRING_FLAG(file_encryption_field_key_version)]));
-                        keyVersion = -1;
                     }
                 }
                 if (keyVersion >= 1 && keyVersion <= FileEncryption::GetInstance()->GetDefaultKeyVersion()) {
@@ -235,18 +237,18 @@ void DiskBufferWriter::BufferSenderThread() {
                     LOG_ERROR(sLogger,
                               ("invalid key_version in header",
                                kvMap[STRING_FLAG(file_encryption_field_key_version)])("delete bufffer file", fileName));
-                    AlarmManager::GetInstance()->SendAlarm(
+                    AlarmManager::GetInstance()->SendAlarmCritical(
                         DISCARD_SECONDARY_ALARM, "key version in buffer file invalid, delete file: " + fileName);
                 }
             } else {
                 remove(fileName.c_str());
                 LOG_WARNING(sLogger, ("check header of buffer file failed, delete file", fileName));
-                AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
-                                                       "check header of buffer file failed, delete file: " + fileName);
+                AlarmManager::GetInstance()->SendAlarmCritical(
+                    DISCARD_SECONDARY_ALARM, "check header of buffer file failed, delete file: " + fileName);
             }
         }
 #ifdef __ENTERPRISE__
-        mCandidateHostsInfos.clear();
+        mCandidateDomainsInfos.clear();
 #endif
         // mIsSendingBuffer = false;
         lock.lock();
@@ -290,14 +292,14 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
             LOG_WARNING(sLogger,
                         ("buffer file path not exist", bufferFilePath)("logtail will not recreate external path",
                                                                        "local secondary does not work"));
-            AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                                   string("buffer file directory:") + bufferFilePath + " not exist");
+            AlarmManager::GetInstance()->SendAlarmCritical(
+                SECONDARY_READ_WRITE_ALARM, string("buffer file directory:") + bufferFilePath + " not exist");
             return false;
         }
         string errorMessage;
         if (!RebuildExecutionDir(AppConfig::GetInstance()->GetIlogtailConfigJson(), errorMessage)) {
             LOG_ERROR(sLogger, ("failed to rebuild buffer file path", bufferFilePath)("errorMessage", errorMessage));
-            AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM, errorMessage);
+            AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM, errorMessage);
             return false;
         } else
             LOG_INFO(sLogger, ("rebuild buffer file path success", bufferFilePath));
@@ -307,20 +309,21 @@ bool DiskBufferWriter::LoadFileToSend(time_t timeLine, std::vector<std::string>&
     if (!dir.Open()) {
         string errorStr = ErrnoToString(GetErrno());
         LOG_ERROR(sLogger, ("open dir error", bufferFilePath)("reason", errorStr));
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("open dir error,dir:") + bufferFilePath + ",error:" + errorStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(
+            SECONDARY_READ_WRITE_ALARM, string("open dir error,dir:") + bufferFilePath + ",error:" + errorStr);
         return false;
     }
     fsutil::Entry ent;
     while ((ent = dir.ReadNext())) {
         string filename = ent.Name();
         if (filename.find(GetSendBufferFileNamePrefix()) == 0) {
-            try {
-                int32_t filetime = StringTo<int32_t>(filename.substr(GetSendBufferFileNamePrefix().size()));
-                if (filetime < timeLine)
-                    filesToSend.push_back(filename);
-            } catch (...) {
+            int32_t filetime{};
+            if (!StringTo(filename.substr(GetSendBufferFileNamePrefix().size()), filetime)) {
                 LOG_INFO(sLogger, ("can not get file time from file name", filename));
+                continue;
+            }
+            if (filetime < timeLine) {
+                filesToSend.push_back(filename);
             }
         }
     }
@@ -347,8 +350,8 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
             break;
         if (retryTimes >= 3) {
             string errorStr = ErrnoToString(GetErrno());
-            AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                                   string("open file error:") + filename + ",error:" + errorStr);
+            AlarmManager::GetInstance()->SendAlarmCritical(
+                SECONDARY_READ_WRITE_ALARM, string("open file error:") + filename + ",error:" + errorStr);
             LOG_ERROR(sLogger, ("open file error", filename)("error", errorStr));
             return false;
         }
@@ -364,11 +367,11 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     auto nbytes = fread(static_cast<void*>(&meta), sizeof(char), sizeof(meta), fin);
     if (nbytes != sizeof(meta)) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("read encryption file meta error:") + filename
-                                                   + ", error:" + errorStr + ", meta.mEncryptionSize:"
-                                                   + ToString(meta.mEncryptionSize) + ", nbytes: " + ToString(nbytes)
-                                                   + ", pos: " + ToString(pos) + ", ftell: " + ToString(currentSize));
+        AlarmManager::GetInstance()->SendAlarmCritical(
+            SECONDARY_READ_WRITE_ALARM,
+            string("read encryption file meta error:") + filename + ", error:" + errorStr
+                + ", meta.mEncryptionSize:" + ToString(meta.mEncryptionSize) + ", nbytes: " + ToString(nbytes)
+                + ", pos: " + ToString(pos) + ", ftell: " + ToString(currentSize));
         LOG_ERROR(sLogger,
                   ("read encryption file meta error",
                    filename)("error", errorStr)("nbytes", nbytes)("pos", pos)("ftell", currentSize));
@@ -384,10 +387,10 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     }
 
     if (meta.mEncryptionSize < 0 || encodedInfoSize < 0) {
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("meta of encryption file invalid:" + filename
-                                                      + ", meta.mEncryptionSize:" + ToString(meta.mEncryptionSize)
-                                                      + ", meta.mEncodedInfoSize:" + ToString(meta.mEncodedInfoSize)));
+        AlarmManager::GetInstance()->SendAlarmCritical(
+            SECONDARY_READ_WRITE_ALARM,
+            string("meta of encryption file invalid:" + filename + ", meta.mEncryptionSize:"
+                   + ToString(meta.mEncryptionSize) + ", meta.mEncodedInfoSize:" + ToString(meta.mEncodedInfoSize)));
         LOG_ERROR(sLogger,
                   ("meta of encryption file invalid", filename)("meta.mEncryptionSize", meta.mEncryptionSize)(
                       "meta.mEncodedInfoSize", meta.mEncodedInfoSize));
@@ -400,8 +403,8 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
         fclose(fin);
         if (meta.mHandled != 1) {
             LOG_WARNING(sLogger, ("timeout buffer file, meta.mTimeStamp", meta.mTimeStamp));
-            AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
-                                                   "buffer file timeout (1day), delete file: " + filename);
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_SECONDARY_ALARM,
+                                                           "buffer file timeout (1day), delete file: " + filename);
         }
         return true;
     }
@@ -411,10 +414,10 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     if (nbytes != static_cast<size_t>(encodedInfoSize)) {
         fclose(fin);
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("read projectname from file error:") + filename
-                                                   + ", error:" + errorStr + ", meta.mEncodedInfoSize:"
-                                                   + ToString(meta.mEncodedInfoSize) + ", nbytes:" + ToString(nbytes));
+        AlarmManager::GetInstance()->SendAlarmCritical(
+            SECONDARY_READ_WRITE_ALARM,
+            string("read projectname from file error:") + filename + ", error:" + errorStr
+                + ", meta.mEncodedInfoSize:" + ToString(meta.mEncodedInfoSize) + ", nbytes:" + ToString(nbytes));
         LOG_ERROR(sLogger,
                   ("read encodedInfo from file error",
                    filename)("error", errorStr)("meta.mEncodedInfoSize", meta.mEncodedInfoSize)("nbytes", nbytes));
@@ -426,8 +429,8 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     if (pbMeta) {
         if (!bufferMeta.ParseFromString(encodedInfo)) {
             fclose(fin);
-            AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                                   string("parse buffer meta from file error:") + filename);
+            AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                           string("parse buffer meta from file error:") + filename);
             LOG_ERROR(sLogger, ("parse buffer meta from file error", filename)("buffer meta", encodedInfo));
             bufferMeta.Clear();
             return true;
@@ -457,14 +460,14 @@ bool DiskBufferWriter::ReadNextEncryption(int32_t& pos,
     if (nbytes != static_cast<size_t>(meta.mEncryptionSize)) {
         fclose(fin);
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("read encryption from file error:") + filename
-                                                   + ",error:" + errorStr + ",meta.mEncryptionSize:"
-                                                   + ToString(meta.mEncryptionSize) + ", nbytes:" + ToString(nbytes),
-                                               bufferMeta.region(),
-                                               bufferMeta.project(),
-                                               "",
-                                               bufferMeta.logstore());
+        AlarmManager::GetInstance()->SendAlarmCritical(
+            SECONDARY_READ_WRITE_ALARM,
+            string("read encryption from file error:") + filename + ",error:" + errorStr
+                + ",meta.mEncryptionSize:" + ToString(meta.mEncryptionSize) + ", nbytes:" + ToString(nbytes),
+            bufferMeta.region(),
+            bufferMeta.project(),
+            "",
+            bufferMeta.logstore());
         LOG_ERROR(sLogger,
                   ("read encryption from file error",
                    filename)("error", errorStr)("meta.mEncryptionSize", meta.mEncryptionSize)("nbytes", nbytes));
@@ -490,7 +493,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
     while (ReadNextEncryption(pos, filename, encryption, meta, readResult, bufferMeta)) {
         logData.clear();
         bool sendResult = false;
-        if (!readResult || bufferMeta.project().empty()) {
+        if (!readResult || !CheckBufferMetaValidation(filename, bufferMeta)) {
             if (meta.mHandled == 1)
                 continue;
             sendResult = true;
@@ -505,14 +508,14 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                 LOG_ERROR(sLogger,
                           ("decrypt error, project_name",
                            bufferMeta.project())("key_version", keyVersion)("meta.mLogDataSize", meta.mLogDataSize));
-                AlarmManager::GetInstance()->SendAlarm(ENCRYPT_DECRYPT_FAIL_ALARM,
-                                                       string("decrypt error, project_name:" + bufferMeta.project()
-                                                              + ", key_version:" + ToString(keyVersion)
-                                                              + ", meta.mLogDataSize:" + ToString(meta.mLogDataSize)),
-                                                       bufferMeta.region(),
-                                                       bufferMeta.project(),
-                                                       "",
-                                                       bufferMeta.logstore());
+                AlarmManager::GetInstance()->SendAlarmCritical(
+                    ENCRYPT_DECRYPT_FAIL_ALARM,
+                    string("decrypt error, project_name:" + bufferMeta.project() + ", key_version:"
+                           + ToString(keyVersion) + ", meta.mLogDataSize:" + ToString(meta.mLogDataSize)),
+                    bufferMeta.region(),
+                    bufferMeta.project(),
+                    "",
+                    bufferMeta.logstore());
             } else {
                 if (bufferMeta.has_logstore())
                     logData = string(des, meta.mLogDataSize);
@@ -525,7 +528,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                         LOG_ERROR(sLogger,
                                   ("parse error from string to loggroup, projectName is", bufferMeta.project()));
                         discardCount++;
-                        AlarmManager::GetInstance()->SendAlarm(
+                        AlarmManager::GetInstance()->SendAlarmCritical(
                             LOG_GROUP_PARSE_FAIL_ALARM,
                             string("projectName is:" + bufferMeta.project() + ", fileName is:" + filename),
                             bufferMeta.region(),
@@ -536,7 +539,7 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                         sendResult = true;
                         LOG_ERROR(sLogger, ("LZ4 compress loggroup fail, projectName is", bufferMeta.project()));
                         discardCount++;
-                        AlarmManager::GetInstance()->SendAlarm(
+                        AlarmManager::GetInstance()->SendAlarmCritical(
                             SEND_COMPRESS_FAIL_ALARM,
                             string("projectName is:" + bufferMeta.project() + ", fileName is:" + filename),
                             bufferMeta.region(),
@@ -554,8 +557,10 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                 if (!sendResult) {
                     time_t beginTime = time(nullptr);
                     while (true) {
-                        string host;
-                        auto response = SendBufferFileData(bufferMeta, logData, host);
+                        string domain;
+                        string ip;
+                        bool useIPFlag = false;
+                        auto response = SendBufferFileData(bufferMeta, logData, domain, ip, useIPFlag);
                         SendResult sendRes = SEND_OK;
                         if (response.mStatusCode != 200) {
                             sendRes = ConvertErrorCode(response.mErrorCode);
@@ -566,31 +571,33 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                                 break;
                             case SEND_NETWORK_ERROR:
                             case SEND_SERVER_ERROR:
-                                if (response.mErrorMsg != kNoHostErrorMsg) {
+                                if (response.mErrorMsg != kNoDomainErrorMsg) {
                                     LOG_WARNING(
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
-                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "domain", domain)("ip", ip)("useIPFlag", useIPFlag)("projectName",
+                                                                                                bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 }
                                 usleep(INT32_FLAG(send_retry_sleep_interval));
                                 break;
                             case SEND_QUOTA_EXCEED:
-                                AlarmManager::GetInstance()->SendAlarm(SEND_QUOTA_EXCEED_ALARM,
-                                                                       "error_code: " + response.mErrorCode
-                                                                           + ", error_message: " + response.mErrorMsg,
-                                                                       bufferMeta.region(),
-                                                                       bufferMeta.project(),
-                                                                       "",
-                                                                       bufferMeta.logstore());
+                                AlarmManager::GetInstance()->SendAlarmError(
+                                    SEND_QUOTA_EXCEED_ALARM,
+                                    "error_code: " + response.mErrorCode + ", error_message: " + response.mErrorMsg,
+                                    bufferMeta.region(),
+                                    bufferMeta.project(),
+                                    "",
+                                    bufferMeta.logstore());
                                 // no region
                                 if (!GetProfileSender()->IsProfileData("", bufferMeta.project(), bufferMeta.logstore()))
                                     LOG_WARNING(
                                         sLogger,
                                         ("send data to SLS fail", "retry later")("request id", response.mRequestId)(
                                             "error_code", response.mErrorCode)("error_message", response.mErrorMsg)(
-                                            "endpoint", host)("projectName", bufferMeta.project())(
+                                            "domain", domain)("ip", ip)("useIPFlag", useIPFlag)("projectName",
+                                                                                                bufferMeta.project())(
                                             "logstore", bufferMeta.logstore())("rawsize", bufferMeta.rawsize()));
                                 usleep(INT32_FLAG(quota_exceed_wait_interval));
                                 break;
@@ -617,6 +624,12 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
                         }
                         if (sendResult) {
                             break;
+                        }
+                        {
+                            lock_guard<mutex> lock(mBufferSenderThreadRunningMux);
+                            if (!mIsSendBufferThreadRunning) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -648,9 +661,9 @@ void DiskBufferWriter::SendEncryptionBuffer(const std::string& filename, int32_t
         remove(filename.c_str());
         if (discardCount > 0) {
             LOG_ERROR(sLogger, ("send buffer file, discard LogGroup count", discardCount)("delete file", filename));
-            AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
-                                                   "delete buffer file: " + filename + ", discard "
-                                                       + ToString(discardCount) + " logGroups");
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_SECONDARY_ALARM,
+                                                           "delete buffer file: " + filename + ", discard "
+                                                               + ToString(discardCount) + " logGroups");
         } else
             LOG_INFO(sLogger, ("send buffer file success, delete buffer file", filename));
     }
@@ -671,8 +684,8 @@ bool DiskBufferWriter::CreateNewFile() {
                       ("buffer file count exceed limit",
                        "file created earlier will be cleaned, and new file will create for new log data")("delete file",
                                                                                                           fileName));
-            AlarmManager::GetInstance()->SendAlarm(DISCARD_SECONDARY_ALARM,
-                                                   "buffer file count exceed, delete file: " + fileName);
+            AlarmManager::GetInstance()->SendAlarmCritical(DISCARD_SECONDARY_ALARM,
+                                                           "buffer file count exceed, delete file: " + fileName);
         }
     }
     mBufferDivideTime = currentTime;
@@ -687,18 +700,18 @@ bool DiskBufferWriter::WriteBackMeta(int32_t pos, const void* buf, int32_t lengt
     int fd = open(filename.c_str(), O_WRONLY);
     if (fd < 0) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("open secondary file for write meta fail:") + filename
-                                                   + ",reason:" + errorStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("open secondary file for write meta fail:") + filename
+                                                           + ",reason:" + errorStr);
         LOG_ERROR(sLogger, ("open file error", filename));
         return false;
     }
     lseek(fd, pos, SEEK_SET);
     if (write(fd, buf, length) < 0) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("write secondary file for write meta fail:") + filename
-                                                   + ",reason:" + errorStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("write secondary file for write meta fail:") + filename
+                                                           + ",reason:" + errorStr);
         LOG_ERROR(sLogger, ("can not write back meta", filename));
     }
     close(fd);
@@ -707,9 +720,9 @@ bool DiskBufferWriter::WriteBackMeta(int32_t pos, const void* buf, int32_t lengt
     FILE* f = FileWriteOnlyOpen(filename.c_str(), "wb");
     if (!f) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("open secondary file for write meta fail:") + filename
-                                                   + ",reason:" + errorStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("open secondary file for write meta fail:") + filename
+                                                           + ",reason:" + errorStr);
         LOG_ERROR(sLogger, ("open file error", filename));
         return false;
     }
@@ -717,9 +730,9 @@ bool DiskBufferWriter::WriteBackMeta(int32_t pos, const void* buf, int32_t lengt
     auto nbytes = fwrite(buf, 1, length, f);
     if (nbytes != length) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("write secondary file for write meta fail:") + filename
-                                                   + ",reason:" + errorStr);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("write secondary file for write meta fail:") + filename
+                                                           + ",reason:" + errorStr);
         LOG_ERROR(sLogger, ("can not write back meta", filename));
     }
     fclose(f);
@@ -748,12 +761,13 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     FILE* fout = FileAppendOpen(bufferFileName.c_str(), "ab");
     if (!fout) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("open file error:") + bufferFileName + ",error:" + errorStr,
-                                               flusher->mRegion,
-                                               flusher->mProject,
-                                               "",
-                                               data->mLogstore);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("open file error:") + bufferFileName
+                                                           + ",error:" + errorStr,
+                                                       flusher->mRegion,
+                                                       flusher->mProject,
+                                                       "",
+                                                       data->mLogstore);
         LOG_ERROR(sLogger, ("open buffer file error", bufferFileName));
         return false;
     }
@@ -763,13 +777,13 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
         auto nbytes = fwrite(header.c_str(), 1, header.size(), fout);
         if (header.size() != nbytes) {
             string errorStr = ErrnoToString(GetErrno());
-            AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                                   string("write file error:") + bufferFileName + ", error:" + errorStr
-                                                       + ", nbytes:" + ToString(nbytes),
-                                                   flusher->mRegion,
-                                                   flusher->mProject,
-                                                   "",
-                                                   data->mLogstore);
+            AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                           string("write file error:") + bufferFileName
+                                                               + ", error:" + errorStr + ", nbytes:" + ToString(nbytes),
+                                                           flusher->mRegion,
+                                                           flusher->mProject,
+                                                           "",
+                                                           data->mLogstore);
             LOG_ERROR(sLogger, ("error write encryption header", bufferFileName)("error", errorStr)("nbytes", nbytes));
             fclose(fout);
             return false;
@@ -781,12 +795,12 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     if (!FileEncryption::GetInstance()->Encrypt(data->mData.c_str(), data->mData.size(), des, desLength)) {
         fclose(fout);
         LOG_ERROR(sLogger, ("encrypt error, project_name", flusher->mProject));
-        AlarmManager::GetInstance()->SendAlarm(ENCRYPT_DECRYPT_FAIL_ALARM,
-                                               string("encrypt error, project_name:" + flusher->mProject),
-                                               flusher->mRegion,
-                                               flusher->mProject,
-                                               "",
-                                               data->mLogstore);
+        AlarmManager::GetInstance()->SendAlarmCritical(ENCRYPT_DECRYPT_FAIL_ALARM,
+                                                       string("encrypt error, project_name:" + flusher->mProject),
+                                                       flusher->mRegion,
+                                                       flusher->mProject,
+                                                       "",
+                                                       data->mLogstore);
         return false;
     }
 
@@ -801,6 +815,7 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     bufferMeta.set_compresstype(ConvertCompressType(flusher->GetCompressType()));
     bufferMeta.set_telemetrytype(flusher->mTelemetryType);
     bufferMeta.set_subpath(flusher->GetSubpath());
+    bufferMeta.set_workspace(flusher->GetWorkspace());
 #ifdef __ENTERPRISE__
     bufferMeta.set_endpointmode(GetEndpointMode(flusher->mEndpointMode));
 #endif
@@ -825,13 +840,13 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
     auto nbytes = fwrite(buffer, 1, bytesToWrite, fout);
     if (nbytes != bytesToWrite) {
         string errorStr = ErrnoToString(GetErrno());
-        AlarmManager::GetInstance()->SendAlarm(SECONDARY_READ_WRITE_ALARM,
-                                               string("write file error:") + bufferFileName + ", error:" + errorStr
-                                                   + ", nbytes:" + ToString(nbytes),
-                                               flusher->mRegion,
-                                               flusher->mProject,
-                                               "",
-                                               data->mLogstore);
+        AlarmManager::GetInstance()->SendAlarmCritical(SECONDARY_READ_WRITE_ALARM,
+                                                       string("write file error:") + bufferFileName
+                                                           + ", error:" + errorStr + ", nbytes:" + ToString(nbytes),
+                                                       flusher->mRegion,
+                                                       flusher->mProject,
+                                                       "",
+                                                       data->mLogstore);
         LOG_ERROR(
             sLogger,
             ("write meta of buffer file", "fail")("filename", bufferFileName)("errorStr", errorStr)("nbytes", nbytes));
@@ -849,7 +864,9 @@ bool DiskBufferWriter::SendToBufferFile(SenderQueueItem* dataPtr) {
 
 SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
                                                  const std::string& logData,
-                                                 std::string& host) {
+                                                 std::string& domain,
+                                                 std::string& ip,
+                                                 bool useIPFlag) {
     RateLimiter::FlowControl(bufferMeta.rawsize(), mSendLastTime, mSendLastByte, false);
     string region = bufferMeta.region();
 #ifdef __ENTERPRISE__
@@ -859,12 +876,19 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
     }
 #endif
 
-    SLSClientManager::AuthType type;
-    string accessKeyId, accessKeySecret;
-    if (!SLSClientManager::GetInstance()->GetAccessKey(bufferMeta.aliuid(), type, accessKeyId, accessKeySecret)) {
+    AuthType type;
+    string accessKeyId, accessKeySecret, secToken, errorMsg;
+    if (!SLSClientManager::GetInstance()->GetAccessKey(
+            bufferMeta.aliuid(), type, accessKeyId, accessKeySecret, secToken, errorMsg)) {
 #ifdef __ENTERPRISE__
         if (!EnterpriseSLSClientManager::GetInstance()->GetAccessKeyIfProjectSupportsAnonymousWrite(
                 bufferMeta.project(), type, accessKeyId, accessKeySecret)) {
+            AlarmManager::GetInstance()->SendAlarmError(GLOBAL_CONFIG_ALARM,
+                                                        "failed to get access key: " + errorMsg,
+                                                        region,
+                                                        bufferMeta.project(),
+                                                        "",
+                                                        bufferMeta.logstore());
             SLSResponse response;
             response.mErrorCode = LOGE_UNAUTHORIZED;
             response.mErrorMsg = kAKErrorMsg;
@@ -878,19 +902,20 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         EnterpriseSLSClientManager::GetInstance()->UpdateRemoteRegionEndpoints(
             region, {bufferMeta.endpoint()}, EnterpriseSLSClientManager::RemoteEndpointUpdateAction::APPEND);
     }
-    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateHostsInfo(
+    auto info = EnterpriseSLSClientManager::GetInstance()->GetCandidateDomainsInfo(
         region, bufferMeta.project(), GetEndpointMode(bufferMeta.endpointmode()));
-    mCandidateHostsInfos.insert(info);
+    mCandidateDomainsInfos.insert(info);
 
-    host = info->GetCurrentHost();
-    if (host.empty()) {
+    info->GetCurrentEndpoint(region, bufferMeta.project(), EndpointMode::DEFAULT, domain, ip, useIPFlag);
+    if ((useIPFlag && ip.empty()) || (!useIPFlag && domain.empty())) {
         SLSResponse response;
         response.mErrorCode = LOGE_REQUEST_ERROR;
-        response.mErrorMsg = kNoHostErrorMsg;
+        response.mErrorMsg = kNoDomainErrorMsg;
         return response;
     }
 #else
-    host = bufferMeta.project() + "." + bufferMeta.endpoint();
+    domain = bufferMeta.project() + "." + bufferMeta.endpoint();
+    SLSClientManager::GetInstance()->GetCurrentEndpoint(domain, ip, useIPFlag);
 #endif
 
     bool httpsFlag = SLSClientManager::GetInstance()->UsingHttps(region);
@@ -906,10 +931,14 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         = bufferMeta.has_telemetrytype() ? bufferMeta.telemetrytype() : sls_logs::SLS_TELEMETRY_TYPE_LOGS;
     switch (telemetryType) {
         case sls_logs::SLS_TELEMETRY_TYPE_LOGS:
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_MULTIVALUE:
             return PostLogStoreLogs(accessKeyId,
                                     accessKeySecret,
+                                    secToken,
                                     type,
-                                    host,
+                                    domain,
+                                    ip,
+                                    useIPFlag,
                                     httpsFlag,
                                     bufferMeta.project(),
                                     bufferMeta.logstore(),
@@ -921,29 +950,59 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
         case sls_logs::SLS_TELEMETRY_TYPE_METRICS:
             return PostMetricStoreLogs(accessKeyId,
                                        accessKeySecret,
+                                       secToken,
                                        type,
-                                       host,
+                                       domain,
+                                       ip,
+                                       useIPFlag,
                                        httpsFlag,
                                        bufferMeta.project(),
                                        bufferMeta.logstore(),
                                        GetSLSCompressTypeString(bufferMeta.compresstype()),
                                        logData,
                                        bufferMeta.rawsize());
+        case sls_logs::SLS_TELEMETRY_TYPE_METRICS_HOST: {
+#ifdef __ENTERPRISE__
+            return PostMetricHostLogs(accessKeyId,
+                                      accessKeySecret,
+                                      secToken,
+                                      type,
+                                      domain,
+                                      httpsFlag,
+                                      GetSLSCompressTypeString(bufferMeta.compresstype()),
+                                      dataType,
+                                      logData,
+                                      bufferMeta.rawsize());
+#else
+            LOG_WARNING(sLogger, ("metrics_host is not supported in community edition", ""));
+            // return 200 to avoid retry
+            SLSResponse response;
+            response.mStatusCode = 200;
+            return response;
+#endif
+        }
         case sls_logs::SLS_TELEMETRY_TYPE_APM_METRICS:
         case sls_logs::SLS_TELEMETRY_TYPE_APM_TRACES:
-        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS:
+        case sls_logs::SLS_TELEMETRY_TYPE_APM_AGENTINFOS: {
+            std::map<std::string, std::string> headers;
+            headers.insert({CMS_HEADER_WORKSPACE, bufferMeta.workspace()});
+            headers.insert({APM_HEADER_PROJECT, bufferMeta.project()});
             return PostAPMBackendLogs(accessKeyId,
                                       accessKeySecret,
+                                      secToken,
                                       type,
-                                      host,
+                                      domain,
+                                      ip,
+                                      useIPFlag,
                                       httpsFlag,
                                       bufferMeta.project(),
-                                      bufferMeta.logstore(),
                                       GetSLSCompressTypeString(bufferMeta.compresstype()),
                                       dataType,
                                       logData,
                                       bufferMeta.rawsize(),
-                                      bufferMeta.subpath());
+                                      bufferMeta.subpath(),
+                                      headers);
+        }
         default: {
             // should not happen
             LOG_ERROR(sLogger, ("Unhandled telemetry type", " should not happen"));
@@ -953,6 +1012,27 @@ SLSResponse DiskBufferWriter::SendBufferFileData(const sls_logs::LogtailBufferMe
             return response;
         }
     }
+}
+
+bool DiskBufferWriter::CheckBufferMetaValidation(const std::string& filename,
+                                                 const sls_logs::LogtailBufferMeta& bufferMeta) {
+    if (bufferMeta.project().empty()) {
+        LOG_ERROR(sLogger, ("send disk buffer fail", "project is empty")("filename", filename));
+        return false;
+    }
+    if (bufferMeta.aliuid().size() > 16) {
+        LOG_ERROR(sLogger,
+                  ("send disk buffer fail", "aliuid size is too large")("filename",
+                                                                        filename)("size", bufferMeta.aliuid().size()));
+        return false;
+    }
+    if (sizeof(bufferMeta) > BUFFER_META_MAX_SIZE) {
+        LOG_ERROR(
+            sLogger,
+            ("send disk buffer fail", "buffer meta is too large")("filename", filename)("size", sizeof(bufferMeta)));
+        return false;
+    }
+    return true;
 }
 
 } // namespace logtail

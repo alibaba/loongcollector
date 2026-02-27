@@ -109,7 +109,7 @@ void ProcessorTagNative::Process(PipelineEventGroup& logGroup) {
     AddTag(logGroup, TagKey::HOST_IP_TAG_KEY, LoongCollectorMonitor::GetInstance()->mIpAddr);
 #endif
 
-    if (!STRING_FLAG(ALIYUN_LOG_FILE_TAGS).empty()) {
+    if (!AppConfig::GetInstance()->GetFileTagsDir().empty()) {
         vector<sls_logs::LogTag>& fileTags = AppConfig::GetInstance()->GetFileTags();
         if (!fileTags.empty()) { // reloadable, so we must get it every time and copy value
             for (size_t i = 0; i < fileTags.size(); ++i) {

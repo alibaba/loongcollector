@@ -14,6 +14,7 @@
 
 #include <cstdlib>
 
+#include "models/EventPool.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
 #include "unittest/Unittest.h"
@@ -27,6 +28,8 @@ public:
     void TestCast();
     void TestRelease();
     void TestCopy();
+    void TestDestruction();
+    void TestAssignment();
 
 protected:
     void SetUp() override {
@@ -126,11 +129,86 @@ void PipelineEventPtrUnittest::TestCopy() {
     }
 }
 
+void PipelineEventPtrUnittest::TestDestruction() {
+    { auto e = PipelineEventPtr(mEventGroup->CreateLogEvent(true).release(), true, nullptr); }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mLogEventPool.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateMetricEvent(true).release(), true, nullptr); }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mMetricEventPool.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateSpanEvent(true).release(), true, nullptr); }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mSpanEventPool.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateRawEvent(true).release(), true, nullptr); }
+    APSARA_TEST_EQUAL(1U, gThreadedEventPool.mRawEventPool.size());
+
+    EventPool pool(true);
+    { auto e = PipelineEventPtr(mEventGroup->CreateLogEvent(true, &pool).release(), true, &pool); }
+    APSARA_TEST_EQUAL(1U, pool.mLogEventPoolBak.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateMetricEvent(true, &pool).release(), true, &pool); }
+    APSARA_TEST_EQUAL(1U, pool.mMetricEventPoolBak.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateSpanEvent(true, &pool).release(), true, &pool); }
+    APSARA_TEST_EQUAL(1U, pool.mSpanEventPoolBak.size());
+    { auto e = PipelineEventPtr(mEventGroup->CreateRawEvent(true, &pool).release(), true, &pool); }
+    APSARA_TEST_EQUAL(1U, pool.mRawEventPoolBak.size());
+}
+
+void PipelineEventPtrUnittest::TestAssignment() {
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateLogEvent(true).release(), true, nullptr);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateLogEvent(true).release(), true, nullptr);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, gThreadedEventPool.mLogEventPool.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateMetricEvent(true).release(), true, nullptr);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateMetricEvent(true).release(), true, nullptr);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, gThreadedEventPool.mMetricEventPool.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateSpanEvent(true).release(), true, nullptr);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateSpanEvent(true).release(), true, nullptr);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, gThreadedEventPool.mSpanEventPool.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateRawEvent(true).release(), true, nullptr);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateRawEvent(true).release(), true, nullptr);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, gThreadedEventPool.mRawEventPool.size());
+    }
+    EventPool pool(true);
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateLogEvent(true, &pool).release(), true, &pool);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateLogEvent(true, &pool).release(), true, &pool);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, pool.mLogEventPoolBak.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateMetricEvent(true, &pool).release(), true, &pool);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateMetricEvent(true, &pool).release(), true, &pool);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, pool.mMetricEventPoolBak.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateSpanEvent(true, &pool).release(), true, &pool);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateSpanEvent(true, &pool).release(), true, &pool);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, pool.mSpanEventPoolBak.size());
+    }
+    {
+        auto e1 = PipelineEventPtr(mEventGroup->CreateRawEvent(true, &pool).release(), true, &pool);
+        auto e2 = PipelineEventPtr(mEventGroup->CreateRawEvent(true, &pool).release(), true, &pool);
+        e1 = std::move(e2);
+        APSARA_TEST_EQUAL(1U, pool.mRawEventPoolBak.size());
+    }
+}
+
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestIs)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestGet)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCast)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestRelease)
 UNIT_TEST_CASE(PipelineEventPtrUnittest, TestCopy)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestDestruction)
+UNIT_TEST_CASE(PipelineEventPtrUnittest, TestAssignment)
 
 } // namespace logtail
 

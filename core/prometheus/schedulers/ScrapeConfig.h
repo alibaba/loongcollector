@@ -2,17 +2,25 @@
 
 #include <cstdint>
 
+#include <chrono>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
 #include "json/value.h"
 
 #include "common/http/HttpRequest.h"
+#include "prometheus/labels/Labels.h"
 #include "prometheus/labels/Relabel.h"
 
 
 namespace logtail {
+
+struct HostOnlyConfig {
+    std::set<std::string> mTargets;
+    Labels mLabels;
+};
 
 
 class ScrapeConfig {
@@ -24,6 +32,9 @@ public:
     bool mHonorLabels;
     bool mHonorTimestamps;
     std::string mScheme;
+
+    bool mHostOnlyMode;
+    std::vector<HostOnlyConfig> mHostOnlyConfigs;
 
     // auth header
     // scrape_protocols Accept header: PrometheusProto, OpenMetricsText0.0.1, OpenMetricsText1.0.0, PrometheusText0.0.4
@@ -45,21 +56,31 @@ public:
     std::string mQueryString;
 
     std::vector<std::pair<std::string, std::string>> mExternalLabels;
+    std::chrono::system_clock::time_point mLastUpdateTime;
 
     ScrapeConfig();
     bool Init(const Json::Value& config);
     bool InitStaticConfig(const Json::Value& config);
+    bool UpdateAuthorization();
 
 private:
+    std::mutex mAuthMutex;
+    std::string mAuthType;
+    std::string mBearerTokenPath;
+    std::string mBasicNamePath;
+    std::string mBasicPasswordPath;
+
     bool InitBasicAuth(const Json::Value& basicAuth);
     bool InitAuthorization(const Json::Value& authorization);
     bool InitScrapeProtocols(const Json::Value& scrapeProtocols);
     void InitEnableCompression(bool enableCompression);
     bool InitTLSConfig(const Json::Value& tlsConfig);
     bool InitExternalLabels(const Json::Value& externalLabels);
+    bool InitHostOnlyMode(const Json::Value& hostOnlyConfig);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ScrapeConfigUnittest;
+    friend class ScrapeSchedulerUnittest;
 #endif
 };
 

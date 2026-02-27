@@ -20,7 +20,6 @@
 
 #include "collection_pipeline/plugin/interface/Input.h"
 #include "ebpf/Config.h"
-#include "ebpf/eBPFServer.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail {
@@ -33,10 +32,10 @@ public:
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
-    bool SupportAck() const override { return false; }
+    QueueType GetProcessQueueType() const override { return QueueType::COUNT_BOUNDED; }
 
     ebpf::SecurityOptions mSecurityOptions;
-    PluginMetricManagerPtr mPluginMgr;
+    PluginMetricManagerPtr mPluginMetricPtr;
 };
 
 } // namespace logtail

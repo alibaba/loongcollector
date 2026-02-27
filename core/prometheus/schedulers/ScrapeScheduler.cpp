@@ -18,6 +18,7 @@
 
 #include <cstddef>
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <utility>
@@ -122,14 +123,23 @@ void ScrapeScheduler::SetComponent(EventPool* eventPool) {
     mEventPool = eventPool;
 }
 
-void ScrapeScheduler::ScheduleNext() {
+bool ScrapeScheduler::ScheduleNext() {
     auto future = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
     auto isContextValidFuture = std::make_shared<PromFuture<>>();
     future->AddDoneCallback([this](HttpResponse& response, uint64_t timestampMilliSec) {
+        if (response.GetStatusCode() == 401) {
+            auto duration
+                = chrono::duration_cast<chrono::seconds>(mLatestScrapeTime - mScrapeConfigPtr->mLastUpdateTime).count();
+            if ((duration <= mInterval && duration > 0) || mScrapeConfigPtr->UpdateAuthorization()) {
+                LOG_WARNING(sLogger, ("retry", GetId()));
+                this->ScheduleNext();
+                this->DelayExecTime(1);
+                return true;
+            }
+        }
         this->OnMetricResult(response, timestampMilliSec);
         this->ExecDone();
-        this->ScheduleNext();
-        return true;
+        return this->ScheduleNext();
     });
     isContextValidFuture->AddDoneCallback([this]() -> bool {
         if (ProcessQueueManager::GetInstance()->IsValidToPush(mQueueKey)) {
@@ -142,20 +152,19 @@ void ScrapeScheduler::ScheduleNext() {
         return false;
     });
 
-    if (IsCancelled()) {
-        mFuture->Cancel();
-        mIsContextValidFuture->Cancel();
-        return;
-    }
 
     {
         WriteLock lock(mLock);
+        if (mValidState == false) {
+            return false;
+        }
         mFuture = future;
         mIsContextValidFuture = isContextValidFuture;
     }
 
     auto event = BuildScrapeTimerEvent(GetNextExecTime());
     Timer::GetInstance()->PushEvent(std::move(event));
+    return true;
 }
 
 void ScrapeScheduler::ScrapeOnce(std::chrono::steady_clock::time_point execTime) {
@@ -201,15 +210,15 @@ std::unique_ptr<TimerEvent> ScrapeScheduler::BuildScrapeTimerEvent(std::chrono::
 }
 
 void ScrapeScheduler::Cancel() {
+    {
+        WriteLock lock(mLock);
+        mValidState = false;
+    }
     if (mFuture != nullptr) {
         mFuture->Cancel();
     }
     if (mIsContextValidFuture != nullptr) {
         mIsContextValidFuture->Cancel();
-    }
-    {
-        WriteLock lock(mLock);
-        mValidState = false;
     }
 }
 
@@ -225,10 +234,11 @@ void ScrapeScheduler::InitSelfMonitor(const MetricLabels& defaultLabels) {
 
     mSelfMonitor->InitMetricManager(sScrapeMetricKeys, labels);
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE, std::move(labels));
     mPromDelayTotal = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_PROM_SCRAPE_DELAY_TOTAL);
     mPluginTotalDelayMs = mMetricsRecordRef.CreateCounter(METRIC_PLUGIN_TOTAL_DELAY_MS);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 } // namespace logtail

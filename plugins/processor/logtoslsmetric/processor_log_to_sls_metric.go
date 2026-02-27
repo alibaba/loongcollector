@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorLogToSlsMetric struct {
@@ -75,8 +76,8 @@ var (
 )
 
 var (
-	processorLogErrorAlarmType     = "PROCESSOR_LOG_ALARM"
-	processorInitErrorLogAlarmType = "PROCESSOR_INIT_ALARM"
+	processorLogErrorAlarmType     = selfmonitor.AlarmType("PROCESSOR_LOG_ALARM")
+	processorInitErrorLogAlarmType = selfmonitor.AlarmType("PROCESSOR_INIT_ALARM")
 )
 
 func (p *ProcessorLogToSlsMetric) Init(context pipeline.Context) (err error) {
@@ -336,12 +337,12 @@ TraverseLogArray:
 
 func (p *ProcessorLogToSlsMetric) logError(err error) {
 	if !p.IgnoreError {
-		logger.Error(p.context.GetRuntimeContext(), processorLogErrorAlarmType, "process log error", err)
+		logger.Warning(p.context.GetRuntimeContext(), processorLogErrorAlarmType, "process log error", err)
 	}
 }
 
 func (p *ProcessorLogToSlsMetric) logInitError(err error) {
-	logger.Error(p.context.GetRuntimeContext(), processorInitErrorLogAlarmType, "init processor_log_to_sls_metric error", err)
+	logger.Warning(p.context.GetRuntimeContext(), processorInitErrorLogAlarmType, "init processor_log_to_sls_metric error", err)
 }
 
 func GetLogTimeNano(log *protocol.Log) string {

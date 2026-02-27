@@ -26,8 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "checkpoint/RangeCheckpoint.h"
-#include "collection_pipeline/queue/BoundedProcessQueue.h"
+#include "collection_pipeline/queue/CountBoundedProcessQueue.h"
 #include "collection_pipeline/queue/ExactlyOnceSenderQueue.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -35,6 +34,7 @@
 #include "collection_pipeline/queue/QueueParam.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/FeedbackInterface.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 
 namespace logtail {
 
@@ -83,8 +83,8 @@ private:
     BoundedQueueParam mProcessQueueParam;
 
     mutable std::mutex mProcessQueueMux;
-    std::unordered_map<QueueKey, std::list<BoundedProcessQueue>::iterator> mProcessQueues;
-    std::list<BoundedProcessQueue> mProcessPriorityQueue[ProcessQueueManager::sMaxPriority + 1];
+    std::unordered_map<QueueKey, std::list<CountBoundedProcessQueue>::iterator> mProcessQueues;
+    std::list<CountBoundedProcessQueue> mProcessPriorityQueue[ProcessQueueManager::sMaxPriority + 1];
 
     mutable std::mutex mSenderQueueMux;
     std::unordered_map<QueueKey, ExactlyOnceSenderQueue> mSenderQueues;
@@ -96,6 +96,7 @@ private:
     friend class ExactlyOnceQueueManagerUnittest;
     friend class ProcessQueueManagerUnittest;
     friend class SenderQueueManagerUnittest;
+    friend class CreateModifyHandlerUnittest;
 #endif
 };
 

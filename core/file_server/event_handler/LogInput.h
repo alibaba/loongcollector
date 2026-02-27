@@ -104,6 +104,7 @@ private:
     friend class ConfigMatchUnittest;
     friend class FuseFileUnittest;
     friend class PipelineUpdateUnittest;
+    friend class LogInputReaderUnittest;
 
     void CleanEnviroments();
 #endif

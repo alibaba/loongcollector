@@ -20,38 +20,24 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#if defined(__INCLUDE_SSE4_2__)
+#include <cinttypes>
+#include <cstdio>
+
+#include "simdjson/simdjson.h"
+
+// Constants for boolean string conversion
+static constexpr std::string_view TRUE_STR = "true";
+static constexpr std::string_view FALSE_STR = "false";
+#endif
+
 #include "collection_pipeline/plugin/instance/ProcessorInstance.h"
 #include "common/ParamExtractor.h"
+#include "common/StringTools.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
-
-static std::string RapidjsonValueToString(const rapidjson::Value& value) {
-    if (value.IsString())
-        return std::string(value.GetString(), value.GetStringLength());
-    else if (value.IsBool())
-        return ToString(value.GetBool());
-    else if (value.IsInt())
-        return ToString(value.GetInt());
-    else if (value.IsUint())
-        return ToString(value.GetUint());
-    else if (value.IsInt64())
-        return ToString(value.GetInt64());
-    else if (value.IsUint64())
-        return ToString(value.GetUint64());
-    else if (value.IsDouble())
-        return ToString(value.GetDouble());
-    else if (value.IsNull())
-        return "";
-    else // if (value.IsObject() || value.IsArray())
-    {
-        rapidjson::StringBuffer buffer;
-        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-        value.Accept(writer);
-        return std::string(buffer.GetString(), buffer.GetLength());
-    }
-}
 
 const std::string ProcessorParseJsonNative::sName = "processor_parse_json_native";
 
@@ -74,6 +60,21 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
         return false;
     }
 
+    // Runtime check for SIMD support
+    mUseSimdJson = false;
+#if defined(__INCLUDE_SSE4_2__)
+    auto my_implementation = simdjson::get_available_implementations()["westmere"];
+    if (my_implementation && my_implementation->supported_by_runtime_system()) {
+        mUseSimdJson = true;
+        simdjson::get_active_implementation() = my_implementation;
+        LOG_DEBUG(sLogger, ("simdjson active implementation : ", simdjson::get_active_implementation()->name()));
+    } else {
+        LOG_DEBUG(sLogger, ("westmere not supported", "fallback to rapidjson"));
+    }
+#endif
+
+    LOG_DEBUG(sLogger, ("use simdjson: ", mUseSimdJson));
+
     mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
     mOutFailedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
     mOutKeyNotFoundEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_KEY_NOT_FOUND_EVENTS_TOTAL);
@@ -81,6 +82,7 @@ bool ProcessorParseJsonNative::Init(const Json::Value& config) {
 
     return true;
 }
+
 
 void ProcessorParseJsonNative::Process(PipelineEventGroup& logGroup) {
     if (logGroup.GetEvents().empty()) {
@@ -118,7 +120,12 @@ bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath,
     auto rawContent = sourceEvent.GetContent(mSourceKey);
 
     bool sourceKeyOverwritten = false;
-    bool parseSuccess = JsonLogLineParser(sourceEvent, logPath, e, sourceKeyOverwritten);
+    bool parseSuccess;
+    if (mUseSimdJson) {
+        parseSuccess = JsonLogLineParserSimdJson(sourceEvent, logPath, e, sourceKeyOverwritten);
+    } else {
+        parseSuccess = JsonLogLineParserRapidJson(sourceEvent, logPath, e, sourceKeyOverwritten);
+    }
 
     if (!parseSuccess || !sourceKeyOverwritten) {
         sourceEvent.DelContent(mSourceKey);
@@ -137,10 +144,268 @@ bool ProcessorParseJsonNative::ProcessEvent(const StringView& logPath,
     return true;
 }
 
+
+#if defined(__INCLUDE_SSE4_2__)
+// Optimized number processing function using stack buffer
+static StringBuffer
+ProcessNumberValueOptimized(simdjson::ondemand::value& value, LogEvent& sourceEvent, bool& success) {
+    // Use stack buffer to avoid heap allocation
+    constexpr size_t BUFFER_SIZE = 32; // Sufficient for largest number string
+    char buffer[BUFFER_SIZE];
+
+    success = false;
+    if (value.is_integer()) {
+        if (value.is_negative()) {
+            auto int_result = value.get_int64();
+            if (!int_result.error()) {
+                // Use snprintf directly to avoid std::to_string allocation
+                int len = snprintf(buffer, BUFFER_SIZE, "%" PRId64, int_result.value());
+                success = true;
+                return sourceEvent.GetSourceBuffer()->CopyString(buffer, len);
+            }
+        } else {
+            auto uint_result = value.get_uint64();
+            if (!uint_result.error()) {
+                int len = snprintf(buffer, BUFFER_SIZE, "%" PRIu64, uint_result.value());
+                success = true;
+                return sourceEvent.GetSourceBuffer()->CopyString(buffer, len);
+            }
+        }
+    } else {
+        auto double_result = value.get_double();
+        if (!double_result.error()) {
+            // Use std::to_string for consistency with rapidjson/ToString implementation
+            std::string doubleStr = std::to_string(double_result.value());
+            success = true;
+            return sourceEvent.GetSourceBuffer()->CopyString(doubleStr);
+        }
+    }
+    // Return empty buffer on error
+    return sourceEvent.GetSourceBuffer()->CopyString("", 0);
+}
+#endif
+
+#if defined(__INCLUDE_SSE4_2__)
+// Optimized value to StringBuffer conversion function
+static StringBuffer
+OptimizedValueToStringBuffer(simdjson::ondemand::value& value, LogEvent& sourceEvent, bool& success) {
+    success = false;
+    switch (value.type()) {
+        case simdjson::ondemand::json_type::null: {
+            // Directly allocate empty string StringBuffer
+            success = true;
+            return sourceEvent.GetSourceBuffer()->CopyString("", 0);
+        }
+        case simdjson::ondemand::json_type::boolean: {
+            auto bool_result = value.get_bool();
+            if (!bool_result.error()) {
+                const bool boolValue = bool_result.value();
+                const auto& boolStr = boolValue ? TRUE_STR : FALSE_STR;
+                success = true;
+                return sourceEvent.GetSourceBuffer()->CopyString(boolStr.data(), boolStr.size());
+            }
+            break;
+        }
+        case simdjson::ondemand::json_type::string: {
+            auto str_result = value.get_string();
+            if (!str_result.error()) {
+                // Directly copy from simdjson string view, avoiding std::string intermediary
+                std::string_view str_view = str_result.value();
+                success = true;
+                return sourceEvent.GetSourceBuffer()->CopyString(str_view.data(), str_view.size());
+            }
+            break;
+        }
+        case simdjson::ondemand::json_type::number: {
+            return ProcessNumberValueOptimized(value, sourceEvent, success);
+        }
+        case simdjson::ondemand::json_type::object:
+        case simdjson::ondemand::json_type::array: {
+            auto json_str = simdjson::to_json_string(value);
+            if (!json_str.error()) {
+                std::string_view json_view = json_str.value();
+                success = true;
+                return sourceEvent.GetSourceBuffer()->CopyString(json_view.data(), json_view.size());
+            }
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    // Return empty buffer on error
+    return sourceEvent.GetSourceBuffer()->CopyString("", 0);
+}
+#endif
+
 bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                                                  const StringView& logPath,
                                                  PipelineEventPtr& e,
                                                  bool& sourceKeyOverwritten) {
+    if (mUseSimdJson) {
+        return JsonLogLineParserSimdJson(sourceEvent, logPath, e, sourceKeyOverwritten);
+    } else {
+        return JsonLogLineParserRapidJson(sourceEvent, logPath, e, sourceKeyOverwritten);
+    }
+}
+
+bool ProcessorParseJsonNative::JsonLogLineParserSimdJson(LogEvent& sourceEvent,
+                                                         const StringView& logPath,
+                                                         PipelineEventPtr& e,
+                                                         bool& sourceKeyOverwritten) {
+#if defined(__INCLUDE_SSE4_2__)
+    StringView buffer = sourceEvent.GetContent(mSourceKey);
+
+    if (buffer.empty())
+        return false;
+
+    simdjson::ondemand::parser parser;
+    simdjson::padded_string bufStr(buffer.data(), buffer.size());
+    simdjson::ondemand::document doc;
+    simdjson::ondemand::object object;
+
+    // Use try-catch to handle all simdjson parsing errors generically
+    // This maintains compatibility with rapidjson's error handling approach
+    try {
+        auto error = parser.iterate(bufStr).get(doc);
+        if (error) {
+            if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
+                LOG_WARNING(
+                    sLogger,
+                    ("parse json log fail, log", buffer)("simdjson error", simdjson::simdjson_error(error).what())(
+                        "project", GetContext().GetProjectName())("logstore", GetContext().GetLogstoreName())("file",
+                                                                                                              logPath));
+                AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                              std::string("parse json fail:") + buffer.to_string(),
+                                                              GetContext().GetRegion(),
+                                                              GetContext().GetProjectName(),
+                                                              GetContext().GetConfigName(),
+                                                              GetContext().GetLogstoreName());
+            }
+            ADD_COUNTER(mOutFailedEventsTotal, 1);
+            return false;
+        }
+
+        object = doc.get_object();
+    } catch (simdjson::simdjson_error& error) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
+            LOG_WARNING(sLogger,
+                        ("parse json log fail, log", buffer)("simdjson error", error.what())(
+                            "project", GetContext().GetProjectName())("logstore",
+                                                                      GetContext().GetLogstoreName())("file", logPath));
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                          std::string("parse json fail:") + buffer.to_string(),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
+        }
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
+        return false;
+    }
+
+    // Store parsed fields temporarily - reserve more space to avoid reallocations
+    std::vector<std::pair<StringView, StringView>> tempFields;
+    tempFields.reserve(32); // Increased capacity for better performance
+
+    // Pre-check mSourceKey to avoid string comparison in loop
+    std::string_view sourceKeyView(mSourceKey);
+
+    // Wrap the entire field iteration in try-catch as simdjson can throw during iteration
+    try {
+        for (auto field : object) {
+            // Use simdjson error handling mechanism, reduce exception overhead
+            std::string_view keyv;
+            if (auto key_result = field.unescaped_key(); !key_result.error()) {
+                keyv = key_result.value();
+            } else {
+                continue; // Skip field with error
+            }
+
+            StringBuffer contentKeyBuffer = sourceEvent.GetSourceBuffer()->CopyString(keyv.data(), keyv.size());
+
+            // Get value
+            simdjson::ondemand::value value;
+            if (auto value_result = field.value(); !value_result.error()) {
+                value = value_result.value();
+            } else {
+                continue; // Skip field with error
+            }
+
+            // Use optimized value conversion function
+            bool conversionSuccess = false;
+            StringBuffer contentValueBuffer = OptimizedValueToStringBuffer(value, sourceEvent, conversionSuccess);
+
+            // If conversion failed, the function already returns an appropriate fallback buffer
+            // No need for additional fallback logic here
+
+            // Optimized string comparison
+            if (keyv == sourceKeyView) {
+                sourceKeyOverwritten = true;
+            }
+
+            // Store temporarily instead of adding directly
+            tempFields.emplace_back(StringView(contentKeyBuffer.data, contentKeyBuffer.size),
+                                    StringView(contentValueBuffer.data, contentValueBuffer.size));
+        }
+    } catch (simdjson::simdjson_error& error) {
+        if (AlarmManager::GetInstance()->IsLowLevelAlarmValid()) {
+            LOG_WARNING(sLogger,
+                        ("parse json log fail during iteration, log", buffer)("simdjson error", error.what())(
+                            "project", GetContext().GetProjectName())("logstore",
+                                                                      GetContext().GetLogstoreName())("file", logPath));
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                          std::string("parse json fail:") + buffer.to_string(),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
+        }
+        ADD_COUNTER(mOutFailedEventsTotal, 1);
+        return false;
+    }
+
+    // Only add fields if all parsing succeeded
+    for (const auto& field : tempFields) {
+        AddLog(field.first, field.second, sourceEvent);
+    }
+    return true;
+#endif
+    // If SIMD not supported at compile time, this function should not be called
+    // But we provide a fallback to ensure compilation
+    return false;
+}
+
+static std::string RapidjsonValueToString(const rapidjson::Value& value) {
+    if (value.IsString())
+        return std::string(value.GetString(), value.GetStringLength());
+    else if (value.IsBool())
+        return ToString(value.GetBool());
+    else if (value.IsInt())
+        return ToString(value.GetInt());
+    else if (value.IsUint())
+        return ToString(value.GetUint());
+    else if (value.IsInt64())
+        return ToString(value.GetInt64());
+    else if (value.IsUint64())
+        return ToString(value.GetUint64());
+    else if (value.IsDouble())
+        return ToString(value.GetDouble());
+    else if (value.IsNull())
+        return "";
+    else // if (value.IsObject() || value.IsArray())
+    {
+        rapidjson::StringBuffer buffer;
+        rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+        value.Accept(writer);
+        return std::string(buffer.GetString(), buffer.GetLength());
+    }
+}
+
+bool ProcessorParseJsonNative::JsonLogLineParserRapidJson(LogEvent& sourceEvent,
+                                                          const StringView& logPath,
+                                                          PipelineEventPtr& e,
+                                                          bool& sourceKeyOverwritten) {
     StringView buffer = sourceEvent.GetContent(mSourceKey);
 
     if (buffer.empty())
@@ -155,12 +420,12 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
                         ("parse json log fail, log", buffer)("rapidjson offset", doc.GetErrorOffset())(
                             "rapidjson error", doc.GetParseError())("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                   std::string("parse json fail:") + buffer.to_string(),
-                                                   GetContext().GetRegion(),
-                                                   GetContext().GetProjectName(),
-                                                   GetContext().GetConfigName(),
-                                                   GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                          std::string("parse json fail:") + buffer.to_string(),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;
@@ -169,12 +434,12 @@ bool ProcessorParseJsonNative::JsonLogLineParser(LogEvent& sourceEvent,
             LOG_WARNING(sLogger,
                         ("invalid json object, log", buffer)("project", GetContext().GetProjectName())(
                             "logstore", GetContext().GetLogstoreName())("file", logPath));
-            AlarmManager::GetInstance()->SendAlarm(PARSE_LOG_FAIL_ALARM,
-                                                   std::string("invalid json object:") + buffer.to_string(),
-                                                   GetContext().GetRegion(),
-                                                   GetContext().GetProjectName(),
-                                                   GetContext().GetConfigName(),
-                                                   GetContext().GetLogstoreName());
+            AlarmManager::GetInstance()->SendAlarmWarning(PARSE_LOG_FAIL_ALARM,
+                                                          std::string("invalid json object:") + buffer.to_string(),
+                                                          GetContext().GetRegion(),
+                                                          GetContext().GetProjectName(),
+                                                          GetContext().GetConfigName(),
+                                                          GetContext().GetLogstoreName());
         }
         ADD_COUNTER(mOutFailedEventsTotal, 1);
         parseSuccess = false;

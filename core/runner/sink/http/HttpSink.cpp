@@ -52,7 +52,7 @@ bool HttpSink::Init() {
         return false;
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK}});
@@ -66,6 +66,7 @@ bool HttpSink::Init() {
         = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_SINK_FAILED_ITEM_TOTAL_RESPONSE_TIME_MS);
     mSendingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SINK_SENDING_ITEMS_TOTAL);
     mSendConcurrency = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_SINK_SEND_CONCURRENCY);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
     // TODO: should be dynamic
     SET_GAUGE(mSendConcurrency, AppConfig::GetInstance()->GetSendRequestGlobalConcurrency());
@@ -95,13 +96,14 @@ void HttpSink::Run() {
         unique_ptr<HttpSinkRequest> request;
         if (mQueue.WaitAndPop(request, 500)) {
             ADD_COUNTER(mInItemsTotal, 1);
-            LOG_DEBUG(sLogger,
+            LOG_TRACE(sLogger,
                       ("got item from flusher runner, item address", request->mItem)(
                           "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
                           "wait time",
                           ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()
                                                                                - request->mEnqueTime)
-                                       .count()))("try cnt", ToString(request->mTryCnt)));
+                                       .count())
+                              + "ms")("try cnt", ToString(request->mTryCnt)));
             if (!AddRequestToClient(std::move(request))) {
                 continue;
             }
@@ -132,7 +134,6 @@ bool HttpSink::AddRequestToClient(unique_ptr<HttpSinkRequest>&& request) {
                                    request->mResponse,
                                    headers,
                                    request->mTimeout,
-                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    false,
                                    std::nullopt,
@@ -193,13 +194,14 @@ void HttpSink::DoRun() {
         bool hasRequest = false;
         while (mQueue.TryPop(request)) {
             ADD_COUNTER(mInItemsTotal, 1);
-            LOG_DEBUG(sLogger,
+            LOG_TRACE(sLogger,
                       ("got item from flusher runner, item address", request->mItem)(
                           "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(
                           "wait time",
                           ToString(chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now()
                                                                                - request->mEnqueTime)
-                                       .count()))("try cnt", ToString(request->mTryCnt)));
+                                       .count())
+                              + "ms")("try cnt", ToString(request->mTryCnt)));
             if (AddRequestToClient(std::move(request))) {
                 ++runningHandlers;
                 ADD_GAUGE(mSendingItemsTotal, 1);
@@ -208,6 +210,9 @@ void HttpSink::DoRun() {
         }
         if (hasRequest) {
             continue;
+        }
+        if (runningHandlers == 0) {
+            break;
         }
 
         struct timeval timeout {
@@ -239,8 +244,8 @@ void HttpSink::DoRun() {
             LOG_ERROR(sLogger, ("failed to call curl_multi_fdset", "sleep 100ms")("errMsg", curl_multi_strerror(mc)));
         }
         if (maxfd == -1) {
-            // sleep min(timeout, 100ms) according to libcurl
-            int64_t sleepMs = (curlTimeout >= 0 && curlTimeout < 100) ? curlTimeout : 100;
+            // sleep min(timeout, 50ms) according to libcurl
+            int64_t sleepMs = (curlTimeout >= 0 && curlTimeout < 50) ? curlTimeout : 50;
             this_thread::sleep_for(chrono::milliseconds(sleepMs));
         } else {
             select(maxfd + 1, &fdread, &fdwrite, &fdexcep, &timeout);
@@ -267,7 +272,7 @@ void HttpSink::HandleCompletedRequests(int& runningHandlers) {
                     request->mResponse.SetNetworkStatus(NetworkCode::Ok, "");
                     request->mResponse.SetStatusCode(statusCode);
                     request->mResponse.SetResponseTime(responseTimeMs);
-                    LOG_DEBUG(sLogger,
+                    LOG_TRACE(sLogger,
                               ("send http request succeeded, item address",
                                request->mItem)("config-flusher-dst",
                                                QueueKeyManager::GetInstance()->GetName(request->mItem->mQueueKey))(

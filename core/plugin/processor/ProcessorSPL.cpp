@@ -18,6 +18,7 @@
 
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
+#include "common/TimeUtil.h"
 #include "logger/Logger.h"
 #include "monitor/metric_constants/MetricConstants.h"
 
@@ -27,6 +28,8 @@ DEFINE_FLAG_INT32(logtail_spl_query_max_size, "", 65536);
 namespace logtail {
 
 const std::string ProcessorSPL::sName = "processor_spl";
+
+const uint32_t uint32Max = std::numeric_limits<uint32_t>::max();
 
 bool ProcessorSPL::Init(const Json::Value& config) {
     std::string errorMsg;
@@ -117,6 +120,18 @@ void ProcessorSPL::Process(std::vector<PipelineEventGroup>& logGroupList) {
 
     PipelineStats pipelineStats;
     ResultCode result = mSPLPipelinePtr->Execute(std::move(logGroup), logGroupList, pipelineStats, mContext);
+
+    const time_t currentTime = GetCurrentLogtailTime().tv_sec;
+
+    for (auto& g : logGroupList) {
+        EventsContainer& events = g.MutableEvents();
+        for (auto& e : events) {
+            // parse failed time in spl will be set to uint32Max
+            if (e->GetTimestamp() == 0 || e->GetTimestamp() == uint32Max) {
+                e->SetTimestamp(currentTime);
+            }
+        }
+    }
 
     if (result != ResultCode::OK) {
         ADD_COUNTER(mSplExcuteErrorCount, 1);

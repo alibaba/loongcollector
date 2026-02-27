@@ -29,7 +29,6 @@ type timerRunner struct {
 	initialMaxDelay time.Duration
 	interval        time.Duration
 	context         pipeline.Context
-	latencyMetric   pipeline.LatencyMetric
 	state           interface{}
 }
 
@@ -48,25 +47,32 @@ func (p *timerRunner) Run(task func(state interface{}) error, cc *pipeline.Async
 	}
 
 	for {
+		startTime := time.Now()
 		p.execTask(task) // execute task at least once.
+		executeTime := time.Since(startTime)
 		if exitFlag {
 			logger.Info(p.context.GetRuntimeContext(), "task run", "exit", "state", fmt.Sprintf("%T", p.state))
 			return
 		}
-		exitFlag = util.RandomSleep(p.interval, 0, cc.CancelToken())
+		timeToSleep := GetNextDelay(p.interval, executeTime)
+		if timeToSleep == 0 {
+			logger.Warningf(p.context.GetRuntimeContext(), "TASK_EXECUTE_SLOW",
+				"task execute time %v is larger than interval %v, skip sleep", executeTime, p.interval)
+		}
+		exitFlag = util.RandomSleep(timeToSleep, 0, cc.CancelToken())
 	}
 }
 
-func (p *timerRunner) execTask(task func(state interface{}) error) {
-	var begin time.Time
-	if p.latencyMetric != nil {
-		begin = time.Now()
+func GetNextDelay(expectedInterval time.Duration, executeTime time.Duration) time.Duration {
+	if executeTime > expectedInterval {
+		return 0
 	}
+	return expectedInterval - executeTime
+}
+
+func (p *timerRunner) execTask(task func(state interface{}) error) {
 	if err := task(p.state); err != nil {
 		logger.Error(p.context.GetRuntimeContext(), "PLUGIN_RUN_ALARM", "task run", "error", err, "plugin", "state", fmt.Sprintf("%T", p.state))
-	}
-	if p.latencyMetric != nil {
-		p.latencyMetric.Observe(float64(time.Since(begin)))
 	}
 }
 
@@ -77,16 +83,12 @@ func flushOutStore[T FlushData, F FlusherWrapperInterface](lc *LogstoreConfig, s
 				logger.Error(lc.Context.GetRuntimeContext(), "DROP_DATA_ALARM", "flush out data timeout, drop data", store.Len())
 				return false
 			}
-			lc.Statistics.FlushReadyMetric.Add(0)
 			time.Sleep(time.Duration(10) * time.Millisecond)
 		}
-		lc.Statistics.FlushReadyMetric.Add(1)
-		startTime := time.Now()
 		err := flushFunc(lc, flusher, store)
 		if err != nil {
 			logger.Error(lc.Context.GetRuntimeContext(), "FLUSH_DATA_ALARM", "flush data error", lc.ProjectName, lc.LogstoreName, err)
 		}
-		lc.Statistics.FlushLatencyMetric.Observe(float64(time.Since(startTime).Nanoseconds()))
 	}
 	store.Reset()
 	return true

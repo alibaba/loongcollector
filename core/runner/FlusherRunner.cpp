@@ -14,6 +14,8 @@
 
 #include "runner/FlusherRunner.h"
 
+#include <algorithm>
+
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "collection_pipeline/plugin/interface/HttpFlusher.h"
@@ -41,17 +43,20 @@ bool FlusherRunner::Init() {
     mCallback = [this]() { return LoadModuleConfig(false); };
     AppConfig::GetInstance()->RegisterCallback("max_bytes_per_sec", &mCallback);
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER}});
     mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_ITEMS_TOTAL);
     mInItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_IN_SIZE_BYTES);
+    mInItemRawDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES);
     mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_OUT_ITEMS_TOTAL);
+    mOutItemDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_OUT_SIZE_BYTES);
+    mOutItemRawDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_FLUSHER_OUT_RAW_SIZE_BYTES);
     mTotalDelayMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_TOTAL_DELAY_MS);
     mLastRunTime = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_LAST_RUN_TIME);
-    mInItemRawDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_FLUSHER_IN_RAW_SIZE_BYTES);
     mWaitingItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_FLUSHER_WAITING_ITEMS_TOTAL);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 
     mThreadRes = async(launch::async, &FlusherRunner::Run, this);
     mLastCheckSendClientTime = time(nullptr);
@@ -109,7 +114,7 @@ void FlusherRunner::DecreaseHttpSendingCnt() {
     SenderQueueManager::GetInstance()->Trigger();
 }
 
-void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
+bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     // TODO: use semaphore instead
     while (withLimit && !Application::GetInstance()->IsExiting()
            && GetSendingBufferCount() >= AppConfig::GetInstance()->GetSendRequestGlobalConcurrency()) {
@@ -124,27 +129,40 @@ void FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
             && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
                 < INT32_FLAG(discard_send_fail_interval)) {
             item->mStatus = SendingStatus::IDLE;
+            ++item->mTryCnt;
+            // 计算指数回退延迟：初始100ms，最大10秒，每次重试延迟翻倍
+            // 第一次失败(mTryCnt=2)：延迟100ms；第二次失败(mTryCnt=3)：延迟200ms；以此类推
+            // 限制最大位移为7（即最大延迟约12.8秒，但会被限制到10秒）
+            const int64_t kInitialBackoffMs = 100;
+            const int64_t kMaxBackoffMs = 10000;
+            int64_t shift = std::max(0U, std::min(item->mTryCnt - 2, 7U));
+            int64_t backoffMs = std::min(kInitialBackoffMs * (1 << shift), kMaxBackoffMs);
+            auto now = chrono::system_clock::now();
+            item->mQuickFailNextRetryTime = now + chrono::milliseconds(backoffMs);
             LOG_DEBUG(sLogger,
                       ("failed to build request", "retry later")("item address", item)(
-                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
+                          "errMsg", errMsg)("tryCnt", item->mTryCnt)("backoffMs", backoffMs));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         } else {
-            LOG_WARNING(sLogger,
-                        ("failed to build request", "discard item")("item address", item)(
-                            "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+            LOG_WARNING(
+                sLogger,
+                ("failed to build request", "discard item")("item address", item)(
+                    "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
             SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
         }
-        return;
+        return false;
     }
 
     req->mEnqueTime = item->mLastSendTime = chrono::system_clock::now();
-    LOG_DEBUG(sLogger,
+    LOG_TRACE(sLogger,
               ("send item to http sink, item address", item)("config-flusher-dst",
                                                              QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
                   "sending cnt", ToString(mHttpSendingCnt.load() + 1)));
     HttpSink::GetInstance()->AddRequest(std::move(req));
     ++mHttpSendingCnt;
+    return true;
 }
 
 void FlusherRunner::Run() {
@@ -161,17 +179,17 @@ void FlusherRunner::Run() {
         if (items.empty()) {
             SenderQueueManager::GetInstance()->Wait(1000);
         } else {
-            LOG_DEBUG(sLogger, ("got items from sender queue, cnt", items.size()));
-            for (auto itr = items.begin(); itr != items.end(); ++itr) {
-                ADD_COUNTER(mInItemDataSizeBytes, (*itr)->mData.size());
-                ADD_COUNTER(mInItemRawDataSizeBytes, (*itr)->mRawSize);
-            }
+            LOG_TRACE(sLogger, ("got items from sender queue, cnt", items.size()));
             ADD_COUNTER(mInItemsTotal, items.size());
             ADD_GAUGE(mWaitingItemsTotal, items.size());
         }
 
         for (auto itr = items.begin(); itr != items.end(); ++itr) {
-            LOG_DEBUG(
+            auto rawSize = (*itr)->mRawSize;
+            auto dataSize = (*itr)->mData.size();
+            ADD_COUNTER(mInItemDataSizeBytes, dataSize);
+            ADD_COUNTER(mInItemRawDataSizeBytes, rawSize);
+            LOG_TRACE(
                 sLogger,
                 ("got item from sender queue, item address",
                  *itr)("config-flusher-dst", QueueKeyManager::GetInstance()->GetName((*itr)->mQueueKey))(
@@ -179,14 +197,16 @@ void FlusherRunner::Run() {
                     ToString(chrono::duration_cast<chrono::milliseconds>(curTime - (*itr)->mFirstEnqueTime).count())
                         + "ms")("try cnt", ToString((*itr)->mTryCnt)));
 
-            // TODO: use rate limiter instead
-            if (!Application::GetInstance()->IsExiting() && mEnableRateLimiter) {
-                RateLimiter::FlowControl((*itr)->mRawSize, mSendLastTime, mSendLastByte, true);
+            if (Dispatch(*itr)) {
+                // TODO: use rate limiter instead
+                if (!Application::GetInstance()->IsExiting() && mEnableRateLimiter) {
+                    RateLimiter::FlowControl(rawSize, mSendLastTime, mSendLastByte, true);
+                }
+                ADD_COUNTER(mOutItemsTotal, 1);
+                ADD_COUNTER(mOutItemDataSizeBytes, dataSize);
+                ADD_COUNTER(mOutItemRawDataSizeBytes, rawSize);
             }
-
-            Dispatch(*itr);
             SUB_GAUGE(mWaitingItemsTotal, 1);
-            ADD_COUNTER(mOutItemsTotal, 1);
             ADD_COUNTER(mTotalDelayMs, chrono::system_clock::now() - curTime);
         }
 
@@ -196,7 +216,7 @@ void FlusherRunner::Run() {
     }
 }
 
-void FlusherRunner::Dispatch(SenderQueueItem* item) {
+bool FlusherRunner::Dispatch(SenderQueueItem* item) {
     switch (item->mFlusher->GetSinkType()) {
         case SinkType::HTTP:
             // TODO: make it common for all http flushers
@@ -204,13 +224,13 @@ void FlusherRunner::Dispatch(SenderQueueItem* item) {
                 && item->mFlusher->Name() == "flusher_sls") {
                 DiskBufferWriter::GetInstance()->PushToDiskBuffer(item, 3);
                 SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+                return true;
             } else {
-                PushToHttpSink(item);
+                return PushToHttpSink(item);
             }
-            break;
         default:
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
-            break;
+            return false;
     }
 }
 

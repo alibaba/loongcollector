@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "TimeUtil.h"
+#include "common/TimeUtil.h"
 
 #include <cmath>
 #include <memory.h>
@@ -21,6 +21,7 @@
 #include <chrono>
 #include <limits>
 #if defined(__linux__)
+#include <ctime>
 #include <sys/sysinfo.h>
 #include <utmp.h>
 #endif
@@ -38,17 +39,19 @@ std::string ConvertToTimeStamp(const time_t& t, const std::string& format) {
     return GetTimeStamp(t, format);
 }
 
-std::string GetTimeStamp(time_t t, const std::string& format) {
-    if (0 == strcmp(format.c_str(), "%s")) {
+std::string GetTimeStamp(time_t t, const std::string& format, bool isLocal) {
+    if (format.compare("%s") == 0) {
         return t <= 0 ? "" : std::to_string(t);
     }
 
     struct tm timeInfo;
 #if defined(__linux__)
-    if (NULL == localtime_r(&t, &timeInfo))
+    auto* timeInfoPtr = isLocal ? localtime_r(&t, &timeInfo) : gmtime_r(&t, &timeInfo);
+    if (NULL == timeInfoPtr)
         return "";
 #elif defined(_MSC_VER)
-    if (0 != localtime_s(&timeInfo, &t))
+    auto errorNo = isLocal ? localtime_s(&timeInfo, &t) : gmtime_s(&timeInfo, &t);
+    if (errorNo != 0)
         return "";
 #endif
     char buf[256];
@@ -374,8 +377,13 @@ bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond) {
         return false;
     }
     std::string hourStr = logTZ.substr(4, 2);
-    std::string minitueStr = logTZ.substr(7, 2);
-    logTZSecond = StringTo<int>(hourStr) * 3600 + StringTo<int>(minitueStr) * 60;
+    std::string minuteStr = logTZ.substr(7, 2);
+    int hour{};
+    int minute{};
+    if (!StringTo(hourStr, hour) || !StringTo(minuteStr, minute)) {
+        return false;
+    }
+    logTZSecond = hour * 3600 + minute * 60;
     if (logTZ[3] == '-') {
         logTZSecond = -logTZSecond;
     }
@@ -402,6 +410,32 @@ std::string NumberToDigitString(uint32_t number, uint8_t length) {
         result = result.substr(result.length() - length, length);
     }
     return result;
+}
+
+std::chrono::nanoseconds GetTimeDiffFromMonotonic() {
+#if defined(__linux__)
+    struct timespec t;
+    int ret = clock_gettime(CLOCK_MONOTONIC, &t);
+    if (ret != 0) {
+        LOG_ERROR(sLogger, ("failed to get monotonic, ret", ret));
+        return std::chrono::nanoseconds(0);
+    }
+    auto now = std::chrono::system_clock::now();
+    auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+    auto boot_ns = t.tv_sec * 1000000000ULL + t.tv_nsec;
+    return std::chrono::nanoseconds(now_ns - boot_ns);
+#else
+    return std::chrono::nanoseconds(0);
+#endif
+}
+
+struct timespec ConvertKernelTimeToUnixTime(uint64_t nano) {
+    static auto diff = GetTimeDiffFromMonotonic().count();
+    auto ts = std::chrono::nanoseconds(nano + diff);
+    auto seconds = std::chrono::duration_cast<std::chrono::seconds>(ts);
+    auto nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(ts - seconds);
+    struct timespec res = {seconds.count(), nanoseconds.count()};
+    return res;
 }
 
 } // namespace logtail

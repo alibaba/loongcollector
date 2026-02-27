@@ -42,6 +42,7 @@ public:
                                 size_t low,
                                 size_t high,
                                 QueueKey key,
+                                const std::string& target,
                                 const std::string& flusherId,
                                 const CollectionPipelineContext& ctx);
 
@@ -78,6 +79,7 @@ protected:
     IntGaugePtr mExtraBufferSize;
     IntGaugePtr mExtraBufferDataSizeBytes;
     CounterPtr mFetchRejectedByRateLimiterTimesCnt;
+    std::map<std::string, CounterPtr> mConcurrencyLimiterCounterMap;
 
 private:
     virtual void PushFromExtraBuffer(std::unique_ptr<SenderQueueItem>&& item) = 0;

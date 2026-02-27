@@ -27,16 +27,34 @@
 #include "monitor/metric_constants/MetricConstants.h"
 
 namespace logtail {
+
+constexpr uint32_t kTimeFallbackDurationMilliSeconds = 1000;
+constexpr double kTimeFallbackBackoffMultiplier = 2.0;
+constexpr uint32_t kTimeFallbackMaxDurationMilliSeconds = 60000; // 60 seconds
+constexpr uint32_t kConcurrencyStatisticThreshold = 10;
+constexpr uint32_t kConcurrencyStatisticIntervalThresholdSeconds = 3;
+
 class ConcurrencyLimiter {
 public:
     ConcurrencyLimiter(const std::string& description,
                        uint32_t maxConcurrency,
                        uint32_t minConcurrency = 1,
+                       uint32_t timeFallbackDurationMilliSeconds = 0,
                        double concurrencyFastFallBackRatio = 0.5,
-                       double concurrencySlowFallBackRatio = 0.8)
+                       double concurrencySlowFallBackRatio = 0.8,
+                       double timeFallbackBackoffMultiplier = kTimeFallbackBackoffMultiplier,
+                       uint32_t timeFallbackMaxDurationMilliSeconds = kTimeFallbackMaxDurationMilliSeconds,
+                       uint32_t statisticThreshold = kConcurrencyStatisticThreshold,
+                       uint32_t statisticIntervalThresholdSeconds = kConcurrencyStatisticIntervalThresholdSeconds)
         : mDescription(description),
           mMaxConcurrency(maxConcurrency),
           mMinConcurrency(minConcurrency),
+          mTimeFallbackDurationMilliSeconds(timeFallbackDurationMilliSeconds),
+          mTimeFallbackBackoffMultiplier(timeFallbackBackoffMultiplier),
+          mTimeFallbackMaxDurationMilliSeconds(timeFallbackMaxDurationMilliSeconds),
+          mTimeFallbackCurrentDurationMilliSeconds(timeFallbackDurationMilliSeconds),
+          mStatisticThreshold(statisticThreshold),
+          mStatisticIntervalThresholdSeconds(statisticIntervalThresholdSeconds),
           mCurrenctConcurrency(maxConcurrency),
           mConcurrencyFastFallBackRatio(concurrencyFastFallBackRatio),
           mConcurrencySlowFallBackRatio(concurrencySlowFallBackRatio) {}
@@ -67,6 +85,7 @@ public:
     void SetInSendingCount(uint32_t count);
     uint32_t GetInSendingCount() const;
     uint32_t GetStatisticThreshold() const;
+    bool IsInTimeFallback() const;
 
 #endif
 
@@ -78,8 +97,20 @@ private:
     uint32_t mMaxConcurrency = 0;
     uint32_t mMinConcurrency = 0;
 
+    uint32_t mTimeFallbackDurationMilliSeconds = 0;
+    double mTimeFallbackBackoffMultiplier = kTimeFallbackBackoffMultiplier;
+    uint32_t mTimeFallbackMaxDurationMilliSeconds = kTimeFallbackMaxDurationMilliSeconds;
+    uint32_t mTimeFallbackCurrentDurationMilliSeconds = 0;
+
+    uint32_t mStatisticThreshold = kConcurrencyStatisticThreshold;
+    uint32_t mStatisticIntervalThresholdSeconds = kConcurrencyStatisticIntervalThresholdSeconds;
+
     mutable std::mutex mLimiterMux;
     uint32_t mCurrenctConcurrency = 0;
+
+    // Time fallback control
+    bool mInTimeFallback = false;
+    std::chrono::system_clock::time_point mTimeFallbackStartTime;
 
     double mConcurrencyFastFallBackRatio = 0.0;
     double mConcurrencySlowFallBackRatio = 0.0;

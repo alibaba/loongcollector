@@ -3,6 +3,7 @@
 #include "json/json.h"
 
 #include "common/StringTools.h"
+#include "logger/Logger.h"
 #include "models/MetricEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "models/PipelineEventPtr.h"
@@ -29,7 +30,10 @@ void ProcessorPromParseMetricNative::Process(PipelineEventGroup& eGroup) {
     newEvents.reserve(events.size());
 
     StringView scrapeTimestampMilliSecStr = eGroup.GetMetadata(EventGroupMetaKey::PROMETHEUS_SCRAPE_TIMESTAMP_MILLISEC);
-    auto timestampMilliSec = StringTo<uint64_t>(scrapeTimestampMilliSecStr.to_string());
+    uint64_t timestampMilliSec{};
+    if (!StringTo(scrapeTimestampMilliSecStr, timestampMilliSec)) {
+        LOG_WARNING(sLogger, ("parse scrape timestamp failed", scrapeTimestampMilliSecStr));
+    }
     auto timestamp = timestampMilliSec / 1000;
     auto nanoSec = timestampMilliSec % 1000 * 1000000;
     TextParser parser(mScrapeConfigPtr->mHonorTimestamps);

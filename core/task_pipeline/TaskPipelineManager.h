@@ -16,7 +16,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -42,6 +44,10 @@ public:
     const std::unique_ptr<TaskPipeline>& FindPipelineByName(const std::string& configName) const;
     std::vector<std::string> GetAllPipelineNames() const;
 
+    bool IsFirstCheckConfigExecuted() const { return mIsFirstCheckConfigExecuted.load(); }
+    void SetFirstCheckConfigExecuted(bool value) { mIsFirstCheckConfigExecuted.store(value); }
+    size_t GetPipelineCount() const;
+
 #ifdef APSARA_UNIT_TEST_MAIN
     void ClearEnvironment() { mPipelineNameEntityMap.clear(); }
 #endif
@@ -52,7 +58,10 @@ private:
 
     std::unique_ptr<TaskPipeline> BuildPipeline(TaskConfig&& config);
 
+    mutable std::shared_mutex mPipelineNameEntityMapMutex;
     std::unordered_map<std::string, std::unique_ptr<TaskPipeline>> mPipelineNameEntityMap;
+
+    std::atomic<bool> mIsFirstCheckConfigExecuted{false};
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TaskPipelineManagerUnittest;

@@ -24,23 +24,23 @@
 #include <utility>
 #include <vector>
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/DevInode.h"
 #include "common/EncodingConverter.h"
 #include "common/FileInfo.h"
 #include "common/LogFileOperator.h"
 #include "common/StringTools.h"
+#include "common/StringView.h"
 #include "common/TimeUtil.h"
 #include "common/memory/SourceBuffer.h"
 #include "constants/TagConstants.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileServer.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 #include "file_server/event/Event.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "logger/Logger.h"
-#include "models/StringView.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
@@ -162,7 +162,8 @@ public:
 
     static size_t BUFFER_SIZE;
     static const int32_t CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY = -1;
-    static const int32_t CHECKPOINT_IDX_OF_NOT_IN_READER_ARRAY = -2;
+    static const int32_t CHECKPOINT_IDX_OF_ROTATOR_MAP = -2;
+    static const int32_t CHECKPOINT_IDX_UNDEFINED = -3;
     std::vector<BaseLineParse*> mLineParsers = {};
     template <typename T>
     T* GetParser(size_t size) {
@@ -203,7 +204,7 @@ public:
                   const MultilineConfig& multilineConfig,
                   const FileTagConfig& tagConfig);
 
-    bool ReadLog(LogBuffer& logBuffer, const Event* event);
+    bool ReadLog(LogBuffer& logBuffer, const Event* event, bool isStaticFile = false);
     time_t GetLastUpdateTime() const // actually it's the time whenever ReadLogs is called
     {
         return mLastUpdateTime;
@@ -277,6 +278,7 @@ public:
             mFirstWatched = false;
         mLastFilePos = pos;
     }
+    void SetExpectedFileSize(int64_t size) { mExpectedFileSize = size; }
     void
     InitReader(bool tailExisted = false, FileReadPolicy policy = BACKWARD_TO_FIXED_POS, uint32_t eoConcurrency = 0);
 
@@ -331,6 +333,7 @@ public:
     void SetSymbolicLinkFlag(bool flag) { mSymbolicLinkFlag = flag; }
 
     void CloseFilePtr();
+    void CloseFilePtr(bool& isDeleted); // return true if file is deleted (only meaningful on Linux)
 
     // void SetLogstoreKey(uint64_t logstoreKey) { mLogstoreKey = logstoreKey; }
 
@@ -379,6 +382,10 @@ public:
 
     bool IsFromCheckPoint() { return mLastFileSignatureHash != 0 && mLastFileSignatureSize > (size_t)0; }
 
+    std::pair<uint64_t, uint32_t> GetSignature() const {
+        return std::make_pair(mLastFileSignatureHash, mLastFileSignatureSize);
+    }
+
     // void SetDelayAlarmBytes(int64_t value) { mReadDelayAlarmBytes = value; }
 
     // int64_t GetPackId() { return ++mPackId; }
@@ -390,6 +397,13 @@ public:
     const std::vector<std::pair<TagKey, std::string>>& GetContainerMetadatas() { return mContainerMetadatas; }
 
     void SetContainerMetadatas(const std::vector<std::pair<TagKey, std::string>>& tags) { mContainerMetadatas = tags; }
+
+    const std::vector<std::pair<std::string, std::string>>& GetContainerCustomMetadatas() {
+        return mContainerCustomMetadatas;
+    }
+    void SetContainerCustomMetadatas(const std::vector<std::pair<std::string, std::string>>& tags) {
+        mContainerCustomMetadatas = tags;
+    }
 
     const std::vector<std::pair<std::string, std::string>>& GetExtraTags() { return mContainerExtraTags; }
 
@@ -455,9 +469,10 @@ public:
     void ReportMetrics(uint64_t readSize);
 
 protected:
-    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true);
-    void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
-    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
+    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true, bool isStaticFile = false);
+    void
+    ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
+    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
 
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);
@@ -469,6 +484,7 @@ protected:
     inline int64_t GetLastReadPos() const { // pos read but may not consumed, used for read needed
         return mLastFilePos + mCache.size();
     }
+    void ResolveHostLogPath();
 
     // std::string mRegion;
     // std::string mCategory;
@@ -476,7 +492,9 @@ protected:
     std::string mHostLogPath;
     std::string mHostLogPathDir;
     std::string mHostLogPathFile;
+    std::string mResolvedHostLogPath; // same as mHostLogPath, but with resolved symbolic link
     std::string mRealLogPath; // real log path
+    std::string mChineseEncodingPath; // On Windows, Chinese config base path's __path__ will be converted to GBK
     bool mSymbolicLinkFlag = false;
     std::string mSourceId;
     // int32_t mTailLimit; // KB
@@ -484,9 +502,10 @@ protected:
     uint32_t mLastFileSignatureSize = 0;
     int64_t mLastFilePos = 0; // pos read and consumed, used for next read begin
     int64_t mLastFileSize = 0;
+    int64_t mExpectedFileSize = 0; //  expected file size limit, used for StaticFileServer reader
     time_t mLastMTime = 0;
     std::string mCache;
-    // >= 0: index of reader array, -1: new reader, -2: not in reader array
+    // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
     std::string mTopicName;
@@ -530,6 +549,7 @@ protected:
     // tags
     std::vector<std::pair<std::string, std::string>> mTopicExtraTags;
     std::vector<std::pair<TagKey, std::string>> mContainerMetadatas;
+    std::vector<std::pair<std::string, std::string>> mContainerCustomMetadatas;
     std::vector<std::pair<std::string, std::string>> mContainerExtraTags;
     // int32_t mCloseUnusedInterval;
 
@@ -560,7 +580,6 @@ protected:
 
 private:
     bool mHasReadContainerBom = false;
-    void checkContainerType();
     void checkContainerType(LogFileOperator& op);
 
     // Initialized when the exactly once feature is enabled.
@@ -707,6 +726,9 @@ private:
     friend class LastMatchedContainerdTextWithDockerJsonUnittest;
     friend class ForceReadUnittest;
     friend class FileTagUnittest;
+    friend class CreateModifyHandlerUnittest;
+    friend class LogFileReaderHoleUnittest;
+    friend class LogFileReaderResolvedPathUnittest;
 
 protected:
     void UpdateReaderManual();

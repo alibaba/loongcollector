@@ -248,7 +248,47 @@ func (m *Metric) GetTypedValue() MetricTypedValues {
 }
 
 func (m *Metric) GetSize() int64 {
-	return int64(len(m.String()))
+	if m == nil {
+		return 0
+	}
+	var size int64
+	// Calculate size of string fields
+	size += int64(len(m.Name))
+	size += int64(len(m.Unit))
+	size += int64(len(m.Description))
+
+	size += intValueBytes  // metric type
+	size += longValueBytes // timestamp
+	size += longValueBytes // observed timestamp
+
+	// also check the length here, otherwise nil tags Iterator will cause 1 allocation.
+	if m.Tags != nil && m.Tags.Len() > 0 {
+		for k, v := range m.Tags.Iterator() {
+			size += int64(len(k)) // tag name
+			size += int64(len(v)) // tag value
+		}
+	}
+
+	if m.Value != nil {
+		if m.Value.IsSingleValue() {
+			size += doubleValueBytes
+		} else {
+			for k := range m.Value.GetMultiValues().Iterator() {
+				size += int64(len(k))    // field name
+				size += doubleValueBytes // field value
+			}
+		}
+	}
+
+	// also check the length here, otherwise nil tags Iterator will cause 1 allocation.
+	if m.TypedValue != nil && m.TypedValue.Len() > 0 {
+		for k, v := range m.TypedValue.Iterator() {
+			size += int64(len(k))                          // field name
+			size += intValueBytes                          // field type
+			size += int64(len(fmt.Sprintf("%v", v.Value))) // field value
+		}
+	}
+	return size
 }
 
 func (m *Metric) Clone() PipelineEvent {

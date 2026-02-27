@@ -22,12 +22,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/alibaba/ilogtail/pkg/flags"
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
@@ -79,7 +78,7 @@ func (s *containerConfigTestSuite) TestCompareEnvAndLabelAndRecordContainer() {
 
 	envList := []string{0: "test=111"}
 	info := mockDockerInfoDetail("testConfig", envList)
-	cMap := helper.GetContainerMap()
+	cMap := containercenter.GetContainerMap()
 	cMap["test"] = info
 
 	containers := compareEnvAndLabelAndRecordContainer()
@@ -88,7 +87,7 @@ func (s *containerConfigTestSuite) TestCompareEnvAndLabelAndRecordContainer() {
 
 func (s *containerConfigTestSuite) TestRecordContainers() {
 	info := mockDockerInfoDetail("testConfig", []string{0: "test=111"})
-	cMap := helper.GetContainerMap()
+	cMap := containercenter.GetContainerMap()
 	cMap["test"] = info
 
 	containerIDs := make(map[string]struct{})
@@ -110,9 +109,9 @@ func (s *containerConfigTestSuite) AfterTest(suiteName, testName string) {
 
 }
 
-func mockDockerInfoDetail(containerName string, envList []string) *helper.DockerInfoDetail {
-	dockerInfo := types.ContainerJSON{
-		ContainerJSONBase: &types.ContainerJSONBase{
+func mockDockerInfoDetail(containerName string, envList []string) *containercenter.DockerInfoDetail {
+	dockerInfo := container.InspectResponse{
+		ContainerJSONBase: &container.ContainerJSONBase{
 			Name:    containerName,
 			ID:      "test",
 			LogPath: "/var/lib/docker/containers/test/test-json.log",
@@ -125,7 +124,7 @@ func mockDockerInfoDetail(containerName string, envList []string) *helper.Docker
 	}
 	dockerInfo.Config = &container.Config{}
 	dockerInfo.Config.Env = envList
-	return helper.CreateContainerInfoDetail(dockerInfo, *flags.LogConfigPrefix, false)
+	return containercenter.CreateContainerInfoDetail(dockerInfo, *flags.LogConfigPrefix, false)
 }
 
 // project, logstore, config, configJsonStr

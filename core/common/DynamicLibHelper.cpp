@@ -14,7 +14,7 @@
 
 #include "DynamicLibHelper.h"
 
-#include "Logger.h"
+#include "logger/Logger.h"
 
 #if defined(__linux__)
 #include <dlfcn.h>

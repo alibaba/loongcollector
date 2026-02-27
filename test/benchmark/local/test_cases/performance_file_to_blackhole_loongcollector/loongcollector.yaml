@@ -1,0 +1,28 @@
+enable: true
+inputs:
+  - Type: input_file
+    FilePaths: 
+      - /home/loongcollector/*.log
+processors:
+  - Type: processor_parse_regex_native
+    SourceKey: content
+    Regex: ^([^ ]*) ([^ ]*) ([^ ]*) \[([^\]]*)\] "(\S+) ([^\"]*) (\S*)" ([^ ]*) ([^ ]*) "([^\"]*)" "([^\"]*)"
+    Keys:
+      - ip
+      - ident
+      - auth
+      - timestamp
+      - method
+      - request
+      - http_version
+      - response_code
+      - bytes
+      - referrer
+      - user_agent
+  - Type: processor_filter_regex_native
+    FilterKey:
+      - user_agent
+    FilterRegex:
+      - ^no-agent$
+flushers:
+  - Type: flusher_blackhole

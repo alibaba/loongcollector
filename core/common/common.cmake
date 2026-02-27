@@ -26,18 +26,27 @@ else ()
     file(GLOB XX_HASH_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.c ${CMAKE_SOURCE_DIR}/common/xxhash/xxhash.h)
 endif ()
 list(APPEND THIS_SOURCE_FILES_LIST ${XX_HASH_SOURCE_FILES})
+# dns
+file(GLOB DNS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/common/dns/*.cpp ${CMAKE_SOURCE_DIR}/common/dns/*.h)
+list(APPEND THIS_SOURCE_FILES_LIST ${DNS_SOURCE_FILES})
 # add memory in common
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/memory/SourceBuffer.h)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/http/AsynCurlRunner.cpp ${CMAKE_SOURCE_DIR}/common/http/Curl.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpResponse.cpp ${CMAKE_SOURCE_DIR}/common/http/HttpRequest.cpp ${CMAKE_SOURCE_DIR}/common/http/Constant.cpp)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/timer/Timer.cpp ${CMAKE_SOURCE_DIR}/common/timer/HttpRequestTimerEvent.cpp)
 list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/compression/Compressor.cpp ${CMAKE_SOURCE_DIR}/common/compression/CompressorFactory.cpp ${CMAKE_SOURCE_DIR}/common/compression/LZ4Compressor.cpp ${CMAKE_SOURCE_DIR}/common/compression/ZstdCompressor.cpp)
+# add auth in common
+list(APPEND THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/auth/AuthConfig.cpp)
 # remove several files in common
 list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/BoostRegexValidator.cpp ${CMAKE_SOURCE_DIR}/common/GetUUID.cpp)
 
 if(MSVC)
-    # remove LinuxDaemonUtil in common
+    list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/ProcParser.h ${CMAKE_SOURCE_DIR}/common/ProcParser.cpp)
     if (ENABLE_ENTERPRISE)
         list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/LinuxDaemonUtil.cpp)
+    endif()
+elseif(UNIX)
+    if (ENABLE_ENTERPRISE)
+        list(REMOVE_ITEM THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/common/WindowsDaemonUtil.h ${CMAKE_SOURCE_DIR}/common/WindowsDaemonUtil.cpp)
     endif()
 endif()
 

@@ -16,8 +16,8 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type                      | String，无默认值(必填)                | 插件类型，固定为`processor_encrypt` |
-| SourceKeys                | String[]，无默认值(必填)              | 指定需要加密的字段名，支持指定多个。 |
+| Type                      | string，无默认值(必填)                | 插件类型，固定为`processor_encrypt` |
+| SourceKeys                | string[]，无默认值(必填)              | 指定需要加密的字段名，支持指定多个。 |
 | EncryptionParameters      | EncryptionParameter，无默认值(必填)   | 指定加密参数。 |
 | KeepSourceValueIfError    | Boolean，`false`                    | 如果发生加密失败，是否保留原始值，如果不保留的话，字段值会被替换为 `ENCRYPT_ERROR`。为了保护您的数据安全，默认值为 `false`，即失败时进行替换。|
 
@@ -25,9 +25,9 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Key           | String，无默认值         | 指定密钥（十六进制），未配置 KeyFilePath 时必选。AES-128、AES-192、AES-256 分别要求密钥为 16、24、32 字节，所以直接以此参数指定密钥时，需要填入 32、48、64 个十六进制字符。 |
-| IV            | String，默认全`0`        | 指定加密的初始向量（十六进制），若配置了KeyFilePath可不填写。此参数值大小等于内部 block 大小，AES-128、AES-192、AES-256 下分别为 8、12、16 字节，所以需要填入 16、24、32 个十六进制字符。 |
-| KeyFilePath   | String，无默认值         | 指定保存加密参数的文件路径，未配置 Key 时必选。支持将前述参数（Key、IV）保存至文件（JSON 格式），文件中指定的值会覆盖通过前述参数指定的值。 |
+| Key           | string，无默认值         | 指定密钥（十六进制），未配置 KeyFilePath 时必选。AES-128、AES-192、AES-256 分别要求密钥为 16、24、32 字节，所以直接以此参数指定密钥时，需要填入 32、48、64 个十六进制字符。 |
+| IV            | string，默认全`0`        | 指定加密的初始向量（十六进制），若配置了KeyFilePath可不填写。此参数值大小等于内部 block 大小，AES-128、AES-192、AES-256 下分别为 8、12、16 字节，所以需要填入 16、24、32 个十六进制字符。 |
+| KeyFilePath   | string，无默认值         | 指定保存加密参数的文件路径，未配置 Key 时必选。支持将前述参数（Key、IV）保存至文件（JSON 格式），文件中指定的值会覆盖通过前述参数指定的值。 |
 
 ## 样例
 

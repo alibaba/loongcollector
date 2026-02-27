@@ -77,7 +77,7 @@ func (n *Nginx) Collect(collector pipeline.Collector) error {
 	for _, u := range n.Urls {
 		addr, err := url.Parse(u)
 		if err != nil {
-			logger.Error(n.context.GetRuntimeContext(), "NGINX_STATUS_INIT_ALARM", "Unable to parse address", u, "error", err)
+			logger.Warning(n.context.GetRuntimeContext(), "NGINX_STATUS_INIT_ALARM", "Unable to parse address", u, "error", err)
 		}
 
 		wg.Add(1)
@@ -85,7 +85,7 @@ func (n *Nginx) Collect(collector pipeline.Collector) error {
 			defer wg.Done()
 			err := n.gatherURL(addr, collector)
 			if err != nil {
-				logger.Error(n.context.GetRuntimeContext(), "NGINX_STATUS_COLLECT_ALARM", "url", addr.Host, "error", err)
+				logger.Warning(n.context.GetRuntimeContext(), "NGINX_STATUS_COLLECT_ALARM", "url", addr.Host, "error", err)
 			}
 		}(addr)
 	}

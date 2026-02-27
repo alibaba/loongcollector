@@ -36,6 +36,11 @@ public:
         : mData(std::unique_ptr<PipelineEvent>(ptr)), mFromEventPool(fromPool), mEventPool(pool) {}
     PipelineEventPtr(std::unique_ptr<PipelineEvent>&& ptr, bool fromPool, EventPool* pool)
         : mData(std::move(ptr)), mFromEventPool(fromPool), mEventPool(pool) {}
+    PipelineEventPtr(const PipelineEventPtr&) = delete;
+    PipelineEventPtr& operator=(const PipelineEventPtr&) = delete;
+    PipelineEventPtr(PipelineEventPtr&&) noexcept = default;
+    PipelineEventPtr& operator=(PipelineEventPtr&&) noexcept;
+    ~PipelineEventPtr();
 
     template <typename T>
     bool Is() const {
@@ -80,6 +85,11 @@ public:
     EventPool* GetEventPool() const { return mEventPool; }
 
 private:
+    void destroy();
+
+    template <typename T>
+    void releaseToPool();
+
     std::unique_ptr<PipelineEvent> mData;
     bool mFromEventPool = false;
     EventPool* mEventPool = nullptr; // null means using processor runner threaded pool

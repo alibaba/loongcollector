@@ -67,6 +67,13 @@ private:
     void DeleteTimeoutReader();
     void DeleteTimeoutReader(int32_t timeoutInterval);
     void DeleteRollbackReader();
+
+    // Helper function to safely remove reader from array and map
+    // Verifies that expectedReader matches array[0] before removal
+    // Returns true if removal succeeded, false if reader mismatch detected
+    bool RemoveReaderFromArrayAndMap(LogFileReaderPtr expectedReader,
+                                     LogFileReaderPtrArray* readerArray,
+                                     DevInodeLogFileReaderMap* devInodeMap);
     void MakeSpaceForNewReader();
 
     static bool CompareReaderByUpdateTime(const LogFileReader* left, const LogFileReader* right) {
@@ -98,7 +105,7 @@ private:
                                             uint32_t exactlyonceConcurrency = 0,
                                             bool forceBeginingFlag = false);
 
-    int32_t PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer);
+    int32_t PushLogToProcessor(LogFileReaderPtr reader, LogBuffer* logBuffer, bool dropIfBlocked = false);
 
     void ForceReadLogAndPush(LogFileReaderPtr reader);
 
@@ -121,6 +128,8 @@ public:
     friend class SenderUnittest;
     friend class ModifyHandlerUnittest;
     friend class ForceReadUnittest;
+    friend class CreateModifyHandlerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 
@@ -178,6 +187,7 @@ public:
     friend class EventDispatcherTest;
     friend class SenderUnittest;
     friend class EventDispatcherContainerUnittest;
+    friend class LogInputReaderUnittest;
 #endif
 };
 

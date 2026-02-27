@@ -16,6 +16,8 @@ package setup
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/melbahja/goph"
 	"golang.org/x/crypto/ssh"
@@ -58,7 +60,42 @@ func (h *HostEnv) exec(command string) (string, error) {
 }
 
 func (h *HostEnv) initSSHClient() {
-	client, err := goph.NewConn(&goph.Config{
+	client, err := h.initSSHClientByPrivateKey()
+	if err != nil {
+		logger.Warningf(context.TODO(), "SSHExec", "using private key to create ssh client failed, will fallback to password: %v", err)
+	} else {
+		h.sshClient = client
+		return
+	}
+
+	client, err = h.initSSHClientByPassword()
+	if err != nil {
+		logger.Errorf(context.TODO(), "SSHExec", "error in create ssh client: %v", err)
+		return
+	}
+	h.sshClient = client
+	logger.Infof(context.TODO(), "Create ssh client successfully.")
+}
+
+func (h *HostEnv) initSSHClientByPrivateKey() (*goph.Client, error) {
+	auth, err := goph.Key(filepath.Join(os.Getenv("HOME"), ".ssh", "id_rsa"), "")
+	if err != nil {
+		logger.Errorf(context.TODO(), "SSHExec", "error reading private key file: %v", err)
+		return nil, err
+	}
+
+	return goph.NewConn(&goph.Config{
+		User: config.TestConfig.SSHUsername,
+		Addr: config.TestConfig.SSHIP,
+		Port: 22,
+		Auth: auth,
+		// #nosec G106
+		Callback: ssh.InsecureIgnoreHostKey(),
+	})
+}
+
+func (h *HostEnv) initSSHClientByPassword() (*goph.Client, error) {
+	return goph.NewConn(&goph.Config{
 		User: config.TestConfig.SSHUsername,
 		Addr: config.TestConfig.SSHIP,
 		Port: 22,
@@ -66,9 +103,4 @@ func (h *HostEnv) initSSHClient() {
 		// #nosec G106
 		Callback: ssh.InsecureIgnoreHostKey(),
 	})
-	if err != nil {
-		logger.Errorf(context.TODO(), "SSHExec", "error in create ssh client: %v", err)
-		return
-	}
-	h.sshClient = client
 }

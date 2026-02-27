@@ -29,6 +29,7 @@
 #include "collection_pipeline/plugin/interface/Processor.h"
 #include "collection_pipeline/queue/SLSSenderQueueItem.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/StringView.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "task_pipeline/Task.h"
 #include "task_pipeline/TaskRegistry.h"
@@ -40,13 +41,13 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override { return true; }
-    void Process(PipelineEventGroup& logGroup) override { ++mCnt; };
+    bool Init([[maybe_unused]] const Json::Value& config) override { return true; }
+    void Process([[maybe_unused]] PipelineEventGroup& logGroup) override { ++mCnt; };
 
     uint32_t mCnt = 0;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+    bool IsSupportedEvent([[maybe_unused]] const PipelineEventPtr& e) const override { return true; };
 };
 
 const std::string ProcessorInnerMock::sName = "processor_inner_mock";
@@ -56,9 +57,16 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
-        if (config.isMember("SupportAck")) {
-            mSupportAck = config["SupportAck"].asBool();
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
         }
         auto processor = PluginRegistry::GetInstance()->CreateProcessor(
             ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
@@ -67,18 +75,18 @@ public:
         return true;
     }
     bool Start() override { return true; }
-    bool Stop(bool isPipelineRemoving) override {
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
         return true;
     }
-    bool SupportAck() const override { return mSupportAck; }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
 
     void Block() { mBlockFlag = true; }
     void Unblock() { mBlockFlag = false; }
 
-    bool mSupportAck = true;
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
 
 private:
     std::atomic_bool mBlockFlag = false;
@@ -86,13 +94,111 @@ private:
 
 const std::string InputMock::sName = "input_mock";
 
+class InputSingletonMock1 : public Input {
+public:
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
+        }
+        auto processor = PluginRegistry::GetInstance()->CreateProcessor(
+            ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        processor->Init(Json::Value(), *mContext);
+        mInnerProcessors.emplace_back(std::move(processor));
+        return true;
+    }
+    bool Start() override { return true; }
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return true;
+    }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
+
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
+
+private:
+    std::atomic_bool mBlockFlag = false;
+};
+
+const std::string InputSingletonMock1::sName = "input_singleton_mock_1";
+
+class InputSingletonMock2 : public Input {
+public:
+    static const std::string sName;
+
+    const std::string& Name() const override { return sName; }
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
+        if (config.isMember("QueueType")) {
+            std::string queueType = config["QueueType"].asString();
+            if (queueType == "COUNT_BOUNDED") {
+                mQueueType = QueueType::COUNT_BOUNDED;
+            } else if (queueType == "CIRCULAR") {
+                mQueueType = QueueType::CIRCULAR;
+            } else if (queueType == "BYTES_BOUNDED") {
+                mQueueType = QueueType::BYTES_BOUNDED;
+            }
+        }
+        auto processor = PluginRegistry::GetInstance()->CreateProcessor(
+            ProcessorInnerMock::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        processor->Init(Json::Value(), *mContext);
+        mInnerProcessors.emplace_back(std::move(processor));
+        return true;
+    }
+    bool Start() override { return true; }
+    bool Stop([[maybe_unused]] bool isPipelineRemoving) override {
+        while (mBlockFlag) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        return true;
+    }
+    QueueType GetProcessQueueType() const override { return mQueueType; }
+
+    void Block() { mBlockFlag = true; }
+    void Unblock() { mBlockFlag = false; }
+
+    QueueType mQueueType = QueueType::COUNT_BOUNDED;
+
+private:
+    std::atomic_bool mBlockFlag = false;
+};
+
+const std::string InputSingletonMock2::sName = "input_singleton_mock_2";
+
+const std::string PROCESSOR_MOCK_LOCAL_CONTENT_KEY = "processor_mock_local_content_key";
+const std::string PROCESSOR_MOCK_LOCAL_CONTENT_VALUE = "processor_mock_local_content_value";
+
 class ProcessorMock : public Processor {
 public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override { return true; }
-    void Process(PipelineEventGroup& logGroup) override {
+    bool Init([[maybe_unused]] const Json::Value& config) override {
+        mLocalContentKey = PROCESSOR_MOCK_LOCAL_CONTENT_KEY;
+        mLocalContentValue = PROCESSOR_MOCK_LOCAL_CONTENT_VALUE;
+        return true;
+    }
+    void Process([[maybe_unused]] PipelineEventGroup& logGroup) override {
+        for (auto& e : logGroup.MutableEvents()) {
+            if (e.Is<LogEvent>()) {
+                auto& logEvent = e.Cast<LogEvent>();
+                logEvent.SetContentNoCopy(StringView(mLocalContentKey.data(), mLocalContentKey.size()),
+                                          StringView(mLocalContentValue.data(), mLocalContentValue.size()));
+            }
+        }
         while (mBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -105,9 +211,11 @@ public:
     uint32_t mCnt = 0;
 
 protected:
-    bool IsSupportedEvent(const PipelineEventPtr& e) const override { return true; };
+    bool IsSupportedEvent([[maybe_unused]] const PipelineEventPtr& e) const override { return true; };
 
     std::atomic_bool mBlockFlag = false;
+    std::string mLocalContentKey;
+    std::string mLocalContentValue;
 };
 
 const std::string ProcessorMock::sName = "processor_mock";
@@ -117,12 +225,12 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
-    bool Send(PipelineEventGroup&& g) override { return mIsValid; }
+    bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
     bool Flush(size_t key) override {
         mFlushedQueues.push_back(key);
         return true;
@@ -140,12 +248,12 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override {
+    bool Init([[maybe_unused]] const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) override {
         GenerateQueueKey("mock");
-        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
+        SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, "mock", *mContext);
         return true;
     }
-    bool Send(PipelineEventGroup&& g) override { return mIsValid; }
+    bool Send([[maybe_unused]] PipelineEventGroup&& g) override { return mIsValid; }
     bool Flush(size_t key) override {
         mFlushedQueues.push_back(key);
         return true;
@@ -154,7 +262,7 @@ public:
     bool BuildRequest(SenderQueueItem* item,
                       std::unique_ptr<HttpSinkRequest>& req,
                       bool* keepItem,
-                      std::string* errMsg) override {
+                      [[maybe_unused]] std::string* errMsg) override {
         if (item->mData == "invalid_keep") {
             *keepItem = true;
             return false;
@@ -167,7 +275,7 @@ public:
             "", false, "", 80, "", "", std::map<std::string, std::string>(), "", nullptr);
         return true;
     }
-    void OnSendDone(const HttpResponse& response, SenderQueueItem* item) override {}
+    void OnSendDone([[maybe_unused]] const HttpResponse& response, [[maybe_unused]] SenderQueueItem* item) override {}
 
     bool mIsValid = true;
     std::vector<size_t> mFlushedQueues;
@@ -180,14 +288,14 @@ public:
     static const std::string sName;
 
     const std::string& Name() const override { return sName; }
-    bool Init(const Json::Value& config) override {
+    bool Init([[maybe_unused]] const Json::Value& config) override {
         if (config.isMember("Valid")) {
             return config["Valid"].asBool();
         }
         return true;
     }
     void Start() override { mIsRunning = true; }
-    void Stop(bool isRemoving) { mIsRunning = false; }
+    void Stop([[maybe_unused]] bool isRemoving) override { mIsRunning = false; }
 
     bool mIsRunning = false;
 };
@@ -195,7 +303,10 @@ public:
 const std::string TaskMock::sName = "task_mock";
 
 void LoadPluginMock() {
-    PluginRegistry::GetInstance()->RegisterInputCreator(new StaticInputCreator<InputMock>());
+    PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputSingletonMock1>(), true);
+    PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputSingletonMock2>(), true);
+    PluginRegistry::GetInstance()->RegisterContinuousInputCreator(new StaticInputCreator<InputMock>());
+    PluginRegistry::GetInstance()->RegisterOnetimeInputCreator(new StaticInputCreator<InputMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorInnerMock>());
     PluginRegistry::GetInstance()->RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMock>());
     PluginRegistry::GetInstance()->RegisterFlusherCreator(new StaticFlusherCreator<FlusherMock>());

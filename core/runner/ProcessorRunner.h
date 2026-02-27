@@ -38,6 +38,7 @@ public:
         static ProcessorRunner instance;
         return &instance;
     }
+    static uint32_t GetThreadNo() { return sThreadNo; }
 
     void Init();
     void Stop();
@@ -59,6 +60,8 @@ private:
     uint32_t mThreadCount = 1;
     std::vector<std::future<void>> mThreadRes;
     std::atomic_bool mIsFlush = false;
+
+    thread_local static uint32_t sThreadNo;
 
     thread_local static MetricsRecordRef sMetricsRecordRef;
     thread_local static CounterPtr sInGroupsCnt;

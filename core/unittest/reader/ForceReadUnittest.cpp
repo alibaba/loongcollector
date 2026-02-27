@@ -33,6 +33,7 @@
 #include "file_server/event_handler/EventHandler.h"
 #include "logger/Logger.h"
 #include "unittest/Unittest.h"
+#include "unittest/UnittestHelper.h"
 
 using namespace std;
 
@@ -51,9 +52,10 @@ protected:
             logPathDir.resize(logPathDir.size() - 1);
         }
         logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "ForceReadUnittest";
+        logPathDir = NormalizeNativePath(logPathDir);
         utf8File = "utf8.txt";
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -72,6 +74,7 @@ protected:
         unique_ptr<CollectionConfig> config;
         unique_ptr<CollectionPipeline> pipeline;
 
+        std::string jsonLogPathDir = UnitTestHelper::JsonEscapeDirPath(NormalizeNativePath(logPathDir));
         // new pipeline
         configStr = R"(
             {
@@ -80,7 +83,7 @@ protected:
                         "Type": "input_file",
                         "FilePaths": [
                             ")"
-            + logPathDir + R"(/utf8.txt"
+            + jsonLogPathDir + R"(/utf8.txt"
                         ]
                     }
                 ],
@@ -99,7 +102,7 @@ protected:
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
-        config.reset(new CollectionConfig(mConfigName, std::move(configJson)));
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson), "/fake/path"));
         APSARA_TEST_TRUE(config->Parse());
         pipeline.reset(new CollectionPipeline());
         APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
@@ -116,7 +119,7 @@ protected:
         FileServer::GetInstance()->AddFileReaderConfig(mConfigName, &readerOpts, &ctx);
         FileServer::GetInstance()->AddMultilineConfig(mConfigName, &multilineOpts, &ctx);
         FileServer::GetInstance()->AddFileTagConfig(mConfigName, &tagOpts, &ctx);
-        ProcessQueueManager::GetInstance()->CreateOrUpdateBoundedQueue(0, 0, ctx);
+        ProcessQueueManager::GetInstance()->CreateOrUpdateCountBoundedQueue(0, 0, ctx);
         ProcessQueueManager::GetInstance()->EnablePop(mConfigName);
     }
 

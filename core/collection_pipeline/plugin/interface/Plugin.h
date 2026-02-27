@@ -36,8 +36,8 @@ public:
     bool HasContext() const { return mContext != nullptr; }
     void SetContext(CollectionPipelineContext& context) { mContext = &context; }
     MetricsRecordRef& GetMetricsRecordRef() const { return mMetricsRecordRef; }
-    void SetMetricsRecordRef(const std::string& name, const std::string& id) {
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    void CreateMetricsRecordRef(const std::string& name, const std::string& id) {
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef,
             MetricCategory::METRIC_CATEGORY_PLUGIN,
             {{METRIC_LABEL_KEY_PROJECT, mContext->GetProjectName()},
@@ -46,6 +46,8 @@ public:
              {METRIC_LABEL_KEY_PLUGIN_TYPE, name},
              {METRIC_LABEL_KEY_PLUGIN_ID, id}});
     }
+
+    void CommitMetricsRecordRef() { WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef); }
 
 protected:
     CollectionPipelineContext* mContext = nullptr;

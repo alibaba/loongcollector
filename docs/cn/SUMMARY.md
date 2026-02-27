@@ -41,11 +41,13 @@
   * [什么是输入插件](plugins/input/inputs.md)
   * 原生输入插件
     * [文本日志](plugins/input/native/input-file.md)
+    * [一次性文件采集](plugins/input/native/input-static-file-onetime.md)
     * [容器标准输出](plugins/input/native/input-container-stdio.md)
     * [eBPF网络可观测数据](plugins/input/native/input-network-observer.md)
     * [eBPF进程安全数据](plugins/input/native/input-process-security.md)
     * [eBPF网络安全数据](plugins/input/native/input-network-security.md)
     * [eBPF文件安全数据](plugins/input/native/input-file-security.md)
+    * [转发输入插件](plugins/input/native/input-forward.md)
     * [自监控指标数据](plugins/input/native/input-internal-metrics.md)
     * [自监控告警数据](plugins/input/native/input-internal-alarms.md)
   * 扩展输入插件
@@ -79,6 +81,7 @@
     * [分隔符解析](plugins/processor/native/processor-parse-delimiter-native.md)
     * [Json解析](plugins/processor/native/processor-parse-json-native.md)
     * [时间解析](plugins/processor/native/processor-parse-timestamp-native.md)
+    * [时间戳过滤](plugins/processor/native/processor-timestamp-filter-native.md)
     * [过滤](plugins/processor/native/processor-filter-regex-native.md)
     * [脱敏](plugins/processor/native/processor-desensitize-native.md)
   * 扩展处理插件
@@ -212,7 +215,6 @@
 
 * [使用介绍](config-server/usage-instructions.md)
 * [通信协议](config-server/communication-protocol.md)
-* [开发指南](config-server/config-server-developer-guide.md)
 
 ## 社区活动 <a href="#events" id="event"></a>
 
@@ -223,9 +225,7 @@
     * [iLogtail 数据吞吐性能优化](events/summer-ospp-2024/projects/summer-ospp-2024-projects-ilogtail-io.md)
     * [ConfigServer 能力升级 + 体验优化（全栈）](events/summer-ospp-2024/projects/summer-ospp-2024-projects-config-server.md)
 
-## Awesome iLogtail <a href="#awesome-ilogtail" id="awesome-ilogtail"></a>
+## Awesome LoongCollector <a href="#awesome-loongcollector" id="awesome-loongcollector"></a>
 
-* [走近iLogtail社区版](awesome-ilogtail/awesome-ilogtail.md)
-* [iLogtail社区版使用入门](awesome-ilogtail/awesome-ilogtail-getting-started.md)
-* [iLogtail社区版开发者指南](awesome-ilogtail/awesome-ilogtail-developer-guide.md)
-* [iLogtail社区版使用案例](awesome-ilogtail/awesome-ilogtail-use-cases.md)
+* [走近LoongCollector社区版](awesome-loongcollector/awesome-loongcollector.md)
+* [LoongCollector社区版开发使用经验](awesome-loongcollector/awesome-loongcollector-getting-started.md)

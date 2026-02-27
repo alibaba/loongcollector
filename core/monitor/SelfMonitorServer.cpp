@@ -24,15 +24,17 @@ using namespace std;
 
 namespace logtail {
 
-const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__metric__";
-const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__alarm__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
+const string SelfMonitorServer::INTERNAL_DATA_TYPE_CONTAINER = "__container__";
 
 SelfMonitorServer::SelfMonitorServer() {
 }
 
 SelfMonitorServer* SelfMonitorServer::GetInstance() {
-    static SelfMonitorServer* ptr = new SelfMonitorServer();
-    return ptr;
+    static SelfMonitorServer* sPtr = new SelfMonitorServer();
+    return sPtr;
 }
 
 void SelfMonitorServer::Init() {
@@ -114,7 +116,6 @@ void SelfMonitorServer::SendMetrics() {
 
     PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
     pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-    pipelineEventGroup.SetTag(LOG_RESERVED_KEY_TOPIC, INTERNAL_DATA_TYPE_METRIC); // todo: delete this tag
     pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, INTERNAL_DATA_TYPE_METRIC);
     ReadAsPipelineEventGroup(pipelineEventGroup);
 
@@ -154,8 +155,9 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
         } else if (event.mCategory == MetricCategory::METRIC_CATEGORY_PLUGIN_SOURCE) {
             shouldSkip = !ProcessSelfMonitorMetricEvent(event, mSelfMonitorMetricRules->mPluginSourceMetricsRule);
         }
-        if (shouldSkip)
+        if (shouldSkip) {
             continue;
+        }
 
         if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
             mSelfMonitorMetricEventMap[event.mKey].Merge(event);
@@ -211,6 +213,48 @@ void SelfMonitorServer::SendAlarms() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
+}
+
+void SelfMonitorServer::SendTaskStatus() {
+    // metadata:
+    // INTERNAL_DATA_TARGET_REGION:${region}
+    // INTERNAL_DATA_TYPE:__task_status__
+    vector<PipelineEventGroup> pipelineEventGroupList;
+    {
+        std::lock_guard<std::mutex> lock(mTaskStatusMutex);
+        for (auto& [key, pipelineEventGroup] : mTaskStatusMap) {
+            if (pipelineEventGroup.GetEvents().size() <= 0) {
+                continue;
+            }
+            pipelineEventGroupList.emplace_back(std::move(pipelineEventGroup));
+        }
+        mTaskStatusMap.clear();
+    }
+
+    ReadLock lock(mAlarmPipelineMux);
+    if (mAlarmPipelineCtx == nullptr) {
+        return;
+    }
+
+    for (auto& pipelineEventGroup : pipelineEventGroupList) {
+        if (pipelineEventGroup.GetEvents().size() > 0) {
+            ProcessorRunner::GetInstance()->PushQueue(
+                mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
+        }
+    }
+}
+
+LogEvent* SelfMonitorServer::AddTaskStatus(const std::string& region) {
+    std::lock_guard<std::mutex> lock(mTaskStatusMutex);
+    if (mTaskStatusMap.find(region) == mTaskStatusMap.end()) {
+        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
+        // metadata for flusher (region, dataType)
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                       SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS);
+        mTaskStatusMap.emplace(region, std::move(pipelineEventGroup));
+    }
+    return mTaskStatusMap.at(region).AddLogEvent();
 }
 
 } // namespace logtail

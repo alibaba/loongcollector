@@ -22,17 +22,7 @@ public:
                   size_t inputIndex,
                   std::string hash,
                   EventPool* eventPool,
-                  std::chrono::system_clock::time_point scrapeTime)
-        : mEventGroup(PipelineEventGroup(std::make_shared<SourceBuffer>())),
-          mHash(std::move(hash)),
-          mEventPool(eventPool),
-          mQueueKey(queueKey),
-          mInputIndex(inputIndex),
-          mTargetLabels(std::move(labels)) {
-        mScrapeTimestampMilliSec
-            = std::chrono::duration_cast<std::chrono::milliseconds>(scrapeTime.time_since_epoch()).count();
-    }
-
+                  std::chrono::system_clock::time_point scrapeTime);
     static size_t MetricWriteCallback(char* buffer, size_t size, size_t nmemb, void* data);
     void FlushCache();
     void SendMetrics();
@@ -40,6 +30,7 @@ public:
     void SetAutoMetricMeta(double scrapeDurationSeconds, bool upState, const std::string& scrapeState);
 
     size_t mRawSize = 0;
+    static size_t mMaxSampleLength;
     uint64_t mStreamIndex = 0;
 
 private:

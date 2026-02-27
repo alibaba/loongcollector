@@ -3,13 +3,13 @@ package setup
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/controller"
@@ -26,6 +26,7 @@ type DockerComposeEnv struct {
 func SetDockerComposeBootType(t dockercompose.BootType) error {
 	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
 		if t != dockercompose.DockerComposeBootTypeE2E && t != dockercompose.DockerComposeBootTypeBenchmark {
+			logger.Error(context.Background(), "BOOT_LOAD_ALARM", "err", "invalid docker compose boot type, not e2e or benchmark")
 			return fmt.Errorf("invalid docker compose boot type, not e2e or benchmark")
 		}
 		dockerComposeEnv.BootType = t
@@ -37,17 +38,20 @@ func SetDockerComposeBootType(t dockercompose.BootType) error {
 func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.Context, error) {
 	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
 		path := dependencyHome + "/" + dependencyName
-		err := config.Load(path, config.TestConfig.Profile)
+		err := config.Load(path)
 		if err != nil {
+			logger.Error(ctx, "LOAD_CONFIG_ALARM", "err", err)
 			return ctx, err
 		}
 		dockerComposeEnv.BootController = new(controller.BootController)
 		if err = dockerComposeEnv.BootController.Init(dockerComposeEnv.BootType); err != nil {
+			logger.Error(ctx, "BOOT_INIT_ALARM", "err", err)
 			return ctx, err
 		}
 
 		startTime := time.Now().Unix()
 		if err = dockerComposeEnv.BootController.Start(ctx); err != nil {
+			logger.Error(ctx, "BOOT_START_ALARM", "err", err)
 			return ctx, err
 		}
 		return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
@@ -60,6 +64,7 @@ func SetDockerComposeDependOn(ctx context.Context, dependOnContainers string) (c
 		containers := make([]string, 0)
 		err := yaml.Unmarshal([]byte(dependOnContainers), &containers)
 		if err != nil {
+			logger.Error(ctx, "LOAD_CONFIG_ALARM", "err", err)
 			return ctx, err
 		}
 		ctx = context.WithValue(ctx, config.DependOnContainerKey, containers)
@@ -104,9 +109,8 @@ func ExposePort(ctx context.Context, source, target string) (context.Context, er
 func NewDockerComposeEnv() *DockerComposeEnv {
 	env := &DockerComposeEnv{}
 	root, _ := filepath.Abs(".")
-	reportDir := root + "/report/"
-	_ = os.Mkdir(reportDir, 0750)
-	config.ConfigDir = reportDir + "config"
+	config.ConfigDir = root + "/config"
+	config.OnetimeConfigDir = root + "/onetime_pipeline_config"
 	env.BootType = dockercompose.DockerComposeBootTypeE2E
 	return env
 }
@@ -126,18 +130,18 @@ func (d *DockerComposeEnv) Clean() error {
 
 func (d *DockerComposeEnv) ExecOnLoongCollector(command string) (string, error) {
 	// exec on host of docker compose
-	fmt.Println(command)
+	logger.Info(context.Background(), "ExecOnLoongCollector", command)
 	cmd := exec.Command("sh", "-c", command)
 	output, err := cmd.CombinedOutput()
-	fmt.Println(string(output))
+	logger.Info(context.Background(), "ExecOnLoongCollector", command, "output", string(output))
 	return string(output), err
 }
 
 func (d *DockerComposeEnv) ExecOnSource(ctx context.Context, command string) (string, error) {
 	// exec on host of docker compose
-	fmt.Println(command)
+	logger.Info(ctx, "ExecOnSource", command)
 	cmd := exec.Command("sh", "-c", command)
 	output, err := cmd.CombinedOutput()
-	fmt.Println(string(output))
+	logger.Info(ctx, "ExecOnSource", command, "output", string(output))
 	return string(output), err
 }

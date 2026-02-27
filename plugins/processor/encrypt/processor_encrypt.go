@@ -111,7 +111,7 @@ func (p *ProcessorEncrypt) processLog(log *protocol.Log) {
 		if err == nil {
 			cont.Value = hex.EncodeToString(ciphertext)
 		} else {
-			logger.Errorf(p.context.GetRuntimeContext(), defaultAlarmType, "encrypt field %v error: %v", cont.Key, err)
+			logger.Warningf(p.context.GetRuntimeContext(), defaultAlarmType, "encrypt field %v error: %v", cont.Key, err)
 			if !p.KeepSourceValueIfError {
 				cont.Value = encryptErrorText
 			}

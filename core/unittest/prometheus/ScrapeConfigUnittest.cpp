@@ -1,6 +1,7 @@
 
 #include <cstdio>
 
+#include <chrono>
 #include <string>
 
 #include "JsonUtil.h"
@@ -22,6 +23,8 @@ public:
     void TestScrapeProtocols();
     void TestEnableCompression();
     void TestTLS();
+    void TestTokenUpdate();
+    void TestHostOnlyMode();
 
 private:
     void SetUp() override;
@@ -120,8 +123,7 @@ void ScrapeConfigUnittest::TestInit() {
 
     // scrape protocols
     APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Accept"],
-                      "text/plain;version=0.0.4;q=0.4,application/"
-                      "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.3,"
+                      "text/plain;version=0.0.4;q=0.3,"
                       "application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1");
 
     // follow redirects
@@ -238,6 +240,30 @@ void ScrapeConfigUnittest::TestBasicAuth() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     APSARA_TEST_FALSE(scrapeConfig.Init(config));
+
+    scrapeConfig.mRequestHeaders.clear();
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "basic_auth": {
+                "username_file": "prom_password.file",
+                "password_file": "prom_password.file"
+            }
+        })JSON";
+
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"],
+                      "Basic dGVzdF9wYXNzd29yZC5maWxlOnRlc3RfcGFzc3dvcmQuZmlsZQ==");
+
+    OverwriteFile(mFilePath, "new key");
+    scrapeConfig.mRequestHeaders.clear();
+    // update true
+    APSARA_TEST_TRUE(scrapeConfig.UpdateAuthorization());
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Basic bmV3IGtleTpuZXcga2V5");
 }
 
 void ScrapeConfigUnittest::TestAuthorization() {
@@ -281,6 +307,14 @@ void ScrapeConfigUnittest::TestAuthorization() {
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
     APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer " + mKey);
+
+    // update false
+    APSARA_TEST_FALSE(scrapeConfig.UpdateAuthorization());
+    OverwriteFile(mFilePath, "new key");
+    // update true
+    scrapeConfig.mLastUpdateTime = chrono::system_clock::now() - chrono::seconds(301);
+    APSARA_TEST_TRUE(scrapeConfig.UpdateAuthorization());
+    APSARA_TEST_EQUAL(scrapeConfig.mRequestHeaders["Authorization"], "Bearer new key");
 }
 
 void ScrapeConfigUnittest::TestScrapeProtocols() {
@@ -300,11 +334,11 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(
-        "text/plain;version=0.0.4;q=0.5,application/"
-        "vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.4,application/"
-        "openmetrics-text;version=0.0.1;q=0.3,application/openmetrics-text;version=1.0.0;q=0.2,*/*;q=0.1",
-        scrapeConfig.mRequestHeaders["Accept"]);
+    APSARA_TEST_EQUAL("text/plain;version=0.0.4;q=0.4,"
+                      "application/openmetrics-text;version=0.0.1;q=0.3,"
+                      "application/openmetrics-text;version=1.0.0;q=0.2,"
+                      "*/*;q=0.1",
+                      scrapeConfig.mRequestHeaders["Accept"]);
 
     // custom quality protocols
     configStr = R"JSON({
@@ -318,11 +352,9 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
     APSARA_TEST_TRUE(scrapeConfig.Init(config));
-    APSARA_TEST_EQUAL(
-        "application/vnd.google.protobuf;proto=io.prometheus.client.MetricFamily;encoding=delimited;q=0.5,"
-        "application/openmetrics-text;version=1.0.0;q=0.4,"
-        "text/plain;version=0.0.4;q=0.3,application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1",
-        scrapeConfig.mRequestHeaders["Accept"]);
+    APSARA_TEST_EQUAL("application/openmetrics-text;version=1.0.0;q=0.4,"
+                      "text/plain;version=0.0.4;q=0.3,application/openmetrics-text;version=0.0.1;q=0.2,*/*;q=0.1",
+                      scrapeConfig.mRequestHeaders["Accept"]);
 
     // only prometheus0.0.4 protocols
     configStr = R"JSON({
@@ -350,7 +382,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 
     // OpenMetricsText1.0.0 duplication error
     configStr = R"JSON({
@@ -364,7 +396,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 
     // protocols invalid
     configStr = R"JSON({
@@ -392,7 +424,7 @@ void ScrapeConfigUnittest::TestScrapeProtocols() {
 
     APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
     scrapeConfig.mRequestHeaders.clear();
-    APSARA_TEST_FALSE(scrapeConfig.Init(config));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
 }
 
 void ScrapeConfigUnittest::TestEnableCompression() {
@@ -482,6 +514,94 @@ void ScrapeConfigUnittest::TestTLS() {
     APSARA_TEST_EQUAL(false, scrapeConfig.mTLS.mInsecureSkipVerify);
 }
 
+void ScrapeConfigUnittest::TestHostOnlyMode() {
+    Json::Value config;
+    ScrapeConfig scrapeConfig;
+    string errorMsg;
+    string configStr;
+
+    // valid config
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "host_only_mode": true,
+            "static_configs": [
+                {
+                    "targets": ["localhost:9090"],
+                    "labels": {
+                        "test_label": "test_value"
+                    }
+                }
+            ]
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig.Init(config));
+    APSARA_TEST_EQUAL(true, scrapeConfig.mHostOnlyMode);
+    APSARA_TEST_EQUAL(1, scrapeConfig.mHostOnlyConfigs.size());
+    APSARA_TEST_EQUAL(1, scrapeConfig.mHostOnlyConfigs[0].mTargets.size());
+    APSARA_TEST_TRUE(scrapeConfig.mHostOnlyConfigs[0].mTargets.find("localhost:9090")
+                     != scrapeConfig.mHostOnlyConfigs[0].mTargets.end());
+    APSARA_TEST_EQUAL("test_value", scrapeConfig.mHostOnlyConfigs[0].mLabels.Get("test_label"));
+
+    ScrapeConfig scrapeConfig1;
+    // empty static configs config
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "host_only_mode": true,
+            "static_configs": []
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_FALSE(scrapeConfig1.Init(config));
+    APSARA_TEST_EQUAL(true, scrapeConfig1.mHostOnlyMode);
+    APSARA_TEST_EQUAL(0, scrapeConfig1.mHostOnlyConfigs.size());
+
+    ScrapeConfig scrapeConfig2;
+    // multi static configs config
+    configStr = R"JSON({
+            "job_name": "test_job",
+            "scrape_interval": "30s",
+            "scrape_timeout": "30s",
+            "metrics_path": "/metrics",
+            "scheme": "http",
+            "host_only_mode": true,
+            "static_configs": [
+                {
+                    "targets": ["localhost:9090", "localhost:9091"],
+                    "labels": {
+                        "test_label": "test_value"
+                    }
+                },
+                {
+                    "targets": ["localhost:9092"],
+                    "labels": {
+                        "test_label": "test_value_2"
+                    }
+                }
+            ]
+        })JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(scrapeConfig2.Init(config));
+    APSARA_TEST_EQUAL(true, scrapeConfig2.mHostOnlyMode);
+    APSARA_TEST_EQUAL(2, scrapeConfig2.mHostOnlyConfigs.size());
+    APSARA_TEST_EQUAL(2, scrapeConfig2.mHostOnlyConfigs[0].mTargets.size());
+    APSARA_TEST_TRUE(scrapeConfig2.mHostOnlyConfigs[0].mTargets.find("localhost:9090")
+                     != scrapeConfig2.mHostOnlyConfigs[0].mTargets.end());
+    APSARA_TEST_TRUE(scrapeConfig2.mHostOnlyConfigs[0].mTargets.find("localhost:9091")
+                     != scrapeConfig2.mHostOnlyConfigs[0].mTargets.end());
+    APSARA_TEST_EQUAL("test_value", scrapeConfig2.mHostOnlyConfigs[0].mLabels.Get("test_label"));
+    APSARA_TEST_EQUAL(1, scrapeConfig2.mHostOnlyConfigs[1].mTargets.size());
+    APSARA_TEST_TRUE(scrapeConfig2.mHostOnlyConfigs[1].mTargets.find("localhost:9092")
+                     != scrapeConfig2.mHostOnlyConfigs[1].mTargets.end());
+    APSARA_TEST_EQUAL("test_value_2", scrapeConfig2.mHostOnlyConfigs[1].mLabels.Get("test_label"));
+}
+
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestInit);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuth);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestBasicAuth);
@@ -489,6 +609,7 @@ UNIT_TEST_CASE(ScrapeConfigUnittest, TestAuthorization);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestScrapeProtocols);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestEnableCompression);
 UNIT_TEST_CASE(ScrapeConfigUnittest, TestTLS);
+UNIT_TEST_CASE(ScrapeConfigUnittest, TestHostOnlyMode);
 
 } // namespace logtail
 

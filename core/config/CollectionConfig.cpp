@@ -46,7 +46,9 @@ static string UnescapeDollar(string::const_iterator beginIt, string::const_itera
 
 static bool ReplaceEnvVarRefInStr(const string& inStr, string& outStr) {
     string::const_iterator lastMatchEnd = inStr.begin();
-    static boost::regex reg(R"((?<!\$)\${([\w]+)(:(.*?))?(?<!\$)})");
+    // Prometheus 使用 $1, $2, ${1}, ${2} ... 作为采集配置 relabel replacement
+    // 的占位符，所以在进行环境变量替换时，需要排除这些占位符。 因此不再匹配纯数字作为环境变量名。
+    static boost::regex reg(R"((?<!\$)\${([\w]*[a-zA-Z_][\w]*)(:(.*?))?(?<!\$)})");
     boost::regex_iterator<string::const_iterator> it{inStr.begin(), inStr.end(), reg};
     boost::regex_iterator<string::const_iterator> end;
     if (it == end) {
@@ -133,11 +135,15 @@ bool CollectionConfig::Parse() {
                 sLogger, alarm, "global module is not of type object", noModule, mName, mProject, mLogstore, mRegion);
         }
         mGlobal = itr;
+        if (!GetExpireTimeIfOneTime(*mGlobal)) {
+            return false;
+        }
     }
 
     // inputs, processors and flushers module must be parsed first and parsed by order, since aggregators and
     // extensions module parsing will rely on their results.
     bool hasFileInput = false;
+    bool hasSecurityInput = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -194,7 +200,7 @@ bool CollectionConfig::Parse() {
         }
         const string pluginType = it->asString();
         // when input is singleton, there should only one input to simpify config load transaction
-        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType)) {
+        if (PluginRegistry::GetInstance()->IsGlobalSingletonInputPlugin(pluginType, IsOnetime())) {
             mSingletonInput = pluginType;
             if (itr->size() > 1) {
                 PARAM_ERROR_RETURN(sLogger,
@@ -210,7 +216,7 @@ bool CollectionConfig::Parse() {
         if (i == 0) {
             if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                 mHasGoInput = true;
-            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
+            } else if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                 mHasNativeInput = true;
             } else {
                 PARAM_ERROR_RETURN(
@@ -218,7 +224,7 @@ bool CollectionConfig::Parse() {
             }
         } else {
             if (mHasGoInput) {
-                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
+                if (PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                     PARAM_ERROR_RETURN(sLogger,
                                        alarm,
                                        "native and extended input plugins coexist",
@@ -241,7 +247,7 @@ bool CollectionConfig::Parse() {
                                        mProject,
                                        mLogstore,
                                        mRegion);
-                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType)) {
+                } else if (!PluginRegistry::GetInstance()->IsValidNativeInputPlugin(pluginType, IsOnetime())) {
                     PARAM_ERROR_RETURN(
                         sLogger, alarm, "unsupported input plugin", pluginType, mName, mProject, mLogstore, mRegion);
                 }
@@ -250,15 +256,20 @@ bool CollectionConfig::Parse() {
         mInputs.push_back(&plugin);
 #ifndef APSARA_UNIT_TEST_MAIN
         // TODO: remove these special restrictions
-        if (pluginType == "input_file" || pluginType == "input_container_stdio") {
+        if (pluginType == "input_file" || pluginType == "input_container_stdio"
+            || pluginType == "input_static_file_onetime") {
             hasFileInput = true;
         }
 #else
         // TODO: remove these special restrictions after all C++ inputs support Go processors
-        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos) {
+        if (pluginType.find("input_file") != string::npos || pluginType.find("input_container_stdio") != string::npos
+            || pluginType.find("input_static_file_onetime") != string::npos) {
             hasFileInput = true;
         }
 #endif
+        if (pluginType.find("_security") != string::npos) {
+            hasSecurityInput = true;
+        }
     }
     // TODO: remove these special restrictions
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -347,11 +358,11 @@ bool CollectionConfig::Parse() {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
-                        if (!hasFileInput) {
+                        if (!hasFileInput && !hasSecurityInput) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
                                                "extended processor plugins coexist with native input plugins other "
-                                               "than input_file or input_container_stdio",
+                                               "than input_file or input_container_stdio or input_*_security",
                                                noModule,
                                                mName,
                                                mProject,
@@ -476,11 +487,11 @@ bool CollectionConfig::Parse() {
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
-            if (mHasNativeInput && !hasFileInput) {
+            if (mHasNativeInput && !hasFileInput && !hasSecurityInput) {
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
                                    "extended flusher plugins coexist with native input plugins other than "
-                                   "input_file or input_container_stdio",
+                                   "input_file or input_container_stdio or input_*_security",
                                    noModule,
                                    mName,
                                    mProject,

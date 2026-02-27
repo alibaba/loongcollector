@@ -17,8 +17,11 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为processor\_filter\_regex\_native。  |
-|  FilterKey  |  \[string\]  |  是  |  /  |  过滤字段名，需配套`FilterRegex`参数使用，表示如果当前事件要被采集，则key指定的字段内容所需要满足的条件。多个条件之间为“且”的关系，仅当所有条件均满足时，该条日志才会被采集。  |
-|  FilterRegex  |  \[string\]  |  是  |  /  |  与`FilterKey`对应的过滤正则表达式。必须与`FilterKey`长度相同。  |
+|  ConditionExp  |  object  |  否  |  /  |  **实验功能！**条件表达式，高优先级，存在时将忽略下列参数。格式形如：`{"operator":"and","operands":[{"key":"k1","type":"regex","exp":"v1"},{"key":"k2","type":"regex","exp":"v2"}]}`。支持 `not`/`and`/`or` 与 `regex`。 |
+| FilterKey | []string | 是 | / | 过滤字段名，需配套`FilterRegex`参数使用，表示如果当前事件要被采集，则key指定的字段内容所需要满足的条件。多个条件之间为“且”的关系，仅当所有条件均满足时，该条日志才会被采集。 |
+| FilterRegex | []string | 是 | / | 与`FilterKey`对应的过滤正则表达式。必须与`FilterKey`长度相同。 |
+|  Include  |  map[string]string  |  否  |  /  |  `FilterKey`与`FilterRegex`另一种写法，键为字段名，值为正则表达式。  |
+|  DiscardingNonUTF8  |  bool  |  否  |  false  |  是否将字段中的非 UTF-8 字节替换为空格（键与值都会检查）。  |
 
 ## 样例
 

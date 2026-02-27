@@ -23,10 +23,14 @@ namespace logtail {
 extern const std::string LOGSTORES;
 extern const std::string METRICSTORES;
 extern const std::string HEALTH;
+extern const std::string HOSTMETRICS;
 
 extern const std::string APM_METRICS_URL;
 extern const std::string APM_TRACES_URL;
 extern const std::string APM_AGENTINFOS_URL;
+
+extern const std::string CMS_HEADER_WORKSPACE;
+extern const std::string APM_HEADER_PROJECT;
 
 extern const std::string CONTENT_MD5;
 
@@ -38,11 +42,13 @@ extern const std::string ACS_HEADER_PREFIX;
 extern const std::string X_LOG_KEYPROVIDER;
 extern const std::string X_LOG_APIVERSION;
 extern const std::string X_LOG_COMPRESSTYPE;
+extern const std::string X_LOG_PROJECT;
 extern const std::string X_LOG_BODYRAWSIZE;
 extern const std::string X_LOG_SIGNATUREMETHOD;
 extern const std::string X_LOG_MODE;
 extern const std::string X_LOG_HOSTIP;
 extern const std::string X_LOG_REQUEST_ID;
+extern const std::string X_ACS_SECURITY_TOKEN;
 
 extern const std::string LOG_HEADSIGNATURE_PREFIX;
 extern const std::string LOG_API_VERSION;

@@ -24,11 +24,12 @@
 package agent
 
 import (
+	reflect "reflect"
+	sync "sync"
+
 	common "github.com/alibaba/ilogtail/plugins/input/skywalkingv2/skywalking/apm/network/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	reflect "reflect"
-	sync "sync"
 )
 
 const (
@@ -305,11 +306,11 @@ type MemoryPool struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Type     PoolType `protobuf:"varint,1,opt,name=type,proto3,enum=PoolType" json:"type,omitempty"`
-	Init     int64    `protobuf:"varint,2,opt,name=init,proto3" json:"init,omitempty"`
-	Max      int64    `protobuf:"varint,3,opt,name=max,proto3" json:"max,omitempty"`
-	Used     int64    `protobuf:"varint,4,opt,name=used,proto3" json:"used,omitempty"`
-	Commited int64    `protobuf:"varint,5,opt,name=commited,proto3" json:"commited,omitempty"`
+	Type      PoolType `protobuf:"varint,1,opt,name=type,proto3,enum=PoolType" json:"type,omitempty"`
+	Init      int64    `protobuf:"varint,2,opt,name=init,proto3" json:"init,omitempty"`
+	Max       int64    `protobuf:"varint,3,opt,name=max,proto3" json:"max,omitempty"`
+	Used      int64    `protobuf:"varint,4,opt,name=used,proto3" json:"used,omitempty"`
+	Committed int64    `protobuf:"varint,5,opt,name=committed,proto3" json:"committed,omitempty"`
 }
 
 func (x *MemoryPool) Reset() {
@@ -374,7 +375,7 @@ func (x *MemoryPool) GetUsed() int64 {
 
 func (x *MemoryPool) GetCommited() int64 {
 	if x != nil {
-		return x.Commited
+		return x.Committed
 	}
 	return 0
 }

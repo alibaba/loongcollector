@@ -44,7 +44,7 @@ public:
     void DecreaseHttpSendingCnt();
 
     // TODO: should be private
-    void PushToHttpSink(SenderQueueItem* item, bool withLimit = true);
+    bool PushToHttpSink(SenderQueueItem* item, bool withLimit = true);
 
     int32_t GetSendingBufferCount() { return mHttpSendingCnt.load(); }
 
@@ -53,7 +53,7 @@ private:
     ~FlusherRunner() = default;
 
     void Run();
-    void Dispatch(SenderQueueItem* item);
+    bool Dispatch(SenderQueueItem* item);
     bool LoadModuleConfig(bool isInit);
     void UpdateSendFlowControl();
 
@@ -76,6 +76,8 @@ private:
     CounterPtr mInItemDataSizeBytes;
     CounterPtr mInItemRawDataSizeBytes;
     CounterPtr mOutItemsTotal;
+    CounterPtr mOutItemDataSizeBytes;
+    CounterPtr mOutItemRawDataSizeBytes;
     TimeCounterPtr mTotalDelayMs;
     IntGaugePtr mWaitingItemsTotal;
     IntGaugePtr mLastRunTime;

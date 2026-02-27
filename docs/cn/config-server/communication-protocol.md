@@ -1,6 +1,6 @@
 # 通信协议
 
-由iLogtail社区联合哔哩哔哩共同建设。服从HTTP/HTTPS协议。
+由 LoongCollector 社区联合哔哩哔哩共同建设。服从HTTP/HTTPS协议。
 
 ## 通用参数
 

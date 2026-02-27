@@ -46,9 +46,8 @@ function check_docker_buildkit_support {
   echo "$support"
 }
 
-# Currently, there are 4 supported docker categories, which are goc, build, development and production.
+# Currently, there are 4 supported docker categories, which are build, development and production.
 #
-# goc: build goc server with Dockerfile_doc
 # build: build core or plugin binary with Dockerfile_build
 # development: build ilogtail development images.
 # production: build ilogtail production images.
@@ -90,7 +89,7 @@ else
   REMOVE_SSH_MOUNT='sed s/--mount=type=ssh//'
 fi
 
-if [[ $CATEGORY = "goc" || $CATEGORY = "build" ]]; then
+if [[ $CATEGORY = "build" ]]; then
     cat $ROOTDIR/docker/Dockerfile_$CATEGORY | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
 elif [[ $CATEGORY = "development" ]]; then
     cat $ROOTDIR/docker/Dockerfile_build | grep -v "^#" | sed "s/$CN_REGION/$REG_REGION/" | $REMOVE_SSH_MOUNT >> $GEN_DOCKERFILE;
@@ -112,22 +111,25 @@ if [[ $CATEGORY != "multi-arch-production" ]]; then
         --build-arg HOST_OS="$HOST_OS" \
         -t "$REPOSITORY":"$VERSION" \
         --no-cache -f $GEN_DOCKERFILE .
+    if [[ $PUSH = "true" ]]; then
+        echo "COMMAND:"
+        echo "docker push $REPOSITORY:$VERSION"
+        if [[ $VERSION = "latest" ]]; then
+            echo "Current operation is so dangerous, you should push by yourself !!!"
+        else
+            docker push "$REPOSITORY:$VERSION"
+        fi
+    fi
 else
+    OUTPUT_OPTION="-o type=docker"
+    if [[ "$PUSH" = "true" ]]; then
+        OUTPUT_OPTION="-o type=registry"
+    fi
     docker buildx build --platform linux/amd64,linux/arm64 \
         $BUILD_SSH_OPTS \
         --build-arg VERSION="$VERSION" \
         --build-arg HOST_OS="$HOST_OS" \
-        -t "$REPOSITORY":edge \
-        -o type=registry \
+        -t "$REPOSITORY":"$VERSION" \
+        $OUTPUT_OPTION \
         --no-cache -f $GEN_DOCKERFILE .
-fi
-
-if [[ $PUSH = "true" && $CATEGORY != "multi-arch-production" ]]; then
-    echo "COMMAND:"
-    echo "docker push $REPOSITORY:$VERSION"
-    if [[ $VERSION = "latest" ]]; then
-        echo "Current operation is so dangerous, you should push by yourself !!!"
-    else
-        docker push "$REPOSITORY:$VERSION"
-    fi
 fi

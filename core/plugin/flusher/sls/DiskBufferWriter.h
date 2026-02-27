@@ -57,6 +57,7 @@ public:
 
 private:
     static const int32_t BUFFER_META_BASE_SIZE;
+    static const size_t BUFFER_META_MAX_SIZE;
 
     struct EncryptionStateMeta {
         int32_t mLogDataSize;
@@ -73,8 +74,11 @@ private:
     void BufferWriterThread();
     void BufferSenderThread();
 
-    SLSResponse
-    SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta, const std::string& logData, std::string& host);
+    SLSResponse SendBufferFileData(const sls_logs::LogtailBufferMeta& bufferMeta,
+                                   const std::string& logData,
+                                   std::string& domain,
+                                   std::string& ip,
+                                   bool useIPFlag);
     bool SendToBufferFile(SenderQueueItem* dataPtr);
     bool LoadFileToSend(time_t timeLine, std::vector<std::string>& filesToSend);
     bool CreateNewFile();
@@ -91,6 +95,7 @@ private:
     std::string GetBufferFileName();
     void SetBufferFileName(const std::string& filename);
     std::string GetBufferFileHeader();
+    bool CheckBufferMetaValidation(const std::string& filename, const sls_logs::LogtailBufferMeta& bufferMeta);
 
     SafeQueue<SenderQueueItem*> mQueue;
 
@@ -104,19 +109,19 @@ private:
 
 #ifdef __ENTERPRISE__
     struct PointerHash {
-        std::size_t operator()(const std::shared_ptr<CandidateHostsInfo>& ptr) const {
-            return std::hash<CandidateHostsInfo*>()(ptr.get());
+        std::size_t operator()(const std::shared_ptr<CandidateDomainsInfo>& ptr) const {
+            return std::hash<CandidateDomainsInfo*>()(ptr.get());
         }
     };
 
     struct PointerEqual {
-        bool operator()(const std::shared_ptr<CandidateHostsInfo>& lhs,
-                        const std::shared_ptr<CandidateHostsInfo>& rhs) const {
+        bool operator()(const std::shared_ptr<CandidateDomainsInfo>& lhs,
+                        const std::shared_ptr<CandidateDomainsInfo>& rhs) const {
             return lhs.get() == rhs.get();
         }
     };
 
-    std::unordered_set<std::shared_ptr<CandidateHostsInfo>, PointerHash, PointerEqual> mCandidateHostsInfos;
+    std::unordered_set<std::shared_ptr<CandidateDomainsInfo>, PointerHash, PointerEqual> mCandidateDomainsInfos;
 #endif
 
     mutable std::mutex mBufferFileLock;

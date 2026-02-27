@@ -16,13 +16,14 @@ package dockercompose
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"path/filepath"
 
-	"github.com/docker/docker/api/types"
-	dockertypes "github.com/docker/docker/api/types"
+	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
-	"github.com/testcontainers/testcontainers-go"
+	composeModule "github.com/testcontainers/testcontainers-go/modules/compose"
 	"gopkg.in/yaml.v3"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
@@ -31,9 +32,9 @@ import (
 
 const (
 	benchmarkIdentifier = "benchmark"
-	cadvisorTemplate    = `version: '3.8'
+	cadvisorTemplate    = `
 services:
-  cadvisor:
+  cadvisor-%s:
     image: gcr.io/cadvisor/cadvisor:v0.49.1
     volumes:
       - /:/rootfs:ro
@@ -65,7 +66,7 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 	if err := c.createComposeFile(); err != nil {
 		return err
 	}
-	compose := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).WithCommand([]string{"up", "-d", "--build"})
+	compose := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).WithCommand([]string{"up", "-d", "--build"})
 	strategyWrappers := withExposedService(compose)
 	execError := compose.Invoke()
 	if execError.Error != nil {
@@ -79,7 +80,7 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 	}
 	c.cli = cli
 
-	list, err := cli.ContainerList(context.Background(), types.ContainerListOptions{
+	list, err := cli.ContainerList(context.Background(), containertypes.ListOptions{
 		Filters: filters.NewArgs(filters.Arg("name", "benchmark-cadvisor")),
 	})
 	if len(list) != 1 {
@@ -103,10 +104,10 @@ func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
 }
 
 func (c *ComposeBenchmarkBooter) Stop() error {
-	execError := testcontainers.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
+	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, benchmarkIdentifier).Down()
 	if execError.Error != nil {
 		logger.Error(context.Background(), "STOP_DOCKER_COMPOSE_ERROR",
-			"stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
+			"err", execError.Error.Error())
 		return execError.Error
 	}
 	_ = os.Remove(config.CaseHome + finalFileName)
@@ -114,7 +115,7 @@ func (c *ComposeBenchmarkBooter) Stop() error {
 }
 
 func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
-	cfg := dockertypes.ExecConfig{
+	cfg := containertypes.ExecOptions{
 		User: "root",
 		Cmd:  cmd,
 	}
@@ -123,7 +124,7 @@ func (c *ComposeBenchmarkBooter) exec(id string, cmd []string) error {
 		logger.Errorf(context.Background(), "DOCKER_EXEC_ALARM", "cannot create exec config: %v", err)
 		return err
 	}
-	err = c.cli.ContainerExecStart(context.Background(), resp.ID, dockertypes.ExecStartCheck{
+	err = c.cli.ContainerExecStart(context.Background(), resp.ID, containertypes.ExecStartOptions{
 		Detach: false,
 		Tty:    false,
 	})
@@ -155,7 +156,7 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 			return err
 		}
 	}
-	cfg := c.getAdvisorConfig()
+	cfg := c.getAdvisorConfig(filepath.Base(filepath.Dir(config.CaseHome)))
 	services := cfg["services"].(map[string]interface{})
 	// merge docker compose file.
 	if len(bytes) > 0 {
@@ -176,11 +177,9 @@ func (c *ComposeBenchmarkBooter) createComposeFile() error {
 }
 
 // getLogtailpluginConfig find the docker compose configuration of the ilogtail.
-func (c *ComposeBenchmarkBooter) getAdvisorConfig() map[string]interface{} {
+func (c *ComposeBenchmarkBooter) getAdvisorConfig(name string) map[string]interface{} {
 	cfg := make(map[string]interface{})
-	f, _ := os.Create(config.CoverageFile)
-	_ = f.Close()
-	if err := yaml.Unmarshal([]byte(cadvisorTemplate), &cfg); err != nil {
+	if err := yaml.Unmarshal([]byte(fmt.Sprintf(cadvisorTemplate, name)), &cfg); err != nil {
 		panic(err)
 	}
 	bytes, _ := yaml.Marshal(cfg)

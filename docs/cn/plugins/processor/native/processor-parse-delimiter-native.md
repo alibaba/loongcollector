@@ -20,12 +20,13 @@
 |  SourceKey  |  string  |  是  |  /  |  源字段名。  |
 |  Separator  |  string  |  是  |  /  |  分隔符。  |
 |  Quote  |  string  |  否  |  "  |  引用符。  |
-|  Keys  |  \[string\]  |  是  |  /  |  提取的字段列表。  |
+|  Keys  |  []string  |  是  |  /  |  提取的字段列表。  |
 |  AllowingShortenedFields  |  bool  |  否  |  true  |  是否允许提取的字段数量小于Keys的数量。若不允许，则此情景会被视为解析失败。  |
 |  OverflowedFieldsTreatment  |  string  |  否  |  extend  |  当提取的字段数量大于Keys的数量时的行为。可选值包括：<ul><li>extend：保留多余的字段，且每个多余的字段都作为单独的一个字段加入日志，多余字段的字段名为\_\_column$i\_\_，其中$i代表额外字段序号，从0开始计数。</li><li>keep：保留多余的字段，但将多余内容作为一个整体字段加入日志，字段名为\_\_column0\_\_.</li><li>discard：丢弃多余的字段。</li></ul>  |
 |  KeepingSourceWhenParseFail  |  bool  |  否  |  false  |  当解析失败时，是否保留源字段。  |
 |  KeepingSourceWhenParseSucceed  |  bool  |  否  |  false  |  当解析成功时，是否保留源字段。  |
 |  RenamedSourceKey  |  string  |  否  |  空  |  当源字段被保留时，用于存储源字段的字段名。若不填，默认不改名。  |
+|  CopingRawLog  |  bool  |  否  |  false  |  当解析失败且开启保留源字段时，是否额外复制一份原始日志到 `__raw_log__` 字段。  |
 
 ## 样例
 

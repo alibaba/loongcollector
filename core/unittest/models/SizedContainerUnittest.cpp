@@ -15,7 +15,7 @@
 
 #include "PipelineEvent.h"
 #include "SizedContainer.h"
-#include "StringView.h"
+#include "common/StringView.h"
 #include "unittest/Unittest.h"
 
 using namespace std;
@@ -123,7 +123,6 @@ void SizedContainerUnittest::TestInsertAndErase() {
         APSARA_TEST_EQUAL("", findTag(tags, key).to_string());
     }
 }
-
 
 UNIT_TEST_CASE(SizedContainerUnittest, TestInsertAndErase)
 

@@ -30,14 +30,24 @@ struct ConfigDiff {
     std::vector<T> mAdded;
     std::vector<T> mModified;
     std::vector<std::string> mRemoved;
+    std::vector<std::string> mIgnored;
 
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty(); }
+    [[nodiscard]] bool HasDiff() const { return !mRemoved.empty() || !mAdded.empty() || !mModified.empty(); }
+    [[nodiscard]] bool HasIgnored() const { return !mIgnored.empty(); }
 };
 
 using CollectionConfigDiff = ConfigDiff<CollectionConfig>;
 using TaskConfigDiff = ConfigDiff<TaskConfig>;
 using InstanceConfigDiff = ConfigDiff<InstanceConfig>;
 
-enum ConfigDiffEnum { Added, Modified, Removed, Unchanged };
+// 命名的前面表示配置状态，后面表示配置变化
+enum ConfigDiffEnum {
+    Added /*新增*/,
+    AppliedModified /*已应用有修改*/,
+    IgnoredModified /*已忽略有修改*/,
+    Removed /*删除*/,
+    AppliedUnchanged /*已应用无修改*/,
+    IgnoredUnchanged /*已忽略无修改*/
+};
 
 } // namespace logtail

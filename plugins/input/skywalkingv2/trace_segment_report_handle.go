@@ -49,7 +49,7 @@ func panicRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(context.Background(), "PLUGIN_RUNTIME_ALARM", "skywalking v2 runtime panic error", err, "stack", string(trace))
+		logger.Warning(context.Background(), "PLUGIN_RUNTIME_ALARM", "skywalking v2 runtime panic error", err, "stack", string(trace))
 	}
 }
 
@@ -123,7 +123,7 @@ func (t *TraceSegmentReportHandle) collectSegment(server v2.TraceSegmentReportSe
 		} else {
 			log, err := otTrace.ToLog()
 			if err != nil {
-				logger.Error(t.context.GetRuntimeContext(), "SKYWALKING_TO_OT_TRACE_ERR", "err", err)
+				logger.Warning(t.context.GetRuntimeContext(), "SKYWALKING_TO_OT_TRACE_ERR", "err", err)
 				return err
 			}
 			t.collector.AddRawLog(log)

@@ -31,7 +31,6 @@
 #include <vector>
 
 #include "app_config/AppConfig.h"
-#include "checkpoint/CheckPointManager.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/CompressTools.h"
@@ -44,9 +43,10 @@
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
 #include "common/version.h"
-#include "constants/Constants.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/EventHandler.h"
 #include "monitor/AlarmManager.h"
 
@@ -105,17 +105,11 @@ ParseConfResult ParseConfig(const std::string& configName, Json::Value& jsonRoot
         fullPath = GetProcessExecutionDir() + configName;
     }
 
-    ifstream is;
-    is.open(fullPath.c_str());
-    if (!is) { // https://horstmann.com/cpp/pitfalls.html
-        return CONFIG_NOT_EXIST;
-    }
     std::string buffer;
-    try {
-        buffer.assign(std::istreambuf_iterator<char>(is), std::istreambuf_iterator<char>());
-    } catch (const std::ios_base::failure& e) {
+    if (FileReadResult::kOK != ReadFileContent(fullPath, buffer)) {
         return CONFIG_NOT_EXIST;
     }
+
     if (!IsValidJson(buffer.c_str(), buffer.length())) {
         return CONFIG_INVALID_FORMAT;
     }
@@ -142,24 +136,28 @@ bool ConfigManager::RegisterHandlersRecursively(const std::string& path,
         return false;
     }
     bool result = false;
-    if (checkTimeout && config.first->IsTimeout(path))
+    if (checkTimeout && config.first->IsTimeout(path)) {
         return result;
+    }
 
-    if (!config.first->IsDirectoryInBlacklist(path))
+    if (!config.first->IsDirectoryInBlacklist(path)) {
         result = EventDispatcher::GetInstance()->RegisterEventHandler(path, config, mSharedHandler);
+    }
 
-    if (!result)
+    if (!result) {
         return result;
+    }
 
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
 
         LOG_ERROR(sLogger, ("Open dir fail", path.c_str())("errno", ErrnoToString(err)));
         return false;
@@ -242,57 +240,111 @@ bool ConfigManager::RegisterHandlers() {
     if (mSharedHandler == NULL) {
         mSharedHandler = new NormalEventHandler();
     }
-    vector<FileDiscoveryConfig> sortedConfigs;
-    vector<FileDiscoveryConfig> wildcardConfigs;
+
+    // Build and sort path items from all configs.
+    vector<PathItem> sortedPaths; // 所有精确路径（按原始 basePath 排序）
+    vector<PathItem> wildcardPaths; // 所有通配符路径
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto itr = nameConfigMap.begin(); itr != nameConfigMap.end(); ++itr) {
-        if (itr->second.first->GetWildcardPaths().empty())
-            sortedConfigs.push_back(itr->second);
-        else
-            wildcardConfigs.push_back(itr->second);
+    BuildAndSortPathItems(nameConfigMap, sortedPaths, wildcardPaths);
+
+    // Check if has container config
+    bool hasContainerConfig = false;
+    for (auto& pathItem : sortedPaths) {
+        if (pathItem.config.first->IsContainerDiscoveryEnabled()) {
+            hasContainerConfig = true;
+            break;
+        }
     }
-    sort(sortedConfigs.begin(), sortedConfigs.end(), FileDiscoveryOptions::CompareByPathLength);
+    if (!hasContainerConfig) {
+        for (auto& pathItem : wildcardPaths) {
+            if (pathItem.config.first->IsContainerDiscoveryEnabled()) {
+                hasContainerConfig = true;
+                break;
+            }
+        }
+    }
+
     bool result = true;
-    for (auto itr = sortedConfigs.begin(); itr != sortedConfigs.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->first;
+
+    // 注册所有精确路径（已按 basePath 深度排序）
+    for (auto& pathItem : sortedPaths) {
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
         if (!config->IsContainerDiscoveryEnabled()) {
-            result &= RegisterHandlers(config->GetBasePath(), *itr);
+            // 非容器：直接使用 basePath
+            result &= RegisterHandlers(pathItem.path, pathItem.config);
         } else {
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                result &= RegisterHandlers((*config->GetContainerInfo())[i].mRealBaseDir, *itr);
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (!realBaseDir.empty()) {
+                        result &= RegisterHandlers(realBaseDir, pathItem.config);
+                    }
+                }
             }
         }
     }
-    for (auto itr = wildcardConfigs.begin(); itr != wildcardConfigs.end(); ++itr) {
-        const FileDiscoveryOptions* config = itr->first;
+
+    // 注册所有通配符路径（不排序）
+    for (auto& pathItem : wildcardPaths) {
+        const FileDiscoveryOptions* config = pathItem.config.first;
+
         if (!config->IsContainerDiscoveryEnabled()) {
-            RegisterWildcardPath(*itr, config->GetWildcardPaths()[0], 0);
+            // 非容器：直接使用 basePath
+            RegisterWildcardPath(pathItem.config, *pathItem.pathInfo, pathItem.pathInfo->wildcardPaths[0], 0);
         } else {
-            for (size_t i = 0; i < config->GetContainerInfo()->size(); ++i) {
-                RegisterWildcardPath(*itr, (*config->GetContainerInfo())[i].mRealBaseDir, 0);
+            // 容器：使用 pathItem 中保存的索引直接访问对应的 realBaseDir
+            const auto& containerInfos = config->GetContainerInfo();
+
+            if (containerInfos) {
+                for (const auto& containerInfo : *containerInfos) {
+                    // 只处理当前 pathInfo 对应的 realBaseDir
+                    if (pathItem.pathInfoIndex >= containerInfo.mRealBaseDirs.size()) {
+                        continue;
+                    }
+
+                    const string& realBaseDir = containerInfo.mRealBaseDirs[pathItem.pathInfoIndex];
+                    if (!realBaseDir.empty()) {
+                        RegisterWildcardPath(pathItem.config, *pathItem.pathInfo, realBaseDir, 0);
+                    }
+                }
             }
         }
+    }
+    if (hasContainerConfig) {
+        ContainerManager::GetInstance()->Init();
     }
     return result;
 }
 
-void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, const std::string& path, int32_t depth) {
+void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config,
+                                         const BasePathInfo& pathInfo,
+                                         const std::string& path,
+                                         int32_t depth) {
     if (AppConfig::GetInstance()->IsHostPathMatchBlacklist(path)) {
         LOG_INFO(sLogger, ("ignore path matching host path blacklist", path));
         return;
     }
     bool finish;
-    if ((depth + 1) == ((int)config.first->GetWildcardPaths().size() - 1))
+    if ((depth + 1) == ((int)pathInfo.wildcardPaths.size() - 1))
         finish = true;
-    else if ((depth + 1) < ((int)config.first->GetWildcardPaths().size() - 1))
+    else if ((depth + 1) < ((int)pathInfo.wildcardPaths.size() - 1))
         finish = false;
     else
         return;
 
     // const path
-    if (!config.first->GetConstWildcardPaths()[depth].empty()) {
+    if (!pathInfo.constWildcardPaths[depth].empty()) {
         // stat directly
-        string item = PathJoin(path, config.first->GetConstWildcardPaths()[depth]);
+        string item = PathJoin(path, pathInfo.constWildcardPaths[depth]);
         fsutil::PathStat baseDirStat;
         if (!fsutil::PathStat::stat(item, baseDirStat)) {
             LOG_DEBUG(sLogger,
@@ -320,7 +372,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
                                                                                  : config.first->mMaxDirSearchDepth);
             }
         } else {
-            RegisterWildcardPath(config, item, depth + 1);
+            RegisterWildcardPath(config, pathInfo, item, depth + 1);
         }
         return;
     }
@@ -328,12 +380,13 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
         LOG_WARNING(sLogger, ("Open dir fail", path.c_str())("errno", err));
         return;
     }
@@ -341,17 +394,17 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
     int32_t dirCount = 0;
     while ((ent = dir.ReadNext())) {
         if (dirCount >= INT32_FLAG(wildcard_max_sub_dir_count)) {
-            LOG_WARNING(sLogger,
-                        ("too many sub directoried for path", path)("dirCount", dirCount)("basePath",
-                                                                                          config.first->GetBasePath()));
-            AlarmManager::GetInstance()->SendAlarm(STAT_LIMIT_ALARM,
-                                                   string("too many sub directoried for path:" + path
-                                                          + " dirCount: " + ToString(dirCount) + " basePath"
-                                                          + config.first->GetBasePath()),
-                                                   config.second->GetRegion(),
-                                                   config.second->GetProjectName(),
-                                                   config.second->GetConfigName(),
-                                                   config.second->GetLogstoreName());
+            LOG_WARNING(
+                sLogger,
+                ("too many sub directoried for path", path)("dirCount", dirCount)("basePath", pathInfo.basePath));
+            AlarmManager::GetInstance()->SendAlarmError(STAT_LIMIT_ALARM,
+                                                        string("too many sub directoried for path:" + path
+                                                               + " dirCount: " + ToString(dirCount) + " basePath"
+                                                               + pathInfo.basePath),
+                                                        config.second->GetRegion(),
+                                                        config.second->GetProjectName(),
+                                                        config.second->GetConfigName(),
+                                                        config.second->GetLogstoreName());
             break;
         }
         if (!ent.IsDir())
@@ -361,7 +414,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         string item = PathJoin(path, ent.Name());
 
         // we should check match and then check finsh
-        size_t dirIndex = config.first->GetWildcardPaths()[depth].size() + 1;
+        size_t dirIndex = pathInfo.wildcardPaths[depth].size() + 1;
 #if defined(_MSC_VER)
         // Backward compatibility: the inner condition never happen.
         if (!BOOL_FLAG(enable_root_path_collection)) {
@@ -372,7 +425,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         // For wildcard Windows path C:\*, mWildcardPaths[0] will be C:\,
         //   so dirIndex should be adjusted by minus 1.
         else if (0 == depth) {
-            const auto& firstWildcardPath = config.first->GetWildcardPaths()[0];
+            const auto& firstWildcardPath = pathInfo.wildcardPaths[0];
             const auto pathSize = firstWildcardPath.size();
             if (pathSize >= 2 && firstWildcardPath[pathSize - 1] == PATH_SEPARATOR[0]
                 && firstWildcardPath[pathSize - 2] == ':') {
@@ -386,8 +439,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
         }
 #endif
 
-        if (fnmatch(&(config.first->GetWildcardPaths()[depth + 1].at(dirIndex)), ent.Name().c_str(), FNM_PATHNAME)
-            == 0) {
+        if (fnmatch(&(pathInfo.wildcardPaths[depth + 1].at(dirIndex)), ent.Name().c_str(), FNM_PATHNAME) == 0) {
             if (finish) {
                 DirRegisterStatus registerStatus = EventDispatcher::GetInstance()->IsDirRegistered(item);
                 if (registerStatus == GET_REGISTER_STATUS_ERROR) {
@@ -405,7 +457,7 @@ void ConfigManager::RegisterWildcardPath(const FileDiscoveryConfig& config, cons
                         config.first->mMaxDirSearchDepth < 0 ? 100 : config.first->mMaxDirSearchDepth);
                 }
             } else {
-                RegisterWildcardPath(config, item, depth + 1);
+                RegisterWildcardPath(config, pathInfo, item, depth + 1);
             }
         }
     }
@@ -494,12 +546,13 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         int err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
 
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
@@ -516,7 +569,7 @@ bool ConfigManager::RegisterHandlersWithinDepth(const std::string& path,
         DirCheckPointPtr dirCheckPoint;
         if (CheckPointManager::Instance()->GetDirCheckPoint(path, dirCheckPoint)) {
             // path had dircheckpoint means it was watched before, so it is valid
-            const set<string>& subdir = dirCheckPoint.get()->mSubDir;
+            auto subdir = dirCheckPoint.get()->mSubDir;
             for (const auto& it : subdir) {
                 RegisterHandlersWithinDepth(it, config, 0, maxDepth - 1);
             }
@@ -546,12 +599,13 @@ bool ConfigManager::RegisterDescendants(const string& path, const FileDiscoveryC
     fsutil::Dir dir(path);
     if (!dir.Open()) {
         auto err = GetErrno();
-        AlarmManager::GetInstance()->SendAlarm(LOGDIR_PERMISSION_ALARM,
-                                               string("Failed to open dir : ") + path + ";\terrno : " + ToString(err),
-                                               config.second->GetRegion(),
-                                               config.second->GetProjectName(),
-                                               config.second->GetConfigName(),
-                                               config.second->GetLogstoreName());
+        AlarmManager::GetInstance()->SendAlarmWarning(LOGDIR_PERMISSION_ALARM,
+                                                      string("Failed to open dir : ") + path
+                                                          + ";\terrno : " + ToString(err),
+                                                      config.second->GetRegion(),
+                                                      config.second->GetProjectName(),
+                                                      config.second->GetConfigName(),
+                                                      config.second->GetLogstoreName());
         LOG_ERROR(sLogger, ("Open dir error: ", path.c_str())("errno", err));
         return false;
     }
@@ -626,7 +680,8 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
         //     continue;
         // }
 
-        bool match = config->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config->IsMatch(path, name, &matchedPathDepth);
         if (match) {
             // if force multi config, do not send alarm
             if (!name.empty() && !config->mAllowingIncludedByMultiConfigs) {
@@ -639,8 +694,9 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
                 multiConfigs.push_back(itr->second);
             }
 
-            // note: best config is the one which length is longest and create time is nearest
-            curLen = config->GetBasePath().size();
+            // note: best config is the one which depth is greatest and create time is nearest
+            // Use the actual matched path depth
+            curLen = matchedPathDepth;
             if (prevLen < curLen) {
                 prevMatch = itr->second;
                 prevLen = curLen;
@@ -660,7 +716,7 @@ FileDiscoveryConfig ConfigManager::FindBestMatch(const string& path, const strin
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -703,6 +759,10 @@ int32_t ConfigManager::FindAllMatch(vector<FileDiscoveryConfig>& allConfig,
     bool alarmFlag = false;
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     auto itr = nameConfigMap.begin();
+
+    // Store matched configs with their matched path depth
+    vector<pair<FileDiscoveryConfig, int32_t>> matchedConfigsWithDepth;
+
     for (; itr != nameConfigMap.end(); ++itr) {
         const FileDiscoveryOptions* config = itr->second.first;
         // // exclude __FUSE_CONFIG__
@@ -710,18 +770,37 @@ int32_t ConfigManager::FindAllMatch(vector<FileDiscoveryConfig>& allConfig,
         //     continue;
         // }
 
-        bool match = config->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config->IsMatch(path, name, &matchedPathDepth);
         if (match) {
-            allConfig.push_back(itr->second);
+            matchedConfigsWithDepth.emplace_back(itr->second, matchedPathDepth);
         }
     }
 
-    if (!name.empty() && allConfig.size() > static_cast<size_t>(maxMultiConfigSize)) {
+    if (!name.empty() && matchedConfigsWithDepth.size() > static_cast<size_t>(maxMultiConfigSize)) {
         // only report log file alarm
         alarmFlag = true;
-        sort(allConfig.begin(), allConfig.end(), FileDiscoveryOptions::CompareByDepthAndCreateTime);
+        // Sort by matched path depth (desc) and create time (asc)
+        sort(matchedConfigsWithDepth.begin(),
+             matchedConfigsWithDepth.end(),
+             [](const pair<FileDiscoveryConfig, int32_t>& left, const pair<FileDiscoveryConfig, int32_t>& right) {
+                 if (left.second != right.second) {
+                     return left.second > right.second; // Deeper path first
+                 }
+                 return left.first.second->GetCreateTime() < right.first.second->GetCreateTime(); // Older first
+             });
+
+        // Extract configs for alarm and result
+        for (const auto& item : matchedConfigsWithDepth) {
+            allConfig.push_back(item.first);
+        }
         SendAllMatchAlarm(path, name, allConfig, maxMultiConfigSize);
         allConfig.resize(maxMultiConfigSize);
+    } else {
+        // No need to sort, just extract configs
+        for (const auto& item : matchedConfigsWithDepth) {
+            allConfig.push_back(item.first);
+        }
     }
     {
         ScopedSpinLock cachedLock(mCacheFileAllConfigMapLock);
@@ -764,7 +843,8 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
         //     continue;
         // }
 
-        bool match = config.first->IsMatch(path, name);
+        int32_t matchedPathDepth = 0;
+        bool match = config.first->IsMatch(path, name, &matchedPathDepth);
         if (match) {
             // if force multi config, do not send alarm
             if (!name.empty() && !config.first->mAllowingIncludedByMultiConfigs) {
@@ -778,8 +858,9 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
             }
             if (!config.first->mAllowingIncludedByMultiConfigs) {
                 // if not ForceMultiConfig, find best match in normal cofigs
-                // note: best config is the one which length is longest and create time is nearest
-                curLen = config.first->GetBasePath().size();
+                // note: best config is the one which depth is greatest and create time is nearest
+                // Use the actual matched path depth
+                curLen = matchedPathDepth;
                 if (prevLen < curLen) {
                     prevMatch = config;
                     prevLen = curLen;
@@ -805,7 +886,7 @@ int32_t ConfigManager::FindMatchWithForceFlag(std::vector<FileDiscoveryConfig>& 
                   ("file", path + '/' + name)("include in multi config",
                                               logNameList)("best", prevMatch.second->GetConfigName()));
         for (auto iter = multiConfigs.begin(); iter != multiConfigs.end(); ++iter) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmCritical(
                 MULTI_CONFIG_MATCH_ALARM,
                 path + '/' + name + " include in multi config, best and oldest match: "
                     + prevMatch.second->GetProjectName() + ',' + prevMatch.second->GetLogstoreName() + ','
@@ -845,7 +926,7 @@ void ConfigManager::SendAllMatchAlarm(const string& path,
               ("file", path + '/' + name)("include in too many configs", allConfig.size())(
                   "max multi config size", maxMultiConfigSize)("allconfigs", allConfigNames));
     for (auto iter = allConfig.begin(); iter != allConfig.end(); ++iter)
-        AlarmManager::GetInstance()->SendAlarm(
+        AlarmManager::GetInstance()->SendAlarmError(
             TOO_MANY_CONFIG_ALARM,
             path + '/' + name + " include in too many configs:" + ToString(allConfig.size())
                 + ", max multi config size : " + ToString(maxMultiConfigSize) + ", allmatch: " + allConfigNames,
@@ -880,242 +961,11 @@ void ConfigManager::GetRelatedConfigs(const std::string& path, std::vector<FileD
     }
 }
 
-bool ConfigManager::UpdateContainerPath(ConfigContainerInfoUpdateCmd* cmd) {
-    mContainerInfoCmdLock.lock();
-    mContainerInfoCmdVec.push_back(cmd);
-    mContainerInfoCmdLock.unlock();
-    return true;
-}
-
-bool ConfigManager::DoUpdateContainerPaths() {
-    mContainerInfoCmdLock.lock();
-    std::vector<ConfigContainerInfoUpdateCmd*> tmpPathCmdVec = mContainerInfoCmdVec;
-    mContainerInfoCmdVec.clear();
-    mContainerInfoCmdLock.unlock();
-    LOG_INFO(sLogger, ("update container path", tmpPathCmdVec.size()));
-    for (size_t i = 0; i < tmpPathCmdVec.size(); ++i) {
-        FileDiscoveryConfig config = FileServer::GetInstance()->GetFileDiscoveryConfig(tmpPathCmdVec[i]->mConfigName);
-        if (!config.first) {
-            LOG_ERROR(sLogger,
-                      ("invalid container path update cmd",
-                       tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            continue;
-        }
-        if (tmpPathCmdVec[i]->mDeleteFlag) {
-            if (config.first->DeleteContainerInfo(tmpPathCmdVec[i]->mJsonParams)) {
-                LOG_DEBUG(sLogger,
-                          ("container path delete cmd success",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            } else {
-                LOG_ERROR(sLogger,
-                          ("container path delete cmd fail",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            }
-        } else {
-            if (config.first->UpdateContainerInfo(tmpPathCmdVec[i]->mJsonParams, config.second)) {
-                LOG_DEBUG(sLogger,
-                          ("container path update cmd success",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            } else {
-                LOG_ERROR(sLogger,
-                          ("container path update cmd fail",
-                           tmpPathCmdVec[i]->mConfigName)("params", tmpPathCmdVec[i]->mJsonParams.toStyledString()));
-            }
-        }
-        delete tmpPathCmdVec[i];
-    }
-    return true;
-}
-
-bool ConfigManager::IsUpdateContainerPaths() {
-    mContainerInfoCmdLock.lock();
-    bool rst = false;
-    for (size_t i = 0; i < mContainerInfoCmdVec.size(); ++i) {
-        ConfigContainerInfoUpdateCmd* pCmd = mContainerInfoCmdVec[i];
-        if (pCmd->mDeleteFlag) {
-            rst = true;
-            break;
-        }
-        FileDiscoveryConfig pConfig = FileServer::GetInstance()->GetFileDiscoveryConfig(pCmd->mConfigName);
-        if (!pConfig.first) {
-            continue;
-        }
-        if (!pConfig.first->IsSameContainerInfo(pCmd->mJsonParams, pConfig.second)) {
-            rst = true;
-            break;
-        }
-    }
-    if (mContainerInfoCmdVec.size() > 0) {
-        LOG_INFO(sLogger, ("check container path update flag", rst)("size", mContainerInfoCmdVec.size()));
-    }
-    if (rst == false) {
-        for (size_t i = 0; i < mContainerInfoCmdVec.size(); ++i) {
-            delete mContainerInfoCmdVec[i];
-        }
-        mContainerInfoCmdVec.clear();
-    }
-    mContainerInfoCmdLock.unlock();
-
-    /********** qps limit : only update docker config INT32_FLAG(max_docker_config_update_times) times in 3 minutes
-     * ********/
-    static int32_t s_lastUpdateTime = 0;
-    static int32_t s_lastUpdateCount = 0;
-    if (!rst) {
-        return rst;
-    }
-    int32_t nowTime = time(NULL);
-    // not in 3 minutes window
-    if (nowTime / 180 != s_lastUpdateTime / 180) {
-        s_lastUpdateCount = 1;
-        s_lastUpdateTime = nowTime;
-        return rst;
-    }
-    // this window's update times < INT32_FLAG(max_docker_config_update_times)
-    // min interval : 10 seconds
-    // For case with frequent container update (eg. K8s short job), adjust this parameter.
-    if (s_lastUpdateCount < INT32_FLAG(max_docker_config_update_times)
-        && nowTime - s_lastUpdateTime >= INT32_FLAG(docker_config_update_interval)) {
-        ++s_lastUpdateCount;
-        s_lastUpdateTime = nowTime;
-        return rst;
-    }
-    // return false if s_lastUpdateCount >= INT32_FLAG(max_docker_config_update_times) and last update time is in same
-    // window
-    return false;
-    /************************************************************************************************************************/
-}
-
-bool ConfigManager::UpdateContainerStopped(ConfigContainerInfoUpdateCmd* cmd) {
-    PTScopedLock lock(mDockerContainerStoppedCmdLock);
-    mDockerContainerStoppedCmdVec.push_back(cmd);
-    return true;
-}
 
 void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
-    std::vector<ConfigContainerInfoUpdateCmd*> cmdVec;
-    {
-        PTScopedLock lock(mDockerContainerStoppedCmdLock);
-        cmdVec.swap(mDockerContainerStoppedCmdVec);
-    }
-    for (auto& cmd : cmdVec) {
-        // find config and container's path, then emit stopped event
-        FileDiscoveryConfig config = FileServer::GetInstance()->GetFileDiscoveryConfig(cmd->mConfigName);
-        if (!config.first) {
-            continue;
-        }
-        ContainerInfo containerInfo;
-        std::string errorMsg;
-        if (!ContainerInfo::ParseByJSONObj(cmd->mJsonParams, containerInfo, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid container info update param", errorMsg)("action", "ignore current cmd"));
-            continue;
-        }
-        std::vector<ContainerInfo>::iterator iter = config.first->GetContainerInfo()->begin();
-        std::vector<ContainerInfo>::iterator iend = config.first->GetContainerInfo()->end();
-        for (; iter != iend; ++iter) {
-            if (iter->mID == containerInfo.mID) {
-                break;
-            }
-        }
-        if (iter == iend) {
-            continue;
-        }
-        Event* pStoppedEvent = new Event(iter->mRealBaseDir, "", EVENT_ISDIR | EVENT_CONTAINER_STOPPED, -1, 0);
-        pStoppedEvent->SetConfigName(cmd->mConfigName);
-        pStoppedEvent->SetContainerID(containerInfo.mID);
-        iter->mStopped = true;
-        LOG_DEBUG(
-            sLogger,
-            ("GetContainerStoppedEvent Type", pStoppedEvent->GetType())("Source", pStoppedEvent->GetSource())(
-                "Object", pStoppedEvent->GetObject())("Config", pStoppedEvent->GetConfigName())(
-                "IsDir", pStoppedEvent->IsDir())("IsCreate", pStoppedEvent->IsCreate())("IsModify",
-                                                                                        pStoppedEvent->IsModify())(
-                "IsDeleted", pStoppedEvent->IsDeleted())("IsMoveFrom", pStoppedEvent->IsMoveFrom())(
-                "IsContainerStopped", pStoppedEvent->IsContainerStopped())("IsMoveTo", pStoppedEvent->IsMoveTo()));
-        eventVec.push_back(pStoppedEvent);
-    }
-    for (auto cmd : cmdVec) {
-        delete cmd;
-    }
+    ContainerManager::GetInstance()->GetContainerStoppedEvents(eventVec);
 }
 
-void ConfigManager::SaveDockerConfig() {
-    string dockerPathConfigName = AppConfig::GetInstance()->GetDockerFilePathConfig();
-    Json::Value dockerPathValueRoot;
-    dockerPathValueRoot["version"] = Json::Value(STRING_FLAG(ilogtail_docker_path_version));
-    Json::Value dockerPathValueDetail;
-    mContainerInfoCmdLock.lock();
-    const auto& nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
-    for (auto it = nameConfigMap.begin(); it != nameConfigMap.end(); ++it) {
-        if (it->second.first->GetContainerInfo()) {
-            std::vector<ContainerInfo>& containerPathVec = *(it->second.first->GetContainerInfo());
-            for (size_t i = 0; i < containerPathVec.size(); ++i) {
-                Json::Value dockerPathValue;
-                dockerPathValue["config_name"] = Json::Value(it->first);
-                dockerPathValue["container_id"] = Json::Value(containerPathVec[i].mID);
-                containerPathVec[i].mJson["Path"] = Json::Value(containerPathVec[i].mRealBaseDir);
-                dockerPathValue["params"] = Json::Value(containerPathVec[i].mJson.toStyledString());
-                dockerPathValueDetail.append(dockerPathValue);
-            }
-        }
-    }
-    mContainerInfoCmdLock.unlock();
-    dockerPathValueRoot["detail"] = dockerPathValueDetail;
-    string dockerInfo = dockerPathValueRoot.toStyledString();
-    OverwriteFile(dockerPathConfigName, dockerInfo);
-    LOG_INFO(sLogger, ("dump docker path info", dockerPathConfigName));
-}
-
-void ConfigManager::LoadDockerConfig() {
-    string dockerPathConfigName = AppConfig::GetInstance()->GetDockerFilePathConfig();
-    Json::Value dockerPathValueRoot;
-    ParseConfResult rst = ParseConfig(dockerPathConfigName, dockerPathValueRoot);
-    if (rst == CONFIG_INVALID_FORMAT) {
-        LOG_ERROR(sLogger, ("invalid docker config json", rst)("file path", dockerPathConfigName));
-    }
-    if (rst != CONFIG_OK) {
-        return;
-    }
-    if (!dockerPathValueRoot.isMember("detail")) {
-        return;
-    }
-    Json::Value dockerPathValueDetail = dockerPathValueRoot["detail"];
-    if (!dockerPathValueDetail.isArray()) {
-        return;
-    }
-    std::vector<ConfigContainerInfoUpdateCmd*> localPaths;
-    for (Json::Value::iterator iter = dockerPathValueDetail.begin(); iter != dockerPathValueDetail.end(); ++iter) {
-        const Json::Value& dockerPathItem = *iter;
-        string configName = dockerPathItem.isMember("config_name") && dockerPathItem["config_name"].isString()
-            ? dockerPathItem["config_name"].asString()
-            : string();
-        string containerID = dockerPathItem.isMember("container_id") && dockerPathItem["container_id"].isString()
-            ? dockerPathItem["container_id"].asString()
-            : string();
-        string params = dockerPathItem.isMember("params") && dockerPathItem["params"].isString()
-            ? dockerPathItem["params"].asString()
-            : string();
-        LOG_INFO(sLogger, ("load docker path, config", configName)("container id", containerID)("params", params));
-        if (configName.empty() || containerID.empty() || params.empty()) {
-            continue;
-        }
-
-        // cmd 解析json
-        Json::Value jsonParams;
-        std::string errorMsg;
-        if (params.size() < 5UL || !ParseJsonTable(params, jsonParams, errorMsg)) {
-            LOG_ERROR(sLogger, ("invalid docker container params", params)("errorMsg", errorMsg));
-            continue;
-        }
-        ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configName, false, jsonParams);
-        localPaths.push_back(cmd);
-    }
-    mContainerInfoCmdLock.lock();
-    localPaths.insert(localPaths.end(), mContainerInfoCmdVec.begin(), mContainerInfoCmdVec.end());
-    mContainerInfoCmdVec = localPaths;
-    mContainerInfoCmdLock.unlock();
-
-    DoUpdateContainerPaths();
-}
 
 void ConfigManager::ClearFilePipelineMatchCache() {
     ScopedSpinLock lock(mCacheFileConfigMapLock);

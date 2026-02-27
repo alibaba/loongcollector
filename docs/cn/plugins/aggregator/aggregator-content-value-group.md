@@ -16,11 +16,11 @@
 
 | 参数             | 类型     | 是否必选 | 说明                                                                                                               |
 | ---------------- | -------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| Type             | String   | 是       | 插件类型，指定为`aggregator_content_value_group`。                                                                               |
-| GroupKeys        | []String | 是       | 指定需要按照其值分组的Key列表                                                                                      |
-| EnablePackID     | Boolean  | 否       | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
-| Topic            | String   | 否       | LogGroup的Topic名。如果未添加该参数，则默认每个LogGroup的Topic名为空。                                             |
-| ErrIfKeyNotFound | Boolean  | 否       | 当指定的Key在Log的Contents中找不到时，是否打印错误日志                                                             |
+| Type             | string   | 是       | 插件类型，指定为`aggregator_content_value_group`。                                                                               |
+| GroupKeys        | []string | 是       | 指定需要按照其值分组的Key列表                                                                                      |
+| EnablePackID     | bool  | 否       | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
+| Topic            | string   | 否       | LogGroup的Topic名。如果未添加该参数，则默认每个LogGroup的Topic名为空。                                             |
+| ErrIfKeyNotFound | bool  | 否       | 当指定的Key在Log的Contents中找不到时，是否打印错误日志                                                             |
 
 ## 样例
 

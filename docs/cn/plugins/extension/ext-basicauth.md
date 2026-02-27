@@ -16,8 +16,8 @@
 
 | 参数       | 类型     | 是否必选 | 说明  |
 |----------|--------|------|-----|
-| Username | String | 是    | 用户名 |
-| Password | String | 是    | 密码  |
+| Username | string | 是    | 用户名 |
+| Password | string | 是    | 密码  |
 
 ## 样例
 

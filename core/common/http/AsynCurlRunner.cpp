@@ -25,6 +25,10 @@ using namespace std;
 namespace logtail {
 
 bool AsynCurlRunner::Init() {
+    if (mInited) {
+        return true;
+    }
+
     mClient = curl_multi_init();
     mIsFlush = false;
     if (mClient == nullptr) {
@@ -32,20 +36,25 @@ bool AsynCurlRunner::Init() {
         return false;
     }
     mThreadRes = async(launch::async, &AsynCurlRunner::Run, this);
+    mInited = true;
     return true;
 }
 
 void AsynCurlRunner::Stop() {
+    if (mInited == false) {
+        return;
+    }
     mIsFlush = true;
-    future_status s = mThreadRes.wait_for(chrono::seconds(1));
     if (!mThreadRes.valid()) {
         return;
     }
+    future_status s = mThreadRes.wait_for(chrono::seconds(1));
     if (s == future_status::ready) {
         LOG_INFO(sLogger, ("async curl runner", "stopped successfully"));
     } else {
         LOG_WARNING(sLogger, ("async curl runner", "forced to stopped"));
     }
+    mInited = false;
 }
 
 bool AsynCurlRunner::AddRequest(unique_ptr<AsynHttpRequest>&& request) {

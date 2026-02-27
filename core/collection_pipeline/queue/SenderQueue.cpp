@@ -14,15 +14,25 @@
 
 #include "collection_pipeline/queue/SenderQueue.h"
 
-#include "logger/Logger.h"
+#include "collection_pipeline/CollectionPipeline.h"
+#include "collection_pipeline/queue/QueueKeyManager.h"
+#include "common/Flags.h"
+#include "monitor/AlarmManager.h"
+
+DECLARE_FLAG_INT32(default_max_sender_queue_extra_buffer_size_bytes);
 
 using namespace std;
 
 namespace logtail {
 
-SenderQueue::SenderQueue(
-    size_t cap, size_t low, size_t high, QueueKey key, const string& flusherId, const CollectionPipelineContext& ctx)
-    : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, flusherId, ctx) {
+SenderQueue::SenderQueue(size_t cap,
+                         size_t low,
+                         size_t high,
+                         QueueKey key,
+                         const string& target,
+                         const string& flusherId,
+                         const CollectionPipelineContext& ctx)
+    : QueueInterface(key, cap, ctx), BoundedSenderQueueInterface(cap, low, high, key, target, flusherId, ctx) {
     mQueue.resize(cap);
     mFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_FETCH_TIMES_TOTAL);
     mValidFetchTimesCnt = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_QUEUE_VALID_FETCH_TIMES_TOTAL);
@@ -38,6 +48,10 @@ bool SenderQueue::Push(unique_ptr<SenderQueueItem>&& item) {
     ADD_COUNTER(mInItemDataSizeBytes, size);
 
     if (Full()) {
+        if (mExtraBufferDataSizeBytes->GetValue() + size
+            >= size_t(INT32_FLAG(default_max_sender_queue_extra_buffer_size_bytes))) {
+            return false;
+        }
         mExtraBuffer.push_back(std::move(item));
 
         SET_GAUGE(mExtraBufferSize, mExtraBuffer.size());
@@ -124,6 +138,11 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
             }
             ADD_COUNTER(mFetchedItemsCnt, 1);
             if (item->mStatus.load() == SendingStatus::IDLE) {
+                // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+                auto now = chrono::system_clock::now();
+                if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
+                    continue;
+                }
                 item->mStatus = SendingStatus::SENDING;
                 items.emplace_back(item);
                 hasAvailableItem = true;
@@ -136,6 +155,11 @@ void SenderQueue::GetAvailableItems(vector<SenderQueueItem*>& items, int32_t lim
                 continue;
             }
             if (item->mStatus.load() != SendingStatus::IDLE) {
+                continue;
+            }
+            // 检查回退时间：如果设置了mNextRetryTime且当前时间未到，则跳过
+            auto now = chrono::system_clock::now();
+            if (item->mQuickFailNextRetryTime > item->mFirstEnqueTime && now < item->mQuickFailNextRetryTime) {
                 continue;
             }
             hasAvailableItem = true;

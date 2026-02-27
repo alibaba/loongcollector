@@ -47,7 +47,7 @@ template <typename T>
 class Serializer {
 public:
     Serializer(Flusher* f) : mFlusher(f) {
-        WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+        WriteMetrics::GetInstance()->CreateMetricsRecordRef(
             mMetricsRecordRef,
             MetricCategory::METRIC_CATEGORY_COMPONENT,
             {{METRIC_LABEL_KEY_PROJECT, f->GetContext().GetProjectName()},
@@ -61,6 +61,7 @@ public:
         mTotalProcessMs = mMetricsRecordRef.CreateTimeCounter(METRIC_COMPONENT_TOTAL_PROCESS_TIME_MS);
         mDiscardedItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_ITEMS_TOTAL);
         mDiscardedItemSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_DISCARDED_SIZE_BYTES);
+        WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
     }
     virtual ~Serializer() = default;
 

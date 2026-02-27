@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/go-mysql-org/go-mysql/canal"
@@ -158,14 +158,14 @@ type ServiceCanal struct {
 	lastErrorCount     int
 	lastErrorChan      chan error
 
-	rotateCounter     pipeline.CounterMetric
-	syncCounter       pipeline.CounterMetric
-	ddlCounter        pipeline.CounterMetric
-	rowCounter        pipeline.CounterMetric
-	xgidCounter       pipeline.CounterMetric
-	checkpointCounter pipeline.CounterMetric
-	lastBinLogMetric  pipeline.StringMetric
-	lastGTIDMetric    pipeline.StringMetric
+	rotateCounter     selfmonitor.CounterMetric
+	syncCounter       selfmonitor.CounterMetric
+	ddlCounter        selfmonitor.CounterMetric
+	rowCounter        selfmonitor.CounterMetric
+	xgidCounter       selfmonitor.CounterMetric
+	checkpointCounter selfmonitor.CounterMetric
+	lastBinLogMetric  selfmonitor.StringMetric
+	lastGTIDMetric    selfmonitor.StringMetric
 }
 
 func (sc *ServiceCanal) Init(context pipeline.Context) (int, error) {
@@ -195,14 +195,14 @@ func (sc *ServiceCanal) Init(context pipeline.Context) (int, error) {
 	sc.lastErrorChan = make(chan error, 1)
 
 	metricsRecord := context.GetMetricRecord()
-	sc.rotateCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogRotate)
-	sc.syncCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogSync)
-	sc.ddlCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogDdl)
-	sc.rowCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogRow)
-	sc.xgidCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogXgid)
-	sc.checkpointCounter = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginBinlogCheckpoint)
-	sc.lastBinLogMetric = helper.NewStringMetricAndRegister(metricsRecord, helper.MetricPluginBinlogFilename)
-	sc.lastGTIDMetric = helper.NewStringMetricAndRegister(metricsRecord, helper.MetricPluginBinlogGtid)
+	sc.rotateCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogRotate)
+	sc.syncCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogSync)
+	sc.ddlCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogDdl)
+	sc.rowCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogRow)
+	sc.xgidCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogXgid)
+	sc.checkpointCounter = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogCheckpoint)
+	sc.lastBinLogMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogFilename)
+	sc.lastGTIDMetric = selfmonitor.NewStringMetricAndRegister(metricsRecord, selfmonitor.MetricPluginBinlogGtid)
 
 	return 0, nil
 }
@@ -364,7 +364,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 			return nil
 		}
 		if len(e.Rows)%2 != 0 {
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid update value count", len(e.Rows))
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid update value count", len(e.Rows))
 			return nil
 		}
 		for i := 0; i < len(e.Rows); i += 2 {
@@ -377,7 +377,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
 							"old columns", len(e.Rows[i]),
 							"new columns", len(e.Rows[i+1]),
 							"table meta columns", len(e.Table.Columns),
@@ -428,7 +428,7 @@ func (sc *ServiceCanal) OnRow(e *canal.RowsEvent) error {
 					sc.canal.ClearTableCache([]byte(e.Table.Schema), []byte(e.Table.Name))
 					tableMeta, err := sc.canal.GetTable(e.Table.Schema, e.Table.Name)
 					if err != nil || tableMeta == nil {
-						logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
+						logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "invalid row values", e.Table.Name,
 							"columns", len(rowValues),
 							"table meta columns", len(e.Table.Columns),
 							"error", err)
@@ -589,7 +589,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 				if errConv != nil {
 					latestPos.Name = valueStr
 				} else {
-					logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error")
+					logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error")
 				}
 				offset, conErr := strconv.ParseUint(fmt.Sprint(value[1]), 10, 64)
 				if conErr == nil {
@@ -598,7 +598,7 @@ func (sc *ServiceCanal) GetBinlogLatestPos() mysql.Position {
 			}
 		}
 	} else {
-		logger.Error(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error", err)
+		logger.Warning(sc.context.GetRuntimeContext(), "CANAL_INVALID_ALARM", "show binary logs error", err)
 	}
 	logger.Info(sc.context.GetRuntimeContext(), "start from latest binlog position", latestPos)
 	return latestPos
@@ -696,7 +696,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 
 	shouldShutdown, err := sc.newCanal()
 	if err != nil {
-		logger.Error(sc.context.GetRuntimeContext(),
+		logger.Warning(sc.context.GetRuntimeContext(),
 			"CANAL_START_ALARM", "service_canal plugin only supports ROW mode", err)
 		return err
 	}
@@ -748,7 +748,7 @@ func (sc *ServiceCanal) Start(c pipeline.Collector) error {
 	if sc.checkpoint.GTID != "" {
 		gtid, err = mysql.ParseGTIDSet(sc.Flavor, sc.checkpoint.GTID)
 		if err != nil {
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Parse GTID error, clear it",
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_START_ALARM", "Parse GTID error, clear it",
 				sc.checkpoint.GTID, err)
 			gtid = nil
 			sc.checkpoint.GTID = ""
@@ -800,7 +800,7 @@ ForBlock:
 				break ForBlock
 			}
 			errStr := err.Error()
-			logger.Error(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM", "Restart canal because of error", err)
+			logger.Warning(sc.context.GetRuntimeContext(), "CANAL_RUNTIME_ALARM", "Restart canal because of error", err)
 
 			// Get latest position from server and restart.
 			//

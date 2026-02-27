@@ -17,8 +17,8 @@
 | 参数             | 类型                | 是否必选 | 说明                                                                                                                                                    |
 |----------------|-------------------|------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Metadata       | []string          | 是    | 增加元信息配置,，默认追加名字为元信息标签名，支持标签请参考支持元信息标签。                                                                                                                |
-| Platform       | String            | 否    | 云平台名称，目前支持 alibaba_cloud_ecs、auto，auto 模式支持动态选择云平台，默认值auto。                                                                                           |
-| JSONPath       | String            | 否    | 为空时直接添加字段，不为空时表示为json序列化字段增加元数据标签，支持多层结构增加云平台元信息，最内层结构需要为json结构，如存在 Log_Content 结构`a: {"b":{}}`，当在 a 子结构下追加是JSONPath为`a`，当在 b 子结构下追加时JSONPath 为 `a.b` |
+| Platform       | string            | 否    | 云平台名称，目前支持 alibaba_cloud_ecs、auto，auto 模式支持动态选择云平台，默认值auto。                                                                                           |
+| JSONPath       | string            | 否    | 为空时直接添加字段，不为空时表示为json序列化字段增加元数据标签，支持多层结构增加云平台元信息，最内层结构需要为json结构，如存在 Log_Content 结构`a: {"b":{}}`，当在 a 子结构下追加是JSONPath为`a`，当在 b 子结构下追加时JSONPath 为 `a.b` |
 | RenameMetadata | map[string]string | 否    | 重命名Metadata名称                                                                                                                                         |
 | ReadOnce       | bool              | 否    | true表示仅读取一次，不支持感知动态变化，默认值false。                                                                                                                       |
 

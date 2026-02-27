@@ -1,4 +1,4 @@
-// Copyright 2023 iLogtail Authors
+// Copyright 2025 iLogtail Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,15 +23,13 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "ebpf/include/export.h"
 
-
-namespace logtail {
-namespace ebpf {
+namespace logtail::ebpf {
 
 /////////////////////  /////////////////////
 
 enum class ObserverType { PROCESS, FILE, NETWORK };
 bool InitObserverNetworkOption(const Json::Value& config,
-                               nami::ObserverNetworkOption& thisObserverNetworkOption,
+                               ObserverNetworkOption& thisObserverNetworkOption,
                                const CollectionPipelineContext* mContext,
                                const std::string& sName);
 
@@ -46,7 +44,7 @@ public:
               const CollectionPipelineContext* mContext,
               const std::string& sName);
 
-    std::vector<nami::SecurityOption> mOptionList;
+    std::vector<SecurityOption> mOptionList;
     SecurityProbeType mProbeType;
 };
 
@@ -91,7 +89,7 @@ struct ProcessProbeConfig {
 
 class eBPFAdminConfig {
 public:
-    eBPFAdminConfig() {}
+    eBPFAdminConfig() = default;
     ~eBPFAdminConfig() {}
 
     void LoadEbpfConfig(const Json::Value& confJson);
@@ -113,24 +111,23 @@ public:
     const ProcessProbeConfig& GetProcessProbeConfig() const { return mProcessProbeConfig; }
 
 private:
-    int32_t mReceiveEventChanCap;
+    int32_t mReceiveEventChanCap = 0;
     AdminConfig mAdminConfig;
 
-    AggregationConfig mAggregationConfig;
+    AggregationConfig mAggregationConfig{};
 
     ConverageConfig mConverageConfig;
 
     SampleConfig mSampleConfig;
 
-    SocketProbeConfig mSocketProbeConfig;
+    SocketProbeConfig mSocketProbeConfig{};
 
-    ProfileProbeConfig mProfileProbeConfig;
+    ProfileProbeConfig mProfileProbeConfig{};
 
-    ProcessProbeConfig mProcessProbeConfig;
+    ProcessProbeConfig mProcessProbeConfig{};
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class eBPFServerUnittest;
 #endif
 };
 
-} // namespace ebpf
-} // namespace logtail
+} // namespace logtail::ebpf

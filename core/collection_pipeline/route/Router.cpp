@@ -35,7 +35,7 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const C
         }
     }
 
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_COMPONENT,
         {{METRIC_LABEL_KEY_PROJECT, ctx.GetProjectName()},
@@ -43,6 +43,7 @@ bool Router::Init(std::vector<pair<size_t, const Json::Value*>> configs, const C
          {METRIC_LABEL_KEY_COMPONENT_NAME, METRIC_LABEL_VALUE_COMPONENT_NAME_ROUTER}});
     mInEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_EVENTS_TOTAL);
     mInGroupDataSizeBytes = mMetricsRecordRef.CreateCounter(METRIC_COMPONENT_IN_SIZE_BYTES);
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
     return true;
 }
 

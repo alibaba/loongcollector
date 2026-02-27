@@ -31,8 +31,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "checkpoint/CheckPointManager.h"
 #include "file_server/FileDiscoveryOptions.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_listener/EventListener.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
@@ -288,6 +288,7 @@ protected:
     friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
     friend class ModifyHandlerUnittest;
+    friend class PipelineUpdateUnittest;
 
     void CleanEnviroments();
     int32_t GetInotifyWatcherCount();

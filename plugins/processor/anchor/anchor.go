@@ -17,10 +17,10 @@ package anchor
 import (
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/buger/jsonparser"
@@ -67,7 +67,7 @@ type ProcessorAnchor struct {
 	KeepSource    bool
 
 	context       pipeline.Context
-	logPairMetric pipeline.CounterMetric
+	logPairMetric selfmonitor.CounterMetric
 }
 
 // Init called for init some system resources, like socket, mutex...
@@ -94,7 +94,7 @@ func (p *ProcessorAnchor) Init(context pipeline.Context) error {
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.logPairMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.PluginPairsPerLogTotal)
+	p.logPairMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.PluginPairsPerLogTotal)
 	return nil
 }
 

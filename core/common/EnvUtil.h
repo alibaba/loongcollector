@@ -21,6 +21,7 @@ namespace logtail {
 
 void SetEnv(const char* key, const char* value);
 void UnsetEnv(const char* key);
+char* GetEnv(const char* firstKey, const char* secondKey);
 
 } // namespace logtail
 

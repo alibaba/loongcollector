@@ -2,15 +2,7 @@
 
 ![logo](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/readme/loongcollector-icon.png)
 
-LoongCollector 是一款集卓越性能、超强稳定性和灵活可编程性于一身的数据采集器，专为构建下一代可观测 Pipeline 设计。源自阿里云可观测性团队所开源的 iLogtail 项目，在继承了 iLogtail 强大的日志采集与处理能力的基础上，进行了全面的功能升级与扩展。从原来单一日志场景，逐步扩展为可观测数据采集、本地计算、服务发现的统一体。
-
-[![GitHub contributors](https://img.shields.io/github/contributors/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/contributors)
-[![GitHub stars](https://img.shields.io/github/stars/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/stargazers)
-[![GitHub issues](https://img.shields.io/github/issues/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/issues)
-[![GitHub license](https://img.shields.io/github/license/alibaba/loongcollector)](https://github.com/alibaba/loongcollector/blob/main/LICENSE)
-[![Coverity Scan Build Status](https://img.shields.io/coverity/scan/28764.svg)](https://scan.coverity.com/projects/alibaba-ilogtail)
-[![Coverage Status](https://codecov.io/gh/alibaba/loongcollector/branch/main/graph/badge.svg)](https://codecov.io/gh/alibaba/loongcollector)
-[![Go Report Card](https://goreportcard.com/badge/github.com/alibaba/loongcollector)](https://goreportcard.com/report/github.com/alibaba/loongcollector)
+LoongCollector 是一款集卓越性能、超强稳定性和灵活可编程性于一身的数据采集器，专为构建下一代可观测 Pipeline 设计。源自阿里云可观测团队所开源的 iLogtail 项目，在继承了 iLogtail 强大的日志采集与处理能力的基础上，进行了全面的功能升级与扩展。从原来单一日志场景，逐步扩展为可观测数据采集、本地计算、服务发现的统一体。
 
 ## 品牌寓意
 
@@ -27,6 +19,10 @@ LoongCollector 社区将紧密围绕既定的愿景蓝图，专注于核心价�
 LoongCollector 始终将追求极致的采集性能和超强可靠性放在首位，坚信这是实践长期主义理念的根基。我们深知，LoongCollector 核心价值在于为大规模分布式系统提供稳固、高效的可观测性数据统一采集 Agent 与端到端 Pipeline。不管在过去、现在、未来，LoongCollector 都将持续通过技术革新与优化，实现资源利用效率的提升与在极端场景下的稳定运行。
 
 ![uncompromised_performance_and_reliability](<https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/readme/uncompromised_performance_and_reliability.png>)
+
+在多种应用场景的[性能测试](https://alibaba.github.io/loongcollector/dev/bench/record.html)中，LoongCollector 对比其他采集器均展现出强大的性能优势。下图是其中一个采集文本日志并输出到本地文件的性能对比，可以看到LoongCollector使用了最少的CPU和Memory，且非常稳定。
+
+![benchmark_record](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/readme/benchmark_records.png)
 
 ### 遥测数据，无限边界 Unlimited Telemetry Data
 

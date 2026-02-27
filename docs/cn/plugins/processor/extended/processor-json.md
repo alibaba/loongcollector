@@ -24,17 +24,17 @@
 
 | 参数                     | 类型      | 是否必选 | 说明                                                |
 | ---------------------- | ------- | ---- | ------------------------------------------------- |
-| Type                   | String  | 是    | 插件类型                                              |
-| SourceKey              | String  | 是    | 原始字段名                                             |
-| NoKeyError             | Boolean | 否    | 无匹配字段时是否报错。如果未添加该参数，则默认使用true，表示报错。               |
-| ExpandDepth            | Int     | 否    | JSON展开的深度。如果未添加该参数，则默认为0，表示不限制。1表示当前层级，以此类推。      |
-| ExpandConnector        | String  | 否    | JSON展开时的连接符，可以为空。如果未添加该参数，则默认使用下划线（\_）。           |
-| Prefix                 | String  | 否    | JSON展开时对字段附加的前缀。如果未添加该参数，则默认为空。                   |
-| KeepSource             | Boolean | 否    | 是否保留原始字段。如果未添加该参数，则默认使用true，表示保留。                 |
-| UseSourceKeyAsPrefix   | Boolean | 否    | 是否将原始字段名作为所有JSON展开字段名的前缀。如果未添加该参数，则默认使用false，表示否。 |
-| KeepSourceIfParseError | Boolean | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
-| IgnoreFirstConnector   | Boolean | 否    | 是否忽略第一个连接符。如果未添加该参数，则默认使用false，表示忽略第一个连接符。       |
-| ExpandArray            | Boolean | 否    | 是否展开JSON数组。如果未添加该参数，则默认使用false，表示不展开数组。       |
+| Type                   | string  | 是    | 插件类型                                              |
+| SourceKey              | string  | 是    | 原始字段名                                             |
+| NoKeyError             | bool | 否    | 无匹配字段时是否报错。如果未添加该参数，则默认使用true，表示报错。               |
+| ExpandDepth            | int     | 否    | JSON展开的深度。如果未添加该参数，则默认为0，表示不限制。1表示当前层级，以此类推。      |
+| ExpandConnector        | string  | 否    | JSON展开时的连接符，可以为空。如果未添加该参数，则默认使用下划线（\_）。           |
+| Prefix                 | string  | 否    | JSON展开时对字段附加的前缀。如果未添加该参数，则默认为空。                   |
+| KeepSource             | bool | 否    | 是否保留原始字段。如果未添加该参数，则默认使用true，表示保留。                 |
+| UseSourceKeyAsPrefix   | bool | 否    | 是否将原始字段名作为所有JSON展开字段名的前缀。如果未添加该参数，则默认使用false，表示否。 |
+| KeepSourceIfParseError | bool | 否    | 解析失败时，是否保留原始日志。如果未添加该参数，则默认使用true，表示保留原始日志。       |
+| IgnoreFirstConnector   | bool | 否    | 是否忽略第一个连接符。如果未添加该参数，则默认使用false，表示忽略第一个连接符。       |
+| ExpandArray            | bool | 否    | 是否展开JSON数组。如果未添加该参数，则默认使用false，表示不展开数组。       |
 
 ## 样例
 

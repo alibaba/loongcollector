@@ -13,6 +13,8 @@
 // limitations under the License.
 
 
+#include "PipelineEventGroup.h"
+#include "PipelineEventPtr.h"
 #include "collection_pipeline/batch/BatchStatus.h"
 #include "collection_pipeline/batch/FlushStrategy.h"
 #include "unittest/Unittest.h"
@@ -113,6 +115,8 @@ void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     PipelineEventGroup eventGroup(make_shared<SourceBuffer>());
     PipelineEventPtr event(eventGroup.CreateLogEvent(), false, nullptr);
     event->SetTimestamp(1717398001);
+    PipelineEventPtr metricEvent(eventGroup.CreateMetricEvent(), false, nullptr);
+    metricEvent->SetTimestamp(time(nullptr));
 
     SLSEventBatchStatus status;
     status.mCnt = 2;
@@ -122,6 +126,7 @@ void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_TRUE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, event));
+    APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, metricEvent));
 
     status.mCnt = 1;
     status.mSizeBytes = 100;
@@ -130,6 +135,7 @@ void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_FALSE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_TRUE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, event));
+    APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, metricEvent));
 
     status.mCnt = 1;
     status.mSizeBytes = 50;
@@ -138,6 +144,7 @@ void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_FALSE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, event));
+    APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, metricEvent));
 
     status.mCnt = 1;
     status.mSizeBytes = 50;
@@ -146,6 +153,11 @@ void SLSEventFlushStrategyUnittest::TestNeedFlush() {
     APSARA_TEST_FALSE(mStrategy.NeedFlushByCnt(status));
     APSARA_TEST_FALSE(mStrategy.NeedFlushBySize(status));
     APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, event));
+    APSARA_TEST_FALSE(mStrategy.NeedFlushByTime(status, metricEvent));
+    metricEvent->SetTimestamp(time(nullptr) - 302);
+    APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, metricEvent));
+    metricEvent->SetTimestamp(time(nullptr) + 301);
+    APSARA_TEST_TRUE(mStrategy.NeedFlushByTime(status, metricEvent));
 }
 
 UNIT_TEST_CASE(SLSEventFlushStrategyUnittest, TestNeedFlush)

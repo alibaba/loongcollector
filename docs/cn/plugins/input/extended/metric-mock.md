@@ -16,10 +16,10 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type | String，无默认值（必填） | 插件类型，固定为`metric_mock`。 |
+| Type | string，无默认值（必填） | 插件类型，固定为`metric_mock`。 |
 | Tags | Map，其中tagKey和tagValue为String类型，`{}` | 可以按需求给mock数据添加tag。 |
 | Fields | Map，其中fieldKey和fieldValue为String类型，`{}` | 可以按需求给mock数据添加字段。 |
-| Index | Long，`0` | 生成的mock数据的开始编号（从下一个编号开始）。 |
+| Index | long，`0` | 生成的mock数据的开始编号（从下一个编号开始）。 |
 | OpenPrometheusPattern | Boolean，`false` | 是否生成Prometheus样式的mock数据。 |
 
 ## 样例

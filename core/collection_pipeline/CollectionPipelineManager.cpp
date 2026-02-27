@@ -19,11 +19,14 @@
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
+#include <type_traits>
 #include <unordered_map>
 
+#include "common/http/AsynCurlRunner.h"
 #include "common/timer/Timer.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
 #include "file_server/FileServer.h"
+#include "file_server/StaticFileServer.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 #if defined(__ENTERPRISE__) && defined(__linux__) && !defined(__ANDROID__)
@@ -37,7 +40,7 @@ namespace logtail {
 
 static shared_ptr<CollectionPipeline> sEmptyPipeline;
 
-void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
+void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     // 过渡使用
     static bool isFileServerStarted = false;
     bool isFileServerInputChanged = CheckIfFileServerUpdated(diff);
@@ -65,12 +68,19 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
                                                                                      ConfigFeedbackStatus::DELETED);
     }
     for (auto& config : diff.mModified) {
+        // Save config name and collect input types before BuildPipeline moves config
+        const string configName = config.mName;
+        std::set<std::string> newInputTypes;
+        for (const auto& input : config.mInputs) {
+            newInputTypes.insert((*input)["Type"].asString());
+        }
+
         auto p = BuildPipeline(std::move(config)); // auto reuse old pipeline's process queue and sender queue
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for existing config",
                          "keep current pipeline running")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for existing config: keep current pipeline running, config: " + config.mName,
                 config.mRegion,
@@ -83,23 +93,44 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
         }
         LOG_INFO(sLogger,
                  ("pipeline building for existing config succeeded",
-                  "stop the old pipeline and start the new one")("config", config.mName));
-        auto iter = mPipelineNameEntityMap.find(config.mName);
-        iter->second->Stop(false);
+                  "stop the old pipeline and start the new one")("config", configName));
+        auto iter = mPipelineNameEntityMap.find(configName);
+
+        // Check if input type has changed to determine stop behavior
+        bool shouldCompletelyStop = false;
+        const Json::Value& oldConfig = iter->second->GetConfig();
+        const Json::Value& oldInputs = oldConfig["inputs"];
+
+        std::set<std::string> oldInputTypes;
+        for (const auto& oldInput : oldInputs) {
+            oldInputTypes.insert(oldInput["Type"].asString());
+        }
+
+        if (newInputTypes != oldInputTypes) {
+            LOG_INFO(sLogger, ("input type set changed, completely stopping old pipeline", "")("config", configName));
+            shouldCompletelyStop = true;
+        }
+        if (p->IsOnetime()) {
+            // 更新旧 pipeline 的 isRunningBeforeStart 标志，用于后续的 checkpoint 管理，防止误删checkpoint
+            iter->second->GetContext().SetIsOnetimePipelineRunningBeforeStart(
+                p->GetContext().IsOnetimePipelineRunningBeforeStart());
+        }
+        iter->second->Stop(shouldCompletelyStop);
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-            mPipelineNameEntityMap[config.mName] = p;
+            mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
     for (auto& config : diff.mAdded) {
+        const string configName = config.mName;
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
                         ("failed to build pipeline for new config", "skip current object")("config", config.mName));
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
                 "failed to build pipeline for new config: skip current object, config: " + config.mName,
                 config.mRegion,
@@ -111,13 +142,13 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
             continue;
         }
         LOG_INFO(sLogger,
-                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", config.mName));
+                 ("pipeline building for new config succeeded", "begin to start pipeline")("config", configName));
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-            mPipelineNameEntityMap[config.mName] = p;
+            mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
+        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
                                                                                      ConfigFeedbackStatus::APPLIED);
     }
 
@@ -126,7 +157,7 @@ void logtail::CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& d
 
     if (isFileServerInputChanged) {
         if (isFileServerStarted) {
-            FileServer::GetInstance()->Resume();
+            FileServer::GetInstance()->Resume(true, false);
         } else {
             FileServer::GetInstance()->Start();
             isFileServerStarted = true;
@@ -166,6 +197,17 @@ vector<string> CollectionPipelineManager::GetAllConfigNames() const {
     return res;
 }
 
+size_t CollectionPipelineManager::GetPipelineCount() const {
+    shared_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
+    return mPipelineNameEntityMap.size();
+}
+
+void CollectionPipelineManager::ClearInputUnusedCheckpoints() {
+    for (auto& item : mInputRunners) {
+        item->ClearUnusedCheckpoints();
+    }
+}
+
 void CollectionPipelineManager::StopAllPipelines() {
     LOG_INFO(sLogger, ("stop all pipelines", "starts"));
     for (auto& item : mInputRunners) {
@@ -176,6 +218,7 @@ void CollectionPipelineManager::StopAllPipelines() {
     LogtailPlugin::GetInstance()->StopAllPipelines(true);
 
     Timer::GetInstance()->Stop();
+    AsynCurlRunner::GetInstance()->Stop();
     ProcessorRunner::GetInstance()->Stop();
 
     FlushAllBatch();
@@ -210,9 +253,15 @@ void CollectionPipelineManager::FlushAllBatch() {
 bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& diff) {
     // private method, no need to lock mPipelineNameEntityMapMutex
     for (const auto& name : diff.mRemoved) {
-        string inputType = mPipelineNameEntityMap[name]->GetConfig()["inputs"][0]["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        auto pipeline = mPipelineNameEntityMap[name];
+        if (pipeline) {
+            auto inputs = pipeline->GetConfig()["inputs"];
+            for (const auto& input : inputs) {
+                string inputType = input["Type"].asString();
+                if (inputType == "input_file" || inputType == "input_container_stdio") {
+                    return true;
+                }
+            }
         }
     }
     for (const auto& config : diff.mModified) {
@@ -220,11 +269,23 @@ bool CollectionPipelineManager::CheckIfFileServerUpdated(CollectionConfigDiff& d
         if (inputType == "input_file" || inputType == "input_container_stdio") {
             return true;
         }
+        auto oldPipeline = mPipelineNameEntityMap[config.mName];
+        if (oldPipeline) {
+            const Json::Value& oldInputs = oldPipeline->GetConfig()["inputs"];
+            for (const auto& oldInput : oldInputs) {
+                string oldInputType = oldInput["Type"].asString();
+                if (oldInputType == "input_file" || oldInputType == "input_container_stdio") {
+                    return true;
+                }
+            }
+        }
     }
     for (const auto& config : diff.mAdded) {
-        string inputType = (*config.mInputs[0])["Type"].asString();
-        if (inputType == "input_file" || inputType == "input_container_stdio") {
-            return true;
+        for (const auto& input : config.mInputs) {
+            string inputType = (*input)["Type"].asString();
+            if (inputType == "input_file" || inputType == "input_container_stdio") {
+                return true;
+            }
         }
     }
     return false;

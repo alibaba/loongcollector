@@ -15,15 +15,18 @@
 #include "common/http/Curl.h"
 
 #include <cstdint>
+#if !defined(_MSC_VER)
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/socket.h>
+#else
+#include <winsock2.h>
+#endif
 
 #include <map>
 #include <string>
 
 #include "app_config/AppConfig.h"
-#include "common/DNSCache.h"
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/http/HttpRequest.h"
@@ -107,14 +110,14 @@ static size_t header_write_callback(char* buffer,
 static size_t socket_write_callback(void* socketData, curl_socket_t fd, curlsocktype purpose) {
     auto* socket = static_cast<CurlSocket*>(socketData);
     if (socket->mTOS.has_value()) {
-        setsockopt(fd, IPPROTO_IP, IP_TOS, &socket->mTOS, sizeof(socket->mTOS));
+        setsockopt(fd, IPPROTO_IP, IP_TOS, (const char*)&(socket->mTOS.value()), sizeof(socket->mTOS.value()));
     }
     return 0;
 }
 
 CURL* CreateCurlHandler(const string& method,
                         bool httpsFlag,
-                        const string& host,
+                        const string& endpoint,
                         int32_t port,
                         const string& url,
                         const string& queryString,
@@ -123,26 +126,18 @@ CURL* CreateCurlHandler(const string& method,
                         HttpResponse& response,
                         curl_slist*& headers,
                         uint32_t timeout,
-                        bool replaceHostWithIp,
                         const string& intf,
                         bool followRedirects,
                         const optional<CurlTLS>& tls,
                         const optional<CurlSocket>& socket // socket is used async, the lifespan must be longer
 ) {
-    static DnsCache* dnsCache = DnsCache::GetInstance();
-
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         return nullptr;
     }
 
     string totalUrl = httpsFlag ? "https://" : "http://";
-    string hostIP;
-    if (replaceHostWithIp && dnsCache->GetIPFromDnsCache(host, hostIP)) {
-        totalUrl.append(hostIP);
-    } else {
-        totalUrl.append(host);
-    }
+    totalUrl.append(endpoint);
     totalUrl.append(url);
     if (!queryString.empty()) {
         totalUrl.append("?").append(queryString);
@@ -218,7 +213,6 @@ bool SendHttpRequest(unique_ptr<HttpRequest>&& request, HttpResponse& response) 
                                    response,
                                    headers,
                                    request->mTimeout,
-                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,
@@ -279,7 +273,6 @@ bool AddRequestToMultiCurlHandler(CURLM* multiCurl, unique_ptr<AsynHttpRequest>&
                                    request->mResponse,
                                    headers,
                                    request->mTimeout,
-                                   AppConfig::GetInstance()->IsHostIPReplacePolicyEnabled(),
                                    AppConfig::GetInstance()->GetBindInterface(),
                                    request->mFollowRedirects,
                                    request->mTls,

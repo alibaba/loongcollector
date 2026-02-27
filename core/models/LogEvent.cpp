@@ -16,11 +16,16 @@
 
 #include "models/LogEvent.h"
 
+#include "common/Flags.h"
+
+DEFINE_FLAG_INT32(default_log_event_capacity, "", 16);
+
 using namespace std;
 
 namespace logtail {
 
 LogEvent::LogEvent(PipelineEventGroup* ptr) : PipelineEvent(Type::LOG, ptr) {
+    mContents.reserve(INT32_FLAG(default_log_event_capacity));
 }
 
 unique_ptr<PipelineEvent> LogEvent::Copy() const {
@@ -29,23 +34,34 @@ unique_ptr<PipelineEvent> LogEvent::Copy() const {
 
 void LogEvent::Reset() {
     PipelineEvent::Reset();
-    mContents.clear();
-    mIndex.clear();
+    if (mContents.capacity() > static_cast<size_t>(INT32_FLAG(default_log_event_capacity))) {
+        ContentsContainer tmp;
+        tmp.reserve(INT32_FLAG(default_log_event_capacity));
+        mContents.swap(tmp);
+    } else {
+        mContents.clear();
+    }
+    mContentCnt = 0;
     mAllocatedContentSize = 0;
     mFileOffset = 0;
     mRawSize = 0;
 }
 
 StringView LogEvent::GetContent(StringView key) const {
-    auto it = mIndex.find(key);
-    if (it != mIndex.end()) {
-        return mContents[it->second].first.second;
+    auto it = std::find_if(mContents.crbegin(), mContents.crend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    if (it == mContents.crend()) {
+        return gEmptyStringView;
     }
-    return gEmptyStringView;
+    return it->first.second;
 }
 
 bool LogEvent::HasContent(StringView key) const {
-    return mIndex.find(key) != mIndex.end();
+    auto it = std::find_if(mContents.crbegin(), mContents.crend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    return it != mContents.crend();
 }
 
 void LogEvent::SetContent(StringView key, StringView val) {
@@ -65,25 +81,27 @@ void LogEvent::SetContentNoCopy(const StringBuffer& key, const StringBuffer& val
 }
 
 void LogEvent::SetContentNoCopy(StringView key, StringView val) {
-    auto rst = mIndex.insert(make_pair(key, mContents.size()));
-    if (!rst.second) {
-        auto& it = rst.first;
-        auto& field = mContents[it->second].first;
-        mAllocatedContentSize += key.size() + val.size() - field.first.size() - field.second.size();
-        field = make_pair(key, val);
+    auto it = std::find_if(mContents.rbegin(), mContents.rend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    if (it != mContents.rend()) {
+        mAllocatedContentSize += key.size() + val.size() - it->first.first.size() - it->first.second.size();
+        it->first = make_pair(key, val);
     } else {
+        ++mContentCnt;
         mAllocatedContentSize += key.size() + val.size();
         mContents.emplace_back(make_pair(key, val), true);
     }
 }
 
 void LogEvent::DelContent(StringView key) {
-    auto it = mIndex.find(key);
-    if (it != mIndex.end()) {
-        auto& field = mContents[it->second].first;
-        mAllocatedContentSize -= field.first.size() + field.second.size();
-        mContents[it->second].second = false;
-        mIndex.erase(it);
+    auto it = std::find_if(mContents.rbegin(), mContents.rend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    if (it != mContents.rend()) {
+        it->second = false;
+        --mContentCnt;
+        mAllocatedContentSize -= it->first.first.size() + it->first.second.size();
     }
 }
 
@@ -93,31 +111,31 @@ void LogEvent::SetLevel(const std::string& level) {
 }
 
 LogEvent::ContentIterator LogEvent::FindContent(StringView key) {
-    auto it = mIndex.find(key);
-    if (it != mIndex.end()) {
-        return ContentIterator(mContents.begin() + it->second, mContents);
+    auto it = std::find_if(mContents.rbegin(), mContents.rend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    if (it != mContents.rend()) {
+        return ContentIterator(it.base() - 1, mContents);
     }
     return ContentIterator(mContents.end(), mContents);
 }
 
 LogEvent::ConstContentIterator LogEvent::FindContent(StringView key) const {
-    auto it = mIndex.find(key);
-    if (it != mIndex.end()) {
-        return ConstContentIterator(mContents.begin() + it->second, mContents);
+    auto it = std::find_if(mContents.crbegin(), mContents.crend(), [&key](const auto& item) {
+        return item.first.first == key && item.second;
+    });
+    if (it != mContents.crend()) {
+        return ConstContentIterator(it.base() - 1, mContents);
     }
     return ConstContentIterator(mContents.end(), mContents);
 }
 
 LogEvent::ContentIterator LogEvent::begin() {
-    auto it = mContents.begin();
-    while (it != mContents.end() && !it->second) {
-        ++it;
-    }
+    auto it = std::find_if(mContents.begin(), mContents.end(), [](const auto& item) { return item.second; });
     return ContentIterator(it, mContents);
 }
 
 LogEvent::ContentIterator LogEvent::end() {
-    mContents.end() == mContents.end();
     return ContentIterator(mContents.end(), mContents);
 }
 
@@ -130,10 +148,7 @@ LogEvent::ConstContentIterator LogEvent::end() const {
 }
 
 LogEvent::ConstContentIterator LogEvent::cbegin() const {
-    auto it = mContents.cbegin();
-    while (it != mContents.cend() && !it->second) {
-        ++it;
-    }
+    auto it = std::find_if(mContents.cbegin(), mContents.cend(), [](const auto& item) { return item.second; });
     return ConstContentIterator(it, mContents);
 }
 
@@ -142,9 +157,9 @@ LogEvent::ConstContentIterator LogEvent::cend() const {
 }
 
 void LogEvent::AppendContentNoCopy(StringView key, StringView val) {
+    ++mContentCnt;
     mAllocatedContentSize += key.size() + val.size();
     mContents.emplace_back(make_pair(key, val), true);
-    mIndex[key] = mContents.size() - 1;
 }
 
 size_t LogEvent::DataSize() const {

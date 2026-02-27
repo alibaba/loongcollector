@@ -43,7 +43,7 @@ ifndef DOCKER_BUILD_USE_BUILDKIT
 	DOCKER_BUILD_USE_BUILDKIT = true
 
 	# docker BuildKit supported start from 19.03
-	docker_version := $(shell docker version --format '{{.Server.Version}}')
+	docker_version := $(shell docker version --format '{{.Server.Version}}' 2>/dev/null || echo "0.0")
 	least_version := "19.03"
 	ifeq ($(shell printf "$(least_version)\n$(docker_version)" | sort -V | tail -n 1),$(least_version))
 		DOCKER_BUILD_USE_BUILDKIT = false
@@ -74,7 +74,7 @@ DIST_FILE = $(DIST_DIR)/loongcollector-$(VERSION).linux-$(ARCH).tar.gz
 
 .PHONY: tools
 tools:
-	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.49.0
+	$(GO_LINT) version || curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GO_PATH)/bin v1.64.8
 	$(GO_ADDLICENSE) version || go install github.com/google/addlicense@latest
 
 .PHONY: clean
@@ -114,7 +114,7 @@ lint: clean tools
 lint-pkg: clean tools
 	cd pkg && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
-.PHONY: lint-test
+.PHONY: lint-e2e
 lint-e2e: clean tools
 	cd test && pwd && $(GO_LINT) run -v --timeout 5m ./...
 
@@ -153,11 +153,6 @@ e2edocker: clean import_plugins
 	./scripts/gen_build_scripts.sh e2e "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" "$(OUT_DIR)" "$(DOCKER_BUILD_EXPORT_GO_ENVS)" "$(DOCKER_BUILD_COPY_GIT_CONFIGS)" "$(PLUGINS_CONFIG_FILE)" "$(GO_MOD_FILE)"
 	./scripts/docker_build.sh development "$(GENERATED_HOME)" "$(VERSION)" "$(DOCKER_REPOSITORY)" false "$(DOCKER_BUILD_USE_BUILDKIT)"
 
-# provide a goc server for e2e testing
-.PHONY: gocdocker
-gocdocker: clean
-	./scripts/docker_build.sh goc "$(GENERATED_HOME)" latest goc-server false "$(DOCKER_BUILD_USE_BUILDKIT)"
-
 .PHONY: vendor
 vendor: clean import_plugins
 	rm -rf vendor
@@ -173,11 +168,11 @@ docs: clean build
 
 # e2e test
 .PHONY: e2e
-e2e: clean gocdocker e2edocker
+e2e: clean e2edocker
 	./scripts/e2e.sh e2e
 
 .PHONY: e2e-core
-e2e-core: clean gocdocker e2edocker
+e2e-core: clean e2edocker
 	./scripts/e2e.sh e2e core
 
 .PHONY: e2e-performance
@@ -185,7 +180,7 @@ e2e-performance: clean docker
 	./scripts/e2e.sh e2e performance
 
 .PHONY: unittest_e2e_engine
-unittest_e2e_engine: clean gocdocker
+unittest_e2e_engine: clean
 	cd test && go test  $$(go list ./... | grep -Ev "engine|e2e|benchmark") -coverprofile=../e2e-engine-coverage.txt -covermode=atomic -tags docker_ready
 
 .PHONY: unittest_plugin
@@ -196,6 +191,17 @@ unittest_plugin: clean import_plugins
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig|(input\/prometheus)|(input\/syslog)"| grep -Ev "plugin_main|pluginmanager") -coverprofile .testCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
 	rm -rf plugins/input/jmxfetch/test/
+
+.PHONY: unittest_plugin_clean
+unittest_plugin_clean:
+	find . -name "go_plugin.LOG" -type f -delete
+	rm -rf./plugins/input/command/conf
+	rm ./plugins/input/command/VGVzdFNjcmlwdFN0b3JhZ2U=.sh
+	rm -rf .testCoverage.txt
+	rm -rf plugin_main/libGoPluginAdapter.so
+	rm -rf plugin_main/GoPluginAdapter.dll
+	rm -rf plugins/input/jmxfetch/test/
+	@echo "Plugin unittest files cleaned"
 
 .PHONY: unittest_core
 unittest_core:
@@ -209,13 +215,6 @@ unittest_pluginmanager: clean import_plugins
 	mv ./plugins/input/prometheus/input_prometheus.go ./plugins/input/prometheus/input_prometheus.go.bak
 	go test $$(go list ./...|grep -Ev "telegraf|external|envconfig"| grep -E "plugin_main|pluginmanager") -coverprofile .coretestCoverage.txt
 	mv ./plugins/input/prometheus/input_prometheus.go.bak ./plugins/input/prometheus/input_prometheus.go
-
-# benchmark
-.PHONY: benchmark
-benchmark: clean e2edocker
-	./scripts/e2e.sh benchmark performance
-	./scripts/benchmark_collect_result.sh
-
 
 .PHONY: all
 all: clean import_plugins

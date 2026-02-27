@@ -1,0 +1,77 @@
+#########################################################################################################################
+# Step 1: Build
+#########################################################################################################################
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 AS builder
+
+# Build arguments
+ARG VERSION=edge
+ARG ENABLE_COMPATIBLE_MODE=OFF
+ARG ENABLE_STATIC_LINK_CRT=OFF
+ARG WITHOUTGDB=ON
+ARG WITHSPL=ON
+ARG MAKE_JOBS=16
+
+USER root
+WORKDIR /src
+COPY . .
+
+# build and make dist
+RUN sh ./scripts/build_edge_linux.sh && \
+    mkdir -p "dist/loongcollector-edge" && \
+    mkdir -p "dist/loongcollector-edge/conf/instance_config/local/" && \
+    mkdir -p "dist/loongcollector-edge/conf/continuous_pipeline_config/local/" && \
+    mkdir -p "dist/loongcollector-edge/data/checkpoint" && \
+    mkdir -p "dist/loongcollector-edge/log" && \
+    mkdir -p "dist/loongcollector-edge/run" && \
+    cp "LICENSE" "dist/loongcollector-edge" && \
+    cp "README.md" "dist/loongcollector-edge" && \
+    cp "scripts/loongcollector_control.sh" "dist/loongcollector-edge" && \
+    cp "core/build/loongcollector" "dist/loongcollector-edge" && \
+    cp "core/build/go_pipeline/libGoPluginAdapter.so" "dist/loongcollector-edge" && \
+    cp "output/libGoPluginBase.so" "dist/loongcollector-edge" && \
+    cp "example_config/start_with_docker/loongcollector_config.json" "dist/loongcollector-edge/conf/instance_config/local/" && \
+    if file "dist/loongcollector-edge/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "dist/loongcollector-edge"; fi &&\
+    strip "dist/loongcollector-edge/loongcollector" && \
+    strip "dist/loongcollector-edge/libGoPluginAdapter.so" && \
+    strip "dist/loongcollector-edge/libGoPluginBase.so" && \
+    chmod 755 "dist/loongcollector-edge/loongcollector"
+
+#########################################################################################################################
+# Step 2: Build image
+#########################################################################################################################
+FROM ubuntu:25.10 AS loongcollector
+
+ENV container=docker
+
+# Build arguments for final image
+ARG HOST_OS
+ARG VERSION=edge
+ARG TARGETPLATFORM
+
+WORKDIR /usr/local
+COPY --from=builder --chown=$(whoami) /src/dist/loongcollector-edge loongcollector
+
+# Install runtime dependencies (iproute2 for e2e, Kerberos/SASL libs for Kafka)
+RUN if [ "$HOST_OS" = "Linux" ]; then \
+        apt-get update && apt-get install -y iproute2 \
+            libsasl2-2 \
+            libsasl2-modules \
+            libsasl2-modules-gssapi-mit \
+            libkrb5-3 \
+            libk5crypto3 \
+            libgssapi-krb5-2 && \
+        apt-get clean && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Provide CentOS-compiled SASL libraries for librdkafka (expects libsasl2.so.3)
+COPY --from=builder /usr/lib64/libsasl2.so.3 /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib64/libsasl2.so.3.0.0 /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/lib64/sasl2 /usr/lib/x86_64-linux-gnu/sasl2
+
+WORKDIR /usr/local/loongcollector
+ENV HTTP_PROBE_PORT=7953 \
+    ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
+    docker_file_cache_path=checkpoint/docker_path_config.json \
+    LOONGCOLLECTOR_VERSION=$VERSION \
+    HOST_OS=$HOST_OS
+CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

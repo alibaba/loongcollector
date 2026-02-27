@@ -80,7 +80,7 @@ const std::string& ActionToString(Action action) {
     return sUndefined;
 }
 RelabelConfig::RelabelConfig() : mSeparator(";"), mReplacement("$1"), mAction(Action::REPLACE) {
-    mRegex = boost::regex("().*");
+    mRegex = boost::regex("(.*)");
 }
 bool RelabelConfig::Init(const Json::Value& config) {
     string errorMsg;

@@ -18,10 +18,10 @@ import (
 	"errors"
 	"regexp"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -40,7 +40,7 @@ type ProcessorRegex struct {
 	SourceKey              string
 
 	context       pipeline.Context
-	logPairMetric pipeline.CounterMetric
+	logPairMetric selfmonitor.CounterMetric
 	re            *regexp.Regexp
 }
 
@@ -56,12 +56,12 @@ func (p *ProcessorRegex) Init(context pipeline.Context) error {
 	// `(?s)` change the meaning of `.` in Golang to match the every character, and the default meaning is not match a newline.
 	p.re, err = regexp.Compile("(?s)" + p.Regex)
 	if err != nil {
-		logger.Error(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Regex)
+		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Regex)
 		return err
 	}
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.logPairMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.PluginPairsPerLogTotal)
+	p.logPairMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.PluginPairsPerLogTotal)
 	return nil
 }
 

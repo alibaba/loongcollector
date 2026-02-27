@@ -16,48 +16,61 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <atomic>
 #include <chrono>
+#include <future>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "common/ThreadPool.h"
-#include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "host_monitor/collector/BaseCollector.h"
+#include "host_monitor/collector/CollectorMetrics.h"
+#include "monitor/metric_models/MetricRecord.h"
 #include "runner/InputRunner.h"
 
 namespace logtail {
 
-class CollectorInstance {
-public:
-    CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
+struct CollectorInfo {
+    std::string name;
+    uint32_t interval;
+    HostMonitorCollectType type;
+};
 
-    bool IsEnabled() const { return mIsEnabled; }
-    void Enable() {
-        mIsEnabled = true;
-        mLastEnableTime = std::chrono::steady_clock::now();
-    }
-    void Disable() { mIsEnabled = false; }
-    bool IsValidEvent(const std::chrono::steady_clock::time_point& execTime) const {
-        return mIsEnabled && execTime >= mLastEnableTime;
-    }
-    bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) {
-        return mCollector->Collect(collectConfig, group);
-    }
-
-private:
-    bool mIsEnabled = false;
-    std::chrono::steady_clock::time_point mLastEnableTime;
-    std::unique_ptr<BaseCollector> mCollector;
+struct CollectorRunInfo {
+    std::chrono::steady_clock::time_point startTime;
+    std::chrono::steady_clock::time_point lastRunTime;
+    std::chrono::seconds interval;
 };
 
 class HostMonitorInputRunner : public InputRunner {
 public:
+    struct CollectorKey {
+        std::string configName;
+        std::string collectorName;
+
+        bool operator<(const CollectorKey& other) const {
+            if (configName != other.configName) {
+                return configName < other.configName;
+            }
+            return collectorName < other.collectorName;
+        }
+
+        bool operator==(const CollectorKey& other) const {
+            return configName == other.configName && collectorName == other.collectorName;
+        }
+    };
+
     HostMonitorInputRunner(const HostMonitorInputRunner&) = delete;
     HostMonitorInputRunner(HostMonitorInputRunner&&) = delete;
     HostMonitorInputRunner& operator=(const HostMonitorInputRunner&) = delete;
@@ -67,20 +80,25 @@ public:
         return &sInstance;
     }
 
-    // Only support singleton mode
-    void UpdateCollector(const std::vector<std::string>& newCollectorNames,
-                         const std::vector<uint32_t>& newCollectorIntervals,
+    void UpdateCollector(const std::string& configName,
+                         const std::vector<CollectorInfo>& newCollectorInfos,
                          QueueKey processQueueKey,
                          size_t inputIndex);
-    void RemoveCollector();
+    void RemoveCollector(const std::string& configName);
+    void RemoveAllCollector();
 
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
+    bool IsStarted() const { return mIsStarted.load(); }
 
-    bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& execTime, const std::string& collectorName);
-    void ScheduleOnce(const std::chrono::steady_clock::time_point& execTime,
-                      HostMonitorTimerEvent::CollectConfig& collectConfig);
+    bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& startTime,
+                            const std::string& configName,
+                            const std::string& collectorName);
+    void ScheduleOnce(CollectContextPtr collectContext);
+    void InitMetrics();
+
+    bool ShouldRestart();
 
 private:
     HostMonitorInputRunner();
@@ -88,18 +106,32 @@ private:
 
     template <typename T>
     void RegisterCollector() {
-        auto collector = std::make_unique<T>();
-        mRegisteredCollectorMap.emplace(T::sName, CollectorInstance(std::move(collector)));
+        mCollectorCreatorMap.emplace(T::sName,
+                                     []() -> CollectorInstance { return CollectorInstance(std::make_unique<T>()); });
     }
 
-    void PushNextTimerEvent(const std::chrono::steady_clock::time_point& execTime,
-                            const HostMonitorTimerEvent::CollectConfig& config);
+    void PushQueue(CollectContextPtr context, PipelineEventGroup&& group);
+    void PushNextTimerEvent(CollectContextPtr config);
+    void AddHostLabels(PipelineEventGroup& group);
+    bool IsStopping() const;
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
+    std::atomic_uint64_t mRunningPipelineCount = 0;
+    std::future<void> mStopFuture; // Future for async stop operation
 
-    mutable std::shared_mutex mRegisteredCollectorMapMutex;
-    std::unordered_map<std::string, CollectorInstance> mRegisteredCollectorMap;
+    mutable std::shared_mutex mRegisteredCollectorMutex;
+    std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;
+
+    std::unordered_map<std::string, std::function<CollectorInstance()>> mCollectorCreatorMap;
+
+    // Metrics
+    MetricsRecordRef mMetricsRecordRef;
+    CounterPtr mOutItemsTotal;
+    CounterPtr mOutItemsSize;
+    CounterPtr mDropItemsTotal;
+    TimeCounterPtr mLatencyTimeMs;
+    IntGaugePtr mLastRunTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class HostMonitorInputRunnerUnittest;

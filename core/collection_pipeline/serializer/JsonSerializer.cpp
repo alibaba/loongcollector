@@ -14,15 +14,30 @@
 
 #include "collection_pipeline/serializer/JsonSerializer.h"
 
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
+
+#include "common/StringTools.h"
+#include "constants/Constants.h"
 #include "constants/SpanConstants.h"
-// TODO: the following dependencies should be removed
 #include "protobuf/sls/LogGroupSerializer.h"
 
 using namespace std;
 
 namespace logtail {
 
-const string JSON_KEY_TIME = "__time__";
+// Helper function to serialize common fields (tags and time)
+template <typename WriterType>
+void SerializeCommonFields(const SizedMap& tags, uint64_t timestamp, WriterType& writer) {
+    // Serialize tags
+    for (const auto& tag : tags.mInner) {
+        writer.Key(tag.first.to_string().c_str());
+        writer.String(tag.second.to_string().c_str());
+    }
+    // Serialize time
+    writer.Key("__time__");
+    writer.Uint64(timestamp);
+}
 
 bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, string& errorMsg) {
     if (group.mEvents.empty()) {
@@ -37,29 +52,34 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
         return false;
     }
 
-    Json::Value groupTags;
-    for (const auto& tag : group.mTags.mInner) {
-        groupTags[tag.first.to_string()] = tag.second.to_string();
-    }
+    // Create reusable StringBuffer and Writer
+    rapidjson::StringBuffer jsonBuffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(jsonBuffer);
+    auto resetBuffer = [&jsonBuffer, &writer]() {
+        jsonBuffer.Clear(); // Clear the buffer for reuse
+        writer.Reset(jsonBuffer);
+    };
 
     // TODO: should support nano second
-    ostringstream oss;
     switch (eventType) {
         case PipelineEvent::Type::LOG:
             for (const auto& item : group.mEvents) {
                 const auto& e = item.Cast<LogEvent>();
-                Json::Value eventJson;
-                // tags
-                eventJson.copy(groupTags);
-                // time
-                eventJson[JSON_KEY_TIME] = e.GetTimestamp();
+                if (e.Empty()) {
+                    continue;
+                }
+                resetBuffer();
+
+                writer.StartObject();
+                SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
                 // contents
                 for (const auto& kv : e) {
-                    eventJson[kv.first.to_string()] = kv.second.to_string();
+                    writer.Key(kv.first.to_string().c_str());
+                    writer.String(kv.second.to_string().c_str());
                 }
-                Json::StreamWriterBuilder writer;
-                writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson) << endl;
+                writer.EndObject();
+                res.append(jsonBuffer.GetString());
+                res.append("\n");
             }
             break;
         case PipelineEvent::Type::METRIC:
@@ -69,62 +89,112 @@ bool JsonEventGroupSerializer::Serialize(BatchedEvents&& group, string& res, str
                 if (e.Is<std::monostate>()) {
                     continue;
                 }
-                Json::Value eventJson;
-                // tags
-                eventJson.copy(groupTags);
-                // time
-                eventJson[JSON_KEY_TIME] = e.GetTimestamp();
+                resetBuffer();
+
+                writer.StartObject();
+                SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
                 // __labels__
-                eventJson[METRIC_RESERVED_KEY_LABELS] = Json::objectValue;
-                auto& labels = eventJson[METRIC_RESERVED_KEY_LABELS];
+                writer.Key(METRIC_RESERVED_KEY_LABELS.c_str());
+                writer.StartObject();
                 for (auto tag = e.TagsBegin(); tag != e.TagsEnd(); tag++) {
-                    labels[tag->first.to_string()] = tag->second.to_string();
+                    writer.Key(tag->first.to_string().c_str());
+                    writer.String(tag->second.to_string().c_str());
                 }
+                writer.EndObject();
                 // __name__
-                eventJson[METRIC_RESERVED_KEY_NAME] = e.GetName().to_string();
+                writer.Key(METRIC_RESERVED_KEY_NAME.c_str());
+                writer.String(e.GetName().to_string().c_str());
                 // __value__
+                writer.Key(METRIC_RESERVED_KEY_VALUE.c_str());
                 if (e.Is<UntypedSingleValue>()) {
-                    eventJson[METRIC_RESERVED_KEY_VALUE] = e.GetValue<UntypedSingleValue>()->mValue;
+                    writer.Double(e.GetValue<UntypedSingleValue>()->mValue);
                 } else if (e.Is<UntypedMultiDoubleValues>()) {
-                    eventJson[METRIC_RESERVED_KEY_VALUE] = Json::objectValue;
-                    auto& values = eventJson[METRIC_RESERVED_KEY_VALUE];
+                    writer.StartObject();
                     for (auto value = e.GetValue<UntypedMultiDoubleValues>()->ValuesBegin();
                          value != e.GetValue<UntypedMultiDoubleValues>()->ValuesEnd();
                          value++) {
-                        values[value->first.to_string()] = value->second.Value;
+                        writer.Key(value->first.to_string().c_str());
+                        writer.Double(value->second.Value);
                     }
+                    writer.EndObject();
                 }
-                Json::StreamWriterBuilder writer;
-                writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson) << endl;
+                for (auto it = e.MetadataBegin(); it != e.MetadataEnd(); it++) {
+                    writer.Key(it->first.to_string().c_str());
+                    writer.String(it->second.to_string().c_str());
+                }
+                writer.EndObject();
+                res.append(jsonBuffer.GetString());
+                res.append("\n");
             }
-            break;
-        case PipelineEvent::Type::SPAN:
-            // TODO: implement span serializer
-            LOG_ERROR(
-                sLogger,
-                ("invalid event type", "span type is not supported")("config", mFlusher->GetContext().GetConfigName()));
             break;
         case PipelineEvent::Type::RAW:
             for (const auto& item : group.mEvents) {
                 const auto& e = item.Cast<RawEvent>();
-                Json::Value eventJson;
-                // tags
-                eventJson.copy(groupTags);
-                // time
-                eventJson[JSON_KEY_TIME] = e.GetTimestamp();
+                if (e.GetContent().empty()) {
+                    continue;
+                }
+                resetBuffer();
+
+                writer.StartObject();
+                SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
                 // content
-                eventJson[DEFAULT_CONTENT_KEY] = e.GetContent().to_string();
-                Json::StreamWriterBuilder writer;
-                writer["indentation"] = "";
-                oss << Json::writeString(writer, eventJson) << endl;
+                writer.Key(DEFAULT_CONTENT_KEY.c_str());
+                writer.String(e.GetContent().to_string().c_str());
+                writer.EndObject();
+                res.append(jsonBuffer.GetString());
+                res.append("\n");
+            }
+            break;
+        case PipelineEvent::Type::SPAN:
+            for (const auto& item : group.mEvents) {
+                const auto& e = item.Cast<SpanEvent>();
+
+                resetBuffer();
+
+                writer.StartObject();
+                SerializeCommonFields(group.mTags, e.GetTimestamp(), writer);
+
+                writer.Key(DEFAULT_TRACE_TAG_TRACE_ID.data(), DEFAULT_TRACE_TAG_TRACE_ID.size());
+                writer.String(e.GetTraceId().data(), e.GetTraceId().size());
+                writer.Key(DEFAULT_TRACE_TAG_SPAN_ID.data(), DEFAULT_TRACE_TAG_SPAN_ID.size());
+                writer.String(e.GetSpanId().data(), e.GetSpanId().size());
+                writer.Key(DEFAULT_TRACE_TAG_PARENT_ID.data(), DEFAULT_TRACE_TAG_PARENT_ID.size());
+                writer.String(e.GetParentSpanId().data(), e.GetParentSpanId().size());
+                writer.Key(DEFAULT_TRACE_TAG_SPAN_NAME.data(), DEFAULT_TRACE_TAG_SPAN_NAME.size());
+                writer.String(e.GetName().data(), e.GetName().size());
+
+                writer.Key(DEFAULT_TRACE_TAG_START_TIME_NANO.data(), DEFAULT_TRACE_TAG_START_TIME_NANO.size());
+                writer.Uint64(e.GetStartTimeNs());
+                writer.Key(DEFAULT_TRACE_TAG_END_TIME_NANO.data(), DEFAULT_TRACE_TAG_END_TIME_NANO.size());
+                writer.Uint64(e.GetEndTimeNs());
+                writer.Key(DEFAULT_TRACE_TAG_DURATION.data(), DEFAULT_TRACE_TAG_DURATION.size());
+                writer.Uint64(e.GetEndTimeNs() - e.GetStartTimeNs());
+
+                writer.Key(DEFAULT_TRACE_TAG_ATTRIBUTES.data(), DEFAULT_TRACE_TAG_ATTRIBUTES.size());
+                writer.StartObject();
+                for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {
+                    writer.Key(it->first.data(), it->first.size());
+                    writer.String(it->second.data(), it->second.size());
+                }
+                writer.EndObject();
+
+                writer.Key(DEFAULT_TRACE_TAG_SCOPE.data(), DEFAULT_TRACE_TAG_SCOPE.size());
+                writer.StartObject();
+                for (auto it = e.ScopeTagsBegin(); it != e.ScopeTagsEnd(); ++it) {
+                    writer.Key(it->first.data(), it->first.size());
+                    writer.String(it->second.data(), it->second.size());
+                }
+                writer.EndObject();
+
+                writer.EndObject();
+                res.append(jsonBuffer.GetString());
+                res.append("\n");
             }
             break;
         default:
             break;
     }
-    res = oss.str();
-    return true;
+    return !res.empty();
 }
 
 } // namespace logtail

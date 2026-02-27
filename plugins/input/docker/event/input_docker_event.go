@@ -15,7 +15,7 @@
 package event
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"strconv"
@@ -38,7 +38,7 @@ type ServiceDockerEvents struct {
 
 func (p *ServiceDockerEvents) Init(context pipeline.Context) (int, error) {
 	p.context = context
-	helper.ContainerCenterInit()
+	containercenter.Init()
 	return 0, nil
 }
 
@@ -62,8 +62,8 @@ func (p *ServiceDockerEvents) fire(c pipeline.Collector, event events.Message) {
 	key := make([]string, len(event.Actor.Attributes)+4)
 	value := make([]string, len(key))
 	value[0] = strconv.FormatInt(event.TimeNano, 10)
-	value[1] = event.Action
-	value[2] = event.Type
+	value[1] = string(event.Action)
+	value[2] = string(event.Type)
 	value[3] = event.Actor.ID
 	key[0] = "_time_nano_"
 	key[1] = "_action_"
@@ -87,9 +87,9 @@ func (p *ServiceDockerEvents) Start(c pipeline.Collector) error {
 	p.shutdown = make(chan struct{})
 	p.waitGroup.Add(1)
 	p.innerEventQueue = make(chan events.Message, p.EventQueueSize)
-	helper.RegisterDockerEventListener(p.innerEventQueue)
+	containercenter.RegisterDockerEventListener(p.innerEventQueue)
 	defer func() {
-		helper.UnRegisterDockerEventListener(p.innerEventQueue)
+		containercenter.UnRegisterDockerEventListener(p.innerEventQueue)
 		close(p.innerEventQueue)
 		p.waitGroup.Done()
 	}()

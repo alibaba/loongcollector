@@ -16,11 +16,11 @@
 
 | 参数 | 类型 | 是否必选 | 说明 |
 | --- | --- | --- | --- |
-| Type | String | 是 | 插件类型，指定为`aggregator_base`。 |
-| MaxLogGroupCount | Int | 否 | 在执行Flush之前，内存中允许存在的最大LogGroup数量。如果未添加该参数，则默认内存中最多允许存在4个LogGroup。 |
-| MaxLogCount | Int | 否 | 每个LogGroup最多可包含的日志条数。如果未添加该参数，则默认每个LogGroup最多可包含1024条日志。 |
-| PackFlag | Boolean | 否 | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
-| Topic | String | 否 | LogGroup的Topic名。如果未添加该参数，则默认每个LogGroup的Topic名为空。 |
+| Type | string | 是 | 插件类型，指定为`aggregator_base`。 |
+| MaxLogGroupCount | int | 否 | 在执行Flush之前，内存中允许存在的最大LogGroup数量。如果未添加该参数，则默认内存中最多允许存在4个LogGroup。 |
+| MaxLogCount | int | 否 | 每个LogGroup最多可包含的日志条数。如果未添加该参数，则默认每个LogGroup最多可包含1024条日志。 |
+| PackFlag | bool | 否 | 是否需要在LogGroup的LogTag中添加__pack_id__字段。如果未添加改参数，则默认在LogGroup的LogTag中添加__pack_id__字段。 |
+| Topic | string | 否 | LogGroup的Topic名。如果未添加该参数，则默认每个LogGroup的Topic名为空。 |
 
 ## 样例
 

@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"github.com/alibaba/ilogtail/pkg/config"
 
@@ -49,6 +49,7 @@ type InputCommand struct {
 	storageDir       string
 	scriptPath       string
 	cmdUser          *user.User
+	currentUser      *user.User
 	scriptContentMd5 string
 }
 
@@ -56,13 +57,23 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 	in.context = context
 
 	if valid, err := in.Validate(); err != nil || !valid {
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return 0, err
 	}
 
+	// Get current user
+	currentUser, err := user.Current()
+	if err != nil {
+		err = fmt.Errorf("cannot get current user, error: %s", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
+		return 0, err
+	}
+	in.currentUser = currentUser
+
 	// Parse Base64 content
 	if in.ContentEncoding == ContentTypeBase64 {
-		decodeContent, err := base64.StdEncoding.DecodeString(in.ScriptContent)
+		var decodeContent []byte
+		decodeContent, err = base64.StdEncoding.DecodeString(in.ScriptContent)
 		if err != nil {
 			return 0, fmt.Errorf("base64.StdEncoding error:%s", err)
 		}
@@ -71,10 +82,10 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 
 	// mkdir
 	in.storageDir = path.Join(config.LoongcollectorGlobalConfig.LoongCollectorConfDir, "/scripts")
-	err := mkdir(in.storageDir)
+	err = mkdir(in.storageDir)
 	if err != nil {
 		err = fmt.Errorf("init storageInstance error : %s", err)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return 0, err
 	}
 
@@ -82,7 +93,7 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 	scriptPath, err := saveContent(in.storageDir, in.ScriptContent, in.context.GetConfigName(), in.ScriptType)
 	if err != nil {
 		err = fmt.Errorf("SaveContent error: %s", err)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return 0, err
 	}
 	in.scriptPath = scriptPath
@@ -93,7 +104,7 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 	cmdUser, err := user.Lookup(in.User)
 	if err != nil {
 		err = fmt.Errorf("cannot find User %s, error: %s", in.User, err)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return 0, err
 	}
 	in.cmdUser = cmdUser
@@ -104,43 +115,43 @@ func (in *InputCommand) Init(context pipeline.Context) (int, error) {
 func (in *InputCommand) Validate() (bool, error) {
 	if _, ok := ScriptTypeToSuffix[in.ScriptType]; !ok {
 		err := fmt.Errorf("not support ScriptType %s", in.ScriptType)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if in.User == UserRoot {
 		err := fmt.Errorf("exec command not support user root")
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if in.User == "" {
 		err := fmt.Errorf("params User can not be empty")
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if _, ok := SupportContentType[in.ContentEncoding]; !ok {
 		err := fmt.Errorf("not support ContentType %s", in.ContentEncoding)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if in.ScriptContent == "" {
 		err := fmt.Errorf("params ScriptContent can not empty")
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if len(in.ScriptContent) > 512*1024 {
 		err := fmt.Errorf("ScriptContent size is greater than 512K")
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 
 	if in.TimeoutMilliSeconds > in.IntervalMs {
 		in.TimeoutMilliSeconds = in.IntervalMs
-		logger.Warning(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command warning", "TimeoutMilliSeconds > IntervalMs", "set TimeoutMilliSeconds = IntervalMs")
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command warning", "TimeoutMilliSeconds > IntervalMs", "set TimeoutMilliSeconds = IntervalMs")
 	}
 
 	if in.CmdPath == "" {
@@ -149,7 +160,7 @@ func (in *InputCommand) Validate() (bool, error) {
 
 	if err := isValidBinPath(in.CmdPath); err != nil {
 		err = fmt.Errorf("CmdPath %s does not exist, err:%v", in.CmdPath, err)
-		logger.Error(in.context.GetRuntimeContext(), util.CategoryConfigAlarm, "init input_command error", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.CategoryConfigAlarm, "init input_command error", err)
 		return false, err
 	}
 	return true, nil
@@ -161,14 +172,14 @@ func isValidBinPath(cmdPath string) error {
 func (in *InputCommand) Collect(collector pipeline.Collector) error {
 	// stderrStr is used to store the standard error output generated during command execution.
 	// It captures any error messages or diagnostic information produced by the command.
-	stdoutStr, stderrStr, isKilled, err := RunCommandWithTimeOut(in.TimeoutMilliSeconds, in.cmdUser, in.CmdPath, in.Environments, in.scriptPath)
+	stdoutStr, stderrStr, isKilled, err := RunCommandWithTimeOut(in.TimeoutMilliSeconds, in.cmdUser, in.currentUser, in.CmdPath, in.Environments, in.scriptPath)
 
 	if err != nil {
 		if in.IgnoreError {
 			err = nil
 		} else {
 			err = fmt.Errorf("exec cmd error errInfo:%s, stderr:%s, stdout:%s", err, stderrStr, stdoutStr)
-			logger.Error(in.context.GetRuntimeContext(), util.InputCollectAlarm, "input_command Collect error", err)
+			logger.Warning(in.context.GetRuntimeContext(), selfmonitor.InputCollectAlarm, "input_command Collect error", err)
 		}
 		return err
 	}
@@ -178,7 +189,7 @@ func (in *InputCommand) Collect(collector pipeline.Collector) error {
 			err = nil
 		} else {
 			err = fmt.Errorf("timeout run exec script file filepath %s", in.scriptPath)
-			logger.Error(in.context.GetRuntimeContext(), util.InputCollectAlarm, "input_command Collect error", err)
+			logger.Warning(in.context.GetRuntimeContext(), selfmonitor.InputCollectAlarm, "input_command Collect error", err)
 		}
 		return err
 	}
@@ -188,7 +199,7 @@ func (in *InputCommand) Collect(collector pipeline.Collector) error {
 			err = nil
 		} else {
 			err = fmt.Errorf("exec cmd error, stderr:%s, stdout:%s", stderrStr, stdoutStr)
-			logger.Error(in.context.GetRuntimeContext(), util.InputCollectAlarm, "input_command Collect error", err)
+			logger.Warning(in.context.GetRuntimeContext(), selfmonitor.InputCollectAlarm, "input_command Collect error", err)
 		}
 		return err
 	}

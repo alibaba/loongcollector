@@ -29,6 +29,10 @@ const string METRIC_LABEL_KEY_PROJECT = "project";
 const string METRIC_LABEL_KEY_USER_DEFINED_ID = "user_defined_id";
 const string METRIC_LABEL_KEY_UUID = "uuid";
 const string METRIC_LABEL_KEY_VERSION = "version";
+const string METRIC_LABEL_KEY_ECS_INSTANCE_ID = "ecs_instance_id";
+const string METRIC_LABEL_KEY_ECS_REGION_ID = "ecs_region_id";
+const string METRIC_LABEL_KEY_ECS_USER_ID = "ecs_user_id";
+const string METRIC_LABEL_KEY_HOST_ID = "host_id";
 
 // metric keys
 const string METRIC_AGENT_CPU = "cpu";
@@ -38,5 +42,6 @@ const string METRIC_AGENT_MEMORY = "memory_used_mb";
 const string METRIC_AGENT_MEMORY_GO = "go_memory_used_mb";
 const string METRIC_AGENT_OPEN_FD_TOTAL = "open_fd_total";
 const string METRIC_AGENT_PIPELINE_CONFIG_TOTAL = "pipeline_config_total";
+const string METRIC_AGENT_HOST_MONITOR_TOTAL = "host_monitor_config_total";
 
 } // namespace logtail

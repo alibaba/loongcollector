@@ -67,7 +67,7 @@ func (g *metadataGroup) collectByLengthChecker(group *models.PipelineGroupEvents
 		inputSize := len(group.Events)
 		availableSize := g.maxEventsLength - g.nowEventsLength
 		if availableSize < 0 {
-			logger.Error(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize is negative")
+			logger.Warning(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize is negative")
 			_ = g.GetResultWithoutLock(ctx)
 			continue
 		}
@@ -93,7 +93,7 @@ func (g *metadataGroup) collectByLengthAndBytesChecker(group *models.PipelineGro
 		availableBytesSize := g.maxEventsByteLength - g.nowEventsByteLength
 		availableLenSize := g.maxEventsLength - g.nowEventsLength
 		if availableLenSize < 0 || availableBytesSize < 0 {
-			logger.Error(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize or availableLength is negative")
+			logger.Warning(g.context.GetRuntimeContext(), "RUNTIME_ALARM", "availableSize or availableLength is negative")
 			_ = g.GetResultWithoutLock(ctx)
 			continue
 		}
@@ -118,7 +118,7 @@ func (g *metadataGroup) collectByLengthAndBytesChecker(group *models.PipelineGro
 				num = 1
 				oversize = true
 			} else {
-				logger.Errorf(g.context.GetRuntimeContext(), "AGGREGATE_OVERSIZE_ALARM", "event[%s] size [%d] is over the limit size %d, the event would be dropped",
+				logger.Warningf(g.context.GetRuntimeContext(), "AGGREGATE_OVERSIZE_ALARM", "event[%s] size [%d] is over the limit size %d, the event would be dropped",
 					group.Events[0].GetName(),
 					len(group.Events[0].(models.ByteArray)),
 					g.maxEventsByteLength)

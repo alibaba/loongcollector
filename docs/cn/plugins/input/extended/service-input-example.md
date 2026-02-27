@@ -16,8 +16,8 @@
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
-| Type | String，无默认值（必填） | 插件类型，固定为`service_input_example`。 |
-| Address | String，`：19000` | 接收端口。 |
+| Type | string，无默认值（必填） | 插件类型，固定为`service_input_example`。 |
+| Address | string，`：19000` | 接收端口。 |
 
 ## 样例
 

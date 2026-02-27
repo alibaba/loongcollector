@@ -16,58 +16,17 @@
 
 #pragma once
 
-#include <array>
 #include <string>
 #include <unordered_set>
 
 #include "json/value.h"
 
-#include "AppConfig.h"
-#include "models/StringView.h"
+#include "app_config/AppConfig.h"
+#include "common/EcsMetaData.h"
+#include "common/StringView.h"
 
 namespace logtail {
 
-static const size_t ID_MAX_LENGTH = 128;
-template <size_t N>
-inline void SetID(const std::string& id, std::array<char, N>& target, size_t& targetLen) {
-    if (id.empty()) {
-        target[0] = '\0';
-        targetLen = 0;
-        return;
-    }
-    targetLen = std::min(id.size(), N - 1);
-    std::memcpy(target.data(), id.data(), targetLen);
-    target[targetLen] = '\0';
-}
-struct ECSMeta {
-    ECSMeta() = default;
-
-    void SetInstanceID(const std::string& id) { SetID(id, mInstanceID, mInstanceIDLen); }
-
-    void SetUserID(const std::string& id) { SetID(id, mUserID, mUserIDLen); }
-
-    void SetRegionID(const std::string& id) { SetID(id, mRegionID, mRegionIDLen); }
-
-    [[nodiscard]] StringView GetInstanceID() const { return StringView(mInstanceID.data(), mInstanceIDLen); }
-    [[nodiscard]] StringView GetUserID() const { return StringView(mUserID.data(), mUserIDLen); }
-    [[nodiscard]] StringView GetRegionID() const { return StringView(mRegionID.data(), mRegionIDLen); }
-
-    [[nodiscard]] bool IsValid() const {
-        return !GetInstanceID().empty() && !GetUserID().empty() && !GetRegionID().empty();
-    }
-
-private:
-    std::array<char, ID_MAX_LENGTH> mInstanceID{};
-    size_t mInstanceIDLen = 0UL;
-
-    std::array<char, ID_MAX_LENGTH> mUserID{};
-    size_t mUserIDLen = 0UL;
-
-    std::array<char, ID_MAX_LENGTH> mRegionID{};
-    size_t mRegionIDLen = 0UL;
-
-    friend class InstanceIdentityUnittest;
-};
 struct Hostid {
     enum Type {
         CUSTOM,
@@ -104,7 +63,7 @@ struct Hostid {
 
 private:
     std::array<char, ID_MAX_LENGTH> mId{};
-    size_t mIdLen = 0UL;
+    size_t mIdLen = (size_t)0;
 
     Type mType;
 
@@ -112,10 +71,13 @@ private:
 };
 class Entity {
 public:
-    bool IsECSValid() const { return mECSMeta.IsValid(); }
+    bool IsECSValid() const { return mECSMeta.IsBasicValid(); }
     StringView GetEcsInstanceID() const { return mECSMeta.GetInstanceID(); }
     StringView GetEcsUserID() const { return mECSMeta.GetUserID(); }
     StringView GetEcsRegionID() const { return mECSMeta.GetRegionID(); }
+    StringView GetEcsZoneID() const { return mECSMeta.GetZoneID(); }
+    StringView GetEcsVpcID() const { return mECSMeta.GetVpcID(); }
+    StringView GetEcsVswitchID() const { return mECSMeta.GetVswitchID(); }
     StringView GetHostID() const { return mHostid.GetHostID(); }
     Hostid::Type GetHostIdType() const { return mHostid.GetType(); }
     [[nodiscard]] const ECSMeta& GetECSMeta() const { return mECSMeta; }
@@ -146,8 +108,6 @@ bool IsDigitsDotsHostname(const char* hostname);
 //
 // NOTE: logger must be initialized before calling this.
 std::string GetAnyAvailableIP();
-
-bool FetchECSMeta(ECSMeta& metaObj);
 
 class InstanceIdentity {
 public:

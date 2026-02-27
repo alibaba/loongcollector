@@ -24,7 +24,6 @@
 #include <vector>
 
 #include "common/Lock.h"
-#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/event/Event.h"
 
@@ -157,11 +156,6 @@ protected:
     SpinLock mCacheFileAllConfigMapLock;
     std::unordered_map<std::string, std::pair<std::vector<FileDiscoveryConfig>, int32_t>> mCacheFileAllConfigMap;
 
-    PTMutex mContainerInfoCmdLock;
-    std::vector<ConfigContainerInfoUpdateCmd*> mContainerInfoCmdVec;
-
-    PTMutex mDockerContainerStoppedCmdLock;
-    std::vector<ConfigContainerInfoUpdateCmd*> mDockerContainerStoppedCmdVec;
 
     // /**
     //  * @brief mAllContainerInfoMap. when config update, we dump all config's std::vector<ContainerInfo>
@@ -257,7 +251,10 @@ public:
     // 废弃
     // const std::unordered_map<std::string, Config*>& GetAllConfig() { return mNameConfigMap; }
 
-    void RegisterWildcardPath(const FileDiscoveryConfig& config, const std::string& path, int32_t depth);
+    void RegisterWildcardPath(const FileDiscoveryConfig& config,
+                              const BasePathInfo& pathInfo,
+                              const std::string& path,
+                              int32_t depth);
     bool RegisterHandlers(const std::string& basePath, const FileDiscoveryConfig& config);
     bool RegisterHandlers();
     bool RegisterHandlersRecursively(const std::string& dir, const FileDiscoveryConfig& config, bool checkTimeout);
@@ -442,16 +439,8 @@ public:
 
     // std::string GetAllProjectsSet();
 
-    bool UpdateContainerPath(ConfigContainerInfoUpdateCmd* cmd);
-    bool IsUpdateContainerPaths();
-    bool DoUpdateContainerPaths();
-
-    bool UpdateContainerStopped(ConfigContainerInfoUpdateCmd* cmd);
     void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
 
-    void SaveDockerConfig();
-
-    void LoadDockerConfig();
 
     /**
      * delete mHandlersToDelete and mReaderToDelete

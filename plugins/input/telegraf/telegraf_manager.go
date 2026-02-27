@@ -28,7 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 var statusCheckInterval = time.Second * time.Duration(30)
@@ -366,7 +366,7 @@ func GetTelegrafManager(agentDirPath string) *Manager {
 		}
 		// don't init the collector with struct because the collector depends on the bindMeta.
 		telegrafManager.collector = NewLogCollector(agentDirPath)
-		util.RegisterAlarm("telegraf", telegrafManager.bindMeta.GetAlarm())
+		selfmonitor.RegisterAlarm("telegraf", telegrafManager.bindMeta.GetAlarm())
 		go telegrafManager.run()
 		go telegrafManager.collector.Run()
 	})

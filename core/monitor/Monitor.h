@@ -34,6 +34,9 @@ class LogGroup;
 }
 
 namespace logtail {
+#ifndef LOGTAIL_NO_TC_MALLOC
+extern time_t gLastTcmallocReleaseMemTime;
+#endif
 
 struct CpuStat {
 #if defined(__linux__)
@@ -209,6 +212,11 @@ public:
         SET_GAUGE(mAgentConfigTotal, total);
 #endif
     }
+    void SetAgentHostMonitorTotal(uint64_t total) {
+#ifndef APSARA_UNIT_TEST_MAIN
+        SET_GAUGE(mAgentHostMonitorTotal, total);
+#endif
+    }
 
     static std::string mHostname;
     static std::string mIpAddr;
@@ -216,6 +224,9 @@ public:
     static std::string mUsername;
     static int32_t mSystemBootTime;
     static std::string mStartTime;
+    static std::string mEcsInstanceID;
+    static std::string mEcsUserID;
+    static std::string mEcsRegionID;
 
 private:
     LoongCollectorMonitor();
@@ -240,6 +251,7 @@ private:
     IntGaugePtr mAgentGoRoutinesTotal;
     IntGaugePtr mAgentOpenFdTotal;
     IntGaugePtr mAgentConfigTotal;
+    IntGaugePtr mAgentHostMonitorTotal;
 };
 
 } // namespace logtail

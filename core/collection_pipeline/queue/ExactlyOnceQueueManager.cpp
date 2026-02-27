@@ -25,13 +25,14 @@
 DEFINE_FLAG_INT32(logtail_queue_gc_threshold_sec, "2min", 2 * 60);
 DEFINE_FLAG_INT64(logtail_queue_max_used_time_per_round_in_msec, "500ms", 500);
 
-DECLARE_FLAG_INT32(bounded_process_queue_capacity);
+DECLARE_FLAG_INT32(count_bounded_process_queue_capacity);
 
 using namespace std;
 
 namespace logtail {
 
-ExactlyOnceQueueManager::ExactlyOnceQueueManager() : mProcessQueueParam(INT32_FLAG(bounded_process_queue_capacity)) {
+ExactlyOnceQueueManager::ExactlyOnceQueueManager()
+    : mProcessQueueParam(INT32_FLAG(count_bounded_process_queue_capacity)) {
 }
 
 bool ExactlyOnceQueueManager::CreateOrUpdateQueue(QueueKey key,
@@ -153,12 +154,6 @@ void ExactlyOnceQueueManager::DisablePopProcessQueue(const string& configName, b
     for (auto& iter : mProcessQueues) {
         if (iter.second->GetConfigName() == configName) {
             iter.second->DisablePop();
-            if (!isPipelineRemoving) {
-                const auto& p = CollectionPipelineManager::GetInstance()->FindConfigByName(configName);
-                if (p) {
-                    iter.second->SetPipelineForItems(p);
-                }
-            }
         }
     }
 }

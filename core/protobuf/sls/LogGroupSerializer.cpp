@@ -38,13 +38,13 @@ const string METRIC_LABELS_KEY_VALUE_SEPARATOR = "#$#";
  *      Number of bytes required.
  */
 static inline size_t uint32_size(uint32_t v) {
-    if (v < (1UL << 7)) {
+    if (v < ((size_t)1 << 7)) {
         return 1;
-    } else if (v < (1UL << 14)) {
+    } else if (v < ((size_t)1 << 14)) {
         return 2;
-    } else if (v < (1UL << 21)) {
+    } else if (v < ((size_t)1 << 21)) {
         return 3;
-    } else if (v < (1UL << 28)) {
+    } else if (v < ((size_t)1 << 28)) {
         return 4;
     } else {
         return 5;
@@ -110,7 +110,7 @@ void LogGroupSerializer::StartToAddLog(size_t size) {
 
 void LogGroupSerializer::AddLogTime(uint32_t logTime) {
     // limit logTime's min value, ensure varint size is 5, which is 1978-07-05 05:24:16
-    static uint32_t minLogTime = 1UL << 28;
+    static uint32_t minLogTime = (uint32_t)1 << 28;
     if (logTime < minLogTime) {
         logTime = minLogTime;
     }
@@ -261,6 +261,10 @@ size_t GetLogTagSize(size_t keySZ, size_t valueSZ) {
 size_t GetMetricLabelSize(const MetricEvent& e) {
     static size_t labelSepSZ = METRIC_LABELS_SEPARATOR.size();
     static size_t keyValSepSZ = METRIC_LABELS_KEY_VALUE_SEPARATOR.size();
+
+    if (e.TagsSize() == 0) {
+        return 0;
+    }
 
     size_t valueSZ = e.TagsSize() * keyValSepSZ + (e.TagsSize() - 1) * labelSepSZ;
     for (auto it = e.TagsBegin(); it != e.TagsEnd(); ++it) {

@@ -23,12 +23,13 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 type LocalContext struct {
-	MetricsRecords             []*pipeline.MetricsRecord
-	logstoreConfigMetricRecord *pipeline.MetricsRecord
+	MetricsRecords             []*selfmonitor.MetricsRecord
+	logstoreConfigMetricRecord *selfmonitor.MetricsRecord
 
 	AllCheckPoint map[string][]byte
 
@@ -75,29 +76,28 @@ func (p *LocalContext) GetExtension(name string, cfg any) (pipeline.Extension, e
 	return nil, nil
 }
 
-func (p *LocalContext) RegisterMetricRecord(labels []pipeline.LabelPair) *pipeline.MetricsRecord {
+func (p *LocalContext) RegisterMetricRecord(labels []selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
 	contextMutex.Lock()
 	defer contextMutex.Unlock()
 
-	metricsRecord := &pipeline.MetricsRecord{Context: p, Labels: labels}
+	metricsRecord := &selfmonitor.MetricsRecord{Labels: labels}
 
 	p.MetricsRecords = append(p.MetricsRecords, metricsRecord)
 	return metricsRecord
 }
 
-func (p *LocalContext) RegisterLogstoreConfigMetricRecord(labels []pipeline.LabelPair) *pipeline.MetricsRecord {
-	p.logstoreConfigMetricRecord = &pipeline.MetricsRecord{
-		Context: p,
-		Labels:  labels,
+func (p *LocalContext) RegisterLogstoreConfigMetricRecord(labels []selfmonitor.LabelPair) *selfmonitor.MetricsRecord {
+	p.logstoreConfigMetricRecord = &selfmonitor.MetricsRecord{
+		Labels: labels,
 	}
 	return p.logstoreConfigMetricRecord
 }
 
-func (p *LocalContext) GetLogstoreConfigMetricRecord() *pipeline.MetricsRecord {
+func (p *LocalContext) GetLogstoreConfigMetricRecord() *selfmonitor.MetricsRecord {
 	return p.logstoreConfigMetricRecord
 }
 
-func (p *LocalContext) GetMetricRecord() *pipeline.MetricsRecord {
+func (p *LocalContext) GetMetricRecord() *selfmonitor.MetricsRecord {
 	contextMutex.RLock()
 	if len(p.MetricsRecords) > 0 {
 		defer contextMutex.RUnlock()

@@ -1,0 +1,22 @@
+sources:
+  input_file:
+    type: file
+    include:
+      - /home/vector-log/*.log
+
+transforms:
+  transform_regex:
+    type: remap
+    inputs:
+      - input_file
+    source: |-
+      . = parse_regex!(.message, r'^(?P<remote>[^ ]*) (?P<ident>[^ ]*) (?P<auth>[^ ]*) \[(?P<timestamp>[^\]]*)\] "(?P<method>\S+)(?: +(?P<request>[^\"]*?)(?: +\S*)?)?" (?P<response_code>[^ ]*) (?P<bytes>[^ ]*)(?: "(?P<referer>[^\"]*)" "(?P<user_agent>[^\"]*)")')
+
+sinks:
+  output_file:
+    type: file
+    inputs:
+      - transform_regex
+    path: /home/vector-log/test.out
+    encoding:
+      codec: json

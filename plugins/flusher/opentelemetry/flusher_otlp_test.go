@@ -37,6 +37,7 @@ import (
 
 type TestOtlpLogService struct {
 	otlpv1.UnimplementedLogsServiceServer
+	plogotlp.UnimplementedGRPCServer
 	ch    chan *otlpv1.ExportLogsServiceRequest
 	pause time.Duration
 }
@@ -514,6 +515,7 @@ func makeTestLogGroupList() *protocol.LogGroupList {
 }
 
 type TestOtlpLogServiceV2 struct {
+	plogotlp.UnimplementedGRPCServer
 	ch    chan plogotlp.ExportRequest
 	pause time.Duration
 }
@@ -527,6 +529,7 @@ func (t *TestOtlpLogServiceV2) Export(ctx context.Context, request plogotlp.Expo
 }
 
 type TestOtlpMetricServiceV2 struct {
+	pmetricotlp.UnimplementedGRPCServer
 	ch    chan pmetricotlp.ExportRequest
 	pause time.Duration
 }
@@ -568,6 +571,7 @@ func newTestGrpcMetricServiceV2(t *testing.T, address string, pause time.Duratio
 }
 
 type TestOtlpTraceServiceV2 struct {
+	ptraceotlp.UnimplementedGRPCServer
 	ch    chan ptraceotlp.ExportRequest
 	pause time.Duration
 }

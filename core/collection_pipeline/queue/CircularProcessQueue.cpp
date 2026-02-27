@@ -79,14 +79,6 @@ bool CircularProcessQueue::Pop(unique_ptr<ProcessQueueItem>& item) {
     return true;
 }
 
-void CircularProcessQueue::SetPipelineForItems(const std::shared_ptr<CollectionPipeline>& p) const {
-    for (auto& item : mQueue) {
-        if (!item->mPipeline) {
-            item->mPipeline = p;
-        }
-    }
-}
-
 void CircularProcessQueue::Reset(size_t cap) {
     // it seems more reasonable to retain extra items and process them immediately, however this contray to current
     // framework design so we simply discard extra items, considering that it is a rare case to change capacity

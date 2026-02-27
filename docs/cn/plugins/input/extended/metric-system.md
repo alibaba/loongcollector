@@ -16,15 +16,15 @@
 
 | 参数          | 类型      | 是否必选 | 说明                                                                                         |
 | ----------- | ------- | ---- | ------------------------------------------------------------------------------------------ |
-| Type        | String  | 是    | 插件类型                                                                                       |
-| CPU     | Boolean  | 否    | <p>是否开启主机CPU指标采集。</p><p>默认取值：true。</p> |
-| Mem    | Boolean  | 否   | <p>是否开启主机Memory指标采集。</p><p>默认取值：true。</p> |
-| Disk    | Boolean | 否    | <p>是否开启主机Disk指标采集。</p><p>默认取值：true。</p> |
-| Net    | Boolean | 否    | <p>是否开启主机Net指标采集。</p><p>默认取值：true。</p> |
-| Protocol  | Boolean | 否    | <p>是否开启主机Protocol指标采集。</p><p>默认取值：true。</p>件。                                                                               |
-| TCP    | Boolean | 否    | <p>是否开启主机Net采集。</p><p>默认取值：false。</p> |
-| OpenFd    | Boolean | 否    | <p>是否开启主机Net采集。</p><p>默认取值：true。</p> |
-| CPUPercent    | Boolean | 否    | <p>是否开启主机CPU使用率指标采集。</p><p>默认取值：true。</p> |
+| Type        | string  | 是    | 插件类型                                                                                       |
+| CPU     | bool  | 否    | <p>是否开启主机CPU指标采集。</p><p>默认取值：true。</p> |
+| Mem    | bool  | 否   | <p>是否开启主机Memory指标采集。</p><p>默认取值：true。</p> |
+| Disk    | bool | 否    | <p>是否开启主机Disk指标采集。</p><p>默认取值：true。</p> |
+| Net    | bool | 否    | <p>是否开启主机Net指标采集。</p><p>默认取值：true。</p> |
+| Protocol  | bool | 否    | <p>是否开启主机Protocol指标采集。</p><p>默认取值：true。</p>件。                                                                               |
+| TCP    | bool | 否    | <p>是否开启主机Net采集。</p><p>默认取值：false。</p> |
+| OpenFd    | bool | 否    | <p>是否开启主机Net采集。</p><p>默认取值：true。</p> |
+| CPUPercent    | bool | 否    | <p>是否开启主机CPU使用率指标采集。</p><p>默认取值：true。</p> |
 | Labels  | String字典 | 否    | 自定义Labels。件。                                                                               |
 
 ## 样例

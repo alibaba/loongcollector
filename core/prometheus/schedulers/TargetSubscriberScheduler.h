@@ -43,9 +43,12 @@ public:
     void OnSubscription(HttpResponse&, uint64_t);
     void SubscribeOnce(std::chrono::steady_clock::time_point execTime);
 
+    bool IsHostOnlyMode() const;
+    void ScheduleHostOnlyTargets();
+
     std::string GetId() const;
 
-    void ScheduleNext() override;
+    bool ScheduleNext() override;
     void Cancel() override;
     void InitSelfMonitor(const MetricLabels&);
 
@@ -65,6 +68,8 @@ public:
 
 private:
     bool ParseScrapeSchedulerGroup(const std::string& content, std::vector<PromTargetInfo>& scrapeSchedulerGroup);
+    void BuildHostOnlyScrapeSchedulerGroup(std::vector<PromTargetInfo>& scrapeSchedulerGroup);
+    bool BuildPromTargetInfo(const std::string& target, Labels& labels, PromTargetInfo& targetInfo);
 
     std::unordered_map<std::string, std::shared_ptr<ScrapeScheduler>>
     BuildScrapeSchedulerSet(std::vector<PromTargetInfo>& scrapeSchedulerGroup);

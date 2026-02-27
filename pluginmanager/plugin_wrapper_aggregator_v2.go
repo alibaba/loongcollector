@@ -17,11 +17,11 @@ package pluginmanager
 import (
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // AggregatorWrapperV2 wrappers Aggregator.
@@ -33,12 +33,12 @@ type AggregatorWrapperV2 struct {
 	AggregatorWrapper
 	Aggregator pipeline.AggregatorV2
 
-	totalDelayTimeMs pipeline.CounterMetric
+	totalDelayTimeMs selfmonitor.CounterMetric
 }
 
 func (wrapper *AggregatorWrapperV2) Init(pluginMeta *pipeline.PluginMeta) error {
 	wrapper.InitMetricRecord(pluginMeta)
-	wrapper.totalDelayTimeMs = helper.NewCounterMetricAndRegister(wrapper.MetricRecord, helper.MetricPluginTotalDelayMs)
+	wrapper.totalDelayTimeMs = selfmonitor.NewCounterMetricAndRegister(wrapper.MetricRecord, selfmonitor.MetricPluginTotalDelayMs)
 
 	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
 	if err != nil {
@@ -57,11 +57,9 @@ func (wrapper *AggregatorWrapperV2) Record(events *models.PipelineGroupEvents, c
 
 	err := wrapper.Aggregator.Record(events, context)
 	if err == nil {
-		wrapper.outEventsTotal.Add(int64(len(events.Events)))
+		wrapper.outEventsTotal.Add(events.GetEventCount())
 		wrapper.outEventGroupsTotal.Add(1)
-		for _, event := range events.Events {
-			wrapper.outSizeBytes.Add(event.GetSize())
-		}
+		wrapper.outSizeBytes.Add(events.GetSize())
 	}
 	wrapper.totalDelayTimeMs.Add(time.Since(startTime).Milliseconds())
 	return err

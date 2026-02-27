@@ -20,18 +20,22 @@ import (
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/input"
+
+	"github.com/docker/docker/api/types/container"
 )
 
 const serviceDockerStdoutKey = "service_docker_stdout_v2"
 
-func logDriverSupported(container types.ContainerJSON) bool {
+func logDriverSupported(container container.InspectResponse) bool {
 	// containerd has no hostConfig, return true
 	if container.HostConfig == nil {
 		return true
@@ -44,19 +48,19 @@ func logDriverSupported(container types.ContainerJSON) bool {
 	}
 }
 
-func logPathEmpty(container types.ContainerJSON) bool {
+func logPathEmpty(container container.InspectResponse) bool {
 	return len(container.LogPath) == 0
 }
 
 type DockerFileSyner struct {
 	dockerFileReader    *helper.LogFileReader
 	dockerFileProcessor *DockerStdoutProcessor
-	info                *helper.DockerInfoDetail
+	info                *containercenter.DockerInfoDetail
 }
 
 func NewDockerFileSynerByFile(sds *ServiceDockerStdout, filePath string) *DockerFileSyner {
-	dockerInfoDetail := &helper.DockerInfoDetail{}
-	dockerInfoDetail.ContainerInfo = types.ContainerJSON{}
+	dockerInfoDetail := &containercenter.DockerInfoDetail{}
+	dockerInfoDetail.ContainerInfo = container.InspectResponse{}
 	dockerInfoDetail.ContainerInfo.LogPath = filePath
 	sds.LogtailInDocker = false
 	sds.StartLogMaxOffset = 10 * 1024 * 1024 * 1024
@@ -64,7 +68,7 @@ func NewDockerFileSynerByFile(sds *ServiceDockerStdout, filePath string) *Docker
 }
 
 func NewDockerFileSyner(sds *ServiceDockerStdout,
-	info *helper.DockerInfoDetail,
+	info *containercenter.DockerInfoDetail,
 	checkpointMap map[string]helper.LogFileReaderCheckPoint) *DockerFileSyner {
 	var reg *regexp.Regexp
 	var err error
@@ -84,13 +88,13 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 	checkpoint, ok := checkpointMap[info.ContainerInfo.ID]
 	if !ok {
 		if sds.LogtailInDocker {
-			checkpoint.Path = helper.GetMountedFilePath(info.ContainerInfo.LogPath)
+			checkpoint.Path = containercenter.GetMountedFilePath(info.ContainerInfo.LogPath)
 		} else {
 			checkpoint.Path = info.ContainerInfo.LogPath
 		}
 
 		// first watch this container
-		realPath, stat := helper.TryGetRealPath(checkpoint.Path)
+		realPath, stat := containercenter.TryGetRealPath(checkpoint.Path)
 		if realPath == "" {
 			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", "path not found")
 		} else {
@@ -157,17 +161,17 @@ type ServiceDockerStdout struct {
 	K8sContainerRegex     string            `comment:"the regular expression of kubernetes container to match containers."`
 
 	// export from ilogtail-trace component
-	IncludeLabelRegex map[string]*regexp.Regexp
-	ExcludeLabelRegex map[string]*regexp.Regexp
-	IncludeEnvRegex   map[string]*regexp.Regexp
-	ExcludeEnvRegex   map[string]*regexp.Regexp
-	K8sFilter         *helper.K8SFilter
+	IncludeLabelRegex map[string]*regexp2.Regexp
+	ExcludeLabelRegex map[string]*regexp2.Regexp
+	IncludeEnvRegex   map[string]*regexp2.Regexp
+	ExcludeEnvRegex   map[string]*regexp2.Regexp
+	K8sFilter         *containercenter.K8SFilter
 
 	// for tracker
 	tracker           *helper.ReaderMetricTracker
-	avgInstanceMetric pipeline.CounterMetric
-	addMetric         pipeline.CounterMetric
-	deleteMetric      pipeline.CounterMetric
+	avgInstanceMetric selfmonitor.CounterMetric
+	addMetric         selfmonitor.CounterMetric
+	deleteMetric      selfmonitor.CounterMetric
 
 	synerMap      map[string]*DockerFileSyner
 	checkpointMap map[string]helper.LogFileReaderCheckPoint
@@ -179,16 +183,16 @@ type ServiceDockerStdout struct {
 
 	// Last return of GetAllAcceptedInfoV2
 	fullList              map[string]bool
-	matchList             map[string]*helper.DockerInfoDetail
+	matchList             map[string]*containercenter.DockerInfoDetail
 	lastUpdateTime        int64
 	CollectContainersFlag bool
 }
 
 func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	sds.context = context
-	helper.ContainerCenterInit()
+	containercenter.Init()
 	sds.fullList = make(map[string]bool)
-	sds.matchList = make(map[string]*helper.DockerInfoDetail)
+	sds.matchList = make(map[string]*containercenter.DockerInfoDetail)
 	sds.synerMap = make(map[string]*DockerFileSyner)
 
 	if sds.MaxLogSize < 1024 {
@@ -201,16 +205,16 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	metricsRecord := sds.context.GetMetricRecord()
 	sds.tracker = helper.NewReaderMetricTracker(metricsRecord)
 
-	sds.avgInstanceMetric = helper.NewAverageMetricAndRegister(metricsRecord, helper.MetricPluginContainerTotal)
-	sds.addMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginAddContainerTotal)
-	sds.deleteMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginRemoveContainerTotal)
+	sds.avgInstanceMetric = selfmonitor.NewAverageMetricAndRegister(metricsRecord, selfmonitor.MetricPluginContainerTotal)
+	sds.addMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginAddContainerTotal)
+	sds.deleteMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginRemoveContainerTotal)
 
 	var err error
-	sds.IncludeEnv, sds.IncludeEnvRegex, err = helper.SplitRegexFromMap(sds.IncludeEnv)
+	sds.IncludeEnv, sds.IncludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
 	}
-	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = helper.SplitRegexFromMap(sds.ExcludeEnv)
+	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeEnv)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
 	}
@@ -228,16 +232,16 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	} else {
 		sds.ExcludeLabel = sds.ExcludeContainerLabel
 	}
-	sds.IncludeLabel, sds.IncludeLabelRegex, err = helper.SplitRegexFromMap(sds.IncludeLabel)
+	sds.IncludeLabel, sds.IncludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.IncludeLabel)
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
 	}
-	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = helper.SplitRegexFromMap(sds.ExcludeLabel)
+	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeLabel)
 
 	if err != nil {
 		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
 	}
-	sds.K8sFilter, err = helper.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
+	sds.K8sFilter, err = containercenter.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
 	return 0, err
 }
 
@@ -250,7 +254,7 @@ func (sds *ServiceDockerStdout) Collect(pipeline.Collector) error {
 }
 
 func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) error {
-	newUpdateTime := helper.GetContainersLastUpdateTime()
+	newUpdateTime := containercenter.GetContainersLastUpdateTime()
 	if sds.lastUpdateTime != 0 {
 		if sds.lastUpdateTime >= newUpdateTime {
 			return nil
@@ -258,7 +262,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	}
 
 	var err error
-	newCount, delCount, addResultList, deleteResultList := helper.GetContainerByAcceptedInfoV2(
+	newCount, delCount, addResultList, deleteResultList := containercenter.GetContainerByAcceptedInfoV2(
 		sds.fullList, sds.matchList,
 		sds.IncludeLabel, sds.ExcludeLabel,
 		sds.IncludeLabelRegex, sds.ExcludeLabelRegex,
@@ -273,23 +277,23 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 			keys := make([]string, 0, len(sds.matchList))
 			for k := range sds.matchList {
 				if len(k) > 0 {
-					keys = append(keys, helper.GetShortID(k))
+					keys = append(keys, containercenter.GetShortID(k))
 				}
 			}
-			configResult := &helper.ContainerConfigResult{
+			configResult := &containercenter.ContainerConfigResult{
 				DataType:                   "container_config_result",
 				Project:                    sds.context.GetProject(),
 				Logstore:                   sds.context.GetLogstore(),
 				ConfigName:                 sds.context.GetConfigName(),
-				PathExistInputContainerIDs: helper.GetStringFromList(keys),
+				PathExistInputContainerIDs: containercenter.GetStringFromList(keys),
 				SourceAddress:              "stdout",
 				InputType:                  input.ServiceDockerStdoutPluginName,
 				FlusherType:                "flusher_sls",
 				FlusherTargetAddress:       fmt.Sprintf("%s/%s", sds.context.GetProject(), sds.context.GetLogstore()),
 			}
-			helper.RecordContainerConfigResultMap(configResult)
+			containercenter.RecordContainerConfigResultMap(configResult)
 			if newCount != 0 || delCount != 0 || firstStart {
-				helper.RecordContainerConfigResultIncrement(configResult)
+				containercenter.RecordContainerConfigResultIncrement(configResult)
 			}
 			logger.Debugf(sds.context.GetRuntimeContext(), "update match list, addResultList: %v, deleteResultList: %v", addResultList, deleteResultList)
 		}
@@ -326,7 +330,7 @@ func (sds *ServiceDockerStdout) FlushAll(c pipeline.Collector, firstStart bool) 
 	// delete container
 	for id, syner := range sds.synerMap {
 		if _, ok := dockerInfos[id]; !ok {
-			logger.Info(sds.context.GetRuntimeContext(), "docker stdout", "deleted", "id", helper.GetShortID(id), "name", syner.info.ContainerInfo.Name)
+			logger.Info(sds.context.GetRuntimeContext(), "docker stdout", "deleted", "id", containercenter.GetShortID(id), "name", syner.info.ContainerInfo.Name)
 			syner.dockerFileReader.Stop()
 			delete(sds.synerMap, id)
 			sds.deleteMetric.Add(1)

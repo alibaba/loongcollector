@@ -16,13 +16,18 @@
 
 #include <json/json.h>
 
+#include <atomic>
+#include <chrono>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "ScrapeScheduler.h"
 #include "common/JsonUtil.h"
+#include "common/http/HttpResponse.h"
 #include "prometheus/Constants.h"
+#include "prometheus/async/PromFuture.h"
 #include "prometheus/labels/Labels.h"
 #include "prometheus/schedulers/TargetSubscriberScheduler.h"
 #include "unittest/Unittest.h"
@@ -36,9 +41,11 @@ public:
     void OnInitScrapeJobEvent();
     void TestProcess();
     void TestParseTargetGroups();
+    void TestBuildHostOnlyScrapeSchedulerGroup();
     void TestBuildScrapeSchedulerSet();
     void TestTargetLabels();
     void TestTargetsInfoToString();
+    void TestRaceConditionBetweenCancelAndCallback();
 
 protected:
     void SetUp() override {
@@ -304,6 +311,41 @@ void TargetSubscriberSchedulerUnittest::TestParseTargetGroups() {
     APSARA_TEST_EQUAL(3UL, newScrapeSchedulerSet.size());
 }
 
+void TargetSubscriberSchedulerUnittest::TestBuildHostOnlyScrapeSchedulerGroup() {
+    std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    Json::Value config;
+    string errorMsg;
+    string configStr = R"JSON(
+    {
+        "job_name": "test_job",
+        "scheme": "http",
+        "metrics_path": "/metrics",
+        "scrape_interval": "30s",
+        "scrape_timeout": "30s",
+        "host_only_mode": true,
+        "static_configs": [
+            {
+                "targets": ["localhost:9090", "127.0.0.1:9091"],
+                "labels": {
+                    "test_label": "test_value"
+                }
+            }
+        ]
+    }
+    )JSON";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, config, errorMsg));
+    APSARA_TEST_TRUE(targetSubscriber->Init(config));
+    std::vector<PromTargetInfo> targetGroup;
+    targetSubscriber->BuildHostOnlyScrapeSchedulerGroup(targetGroup);
+    APSARA_TEST_EQUAL(2UL, targetGroup.size());
+    APSARA_TEST_EQUAL(targetGroup[0].mInstance, "127.0.0.1:9091");
+    APSARA_TEST_EQUAL(targetGroup[0].mLabels.Get("test_label"), "test_value");
+    APSARA_TEST_EQUAL(targetGroup[1].mInstance, "localhost:9090");
+    APSARA_TEST_EQUAL(targetGroup[1].mLabels.Get("test_label"), "test_value");
+    APSARA_TEST_TRUE(targetGroup[0].mHash != targetGroup[1].mHash);
+}
+
+
 void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     // prepare data
     std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
@@ -324,6 +366,8 @@ void TargetSubscriberSchedulerUnittest::TestBuildScrapeSchedulerSet() {
     APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[1].second);
     APSARA_TEST_NOT_EQUAL(startTimeList[1].second, startTimeList[2].second);
     APSARA_TEST_NOT_EQUAL(startTimeList[0].second, startTimeList[2].second);
+
+    APSARA_TEST_EQUAL(result.size(), 3UL);
 
     APSARA_TEST_EQUAL(1UL, result.count("loong-collector/demo-podmonitor-500/010.0.2.81:808093796c8e4493906d"));
 }
@@ -596,12 +640,124 @@ void TargetSubscriberSchedulerUnittest::TestTargetsInfoToString() {
     APSARA_TEST_EQUAL((uint64_t)3, data[prometheus::TARGETS_INFO].size());
 }
 
+void TargetSubscriberSchedulerUnittest::TestRaceConditionBetweenCancelAndCallback() {
+    // This test reproduces the race condition bug between Cancel() and callback execution.
+    //
+    // Test structure:
+    // - Thread 1 (callbackThread): Executes future->Process() which triggers callback
+    // - Thread 2 (cancelThread): Calls scheduler->Cancel()
+
+    std::shared_ptr<TargetSubscriberScheduler> targetSubscriber = std::make_shared<TargetSubscriberScheduler>();
+    auto metricLabels = MetricLabels();
+    APSARA_TEST_TRUE(targetSubscriber->Init(mConfig["ScrapeConfig"]));
+    targetSubscriber->InitSelfMonitor(metricLabels);
+
+    // Set up initial state
+    targetSubscriber->mServiceHost = "localhost";
+    targetSubscriber->mServicePort = 8080;
+    targetSubscriber->mPodName = "test-pod";
+
+    // Synchronization primitives
+    std::atomic<bool> callbackStarted{false};
+    std::atomic<bool> cancelStarted{false};
+    std::atomic<bool> bugFix{false};
+
+    auto doneCallback
+        = [&targetSubscriber, &callbackStarted, &cancelStarted, &bugFix](HttpResponse&, uint64_t) -> bool {
+        while (cancelStarted.load() == false) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        callbackStarted.store(true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        auto newFuture = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+        if (bugFix.load() == false) {
+            targetSubscriber->mFuture = newFuture;
+        } else {
+            WriteLock lock(targetSubscriber->mLock);
+            if (targetSubscriber->mValidState == false) {
+                return false;
+            }
+            targetSubscriber->mFuture = newFuture;
+        }
+
+        return true;
+    };
+
+    auto cancelCallback = [&targetSubscriber, &cancelStarted, &callbackStarted]() {
+        cancelStarted.store(true);
+        while (callbackStarted.load() == false) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        {
+            WriteLock lock(targetSubscriber->mLock);
+            targetSubscriber->mValidState = false;
+        }
+        targetSubscriber->mFuture->Cancel();
+    };
+
+
+    // Create future with callback that simulates ScheduleNext()'s callback behavior
+    auto testFuture = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    targetSubscriber->mFuture = testFuture;
+    testFuture->AddDoneCallback(doneCallback);
+
+    // Prepare test response
+    HttpResponse testResponse;
+    testResponse.SetStatusCode(200);
+    *testResponse.GetBody<string>() = "[]";
+    uint64_t timestamp
+        = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+              .count();
+
+    // Thread 1: Execute callback via future->Process()
+    std::thread callbackThread1(
+        [&testFuture, &testResponse, timestamp]() { testFuture->Process(testResponse, timestamp); });
+
+    // Thread 2: Call Cancel() on scheduler
+    std::thread cancelThread1(cancelCallback);
+
+    // Wait for both threads to complete
+    callbackThread1.join();
+    cancelThread1.join();
+
+    // Verify results
+    // 1. Both threads should have executed
+    APSARA_TEST_TRUE(callbackStarted.load());
+    APSARA_TEST_TRUE(cancelStarted.load());
+
+    // 3. Scheduler should be in cancelled state
+    // The future should be new because the mFuture is replaced by a new future in the callback.
+    APSARA_TEST_TRUE(targetSubscriber->mFuture->mState == PromFutureState::New);
+
+    // reset with bugfix
+    bugFix.store(true);
+    callbackStarted.store(false);
+    cancelStarted.store(false);
+
+    testFuture = std::make_shared<PromFuture<HttpResponse&, uint64_t>>();
+    targetSubscriber->mFuture = testFuture;
+    targetSubscriber->mValidState = true;
+    testFuture->AddDoneCallback(doneCallback);
+
+
+    std::thread callbackThread2(
+        [&testFuture, &testResponse, timestamp]() { testFuture->Process(testResponse, timestamp); });
+    std::thread cancelThread2(cancelCallback);
+    callbackThread2.join();
+    cancelThread2.join();
+
+    APSARA_TEST_TRUE(targetSubscriber->mFuture->mState == PromFutureState::Done);
+}
+
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, OnInitScrapeJobEvent)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestProcess)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestParseTargetGroups)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildScrapeSchedulerSet)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestBuildHostOnlyScrapeSchedulerGroup)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetLabels)
 UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestTargetsInfoToString)
+UNIT_TEST_CASE(TargetSubscriberSchedulerUnittest, TestRaceConditionBetweenCancelAndCallback)
 
 } // namespace logtail
 

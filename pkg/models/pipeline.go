@@ -57,3 +57,21 @@ type PipelineGroupEvents struct {
 	Group  *GroupInfo
 	Events []PipelineEvent
 }
+
+func (g *PipelineGroupEvents) GetEventCount() int64 {
+	if g == nil {
+		return 0
+	}
+	return int64(len(g.Events))
+}
+
+func (g *PipelineGroupEvents) GetSize() int64 {
+	if g == nil {
+		return 0
+	}
+	var size int64
+	for _, event := range g.Events {
+		size += event.GetSize()
+	}
+	return size
+}

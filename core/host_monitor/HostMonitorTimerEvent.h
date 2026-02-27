@@ -17,39 +17,24 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 #include <string>
 
-#include "collection_pipeline/queue/QueueKey.h"
+#include "host_monitor/HostMonitorContext.h"
 #include "timer/TimerEvent.h"
 
 namespace logtail {
 
 class HostMonitorTimerEvent : public TimerEvent {
 public:
-    struct CollectConfig {
-        std::string mCollectorName;
-        QueueKey mProcessQueueKey;
-        size_t mInputIndex;
-        std::chrono::seconds mInterval;
-
-        CollectConfig(const std::string& collectorName,
-                      QueueKey processQueueKey,
-                      size_t inputIndex,
-                      const std::chrono::seconds& interval)
-            : mCollectorName(collectorName),
-              mProcessQueueKey(processQueueKey),
-              mInputIndex(inputIndex),
-              mInterval(interval) {}
-    };
-
-    HostMonitorTimerEvent(const std::chrono::steady_clock::time_point& execTime, const CollectConfig& collectConfig)
-        : TimerEvent(execTime), mCollectConfig(collectConfig) {}
+    explicit HostMonitorTimerEvent(CollectContextPtr collectContext)
+        : TimerEvent(collectContext->GetScheduleTime()), mCollectContext(collectContext) {}
 
     bool IsValid() const override;
     bool Execute() override;
 
 private:
-    CollectConfig mCollectConfig;
+    CollectContextPtr mCollectContext;
 };
 
 } // namespace logtail

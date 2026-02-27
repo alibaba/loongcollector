@@ -26,7 +26,7 @@ func panicRecover(cxt context.Context, key string) {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Error(cxt, "PLUGIN_RUNTIME_ALARM", "key", key, "panicked", err, "stack", string(trace))
+		logger.Critical(cxt, "PLUGIN_RUNTIME_ALARM", "key", key, "panicked", err, "stack", string(trace))
 	}
 }
 

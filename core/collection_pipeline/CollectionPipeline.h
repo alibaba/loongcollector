@@ -34,6 +34,7 @@
 #include "monitor/MetricManager.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
+#include "plugin/input/InputStaticFile.h"
 
 namespace logtail {
 
@@ -62,6 +63,9 @@ public:
     }
 
     const std::string& Name() const { return mName; }
+    bool IsOnetime() const { return mIsOnetime; }
+    const std::optional<uint32_t>& GetOnetimeStartTime() const { return mOnetimeStartTime; }
+    const std::optional<uint32_t>& GetOnetimeExpireTime() const { return mOnetimeExpireTime; }
     CollectionPipelineContext& GetContext() const { return mContext; }
     const Json::Value& GetConfig() const { return *mConfig; }
     const std::optional<std::string>& GetSingletonInput() const { return mSingletonInput; }
@@ -92,6 +96,9 @@ private:
     void WaitAllItemsInProcessFinished();
 
     std::string mName;
+    bool mIsOnetime = false;
+    std::optional<uint32_t> mOnetimeStartTime;
+    std::optional<uint32_t> mOnetimeExpireTime;
     std::vector<std::unique_ptr<InputInstance>> mInputs;
     std::vector<std::unique_ptr<ProcessorInstance>> mPipelineInnerProcessorLine;
     std::vector<std::unique_ptr<ProcessorInstance>> mProcessorLine;
@@ -119,19 +126,21 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineMock;
     friend class PipelineUnittest;
-    friend class InputContainerStdioUnittest;
+    friend class PipelineUpdateUnittest;
     friend class InputFileUnittest;
-    friend class InputInternalAlarmsUnittest;
-    friend class InputInternalMetricsUnittest;
+    friend class InputStaticFileUnittest;
+    friend class InputContainerStdioUnittest;
     friend class InputPrometheusUnittest;
-    friend class ProcessorTagNativeUnittest;
-    friend class FlusherSLSUnittest;
     friend class InputFileSecurityUnittest;
     friend class InputProcessSecurityUnittest;
     friend class InputNetworkSecurityUnittest;
     friend class InputNetworkObserverUnittest;
-    friend class PipelineUpdateUnittest;
     friend class InputHostMetaUnittest;
+    friend class InputInternalAlarmsUnittest;
+    friend class InputInternalMetricsUnittest;
+    friend class ProcessorTagNativeUnittest;
+    friend class FlusherSLSUnittest;
+    friend class StaticFileServerUnittest;
 #endif
 };
 

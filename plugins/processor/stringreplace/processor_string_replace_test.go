@@ -15,7 +15,9 @@
 package stringreplace
 
 import (
+	"strings"
 	"testing"
+	"time"
 
 	. "github.com/smartystreets/goconvey/convey"
 
@@ -451,4 +453,68 @@ func BenchmarkSplit_Unquote_0_1_512(b *testing.B) {
 	_ = s.Init(ctx)
 
 	benchmarkReplace(b, s, 0, 1, 512)
+}
+
+func TestZeroWidthRegexWarning(t *testing.T) {
+	Convey("Init should warn about zero-width regex (matches empty string)", t, func() {
+		processor := &ProcessorStringReplace{
+			SourceKey:     "content",
+			Method:        MethodRegex,
+			Match:         ".*", // matches empty string
+			ReplaceString: "x",
+		}
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil) // Should not error, just warn
+
+		// Should still work despite zero-width pattern
+		record := "test"
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+		logs := []*protocol.Log{log}
+		out := processor.ProcessLogs(logs)
+		So(len(out), ShouldEqual, 1)
+	})
+}
+
+func TestRegexTimeoutProtection(t *testing.T) {
+	Convey("Regex replacement should be protected by timeout", t, func() {
+		processor := &ProcessorStringReplace{
+			SourceKey:      "content",
+			Method:         MethodRegex,
+			Match:          "(a+)+b", // catastrophic backtracking pattern
+			ReplaceString:  "X",
+			RegexTimeoutMs: 50, // very short timeout
+		}
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+
+		// Input that will trigger catastrophic backtracking
+		record := strings.Repeat("a", 10000) + "c" // many 'a's but no 'b'
+		log := &protocol.Log{Time: 0}
+		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "content", Value: record})
+
+		start := time.Now()
+		logs := []*protocol.Log{log}
+		out := processor.ProcessLogs(logs)
+		elapsed := time.Since(start)
+
+		// Should complete quickly due to timeout protection
+		So(elapsed.Milliseconds(), ShouldBeLessThan, 500)
+		// Original value should be kept when timeout occurs
+		So(out[0].Contents[0].Value, ShouldEqual, record)
+	})
+}
+
+func TestRegexTimeoutDefault(t *testing.T) {
+	Convey("RegexTimeoutMs should default to 100ms when not set", t, func() {
+		processor := &ProcessorStringReplace{
+			SourceKey:     "content",
+			Method:        MethodRegex,
+			Match:         "test",
+			ReplaceString: "replaced",
+		}
+		err := processor.Init(mock.NewEmptyContext("p", "l", "c"))
+		So(err, ShouldBeNil)
+		So(processor.RegexTimeoutMs, ShouldEqual, 100)
+	})
 }

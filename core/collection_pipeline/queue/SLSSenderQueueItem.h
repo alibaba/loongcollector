@@ -16,8 +16,8 @@
 
 #pragma once
 
-#include "checkpoint/RangeCheckpoint.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
+#include "file_server/checkpoint/RangeCheckpoint.h"
 
 namespace logtail {
 
@@ -32,8 +32,9 @@ struct SLSSenderQueueItem : public SenderQueueItem {
     std::string mLogstore;
     RangeCheckpointPtr mExactlyOnceCheckpoint;
 
-    std::string mCurrentHost;
-    bool mRealIpFlag = false;
+    std::string mCurrentDomain;
+    std::string mCurrentIP;
+    bool mUseIPFlag = false;
     int32_t mLastLogWarningTime = 0; // temporaily used
 
     SLSSenderQueueItem(std::string&& data,
@@ -51,6 +52,8 @@ struct SLSSenderQueueItem : public SenderQueueItem {
           mExactlyOnceCheckpoint(std::move(exactlyOnceCheckpoint)) {}
 
     SenderQueueItem* Clone() override { return new SLSSenderQueueItem(*this); }
+
+    std::string GetEndpoint() const { return mUseIPFlag ? mCurrentIP : mCurrentDomain; }
 };
 
 } // namespace logtail

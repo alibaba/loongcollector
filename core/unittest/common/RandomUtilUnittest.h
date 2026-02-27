@@ -38,7 +38,7 @@ void RandomUtilUnittest::TestGenerateRandomHashKey() {
     std::unordered_set<std::string> keys;
     for (int i = 0; i < 1000; ++i) {
         auto key = GenerateRandomHashKey();
-        EXPECT_EQ(key.size(), 32);
+        EXPECT_EQ(key.size(), 32UL);
         EXPECT_TRUE(keys.find(key) == keys.end());
         keys.insert(key);
     }

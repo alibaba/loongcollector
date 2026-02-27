@@ -14,10 +14,13 @@
  * limitations under the License.
  */
 
+#include <unistd.h>
+
+#include <chrono>
 #include <memory>
 #include <string>
 
-#include "common/StringTools.h"
+#include "FileSystemUtil.h"
 #include "common/http/Curl.h"
 #include "common/http/HttpResponse.h"
 #include "common/timer/Timer.h"
@@ -41,11 +44,14 @@ public:
     void TestReceiveMessage();
 
     void TestScheduler();
+    void TestTokenUpdate();
+    void TestTokenUpdateNoInfiniteLoop();
     void TestQueueIsFull();
     void TestExactlyScrape();
 
 protected:
     void SetUp() override {
+        OverwriteFile(mFilePath, mKey);
         mScrapeConfig = make_shared<ScrapeConfig>();
         mScrapeConfig->mJobName = "test_job";
         mScrapeConfig->mScheme = "http";
@@ -53,12 +59,20 @@ protected:
         mScrapeConfig->mScrapeTimeoutSeconds = 10;
         mScrapeConfig->mMetricsPath = "/metrics";
         mScrapeConfig->mRequestHeaders = {{"Authorization", "Bearer xxxxx"}};
+        mScrapeConfig->mAuthType = "Bearer";
+        mScrapeConfig->mBearerTokenPath = "test_password.file";
     }
 
-    void TearDown() override { Timer::GetInstance()->Clear(); }
+    void TearDown() override {
+        Timer::GetInstance()->Clear();
+        remove(mFilePath.c_str());
+    }
 
 private:
     std::shared_ptr<ScrapeConfig> mScrapeConfig;
+
+    string mFilePath = "prom_password.file";
+    string mKey = "test_password.file";
 };
 
 void ScrapeSchedulerUnittest::TestInitscrapeScheduler() {
@@ -240,6 +254,101 @@ void ScrapeSchedulerUnittest::TestScheduler() {
     APSARA_TEST_TRUE(event.mFuture->mState == PromFutureState::Done);
 }
 
+void ScrapeSchedulerUnittest::TestTokenUpdate() {
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    PromTargetInfo targetInfo;
+    targetInfo.mLabels = labels;
+    targetInfo.mHash = "test_hash";
+    ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
+    EventPool eventPool{true};
+    event.SetComponent(&eventPool);
+    event.CalculateFirstExecTime(chrono::steady_clock::now(), chrono::system_clock::now());
+    event.ScheduleNext();
+
+    auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    httpResponse.SetStatusCode(401);
+    httpResponse.SetNetworkStatus(NetworkCode::Other, "");
+
+    // success update
+    event.mFuture->Process(httpResponse, 0);
+    auto curTime = chrono::system_clock::now();
+    APSARA_TEST_TRUE(chrono::duration_cast<chrono::seconds>(curTime - mScrapeConfig->mLastUpdateTime)
+                     <= chrono::seconds(1));
+
+    // fail update, no change
+    curTime = mScrapeConfig->mLastUpdateTime;
+    this_thread::sleep_for(chrono::milliseconds(10));
+    event.mFuture->Process(httpResponse, 0);
+    APSARA_TEST_EQUAL(curTime, mScrapeConfig->mLastUpdateTime);
+
+    // success update
+    mScrapeConfig->mLastUpdateTime = curTime - chrono::minutes(6);
+    curTime = chrono::system_clock::now();
+    this_thread::sleep_for(chrono::milliseconds(10));
+    event.mFuture->Process(httpResponse, 0);
+    APSARA_TEST_TRUE(chrono::duration_cast<chrono::seconds>(curTime - mScrapeConfig->mLastUpdateTime)
+                     <= chrono::seconds(1));
+}
+
+void ScrapeSchedulerUnittest::TestTokenUpdateNoInfiniteLoop() {
+    // Test that 401 retry calls ExecDone() to update mLatestScrapeTime,
+    // preventing infinite loop when (duration <= mInterval && duration > 0)
+    Labels labels;
+    labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
+    PromTargetInfo targetInfo;
+    targetInfo.mLabels = labels;
+    targetInfo.mHash = "test_hash";
+    uint64_t scrapeInterval = 15;
+    ScrapeScheduler event(
+        mScrapeConfig, "localhost", 8080, "http", "/metrics", scrapeInterval, scrapeInterval, 0, 0, targetInfo);
+    EventPool eventPool{true};
+    event.SetComponent(&eventPool);
+
+    auto execTime = chrono::steady_clock::now();
+    auto scrapeTime = chrono::system_clock::now();
+    event.CalculateFirstExecTime(execTime, scrapeTime);
+    event.ScheduleNext();
+
+    APSARA_TEST_EQUAL(1UL, Timer::GetInstance()->mQueue.size());
+
+    auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), &eventPool, std::chrono::system_clock::now());
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    auto defaultLabels = MetricLabels();
+    event.InitSelfMonitor(defaultLabels);
+    httpResponse.SetStatusCode(401);
+    httpResponse.SetNetworkStatus(NetworkCode::Other, "");
+
+    // Set mLastUpdateTime so that duration is within (0, mInterval]
+    // This would cause infinite loop if ExecDone() is not called during retry
+    auto firstScrapeTime = event.mLatestScrapeTime;
+    auto firstExecTime = event.mLatestExecTime;
+    mScrapeConfig->mLastUpdateTime = firstScrapeTime - chrono::seconds(scrapeInterval / 2);
+
+    // Record queue size before retry
+    // Timer::GetInstance()->mQueue.pop();
+
+    // First 401 triggers retry (duration condition is met)
+    event.mFuture->Process(httpResponse, 0);
+
+    // Verify a new event was pushed to the queue
+    APSARA_TEST_EQUAL(2, Timer::GetInstance()->mQueue.size());
+
+    // Pop the first event (scheduled by initial ScheduleNext)
+    Timer::GetInstance()->mQueue.pop();
+
+    // Get the retry event from queue and verify its exec time
+    const auto& retryEvent = Timer::GetInstance()->mQueue.top();
+    auto retryExecTime = retryEvent->GetExecTime();
+
+    // Verify the first event's exec time is close to firstExecTime (within 500ms)
+    APSARA_TEST_TRUE(retryExecTime - firstExecTime <= chrono::milliseconds(500));
+    APSARA_TEST_TRUE(event.GetNextExecTime() - firstExecTime == chrono::seconds(1));
+}
+
 void ScrapeSchedulerUnittest::TestQueueIsFull() {
     Labels labels;
     labels.Set(prometheus::ADDRESS_LABEL_NAME, "localhost:8080");
@@ -253,7 +362,7 @@ void ScrapeSchedulerUnittest::TestQueueIsFull() {
     event.SetComponent(&eventPool);
     auto now = std::chrono::steady_clock::now();
     auto nowScrape = std::chrono::system_clock::now();
-    event.SetFirstExecTime(now, nowScrape);
+    event.CalculateFirstExecTime(now, nowScrape);
     event.ScheduleNext();
 
     APSARA_TEST_TRUE(Timer::GetInstance()->mQueue.size() == 1);
@@ -281,7 +390,7 @@ void ScrapeSchedulerUnittest::TestExactlyScrape() {
     event.SetComponent(&eventPool);
     auto execTime = std::chrono::steady_clock::now();
     auto scrapeTime = std::chrono::system_clock::now();
-    event.SetFirstExecTime(execTime, scrapeTime);
+    event.CalculateFirstExecTime(execTime, scrapeTime);
 
     auto firstScrapeTime = event.mLatestScrapeTime;
     event.ExecDone();
@@ -305,6 +414,8 @@ UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestStreamMetricWriteCallback)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestScheduler)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestQueueIsFull)
 UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestExactlyScrape)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestTokenUpdate)
+UNIT_TEST_CASE(ScrapeSchedulerUnittest, TestTokenUpdateNoInfiniteLoop)
 
 
 } // namespace logtail

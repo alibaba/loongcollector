@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "models/LogEvent.h"
 #include "models/PipelineEventGroup.h"
 #include "unittest/Unittest.h"
+
+DECLARE_FLAG_INT32(default_log_event_capacity);
 
 using namespace std;
 
@@ -165,7 +168,7 @@ void LogEventUnittest::TestMeta() {
 }
 
 void LogEventUnittest::TestSize() {
-    size_t basicSize = sizeof(time_t) + sizeof(long) + sizeof(vector<pair<LogContent, bool>>);
+    size_t basicSize = sizeof(time_t) + sizeof(uint64_t) + sizeof(vector<pair<LogContent, bool>>);
     // add content, and key not existed
     mLogEvent->SetContent(string("key1"), string("a"));
     APSARA_TEST_EQUAL(basicSize + 5U, mLogEvent->DataSize());
@@ -187,8 +190,18 @@ void LogEventUnittest::TestReset() {
     APSARA_TEST_EQUAL(0, mLogEvent->GetTimestamp());
     APSARA_TEST_FALSE(mLogEvent->GetTimestampNanosecond().has_value());
     APSARA_TEST_TRUE(mLogEvent->Empty());
+    APSARA_TEST_EQUAL(static_cast<size_t>(INT32_FLAG(default_log_event_capacity)), mLogEvent->mContents.capacity());
+    APSARA_TEST_EQUAL(0U, mLogEvent->mContents.size());
     APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().first);
     APSARA_TEST_EQUAL(0U, mLogEvent->GetPosition().second);
+
+    auto e = mEventGroup->CreateLogEvent();
+    for (int i = 0; i < 100; i++) {
+        e->SetContent(string("key") + to_string(i), string("value"));
+    }
+    e->Reset();
+    APSARA_TEST_EQUAL(static_cast<size_t>(INT32_FLAG(default_log_event_capacity)), e->mContents.capacity());
+    APSARA_TEST_EQUAL(0U, e->mContents.size());
 }
 
 void LogEventUnittest::TestFromJsonToJson() {

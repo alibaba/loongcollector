@@ -16,16 +16,17 @@
 
 #include "json/json.h"
 
+#include "StringView.h"
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/CrashBackTraceUtil.h"
 #include "common/DynamicLibHelper.h"
 #include "common/HashUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/TimeUtil.h"
 #include "common/compression/CompressorFactory.h"
-#include "container_manager/ConfigContainerInfoUpdateCmd.h"
 #include "file_server/ConfigManager.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
@@ -36,9 +37,9 @@
 #endif
 
 DEFINE_FLAG_BOOL(enable_sls_metrics_format, "if enable format metrics in SLS metricstore log pattern", true);
-DECLARE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS);
 DECLARE_FLAG_INT32(file_tags_update_interval);
 DECLARE_FLAG_STRING(agent_host_id);
+DECLARE_FLAG_BOOL(ilogtail_disable_core);
 
 using namespace std;
 using namespace logtail;
@@ -58,9 +59,6 @@ LogtailPlugin::LogtailPlugin() {
     mPluginAlarmConfig.mLogstore = "logtail_alarm";
     mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
-    mPluginProfileConfig.mLogstore = "shennong_log_profile";
-    mPluginProfileConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginProfileConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -153,8 +151,8 @@ void LogtailPlugin::StopAllPipelines(bool withInputFlag) {
         auto stopAllCost = GetCurrentTimeInMilliSeconds() - stopAllStart;
         LOG_INFO(sLogger, ("Go pipelines stop all", "succeeded")("cost", ToString(stopAllCost) + "ms"));
         if (stopAllCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                                   "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
+            AlarmManager::GetInstance()->SendAlarmError(
+                HOLD_ON_TOO_SLOW_ALARM, "Stopping all Go pipelines took " + ToString(stopAllCost) + "ms");
         }
     }
 #else
@@ -174,7 +172,7 @@ void LogtailPlugin::Stop(const std::string& configName, bool removedFlag) {
         auto stopCost = GetCurrentTimeInMilliSeconds() - stopStart;
         LOG_INFO(sLogger, ("Go pipelines stop", "succeeded")("config", configName)("cost", ToString(stopCost) + "ms"));
         if (stopCost >= 10 * 1000) {
-            AlarmManager::GetInstance()->SendAlarm(
+            AlarmManager::GetInstance()->SendAlarmError(
                 HOLD_ON_TOO_SLOW_ALARM, "Stopping Go pipeline " + configName + " took " + ToString(stopCost) + "ms");
         }
     }
@@ -236,7 +234,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             const char* shardHash,
                             int shardHashSize) {
     static FlusherSLS* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
-    static FlusherSLS* profileConfig = &(LogtailPlugin::GetInstance()->mPluginProfileConfig);
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
@@ -250,13 +247,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     FlusherSLS* pConfig = NULL;
     if (configNameStr == alarmConfig->mLogstore) {
         pConfig = alarmConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == profileConfig->mLogstore) {
-        pConfig = profileConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
         if (pConfig->mProject.empty()) {
@@ -287,48 +277,6 @@ int LogtailPlugin::SendPbV2(const char* configName,
     return pConfig->Send(std::string(pbBuffer, pbSize), shardHashStr, logstore) ? 0 : -1;
 }
 
-int LogtailPlugin::ExecPluginCmd(
-    const char* configName, int configNameSize, int cmdId, const char* params, int paramsLen) {
-    if (cmdId < (int)PLUGIN_CMD_MIN || cmdId > (int)PLUGIN_CMD_MAX) {
-        LOG_ERROR(sLogger, ("invalid cmd", cmdId));
-        return -2;
-    }
-    string configNameStr(configName, configNameSize);
-    string paramsStr(params, paramsLen);
-    PluginCmdType cmdType = (PluginCmdType)cmdId;
-    LOG_DEBUG(sLogger, ("exec cmd", cmdType)("config", configNameStr)("detail", paramsStr));
-    // cmd 解析json
-    Json::Value jsonParams;
-    std::string errorMsg;
-    if (paramsStr.size() < 5UL || !ParseJsonTable(paramsStr, jsonParams, errorMsg)) {
-        LOG_ERROR(sLogger, ("invalid docker container params", paramsStr)("errorMsg", errorMsg));
-        return -2;
-    }
-
-    switch (cmdType) {
-        case PLUGIN_DOCKER_UPDATE_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        case PLUGIN_DOCKER_STOP_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerStopped(cmd);
-        } break;
-        case PLUGIN_DOCKER_REMOVE_FILE: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, true, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        case PLUGIN_DOCKER_UPDATE_FILE_ALL: {
-            ConfigContainerInfoUpdateCmd* cmd = new ConfigContainerInfoUpdateCmd(configNameStr, false, jsonParams);
-            ConfigManager::GetInstance()->UpdateContainerPath(cmd);
-        } break;
-        default:
-            LOG_ERROR(sLogger, ("unknown cmd", cmdType));
-            break;
-    }
-    return 0;
-}
-
 
 bool LogtailPlugin::LoadPluginBase() {
     if (mPluginValid) {
@@ -340,7 +288,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin adapter
-        if (!loader.LoadDynLib("GoPluginAdapter", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginAdapterName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open adapter lib error, Message", error));
             return mPluginValid;
         }
@@ -360,10 +308,7 @@ bool LogtailPlugin::LoadPluginBase() {
         // Be compatible with old libGoPluginAdapter.so, V2 -> V1.
         auto registerV2Fun = (RegisterLogtailCallBackV2)loader.LoadMethod("RegisterLogtailCallBackV2", error);
         if (error.empty()) {
-            registerV2Fun(LogtailPlugin::IsValidToSend,
-                          LogtailPlugin::SendPb,
-                          LogtailPlugin::SendPbV2,
-                          LogtailPlugin::ExecPluginCmd);
+            registerV2Fun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::SendPbV2);
         } else {
             LOG_WARNING(sLogger, ("load RegisterLogtailCallBackV2 failed", error)("try to load V1", ""));
 
@@ -372,7 +317,7 @@ bool LogtailPlugin::LoadPluginBase() {
                 LOG_WARNING(sLogger, ("load RegisterLogtailCallBack failed", error));
                 return mPluginValid;
             }
-            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb, LogtailPlugin::ExecPluginCmd);
+            registerFun(LogtailPlugin::IsValidToSend, LogtailPlugin::SendPb);
         }
 
         mPluginAdapterPtr = loader.Release();
@@ -385,7 +330,7 @@ bool LogtailPlugin::LoadPluginBase() {
         DynamicLibLoader loader;
         std::string error;
         // load plugin base
-        if (!loader.LoadDynLib("GoPluginBase", error, AppConfig::GetInstance()->GetWorkingDir())) {
+        if (!loader.LoadDynLib(GetPluginBaseName(), error, AppConfig::GetInstance()->GetWorkingDir())) {
             LOG_ERROR(sLogger, ("open plugin base dl error, Message", error));
             return mPluginValid;
         }
@@ -443,10 +388,22 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load Start error, Message", error));
             return mPluginValid;
         }
-        // C++获取容器信息的
+        // C++获取单个容器信息的
         mGetContainerMetaFun = (GetContainerMetaFun)loader.LoadMethod("GetContainerMeta", error);
         if (!error.empty()) {
             LOG_ERROR(sLogger, ("load GetContainerMeta error, Message", error));
+            return mPluginValid;
+        }
+        // C++获取全量容器信息的
+        mGetAllContainerMetaFun = (GetAllContainerMetaFun)loader.LoadMethod("GetAllContainers", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetAllContainerMetaFun error, Message", error));
+            return mPluginValid;
+        }
+        // C++获取差异容器信息的
+        mGetDiffContainerMetaFun = (GetDiffContainerMetaFun)loader.LoadMethod("GetDiffContainers", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetDiffContainerMetaFun error, Message", error));
             return mPluginValid;
         }
         // C++传递单条数据到golang插件
@@ -488,6 +445,11 @@ bool LogtailPlugin::LoadPluginBase() {
     } else {
         LOG_INFO(sLogger, ("Go plugin system init", "succeeded"));
         mPluginValid = true;
+#ifdef __ENTERPRISE__
+        if (BOOL_FLAG(ilogtail_disable_core)) {
+            ResetCrashBackTrace();
+        }
+#endif
     }
     return mPluginValid;
 }
@@ -559,7 +521,7 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
         GoString type;
         type.n = metricType.size();
         type.p = metricType.c_str();
-        auto metrics = mGetGoMetricsFun(type);
+        auto* metrics = mGetGoMetricsFun(type);
         if (metrics != nullptr) {
             for (int i = 0; i < metrics->count; ++i) {
                 std::map<std::string, std::string> item;
@@ -585,12 +547,44 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
     }
 }
 
+std::string LogtailPlugin::GetAllContainersMeta() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (mPluginValid && mGetAllContainerMetaFun != nullptr) {
+        char* res = mGetAllContainerMetaFun();
+        std::string cppString(res);
+        free(res);
+        return cppString;
+    }
+    return "{}";
+#else
+    return LogtailPluginMock::GetInstance()->GetAllContainersMeta();
+#endif
+}
+
+
+std::string LogtailPlugin::GetDiffContainersMeta() {
+#ifndef APSARA_UNIT_TEST_MAIN
+    if (mPluginValid && mGetDiffContainerMetaFun != nullptr) {
+        char* res = mGetDiffContainerMetaFun();
+        std::string cppString(res);
+        free(res);
+        return cppString;
+    }
+    return "";
+#else
+    return LogtailPluginMock::GetInstance()->GetDiffContainersMeta();
+#endif
+}
+
 K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
+    return GetContainerMeta(StringView(containerID));
+}
+K8sContainerMeta LogtailPlugin::GetContainerMeta(StringView containerID) {
     if (mPluginValid && mGetContainerMetaFun != nullptr) {
         GoString id;
         id.n = containerID.size();
-        id.p = containerID.c_str();
-        auto innerMeta = mGetContainerMetaFun(id);
+        id.p = containerID.data();
+        auto* innerMeta = mGetContainerMetaFun(id);
         if (innerMeta != NULL) {
             K8sContainerMeta meta;
             meta.ContainerName.assign(innerMeta->containerName);
@@ -598,19 +592,22 @@ K8sContainerMeta LogtailPlugin::GetContainerMeta(const string& containerID) {
             meta.K8sNamespace.assign(innerMeta->k8sNamespace);
             meta.PodName.assign(innerMeta->podName);
             for (int i = 0; i < innerMeta->containerLabelsSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->containerLabelsKey[i]);
                 value.assign(innerMeta->containerLabelsVal[i]);
                 meta.containerLabels.insert(std::make_pair(std::move(key), std::move(key)));
             }
             for (int i = 0; i < innerMeta->k8sLabelsSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->k8sLabelsKey[i]);
                 value.assign(innerMeta->k8sLabelsVal[i]);
                 meta.k8sLabels.insert(std::make_pair(std::move(key), std::move(key)));
             }
             for (int i = 0; i < innerMeta->envSize; ++i) {
-                std::string key, value;
+                std::string key;
+                std::string value;
                 key.assign(innerMeta->envsKey[i]);
                 value.assign(innerMeta->envsVal[i]);
                 meta.envs.insert(std::make_pair(std::move(key), std::move(key)));

@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "Application.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -58,6 +59,7 @@ protected:
     static void TearDownTestCase() {
         PluginRegistry::GetInstance()->UnloadPlugins();
         TaskRegistry::GetInstance()->UnloadPlugins();
+        Application::GetInstance()->SetSigTermSignalFlag(true);
         FileServer::GetInstance()->Stop();
     }
 
@@ -243,16 +245,16 @@ private:
 void ConfigUpdateUnittest::OnStartUp() const {
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     APSARA_TEST_EQUAL(0U + builtinPipelineCnt, diff.first.mAdded.size());
-    APSARA_TEST_TRUE(diff.second.IsEmpty());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
     PipelineManagerMock::GetInstance()->UpdatePipelines(diff.first);
 
     GenerateInitialConfigs();
     diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.first.mModified.empty());
     APSARA_TEST_TRUE(diff.first.mRemoved.empty());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_EQUAL(2U, diff.second.mAdded.size());
     APSARA_TEST_TRUE(diff.second.mModified.empty());
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
@@ -261,7 +263,7 @@ void ConfigUpdateUnittest::OnStartUp() const {
     APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     TaskPipelineManager::GetInstance()->UpdatePipelines(diff.second);
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
-    auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
+    const auto& ptr = TaskPipelineManager::GetInstance()->FindPipelineByName("task_enabled_valid");
     APSARA_TEST_NOT_EQUAL(nullptr, ptr);
     APSARA_TEST_EQUAL(TaskMock::sName, ptr->GetPlugin()->Name());
     APSARA_TEST_TRUE(static_cast<TaskMock*>(ptr->GetPlugin())->mIsRunning);
@@ -274,11 +276,11 @@ void ConfigUpdateUnittest::OnConfigDelete() const {
 
     filesystem::remove_all(configDir);
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_TRUE(diff.first.mAdded.empty());
     APSARA_TEST_TRUE(diff.first.mModified.empty());
     APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_TRUE(diff.second.mAdded.empty());
     APSARA_TEST_TRUE(diff.second.mModified.empty());
     APSARA_TEST_EQUAL(1U, diff.second.mRemoved.size());
@@ -303,8 +305,8 @@ void ConfigUpdateUnittest::OnConfigToInvalidFormat() const {
         fout << newInvalidTaskConfigWithInvalidFormat;
     }
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.first.IsEmpty());
-    APSARA_TEST_TRUE(diff.second.IsEmpty());
+    APSARA_TEST_FALSE(diff.first.HasDiff());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
 }
 
 void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
@@ -321,11 +323,11 @@ void ConfigUpdateUnittest::OnConfigToInvalidDetail() const {
         fout << newInvalidTaskConfigWithInvalidDetail;
     }
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_EQUAL(3U, diff.first.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.first.mModified.size());
     APSARA_TEST_TRUE(diff.first.mRemoved.empty());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_EQUAL(3U, diff.second.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.second.mModified.size());
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
@@ -355,11 +357,11 @@ void ConfigUpdateUnittest::OnConfigToEnabledValid() const {
         fout << newEnabledValidTaskConfig;
     }
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_EQUAL(3U, diff.first.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.first.mModified.size());
     APSARA_TEST_TRUE(diff.first.mRemoved.empty());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_EQUAL(3U, diff.second.mAdded.size());
     APSARA_TEST_EQUAL(1U, diff.second.mModified.size());
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
@@ -408,7 +410,7 @@ void ConfigUpdateUnittest::OnConfigToDisabledValid() const {
         fout << newDisabledValidTaskConfig;
     }
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_TRUE(diff.first.mAdded.empty());
     APSARA_TEST_TRUE(diff.first.mModified.empty());
     APSARA_TEST_EQUAL(1U, diff.first.mRemoved.size());
@@ -425,8 +427,8 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_TRUE(diff.first.IsEmpty());
-    APSARA_TEST_TRUE(diff.second.IsEmpty());
+    APSARA_TEST_FALSE(diff.first.HasDiff());
+    APSARA_TEST_FALSE(diff.second.HasDiff());
 
     GenerateInitialConfigs();
     // mandatorily overwrite modify time in case of no update when file content remains the same.
@@ -439,11 +441,11 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
         filesystem::last_write_time(path, fTime + 1s);
     }
     diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_EQUAL(1U, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.first.mModified.empty());
     APSARA_TEST_TRUE(diff.first.mRemoved.empty());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_EQUAL(1U, diff.second.mAdded.size());
     APSARA_TEST_TRUE(diff.second.mModified.empty());
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());
@@ -497,11 +499,11 @@ void ConfigUpdateUnittest::OnConfigAdded() const {
         fout << disabledValidTaskConfig;
     }
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
-    APSARA_TEST_FALSE(diff.first.IsEmpty());
+    APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_EQUAL(2U, diff.first.mAdded.size());
     APSARA_TEST_TRUE(diff.first.mModified.empty());
     APSARA_TEST_TRUE(diff.first.mRemoved.empty());
-    APSARA_TEST_FALSE(diff.second.IsEmpty());
+    APSARA_TEST_TRUE(diff.second.HasDiff());
     APSARA_TEST_EQUAL(2U, diff.second.mAdded.size());
     APSARA_TEST_TRUE(diff.second.mModified.empty());
     APSARA_TEST_TRUE(diff.second.mRemoved.empty());

@@ -21,6 +21,10 @@ target_link_libraries(serializer_unittest ${UT_BASE_TARGET})
 add_executable(sls_serializer_unittest SLSSerializerUnittest.cpp)
 target_link_libraries(sls_serializer_unittest ${UT_BASE_TARGET})
 
+add_executable(json_serializer_unittest JsonSerializerUnittest.cpp)
+target_link_libraries(json_serializer_unittest ${UT_BASE_TARGET})
+
 include(GoogleTest)
 gtest_discover_tests(serializer_unittest)
 gtest_discover_tests(sls_serializer_unittest)
+gtest_discover_tests(json_serializer_unittest)

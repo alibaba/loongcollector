@@ -18,9 +18,11 @@
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "common/TimeUtil.h"
+#include "container_manager/ContainerManager.h"
 #include "file_server/ConfigManager.h"
 #include "file_server/EventDispatcher.h"
 #include "file_server/FileTagOptions.h"
+#include "file_server/checkpoint/CheckPointManager.h"
 #include "file_server/event_handler/LogInput.h"
 #include "file_server/polling/PollingDirFile.h"
 #include "file_server/polling/PollingModify.h"
@@ -33,7 +35,7 @@ using namespace std;
 namespace logtail {
 
 FileServer::FileServer() {
-    WriteMetrics::GetInstance()->PrepareMetricsRecordRef(
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
         mMetricsRecordRef,
         MetricCategory::METRIC_CATEGORY_RUNNER,
         {{METRIC_LABEL_KEY_RUNNER_NAME, METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER}});
@@ -41,15 +43,15 @@ FileServer::FileServer() {
 
 // 启动文件服务，包括加载配置、处理检查点、注册事件等
 void FileServer::Start() {
-    ConfigManager::GetInstance()->LoadDockerConfig();
+    ContainerManager::GetInstance()->LoadContainerInfo();
     CheckPointManager::Instance()->LoadCheckPoint();
     LOG_INFO(sLogger, ("watch dirs", "start"));
     auto start = GetCurrentTimeInMilliSeconds();
     ConfigManager::GetInstance()->RegisterHandlers();
     auto costMs = GetCurrentTimeInMilliSeconds() - start;
     if (costMs >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(REGISTER_HANDLERS_TOO_SLOW_ALARM,
-                                               "Registering handlers took " + ToString(costMs) + " ms");
+        AlarmManager::GetInstance()->SendAlarmWarning(REGISTER_HANDLERS_TOO_SLOW_ALARM,
+                                                      "Registering handlers took " + ToString(costMs) + " ms");
         LOG_WARNING(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
     } else {
         LOG_INFO(sLogger, ("watch dirs", "succeeded")("costMs", costMs));
@@ -62,6 +64,7 @@ void FileServer::Start() {
         PollingDirFile::GetInstance()->Start();
     }
     LogInput::GetInstance()->Start();
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
     LOG_INFO(sLogger, ("file server", "started"));
 }
 
@@ -89,24 +92,31 @@ void FileServer::PauseInner() {
     LogInput::GetInstance()->HoldOn();
     auto holdOnCost = GetCurrentTimeInMilliSeconds() - holdOnStart;
     if (holdOnCost >= 60 * 1000) {
-        AlarmManager::GetInstance()->SendAlarm(HOLD_ON_TOO_SLOW_ALARM,
-                                               "Pausing file server took " + ToString(holdOnCost) + "ms");
+        AlarmManager::GetInstance()->SendAlarmError(HOLD_ON_TOO_SLOW_ALARM,
+                                                    "Pausing file server took " + ToString(holdOnCost) + "ms");
     }
     LOG_INFO(sLogger, ("file server pause", "succeeded")("cost", ToString(holdOnCost) + "ms"));
 }
 
 // 恢复文件服务，重新注册事件处理程序和恢复日志输入
-void FileServer::Resume(bool isConfigUpdate) {
+void FileServer::Resume(bool isConfigUpdate, bool isContainerUpdate) {
     if (isConfigUpdate) {
-        ClearContainerInfo();
-        ConfigManager::GetInstance()->DoUpdateContainerPaths();
-        ConfigManager::GetInstance()->SaveDockerConfig();
+        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
+    } else {
+        if (isContainerUpdate) {
+            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->SaveContainerInfo();
+        }
     }
-
-    LOG_INFO(sLogger, ("file server resume", "starts"));
+    LOG_INFO(
+        sLogger,
+        ("file server resume", "starts")("isConfigUpdate", isConfigUpdate)("isContainerUpdate", isContainerUpdate));
     ConfigManager::GetInstance()->RegisterHandlers();
     LOG_INFO(sLogger, ("watch dirs", "succeeded"));
-    if (isConfigUpdate) {
+    if (isConfigUpdate || isContainerUpdate) {
         EventDispatcher::GetInstance()->AddExistedCheckPointFileEvents();
     }
     LogInput::GetInstance()->Resume();
@@ -218,31 +228,6 @@ void FileServer::AddFileTagConfig(const std::string& name,
 void FileServer::RemoveFileTagConfig(const string& name) {
     WriteLock lock(mReadWriteLock);
     mPipelineNameFileTagConfigsMap.erase(name);
-}
-
-
-// 保存容器信息
-void FileServer::SaveContainerInfo(const string& pipeline, const shared_ptr<vector<ContainerInfo>>& info) {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap[pipeline] = info;
-}
-
-// 获取并移除给定管道的容器信息
-shared_ptr<vector<ContainerInfo>> FileServer::GetAndRemoveContainerInfo(const string& pipeline) {
-    WriteLock lock(mReadWriteLock);
-    auto iter = mAllContainerInfoMap.find(pipeline);
-    if (iter == mAllContainerInfoMap.end()) {
-        return make_shared<vector<ContainerInfo>>();
-    }
-    auto res = iter->second;
-    mAllContainerInfoMap.erase(iter);
-    return res;
-}
-
-// 清除所有容器信息
-void FileServer::ClearContainerInfo() {
-    WriteLock lock(mReadWriteLock);
-    mAllContainerInfoMap.clear();
 }
 
 // 获取插件的指标管理器

@@ -24,6 +24,7 @@
 #include "application/Application.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/StringTools.h"
+#include "common/TimeUtil.h"
 #include "common/UUIDUtil.h"
 #include "common/YamlUtil.h"
 #include "common/http/Constant.h"
@@ -32,7 +33,6 @@
 #include "config/CollectionConfig.h"
 #include "config/ConfigUtil.h"
 #include "config/feedbacker/ConfigFeedbackReceiver.h"
-#include "constants/Constants.h"
 #include "logger/Logger.h"
 #include "monitor/Monitor.h"
 
@@ -139,13 +139,12 @@ void CommonConfigProvider::LoadConfigFile() {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
-            info.name = entry.path().stem();
+            info.name = entry.path().stem().string();
             if (detail.isMember(CommonConfigProvider::configVersion)
                 && detail[CommonConfigProvider::configVersion].isInt64()) {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
             }
             info.status = ConfigFeedbackStatus::APPLYING;
-            info.detail = detail.toStyledString();
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mContinuousPipelineConfigInfoMap[info.name] = info;
@@ -157,13 +156,12 @@ void CommonConfigProvider::LoadConfigFile() {
         Json::Value detail;
         if (LoadConfigDetailFromFile(entry, detail)) {
             ConfigInfo info;
-            info.name = entry.path().stem();
+            info.name = entry.path().stem().string();
             if (detail.isMember(CommonConfigProvider::configVersion)
                 && detail[CommonConfigProvider::configVersion].isInt64()) {
                 info.version = detail[CommonConfigProvider::configVersion].asInt64();
             }
             info.status = ConfigFeedbackStatus::APPLYING;
-            info.detail = detail.toStyledString();
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
                 mInstanceConfigInfoMap[info.name] = info;
@@ -384,12 +382,14 @@ bool CommonConfigProvider::DumpConfigFile(const configserver::proto::v2::ConfigD
     }
     detail[CommonConfigProvider::configVersion] = config.version();
     string configDetail = detail.toStyledString();
-    ofstream fout(tmpFilePath);
-    if (!fout) {
-        LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
-        return false;
+    {
+        ofstream fout(tmpFilePath);
+        if (!fout) {
+            LOG_WARNING(sLogger, ("failed to open config file", filePath.string()));
+            return false;
+        }
+        fout << configDetail;
     }
-    fout << configDetail;
 
     error_code ec;
     filesystem::rename(tmpFilePath, filePath, ec);
@@ -428,18 +428,20 @@ void CommonConfigProvider::UpdateRemotePipelineConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::FAILED,
-                                                                             .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::FAILED;
+                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mContinuousPipelineConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                             .version = config.version(),
-                                                                             .status = ConfigFeedbackStatus::APPLYING,
-                                                                             .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::APPLYING;
+                mContinuousPipelineConfigInfoMap[config.name()] = std::move(info);
             }
             ConfigFeedbackReceiver::GetInstance().RegisterContinuousPipelineConfig(config.name(), this);
         }
@@ -472,18 +474,20 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
         } else {
             if (!DumpConfigFile(config, sourceDir)) {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::FAILED,
-                                                                   .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::FAILED;
+                mInstanceConfigInfoMap[config.name()] = std::move(info);
                 continue;
             }
             {
                 lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mInstanceConfigInfoMap[config.name()] = ConfigInfo{.name = config.name(),
-                                                                   .version = config.version(),
-                                                                   .status = ConfigFeedbackStatus::APPLYING,
-                                                                   .detail = config.detail()};
+                ConfigInfo info;
+                info.name = config.name();
+                info.version = config.version();
+                info.status = ConfigFeedbackStatus::APPLYING;
+                mInstanceConfigInfoMap[config.name()] = std::move(info);
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
@@ -564,17 +568,15 @@ void CommonConfigProvider::FeedbackInstanceConfigStatus(const std::string& name,
     LOG_DEBUG(sLogger,
               ("CommonConfigProvider", "FeedbackInstanceConfigStatus")("name", name)("status", ToStringView(status)));
 }
-void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& type,
-                                                               const std::string& name,
-                                                               ConfigFeedbackStatus status) {
+void CommonConfigProvider::FeedbackOnetimePipelineConfigStatus(const std::string& name, ConfigFeedbackStatus status) {
     lock_guard<mutex> lockInfoMap(mInfoMapMux);
-    auto info = mOnetimePipelineConfigInfoMap.find(GenerateOnetimePipelineConfigFeedBackKey(type, name));
+    auto info = mOnetimePipelineConfigInfoMap.find(name);
     if (info != mOnetimePipelineConfigInfoMap.end()) {
         info->second.status = status;
     }
-    LOG_DEBUG(sLogger,
-              ("CommonConfigProvider",
-               "FeedbackOnetimePipelineConfigStatus")("type", type)("name", name)("status", ToStringView(status)));
+    LOG_DEBUG(
+        sLogger,
+        ("CommonConfigProvider", "FeedbackOnetimePipelineConfigStatus")("name", name)("status", ToStringView(status)));
 }
 
 } // namespace logtail

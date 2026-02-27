@@ -18,6 +18,7 @@ project(provider)
 file(GLOB LIB_SOURCE_FILES *.cpp *.h)
 
 set(PROVIDER_SUB_DIRECTORIES_LIST    
+    config
     monitor/profile_sender config/feedbacker config/provider config/common_provider protobuf/config_server/v1 protobuf/config_server/v2
 )
 
@@ -31,9 +32,12 @@ foreach(DIR_NAME IN LISTS PROVIDER_SUB_DIRECTORIES_LIST)
 endforeach()
 
 add_library(${PROVIDER_BASE_TARGET} STATIC ${LIB_SOURCE_FILES})
-
 # message(STATUS "PROVIDER SOURCE FILES: ${LIB_SOURCE_FILES}")
 
 foreach(DIR_NAME IN LISTS PROVIDER_SUB_DIRECTORIES_LIST)
     target_include_directories(${PROVIDER_BASE_TARGET} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../${DIR_NAME})
 endforeach()
+if (LINUX)
+    target_compile_options(${PROVIDER_BASE_TARGET} PRIVATE -fPIC -Werror)
+    add_dependencies(${PROVIDER_BASE_TARGET} install_coolbpf)
+endif()

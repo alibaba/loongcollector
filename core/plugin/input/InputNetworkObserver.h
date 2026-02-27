@@ -19,7 +19,6 @@
 #include <string>
 
 #include "collection_pipeline/plugin/interface/Input.h"
-#include "ebpf/Config.h"
 #include "ebpf/include/export.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
@@ -33,10 +32,10 @@ public:
     bool Init(const Json::Value& config, Json::Value& optionalGoPipeline) override;
     bool Start() override;
     bool Stop(bool isPipelineRemoving) override;
-    bool SupportAck() const override { return false; }
+    QueueType GetProcessQueueType() const override { return QueueType::COUNT_BOUNDED; }
 
-    nami::ObserverNetworkOption mNetworkOption;
-    PluginMetricManagerPtr mPluginMgr;
+    logtail::ebpf::ObserverNetworkOption mNetworkOption;
+    PluginMetricManagerPtr mPluginMetricPtr;
 };
 
 } // namespace logtail

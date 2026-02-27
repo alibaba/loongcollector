@@ -97,7 +97,7 @@ func NewFlusherLoki() *FlusherLoki {
 func (f *FlusherLoki) Init(context pipeline.Context) error {
 	f.context = context
 	if err := f.Validate(); err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
 		return err
 	}
 	// Set default value while not set
@@ -110,18 +110,18 @@ func (f *FlusherLoki) Init(context pipeline.Context) error {
 	// Init converter
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher converter error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher converter error", err)
 		return err
 	}
 	f.converter = convert
 	config, err := f.buildLokiConfig()
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
 		return err
 	}
 	client, err := loki.New(config)
 	if err != nil {
-		logger.Error(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init loki flusher error", err)
 		return err
 	}
 	f.lokiClient = client
@@ -154,7 +154,7 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 		logger.Debug(f.context.GetRuntimeContext(), "[LogGroup] topic", logGroup.Topic, "logstore", logGroup.Category, "logcount", len(logGroup.Logs), "tags", logGroup.LogTags)
 		serializedLogs, values, err := f.converter.ToByteStreamWithSelectedFields(logGroup, f.DynamicLabels)
 		if err != nil {
-			logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush loki convert log fail, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush loki convert log fail, error", err)
 			continue
 		}
 
@@ -163,7 +163,7 @@ func (f *FlusherLoki) Flush(projectName string, logstoreName string, configName 
 			// Append a log to the next batch, the sending is async
 			err = f.lokiClient.Handle(labels, time.Unix(int64(logGroup.Logs[i].Time), 0), string(log))
 			if err != nil {
-				logger.Error(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush loki convert log fail, error", err)
+				logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush loki convert log fail, error", err)
 			}
 		}
 	}

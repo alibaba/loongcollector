@@ -102,7 +102,8 @@ int32_t logtail::EventListener::ReadEvents(std::vector<logtail::Event*>& eventVe
             EventType etype = 0;
             if (event->mask & IN_Q_OVERFLOW) {
                 LOG_INFO(sLogger, ("inotify event queue overflow", "miss inotify events"));
-                AlarmManager::GetInstance()->SendAlarm(INOTIFY_EVENT_OVERFLOW_ALARM, "inotify event queue overflow");
+                AlarmManager::GetInstance()->SendAlarmWarning(INOTIFY_EVENT_OVERFLOW_ALARM,
+                                                              "inotify event queue overflow");
             } else {
                 etype |= event->mask & IN_DELETE_SELF ? EVENT_TIMEOUT : 0;
                 etype |= event->mask & IN_CREATE ? EVENT_CREATE : 0;

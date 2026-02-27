@@ -14,30 +14,37 @@
 
 #include "common/timer/Timer.h"
 
+#include <chrono>
+
+#include "MetricTypes.h"
+#include "application/Application.h"
 #include "logger/Logger.h"
+#include "monitor/MetricManager.h"
+#include "monitor/metric_constants/MetricConstants.h"
 
 using namespace std;
 
 namespace logtail {
 
+Timer::~Timer() {
+    Stop();
+}
+
 void Timer::Init() {
     {
-        lock_guard<mutex> lock(mThreadRunningMux);
-        if (mIsThreadRunning) {
+        if (mIsThreadRunning.exchange(true)) {
             return;
         }
-        mIsThreadRunning = true;
     }
+    InitMetrics();
     mThreadRes = async(launch::async, &Timer::Run, this);
 }
 
 void Timer::Stop() {
     {
-        lock_guard<mutex> lock(mThreadRunningMux);
-        if (!mIsThreadRunning) {
+        if (!mIsThreadRunning.exchange(false)) {
             return;
         }
-        mIsThreadRunning = false;
     }
     mCV.notify_one();
     if (!mThreadRes.valid()) {
@@ -59,39 +66,60 @@ void Timer::PushEvent(unique_ptr<TimerEvent>&& e) {
     } else {
         mQueue.push(std::move(e));
     }
+    ADD_COUNTER(mInItemsTotal, 1);
+    SET_GAUGE(mQueueItemsTotal, mQueue.size());
 }
 
 void Timer::Run() {
     LOG_INFO(sLogger, ("timer", "started"));
-    unique_lock<mutex> threadLock(mThreadRunningMux);
-    while (mIsThreadRunning) {
+    while (mIsThreadRunning.load()) {
         unique_lock<mutex> queueLock(mQueueMux);
         if (mQueue.empty()) {
-            queueLock.unlock();
-            mCV.wait(threadLock, [this]() { return !mIsThreadRunning || !mQueue.empty(); });
+            mCV.wait(queueLock, [this]() { return !mIsThreadRunning.load() || !mQueue.empty(); });
         } else {
             auto now = chrono::steady_clock::now();
             while (!mQueue.empty()) {
                 auto& e = mQueue.top();
                 if (now < e->GetExecTime()) {
                     auto timeout = e->GetExecTime() - now + chrono::milliseconds(1);
-                    queueLock.unlock();
-                    mCV.wait_for(threadLock, timeout);
+                    mCV.wait_for(queueLock, timeout);
                     break;
                 } else {
                     auto e = std::move(const_cast<unique_ptr<TimerEvent>&>(mQueue.top()));
+                    auto execTime = e->GetExecTime();
                     mQueue.pop();
                     queueLock.unlock();
+
+                    if (mLatencyTimeMs) {
+                        auto latency = chrono::duration_cast<chrono::nanoseconds>(now - execTime);
+                        ADD_COUNTER(mLatencyTimeMs, latency);
+                    }
                     if (!e->IsValid()) {
                         LOG_INFO(sLogger, ("invalid timer event", "task is cancelled"));
                     } else {
                         e->Execute();
+                        ADD_COUNTER(mOutItemsTotal, 1);
                     }
                     queueLock.lock();
+                    SET_GAUGE(mQueueItemsTotal, mQueue.size());
                 }
             }
         }
     }
+}
+
+void Timer::InitMetrics() {
+    MetricLabels labels;
+    labels.emplace_back(METRIC_LABEL_KEY_RUNNER_NAME, "timer");
+    WriteMetrics::GetInstance()->CreateMetricsRecordRef(
+        mMetricsRecordRef, MetricCategory::METRIC_CATEGORY_RUNNER, std::move(labels));
+
+    mInItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_TIMER_IN_ITEMS_TOTAL);
+    mOutItemsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_TIMER_OUT_ITEMS_TOTAL);
+    mQueueItemsTotal = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_TIMER_QUEUE_ITEMS_TOTAL);
+    mLatencyTimeMs = mMetricsRecordRef.CreateTimeCounter(METRIC_RUNNER_TIMER_LATENCY_TIME_MS);
+
+    WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricsRecordRef);
 }
 
 #ifdef APSARA_UNIT_TEST_MAIN

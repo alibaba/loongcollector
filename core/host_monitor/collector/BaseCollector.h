@@ -16,22 +16,50 @@
 
 #pragma once
 
+#include <chrono>
+#include <functional>
+#include <memory>
+#include <optional>
 #include <string>
 
-#include "host_monitor/HostMonitorTimerEvent.h"
+#include "host_monitor/HostMonitorTypes.h"
 #include "models/PipelineEventGroup.h"
 
 namespace logtail {
+
+// Forward declarations
+class HostMonitorContext;
 
 class BaseCollector {
 public:
     virtual ~BaseCollector() = default;
 
-    virtual bool Collect(const HostMonitorTimerEvent::CollectConfig& collectConfig, PipelineEventGroup* group) = 0;
-    virtual const std::string& Name() const = 0;
+    virtual bool Init(HostMonitorContext& collectContext);
+    virtual bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) = 0;
+    [[nodiscard]] virtual const std::string& Name() const = 0;
+    [[nodiscard]] virtual const std::chrono::seconds GetCollectInterval() const = 0;
 
 protected:
-    bool mValidState = false;
+    bool mValidState = true;
+    static const uint32_t kWarningPrintInterval = 10; // 警告打印频率（每发生 kWarningPrintInterval 次错误打印一次警告）
 };
+
+class CollectorInstance {
+public:
+    explicit CollectorInstance(std::unique_ptr<BaseCollector>&& collector) : mCollector(std::move(collector)) {}
+
+    bool Init(HostMonitorContext& collectContext);
+
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* groupPtr) {
+        return mCollector->Collect(collectContext, groupPtr);
+    }
+
+    std::chrono::seconds GetCollectInterval() const { return mCollector->GetCollectInterval(); }
+
+private:
+    std::chrono::steady_clock::time_point mStartTime;
+    std::unique_ptr<BaseCollector> mCollector;
+};
+
 
 } // namespace logtail

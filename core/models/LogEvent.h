@@ -92,8 +92,8 @@ public:
     StringView GetLevel() const { return mLevel; }
     void SetLevel(const std::string& level);
 
-    bool Empty() const { return mIndex.empty(); }
-    size_t Size() const { return mIndex.size(); }
+    bool Empty() const { return mContentCnt == 0; }
+    size_t Size() const { return mContentCnt; }
 
     ContentIterator begin();
     ContentIterator end();
@@ -121,10 +121,14 @@ private:
     // information for backward compatability.
     ContentsContainer mContents;
     size_t mAllocatedContentSize = 0;
-    std::map<StringView, size_t> mIndex;
+    size_t mContentCnt = 0;
     uint64_t mFileOffset = 0;
     uint64_t mRawSize = 0;
     StringView mLevel;
+
+#ifdef APSARA_UNIT_TEST_MAIN
+    friend class LogEventUnittest;
+#endif
 };
 
 } // namespace logtail

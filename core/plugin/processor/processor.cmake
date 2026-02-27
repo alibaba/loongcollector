@@ -21,6 +21,12 @@ file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/*.c ${CMAKE_SOU
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 # add processor/inner
 file(GLOB THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/*.c ${CMAKE_SOURCE_DIR}/plugin/processor/inner/*.cc ${CMAKE_SOURCE_DIR}/plugin/processor/inner/*.cpp ${CMAKE_SOURCE_DIR}/plugin/processor/inner/*.h)
+if (MSVC)
+    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromRelabelMetricNative.cpp)
+    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromParseMetricNative.cpp)
+    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromRelabelMetricNative.h)
+    list(REMOVE_ITEM THIS_SOURCE_FILES ${CMAKE_SOURCE_DIR}/plugin/processor/inner/ProcessorPromParseMetricNative.h)
+endif()
 list(APPEND THIS_SOURCE_FILES_LIST ${THIS_SOURCE_FILES})
 
 # Set source files to parent

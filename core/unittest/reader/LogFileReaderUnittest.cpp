@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <fstream>
 
-#include "checkpoint/CheckPointManager.h"
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
-#include "common/memory/SourceBuffer.h"
 #include "file_server/FileServer.h"
+#include "file_server/checkpoint/CheckPointManager.h"
+#include "file_server/reader/JsonLogFileReader.h"
 #include "file_server/reader/LogFileReader.h"
-#include "protobuf/sls/sls_logs.pb.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(force_release_deleted_file_fd_timeout);
@@ -46,7 +45,7 @@ public:
     void SetUp() override {
         readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -70,11 +69,14 @@ public:
     }
     void TestReadGBK();
     void TestReadUTF8();
+    void TestSetExpectedFileSize();
 
     std::unique_ptr<char[]> expectedContent;
     static std::string logPathDir;
     static std::string gbkFile;
     static std::string utf8File;
+
+protected:
     FileDiscoveryOptions discoveryOpts;
     FileReaderOptions readerOpts;
     FileTagOptions fileTagOpts;
@@ -83,6 +85,7 @@ public:
 
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadGBK);
 UNIT_TEST_CASE(LogFileReaderUnittest, TestReadUTF8);
+UNIT_TEST_CASE(LogFileReaderUnittest, TestSetExpectedFileSize);
 
 std::string LogFileReaderUnittest::logPathDir;
 std::string LogFileReaderUnittest::gbkFile;
@@ -300,7 +303,11 @@ void LogFileReaderUnittest::TestReadGBK() {
         // first read, read first line without \n and not allowRollback
         int64_t firstReadSize = expectedPart.find("\n");
         expectedPart.resize(firstReadSize);
+#if defined(__linux__)
         reader.ReadGBK(logBuffer, 127, moreData, false); // first line without \n
+#else
+        reader.ReadGBK(logBuffer, 128, moreData, false); // Windows has an extra \r character compared to Linux.
+#endif
         APSARA_TEST_FALSE_FATAL(moreData);
         APSARA_TEST_FALSE_FATAL(reader.mLastForceRead);
         reader.ReadGBK(logBuffer, 127, moreData, false); // force read, clear cache
@@ -571,6 +578,155 @@ void LogFileReaderUnittest::TestReadUTF8() {
     }
 }
 
+void LogFileReaderUnittest::TestSetExpectedFileSize() {
+    // Test 1: SetExpectedFileSize sets the value correctly
+    {
+        MultilineOptions multilineOpts;
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::UTF8;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader.CheckFileSignatureAndOffset(true);
+
+        // Set expected file size
+        int64_t expectedSize = 100;
+        reader.SetExpectedFileSize(expectedSize);
+        APSARA_TEST_EQUAL_FATAL(reader.mExpectedFileSize, expectedSize);
+    }
+
+    // Test 2: GetRawData respects mExpectedFileSize when fileSize > mExpectedFileSize
+    {
+        MultilineOptions multilineOpts;
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::UTF8;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader.CheckFileSignatureAndOffset(true);
+
+        int64_t actualFileSize = reader.mLogFileOp.GetFileSize();
+        APSARA_TEST_TRUE_FATAL(actualFileSize > 0);
+
+        // Set expected file size smaller than actual file size
+        int64_t expectedSize = 50;
+        reader.SetExpectedFileSize(expectedSize);
+        reader.mLastFilePos = 0;
+
+        LogBuffer logBuffer;
+        reader.GetRawData(logBuffer, actualFileSize, true);
+
+        // Should read up to expectedSize, not actualFileSize
+        APSARA_TEST_LE_FATAL(reader.mLastFilePos, expectedSize);
+    }
+
+    // Test 3: GetRawData returns false when mLastFilePos >= mExpectedFileSize
+    {
+        MultilineOptions multilineOpts;
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::UTF8;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader.CheckFileSignatureAndOffset(true);
+
+        int64_t actualFileSize = reader.mLogFileOp.GetFileSize();
+        APSARA_TEST_TRUE_FATAL(actualFileSize > 0);
+
+        // Set expected file size
+        int64_t expectedSize = 100;
+        reader.SetExpectedFileSize(expectedSize);
+        // Set last file pos to expected size (already read to expected size)
+        reader.mLastFilePos = expectedSize;
+
+        LogBuffer logBuffer;
+        bool moreData = reader.GetRawData(logBuffer, actualFileSize, true);
+
+        // Should return false when already read to expected size
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, expectedSize);
+    }
+
+    // Test 4: GetRawData uses min(fileSize, mExpectedFileSize) when both are set
+    {
+        MultilineOptions multilineOpts;
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::UTF8;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader.CheckFileSignatureAndOffset(true);
+
+        int64_t actualFileSize = reader.mLogFileOp.GetFileSize();
+        APSARA_TEST_TRUE_FATAL(actualFileSize > 0);
+
+        // Set expected file size larger than actual file size
+        int64_t expectedSize = actualFileSize + 1000;
+        reader.SetExpectedFileSize(expectedSize);
+        reader.mLastFilePos = 0;
+
+        LogBuffer logBuffer;
+        reader.GetRawData(logBuffer, actualFileSize, true);
+
+        // Should use actualFileSize (the smaller one)
+        APSARA_TEST_LE_FATAL(reader.mLastFilePos, actualFileSize);
+    }
+
+    // Test 5: When mExpectedFileSize is 0, it should not limit reading
+    {
+        MultilineOptions multilineOpts;
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::UTF8;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        reader.CheckFileSignatureAndOffset(true);
+
+        int64_t actualFileSize = reader.mLogFileOp.GetFileSize();
+        APSARA_TEST_TRUE_FATAL(actualFileSize > 0);
+
+        // mExpectedFileSize defaults to 0, should not limit reading
+        APSARA_TEST_EQUAL_FATAL(reader.mExpectedFileSize, 0);
+        reader.mLastFilePos = 0;
+
+        LogBuffer logBuffer;
+        reader.GetRawData(logBuffer, actualFileSize, true);
+
+        // Should read normally without size limit
+        APSARA_TEST_LE_FATAL(reader.mLastFilePos, actualFileSize);
+    }
+}
+
 class LogMultiBytesUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
@@ -587,7 +743,7 @@ public:
 
     void SetUp() override {
         std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
-        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "r"), &std::fclose);
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
         if (!fp.get()) {
             return;
         }
@@ -820,6 +976,125 @@ void LogFileReaderCheckpointUnittest::TestDumpMetaToMem() {
         reader1.DumpMetaToMem(false);
     }
 }
+
+class LogFileReaderHoleUnittest : public ::testing::Test {
+public:
+    void TestReadLogHoleInTheMiddle();
+    void TestReadLogHoleOnTheLeft();
+    void TestReadLogJsonHoleOnTheRight();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderHoleUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::CUSTOM;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    const std::string mConfigName = "##1.0##project-0$config-0";
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+    FileDiscoveryConfig mConfig;
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string LogFileReaderHoleUnittest::gRootDir;
+std::string LogFileReaderHoleUnittest::gLogName;
+std::string LogFileReaderHoleUnittest::gLogPath;
+
+void LogFileReaderHoleUnittest::TestReadLogHoleInTheMiddle() {
+    std::string content = "a sample " + std::string(1024, '\0') + " log";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, content);
+}
+
+void LogFileReaderHoleUnittest::TestReadLogHoleOnTheLeft() {
+    std::string content = std::string(1024, '\0') + "a sample log";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(!reader.ReadLog(logbuf, &event1)); // false means no more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
+}
+
+void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
+    std::string content = "a sample log" + std::string(LogFileReader::BUFFER_SIZE, '\0');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content + "\n"));
+    mMultilineOpts.mMode = MultilineOptions::Mode::JSON;
+
+    JsonLogFileReader reader(gRootDir,
+                             gLogName,
+                             DevInode(),
+                             std::make_pair(&mReaderOpts, &mCtx),
+                             std::make_pair(&mMultilineOpts, &mCtx),
+                             std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    Event event1(gRootDir, "", EVENT_MODIFY, 0);
+    LogBuffer logbuf;
+    APSARA_TEST_TRUE_FATAL(reader.ReadLog(logbuf, &event1)); // true means has more data
+    APSARA_TEST_TRUE_FATAL(reader.mLogFileOp.IsOpen());
+    APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer, "a sample log");
+}
+
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
+UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
 
 } // namespace logtail
 

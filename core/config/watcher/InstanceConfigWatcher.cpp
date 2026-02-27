@@ -20,6 +20,7 @@
 #include "common/FileSystemUtil.h"
 #include "config/ConfigUtil.h"
 #include "config/InstanceConfigManager.h"
+#include "constants/Constants.h"
 #include "logger/Logger.h"
 
 using namespace std;
@@ -62,7 +63,7 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
 
             const filesystem::path& path = entry.path();
             const string& configName = path.stem().string();
-            if (configName == "region_config") {
+            if (configName == REGION_CONFIG || configName == READABLE_REGION_CONFIG) {
                 continue;
             }
             const string& filepath = path.string();
@@ -157,7 +158,7 @@ InstanceConfigDiff InstanceConfigWatcher::CheckConfigDiff() {
         mFileInfoMap.erase(key);
     }
 
-    if (!diff.IsEmpty()) {
+    if (diff.HasDiff()) {
         LOG_INFO(sLogger,
                  ("config files scan done", "got updates, begin to update instanceConfigs")(
                      "added", diff.mAdded.size())("modified", diff.mModified.size())("removed", diff.mRemoved.size()));

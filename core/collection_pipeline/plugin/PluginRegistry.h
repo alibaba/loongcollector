@@ -45,19 +45,20 @@ public:
 
     void LoadPlugins();
     void UnloadPlugins();
-    std::unique_ptr<InputInstance> CreateInput(const std::string& name, const PluginInstance::PluginMeta& pluginMeta);
+    std::unique_ptr<InputInstance>
+    CreateInput(const std::string& name, bool isOnetime, const PluginInstance::PluginMeta& pluginMeta);
     std::unique_ptr<ProcessorInstance> CreateProcessor(const std::string& name,
                                                        const PluginInstance::PluginMeta& pluginMeta);
     std::unique_ptr<FlusherInstance> CreateFlusher(const std::string& name,
                                                    const PluginInstance::PluginMeta& pluginMeta);
     bool IsValidGoPlugin(const std::string& name) const;
-    bool IsValidNativeInputPlugin(const std::string& name) const;
+    bool IsValidNativeInputPlugin(const std::string& name, bool isOnetime) const;
     bool IsValidNativeProcessorPlugin(const std::string& name) const;
     bool IsValidNativeFlusherPlugin(const std::string& name) const;
-    bool IsGlobalSingletonInputPlugin(const std::string& name) const;
+    bool IsGlobalSingletonInputPlugin(const std::string& name, bool isOnetime) const;
 
 private:
-    enum PluginCat { INPUT_PLUGIN, PROCESSOR_PLUGIN, FLUSHER_PLUGIN };
+    enum PluginCat { CONTINUOUS_INPUT_PLUGIN, ONETIME_INPUT_PLUGIN, PROCESSOR_PLUGIN, FLUSHER_PLUGIN };
 
     struct PluginKey {
         PluginCat cat;
@@ -79,7 +80,8 @@ private:
 
     void LoadStaticPlugins();
     void LoadDynamicPlugins(const std::set<std::string>& plugins);
-    void RegisterInputCreator(PluginCreator* creator, bool isSingleton = false);
+    void RegisterOnetimeInputCreator(PluginCreator* creator, bool isSingleton = false);
+    void RegisterContinuousInputCreator(PluginCreator* creator, bool isSingleton = false);
     void RegisterProcessorCreator(PluginCreator* creator);
     void RegisterFlusherCreator(PluginCreator* creator, bool isSingleton = false);
     PluginCreator* LoadProcessorPlugin(DynamicLibLoader& loader, const std::string pluginType);
@@ -92,6 +94,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PluginRegistryUnittest;
+    friend class PipelineUpdateUnittest;
     friend void LoadPluginMock();
 #endif
 };

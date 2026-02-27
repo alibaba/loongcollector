@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -79,7 +80,9 @@ public:
     // for use of Go pipeline and shennong
     bool Send(std::string&& data, const std::string& shardHashKey, const std::string& logstore = "");
 
-    std::string GetSubpath() const { return mSubpath; }
+    const std::string& GetSubpath() const { return mSubpath; }
+
+    const std::string& GetWorkspace() const { return mWorkspace; }
 
     std::string mProject;
     std::string mLogstore;
@@ -95,6 +98,7 @@ public:
 
     // TODO: temporarily public for profile
     std::unique_ptr<Compressor> mCompressor;
+    std::unordered_map<std::string, std::string> mExtraHeaders;
 
 private:
     static void IncreaseProjectRegionReferenceCnt(const std::string& project, const std::string& region);
@@ -126,32 +130,43 @@ private:
 
     std::unique_ptr<HttpSinkRequest> CreatePostLogStoreLogsRequest(const std::string& accessKeyId,
                                                                    const std::string& accessKeySecret,
-                                                                   SLSClientManager::AuthType type,
+                                                                   const std::string& secToken,
+                                                                   AuthType type,
                                                                    SLSSenderQueueItem* item) const;
+    std::unique_ptr<HttpSinkRequest> CreatePostHostMetricsRequest(const std::string& accessKeyId,
+                                                                  const std::string& accessKeySecret,
+                                                                  const std::string& secToken,
+                                                                  AuthType type,
+                                                                  SLSSenderQueueItem* item) const;
     std::unique_ptr<HttpSinkRequest> CreatePostMetricStoreLogsRequest(const std::string& accessKeyId,
                                                                       const std::string& accessKeySecret,
-                                                                      SLSClientManager::AuthType type,
+                                                                      const std::string& secToken,
+                                                                      AuthType type,
                                                                       SLSSenderQueueItem* item) const;
     std::unique_ptr<HttpSinkRequest> CreatePostAPMBackendRequest(const std::string& accessKeyId,
                                                                  const std::string& accessKeySecret,
-                                                                 SLSClientManager::AuthType type,
-                                                                 SLSSenderQueueItem* item,
-                                                                 const std::string& subPath) const;
+                                                                 const std::string& secToken,
+                                                                 AuthType type,
+                                                                 SLSSenderQueueItem* item) const;
+    bool IsRawSLSTelemetryType() const;
+    bool IsMetricsTelemetryType() const;
 
     std::string mSubpath;
+    std::string mWorkspace;
 
     Batcher<SLSEventBatchStatus> mBatcher;
     std::unique_ptr<EventGroupSerializer> mGroupSerializer;
     std::unique_ptr<Serializer<std::vector<CompressedLogGroup>>> mGroupListSerializer;
 #ifdef __ENTERPRISE__
-    // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateHostsInfo.
-    // Otherwise, timeout machanisim must be emplyed to clean up unused CandidateHostsInfo.
-    std::shared_ptr<CandidateHostsInfo> mCandidateHostsInfo;
+    // This may not be cached. However, this provides a simple way to control the lifetime of a CandidateDomainsInfo.
+    // Otherwise, timeout machanisim must be emplyed to clean up unused CandidateDomainsInfo.
+    std::shared_ptr<CandidateDomainsInfo> mCandidateDomainsInfo;
 #endif
 
     CounterPtr mSendCnt;
     CounterPtr mSendDoneCnt;
     CounterPtr mSuccessCnt;
+    CounterPtr mRetryCnt;
     CounterPtr mDiscardCnt;
     CounterPtr mNetworkErrorCnt;
     CounterPtr mServerErrorCnt;

@@ -23,16 +23,18 @@
 
 #include "config/TaskConfig.h"
 #include "task_pipeline/Task.h"
+#include "task_pipeline/TaskPipelineContext.h"
 
 namespace logtail {
 
 class TaskPipeline {
 public:
-    const std::string& Name() const { return mConfigName; }
+    const std::string& Name() const { return mName; }
     bool Init(TaskConfig&& config);
-    void Start() { mPlugin->Start(); }
-    void Stop(bool isRemoving) { mPlugin->Stop(isRemoving); }
+    void Start();
+    void Stop(bool isRemoving);
     const Json::Value& GetConfig() const { return *mConfig; }
+    bool IsOnetime() const { return mIsOnetime; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     Task* GetPlugin() const { return mPlugin.get(); }
@@ -41,9 +43,11 @@ public:
 private:
     std::unique_ptr<Task> mPlugin;
 
-    std::string mConfigName;
+    std::string mName;
+    bool mIsOnetime = false;
     std::unique_ptr<Json::Value> mConfig;
     uint32_t mCreateTime = 0;
+    mutable TaskPipelineContext mContext;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class TaskPipelineUnittest;

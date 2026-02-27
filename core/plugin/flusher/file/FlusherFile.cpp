@@ -14,11 +14,8 @@
 
 #include "plugin/flusher/file/FlusherFile.h"
 
-#include "spdlog/async.h"
-#include "spdlog/sinks/rotating_file_sink.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-
 #include "collection_pipeline/queue/SenderQueueManager.h"
+#include "common/FileSystemUtil.h"
 
 using namespace std;
 
@@ -26,11 +23,7 @@ namespace logtail {
 
 const string FlusherFile::sName = "flusher_file";
 
-bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
-    static uint32_t cnt = 0;
-    GenerateQueueKey(to_string(++cnt));
-    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, *mContext);
-
+bool FlusherFile::Init(const Json::Value& config, [[maybe_unused]] Json::Value& optionalGoPipeline) {
     string errorMsg;
     // FilePath
     if (!GetMandatoryStringParam(config, "FilePath", mFilePath, errorMsg)) {
@@ -43,82 +36,70 @@ bool FlusherFile::Init(const Json::Value& config, Json::Value& optionalGoPipelin
                            mContext->GetLogstoreName(),
                            mContext->GetRegion());
     }
-    // Pattern
-    // GetMandatoryStringParam(config, "Pattern", mPattern, errorMsg);
+    mFilePath = ConvertAndNormalizeNativePath(mFilePath);
     // MaxFileSize
-    // GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
+    GetMandatoryUIntParam(config, "MaxFileSize", mMaxFileSize, errorMsg);
     // MaxFiles
-    // GetMandatoryUIntParam(config, "MaxFiles", mMaxFileSize, errorMsg);
+    GetMandatoryUIntParam(config, "MaxFiles", mMaxFiles, errorMsg);
 
     // create file writer
-    auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
-    mFileWriter = std::make_shared<spdlog::async_logger>(
-        sName, file_sink, spdlog::thread_pool(), spdlog::async_overflow_policy::block);
-    mFileWriter->set_pattern(mPattern);
+    mThreadPool = std::make_shared<spdlog::details::thread_pool>(10, 1);
+    try {
+        mFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(mFilePath, mMaxFileSize, mMaxFiles, true);
+    } catch (const spdlog::spdlog_ex& e) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           e.what(),
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    mFileWriter
+        = std::make_shared<spdlog::async_logger>(sName, mFileSink, mThreadPool, spdlog::async_overflow_policy::block);
+    mFileWriter->set_pattern("%v");
 
-    mBatcher.Init(Json::Value(), this, DefaultFlushStrategyOptions{});
     mGroupSerializer = make_unique<JsonEventGroupSerializer>(this);
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_FLUSHER_OUT_EVENT_GROUPS_TOTAL);
+
+    GenerateQueueKey(mFilePath);
+    SenderQueueManager::GetInstance()->CreateQueue(mQueueKey, mPluginID, mFilePath, *mContext);
     return true;
 }
 
 bool FlusherFile::Send(PipelineEventGroup&& g) {
-    if (g.IsReplay()) {
-        return SerializeAndPush(std::move(g));
-    } else {
-        vector<BatchedEventsList> res;
-        mBatcher.Add(std::move(g), res);
-        return SerializeAndPush(std::move(res));
-    }
+    return SerializeAndPush(std::move(g));
 }
 
-bool FlusherFile::Flush(size_t key) {
-    BatchedEventsList res;
-    mBatcher.FlushQueue(key, res);
-    return SerializeAndPush(std::move(res));
+bool FlusherFile::Flush([[maybe_unused]] size_t key) {
+    return true;
 }
 
 bool FlusherFile::FlushAll() {
-    vector<BatchedEventsList> res;
-    mBatcher.FlushAll(res);
-    return SerializeAndPush(std::move(res));
+    return true;
 }
 
 bool FlusherFile::SerializeAndPush(PipelineEventGroup&& group) {
-    string serializedData, errorMsg;
+    string serializedData;
+    string errorMsg;
     BatchedEvents g(std::move(group.MutableEvents()),
                     std::move(group.GetSizedTags()),
                     std::move(group.GetSourceBuffer()),
                     group.GetMetadata(EventGroupMetaKey::SOURCE_ID),
                     std::move(group.GetExactlyOnceCheckpoint()));
-    mGroupSerializer->DoSerialize(move(g), serializedData, errorMsg);
+    for (const auto& extraSourceBuffer : group.GetExtraSourceBuffers()) {
+        g.mSourceBuffers.emplace_back(extraSourceBuffer);
+    }
+    mGroupSerializer->DoSerialize(std::move(g), serializedData, errorMsg);
     if (errorMsg.empty()) {
+        if (!serializedData.empty() && serializedData.back() == '\n') {
+            serializedData.pop_back();
+        }
         mFileWriter->info(serializedData);
+        mFileWriter->flush();
     } else {
         LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
-    }
-    mFileWriter->flush();
-    return true;
-}
-
-bool FlusherFile::SerializeAndPush(BatchedEventsList&& groupList) {
-    string serializedData;
-    for (auto& group : groupList) {
-        string errorMsg;
-        mGroupSerializer->DoSerialize(move(group), serializedData, errorMsg);
-        if (errorMsg.empty()) {
-            mFileWriter->info(serializedData);
-        } else {
-            LOG_ERROR(sLogger, ("serialize pipeline event group error", errorMsg));
-        }
-    }
-    mFileWriter->flush();
-    return true;
-}
-
-bool FlusherFile::SerializeAndPush(vector<BatchedEventsList>&& groupLists) {
-    for (auto& groupList : groupLists) {
-        SerializeAndPush(std::move(groupList));
     }
     return true;
 }

@@ -1,11 +1,14 @@
 package monitor
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sort"
 
 	v1 "github.com/google/cadvisor/info/v1"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
 type Info struct {
@@ -85,7 +88,7 @@ func (m *Statistic) UpdateStatistic(stat *v1.ContainerStats) {
 	m.cpu.Add(cpuUsageRateTotal)
 	m.mem.Add(float64(stat.Memory.Usage) / 1024 / 1024)
 	m.lastStat = stat
-	// fmt.Println("CPU Usage Rate(%):", cpuUsageRateTotal, "CPU Usage Rate Max(%):", m.cpu.maxVal, "CPU Usage Rate Avg(%):", m.cpu.avgVal, "Memory Usage Max(MB):", m.mem.maxVal, "Memory Usage Avg(MB):", m.mem.avgVal)
+	logger.Info(context.Background(), "CPU Usage Rate(%)", cpuUsageRateTotal, "Memory Usage(MB)", float64(stat.Memory.Usage)/1024/1024)
 }
 
 func (m *Statistic) ClearStatistic() {

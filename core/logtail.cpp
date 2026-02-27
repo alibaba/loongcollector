@@ -15,7 +15,9 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-
+#ifndef LOGTAIL_NO_TC_MALLOC
+// #include <gperftools/heap-profiler.h> // for memory leak debug
+#endif
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
 #include "common/ErrorUtil.h"
@@ -161,6 +163,7 @@ int main(int argc, char** argv) {
         exit(3);
     }
 
+    // HeapProfilerStart("my_heap_profile"); // for memory leak debug
     do_worker_process();
 
     return 0;

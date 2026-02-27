@@ -18,9 +18,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorRateLimit struct {
@@ -28,7 +28,7 @@ type ProcessorRateLimit struct {
 	Limit  string   `comment:"Optional. Limit rate in the format of (number)/(time unit). Supported time unit: 's' (per second), 'm' (per minute), and 'h' (per hour)."`
 
 	Algorithm   algorithm
-	limitMetric pipeline.CounterMetric
+	limitMetric selfmonitor.CounterMetric
 	context     pipeline.Context
 }
 
@@ -45,7 +45,7 @@ func (p *ProcessorRateLimit) Init(context pipeline.Context) error {
 	p.Algorithm = newTokenBucket(limit)
 
 	metricsRecord := p.context.GetMetricRecord()
-	p.limitMetric = helper.NewCounterMetricAndRegister(metricsRecord, helper.MetricPluginDiscardedEventsTotal)
+	p.limitMetric = selfmonitor.NewCounterMetricAndRegister(metricsRecord, selfmonitor.MetricPluginDiscardedEventsTotal)
 	return nil
 }
 

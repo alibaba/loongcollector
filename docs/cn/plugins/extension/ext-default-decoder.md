@@ -16,9 +16,9 @@
 
 | 参数                | 类型      | 是否必选 | 说明                                                                                                  |
 |-------------------|---------|------|-----------------------------------------------------------------------------------------------------|
-| Format            | String  | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/master/pkg/protocol/decoder/common/comon.go) |
-| FieldsExtend      | Boolean | 否    | 是否启用增强字段功能，默认为false，仅针对Format=influxdb时有效                                                           |
-| DisableUncompress | Boolean | 是    | 否不解压数据，默认为false，仅针对Format=raw时有效                                                                    |
+| Format            | string  | 是    | 具体的协议，[查看支持的具体协议列表](https://github.com/alibaba/loongcollector/blob/master/pkg/protocol/decoder/common/comon.go) |
+| FieldsExtend      | bool | 否    | 是否启用增强字段功能，默认为false，仅针对Format=influxdb时有效                                                           |
+| DisableUncompress | bool | 是    | 否不解压数据，默认为false，仅针对Format=raw时有效                                                                    |
 
 ## 样例
 

@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <variant>
 #include <vector>
 
 #include "Constants.h"
 #include "TagConstants.h"
+#include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "file_server/reader/LogFileReader.h"
 #include "unittest/Unittest.h"
@@ -44,6 +46,12 @@ private:
         metadata.emplace_back(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY, "test_image");
         metadata.emplace_back(TagKey::CONTAINER_NAME_TAG_KEY, "test_container");
         metadata.emplace_back(TagKey::CONTAINER_IP_TAG_KEY, "test_container_ip");
+        return metadata;
+    }
+
+    vector<pair<string, string>> GenerateFakeContainerCustomMetadatas() {
+        vector<pair<string, string>> metadata;
+        metadata.emplace_back("test_env_config_tag_key", "test_env_config_tag_value");
         return metadata;
     }
 
@@ -84,7 +92,7 @@ void FileTagUnittest::TestDefaultTag() {
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 1);
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
-                          hostLogPathDir + "/" + hostLogPathFile);
+                          hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
     }
     {
         configStr = R"(
@@ -106,6 +114,7 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -114,10 +123,10 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
                           GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
-        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 12);
+        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 13);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
-                          hostLogPathDir + "/" + hostLogPathFile);
+                          hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_POD_NAME_TAG_KEY)), "test_pod");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::K8S_NAMESPACE_TAG_KEY)), "test_namespace");
@@ -129,6 +138,7 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_env_config_tag_key"), "test_env_config_tag_value");
     }
     {
         configStr = R"(
@@ -163,7 +173,7 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
-                          hostLogPathDir + "/" + hostLogPathFile);
+                          hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
@@ -201,7 +211,7 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
-                          hostLogPathDir + "/" + hostLogPathFile);
+                          hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
@@ -237,6 +247,7 @@ void FileTagUnittest::TestDefaultTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -245,10 +256,10 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY),
                           GetDefaultTagKeyString(TagKey::FILE_OFFSET_KEY));
 
-        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 12);
+        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 13);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_PATH_TAG_KEY)),
-                          hostLogPathDir + "/" + hostLogPathFile);
+                          hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::FILE_INODE_TAG_KEY)), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag(GetDefaultTagKeyString(TagKey::CONTAINER_IMAGE_NAME_TAG_KEY)),
                           "test_image");
@@ -260,6 +271,7 @@ void FileTagUnittest::TestDefaultTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_env_config_tag_key"), "test_env_config_tag_value");
     }
 }
 
@@ -298,7 +310,7 @@ void FileTagUnittest::TestRenameTag() {
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + "/" + hostLogPathFile);
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_inode"), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
@@ -334,7 +346,7 @@ void FileTagUnittest::TestRenameTag() {
 
         APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + "/" + hostLogPathFile);
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_inode"), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
@@ -370,6 +382,7 @@ void FileTagUnittest::TestRenameTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
@@ -377,9 +390,9 @@ void FileTagUnittest::TestRenameTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_OFFSET_KEY), "test_offset");
 
-        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 12);
+        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 13);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
-        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + "/" + hostLogPathFile);
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_path"), hostLogPathDir + PATH_SEPARATOR + hostLogPathFile);
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_inode"), "0");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_namespace"), "test_namespace");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_pod"), "test_pod");
@@ -390,6 +403,7 @@ void FileTagUnittest::TestRenameTag() {
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_env_config_tag_key"), "test_env_config_tag_value");
     }
 }
 
@@ -492,17 +506,19 @@ void FileTagUnittest::TestDeleteTag() {
         reader.mTopicExtraTags = {{"test_topic_1", "test_topic_value_1"}, {"test_topic_2", "test_topic_value_2"}};
         reader.mContainerMetadatas = GenerateFakeContainerMetadatas();
         reader.mContainerExtraTags = GenerateFakeContainerExtraTags();
+        reader.mContainerCustomMetadatas = GenerateFakeContainerCustomMetadatas();
 
         auto sourceBuffer = std::make_shared<SourceBuffer>();
         PipelineEventGroup eventGroup(sourceBuffer);
         reader.SetEventGroupMetaAndTag(eventGroup);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
 
-        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 4);
+        APSARA_TEST_EQUAL(eventGroup.GetTags().size(), 5);
         APSARA_TEST_EQUAL(eventGroup.GetTag(LOG_RESERVED_KEY_TOPIC), "test_topic");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_1"), "test_topic_value_1");
         APSARA_TEST_EQUAL(eventGroup.GetTag("test_topic_2"), "test_topic_value_2");
         APSARA_TEST_EQUAL(eventGroup.GetTag("_test_tag_"), "test_value");
+        APSARA_TEST_EQUAL(eventGroup.GetTag("test_env_config_tag_key"), "test_env_config_tag_value");
     }
 }
 

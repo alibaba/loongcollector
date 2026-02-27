@@ -42,8 +42,8 @@ public:
     SelfMonitorMetricEvent() = default;
     SelfMonitorMetricEvent(const SelfMonitorMetricEvent& event) = default;
 
-    SelfMonitorMetricEvent(MetricsRecord* metricRecord);
-    SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
+    explicit SelfMonitorMetricEvent(MetricsRecord* metricRecord);
+    explicit SelfMonitorMetricEvent(const std::map<std::string, std::string>& metricRecord);
 
     void SetInterval(size_t interval);
     void Merge(const SelfMonitorMetricEvent& event);
@@ -57,7 +57,7 @@ public:
     uint64_t GetCounter(const std::string& counterName);
     double GetGauge(const std::string& gaugeName);
 
-    SelfMonitorMetricEventKey mKey; // labels + category
+    SelfMonitorMetricEventKey mKey = 0L; // labels + category
     std::string mCategory; // category
 private:
     void CreateKey();
@@ -65,9 +65,9 @@ private:
     std::unordered_map<std::string, std::string> mLabels;
     std::unordered_map<std::string, uint64_t> mCounters;
     std::unordered_map<std::string, double> mGauges;
-    int32_t mSendInterval;
-    int32_t mIntervalsSinceLastSend;
-    bool mUpdatedFlag;
+    int32_t mSendInterval = 0;
+    int32_t mIntervalsSinceLastSend = 0;
+    bool mUpdatedFlag = false;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SelfMonitorMetricEventUnittest;

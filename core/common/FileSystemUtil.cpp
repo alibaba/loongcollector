@@ -14,16 +14,22 @@
 
 #include "FileSystemUtil.h"
 
+#include <cstddef>
+#include <cstdint>
+#include <sys/types.h>
+
 #if defined(_MSC_VER)
 #include <direct.h>
 #include <fcntl.h>
 #elif defined(__linux__)
 #include <fnmatch.h>
+#include <sys/statvfs.h>
 #endif
 #include <fstream>
 
 #include "boost/filesystem.hpp"
 
+#include "EncodingConverter.h"
 #include "RuntimeUtil.h"
 #include "StringTools.h"
 #include "logger/Logger.h"
@@ -122,24 +128,46 @@ void TrimLastSeperator(std::string& path) {
     }
 }
 
-bool ReadFileContent(const std::string& fileName, std::string& content, uint32_t maxFileSize) {
-    FILE* pFile = fopen(fileName.c_str(), "r");
-    if (pFile == NULL) {
-        APSARA_LOG_DEBUG(sLogger, ("open file fail", fileName)("errno", strerror(errno)));
-        return false;
+FileReadResult ReadFileContent(const std::string& fileName, std::string& content, uint64_t maxFileSize) {
+    std::ifstream ifs(fileName, std::ios::binary);
+    if (!ifs) {
+        return FileReadResult::kError;
     }
 
     content.clear();
-    char* buffer = new char[maxFileSize];
-    uint32_t readBytes = fread(buffer, 1, maxFileSize, pFile);
-    if (readBytes > 0) {
-        content.append(buffer, readBytes);
-        delete[] buffer;
-    } else
-        delete[] buffer;
+    try {
+        constexpr uint64_t kFileReadBufferSize = 32 * 1024;
+        // 设定为32K，对于特殊文件（如 /proc 中的文件）
+        // 尽可能一次性读进来 https://github.com/giampaolo/psutil/issues/2050
+        uint64_t totalRead = 0;
+        uint64_t bytesRead = 0;
+        content.resize(std::min(kFileReadBufferSize, maxFileSize));
 
-    fclose(pFile);
-    return true;
+        while (ifs && totalRead < maxFileSize) {
+            ifs.read(content.data() + totalRead, std::min(kFileReadBufferSize, maxFileSize - totalRead));
+            bytesRead = ifs.gcount();
+            totalRead += bytesRead;
+
+            if (bytesRead > 0 && totalRead < maxFileSize) {
+                content.resize(totalRead + kFileReadBufferSize);
+            }
+        }
+
+        content.resize(totalRead);
+
+        // Check if file is larger than maxFileSize
+        char extra = 0;
+        if (ifs.read(&extra, 1)) {
+            return FileReadResult::kTruncated;
+        }
+    } catch (const std::ios_base::failure& e) {
+        return FileReadResult::kError;
+    } catch (const std::filesystem::filesystem_error& e) {
+        // Handle filesystem errors (e.g., permissions)
+        return FileReadResult::kError;
+    }
+
+    return FileReadResult::kOK;
 }
 
 int GetLines(std::istream& is,
@@ -208,8 +236,29 @@ bool OverwriteFile(const std::string& fileName, const std::string& content) {
     return true;
 }
 
+bool UpdateFileContent(const std::filesystem::path& filepath, const std::string& content, std::string& errMsg) {
+    filesystem::path tmpFilepath = filepath.string() + ".new";
+    {
+        ofstream fout(tmpFilepath, ios::binary);
+        if (!fout) {
+            errMsg = "failed to open file";
+            return false;
+        }
+        fout << content;
+    }
+
+    error_code ec;
+    filesystem::rename(tmpFilepath, filepath, ec);
+    if (ec) {
+        filesystem::remove(tmpFilepath, ec);
+        errMsg = "failed to rename tmp file to file";
+        return false;
+    }
+    return true;
+}
+
 bool WriteFile(const std::string& fileName, const std::string& content, std::string& errMsg) {
-    ofstream f(fileName, ios::trunc);
+    ofstream f(fileName, ios::trunc | ios::binary);
     if (!f.is_open()) {
         errMsg = "failed to open file " + fileName;
         return false;
@@ -379,6 +428,33 @@ void Chmod(const char* filePath, mode_t mode) {
     if (chmod(filePath, mode) == -1) {
         APSARA_LOG_ERROR(sLogger, ("chmod error", filePath)("mode", mode)("errno", errno));
     }
+#endif
+}
+
+std::string NormalizeNativePath(const std::string& path) {
+#if defined(_MSC_VER)
+    // On Windows, only normalize the drive letter to uppercase
+    // This ensures case-insensitive drive letter matching while preserving case sensitivity for the rest
+    if (path.size() >= 2 && path[1] == ':' && isalpha(static_cast<unsigned char>(path[0]))) {
+        std::string normalized = path;
+        normalized[0] = toupper(static_cast<unsigned char>(path[0]));
+        return normalized;
+    }
+    return path;
+#else
+    // On Linux, return as-is
+    return path;
+#endif
+}
+
+std::string ConvertAndNormalizeNativePath(const std::string& path) {
+#if defined(_MSC_VER)
+    // On Windows, convert UTF-8 to ACP and normalize the drive letter
+    std::string nativePath = EncodingConverter::GetInstance()->FromUTF8ToACP(path);
+    return NormalizeNativePath(nativePath);
+#else
+    // On Linux, UTF-8 is the native encoding, return as-is
+    return path;
 #endif
 }
 

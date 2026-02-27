@@ -49,11 +49,15 @@ public:
     bool InitGlobalConfig(const Json::Value& config, Json::Value& extendedParams) {
         return mGlobalConfig.Init(config, *this, extendedParams);
     }
+    void SetConfigPriority(uint32_t priority) { mGlobalConfig.mPriority = priority; }
     void SetProcessQueueKey(QueueKey key) { mProcessQueueKey = key; }
     QueueKey GetProcessQueueKey() const { return mProcessQueueKey; }
+    void SetIsOnetimePipelineRunningBeforeStart(bool flag) { mIsOnetimePipelineRunningBeforeStart = flag; }
+    bool IsOnetimePipelineRunningBeforeStart() const { return mIsOnetimePipelineRunningBeforeStart; }
     const CollectionPipeline& GetPipeline() const { return *mPipeline; }
     CollectionPipeline& GetPipeline() { return *mPipeline; }
     void SetPipeline(CollectionPipeline& pipeline) { mPipeline = &pipeline; }
+    bool HasValidPipeline() const { return mPipeline != nullptr; }
 
     const std::string& GetProjectName() const;
     const std::string& GetLogstoreName() const;
@@ -85,6 +89,7 @@ private:
     uint32_t mCreateTime;
     GlobalConfig mGlobalConfig;
     QueueKey mProcessQueueKey = -1;
+    bool mIsOnetimePipelineRunningBeforeStart = false;
     CollectionPipeline* mPipeline = nullptr;
 
     const FlusherSLS* mSLSInfo = nullptr;

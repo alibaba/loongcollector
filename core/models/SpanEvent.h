@@ -60,9 +60,15 @@ public:
         void SetTag(const std::string& key, const std::string& val);
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
+        void AppendTag(StringView key, StringView val);
+        void AppendTag(const std::string& key, const std::string& val);
+        void AppendTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void AppendTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
-        std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-        std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+        std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
+            return mTags.mInner.begin();
+        }
+        std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
         size_t TagsSize() const { return mTags.mInner.size(); }
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
@@ -80,7 +86,7 @@ public:
         StringView mTraceId;
         StringView mSpanId;
         StringView mTraceState;
-        SizedMap mTags;
+        SizedVectorTags mTags;
         SpanEvent* mParent = nullptr;
     };
 
@@ -100,9 +106,15 @@ public:
         void SetTag(const std::string& key, const std::string& val);
         void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
         void SetTagNoCopy(StringView key, StringView val);
+        void AppendTag(StringView key, StringView val);
+        void AppendTag(const std::string& key, const std::string& val);
+        void AppendTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+        void AppendTagNoCopy(StringView key, StringView val);
         void DelTag(StringView key);
-        std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-        std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+        std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const {
+            return mTags.mInner.begin();
+        }
+        std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
         size_t TagsSize() const { return mTags.mInner.size(); }
 
         std::shared_ptr<SourceBuffer>& GetSourceBuffer();
@@ -119,7 +131,7 @@ public:
 
         uint64_t mTimestampNs = 0;
         StringView mName;
-        SizedMap mTags;
+        SizedVectorTags mTags;
         SpanEvent* mParent = nullptr;
     };
 
@@ -162,10 +174,15 @@ public:
     void SetTag(const std::string& key, const std::string& val);
     void SetTagNoCopy(const StringBuffer& key, const StringBuffer& val);
     void SetTagNoCopy(StringView key, StringView val);
+    void AppendTag(StringView key, StringView val);
+    void AppendTag(const std::string& key, const std::string& val);
+    void AppendTagNoCopy(const StringBuffer& key, const StringBuffer& val);
+    void AppendTagNoCopy(StringView key, StringView val);
     void DelTag(StringView key);
-    std::map<StringView, StringView>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
-    std::map<StringView, StringView>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsBegin() const { return mTags.mInner.begin(); }
+    std::vector<std::pair<StringView, StringView>>::const_iterator TagsEnd() const { return mTags.mInner.end(); }
     size_t TagsSize() const { return mTags.mInner.size(); }
+    void SortTags() { std::sort(mTags.mInner.begin(), mTags.mInner.end()); };
 
     const std::vector<InnerEvent>& GetEvents() const { return mEvents; }
     InnerEvent* AddEvent();
@@ -205,7 +222,7 @@ private:
     Kind mKind = Kind::Unspecified;
     uint64_t mStartTimeNs = 0; // required
     uint64_t mEndTimeNs = 0; // required
-    SizedMap mTags;
+    SizedVectorTags mTags;
     std::vector<InnerEvent> mEvents;
     std::vector<SpanLink> mLinks;
     StatusCode mStatus = StatusCode::Unset;
