@@ -75,7 +75,6 @@ public:
     using DiscoverEntry = std::pair<size_t, std::set<uint32_t>>;
     using DiscoverResult = std::vector<DiscoverEntry>;
     using NotifyFn = std::function<void(DiscoverResult)>;
-    using UpdateFn = std::function<void(ProcessDiscoveryConfig&)>;
 
     ProcessDiscoveryManager()
         : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()),
@@ -98,8 +97,7 @@ public:
 
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
 
-    bool UpdateDiscovery(const std::string& configName, UpdateFn updater);
-    bool UpdateDiscovery(const std::string& configName, ContainerDiff& diff);
+    bool UpdateDiscovery(const std::string& configName, const ContainerDiff& diff);
 
     void RemoveDiscovery(const std::string& configName);
 
