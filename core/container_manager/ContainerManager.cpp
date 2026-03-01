@@ -106,12 +106,27 @@ void ContainerManager::ApplyContainerDiffs() {
     FileServer::GetInstance()->WithFileDiscoveryConfigsMutable(
         [&](std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
             for (auto& pair : mConfigContainerDiffMap) {
+                FileDiscoveryOptions* options = nullptr;
+                const CollectionPipelineContext* ctx = nullptr;
                 const auto& itr = nameConfigMap.find(pair.first);
                 if (itr == nameConfigMap.end()) {
-                    continue;
+                    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+                    const auto& handlerItr = mContainerHandlers.find(pair.first);
+                    if (handlerItr == mContainerHandlers.end()) {
+                        continue;
+                    }
+                    options = handlerItr->second.first.first;
+                    ctx = handlerItr->second.first.second;
+                    if (options->IsContainerDiscoveryEnabled()) {
+                        auto& callback = handlerItr->second.second;
+                        // Invoke callback
+                        callback(pair.second);
+                        continue;
+                    }
+                } else {
+                    options = itr->second.first;
+                    ctx = itr->second.second;
                 }
-                const auto& options = itr->second.first;
-                const auto& ctx = itr->second.second;
                 const auto& diff = pair.second;
 
                 LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
@@ -218,6 +233,20 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
                 }
             }
         });
+
+    {
+        std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
+        for (auto itr = mContainerHandlers.begin(); itr != mContainerHandlers.end(); ++itr) {
+            FileDiscoveryOptions* options = itr->second.first.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                bool isCurrentConfigUpdate = checkContainerDiffForOneConfig(options, itr->second.first.second);
+                if (isCurrentConfigUpdate) {
+                    isUpdate = true;
+                }
+            }
+        }
+    }
+
     return isUpdate;
 }
 
