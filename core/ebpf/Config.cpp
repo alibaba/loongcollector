@@ -594,7 +594,8 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                              mContext->GetRegion());
     }
 
-    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", mCmdlines, errorMsg)) {
+    std::vector<std::string> cmdlineStrs;
+    if (!GetOptionalListFilterParam<std::string>(config, "CommandLines", cmdlineStrs, errorMsg)) {
         PARAM_WARNING_IGNORE(mContext->GetLogger(),
                              mContext->GetAlarm(),
                              errorMsg,
@@ -603,6 +604,21 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                              mContext->GetProjectName(),
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
+    }
+    for (const auto& cmdlineStr : cmdlineStrs) {
+        try {
+            mCmdlines.emplace_back(cmdlineStr);
+        } catch (const boost::regex_error& e) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 "Invalid command line regex: " + cmdlineStr + ", error: " + e.what(),
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+            return false;
+        }
     }
 
     if (AppConfig::GetInstance()->IsPurageContainerMode()) {
