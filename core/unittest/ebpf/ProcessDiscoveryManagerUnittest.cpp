@@ -87,11 +87,11 @@ void ProcessDiscoveryManagerUnittest::TestUpdateConfig() {
 
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{});
 
+    ContainerDiff diff;
     // ok to update "test_watch"
-    APSARA_TEST_TRUE(manager.UpdateDiscovery("test_watch", [](ProcessDiscoveryConfig& config) {}));
-
+    APSARA_TEST_TRUE(manager.UpdateDiscovery("test_watch", diff));
     // not ok to update "test_watch2"
-    APSARA_TEST_FALSE(manager.UpdateDiscovery("test_watch2", [](ProcessDiscoveryConfig& config) {}));
+    APSARA_TEST_FALSE(manager.UpdateDiscovery("test_watch2", diff));
 }
 
 void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {

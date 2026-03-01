@@ -55,19 +55,7 @@ void ProcessDiscoveryManager::AddDiscovery(const std::string& configName, Proces
     state.mConfig = std::move(config);
 }
 
-bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, UpdateFn updater) {
-    std::lock_guard<std::mutex> guard(mLock);
-    auto it = mStates.find(configName);
-    if (it == mStates.end()) {
-        return false;
-    }
-    auto& state = it->second;
-    auto& config = state.mConfig;
-    updater(config);
-    return true;
-}
-
-bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, ContainerDiff& diff) {
+bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, const ContainerDiff& diff) {
     std::lock_guard<std::mutex> guard(mLock);
     auto it = mStates.find(configName);
     if (it == mStates.end()) {
