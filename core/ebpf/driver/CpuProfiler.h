@@ -58,20 +58,24 @@ namespace ebpf {
 class CpuProfiler {
 public:
     CpuProfiler() = default;
-    
+
     CpuProfiler(const CpuProfiler&) = delete;
     CpuProfiler& operator=(const CpuProfiler&) = delete;
     CpuProfiler(CpuProfiler&&) = delete;
     CpuProfiler& operator=(CpuProfiler&&) = delete;
-    
+
     ~CpuProfiler() { Stop(); }
-    
+
     void Start(livetrace_profiler_read_cb_ctx_t handler, void* ctx, std::optional<std::string> hostRootPath) {
         std::lock_guard<std::mutex> lock(mMutex);
         if (mProfiler == nullptr) {
             livetrace_enable_tracing();
             mProfiler = livetrace_profiler_create();
-            assert(mProfiler != nullptr);
+            if (mProfiler == nullptr) {
+                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_ERROR,
+                         "[CpuProfiler][Start] failed to create profiler");
+                return;
+            }
             mHandler = handler;
             mCtx = ctx;
             if (hostRootPath != std::nullopt) {
