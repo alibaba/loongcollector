@@ -114,6 +114,12 @@ void ContainerManager::ApplyContainerDiffs() {
             }
             options = handlerItr->second.first.first;
             ctx = handlerItr->second.first.second;
+            if (options->IsContainerDiscoveryEnabled()) {
+                auto& callback = handlerItr->second.second;
+                // Invoke callback
+                callback(pair.second);
+                continue;
+            }
         } else {
             options = itr->second.first;
             ctx = itr->second.second;
@@ -223,8 +229,6 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
                 bool isCurrentConfigUpdate = checkContainerDiffForOneConfig(options, itr->second.first.second);
                 if (isCurrentConfigUpdate) {
                     isUpdate = true;
-                    // Invoke callback
-                    itr->second.second(mConfigContainerDiffMap[itr->first]);
                 }
             }
         }
@@ -1065,18 +1069,6 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             FileDiscoveryOptions* options = itr->second.first;
             if (options->IsContainerDiscoveryEnabled()) {
                 checkContainerDiffForOneConfig(options, itr->second.second);
-            }
-        }
-        {
-            std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
-            for (auto iter = mContainerHandlers.begin(); iter != mContainerHandlers.end(); ++iter) {
-                FileDiscoveryOptions* options = iter->second.first.first;
-                if (options->IsContainerDiscoveryEnabled()) {
-                    if (checkContainerDiffForOneConfig(options, nullptr)) {
-                        // Invoke callback
-                        iter->second.second(mConfigContainerDiffMap[iter->first]);
-                    }
-                }
             }
         }
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v1.0.0)", configPath));
