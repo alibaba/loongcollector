@@ -26,6 +26,7 @@
 #include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
 #include "common/StringTools.h"
+#include "container_manager/ContainerDiff.h"
 
 namespace logtail {
 namespace ebpf {
@@ -98,6 +99,7 @@ public:
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
 
     bool UpdateDiscovery(const std::string& configName, UpdateFn updater);
+    bool UpdateDiscovery(const std::string& configName, ContainerDiff& diff);
 
     void RemoveDiscovery(const std::string& configName);
 

@@ -67,6 +67,23 @@ bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, Upd
     return true;
 }
 
+bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, ContainerDiff& diff) {
+    std::lock_guard<std::mutex> guard(mLock);
+    auto it = mStates.find(configName);
+    if (it == mStates.end()) {
+        return false;
+    }
+    auto& state = it->second;
+    auto& config = state.mConfig;
+    for (const auto& containerId : diff->mRemoved) {
+        config.mContainerIds.erase(containerId);
+    }
+    for (const auto& container : diff->mAdded) {
+        config.mContainerIds.insert(container->mID);
+    }
+    return true;
+}
+
 void ProcessDiscoveryManager::RemoveDiscovery(const std::string& configName) {
     std::lock_guard<std::mutex> guard(mLock);
     mStates.erase(configName);
