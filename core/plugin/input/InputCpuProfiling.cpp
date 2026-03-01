@@ -62,15 +62,7 @@ bool InputCpuProfiling::Start() {
             std::make_pair(&mTempFileDiscoveryOptions, mContext),
             [configName = mContext->GetConfigName()](std::shared_ptr<ContainerDiff> diff) {
                 LOG_DEBUG(sLogger, ("config", configName)("container handler", "called"));
-                ebpf::ProcessDiscoveryManager::GetInstance()->UpdateDiscovery(
-                    configName, [&](ebpf::ProcessDiscoveryConfig& config) {
-                        for (const auto& containerId : diff->mRemoved) {
-                            config.mContainerIds.erase(containerId);
-                        }
-                        for (const auto& container : diff->mAdded) {
-                            config.mContainerIds.insert(container->mID);
-                        }
-                    });
+                ebpf::ProcessDiscoveryManager::GetInstance()->UpdateDiscovery(configName, *diff);
             });
     }
     return ebpf::EBPFServer::GetInstance()->EnablePlugin(mContext->GetConfigName(),
