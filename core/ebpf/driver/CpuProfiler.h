@@ -66,120 +66,24 @@ public:
 
     ~CpuProfiler() { Stop(); }
 
-    void Start(livetrace_profiler_read_cb_ctx_t handler, void* ctx, std::optional<std::string> hostRootPath) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mProfiler == nullptr) {
-            livetrace_enable_tracing();
-            mProfiler = livetrace_profiler_create();
-            if (mProfiler == nullptr) {
-                ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_ERROR,
-                         "[CpuProfiler][Start] failed to create profiler");
-                return;
-            }
-            mHandler = handler;
-            mCtx = ctx;
-            if (hostRootPath != std::nullopt) {
-                livetrace_set_host_root_path(hostRootPath.value().c_str());
-            }
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "[CpuProfiler][Start] create profiler, handler: %p ctx: %p",
-                     handler,
-                     ctx);
-        }
-    }
+    void Start(livetrace_profiler_read_cb_ctx_t handler, void* ctx, std::optional<std::string> hostRootPath);
 
-    void Stop() {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mProfiler != nullptr) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[CpuProfiler][Stop] destroy profiler");
-            livetrace_profiler_destroy(mProfiler);
-            mProfiler = nullptr;
-        }
-        mPids.clear();
-        mHandler = nullptr;
-        mCtx = nullptr;
-    }
+    void Stop();
 
-    void UpdatePids(std::unordered_set<uint32_t> newPids) {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mProfiler == nullptr) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CpuProfiler][UpdatePids] profiler is not initialized, cannot update pids");
-            return;
-        }
+    void UpdatePids(std::unordered_set<uint32_t> newPids);
 
-        std::unordered_set<uint32_t> toAdd, toRemove;
-        compareSets(newPids, toAdd, toRemove);
-
-        if (toAdd.empty() && toRemove.empty()) {
-            return; // No changes
-        }
-
-        if (!toAdd.empty()) {
-            std::string pidsToAdd = pidsToString(toAdd);
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "[CpuProfiler][UpdatePids] add pids: %s",
-                     pidsToAdd.c_str());
-            livetrace_profiler_ctrl(mProfiler, LivetraceCtrlOp::LIVETRACE_ADD, pidsToAdd.c_str());
-        }
-
-        if (!toRemove.empty()) {
-            std::string pidsToRemove = pidsToString(toRemove);
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
-                     "[CpuProfiler][UpdatePids] remove pids: %s",
-                     pidsToRemove.c_str());
-            livetrace_profiler_ctrl(mProfiler, LivetraceCtrlOp::LIVETRACE_REMOVE, pidsToRemove.c_str());
-        }
-
-        mPids = std::move(newPids);
-    }
-
-    void Poll() {
-        std::lock_guard<std::mutex> lock(mMutex);
-        if (mProfiler == nullptr || mHandler == nullptr) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
-                     "[CpuProfiler][Poll] profiler is not initialized or handler is null, cannot poll");
-            return;
-        }
-        if (mPids.empty()) {
-            return;
-        }
-
-        ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[CpuProfiler][Poll] poll");
-        livetrace_profiler_read(mProfiler, handler_without_ctx);
-    }
+    void Poll();
 
 private:
     static void handler_without_ctx(uint32_t pid, const char* comm, const char* stack, uint32_t cnt) {
         mHandler(pid, comm, stack, cnt, mCtx);
     }
 
-    static std::string pidsToString(const std::unordered_set<uint32_t>& pids) {
-        std::string result;
-        for (const auto& pid : pids) {
-            if (!result.empty()) {
-                result += ",";
-            }
-            result += std::to_string(pid);
-        }
-        return result;
-    }
+    static std::string pidsToString(const std::unordered_set<uint32_t>& pids);
 
     void compareSets(const std::unordered_set<uint32_t>& newPids,
                      std::unordered_set<uint32_t>& toAdd,
-                     std::unordered_set<uint32_t>& toRemove) {
-        for (const auto& pid : newPids) {
-            if (mPids.find(pid) == mPids.end()) {
-                toAdd.insert(pid);
-            }
-        }
-
-        for (const auto& pid : mPids) {
-            if (newPids.find(pid) == newPids.end()) {
-                toRemove.insert(pid);
-            }
-        }
-    }
+                     std::unordered_set<uint32_t>& toRemove);
 
     std::mutex mMutex;
     std::unordered_set<uint32_t> mPids;
