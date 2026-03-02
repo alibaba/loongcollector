@@ -86,7 +86,7 @@ void InputCpuProfilingUnittest::OnFailedInit() {
     Json::Value configJson, optionalGoPipeline;
     std::string configStr, errorMsg;
 
-    // Invalid Pids
+    // Invalid CommandLines type
     configStr = R"(
         {
             "Type": "input_cpu_profiling",
@@ -97,10 +97,27 @@ void InputCpuProfilingUnittest::OnFailedInit() {
     input.reset(new InputCpuProfiling());
     input->SetContext(ctx);
     input->CreateMetricsRecordRef("test", "1");
-    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
     APSARA_TEST_EQUAL(input->sName, "input_cpu_profiling");
     logtail::ebpf::CpuProfilingOption option = input->mCpuProfilingOption;
+    APSARA_TEST_TRUE(option.mCmdlines.empty());
+
+    // Invalid Regex
+    configStr = R"(
+        {
+            "Type": "input_cpu_profiling",
+            "CommandLines": ["[invalid_regex"],
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputCpuProfiling());
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef("test", "1");
+    APSARA_TEST_FALSE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
+    APSARA_TEST_EQUAL(input->sName, "input_cpu_profiling");
+    option = input->mCpuProfilingOption;
     APSARA_TEST_TRUE(option.mCmdlines.empty());
 }
 
