@@ -63,10 +63,10 @@ bool ProcessDiscoveryManager::UpdateDiscovery(const std::string& configName, con
     }
     auto& state = it->second;
     auto& config = state.mConfig;
-    for (const auto& containerId : diff->mRemoved) {
+    for (const auto& containerId : diff.mRemoved) {
         config.mContainerIds.erase(containerId);
     }
-    for (const auto& container : diff->mAdded) {
+    for (const auto& container : diff.mAdded) {
         config.mContainerIds.insert(container->mID);
     }
     return true;
