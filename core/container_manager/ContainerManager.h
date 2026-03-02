@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <future>
 #include <string>
 #include <unordered_map>
@@ -87,13 +88,13 @@ private:
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
-    std::mutex mContainerMapMutex;
+    mutable ReadWriteLock mContainerMapRWLock;
     mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    uint32_t mLastIncrementalUpdateTime = 0;
-    uint32_t mLastFullUpdateTime = 0;
+    std::atomic<int64_t> mLastIncrementalUpdateTime{0};
+    std::atomic<int64_t> mLastFullUpdateTime{0};
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};

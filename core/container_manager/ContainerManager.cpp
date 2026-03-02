@@ -293,10 +293,15 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     // If this config's container update time is newer than or equal to global update time,
     // return the cached result if it exists
     bool refrashAllContainers = false;
-    if (options->GetLastContainerUpdateTime() <= mLastFullUpdateTime) {
+
+    int64_t lastConfigContainerUpdateTime = options->GetLastContainerUpdateTime();
+    int64_t newContainerUpdateTime;
+    if (lastConfigContainerUpdateTime <= mLastFullUpdateTime) {
         refrashAllContainers = true;
-    } else if (options->GetLastContainerUpdateTime() <= mLastIncrementalUpdateTime) {
+        newContainerUpdateTime = mLastFullUpdateTime;
+    } else if (lastConfigContainerUpdateTime <= mLastIncrementalUpdateTime) {
         refrashAllContainers = false;
+        newContainerUpdateTime = mLastIncrementalUpdateTime;
     } else {
         return false;
     }
@@ -316,6 +321,9 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         const auto& containerInfos = options->GetContainerInfo();
         if (containerInfos) {
             for (const auto& info : *containerInfos) {
+                if (!info.mRawContainerInfo) {
+                    continue;
+                }
                 containerInfoMap[info.mRawContainerInfo->mID] = info.mRawContainerInfo;
             }
         }
@@ -331,11 +339,12 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
         ("diff", diff.ToString())("configName", ctx->GetConfigName())(
             "containerFilters", options->GetContainerDiscoveryOptions().mContainerFilters.ToString())(
             "fullContainerList", options->GetFullContainerList()->size())("containerInfoMap", containerInfoMap.size())(
-            "lastConfigContainerUpdateTime", options->GetLastContainerUpdateTime())(
-            "mLastFullUpdateTime", mLastFullUpdateTime)("mLastIncrementalUpdateTime", mLastIncrementalUpdateTime));
+            "lastConfigContainerUpdateTime", lastConfigContainerUpdateTime)("mLastFullUpdateTime", mLastFullUpdateTime)(
+            "mLastIncrementalUpdateTime", mLastIncrementalUpdateTime)("newContainerUpdateTime",
+                                                                      newContainerUpdateTime));
 
     // Update the config's container update time when there are changes
-    options->SetLastContainerUpdateTime(time(nullptr));
+    options->SetLastContainerUpdateTime(newContainerUpdateTime);
 
     if (diff.IsEmpty()) {
         return false;
@@ -369,7 +378,7 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
         auto containerInfo = DeserializeRawContainerInfo(container);
         if (containerInfo && !containerInfo->mID.empty()) {
             {
-                std::lock_guard<std::mutex> lock(mContainerMapMutex);
+                WriteLock lock(mContainerMapRWLock);
                 mContainerMap[containerInfo->mID] = containerInfo;
             }
             updatedContainerIDs.push_back(containerInfo->mID);
@@ -380,7 +389,7 @@ void ContainerManager::incrementallyUpdateContainersSnapshot() {
     for (const auto& container : deleteContainers) {
         std::string containerId = container.asString();
         {
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            WriteLock lock(mContainerMapRWLock);
             if (mContainerMap.erase(containerId) > 0) {
                 hasChanges = true;
             }
@@ -427,7 +436,7 @@ void ContainerManager::refreshAllContainersSnapshot() {
         }
     }
     {
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
+        WriteLock lock(mContainerMapRWLock);
         mContainerMap.swap(tmpContainerMap);
     }
     mLastFullUpdateTime = time(nullptr);
@@ -624,16 +633,10 @@ void ContainerManager::computeMatchedContainersDiff(
     const ContainerFilters& filters,
     bool isStdio,
     ContainerDiff& diff) {
-    // Create a local snapshot of mContainerMap to avoid holding the lock for extended period
-    std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerMapSnapshot;
-    {
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
-        containerMapSnapshot = mContainerMap;
-    }
-
+    ReadLock lock(mContainerMapRWLock);
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
-        if (containerMapSnapshot.find(*it) == containerMapSnapshot.end()) {
+        if (mContainerMap.find(*it) == mContainerMap.end()) {
             std::string id = *it; // 复制一份，避免 erase 后引用失效
             it = fullContainerIDList.erase(it); // 删除元素并移到下一个
             if (matchList.find(id) != matchList.end()) {
@@ -646,7 +649,7 @@ void ContainerManager::computeMatchedContainersDiff(
 
     // 更新匹配的容器状态
     for (auto& pair : matchList) {
-        if (auto it = containerMapSnapshot.find(pair.first); it != containerMapSnapshot.end()) {
+        if (auto it = mContainerMap.find(pair.first); it != mContainerMap.end()) {
             // 更新为最新的 info
             if (*pair.second != *it->second) {
                 diff.mModified.push_back(it->second);
@@ -655,7 +658,7 @@ void ContainerManager::computeMatchedContainersDiff(
     }
 
     // 添加新容器
-    for (const auto& pair : containerMapSnapshot) {
+    for (const auto& pair : mContainerMap) {
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             if (!isStdio && pair.second->mStatus != "running") {
@@ -842,7 +845,7 @@ void ContainerManager::SaveContainerInfo() {
     Json::Value root(Json::objectValue);
     Json::Value arr(Json::arrayValue);
     {
-        std::lock_guard<std::mutex> lock(mContainerMapMutex);
+        ReadLock lock(mContainerMapRWLock);
         for (const auto& kv : mContainerMap) {
             arr.append(SerializeRawContainerInfo(kv.second));
         }
@@ -1022,7 +1025,7 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
 
     if (!tmpContainerMap.empty()) {
         {
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmpContainerMap);
         }
 
@@ -1063,7 +1066,7 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
 
     if (!tmp.empty()) {
         {
-            std::lock_guard<std::mutex> lock(mContainerMapMutex);
+            WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmp);
         }
         // Apply containers to all existing configs

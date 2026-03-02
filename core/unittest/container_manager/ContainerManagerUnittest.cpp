@@ -1913,7 +1913,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Verify mContainerMap has 5 containers
     {
-        std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+        ReadLock lock(containerManager.mContainerMapRWLock);
         EXPECT_EQ(containerManager.mContainerMap.size(), 5);
     }
 
@@ -1956,7 +1956,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Verify incremental update in mContainerMap
     {
-        std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+        ReadLock lock(containerManager.mContainerMapRWLock);
         EXPECT_EQ(containerManager.mContainerMap.size(), 6); // 5 + 1 = 6
         auto container0 = containerManager.mContainerMap["container_0"];
         EXPECT_EQ(container0->mLogPath, "/var/log/container_0_updated");
@@ -2010,7 +2010,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Verify deletions in mContainerMap
     {
-        std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+        ReadLock lock(containerManager.mContainerMapRWLock);
         EXPECT_EQ(containerManager.mContainerMap.size(), 4); // 6 - 2 = 4
         EXPECT_TRUE(containerManager.mContainerMap.find("container_1") == containerManager.mContainerMap.end());
         EXPECT_TRUE(containerManager.mContainerMap.find("container_2") == containerManager.mContainerMap.end());
@@ -2081,7 +2081,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Verify mContainerMap has 9 containers
     {
-        std::lock_guard<std::mutex> lock(containerManager.mContainerMapMutex);
+        ReadLock lock(containerManager.mContainerMapRWLock);
         EXPECT_EQ(containerManager.mContainerMap.size(), 9);
         // Verify new containers exist
         EXPECT_TRUE(containerManager.mContainerMap.find("container_6") != containerManager.mContainerMap.end());

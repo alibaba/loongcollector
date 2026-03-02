@@ -108,8 +108,8 @@ public:
     bool IsTailingAllMatchedFiles() const { return mTailingAllMatchedFiles; }
     void SetTailingAllMatchedFiles(bool flag) { mTailingAllMatchedFiles = flag; }
 
-    uint32_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
-    void SetLastContainerUpdateTime(uint32_t time) { mLastContainerUpdateTime = time; }
+    int64_t GetLastContainerUpdateTime() const { return mLastContainerUpdateTime; }
+    void SetLastContainerUpdateTime(int64_t time) { mLastContainerUpdateTime = time; }
 
 
     std::vector<std::string> mFilePaths;
