@@ -78,7 +78,7 @@ void InputCpuProfilingUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(input->sName, "input_cpu_profiling");
     logtail::ebpf::CpuProfilingOption option = input->mCpuProfilingOption;
     APSARA_TEST_TRUE(option.mCmdlines.size() == 1);
-    APSARA_TEST_TRUE(option.mCmdlines[0] == "java");
+    APSARA_TEST_TRUE(option.mCmdlines[0].str() == "java");
 }
 
 void InputCpuProfilingUnittest::OnFailedInit() {

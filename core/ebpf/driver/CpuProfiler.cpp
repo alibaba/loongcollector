@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "CpuProfiler.h"
+#include "Log.h"
+
 namespace logtail {
 namespace ebpf {
 
@@ -21,7 +24,7 @@ void CpuProfiler::Start(livetrace_profiler_read_cb_ctx_t handler, void* ctx, std
         livetrace_enable_tracing();
         mProfiler = livetrace_profiler_create();
         if (mProfiler == nullptr) {
-            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_ERROR, "[CpuProfiler][Start] failed to create profiler");
+            ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "[CpuProfiler][Start] failed to create profiler");
             return;
         }
         mHandler = handler;
