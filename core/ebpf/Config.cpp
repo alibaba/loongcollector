@@ -631,6 +631,7 @@ bool CpuProfilingOption::Init(const Json::Value& config,
                              mContext->GetProjectName(),
                              mContext->GetLogstoreName(),
                              mContext->GetRegion());
+        return false;
     }
     for (const auto& cmdlineStr : cmdlineStrs) {
         try {
