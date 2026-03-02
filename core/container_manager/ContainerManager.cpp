@@ -633,10 +633,16 @@ void ContainerManager::computeMatchedContainersDiff(
     const ContainerFilters& filters,
     bool isStdio,
     ContainerDiff& diff) {
-    ReadLock lock(mContainerMapRWLock);
+    // Create a local snapshot of mContainerMap to avoid holding the lock for extended period
+    std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> containerMapSnapshot;
+    {
+        WriteLock lock(mContainerMapRWLock);
+        containerMapSnapshot = mContainerMap;
+    }
+
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
-        if (mContainerMap.find(*it) == mContainerMap.end()) {
+        if (containerMapSnapshot.find(*it) == containerMapSnapshot.end()) {
             std::string id = *it; // 复制一份，避免 erase 后引用失效
             it = fullContainerIDList.erase(it); // 删除元素并移到下一个
             if (matchList.find(id) != matchList.end()) {
@@ -649,7 +655,7 @@ void ContainerManager::computeMatchedContainersDiff(
 
     // 更新匹配的容器状态
     for (auto& pair : matchList) {
-        if (auto it = mContainerMap.find(pair.first); it != mContainerMap.end()) {
+        if (auto it = containerMapSnapshot.find(pair.first); it != containerMapSnapshot.end()) {
             // 更新为最新的 info
             if (*pair.second != *it->second) {
                 diff.mModified.push_back(it->second);
@@ -658,7 +664,7 @@ void ContainerManager::computeMatchedContainersDiff(
     }
 
     // 添加新容器
-    for (const auto& pair : mContainerMap) {
+    for (const auto& pair : containerMapSnapshot) {
         // 如果 fullContainerIDList 中不存在该 id
         if (fullContainerIDList.find(pair.first) == fullContainerIDList.end()) {
             if (!isStdio && pair.second->mStatus != "running") {
