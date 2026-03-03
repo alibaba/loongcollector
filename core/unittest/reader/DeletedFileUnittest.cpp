@@ -25,7 +25,7 @@ namespace logtail {
 
 class DeletedFileUnittest : public testing::Test {
 public:
-    void TestShouldForceReleaseDeletedFileFdDeleted();
+    void TestNotForceReleaseDeletedFileFdDeleted();
     void TestShouldForceReleaseDeletedFileFdStopped();
 
 protected:
@@ -50,12 +50,12 @@ private:
     string hostLogPathFile = "DeletedFileUnittest.txt";
 };
 
-void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdDeleted() {
+void DeletedFileUnittest::TestNotForceReleaseDeletedFileFdDeleted() {
     APSARA_TEST_FALSE(reader->ShouldForceReleaseDeletedFileFd());
     INT32_FLAG(force_release_deleted_file_fd_timeout) = 0;
     APSARA_TEST_FALSE(reader->ShouldForceReleaseDeletedFileFd());
     reader->SetFileDeleted(true);
-    APSARA_TEST_TRUE(reader->ShouldForceReleaseDeletedFileFd());
+    APSARA_TEST_FALSE(reader->ShouldForceReleaseDeletedFileFd());
 }
 
 void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdStopped() {
@@ -64,7 +64,7 @@ void DeletedFileUnittest::TestShouldForceReleaseDeletedFileFdStopped() {
     APSARA_TEST_TRUE(reader->ShouldForceReleaseDeletedFileFd());
 }
 
-UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdDeleted)
+UNIT_TEST_CASE(DeletedFileUnittest, TestNotForceReleaseDeletedFileFdDeleted)
 UNIT_TEST_CASE(DeletedFileUnittest, TestShouldForceReleaseDeletedFileFdStopped)
 
 } // namespace logtail

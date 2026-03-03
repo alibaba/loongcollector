@@ -19,6 +19,7 @@ package containercenter
 
 import (
 	"testing"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 
@@ -42,4 +43,103 @@ func TestLookupContainerRootfsAbsDir(t *testing.T) {
 	}
 	dir := crirt.lookupContainerRootfsAbsDir(container)
 	require.Equal(t, dir, "")
+}
+
+func TestContainerShouldMarkRemove(t *testing.T) {
+	crirt := &CRIRuntimeWrapper{
+		containerCenter: nil,
+		client:          nil,
+		runtimeInfo:     CriVersionInfo{},
+		containers:      make(map[string]*innerContainerInfo),
+		stopCh:          make(<-chan struct{}),
+		rootfsCache:     make(map[string]string),
+	}
+
+	tests := []struct {
+		name                             string
+		forceReleaseDeletedFileFDTimeout int // in seconds, -1 means disabled
+		containerStatus                  string
+		containerState                   CriContainerState
+		expectedResult                   bool
+	}{
+		{
+			name:                             "ForceRelease enabled (0) with exited status",
+			forceReleaseDeletedFileFDTimeout: 0,
+			containerStatus:                  ContainerStatusExited,
+			containerState:                   ContainerStateContainerRunning,
+			expectedResult:                   true,
+		},
+		{
+			name:                             "ForceRelease enabled (0) with running status",
+			forceReleaseDeletedFileFDTimeout: 0,
+			containerStatus:                  ContainerStatusRunning,
+			containerState:                   ContainerStateContainerRunning,
+			expectedResult:                   false,
+		},
+		{
+			name:                             "ForceRelease enabled (positive) with exited status",
+			forceReleaseDeletedFileFDTimeout: 120,
+			containerStatus:                  ContainerStatusExited,
+			containerState:                   ContainerStateContainerRunning,
+			expectedResult:                   true,
+		},
+		{
+			name:                             "ForceRelease enabled (positive) with running status",
+			forceReleaseDeletedFileFDTimeout: 120,
+			containerStatus:                  ContainerStatusRunning,
+			containerState:                   ContainerStateContainerRunning,
+			expectedResult:                   false,
+		},
+		{
+			name:                             "ForceRelease disabled with exited state",
+			forceReleaseDeletedFileFDTimeout: -1,
+			containerStatus:                  ContainerStatusRunning,
+			containerState:                   ContainerStateContainerExited,
+			expectedResult:                   true,
+		},
+		{
+			name:                             "ForceRelease disabled with running state",
+			forceReleaseDeletedFileFDTimeout: -1,
+			containerStatus:                  ContainerStatusRunning,
+			containerState:                   ContainerStateContainerRunning,
+			expectedResult:                   false,
+		},
+		{
+			name:                             "ForceRelease disabled with created state",
+			forceReleaseDeletedFileFDTimeout: -1,
+			containerStatus:                  ContainerStatusExited,
+			containerState:                   ContainerStateContainerCreated,
+			expectedResult:                   false,
+		},
+		{
+			name:                             "ForceRelease enabled with exited status and exited state",
+			forceReleaseDeletedFileFDTimeout: 60,
+			containerStatus:                  ContainerStatusExited,
+			containerState:                   ContainerStateContainerExited,
+			expectedResult:                   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Save and restore the global variable
+			originalTimeout := ForceReleaseDeletedFileFDTimeout
+			defer func() {
+				ForceReleaseDeletedFileFDTimeout = originalTimeout
+			}()
+
+			// Set the timeout for this test case
+			ForceReleaseDeletedFileFDTimeout = time.Duration(tt.forceReleaseDeletedFileFDTimeout) * time.Second
+
+			innerContainer := &innerContainerInfo{
+				State:  tt.containerState,
+				Pid:    12345,
+				Name:   "test-container",
+				Status: tt.containerStatus,
+			}
+
+			result := crirt.containerShouldMarkRemove(innerContainer)
+			require.Equal(t, tt.expectedResult, result)
+		})
+	}
 }
