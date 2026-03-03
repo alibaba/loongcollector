@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
@@ -67,8 +68,6 @@ private:
     void incrementallyUpdateContainersSnapshot();
 
     bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
-    void updateContainerInfoPointersInAllConfigs();
-    void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
     computeMatchedContainersDiff(std::set<std::string>& fullContainerIDList,
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
@@ -89,10 +88,12 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
+    mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    uint32_t mLastUpdateTime = 0;
+    uint32_t mLastIncrementalUpdateTime = 0;
+    uint32_t mLastFullUpdateTime = 0;
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};
