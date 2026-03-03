@@ -358,7 +358,7 @@ void StaticFileServer::UpdateInputs() {
             continue;
         }
         auto fileContainerMetas = mFileContainerMetaMap.find(configInfo)->second;
-        if (ctx->IsOnetimePipelineRunningBeforeStart()) {
+        if (!ctx->IsOnetimePipelineRunningBeforeStart()) {
             files = GetFiles(fileDiscoveryOpts, ctx, fileContainerMetas);
         }
         InputStaticFileCheckpointManager::GetInstance()->CreateCheckpoint(

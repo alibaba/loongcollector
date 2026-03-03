@@ -69,15 +69,16 @@ private:
     StaticFileServer* sServer;
 };
 
-void StaticFileServerUnittest::AddInputWithoutStartingThread(StaticFileServer* srv,
-                                                            const string& configName,
-                                                            size_t idx,
-                                                            FileDiscoveryOptions* discoveryOpts,
-                                                            const FileReaderOptions* fileReaderOpts,
-                                                            const MultilineOptions* multilineOpts,
-                                                            const FileTagOptions* fileTagOpts,
-                                                            unordered_map<string, FileCheckpoint::ContainerMeta>& fileContainerMetas,
-                                                            const CollectionPipelineContext* ctx) {
+void StaticFileServerUnittest::AddInputWithoutStartingThread(
+    StaticFileServer* srv,
+    const string& configName,
+    size_t idx,
+    FileDiscoveryOptions* discoveryOpts,
+    const FileReaderOptions* fileReaderOpts,
+    const MultilineOptions* multilineOpts,
+    const FileTagOptions* fileTagOpts,
+    unordered_map<string, FileCheckpoint::ContainerMeta>& fileContainerMetas,
+    const CollectionPipelineContext* ctx) {
     lock_guard<mutex> lock(srv->mUpdateMux);
     auto configInfo = make_pair(configName, idx);
     srv->mInputFileDiscoveryConfigsMap.try_emplace(configInfo, make_pair(discoveryOpts, ctx));
