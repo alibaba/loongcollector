@@ -175,7 +175,7 @@ void PluginRegistry::LoadStaticPlugins() {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
-    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), true);
+    RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), false);
     RegisterContinuousInputCreator(new StaticInputCreator<InputForward>());
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
