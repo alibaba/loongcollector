@@ -123,7 +123,6 @@ void StaticFileServerUnittest::TestGetNextAvailableReader() const {
     input.Init(configJson, optionalGoPipeline);
     input.CommitMetricsRecordRef();
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
-    ctx.SetIsOnetimePipelineRunningBeforeStart(true);
     AddInputWithoutStartingThread(sServer,
                                   "test_config",
                                   0,
@@ -177,7 +176,6 @@ void StaticFileServerUnittest::TestUpdateInputs() const {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test_config_1");
     ctx.SetPipeline(emptyPipeline);
-    ctx.SetIsOnetimePipelineRunningBeforeStart(true);
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
 
     AddInputWithoutStartingThread(
@@ -260,7 +258,6 @@ void StaticFileServerUnittest::TestSetExpectedFileSize() const {
     input.CommitMetricsRecordRef();
 
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
-    ctx.SetIsOnetimePipelineRunningBeforeStart(true);
     AddInputWithoutStartingThread(sServer,
                                   "test_config",
                                   0,
@@ -318,7 +315,6 @@ void StaticFileServerUnittest::TestFileRotationDetection() const {
     input.CommitMetricsRecordRef();
 
     std::unordered_map<std::string, FileCheckpoint::ContainerMeta> emptyFileContainerMetas;
-    ctx.SetIsOnetimePipelineRunningBeforeStart(true);
     AddInputWithoutStartingThread(sServer,
                                   "test_config",
                                   0,

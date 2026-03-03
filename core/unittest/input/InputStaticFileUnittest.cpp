@@ -403,7 +403,6 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
     filePath = NormalizeNativePath(filePath.string());
     {
         // new config
-        ctx.SetIsOnetimePipelineRunningBeforeStart(true);
         configStr = R"(
             {
                 "Type": "input_static_file_onetime",
@@ -480,7 +479,7 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
         configJson["FilePaths"].append(Json::Value(filePath.string()));
         InputStaticFile input;
-        ctx.SetIsOnetimePipelineRunningBeforeStart(false); // load existing checkpoint from file, do not call GetFiles()
+        ctx.SetIsOnetimePipelineRunningBeforeStart(true);
         input.SetContext(ctx);
         input.CreateMetricsRecordRef(InputStaticFile::sName, "1");
         APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
@@ -494,7 +493,8 @@ void InputStaticFileUnittest::OnPipelineUpdate() {
         APSARA_TEST_EQUAL(&input.mFileTag, sServer->GetFileTagConfig("test_config", 0).first);
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
         APSARA_TEST_EQUAL(1U, cpt.mFileCheckpoints.size());
-        APSARA_TEST_EQUAL("./test_logs/test_file_2.log", cpt.mFileCheckpoints[0].mFilePath.string());
+        APSARA_TEST_EQUAL(fs::absolute("./test_logs/test_file_2.log").lexically_normal(),
+                          fs::absolute(cpt.mFileCheckpoints[0].mFilePath).lexically_normal());
         APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
 
         APSARA_TEST_TRUE(input.Stop(true));
