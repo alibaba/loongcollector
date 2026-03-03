@@ -8,10 +8,7 @@ Feature: input static file docker
     Given subcribe data from {grpc} with config
     """
     """
-    Given loongcollector depends on containers
-    """
-    - container
-    """
+    Given loongcollector depends on containers {["container"]}
     Given {input-static-file-docker-case} onetime pipeline local config as below
     """
     enable: true
