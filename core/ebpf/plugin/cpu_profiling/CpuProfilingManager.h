@@ -70,9 +70,7 @@ public:
 
     PluginType GetPluginType() override { return PluginType::CPU_PROFILING; }
 
-    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override {
-        return nullptr;
-    }
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override { return nullptr; }
 
     int Suspend() override;
 
@@ -83,9 +81,7 @@ public:
     void SetMetrics(CounterPtr pollEventsTotal) { mRecvKernelEventsTotal = std::move(pollEventsTotal); }
 
 protected:
-    int update([[maybe_unused]] const PluginOptions& options) override {
-        return 0;
-    }
+    int update([[maybe_unused]] const PluginOptions& options) override { return 0; }
 
 private:
     std::atomic<bool> mInited = false;
