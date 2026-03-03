@@ -21,12 +21,12 @@
 #include <string>
 #include <vector>
 
-#include "logger/Logger.h"
 #include "app_config/AppConfig.h"
 #include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
 #include "common/StringTools.h"
 #include "container_manager/ContainerDiff.h"
+#include "logger/Logger.h"
 
 namespace logtail {
 namespace ebpf {

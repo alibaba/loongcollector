@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "CpuProfiler.h"
+
 #include "Log.h"
 
 namespace logtail {
@@ -112,8 +113,8 @@ std::string CpuProfiler::pidsToString(const std::unordered_set<uint32_t>& pids) 
 }
 
 void CpuProfiler::compareSets(const std::unordered_set<uint32_t>& newPids,
-                 std::unordered_set<uint32_t>& toAdd,
-                 std::unordered_set<uint32_t>& toRemove) {
+                              std::unordered_set<uint32_t>& toAdd,
+                              std::unordered_set<uint32_t>& toRemove) {
     for (const auto& pid : newPids) {
         if (mPids.find(pid) == mPids.end()) {
             toAdd.insert(pid);
