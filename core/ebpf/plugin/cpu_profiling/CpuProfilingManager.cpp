@@ -204,6 +204,9 @@ void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt
         std::vector<std::string> stackVec;
         StringViewSplitter stackSplitter(stack, ";");
         for (const auto& func : stackSplitter) {
+            if (func.empty()) {
+                continue;
+            }
             stackVec.push_back(func.to_string());
         }
 
