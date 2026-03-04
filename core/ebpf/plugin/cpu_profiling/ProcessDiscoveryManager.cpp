@@ -94,18 +94,7 @@ void ProcessDiscoveryManager::run() {
             std::lock_guard<std::mutex> guard(mLock);
 
             for (auto& [_, state] : mStates) {
-                auto& config = state.mConfig;
-                std::set<uint32_t> matchedPids;
-                for (const auto& proc : procs) {
-                    if (config.IsMatch(proc.mCmdline, proc.mContainerId, mIsContainerMode)) {
-                        matchedPids.insert(proc.mPid);
-                    }
-                }
-                if (state.mPrevPids == matchedPids) {
-                    continue;
-                }
-                result.emplace_back(config.mConfigKey, matchedPids); // copy
-                state.mPrevPids = std::move(matchedPids); // move
+                state.FindAllMatch(procs, result);
             }
         }
 
@@ -115,6 +104,22 @@ void ProcessDiscoveryManager::run() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(mSleepMilliseconds));
     }
+}
+
+
+void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<ProcessEntry>& procs,
+                                                       std::vector<DiscoverEntry>& results) {
+    std::set<uint32_t> matchedPids;
+    for (const auto& proc : procs) {
+        if (mConfig.IsMatch(proc.mCmdline, proc.mContainerId, mIsContainerMode)) {
+            matchedPids.insert(proc.mPid);
+        }
+    }
+    if (mPrevPids == matchedPids) {
+        return;
+    }
+    results.emplace_back(mConfig.mConfigKey, matchedPids); // copy
+    mPrevPids = std::move(matchedPids); // move
 }
 
 } // namespace ebpf
