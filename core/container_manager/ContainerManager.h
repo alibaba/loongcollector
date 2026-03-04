@@ -107,7 +107,6 @@ private:
     CollectionPipelineContext* mMatchedContainerInfoPipelineCtx = nullptr;
     size_t mMatchedContainerInfoInputIndex = 0;
 
-    std::mutex mContainerHandlersMutex;
     using ContainerHandler = std::pair<FileDiscoveryConfig, std::function<void(std::shared_ptr<ContainerDiff>)>>;
     std::unordered_map<std::string, ContainerHandler> mContainerHandlers;
 };
