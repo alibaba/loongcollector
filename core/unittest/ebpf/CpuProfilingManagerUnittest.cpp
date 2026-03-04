@@ -40,6 +40,11 @@ public:
     void TestHandleCpuProfilingEventSingleConfig();
     void TestHandleCpuProfilingEventMultiConfig();
 
+    // test CpuProfilingManager::addContentToEvent
+    void TestAddContentToEventBasic();
+    void TestAddContentToEventEmptyStack();
+    void TestAddContentToEventEmptyNameAndComm();
+
 protected:
     void SetUp() override {
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
@@ -223,10 +228,57 @@ void CpuProfilingManagerUnittest::TestHandleCpuProfilingEventMultiConfig() {
     APSARA_TEST_FALSE(ProcessQueueManager::GetInstance()->PopItem(0, item, configName));
 }
 
+void CpuProfilingManagerUnittest::TestAddContentToEventBasic() {
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    auto* event = eventGroup.AddLogEvent();
+    CpuProfilingManager::addContentToEvent(event, {"func0", "func1", "func2"}, "testApp", "testComm", 10000000);
+    APSARA_TEST_EQUAL(event->GetContent("name"), "func2");
+    APSARA_TEST_EQUAL(event->GetContent("stack"), "func1\nfunc0");
+    APSARA_TEST_TRUE(event->HasContent("stackID"));
+    APSARA_TEST_EQUAL(event->GetContent("type"), "profile_cpu");
+    APSARA_TEST_EQUAL(event->GetContent("type_cn"), "");
+    APSARA_TEST_EQUAL(event->GetContent("units"), "nanoseconds");
+    APSARA_TEST_EQUAL(event->GetContent("val"), "10000000");
+    APSARA_TEST_EQUAL(event->GetContent("valueTypes"), "cpu");
+    APSARA_TEST_EQUAL(event->GetContent("valueTypes_cn"), "");
+    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__": "testApp", "thread": "testComm"})");
+}
+
+void CpuProfilingManagerUnittest::TestAddContentToEventEmptyStack() {
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    auto* event = eventGroup.AddLogEvent();
+    CpuProfilingManager::addContentToEvent(event, {}, "testApp", "testComm", 10000000);
+    APSARA_TEST_TRUE(!event->HasContent("name"));
+    APSARA_TEST_TRUE(!event->HasContent("stack"));
+}
+
+void CpuProfilingManagerUnittest::TestAddContentToEventEmptyNameAndComm() {
+    auto sourceBuffer = std::make_shared<SourceBuffer>();
+    PipelineEventGroup eventGroup(sourceBuffer);
+    auto* event = eventGroup.AddLogEvent();
+    CpuProfilingManager::addContentToEvent(event, {"func0", "func1", "func2"}, "", "", 10000000);
+    APSARA_TEST_EQUAL(event->GetContent("name"), "func2");
+    APSARA_TEST_EQUAL(event->GetContent("stack"), "func1\nfunc0");
+    APSARA_TEST_TRUE(event->HasContent("stackID"));
+    APSARA_TEST_EQUAL(event->GetContent("type"), "profile_cpu");
+    APSARA_TEST_EQUAL(event->GetContent("type_cn"), "");
+    APSARA_TEST_EQUAL(event->GetContent("units"), "nanoseconds");
+    APSARA_TEST_EQUAL(event->GetContent("val"), "10000000");
+    APSARA_TEST_EQUAL(event->GetContent("valueTypes"), "cpu");
+    APSARA_TEST_EQUAL(event->GetContent("valueTypes_cn"), "");
+    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__": "", "thread": ""})");
+}
+
+
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestConstructor);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddOrUpdateConfig);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestHandleProcessDiscoveryEvent);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestHandleCpuProfilingEventSingleConfig);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestHandleCpuProfilingEventMultiConfig);
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventBasic);
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventEmptyStack);
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventEmptyNameAndComm);
 
 UNIT_TEST_MAIN
