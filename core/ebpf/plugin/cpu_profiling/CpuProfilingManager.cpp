@@ -170,22 +170,21 @@ void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt
     // Format: "<comm>:<pid>;<stacks> <cnt> <trace_id>\n"
     // Example: "bash:1234;func1;func2;func3 10 xxxxx\n"
 
-    std::istringstream ssymbol;
-    ssymbol.str(symbol);
-    std::string line;
-    while (std::getline(ssymbol, line)) {
+    StringView symbolView(symbol);
+    StringViewSplitter splitter(symbolView, "\n");
+    for (const auto& line : splitter) {
         auto pos1 = line.find(';');
-        if (pos1 == std::string::npos) {
+        if (pos1 == StringView::npos) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
         }
         auto pos2 = line.rfind(' ');
-        if (pos2 == std::string::npos || pos2 < pos1) {
+        if (pos2 == StringView::npos || pos2 < pos1) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
         }
         auto pos3 = line.rfind(' ', pos2 - 1);
-        if (pos3 == std::string::npos || pos3 < pos1) {
+        if (pos3 == StringView::npos || pos3 < pos1) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
         }
@@ -203,13 +202,12 @@ void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt
         }
 
         std::vector<std::string> stackVec;
-        std::istringstream sstack(stack);
-        std::string func;
-        while (std::getline(sstack, func, ';')) {
-            stackVec.push_back(func);
+        StringViewSplitter stackSplitter(stack, ";");
+        for (const auto& func : stackSplitter) {
+            stackVec.push_back(func.to_string());
         }
 
-        result.emplace_back(std::make_tuple(std::move(stackVec), cnt, traceId));
+        result.emplace_back(std::make_tuple(std::move(stackVec), cnt, traceId.to_string()));
     }
 }
 
