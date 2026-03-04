@@ -233,7 +233,6 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
         });
 
     {
-        std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
         for (auto itr = mContainerHandlers.begin(); itr != mContainerHandlers.end(); ++itr) {
             FileDiscoveryOptions* options = itr->second.first.first;
             if (options->IsContainerDiscoveryEnabled()) {
@@ -334,12 +333,10 @@ void ContainerManager::sendMatchedContainerInfo(std::vector<std::shared_ptr<Matc
 void ContainerManager::AddContainerHandler(const std::string& name,
                                            const FileDiscoveryConfig& config,
                                            const std::function<void(std::shared_ptr<ContainerDiff>)>& handler) {
-    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
     mContainerHandlers[name] = std::make_pair(config, handler);
 }
 
 void ContainerManager::RemoveContainerHandler(const std::string& name) {
-    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
     mContainerHandlers.erase(name);
 }
 
