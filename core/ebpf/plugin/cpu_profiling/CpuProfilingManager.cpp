@@ -226,7 +226,12 @@ void CpuProfilingManager::addContentToEvent(LogEvent* event,
     const std::string& name = fullStack.back();
 
     std::string stack; // stack without the top function name
-
+    size_t stackStrSize = 0;
+    for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
+        stackStrSize += fullStack[i].size() + 1;
+    }
+    stackStrSize = stackStrSize > 0 ? stackStrSize - 1 : 0; // remove the last '\n'
+    stack.reserve(stackStrSize);
     for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
         stack += fullStack[i];
         if (i != 0) {
