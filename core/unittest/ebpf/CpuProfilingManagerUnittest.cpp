@@ -45,6 +45,15 @@ public:
     void TestAddContentToEventEmptyStack();
     void TestAddContentToEventEmptyNameAndComm();
 
+    // test CpuProfilingManager::parseStackCnt
+    void TestParseStackCnt();
+    void TestParseStackCntEmpty();
+    void TestParseStackCntInvalidFormat();
+    void TestParseStackCntMultipleLines();
+    void TestParseStackCntWithNullTraceId();
+    void TestParseStackCntWithEmptyStack();
+    void TestParseStackCntEdgeCases();
+
 protected:
     void SetUp() override {
         mEBPFAdapter = std::make_shared<EBPFAdapter>();
@@ -271,6 +280,175 @@ void CpuProfilingManagerUnittest::TestAddContentToEventEmptyNameAndComm() {
     APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__": "", "thread": ""})");
 }
 
+void CpuProfilingManagerUnittest::TestParseStackCnt() {
+    const char* symbol = "bash:1234;func1;func2;func3 10 trace123\n";
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    CpuProfilingManager::parseStackCnt(symbol, result);
+
+    APSARA_TEST_EQUAL(1U, result.size());
+    
+    auto& [stack, cnt, traceId] = result[0];
+    APSARA_TEST_EQUAL(3U, stack.size());
+    APSARA_TEST_EQUAL("func1", stack[0]);
+    APSARA_TEST_EQUAL("func2", stack[1]);
+    APSARA_TEST_EQUAL("func3", stack[2]);
+    APSARA_TEST_EQUAL(10U, cnt);
+    APSARA_TEST_EQUAL("trace123", traceId);
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntEmpty() {
+    const char* symbol = "";
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    CpuProfilingManager::parseStackCnt(symbol, result);
+
+    APSARA_TEST_EQUAL(0U, result.size());
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntInvalidFormat() {
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    const char* noSemicolon = "bash:1234 func1 10 trace123\n";
+    CpuProfilingManager::parseStackCnt(noSemicolon, result);
+    APSARA_TEST_EQUAL(0U, result.size());
+
+    result.clear();
+    const char* noFirstSpace = "bash:1234;func1;func2;func3\n";
+    CpuProfilingManager::parseStackCnt(noFirstSpace, result);
+    APSARA_TEST_EQUAL(0U, result.size());
+
+    result.clear();
+    const char* noSecondSpace = "bash:1234;func1;func2;func3 10\n";
+    CpuProfilingManager::parseStackCnt(noSecondSpace, result);
+    APSARA_TEST_EQUAL(0U, result.size());
+
+    result.clear();
+    const char* wrongOrder = "bash:1234;10 func1;func2 trace123\n";
+    CpuProfilingManager::parseStackCnt(wrongOrder, result);
+    APSARA_TEST_EQUAL(0U, result.size());
+
+    result.clear();
+    const char* invalidCount = "bash:1234;func1;func2;func3 abc trace123\n";
+    CpuProfilingManager::parseStackCnt(invalidCount, result);
+    APSARA_TEST_EQUAL(0U, result.size());
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntMultipleLines() {
+    const char* symbol = 
+        "bash:1234;func1;func2;func3 10 trace123\n"
+        "nginx:5678;handle_request;process_data 20 trace456\n"
+        "python:9012;main;run;execute 15 trace789\n";
+    
+    std::vector<CpuProfilingManager::StackCnt> result;
+    CpuProfilingManager::parseStackCnt(symbol, result);
+
+    APSARA_TEST_EQUAL(3U, result.size());
+    
+    auto& [stack1, cnt1, traceId1] = result[0];
+    APSARA_TEST_EQUAL(3U, stack1.size());
+    APSARA_TEST_EQUAL("func1", stack1[0]);
+    APSARA_TEST_EQUAL(10U, cnt1);
+    APSARA_TEST_EQUAL("trace123", traceId1);
+    
+    auto& [stack2, cnt2, traceId2] = result[1];
+    APSARA_TEST_EQUAL(2U, stack2.size());
+    APSARA_TEST_EQUAL("handle_request", stack2[0]);
+    APSARA_TEST_EQUAL("process_data", stack2[1]);
+    APSARA_TEST_EQUAL(20U, cnt2);
+    APSARA_TEST_EQUAL("trace456", traceId2);
+    
+    auto& [stack3, cnt3, traceId3] = result[2];
+    APSARA_TEST_EQUAL(3U, stack3.size());
+    APSARA_TEST_EQUAL(15U, cnt3);
+    APSARA_TEST_EQUAL("trace789", traceId3);
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntWithNullTraceId() {
+    const char* symbol = "bash:1234;func1;func2 10 null\n";
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    CpuProfilingManager::parseStackCnt(symbol, result);
+
+    APSARA_TEST_EQUAL(1U, result.size());
+    
+    auto& [stack, cnt, traceId] = result[0];
+    APSARA_TEST_EQUAL(2U, stack.size());
+    APSARA_TEST_EQUAL(10U, cnt);
+    APSARA_TEST_EQUAL("", traceId); // null convert to empty string
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntWithEmptyStack() {
+    // only comm:pid，no stack frame
+    const char* symbol = "bash:1234; 10 trace123\n";
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    CpuProfilingManager::parseStackCnt(symbol, result);
+
+    APSARA_TEST_EQUAL(1U, result.size());
+    
+    auto& [stack, cnt, traceId] = result[0];
+    APSARA_TEST_EQUAL(0U, stack.size()); // stack is empty
+    APSARA_TEST_EQUAL(10U, cnt);
+    APSARA_TEST_EQUAL("trace123", traceId);
+}
+
+void CpuProfilingManagerUnittest::TestParseStackCntEdgeCases() {
+    std::vector<CpuProfilingManager::StackCnt> result;
+
+    // count is 0
+    const char* zeroCount = "bash:1234;func1 0 trace123\n";
+    CpuProfilingManager::parseStackCnt(zeroCount, result);
+    APSARA_TEST_EQUAL(1U, result.size());
+    APSARA_TEST_EQUAL(0U, std::get<1>(result[0]));
+
+    // count is max
+    result.clear();
+    const char* maxCount = "bash:1234;func1 4294967295 trace123\n"; // UINT32_MAX
+    CpuProfilingManager::parseStackCnt(maxCount, result);
+    APSARA_TEST_EQUAL(1U, result.size());
+    APSARA_TEST_EQUAL(4294967295U, std::get<1>(result[0]));
+
+    // very deep
+    result.clear();
+    std::string deepStack = "bash:1234;";
+    for (int i = 0; i < 100; i++) {
+        deepStack += "func" + std::to_string(i);
+        if (i < 99) deepStack += ";";
+    }
+    deepStack += " 10 trace123\n";
+    CpuProfilingManager::parseStackCnt(deepStack.c_str(), result);
+    APSARA_TEST_EQUAL(1U, result.size());
+    APSARA_TEST_EQUAL(100U, std::get<0>(result[0]).size());
+
+    // stack with space
+    result.clear();
+    const char* spaceInTraceId = "bash:1234;func1;stack with space;func2 10 trace123\n";
+    CpuProfilingManager::parseStackCnt(spaceInTraceId, result);
+    APSARA_TEST_EQUAL(1U, result.size());
+    auto& [stack, cnt, traceId] = result[0];
+    APSARA_TEST_EQUAL(3U, stack.size());
+    APSARA_TEST_EQUAL("func1", stack[0]);
+    APSARA_TEST_EQUAL("stack with space", stack[1]);
+    APSARA_TEST_EQUAL("func2", stack[2]);
+
+    // multiple newline
+    result.clear();
+    const char* multipleNewlines = "bash:1234;func1 10 trace123\n\n\n";
+    CpuProfilingManager::parseStackCnt(multipleNewlines, result);
+    APSARA_TEST_EQUAL(1U, result.size()); // only one line
+
+    // valid and invalid
+    result.clear();
+    const char* mixed = 
+        "bash:1234;func1 10 trace123\n"
+        "invalid line without format\n"
+        "nginx:5678;func2 20 trace456\n";
+    CpuProfilingManager::parseStackCnt(mixed, result);
+    APSARA_TEST_EQUAL(2U, result.size()); // only two line
+}
+
+
 
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestConstructor);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddOrUpdateConfig);
@@ -280,5 +458,12 @@ UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestHandleCpuProfilingEventMultiConf
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventBasic);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventEmptyStack);
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestAddContentToEventEmptyNameAndComm);
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCnt)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntEmpty)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntInvalidFormat)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntMultipleLines)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntWithNullTraceId)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntWithEmptyStack)
+UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestParseStackCntEdgeCases)
 
 UNIT_TEST_MAIN
