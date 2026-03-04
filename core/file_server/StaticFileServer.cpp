@@ -351,11 +351,18 @@ void StaticFileServer::UpdateInputs() {
 
         // 获取文件列表
         optional<vector<filesystem::path>> files;
-        auto fileDiscoveryOpts = mInputFileDiscoveryConfigsMap.find(configInfo)->second.first;
-        if (fileDiscoveryOpts->IsContainerDiscoveryEnabled() && !ContainerManager::GetInstance()->IsReady()) {
-            // 如果容器发现模块未准备好，跳过本次，等待下次重试
-            ++it;
-            continue;
+        auto* fileDiscoveryOpts = mInputFileDiscoveryConfigsMap.find(configInfo)->second.first;
+        if (fileDiscoveryOpts->IsContainerDiscoveryEnabled()) {
+            if (!ContainerManager::GetInstance()->IsReady()) {
+                // 如果容器发现模块未准备好，跳过本次，等待下次重试
+                ++it;
+                continue;
+            }
+            // 刷新容器信息
+            if (ContainerManager::GetInstance()->CheckStaticFileServerContainerDiffs()) {
+                ContainerManager::GetInstance()->ApplyStaticFileServerContainerDiffs();
+            }
+            ContainerManager::GetInstance()->GetStaticFileServerContainerStoppedEvents();
         }
         auto fileContainerMetas = mFileContainerMetaMap.find(configInfo)->second;
         if (!ctx->IsOnetimePipelineRunningBeforeStart()) {

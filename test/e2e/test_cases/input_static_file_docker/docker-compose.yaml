@@ -21,11 +21,11 @@ services:
       dockerfile: Dockerfile
     hostname: container
     volumes:
-      - ./a.log:/root/test/a/b/c/d/axxxxxxx.log
+      - .:/root/test/
     environment:
       - STDOUT_SWITCH=true
     healthcheck:
-      test: ["CMD", "test", "-s", "/root/test/a/b/c/d/axxxxxxx.log"]
+      test: ["CMD", "test", "-s", "/root/test/a.log"]
       interval: 5s
       timeout: 3s
       start_period: 5s

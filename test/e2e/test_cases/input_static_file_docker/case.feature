@@ -14,7 +14,6 @@ Feature: input static file docker
     enable: true
     global:
       ExcutionTimeout: 600
-      UsingOldContentTag: true
       DefaultLogQueueSize: 10
     inputs:
       - Type: input_static_file_onetime
@@ -30,7 +29,7 @@ Feature: input static file docker
     Then there is at least {1000} logs
     Then the log tags match kv
     """
-    "__path__": "^/root/test/a/b/c/d/axxxxxxx.log$"
+    "__path__": "^/root/test/a.log$"
     """
     Then the log fields match kv
     """
