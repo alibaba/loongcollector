@@ -25,12 +25,13 @@
 namespace logtail {
 namespace ebpf {
 
-void ProcessDiscoveryManager::Start(NotifyFn fn) {
+void ProcessDiscoveryManager::Start(NotifyFn fn, size_t milliseconds) {
     if (mRunning) {
         return;
     }
     mRunning = true;
     mCallback = std::move(fn);
+    mSleepMilliseconds = milliseconds;
     mThreadRes = std::async(std::launch::async, &ProcessDiscoveryManager::run, this);
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "start"));
 }
@@ -112,7 +113,7 @@ void ProcessDiscoveryManager::run() {
             mCallback(std::move(result));
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(mSleepMilliseconds));
     }
 }
 
