@@ -204,7 +204,7 @@ static void addContentToEvent(LogEvent* event,
                               const std::vector<std::string>& fullStack,
                               const std::string& appName,
                               const std::string& comm,
-                              uint32_t valNs) {
+                              uint64_t valNs) {
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 
@@ -288,7 +288,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
             event->SetContent(kProfileID.LogKey(), profileID);
             event->SetContentNoCopy(kProfileDataType.LogKey(), StringView(CpuProfilingManager::kCallStackValue));
             event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
-            addContentToEvent(event, stack, info.mAppName, commStr, cnt * mSamplePeriodMs * 1000000);
+            addContentToEvent(event, stack, info.mAppName, commStr, static_cast<uint64_t>(cnt) * mSamplePeriodMs * 1000000);
         }
 
         std::unique_ptr<ProcessQueueItem> item
