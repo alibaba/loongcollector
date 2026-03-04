@@ -105,8 +105,9 @@ int CpuProfilingManager::AddOrUpdateConfig(const CollectionPipelineContext* cont
     };
     mConfigInfoMap.insert_or_assign(key, info);
     if (opts->mCollectIntervalMs != 0) {
-        // We always use the collect interval from the latest added/updated config
-        mGlobalConfigCollectIntervalMs = opts->mCollectIntervalMs;
+        // If there are multiple configs, we use the minimum collect interval
+        mConfigNameToCollectIntervalMs[configName] = opts->mCollectIntervalMs;
+        mGlobalConfigCollectIntervalMs = std::min(mGlobalConfigCollectIntervalMs, opts->mCollectIntervalMs);
     }
 
     ProcessDiscoveryConfig config{
@@ -137,6 +138,20 @@ int CpuProfilingManager::RemoveConfig(const std::string& configName) {
     if (hit == 0) {
         LOG_WARNING(sLogger, ("CpuProfilingManager", "config info not found when remove")("config", configName));
         return 1;
+    }
+
+    auto it2 = mConfigNameToCollectIntervalMs.find(configName);
+    if (it2 != mConfigNameToCollectIntervalMs.end()) {
+        auto currIntervalMs = it2->second;
+        mConfigNameToCollectIntervalMs.erase(it2);
+        if (currIntervalMs == mGlobalConfigCollectIntervalMs) {
+            // If the removed config has the same collect interval as the global one, we need to recalculate the global
+            // collect interval
+            mGlobalConfigCollectIntervalMs = std::numeric_limits<uint32_t>::max();
+            for (const auto& [_, interval] : mConfigNameToCollectIntervalMs) {
+                mGlobalConfigCollectIntervalMs = std::min(mGlobalConfigCollectIntervalMs, interval);
+            }
+        }
     }
 
     LOG_DEBUG(sLogger, ("CpuProfilingManager", "remove config")("config", configName));
@@ -288,7 +303,8 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
             event->SetContent(kProfileID.LogKey(), profileID);
             event->SetContentNoCopy(kProfileDataType.LogKey(), StringView(CpuProfilingManager::kCallStackValue));
             event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
-            addContentToEvent(event, stack, info.mAppName, commStr, static_cast<uint64_t>(cnt) * mSamplePeriodMs * 1000000);
+            addContentToEvent(
+                event, stack, info.mAppName, commStr, static_cast<uint64_t>(cnt) * mSamplePeriodMs * 1000000);
         }
 
         std::unique_ptr<ProcessQueueItem> item

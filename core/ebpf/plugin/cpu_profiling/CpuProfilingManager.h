@@ -52,7 +52,11 @@ public:
         // Check if Collect Interval reached
         auto now = std::chrono::steady_clock::now();
         auto durationSinceLastCollect = std::chrono::duration_cast<std::chrono::milliseconds>(now - mPreviousCollectTs);
-        if (durationSinceLastCollect.count() < mGlobalConfigCollectIntervalMs) {
+        uint32_t actualCollectIntervalMs = 1000; // default collect interval
+        if (mGlobalConfigCollectIntervalMs != std::numeric_limits<uint32_t>::max()) {
+            actualCollectIntervalMs = mGlobalConfigCollectIntervalMs;
+        }
+        if (durationSinceLastCollect.count() < actualCollectIntervalMs) {
             return 0;
         }
         mPreviousCollectTs = now;
@@ -98,7 +102,8 @@ private:
     std::unordered_map<std::string, ConfigKey> mConfigNameToKey;
     std::unordered_map<ConfigKey, ConfigInfo> mConfigInfoMap;
 
-    uint32_t mGlobalConfigCollectIntervalMs = 1000;
+    std::unordered_map<std::string, uint32_t> mConfigNameToCollectIntervalMs;
+    uint32_t mGlobalConfigCollectIntervalMs = std::numeric_limits<uint32_t>::max();
     std::chrono::time_point<std::chrono::steady_clock> mPreviousCollectTs = std::chrono::steady_clock::now();
 
     // Default sample period from coolbpf libprofiler, TODO: make it configurable
