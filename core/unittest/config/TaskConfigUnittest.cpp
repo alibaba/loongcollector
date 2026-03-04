@@ -39,7 +39,7 @@ protected:
 
 private:
     const string configName = "test";
-    const filesystem::path filepath = "/path/to/test";
+    const fs::path filepath = "/path/to/test";
 };
 
 void TaskConfigUnittest::HandleValidConfig() const {

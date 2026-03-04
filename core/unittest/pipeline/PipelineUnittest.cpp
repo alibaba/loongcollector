@@ -78,9 +78,9 @@ protected:
 private:
     const string configName = "test_config";
 #if defined(_MSC_VER)
-    const filesystem::path filepath = "C:\\path\\to\\test";
+    const fs::path filepath = "C:\\path\\to\\test";
 #else
-    const filesystem::path filepath = "/path/to/test";
+    const fs::path filepath = "/path/to/test";
 #endif
 };
 

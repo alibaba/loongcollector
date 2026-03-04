@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -64,13 +63,13 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        filesystem::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
 
     void SetUp() override {
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
         // create a file for reader
         std::string logPath = UnitTestHelper::JsonEscapeDirPath(gRootDir + PATH_SEPARATOR + gLogName);
         writeLog(logPath, "a sample log\n");
@@ -108,7 +107,7 @@ protected:
         APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
         Json::Value inputConfigJson = (*configJson)["inputs"][0];
 
-        config.reset(new CollectionConfig(mConfigName, std::move(configJson), filesystem::path(".")));
+        config.reset(new CollectionConfig(mConfigName, std::move(configJson), fs::path(".")));
         APSARA_TEST_TRUE(config->Parse());
         pipeline.reset(new CollectionPipeline());
         APSARA_TEST_TRUE(pipeline->Init(std::move(*config)));
@@ -154,7 +153,7 @@ protected:
         discoveryOpts.SetContainerInfo(containerInfo);
     }
 
-    void TearDown() override { filesystem::remove_all(gRootDir); }
+    void TearDown() override { fs::remove_all(gRootDir); }
 
     static std::string gRootDir;
     static std::string gLogName;

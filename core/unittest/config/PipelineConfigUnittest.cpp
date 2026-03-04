@@ -22,7 +22,7 @@ using namespace std;
 namespace logtail {
 
 struct ConfigMock : public PipelineConfig {
-    ConfigMock(const string& name, unique_ptr<Json::Value>&& detail, const filesystem::path& filepath)
+    ConfigMock(const string& name, unique_ptr<Json::Value>&& detail, const fs::path& filepath)
         : PipelineConfig(name, std::move(detail), filepath) {}
 
     bool Parse() override { return true; }
@@ -36,7 +36,7 @@ protected:
     void TearDown() override {
         sConfigManager->Clear();
         error_code ec;
-        filesystem::remove(sConfigManager->mCheckpointFilePath, ec);
+        fs::remove(sConfigManager->mCheckpointFilePath, ec);
     }
 
 private:
@@ -47,7 +47,7 @@ OnetimeConfigInfoManager* PipelineConfigUnittest::sConfigManager = OnetimeConfig
 
 
 void PipelineConfigUnittest::TestOnetimeConfig() const {
-    filesystem::path filepath("test_config.json");
+    fs::path filepath("test_config.json");
     {
         // enable is removed
         auto configJson = make_unique<Json::Value>();
@@ -135,7 +135,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
     }
     sConfigManager->LoadCheckpointFile();
 
-    filesystem::create_directories("config");
+    fs::create_directories("config");
     {
         // new config
         { ofstream fout("config/new_config.json", ios::binary); }
@@ -172,7 +172,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         APSARA_TEST_FALSE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
         APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
                           sConfigManager->mConfigCheckpointMap.find("obsolete_config_1"));
-        APSARA_TEST_FALSE(filesystem::exists("obsolete_config_1.json"));
+        APSARA_TEST_FALSE(fs::exists("obsolete_config_1.json"));
     }
     {
         // obsolete config, config file existed
@@ -184,7 +184,7 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
     }
     // 使用错误处理来安全地删除目录
     error_code ec;
-    filesystem::remove_all("config", ec);
+    fs::remove_all("config", ec);
     if (ec) {
         // 如果删除失败，记录警告但不抛出异常
         LOG_WARNING(sLogger, ("failed to remove config directory", ec.message()));

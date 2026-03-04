@@ -57,9 +57,9 @@ protected:
 
 private:
     void PrepareConfig() {
-        filesystem::create_directories(configDir1);
+        fs::create_directories(configDir1);
         PipelineConfigWatcher::GetInstance()->AddSource(configDir1.string());
-        filesystem::create_directories(configDir2);
+        fs::create_directories(configDir2);
         PipelineConfigWatcher::GetInstance()->AddSource(configDir2.string());
 #ifdef __ENTERPRISE__
         builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
@@ -69,13 +69,13 @@ private:
     void ClearConfig() {
         PipelineManagerMock::GetInstance()->ClearEnvironment();
         PipelineConfigWatcher::GetInstance()->ClearEnvironment();
-        filesystem::remove_all(configDir1);
-        filesystem::remove_all(configDir2);
+        fs::remove_all(configDir1);
+        fs::remove_all(configDir2);
     }
 
     size_t builtinPipelineCnt = 0;
-    filesystem::path configDir1 = "./continuous_pipeline_config1";
-    filesystem::path configDir2 = "./continuous_pipeline_config2";
+    fs::path configDir1 = "./continuous_pipeline_config1";
+    fs::path configDir2 = "./continuous_pipeline_config2";
 
     const std::string greaterPriorityConfig = R"(
         {
@@ -340,8 +340,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadAddedSingletonConfig(
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << greaterPriorityConfig;
         fout.close();
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -370,8 +370,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadAddedSingletonConfig(
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << lessPriorityConfig;
         fout.close();
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -710,8 +710,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadModifiedSingletonConf
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << modifiedGreaterPriorityConfig;
         fout.close();
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mModified.size());
@@ -744,8 +744,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadModifiedSingletonConf
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << modifiedLessPriorityConfig;
         fout.close();
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -819,7 +819,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadModifiedSingletonConf
         fout.open(configDir1 / "test1.json", ios::trunc);
         fout << modifiedLessPriorityConfig;
         fout.close();
-        filesystem::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test2.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -912,7 +912,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << lessPriorityConfig;
         fout.close();
@@ -942,7 +942,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(1U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << greaterPriorityConfig;
         fout.close();
@@ -987,7 +987,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         this_thread::sleep_for(chrono::milliseconds(1));
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << modifiedLessPriorityConfig;
         fout.close();
@@ -1024,7 +1024,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
         this_thread::sleep_for(chrono::milliseconds(1));
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         fout.open(configDir2 / "test2.json", ios::trunc);
         fout << modifiedGreaterPriorityConfig;
         fout.close();
@@ -1068,9 +1068,9 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir1 / "test1.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -1097,9 +1097,9 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir1 / "test1.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -1134,7 +1134,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -1164,7 +1164,7 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadRemovedSingletonConfi
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir1 / "test1.json");
+        fs::remove(configDir1 / "test1.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -1410,8 +1410,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadUnchangedSingletonCon
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());
@@ -1440,8 +1440,8 @@ void SingletonInputCollectionConfigUpdateUnittest::TestLoadUnchangedSingletonCon
         APSARA_TEST_EQUAL_FATAL(2U + builtinPipelineCnt,
                                 PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
 
-        filesystem::remove(configDir2 / "test2.json");
-        filesystem::remove(configDir2 / "test-other.json");
+        fs::remove(configDir2 / "test2.json");
+        fs::remove(configDir2 / "test-other.json");
         diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_EQUAL_FATAL(1U, diff.first.mAdded.size());
         APSARA_TEST_EQUAL_FATAL(0U, diff.first.mModified.size());

@@ -45,15 +45,25 @@ public:
     void Init();
     void Stop();
 
-    void ApplyContainerDiffs();
-    bool CheckContainerDiffForAllConfig();
+    // 由于获取容器信息可能耗时较大，这里通过mLastUpdateTime是否更新过判断是否成功拉取过一次容器信息
+    bool IsReady() { return mIsRunning.load() && mLastUpdateTime.load() > 0; }
 
-    void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
+    // file server
+    void ApplyFileServerContainerDiffs();
+    bool CheckFileServerContainerDiffs();
+    void GetFileServerContainerStoppedEvents(std::vector<Event*>& eventVec);
+    // static file server
+    void ApplyStaticFileServerContainerDiffs();
+    bool CheckStaticFileServerContainerDiffs();
+    void GetStaticFileServerContainerStoppedEvents();
+
     // Persist/restore container runtime state
     void SaveContainerInfo();
     void LoadContainerInfo();
 
-    MatchedContainerInfo CreateMatchedContainerInfo(const FileDiscoveryOptions* options,
+    MatchedContainerInfo CreateMatchedContainerInfo(const std::string& configName,
+                                                    size_t inputIndex,
+                                                    const FileDiscoveryOptions* options,
                                                     const CollectionPipelineContext* ctx,
                                                     const std::vector<std::string>& pathExistContainerIDs,
                                                     const std::vector<std::string>& pathNotExistContainerIDs);
@@ -66,7 +76,20 @@ private:
     void refreshAllContainersSnapshot();
     void incrementallyUpdateContainersSnapshot();
 
-    bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
+    void applyContainerDiffForOneConfig(const std::string& configName,
+                                        size_t inputIndex,
+                                        FileDiscoveryOptions* options,
+                                        const CollectionPipelineContext* ctx,
+                                        std::shared_ptr<MatchedContainerInfo> configResult);
+    bool checkContainerDiffForOneConfig(const std::string& configName,
+                                        size_t inputIndex,
+                                        FileDiscoveryOptions* options,
+                                        const CollectionPipelineContext* ctx);
+    void getContainerStoppedEventForOneConfig(const std::string& configName,
+                                              size_t inputIndex,
+                                              const std::string& containerID,
+                                              const FileDiscoveryConfig& config,
+                                              std::vector<Event*>* eventVec = nullptr);
     void updateContainerInfoPointersInAllConfigs();
     void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
@@ -76,6 +99,7 @@ private:
                                  bool isStdio,
                                  ContainerDiff& diff);
 
+    std::map<std::pair<std::string, size_t>, FileDiscoveryConfig> getAllFileDiscoveryConfigs();
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
     void loadContainerInfoFromContainersFormat(const Json::Value& root, const std::string& configPath);
 
@@ -86,13 +110,13 @@ private:
     std::string joinContainerIDs(const std::vector<std::string>& containerIDs);
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
-    std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
-    std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
+    std::map<std::pair<std::string, size_t>, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
+    std::map<std::pair<std::string, size_t>, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     std::mutex mContainerMapMutex;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    uint32_t mLastUpdateTime = 0;
+    std::atomic<uint32_t> mLastUpdateTime{0};
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};

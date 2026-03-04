@@ -37,7 +37,7 @@ protected:
     static void TearDownTestCase() { PluginRegistry::GetInstance()->UnloadPlugins(); }
 
     void SetUp() override {
-        filesystem::create_directories(mConfigDir);
+        fs::create_directories(mConfigDir);
         PipelineConfigWatcher::GetInstance()->AddSource(mConfigDir.string());
     }
 
@@ -46,15 +46,15 @@ protected:
         // PipelineManagerMock::GetInstance()->ClearEnvironment();
         PipelineConfigWatcher::GetInstance()->ClearEnvironment();
         sConfigManager->Clear();
-        filesystem::remove_all(mConfigDir);
+        fs::remove_all(mConfigDir);
         error_code ec;
-        filesystem::remove(sConfigManager->mCheckpointFilePath, ec);
+        fs::remove(sConfigManager->mCheckpointFilePath, ec);
     }
 
 private:
     static OnetimeConfigInfoManager* sConfigManager;
 
-    filesystem::path mConfigDir = "continuous_pipeline_config";
+    fs::path mConfigDir = "continuous_pipeline_config";
 };
 
 OnetimeConfigInfoManager* OnetimeConfigUpdateUnittest::sConfigManager = OnetimeConfigInfoManager::GetInstance();
@@ -238,20 +238,24 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.HasDiff());
+        time_t beforeUpdate = time(nullptr);
         CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         sConfigManager->DumpCheckpointFile();
+        time_t afterUpdate = time(nullptr);
 
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-            APSARA_TEST_EQUAL(time(nullptr) + 3600U, item.mExpireTime);
+            APSARA_TEST_TRUE(item.mExpireTime >= static_cast<uint64_t>(beforeUpdate) + 3600U
+                             && item.mExpireTime <= static_cast<uint64_t>(afterUpdate) + 3600U + 1);
             APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
-            APSARA_TEST_EQUAL(time(nullptr) + 7200U, item.mExpireTime);
+            APSARA_TEST_TRUE(item.mExpireTime >= static_cast<uint64_t>(beforeUpdate) + 7200U
+                             && item.mExpireTime <= static_cast<uint64_t>(afterUpdate) + 7200U + 1);
             APSARA_TEST_EQUAL(configHash["changed_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
@@ -304,13 +308,13 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         })"};
         vector<string> filenames = {"new_config.json", "old_config.json"};
         for (size_t i = 0; i < configDetails.size(); ++i) {
-            filesystem::path filePath = mConfigDir / filenames[i];
+            fs::path filePath = mConfigDir / filenames[i];
             ofstream fout(filePath, ios::binary);
             fout << configDetails[i];
             fout.close();
             // 强制更新文件修改时间
-            filesystem::file_time_type newTime = filesystem::file_time_type::clock::now();
-            filesystem::last_write_time(filePath, newTime);
+            fs::file_time_type newTime = fs::file_time_type::clock::now();
+            fs::last_write_time(filePath, newTime);
             // 添加一个小延迟确保文件系统更新
             this_thread::sleep_for(chrono::milliseconds(10));
         }
@@ -319,7 +323,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
             fout << unusedConfigDetail;
             fout.close();
         }
-        filesystem::remove(mConfigDir / "changed_config.json");
+        fs::remove(mConfigDir / "changed_config.json");
 
         // compute config hash, inputs hash and excution timeout
         for (size_t i = 0; i < configDetails.size(); ++i) {
@@ -333,20 +337,25 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.HasDiff());
+        time_t beforeUpdate = time(nullptr);
         CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         sConfigManager->DumpCheckpointFile();
+        time_t afterUpdate = time(nullptr);
 
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-            APSARA_TEST_EQUAL(time(nullptr) + 1000U, item.mExpireTime);
+            // mExpireTime 在 UpdatePipelines 内部用当时的 time(nullptr) 设置，允许 1 秒执行误差
+            APSARA_TEST_TRUE(item.mExpireTime >= static_cast<uint64_t>(beforeUpdate) + 1000U
+                             && item.mExpireTime <= static_cast<uint64_t>(afterUpdate) + 1000U + 1);
             APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
-            APSARA_TEST_EQUAL(time(nullptr) + 1200U, item.mExpireTime);
+            APSARA_TEST_TRUE(item.mExpireTime >= static_cast<uint64_t>(beforeUpdate) + 1200U
+                             && item.mExpireTime <= static_cast<uint64_t>(afterUpdate) + 1200U + 1);
             APSARA_TEST_EQUAL(configHash["old_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
