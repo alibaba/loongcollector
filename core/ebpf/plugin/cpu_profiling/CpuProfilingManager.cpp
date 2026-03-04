@@ -218,7 +218,13 @@ void CpuProfilingManager::addContentToEvent(LogEvent* event,
                                             const std::string& appName,
                                             const std::string& comm,
                                             uint64_t valNs) {
-    std::string name = fullStack.back();
+    if (fullStack.empty()) {
+        LOG_ERROR(sLogger, ("Empty stack trace", ""));
+        return;
+    }
+
+    const std::string& name = fullStack.back();
+
     std::string stack; // stack without the top function name
 
     for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
@@ -296,6 +302,9 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
         PipelineEventGroup eventGroup(sourceBuffer);
 
         for (auto& [stack, cnt, traceId] : stacks) {
+            if (stack.empty()) {
+                continue;
+            }
             auto* event = eventGroup.AddLogEvent();
             event->SetTimestamp(logtime);
             event->SetContent(kProfileID.LogKey(), profileID);
