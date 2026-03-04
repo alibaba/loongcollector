@@ -87,6 +87,7 @@ void ProcessDiscoveryManager::run() {
     while (mRunning) {
         std::vector<ProcessEntry> procs;
         ListAllProcesses(mProcParser, procs);
+        std::sort(procs.begin(), procs.end(), [](const auto& a, const auto& b) { return a.mPid < b.mPid; });
 
         std::vector<DiscoverEntry> result;
 
@@ -94,7 +95,7 @@ void ProcessDiscoveryManager::run() {
             std::lock_guard<std::mutex> guard(mLock);
 
             for (auto& [_, state] : mStates) {
-                state.FindAllMatch(procs, result);
+                state.FindAllMatch(procs, result, mIsContainerMode);
             }
         }
 
@@ -107,14 +108,46 @@ void ProcessDiscoveryManager::run() {
 }
 
 
-void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<ProcessEntry>& procs,
-                                                       std::vector<DiscoverEntry>& results) {
+void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<ProcessEntry>& procsOrdered,
+                                                       std::vector<DiscoverEntry>& results, bool isContainerMode) {
     std::set<uint32_t> matchedPids;
-    for (const auto& proc : procs) {
-        if (mConfig.IsMatch(proc.mCmdline, proc.mContainerId, mIsContainerMode)) {
-            matchedPids.insert(proc.mPid);
+    auto it = procsOrdered.begin();
+    auto cacheIt = mPidMatchCache.begin();
+    while (it != procsOrdered.end() && cacheIt != mPidMatchCache.end()) {
+        if (it->mPid == cacheIt->first) {
+            // Cache hit, use the cached result
+            if (cacheIt->second) {
+                matchedPids.insert(it->mPid);
+            }
+            ++it;
+            ++cacheIt;
+        } else if (it->mPid < cacheIt->first) {
+            // New process, check and insert into cache
+            bool isMatch = mConfig.IsMatch(it->mCmdline, it->mContainerId, isContainerMode);
+            mPidMatchCache[it->mPid] = isMatch;
+            if (isMatch) {
+                matchedPids.insert(it->mPid);
+            }
+            ++it;
+        } else { // it->mPid > cacheIt->first
+            // Process disappeared, remove from cache
+            cacheIt = mPidMatchCache.erase(cacheIt);
         }
     }
+    while (it != procsOrdered.end()) {
+        // New processes after the last cached one
+        bool isMatch = mConfig.IsMatch(it->mCmdline, it->mContainerId, isContainerMode);
+        mPidMatchCache[it->mPid] = isMatch;
+        if (isMatch) {
+            matchedPids.insert(it->mPid);
+        }
+        ++it;
+    }
+    while (cacheIt != mPidMatchCache.end()) {
+        // Processes disappeared after the last one in the current list
+        cacheIt = mPidMatchCache.erase(cacheIt);
+    }
+
     if (mPrevPids == matchedPids) {
         return;
     }

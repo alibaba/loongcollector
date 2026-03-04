@@ -27,6 +27,7 @@
 #include "common/StringTools.h"
 #include "container_manager/ContainerDiff.h"
 #include "logger/Logger.h"
+#include "ebpf/plugin/cpu_profiling/ProcessEntry.h"
 
 namespace logtail {
 namespace ebpf {
@@ -109,8 +110,9 @@ private:
     struct InnerState {
         ProcessDiscoveryConfig mConfig;
         std::set<uint32_t> mPrevPids;
+        std::map<uint32_t, bool> mPidMatchCache;
 
-        void FindAllMatch(const std::vector<ProcessEntry>& procs, std::vector<DiscoverEntry>& results);
+        void FindAllMatch(const std::vector<ProcessEntry>& procsOrdered, std::vector<DiscoverEntry>& results, bool isContainerMode);
     };
 
     std::atomic_bool mRunning = false;
