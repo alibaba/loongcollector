@@ -108,21 +108,19 @@ void ContainerManager::ApplyContainerDiffs() {
             for (auto& pair : mConfigContainerDiffMap) {
                 FileDiscoveryOptions* options = nullptr;
                 const CollectionPipelineContext* ctx = nullptr;
-                const auto& itr = nameConfigMap.find(pair.first);
-                if (itr != nameConfigMap.end()) {
+                if (const auto itr = nameConfigMap.find(pair.first); itr != nameConfigMap.end()) {
                     options = itr->second.first;
                     ctx = itr->second.second;
-                } else {
-                    std::lock_guard<std::mutex> lock(mContainerHandlersMutex);
-                    const auto& handlerItr = mContainerHandlers.find(pair.first);
-                    if (handlerItr != mContainerHandlers.end()) {
-                        auto* options = handlerItr->second.first.first;
-                        if (options->IsContainerDiscoveryEnabled()) {
-                            auto& callback = handlerItr->second.second;
-                            // Invoke callback
-                            callback(pair.second);
-                        }
+                } else if (const auto handlerItr = mContainerHandlers.find(pair.first);
+                        handlerItr != mContainerHandlers.end()) {
+                    auto* options = handlerItr->second.first.first;
+                    if (options->IsContainerDiscoveryEnabled()) {
+                        auto& callback = handlerItr->second.second;
+                        // Invoke callback
+                        callback(pair.second);
                     }
+                    continue;
+                } else {
                     continue;
                 }
                 const auto& diff = pair.second;
