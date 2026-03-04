@@ -92,7 +92,7 @@ public:
         return &sInstance;
     }
 
-    void Start(NotifyFn fn);
+    void Start(NotifyFn fn, size_t milliseconds = 15000);
     void Stop();
 
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
@@ -119,6 +119,7 @@ private:
 
     bool mIsContainerMode;
     ProcParser mProcParser;
+    size_t mSleepMilliseconds;
 };
 
 } // namespace ebpf

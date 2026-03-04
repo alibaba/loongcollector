@@ -59,7 +59,7 @@ void ProcessDiscoveryManagerUnittest::TestSingleConfig() {
     auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
-    manager.Start(callback);
+    manager.Start(callback, /*milliseconds=*/100);
 
     // watch single config
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
@@ -72,7 +72,7 @@ void ProcessDiscoveryManagerUnittest::TestMultiConfig() {
     auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
-    manager.Start(callback);
+    manager.Start(callback, /*milliseconds=*/100);
 
     // watch single config
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
@@ -99,7 +99,7 @@ void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {
     auto callback = [&](ProcessDiscoveryManager::DiscoverResult r) { count += r.size(); };
 
     ProcessDiscoveryManager manager;
-    manager.Start(callback);
+    manager.Start(callback, /*milliseconds=*/100);
 
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{.mRegexs = {boost::regex("sleep.+")}});
     std::system("sleep 0.5");
