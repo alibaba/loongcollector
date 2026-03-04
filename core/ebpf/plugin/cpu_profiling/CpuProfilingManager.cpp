@@ -165,10 +165,8 @@ int CpuProfilingManager::Suspend() {
     return 0;
 }
 
-// stack, cnt, trace_id
-using StackCnt = std::tuple<std::vector<std::string>, uint32_t, std::string>;
 
-static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
+void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
     // Format: "<comm>:<pid>;<stacks> <cnt> <trace_id>\n"
     // Example: "bash:1234;func1;func2;func3 10 xxxxx\n"
 
@@ -215,11 +213,11 @@ static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
     }
 }
 
-static void addContentToEvent(LogEvent* event,
-                              const std::vector<std::string>& fullStack,
-                              const std::string& appName,
-                              const std::string& comm,
-                              uint64_t valNs) {
+void CpuProfilingManager::addContentToEvent(LogEvent* event,
+                                            const std::vector<std::string>& fullStack,
+                                            const std::string& appName,
+                                            const std::string& comm,
+                                            uint64_t valNs) {
     std::string name = fullStack.back();
     std::string stack; // stack without the top function name
 

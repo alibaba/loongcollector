@@ -88,6 +88,15 @@ protected:
     int update([[maybe_unused]] const PluginOptions& options) override { return 0; }
 
 private:
+    // stack, cnt, trace_id
+    using StackCnt = std::tuple<std::vector<std::string>, uint32_t, std::string>;
+    static void parseStackCnt(char const* symbol, std::vector<StackCnt>& result);
+    static void addContentToEvent(LogEvent* event,
+                                  const std::vector<std::string>& fullStack,
+                                  const std::string& appName,
+                                  const std::string& comm,
+                                  uint64_t valNs);
+
     std::atomic<bool> mInited = false;
 
     using ConfigKey = size_t;
