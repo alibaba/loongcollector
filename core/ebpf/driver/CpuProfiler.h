@@ -88,7 +88,7 @@ private:
     std::mutex mMutex;
     std::unordered_set<uint32_t> mPids;
     Profiler* mProfiler = nullptr;
-    // TODO: make this non-static
+    // TODO: make this non-static after coolbpf libprofiler support ctx in callback
     inline static livetrace_profiler_read_cb_ctx_t mHandler = nullptr;
     inline static void* mCtx = nullptr;
 };
