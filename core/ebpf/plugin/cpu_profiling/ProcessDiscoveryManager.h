@@ -109,6 +109,8 @@ private:
     struct InnerState {
         ProcessDiscoveryConfig mConfig;
         std::set<uint32_t> mPrevPids;
+
+        void FindAllMatch(const std::vector<ProcessEntry>& procs, std::vector<DiscoverEntry>& results);
     };
 
     std::atomic_bool mRunning = false;
