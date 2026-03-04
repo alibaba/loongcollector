@@ -40,17 +40,17 @@ void ProcessDiscoveryManagerUnittest::TestStartAndStop() {
     auto callback = [](ProcessDiscoveryManager::DiscoverResult) {};
 
     // singleton
-    ProcessDiscoveryManager::GetInstance()->Start(callback);
+    ProcessDiscoveryManager::GetInstance()->Start(callback, /*milliseconds=*/100);
     ProcessDiscoveryManager::GetInstance()->Stop();
-    ProcessDiscoveryManager::GetInstance()->Start(callback);
+    ProcessDiscoveryManager::GetInstance()->Start(callback, /*milliseconds=*/100);
     ProcessDiscoveryManager::GetInstance()->Stop();
 
     // scope
     {
         ProcessDiscoveryManager manager;
-        manager.Start(callback);
+        manager.Start(callback, /*milliseconds=*/100);
         manager.Stop();
-        manager.Start(callback);
+        manager.Start(callback, /*milliseconds=*/100);
     }
 }
 
@@ -83,7 +83,7 @@ void ProcessDiscoveryManagerUnittest::TestMultiConfig() {
 
 void ProcessDiscoveryManagerUnittest::TestUpdateConfig() {
     ProcessDiscoveryManager manager;
-    manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {});
+    manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {}, /*milliseconds=*/100);
 
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{});
 
@@ -113,7 +113,7 @@ void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {
 
 void ProcessDiscoveryManagerUnittest::TestCheckConfigExist() {
     ProcessDiscoveryManager manager;
-    manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {});
+    manager.Start([](ProcessDiscoveryManager::DiscoverResult r) {}, /*milliseconds=*/100);
 
     APSARA_TEST_FALSE(manager.CheckDiscoveryExist("test_watch"));
     manager.AddDiscovery("test_watch", ProcessDiscoveryConfig{});
