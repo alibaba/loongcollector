@@ -80,6 +80,7 @@ private:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PollingPreservedDirDepthUnittest;
+    friend class AlarmDiskBufferUnittest;
 #endif
 };
 

@@ -23,6 +23,7 @@
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
 #include "common/JsonUtil.h"
+#include "monitor/Monitor.h"
 #include "monitor/SelfMonitorServer.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "unittest/Unittest.h"
