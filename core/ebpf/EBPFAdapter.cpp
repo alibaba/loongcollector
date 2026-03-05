@@ -280,6 +280,9 @@ bool EBPFAdapter::SetNetworkObserverCidFilter(const std::string& cid, bool updat
 
 int32_t EBPFAdapter::PollPerfBuffers(PluginType pluginType, int32_t maxEvents, int32_t* flag, int timeoutMs) {
     if (!dynamicLibSuccess()) {
+        LOG_WARNING(sLogger,
+            ("poll perf buffer skip, dynamic lib not ready",
+             magic_enum::enum_name(pluginType)));
         return -1;
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_POLL_PLUGIN_PBS)];
@@ -473,6 +476,9 @@ std::vector<int> EBPFAdapter::GetPerfBufferEpollFds(PluginType pluginType) {
 
 int32_t EBPFAdapter::ConsumePerfBufferData(PluginType pluginType) {
     if (!dynamicLibSuccess()) {
+        LOG_WARNING(sLogger,
+            ("consume perf buffer data skip, dynamic lib not ready",
+             magic_enum::enum_name(pluginType)));
         return -1;
     }
     void* f = mFuncs[static_cast<int>(ebpf_func::EBPF_CONSUME_PLUGIN_PB_DATA)];
