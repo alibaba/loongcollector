@@ -109,7 +109,8 @@ void ProcessDiscoveryManager::run() {
 
 
 void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<ProcessEntry>& procsOrdered,
-                                                       std::vector<DiscoverEntry>& results, bool isContainerMode) {
+                                                       std::vector<DiscoverEntry>& results,
+                                                       bool isContainerMode) {
     std::set<uint32_t> matchedPids;
     auto it = procsOrdered.begin();
     auto cacheIt = mPidMatchCache.begin();

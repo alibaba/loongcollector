@@ -287,7 +287,7 @@ void CpuProfilingManagerUnittest::TestParseStackCnt() {
     CpuProfilingManager::parseStackCnt(symbol, result);
 
     APSARA_TEST_EQUAL(1U, result.size());
-    
+
     auto& [stack, cnt, traceId] = result[0];
     APSARA_TEST_EQUAL(3U, stack.size());
     APSARA_TEST_EQUAL("func1", stack[0]);
@@ -335,29 +335,28 @@ void CpuProfilingManagerUnittest::TestParseStackCntInvalidFormat() {
 }
 
 void CpuProfilingManagerUnittest::TestParseStackCntMultipleLines() {
-    const char* symbol = 
-        "bash:1234;func1;func2;func3 10 trace123\n"
-        "nginx:5678;handle_request;process_data 20 trace456\n"
-        "python:9012;main;run;execute 15 trace789\n";
-    
+    const char* symbol = "bash:1234;func1;func2;func3 10 trace123\n"
+                         "nginx:5678;handle_request;process_data 20 trace456\n"
+                         "python:9012;main;run;execute 15 trace789\n";
+
     std::vector<CpuProfilingManager::StackCnt> result;
     CpuProfilingManager::parseStackCnt(symbol, result);
 
     APSARA_TEST_EQUAL(3U, result.size());
-    
+
     auto& [stack1, cnt1, traceId1] = result[0];
     APSARA_TEST_EQUAL(3U, stack1.size());
     APSARA_TEST_EQUAL("func1", stack1[0]);
     APSARA_TEST_EQUAL(10U, cnt1);
     APSARA_TEST_EQUAL("trace123", traceId1);
-    
+
     auto& [stack2, cnt2, traceId2] = result[1];
     APSARA_TEST_EQUAL(2U, stack2.size());
     APSARA_TEST_EQUAL("handle_request", stack2[0]);
     APSARA_TEST_EQUAL("process_data", stack2[1]);
     APSARA_TEST_EQUAL(20U, cnt2);
     APSARA_TEST_EQUAL("trace456", traceId2);
-    
+
     auto& [stack3, cnt3, traceId3] = result[2];
     APSARA_TEST_EQUAL(3U, stack3.size());
     APSARA_TEST_EQUAL(15U, cnt3);
@@ -371,7 +370,7 @@ void CpuProfilingManagerUnittest::TestParseStackCntWithNullTraceId() {
     CpuProfilingManager::parseStackCnt(symbol, result);
 
     APSARA_TEST_EQUAL(1U, result.size());
-    
+
     auto& [stack, cnt, traceId] = result[0];
     APSARA_TEST_EQUAL(2U, stack.size());
     APSARA_TEST_EQUAL(10U, cnt);
@@ -386,7 +385,7 @@ void CpuProfilingManagerUnittest::TestParseStackCntWithEmptyStack() {
     CpuProfilingManager::parseStackCnt(symbol, result);
 
     APSARA_TEST_EQUAL(1U, result.size());
-    
+
     auto& [stack, cnt, traceId] = result[0];
     APSARA_TEST_EQUAL(0U, stack.size()); // stack is empty
     APSARA_TEST_EQUAL(10U, cnt);
@@ -414,7 +413,8 @@ void CpuProfilingManagerUnittest::TestParseStackCntEdgeCases() {
     std::string deepStack = "bash:1234;";
     for (int i = 0; i < 100; i++) {
         deepStack += "func" + std::to_string(i);
-        if (i < 99) deepStack += ";";
+        if (i < 99)
+            deepStack += ";";
     }
     deepStack += " 10 trace123\n";
     CpuProfilingManager::parseStackCnt(deepStack.c_str(), result);
@@ -440,14 +440,12 @@ void CpuProfilingManagerUnittest::TestParseStackCntEdgeCases() {
 
     // valid and invalid
     result.clear();
-    const char* mixed = 
-        "bash:1234;func1 10 trace123\n"
-        "invalid line without format\n"
-        "nginx:5678;func2 20 trace456\n";
+    const char* mixed = "bash:1234;func1 10 trace123\n"
+                        "invalid line without format\n"
+                        "nginx:5678;func2 20 trace456\n";
     CpuProfilingManager::parseStackCnt(mixed, result);
     APSARA_TEST_EQUAL(2U, result.size()); // only two line
 }
-
 
 
 UNIT_TEST_CASE(CpuProfilingManagerUnittest, TestConstructor);
