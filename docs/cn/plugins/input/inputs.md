@@ -26,6 +26,7 @@
 | `input_process_security`<br>[进程安全数据](native/input-process-security.md)   | SLS 官方 | 进程安全数据采集。                    |
 | `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS 官方 | 导出自监控指标数据。                  |
 | `input_internal_alarms`<br>[自监控告警数据](native/input-internal-alarms.md)   | SLS 官方 | 导出自监控告警数据。                  |
+| `input_cpu_profiling`<br>[CPU性能剖析数据](native/input-cpu-profiling.md)   | SLS 官方 | CPU性能剖析数据采集。                  |
 
 ### 扩展插件
 

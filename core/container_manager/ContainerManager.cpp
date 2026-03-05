@@ -104,12 +104,23 @@ void ContainerManager::ApplyContainerDiffs() {
     auto nameConfigMap = FileServer::GetInstance()->GetAllFileDiscoveryConfigs();
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
     for (auto& pair : mConfigContainerDiffMap) {
-        const auto& itr = nameConfigMap.find(pair.first);
-        if (itr == nameConfigMap.end()) {
+        FileDiscoveryOptions* options = nullptr;
+        const CollectionPipelineContext* ctx = nullptr;
+        if (const auto itr = nameConfigMap.find(pair.first); itr != nameConfigMap.end()) {
+            options = itr->second.first;
+            ctx = itr->second.second;
+        } else if (const auto handlerItr = mContainerHandlers.find(pair.first);
+                   handlerItr != mContainerHandlers.end()) {
+            auto* options = handlerItr->second.first.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                auto& callback = handlerItr->second.second;
+                // Invoke callback
+                callback(pair.second);
+            }
+            continue;
+        } else {
             continue;
         }
-        const auto& options = itr->second.first;
-        const auto& ctx = itr->second.second;
 
         const auto& diff = pair.second;
 
@@ -195,6 +206,17 @@ bool ContainerManager::CheckContainerDiffForAllConfig() {
             bool isCurrentConfigUpdate = checkContainerDiffForOneConfig(options, itr->second.second);
             if (isCurrentConfigUpdate) {
                 isUpdate = true;
+            }
+        }
+    }
+    {
+        for (auto itr = mContainerHandlers.begin(); itr != mContainerHandlers.end(); ++itr) {
+            FileDiscoveryOptions* options = itr->second.first.first;
+            if (options->IsContainerDiscoveryEnabled()) {
+                bool isCurrentConfigUpdate = checkContainerDiffForOneConfig(options, itr->second.first.second);
+                if (isCurrentConfigUpdate) {
+                    isUpdate = true;
+                }
             }
         }
     }
@@ -287,6 +309,15 @@ void ContainerManager::sendMatchedContainerInfo(std::vector<std::shared_ptr<Matc
     }
 }
 
+void ContainerManager::AddContainerHandler(const std::string& name,
+                                           const FileDiscoveryConfig& config,
+                                           const std::function<void(std::shared_ptr<ContainerDiff>)>& handler) {
+    mContainerHandlers[name] = std::make_pair(config, handler);
+}
+
+void ContainerManager::RemoveContainerHandler(const std::string& name) {
+    mContainerHandlers.erase(name);
+}
 
 bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* options,
                                                       const CollectionPipelineContext* ctx) {

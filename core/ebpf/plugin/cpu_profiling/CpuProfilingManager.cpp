@@ -1,0 +1,354 @@
+// Copyright 2025 iLogtail Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "ebpf/plugin/cpu_profiling/CpuProfilingManager.h"
+
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "collection_pipeline/queue/ProcessQueueItem.h"
+#include "collection_pipeline/queue/ProcessQueueManager.h"
+#include "common/HashUtil.h"
+#include "common/StringTools.h"
+#include "common/TimeUtil.h"
+#include "common/UUIDUtil.h"
+#include "common/queue/blockingconcurrentqueue.h"
+#include "ebpf/plugin/cpu_profiling/ProcessDiscoveryManager.h"
+#include "ebpf/type/table/ProfileTable.h"
+
+namespace logtail {
+namespace ebpf {
+
+const std::string CpuProfilingManager::kProfileCpuValue = "profile_cpu";
+const std::string CpuProfilingManager::kEmptyValue = "";
+const std::string CpuProfilingManager::kNanosecondsValue = "nanoseconds";
+const std::string CpuProfilingManager::kCpuValue = "cpu";
+const std::string CpuProfilingManager::kCallStackValue = "CallStack";
+
+std::unique_ptr<PluginConfig> buildCpuProfilingConfig(std::unordered_set<uint32_t> pids,
+                                                      std::optional<std::string> hostRootPath,
+                                                      CpuProfilingHandler handler,
+                                                      void* ctx) {
+    CpuProfilingConfig config
+        = {.mPids = std::move(pids), .mHostRootPath = std::move(hostRootPath), .mHandler = handler, .mCtx = ctx};
+    auto pc = std::make_unique<PluginConfig>();
+    pc->mPluginType = PluginType::CPU_PROFILING;
+    pc->mConfig = std::move(config);
+    return pc;
+}
+
+void handleCpuProfilingEvent(uint32_t pid, const char* comm, const char* stack, uint32_t cnt, void* ctx) {
+    auto* self = static_cast<CpuProfilingManager*>(ctx);
+    assert(self != nullptr);
+    self->HandleCpuProfilingEvent(pid, comm, stack, cnt);
+}
+
+CpuProfilingManager::CpuProfilingManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
+                                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
+                                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
+                                         EventPool* pool)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool) {
+}
+
+int CpuProfilingManager::Init() {
+    if (mInited) {
+        return 0;
+    }
+    mInited = true;
+    mEBPFAdapter->StartPlugin(PluginType::CPU_PROFILING,
+                              buildCpuProfilingConfig({}, GetContainerHostPath(), handleCpuProfilingEvent, this));
+    ProcessDiscoveryManager::GetInstance()->Start([this](auto v) { HandleProcessDiscoveryEvent(std::move(v)); });
+    LOG_INFO(sLogger, ("CpuProfilingManager", "init"));
+    return 0;
+}
+
+int CpuProfilingManager::Destroy() {
+    if (!mInited) {
+        return 0;
+    }
+    mInited = false;
+    ProcessDiscoveryManager::GetInstance()->Stop();
+    mEBPFAdapter->StopPlugin(PluginType::CPU_PROFILING);
+    LOG_INFO(sLogger, ("CpuProfilingManager", "destroy"));
+    return 0;
+}
+
+int CpuProfilingManager::AddOrUpdateConfig(const CollectionPipelineContext* context,
+                                           uint32_t index,
+                                           const PluginMetricManagerPtr& metricManager,
+                                           const PluginOptions& options) {
+    auto configName = context->GetConfigName();
+    auto it = mConfigNameToKey.find(configName);
+    if (it == mConfigNameToKey.end()) {
+        auto key = mNextKey++;
+        it = mConfigNameToKey.emplace(configName, key).first;
+    }
+    auto key = it->second;
+
+    CpuProfilingOption* opts = std::get<CpuProfilingOption*>(options);
+
+    auto info = ConfigInfo{
+        .mPipelineCtx = context,
+        .mQueueKey = context->GetProcessQueueKey(),
+        .mPluginIndex = index,
+        .mAppName = opts->mAppName,
+        .mLanguage = opts->mLanguage,
+    };
+    mConfigInfoMap.insert_or_assign(key, info);
+    if (opts->mCollectIntervalMs != 0) {
+        // If there are multiple configs, we use the minimum collect interval
+        mConfigNameToCollectIntervalMs[configName] = opts->mCollectIntervalMs;
+        mGlobalConfigCollectIntervalMs = std::min(mGlobalConfigCollectIntervalMs, opts->mCollectIntervalMs);
+    }
+
+    ProcessDiscoveryConfig config{
+        .mConfigKey = key,
+        .mRegexs = opts->mCmdlines,
+        .mFullDiscovery = opts->mCmdlines.empty(),
+    };
+
+    ProcessDiscoveryManager::GetInstance()->AddDiscovery(configName, std::move(config));
+
+    LOG_DEBUG(sLogger, ("CpuProfilingManager", "add or update config")("config", configName));
+
+    return 0;
+}
+
+int CpuProfilingManager::RemoveConfig(const std::string& configName) {
+    auto it = mConfigNameToKey.find(configName);
+    if (it == mConfigNameToKey.end()) {
+        LOG_WARNING(sLogger, ("CpuProfilingManager", "config not found")("config", configName));
+        return 1;
+    }
+    auto key = it->second;
+    mConfigNameToKey.erase(it);
+
+    ProcessDiscoveryManager::GetInstance()->RemoveDiscovery(configName);
+
+    auto hit = mConfigInfoMap.erase(key);
+    if (hit == 0) {
+        LOG_WARNING(sLogger, ("CpuProfilingManager", "config info not found when remove")("config", configName));
+        return 1;
+    }
+
+    auto it2 = mConfigNameToCollectIntervalMs.find(configName);
+    if (it2 != mConfigNameToCollectIntervalMs.end()) {
+        auto currIntervalMs = it2->second;
+        mConfigNameToCollectIntervalMs.erase(it2);
+        if (currIntervalMs == mGlobalConfigCollectIntervalMs) {
+            // If the removed config has the same collect interval as the global one, we need to recalculate the global
+            // collect interval
+            mGlobalConfigCollectIntervalMs = std::numeric_limits<uint32_t>::max();
+            for (const auto& [_, interval] : mConfigNameToCollectIntervalMs) {
+                mGlobalConfigCollectIntervalMs = std::min(mGlobalConfigCollectIntervalMs, interval);
+            }
+        }
+    }
+
+    LOG_DEBUG(sLogger, ("CpuProfilingManager", "remove config")("config", configName));
+
+    return 0;
+}
+
+int CpuProfilingManager::Suspend() {
+    // Do nothing
+    LOG_INFO(sLogger, ("CpuProfilingManager", "suspend"));
+    return 0;
+}
+
+
+void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt>& result) {
+    // Format: "<comm>:<pid>;<stacks> <cnt> <trace_id>\n"
+    // Example: "bash:1234;func1;func2;func3 10 xxxxx\n"
+
+    StringView symbolView(symbol);
+    StringViewSplitter splitter(symbolView, "\n");
+    for (const auto& line : splitter) {
+        auto pos1 = line.find(';');
+        if (pos1 == StringView::npos) {
+            LOG_ERROR(sLogger, ("Invalid symbol format", line));
+            continue;
+        }
+        auto pos2 = line.rfind(' ');
+        if (pos2 == StringView::npos || pos2 < pos1) {
+            LOG_ERROR(sLogger, ("Invalid symbol format", line));
+            continue;
+        }
+        auto pos3 = line.rfind(' ', pos2 - 1);
+        if (pos3 == StringView::npos || pos3 < pos1) {
+            LOG_ERROR(sLogger, ("Invalid symbol format", line));
+            continue;
+        }
+
+        auto stack = line.substr(pos1 + 1, pos3 - pos1 - 1);
+        auto cntStr = line.substr(pos3 + 1, pos2 - pos3 - 1);
+        uint32_t cnt;
+        if (!StringTo(cntStr, cnt)) {
+            LOG_ERROR(sLogger, ("Invalid count value", cntStr)("line", line));
+            continue;
+        }
+        auto traceId = line.substr(pos2 + 1);
+        if (traceId == "null") {
+            traceId = "";
+        }
+
+        std::vector<std::string> stackVec;
+        StringViewSplitter stackSplitter(stack, ";");
+        for (const auto& func : stackSplitter) {
+            if (func.empty()) {
+                continue;
+            }
+            stackVec.push_back(func.to_string());
+        }
+
+        result.emplace_back(std::make_tuple(std::move(stackVec), cnt, traceId.to_string()));
+    }
+}
+
+void CpuProfilingManager::addContentToEvent(LogEvent* event,
+                                            const std::vector<std::string>& fullStack,
+                                            const std::string& appName,
+                                            const std::string& comm,
+                                            uint64_t valNs) {
+    if (fullStack.empty()) {
+        LOG_ERROR(sLogger, ("Empty stack trace", ""));
+        return;
+    }
+
+    const std::string& name = fullStack.back();
+
+    std::string stack; // stack without the top function name
+    size_t stackStrSize = 0;
+    for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
+        stackStrSize += fullStack[i].size() + 1;
+    }
+    stackStrSize = stackStrSize > 0 ? stackStrSize - 1 : 0; // remove the last '\n'
+    stack.reserve(stackStrSize);
+    for (ssize_t i = fullStack.size() - 2; i >= 0; i--) {
+        stack += fullStack[i];
+        if (i != 0) {
+            stack += "\n";
+        }
+    }
+
+    std::hash<std::string_view> hasher;
+    size_t hashStack = hasher(stack);
+    AttrHashCombine(hashStack, hasher(name));
+
+    std::string stackId = ToHexString(hashStack);
+
+    event->SetContent(kName.LogKey(), name);
+    event->SetContent(kStack.LogKey(), stack);
+    event->SetContent(kStackID.LogKey(), stackId);
+
+    event->SetContentNoCopy(kType.LogKey(), StringView(CpuProfilingManager::kProfileCpuValue));
+    event->SetContentNoCopy(kTypeCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
+    event->SetContentNoCopy(kUnits.LogKey(), StringView(CpuProfilingManager::kNanosecondsValue));
+    event->SetContent(kVal.LogKey(), std::to_string(valNs));
+    event->SetContentNoCopy(kValueTypes.LogKey(), StringView(CpuProfilingManager::kCpuValue));
+    event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
+    // {"__name__": "xxx", "thread": "comm"}
+    std::string jsonLabels;
+    jsonLabels.reserve(30 + appName.size() + comm.size());
+    jsonLabels += R"({"__name__": ")";
+    jsonLabels += appName;
+    jsonLabels += R"(", "thread": ")";
+    jsonLabels += comm;
+    jsonLabels += R"("})";
+    event->SetContent(kLabels.LogKey(), jsonLabels);
+}
+
+void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm, const char* stack, uint32_t cnt) {
+    ADD_COUNTER(mRecvKernelEventsTotal, 1);
+
+    std::unordered_set<ConfigKey> targets;
+    {
+        std::lock_guard guard(mMutex);
+        auto it = mRouter.find(pid);
+        if (it != mRouter.end()) {
+            targets = it->second;
+        }
+    }
+
+    LOG_DEBUG(sLogger,
+              ("CpuProfilingEvent", "")("pid", pid)("comm", comm)("stack", stack)("cnt", cnt)("send to queues num",
+                                                                                              targets.size()));
+
+    if (targets.empty()) {
+        return;
+    }
+
+    auto logtime = time(nullptr);
+    if (AppConfig::GetInstance()->EnableLogTimeAutoAdjust()) {
+        logtime += GetTimeDelta();
+    }
+
+    std::vector<StackCnt> stacks;
+    parseStackCnt(stack, stacks);
+    std::string profileID = CalculateRandomUUID();
+
+    std::string commStr(comm);
+
+    for (const auto& key : targets) {
+        auto it = mConfigInfoMap.find(key);
+        if (it == mConfigInfoMap.end()) {
+            continue;
+        }
+        ConfigInfo& info = it->second;
+
+        auto sourceBuffer = std::make_shared<SourceBuffer>();
+        PipelineEventGroup eventGroup(sourceBuffer);
+
+        for (auto& [stack, cnt, traceId] : stacks) {
+            if (stack.empty()) {
+                continue;
+            }
+            auto* event = eventGroup.AddLogEvent();
+            event->SetTimestamp(logtime);
+            event->SetContent(kProfileID.LogKey(), profileID);
+            event->SetContentNoCopy(kProfileDataType.LogKey(), StringView(CpuProfilingManager::kCallStackValue));
+            event->SetContent(kProfileLanguage.LogKey(), info.mLanguage);
+            addContentToEvent(
+                event, stack, info.mAppName, commStr, static_cast<uint64_t>(cnt) * mSamplePeriodMs * 1000000);
+        }
+
+        std::unique_ptr<ProcessQueueItem> item
+            = std::make_unique<ProcessQueueItem>(eventGroup.Copy(), info.mPluginIndex);
+        if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(info.mQueueKey, std::move(item))) {
+            LOG_WARNING(sLogger,
+                        ("configName", info.mPipelineCtx->GetConfigName())("pluginIdx", info.mPluginIndex)(
+                            "[CpuProfilingEvent] push queue failed!", ""));
+        }
+    }
+};
+
+void CpuProfilingManager::HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result) {
+    std::unordered_set<uint32_t> totalPids;
+    {
+        std::lock_guard guard(mMutex);
+        mRouter.clear();
+        for (auto& [configKey, pids] : result) {
+            for (auto& pid : pids) {
+                totalPids.insert(pid);
+                auto it = mRouter.emplace(pid, std::unordered_set<ConfigKey>{}).first;
+                auto& configSet = it->second;
+                configSet.insert(configKey);
+            }
+        }
+    }
+
+    mEBPFAdapter->UpdatePlugin(PluginType::CPU_PROFILING,
+                               buildCpuProfilingConfig(std::move(totalPids), std::nullopt, nullptr, nullptr));
+}
+
+} // namespace ebpf
+} // namespace logtail

@@ -183,7 +183,7 @@ public:
         // Test add config
         CollectionPipelineContext ctx;
         ctx.SetConfigName("test_config");
-        std::variant<SecurityOptions*, ObserverNetworkOption*> options = createTestOptions();
+        PluginOptions options = createTestOptions();
 
         auto result = manager->AddOrUpdateConfig(&ctx, 0, nullptr, options);
         APSARA_TEST_EQUAL(result, 0);
@@ -236,7 +236,7 @@ protected:
     virtual std::shared_ptr<AbstractManager> createManagerInstance() = 0;
 
     // Factory method to create test options - override in derived classes
-    virtual std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() = 0;
+    virtual PluginOptions createTestOptions() = 0;
 
     // Verify plugin lifecycle pairing
     void verifyPluginPairing(PluginType pluginType) {
@@ -302,7 +302,7 @@ protected:
 // Test fixture specifically for security managers
 class SecurityManagerUnittestBase : public ManagerUnittestWithProcessCacheManager {
 protected:
-    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override {
+    PluginOptions createTestOptions() override {
         static SecurityOptions options;
         options.mOptionList.push_back(SecurityOption{{"test_option"}, std::monostate{}});
         return &options;
@@ -312,7 +312,7 @@ protected:
 // Test fixture specifically for network observer managers
 class NetworkObserverManagerUnittestBase : public ManagerUnittestWithProcessCacheManager {
 protected:
-    std::variant<SecurityOptions*, ObserverNetworkOption*> createTestOptions() override {
+    PluginOptions createTestOptions() override {
         static ObserverNetworkOption options;
         options.mApmConfig = {.mWorkspace = "test-ws",
                               .mAppName = "test-app",
