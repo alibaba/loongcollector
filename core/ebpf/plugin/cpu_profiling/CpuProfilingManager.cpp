@@ -258,6 +258,7 @@ void CpuProfilingManager::addContentToEvent(LogEvent* event,
     event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
     // {"__name__": "xxx", "thread": "comm"}
     std::string jsonLabels;
+    jsonLabels.reserve(30 + appName.size() + comm.size());
     jsonLabels += R"({"__name__": ")";
     jsonLabels += appName;
     jsonLabels += R"(", "thread": ")";
