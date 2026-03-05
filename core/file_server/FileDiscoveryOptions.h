@@ -165,7 +165,7 @@ private:
     // 过渡使用
     bool mTailingAllMatchedFiles = false;
 
-    uint32_t mLastContainerUpdateTime = 0;
+    int64_t mLastContainerUpdateTime = 0;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class FileDiscoveryOptionsUnittest;

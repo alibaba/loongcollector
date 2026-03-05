@@ -296,10 +296,10 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
 
     int64_t lastConfigContainerUpdateTime = options->GetLastContainerUpdateTime();
     int64_t newContainerUpdateTime;
-    if (lastConfigContainerUpdateTime <= mLastFullUpdateTime) {
+    if (lastConfigContainerUpdateTime < mLastFullUpdateTime) {
         refrashAllContainers = true;
         newContainerUpdateTime = mLastFullUpdateTime;
-    } else if (lastConfigContainerUpdateTime <= mLastIncrementalUpdateTime) {
+    } else if (lastConfigContainerUpdateTime < mLastIncrementalUpdateTime) {
         refrashAllContainers = false;
         newContainerUpdateTime = mLastIncrementalUpdateTime;
     } else {
