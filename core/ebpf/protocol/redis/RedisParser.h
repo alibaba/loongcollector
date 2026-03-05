@@ -31,8 +31,6 @@ namespace redis {
 
 ParseState ParseRequest(std::string_view& buf, std::shared_ptr<RedisRecord>& result, bool forceSample = false);
 
-ParseState ParseRequestBody(std::string_view& buf, std::shared_ptr<RedisRecord>& result);
-
 ParseState
 ParseResponse(std::string_view& buf, std::shared_ptr<RedisRecord>& result, bool closed, bool forceSample = false);
 } // namespace redis

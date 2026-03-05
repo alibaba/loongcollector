@@ -121,26 +121,8 @@ public:
     void SetRespMsg(std::string&& msg) { mRespMsg = std::move(msg); }
     void SetMethod(const std::string& method) { mHttpMethod = method; }
 
-    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
-        logEvent->SetContent(kHTTPMethod.LogKey(), mHttpMethod);
-        logEvent->SetContent(kHTTPPath.LogKey(), mRealPath.size() ? mRealPath : mPath);
-        logEvent->SetContent(kHTTPVersion.LogKey(), mProtocolVersion);
-        logEvent->SetContent(kStatusCode.LogKey(), std::to_string(mCode));
-        logEvent->SetContent(kHTTPReqBody.LogKey(), mReqBody);
-        logEvent->SetContent(kHTTPRespBody.LogKey(), mRespBody);
-    }
-
-    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
-        spanEvent->SetTag(kRpc.SpanKey(), GetConvSpanName());
-        if (!isServer) {
-            spanEvent->SetTag(kEndpoint.SpanKey(), GetConvSpanName());
-        }
-        spanEvent->SetTag(kHTTPReqBody.SpanKey(), mReqBody);
-        spanEvent->SetTag(kHTTPRespBody.SpanKey(), mRespBody);
-        spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(mReqBodySize));
-        spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(mRespBodySize));
-        spanEvent->SetTag(kHTTPVersion.SpanKey(), mProtocolVersion);
-    }
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override;
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override;
 
     // private:
     int mCode = 0;
@@ -178,17 +160,8 @@ public:
     const std::string& GetSql() const { return mSql; }
     void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
 
-    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
-        logEvent->SetContent(kDBSystemName.LogKey(), "mysql");
-        logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mCode));
-        logEvent->SetContent(kDBStatement.LogKey(), mSql);
-    }
-
-    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
-        spanEvent->SetTag(kDBSystemName.SpanKey(), "mysql");
-        spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mCode));
-        spanEvent->SetTag(kDBStatement.SpanKey(), mSql);
-    }
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override;
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override;
 
 private:
     int mCode = 0;
@@ -217,23 +190,8 @@ public:
     void SetCommandName(const std::string& commandName) { mCommandName = commandName; }
     const std::string& GetCommandName() { return mCommandName; }
 
-    void FillProtocolSpecificLogFields(LogEvent* logEvent) override {
-        logEvent->SetContent(kDBSystemName.LogKey(), "redis");
-        logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mCode));
-        logEvent->SetContent(kDBStatement.LogKey(), mSql);
-        if (!mErrorMsg.empty()) {
-            logEvent->SetContent(kDBResponseMessage.LogKey(), mErrorMsg);
-        }
-    }
-
-    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override {
-        spanEvent->SetTag(kDBSystemName.SpanKey(), "redis");
-        spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mCode));
-        spanEvent->SetTag(kDBStatement.SpanKey(), mSql);
-        if (!mErrorMsg.empty()) {
-            spanEvent->SetTag(kDBResponseMessage.SpanKey(), mErrorMsg);
-        }
-    }
+    void FillProtocolSpecificLogFields(LogEvent* logEvent) override;
+    void FillProtocolSpecificSpanFields(SpanEvent* spanEvent, bool isServer) override;
 
 private:
     int mCode = 0;

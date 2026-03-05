@@ -48,9 +48,10 @@ public:
     void TestParseMysqlQuery();
     void TestParseMysqlResponse();
 
-    void TestParseRedisRequest();
-    void TestParseRedisResponse();
-    void TestParseRedisEdgeCases();
+    void TestParseRedisRequestSuccess();
+    void TestParseRedisRequestError();
+    void TestParseRedisResponseSuccess();
+    void TestParseRedisResponseError();
 
 protected:
     void SetUp() override {}
@@ -455,226 +456,348 @@ void ProtocolParserUnittest::TestParseMysqlResponse() {
     APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
 }
 
-void ProtocolParserUnittest::TestParseRedisRequest() {
-    // Test standard Redis command: SET key value
+void ProtocolParserUnittest::TestParseRedisRequestSuccess() {
+    std::shared_ptr<RedisRecord> result;
+    ParseState state;
+
+    // Array format: SET key value
     const std::string setCommand = "*3\r\n$3\r\nSET\r\n$3\r\nkey\r\n$5\r\nvalue\r\n";
     std::string_view buf(setCommand);
-    std::shared_ptr<RedisRecord> result = std::make_shared<RedisRecord>(nullptr, nullptr);
-
-    ParseState state = redis::ParseRequest(buf, result);
-
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf, result);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetCommandName(), "SET");
     APSARA_TEST_EQUAL(result->GetSql(), "SET key value");
+    APSARA_TEST_TRUE(buf.empty()); // buffer fully consumed
 
-    // Test GET command
+    // Array format: GET key
     const std::string getCommand = "*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n";
     std::string_view buf2(getCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseRequest(buf2, result);
-
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetCommandName(), "GET");
     APSARA_TEST_EQUAL(result->GetSql(), "GET key");
+    APSARA_TEST_TRUE(buf2.empty());
 
-    // Test PING command
+    // Array format: PING (no args)
     const std::string pingCommand = "*1\r\n$4\r\nPING\r\n";
     std::string_view buf3(pingCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseRequest(buf3, result);
-
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetCommandName(), "PING");
     APSARA_TEST_EQUAL(result->GetSql(), "PING");
+    APSARA_TEST_TRUE(buf3.empty());
 
-    // Test HSET command with multiple arguments
+    // Array format: HSET with multiple arguments
     const std::string hsetCommand = "*4\r\n$4\r\nHSET\r\n$4\r\nhash\r\n$5\r\nfield\r\n$5\r\nvalue\r\n";
     std::string_view buf4(hsetCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseRequest(buf4, result);
-
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetCommandName(), "HSET");
     APSARA_TEST_EQUAL(result->GetSql(), "HSET hash field value");
+    APSARA_TEST_TRUE(buf4.empty());
 
-    // Test incomplete request (missing data)
-    const std::string incompleteRequest = "+INCOMPLETE";
-    std::string_view buf5(incompleteRequest);
+    // Array format: LPUSH with multiple values
+    const std::string lpushCommand
+        = "*5\r\n$5\r\nLPUSH\r\n$6\r\nmylist\r\n$6\r\nvalue1\r\n$6\r\nvalue2\r\n$6\r\nvalue3\r\n";
+    std::string_view buf5(lpushCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseRequest(buf5, result);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetCommandName(), "LPUSH");
+    APSARA_TEST_EQUAL(result->GetSql(), "LPUSH mylist value1 value2 value3");
+    APSARA_TEST_TRUE(buf5.empty());
 
-    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
-
-    // Test lowercase command (should be converted to uppercase)
+    // Array format: lowercase command should be normalized to uppercase
     const std::string lowerCaseCommand = "*2\r\n$3\r\nget\r\n$8\r\nmykey123\r\n";
     std::string_view buf6(lowerCaseCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseRequest(buf6, result);
-
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_EQUAL(result->GetCommandName(), "GET");
     APSARA_TEST_EQUAL(result->GetSql(), "GET mykey123");
-}
+    APSARA_TEST_TRUE(buf6.empty());
 
-void ProtocolParserUnittest::TestParseRedisResponse() {
-    // Test simple string response: +OK\r\n
-    const std::string okResponse = "+OK\r\n";
-    std::string_view buf(okResponse);
-    std::shared_ptr<RedisRecord> result = std::make_shared<RedisRecord>(nullptr, nullptr);
-
-    ParseState state = redis::ParseResponse(buf, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test error response: -ERR unknown command\r\n
-    const std::string errorResponse = "-ERR unknown command 'INVALID'\r\n";
-    std::string_view buf2(errorResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf2, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 1);
-    APSARA_TEST_EQUAL(result->GetErrorMessage(), "ERR unknown command 'INVALID'");
-
-    // Test integer response: :1000\r\n
-    const std::string intResponse = ":1000\r\n";
-    std::string_view buf3(intResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf3, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test bulk string response: $5\r\nhello\r\n
-    const std::string bulkResponse = "$5\r\nhello\r\n";
-    std::string_view buf4(bulkResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf4, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test null bulk string response: $-1\r\n
-    const std::string nullResponse = "$-1\r\n";
-    std::string_view buf5(nullResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf5, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test array response: *2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
-    const std::string arrayResponse = "*2\r\n";
-    std::string_view buf6(arrayResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf6, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test empty array: *0\r\n
-    const std::string emptyArray = "*0\r\n";
-    std::string_view buf7(emptyArray);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf7, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
-
-    // Test incomplete response
-    const std::string incompleteResponse = "$10\r\nhel";
-    std::string_view buf8(incompleteResponse);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf8, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
-}
-
-void ProtocolParserUnittest::TestParseRedisEdgeCases() {
-    // Test empty buffer
-    const std::string emptyBuffer = "";
-    std::string_view buf(emptyBuffer);
-    std::shared_ptr<RedisRecord> result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    ParseState state = redis::ParseRequest(buf, result);
-
-    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
-
-    // Test invalid format (not starting with *)
-    const std::string invalidFormat = "INVALID\r\n";
-    std::string_view buf2(invalidFormat);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseRequest(buf2, result);
-
-    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
-
-    // Test invalid array count (zero)
-    const std::string zeroArrayCount = "*0\r\n";
-    std::string_view buf3(zeroArrayCount);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseRequest(buf3, result);
-
-    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
-
-    // Test command with many arguments (should limit to 10)
+    // Array format: argument count > 10 should only parse first 10 (command + 9 args)
+    // Elements: arg0(cmd) arg1 arg2 ... arg9 arg0 arg1 ... arg4  (15 total, only first 10 consumed)
     std::string manyArgsCommand = "*15\r\n";
     for (int i = 0; i < 15; i++) {
         manyArgsCommand += "$4\r\narg" + std::to_string(i % 10) + "\r\n";
     }
-    std::string_view buf4(manyArgsCommand);
+    std::string_view buf7(manyArgsCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseRequest(buf4, result);
-
+    state = redis::ParseRequest(buf7, result);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    // Should only parse first 10 arguments (command + 9 args)
-    APSARA_TEST_TRUE(result->GetSql().length() > 0);
+    // command name is uppercased; args are kept as-is
+    // command="ARG0", args=arg1..arg9 => exactly 10 tokens (command + 9 args)
+    const std::string expectedManyArgs = "ARG0 arg1 arg2 arg3 arg4 arg5 arg6 arg7 arg8 arg9";
+    APSARA_TEST_EQUAL(result->GetSql(), expectedManyArgs);
+    APSARA_TEST_EQUAL(result->GetCommandName(), "ARG0");
+    // Verify token count: 10 space-separated tokens = 9 spaces
+    size_t tokenCount = 1;
+    for (char c : result->GetSql()) {
+        if (c == ' ')
+            ++tokenCount;
+    }
+    APSARA_TEST_EQUAL(tokenCount, static_cast<size_t>(10));
 
-    // Test very long command (should be truncated to 256 chars)
+    // Array format: value longer than kMaxCommandLength should be truncated
     std::string longValue(300, 'x');
     std::string longCommand = "*2\r\n$3\r\nSET\r\n$" + std::to_string(longValue.length()) + "\r\n" + longValue + "\r\n";
-    std::string_view buf5(longCommand);
+    std::string_view buf8(longCommand);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseRequest(buf5, result);
-
+    state = redis::ParseRequest(buf8, result);
     APSARA_TEST_EQUAL(state, ParseState::kSuccess);
     APSARA_TEST_TRUE(result->GetSql().length() <= 256);
 
-    // Test response with invalid type
-    const std::string invalidResponse = "?INVALID\r\n";
-    std::string_view buf6(invalidResponse);
+    // Inline format: single bulk string command
+    const std::string bulkSingleCommand = "$4\r\nPING\r\n";
+    std::string_view buf9(bulkSingleCommand);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf9, result);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetCommandName(), "PING");
+    APSARA_TEST_EQUAL(result->GetSql(), "PING");
+    APSARA_TEST_TRUE(buf9.empty());
+
+    // Inline format: simple string command
+    const std::string inlineCommand = "+PING\r\n";
+    std::string_view buf10(inlineCommand);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf10, result);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetCommandName(), "PING");
+    APSARA_TEST_EQUAL(result->GetSql(), "PING");
+    APSARA_TEST_TRUE(buf10.empty());
+}
+
+void ProtocolParserUnittest::TestParseRedisRequestError() {
+    std::shared_ptr<RedisRecord> result;
+    ParseState state;
+
+    // kNeedsMoreData: empty buffer
+    const std::string emptyBuffer = "";
+    std::string_view buf(emptyBuffer);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: array header without CRLF
+    const std::string noArrayCRLF = "*3";
+    std::string_view buf2(noArrayCRLF);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf2, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: array header present but bulk string data missing
+    const std::string missingBulk = "*2\r\n$3\r\n";
+    std::string_view buf3(missingBulk);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf3, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: inline simple string without CRLF
+    const std::string inlineNoCRLF = "+INCOMPLETE";
+    std::string_view buf4(inlineNoCRLF);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf4, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: bulk string command without CRLF
+    const std::string bulkNoCRLF = "$4\r\nPIN";
+    std::string_view buf5(bulkNoCRLF);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf5, result);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kInvalid: unknown leading byte
+    const std::string invalidFormat = "INVALID\r\n";
+    std::string_view buf6(invalidFormat);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf6, result);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
+
+    // kInvalid: array count = 0
+    const std::string zeroArrayCount = "*0\r\n";
+    std::string_view buf7(zeroArrayCount);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf7, result);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
+
+    // kInvalid: negative array count (not -1)
+    const std::string negArrayCount = "*-2\r\n";
+    std::string_view buf8(negArrayCount);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseRequest(buf8, result);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
+}
+
+void ProtocolParserUnittest::TestParseRedisResponseSuccess() {
+    std::shared_ptr<RedisRecord> result;
+    ParseState state;
+
+    // Simple string: +OK\r\n
+    const std::string okResponse = "+OK\r\n";
+    std::string_view buf(okResponse);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf.empty());
+
+    // Error response: -ERR ...\r\n  (protocol-level success, status=1)
+    const std::string errorResponse = "-ERR unknown command 'INVALID'\r\n";
+    std::string_view buf2(errorResponse);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf2, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 1);
+    APSARA_TEST_EQUAL(result->GetErrorMessage(), "ERR unknown command 'INVALID'");
+    APSARA_TEST_TRUE(buf2.empty());
+
+    // Integer response: :1000\r\n
+    const std::string intResponse = ":1000\r\n";
+    std::string_view buf3(intResponse);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf3, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf3.empty());
+
+    // Bulk string: $5\r\nhello\r\n
+    const std::string bulkResponse = "$5\r\nhello\r\n";
+    std::string_view buf4(bulkResponse);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf4, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf4.empty());
+
+    // Null bulk string: $-1\r\n
+    const std::string nullResponse = "$-1\r\n";
+    std::string_view buf5(nullResponse);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf5, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf5.empty());
+
+    // Array with elements: *2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
+    const std::string arrayResponse = "*2\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
+    std::string_view buf6(arrayResponse);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
     state = redis::ParseResponse(buf6, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf6.empty());
 
+    // Empty array: *0\r\n
+    const std::string emptyArray = "*0\r\n";
+    std::string_view buf7(emptyArray);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf7, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf7.empty());
+
+    // Null array: *-1\r\n
+    const std::string nullArray = "*-1\r\n";
+    std::string_view buf8(nullArray);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf8, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf8.empty());
+
+    // Nested array: *2\r\n*1\r\n$3\r\nfoo\r\n$3\r\nbar\r\n
+    const std::string nestedArray = "*2\r\n*1\r\n$3\r\nfoo\r\n$3\r\nbar\r\n";
+    std::string_view buf9(nestedArray);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf9, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
+    APSARA_TEST_EQUAL(result->GetStatusCode(), 0);
+    APSARA_TEST_TRUE(buf9.empty());
+}
+
+void ProtocolParserUnittest::TestParseRedisResponseError() {
+    std::shared_ptr<RedisRecord> result;
+    ParseState state;
+
+    // kNeedsMoreData: empty buffer
+    const std::string emptyBuffer = "";
+    std::string_view buf(emptyBuffer);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: simple string without CRLF
+    const std::string simpleNoCRLF = "+OK";
+    std::string_view buf2(simpleNoCRLF);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf2, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: integer without CRLF
+    const std::string intNoCRLF = ":1000";
+    std::string_view buf3(intNoCRLF);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf3, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: bulk string data incomplete
+    const std::string bulkIncomplete = "$10\r\nhel";
+    std::string_view buf4(bulkIncomplete);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf4, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: bulk string without trailing CRLF
+    const std::string bulkNoTrailing = "$5\r\nhello";
+    std::string_view buf5(bulkNoTrailing);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf5, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: array header present but elements missing
+    const std::string arrayNoElements = "*2\r\n";
+    std::string_view buf6(arrayNoElements);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf6, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kNeedsMoreData: array with only first element complete
+    const std::string arrayPartial = "*2\r\n$3\r\nfoo\r\n";
+    std::string_view buf7(arrayPartial);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf7, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
+
+    // kInvalid: unknown response type
+    const std::string invalidType = "?INVALID\r\n";
+    std::string_view buf8(invalidType);
+    result = std::make_shared<RedisRecord>(nullptr, nullptr);
+    state = redis::ParseResponse(buf8, result, false, false);
     APSARA_TEST_EQUAL(state, ParseState::kInvalid);
     APSARA_TEST_EQUAL(result->GetStatusCode(), -1);
 
-    // Test bulk string with negative length (not -1)
+    // kInvalid: bulk string with illegal negative length (not -1)
     const std::string negativeBulk = "$-5\r\n";
-    std::string_view buf7(negativeBulk);
+    std::string_view buf9(negativeBulk);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf7, result, false, false);
-
+    state = redis::ParseResponse(buf9, result, false, false);
     APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 
-    // Test bulk string without trailing CRLF
-    const std::string noTrailingCRLF = "$5\r\nhello";
-    std::string_view buf8(noTrailingCRLF);
+    // kInvalid: bulk string trailing CRLF corrupted
+    const std::string badCRLF = "$5\r\nhelloXX";
+    std::string_view buf10(badCRLF);
     result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseResponse(buf8, result, false, false);
-
-    APSARA_TEST_EQUAL(state, ParseState::kNeedsMoreData);
-
-    // Test LPUSH command with multiple values
-    const std::string lpushCommand
-        = "*5\r\n$5\r\nLPUSH\r\n$6\r\nmylist\r\n$6\r\nvalue1\r\n$6\r\nvalue2\r\n$6\r\nvalue3\r\n";
-    std::string_view buf9(lpushCommand);
-    result = std::make_shared<RedisRecord>(nullptr, nullptr);
-    state = redis::ParseRequest(buf9, result);
-
-    APSARA_TEST_EQUAL(state, ParseState::kSuccess);
-    APSARA_TEST_EQUAL(result->GetCommandName(), "LPUSH");
-    APSARA_TEST_EQUAL(result->GetSql(), "LPUSH mylist value1 value2 value3");
+    state = redis::ParseResponse(buf10, result, false, false);
+    APSARA_TEST_EQUAL(state, ParseState::kInvalid);
 }
+
 
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttp);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseHttpResponse);
@@ -686,9 +809,10 @@ UNIT_TEST_CASE(ProtocolParserUnittest, TestProtocolParserManager);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestHttpParserEdgeCases);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlQuery);
 UNIT_TEST_CASE(ProtocolParserUnittest, TestParseMysqlResponse);
-UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisRequest);
-UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisResponse);
-UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisEdgeCases);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisRequestSuccess);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisRequestError);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisResponseSuccess);
+UNIT_TEST_CASE(ProtocolParserUnittest, TestParseRedisResponseError);
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, RequestWithoutBodyBenchmark);
 UNIT_TEST_CASE(ProtocolParserUnittest, ResponseBenchmark);

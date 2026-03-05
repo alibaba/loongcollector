@@ -48,6 +48,9 @@ REDISProtocolParser::Parse(struct conn_data_event_t* dataEvent,
             LOG_DEBUG(sLogger, ("[REDISProtocolParser]: Parse REDIS response failed", int(state)));
             return {};
         }
+        // buf is a local view; remaining bytes after a single-message parse are expected to be zero.
+        // If non-zero, it indicates unexpected trailing data (pipeline not yet supported).
+        LOG_DEBUG(sLogger, ("[REDISProtocolParser]: response remaining bytes", buf.size()));
     }
 
     if (dataEvent->request_len > 0) {
@@ -84,25 +87,75 @@ constexpr char kCRLF[] = "\r\n";
 
 // Helper function: Find CRLF (\r\n) in buffer
 static size_t FindCRLF(const std::string_view& buf, size_t start = 0) {
-    for (size_t i = start; i + 1 < buf.size(); ++i) {
-        if (buf[i] == '\r' && buf[i + 1] == '\n') {
-            return i;
-        }
-    }
-    return std::string_view::npos;
+    return buf.find("\r\n", start);
 }
 
-// Helper function: Parse integer from string_view
-static bool ParseInteger(const std::string_view& str, int64_t& result) {
-    if (str.empty()) {
-        return false;
+// Skip one complete RESP object without building its value (lightweight, supports nesting)
+static ParseState SkipRespObject(std::string_view& buf) {
+    if (buf.empty()) {
+        return ParseState::kNeedsMoreData;
     }
-    try {
-        size_t pos;
-        result = std::stoll(std::string(str), &pos);
-        return pos == str.size();
-    } catch (...) {
-        return false;
+    char type = buf[0];
+    switch (type) {
+        case kRespSimpleStringType: // +<text>\r\n
+        case kRespErrorType: // -<text>\r\n
+        case kRespIntegerType: { // :<number>\r\n
+            size_t endPos = FindCRLF(buf, 1);
+            if (endPos == std::string_view::npos) {
+                return ParseState::kNeedsMoreData;
+            }
+            buf.remove_prefix(endPos + 2);
+            return ParseState::kSuccess;
+        }
+        case kRespBulkStringType: { // $<len>\r\n<data>\r\n
+            size_t lengthEnd = FindCRLF(buf, 1);
+            if (lengthEnd == std::string_view::npos) {
+                return ParseState::kNeedsMoreData;
+            }
+            int64_t length;
+            if (!StringTo(buf.substr(1, lengthEnd - 1), length)) {
+                return ParseState::kInvalid;
+            }
+            if (length == -1) { // Null bulk string: $-1\r\n
+                buf.remove_prefix(lengthEnd + 2);
+                return ParseState::kSuccess;
+            }
+            if (length < 0) {
+                return ParseState::kInvalid;
+            }
+            size_t requiredSize = lengthEnd + 2 + static_cast<size_t>(length) + 2;
+            if (buf.size() < requiredSize) {
+                return ParseState::kNeedsMoreData;
+            }
+            if (buf[requiredSize - 2] != '\r' || buf[requiredSize - 1] != '\n') {
+                return ParseState::kInvalid;
+            }
+            buf.remove_prefix(requiredSize);
+            return ParseState::kSuccess;
+        }
+        case kRespArrayType: { // *<count>\r\n...
+            size_t arrayCountEnd = FindCRLF(buf, 1);
+            if (arrayCountEnd == std::string_view::npos) {
+                return ParseState::kNeedsMoreData;
+            }
+            int64_t arrayCount;
+            if (!StringTo(buf.substr(1, arrayCountEnd - 1), arrayCount)) {
+                return ParseState::kInvalid;
+            }
+            buf.remove_prefix(arrayCountEnd + 2);
+            if (arrayCount <= 0) { // Null array or empty array
+                return ParseState::kSuccess;
+            }
+            for (int64_t i = 0; i < arrayCount; ++i) {
+                ParseState state = SkipRespObject(buf);
+                if (state != ParseState::kSuccess) {
+                    return state;
+                }
+            }
+            return ParseState::kSuccess;
+        }
+        default:
+            return ParseState::kInvalid;
     }
 }
 
@@ -120,7 +173,7 @@ static ParseState ParseBulkString(std::string_view& buf, std::string& result, si
 
     // Parse length
     int64_t length;
-    if (!ParseInteger(buf.substr(1, lengthEnd - 1), length)) {
+    if (!StringTo(buf.substr(1, lengthEnd - 1), length)) {
         return ParseState::kInvalid;
     }
 
@@ -149,7 +202,7 @@ static ParseState ParseBulkString(std::string_view& buf, std::string& result, si
     // Extract data (limit to maxLen)
     size_t dataStart = lengthEnd + 2;
     size_t dataLen = std::min(static_cast<size_t>(length), maxLen);
-    result = std::string(buf.substr(dataStart, dataLen));
+    result.assign(buf.data() + dataStart, dataLen);
 
     buf.remove_prefix(requiredSize);
     return ParseState::kSuccess;
@@ -172,7 +225,7 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<RedisRecord>& res
 
         // Parse argument count
         int64_t arrayCount;
-        if (!ParseInteger(buf.substr(1, arrayCountEnd - 1), arrayCount)) {
+        if (!StringTo(buf.substr(1, arrayCountEnd - 1), arrayCount)) {
             return ParseState::kInvalid;
         }
 
@@ -196,16 +249,25 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<RedisRecord>& res
         });
         result->SetCommandName(commandName);
 
-        // Build complete SQL string (command + arguments)
+        // Build complete SQL string (command + first 9 arguments, up to 10 tokens total)
         std::string sql = commandName;
-        for (int64_t i = 1; i < arrayCount && i < 10; ++i) { // Parse at most 10 arguments
+        constexpr int64_t kMaxArgs = 10; // command name + at most 9 args
+        for (int64_t i = 1; i < arrayCount && i < kMaxArgs; ++i) {
             std::string arg;
             state = ParseBulkString(buf, arg, kMaxCommandLength);
             if (state != ParseState::kSuccess) {
-                // Keep already parsed command even if subsequent arguments fail
-                break;
+                return state;
             }
-            sql += " " + arg;
+            sql += ' ';
+            sql += arg;
+        }
+
+        // Skip remaining arguments beyond the limit to fully consume the buffer
+        for (int64_t i = kMaxArgs; i < arrayCount; ++i) {
+            ParseState skipState = SkipRespObject(buf);
+            if (skipState != ParseState::kSuccess) {
+                return skipState;
+            }
         }
 
         // Limit SQL length
@@ -215,15 +277,31 @@ ParseState ParseRequest(std::string_view& buf, std::shared_ptr<RedisRecord>& res
         result->SetSql(sql);
 
         return ParseState::kSuccess;
-    } else if (buf[0] == kRespBulkStringType || buf[0] == kRespSimpleStringType) {
-        // Simple command or single bulk string (inline command, less common)
-        size_t endPos = FindCRLF(buf);
+    } else if (buf[0] == kRespBulkStringType) {
+        // Single bulk string command: $<len>\r\n<cmd>\r\n
+        std::string cmd;
+        ParseState state = ParseBulkString(buf, cmd, kMaxCommandLength);
+        if (state != ParseState::kSuccess) {
+            return state;
+        }
+        std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::toupper(c); });
+        result->SetCommandName(cmd);
+        result->SetSql(cmd);
+        return ParseState::kSuccess;
+    } else if (buf[0] == kRespSimpleStringType) {
+        // Inline simple string command: +<cmd>\r\n
+        size_t endPos = FindCRLF(buf, 1);
         if (endPos == std::string_view::npos) {
             return ParseState::kNeedsMoreData;
         }
-        std::string cmd = std::string(buf.substr(0, std::min(endPos, kMaxCommandLength)));
-        result->SetSql(cmd);
+        // Skip the leading '+' prefix, extract actual command content
+        size_t cmdLen = std::min(endPos - 1, kMaxCommandLength);
+        std::string cmd;
+        cmd.assign(buf.data() + 1, cmdLen);
+        std::transform(cmd.begin(), cmd.end(), cmd.begin(), [](unsigned char c) { return std::toupper(c); });
         result->SetCommandName(cmd);
+        result->SetSql(cmd);
+        buf.remove_prefix(endPos + 2);
         return ParseState::kSuccess;
     } else {
         // Unknown format
@@ -256,7 +334,8 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<RedisRecord>& re
             }
             result->SetStatusCode(1); // Error
             if (endPos > 1) {
-                std::string errorMsg = std::string(buf.substr(1, endPos - 1));
+                std::string errorMsg;
+                errorMsg.assign(buf.data() + 1, endPos - 1);
                 result->SetErrorMessage(errorMsg);
                 // Force sampling for error responses
                 result->MarkSample();
@@ -280,7 +359,7 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<RedisRecord>& re
             }
 
             int64_t length;
-            if (!ParseInteger(buf.substr(1, lengthEnd - 1), length)) {
+            if (!StringTo(buf.substr(1, lengthEnd - 1), length)) {
                 return ParseState::kInvalid;
             }
 
@@ -317,7 +396,7 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<RedisRecord>& re
             }
 
             int64_t arrayCount;
-            if (!ParseInteger(buf.substr(1, arrayCountEnd - 1), arrayCount)) {
+            if (!StringTo(buf.substr(1, arrayCountEnd - 1), arrayCount)) {
                 return ParseState::kInvalid;
             }
 
@@ -328,10 +407,15 @@ ParseState ParseResponse(std::string_view& buf, std::shared_ptr<RedisRecord>& re
                 return ParseState::kSuccess;
             }
 
-            // Simplified handling for array responses: only validate format, not parsing all elements
-            // This avoids complex recursive parsing and improves performance
-            result->SetStatusCode(0); // Success
+            // Consume the array header, then skip each element to fully consume the buffer
             buf.remove_prefix(arrayCountEnd + 2);
+            for (int64_t i = 0; i < arrayCount; ++i) {
+                ParseState state = SkipRespObject(buf);
+                if (state != ParseState::kSuccess) {
+                    return state;
+                }
+            }
+            result->SetStatusCode(0);
             return ParseState::kSuccess;
         }
         default:
