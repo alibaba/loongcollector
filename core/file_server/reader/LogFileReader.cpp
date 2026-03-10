@@ -2542,7 +2542,7 @@ bool LogFileReader::UpdateContainerInfo() {
         LOG_INFO(sLogger,
                  ("container info of file reader changed", "may be because container restart")(
                      "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
-                     "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
+                     "container status", containerInfo->mRawContainerInfo->mStopped.load() ? "stopped" : "running"));
         // if config have wildcard path, use wildcardPaths[0] as base path
         std::string dockerPath;
         size_t realBaseDirSize = 0;
@@ -2565,7 +2565,7 @@ bool LogFileReader::UpdateContainerInfo() {
         }
         SetDockerPath(dockerPath, realBaseDirSize);
         SetContainerID(containerInfo->mRawContainerInfo->mID);
-        mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
+        mContainerStopped = containerInfo->mRawContainerInfo->mStopped.load();
         mContainerMetadatas.clear();
         mContainerExtraTags.clear();
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);

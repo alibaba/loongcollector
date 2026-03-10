@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <future>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,7 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
@@ -45,8 +47,10 @@ public:
     void Init();
     void Stop();
 
-    // 由于获取容器信息可能耗时较大，这里通过mLastUpdateTime是否更新过判断是否成功拉取过一次容器信息
-    bool IsReady() { return mIsRunning.load() && mLastUpdateTime.load() > 0; }
+    // 由于获取容器信息可能耗时较大，这里通过更新时间是否更新过判断是否成功拉取过一次容器信息
+    bool IsReady() {
+        return mIsRunning.load() && (mLastFullUpdateTime.load() > 0 || mLastIncrementalUpdateTime.load() > 0);
+    }
 
     // file server
     void ApplyFileServerContainerDiffs();
@@ -80,7 +84,7 @@ private:
                                         size_t inputIndex,
                                         FileDiscoveryOptions* options,
                                         const CollectionPipelineContext* ctx,
-                                        std::shared_ptr<MatchedContainerInfo> configResult);
+                                        std::shared_ptr<MatchedContainerInfo>& configResult);
     bool checkContainerDiffForOneConfig(const std::string& configName,
                                         size_t inputIndex,
                                         FileDiscoveryOptions* options,
@@ -112,11 +116,13 @@ private:
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::map<std::pair<std::string, size_t>, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::map<std::pair<std::string, size_t>, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
-    std::mutex mContainerMapMutex;
+    mutable ReadWriteLock mContainerMapRWLock;
+    mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    std::atomic<uint32_t> mLastUpdateTime{0};
+    std::atomic<int64_t> mLastIncrementalUpdateTime{0};
+    std::atomic<int64_t> mLastFullUpdateTime{0};
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};
