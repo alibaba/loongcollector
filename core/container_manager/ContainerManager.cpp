@@ -115,6 +115,10 @@ void ContainerManager::ApplyContainerDiffs() {
 
         LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
 
+        if (diff->mRefrashAllContainers) {
+            options->ClearContainerInfo();
+        }
+
         for (const auto& pair : diff->mLegacyCheckpointAdded) {
             const std::string& basePathInCheckpoint = pair.first;
             const std::shared_ptr<RawContainerInfo>& container = pair.second;
@@ -316,6 +320,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                      containerInfoMap,
                                      options->GetContainerDiscoveryOptions().mContainerFilters,
                                      options->GetContainerDiscoveryOptions().mIsStdio,
+                                     true,
                                      diff);
     } else {
         const auto& containerInfos = options->GetContainerInfo();
@@ -331,6 +336,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                      containerInfoMap,
                                      options->GetContainerDiscoveryOptions().mContainerFilters,
                                      options->GetContainerDiscoveryOptions().mIsStdio,
+                                     false,
                                      diff);
     }
 
@@ -632,7 +638,9 @@ void ContainerManager::computeMatchedContainersDiff(
     const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
     const ContainerFilters& filters,
     bool isStdio,
+    bool refrashAllContainers,
     ContainerDiff& diff) {
+    diff.mRefrashAllContainers = refrashAllContainers;
     ReadLock lock(mContainerMapRWLock);
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {

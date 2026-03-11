@@ -89,7 +89,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // test empty filter
         ContainerFilters filters;
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 0);
         EXPECT_EQ(matchList.size(), 0);
     }
@@ -113,7 +113,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.mContainerMap["mod1"] = std::make_shared<RawContainerInfo>(newInfo);
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList2, matchList2, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList2, matchList2, filters, false, false, diff);
         EXPECT_EQ(diff.mModified.size(), 1);
         EXPECT_EQ(diff.mModified[0]->mLogPath, std::string("/var/lib/docker/containers/mod1/new-logs"));
     }
@@ -134,7 +134,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.mContainerMap.erase("gone1");
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList3, matchList3, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList3, matchList3, filters, false, false, diff);
         EXPECT_EQ(std::count(diff.mRemoved.begin(), diff.mRemoved.end(), std::string("gone1")), 1);
         EXPECT_EQ(fullList3.count("gone1"), 0);
     }
@@ -162,7 +162,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mIncludeFields.mFieldsMap["test"] = "test";
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -179,7 +179,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // exclude key "test" with value "test" so only 1234 is added
         filters.mEnvFilter.mExcludeFields.mFieldsMap["test"] = "test";
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -195,7 +195,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mIncludeFields.mFieldsRegMap["test"] = std::make_shared<boost::regex>("^test2$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -211,7 +211,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mExcludeFields.mFieldsRegMap["test"] = std::make_shared<boost::regex>("^test2$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -248,7 +248,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>("^namespace1$");
         filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>("^container1$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -278,7 +278,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include label
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff1);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
@@ -291,7 +291,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mK8SFilter.mK8sLabelFilter.mExcludeFields.mFieldsMap["tier"] = "backend";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, false, diff2);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
@@ -305,7 +305,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters3.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap["tier"]
             = std::make_shared<boost::regex>("^front.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, false, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "k8s1");
@@ -334,7 +334,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include map
         filters.mContainerLabelFilter.mIncludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff1);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
             EXPECT_EQ(diff1.mAdded[0]->mID, "cl1");
@@ -346,7 +346,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mContainerLabelFilter.mExcludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, false, diff2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
             EXPECT_EQ(diff2.mAdded[0]->mID, "cl2");
@@ -358,7 +358,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters3;
         filters3.mContainerLabelFilter.mIncludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^ng.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, false, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "cl1");
@@ -370,7 +370,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters4;
         filters4.mContainerLabelFilter.mExcludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^re.*$");
         ContainerDiff diff4;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, true, diff4);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, true, false, diff4);
         EXPECT_EQ(diff4.mAdded.size(), 1);
         if (diff4.mAdded.size() > 0) {
             EXPECT_EQ(diff4.mAdded[0]->mID, "cl1");
@@ -414,7 +414,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
             EXPECT_EQ(diff.mAdded[0]->mID, "combo1");
@@ -1222,7 +1222,7 @@ void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) cons
         std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
 
         // Collect actual matched IDs
         std::set<std::string> actualMatchedIDs;
@@ -1340,7 +1340,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() co
         ContainerFilters filters;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
 
         // Should only add running containers to both diff.mAdded and fullList
         EXPECT_EQ(diff.mAdded.size(), 2);
@@ -1367,7 +1367,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() co
         ContainerFilters filters;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
 
         // Should add all containers when isStdio=true (including exited)
         EXPECT_EQ(diff.mAdded.size(), 3);
@@ -1402,7 +1402,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() co
         ContainerFilters filters;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
 
         // The removed container should be in mRemoved list
         EXPECT_TRUE(std::find(diff.mRemoved.begin(), diff.mRemoved.end(), "removed1") != diff.mRemoved.end());
@@ -1442,7 +1442,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() co
         ContainerFilters filters;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
 
         // The container should be in mModified list
         EXPECT_EQ(diff.mModified.size(), 1);
@@ -1472,7 +1472,7 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
         ContainerDiff diff;
 
         // Should not crash with empty map
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(diff.mAdded.size(), 0);
         EXPECT_EQ(diff.mRemoved.size(), 0);
         EXPECT_EQ(diff.mModified.size(), 0);
@@ -1490,7 +1490,7 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
         ContainerFilters filters;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
             EXPECT_EQ(diff.mAdded[0]->mID, "minimal1");
@@ -1525,7 +1525,7 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
         ContainerDiff diff;
 
         // With isStdio=false, only running containers should be added
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
         EXPECT_EQ(fullList.size(), 1); // Only running container in fullList
         if (diff.mAdded.size() > 0) {
@@ -1536,7 +1536,7 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
         fullList.clear();
         matchList.clear();
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff2);
         EXPECT_EQ(diff2.mAdded.size(), 3);
         EXPECT_EQ(fullList.size(), 3); // All containers in fullList when isStdio=true
     }
@@ -1560,7 +1560,7 @@ void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
         ContainerDiff diff;
 
         // This should use a snapshot and not be affected by concurrent modifications
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
 
         // Only running containers (even indices: 0, 2, 4, 6, 8) should be added
         EXPECT_EQ(diff.mAdded.size(), 5);
