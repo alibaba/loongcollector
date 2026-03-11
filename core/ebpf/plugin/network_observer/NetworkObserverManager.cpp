@@ -574,23 +574,8 @@ bool NetworkObserverManager::ConsumeLogAggregateTree() { // handler
                 logEvent->SetContent(kLatencyNS.LogKey(), std::to_string(record->GetLatencyNs()));
                 auto timeSpec = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
                 logEvent->SetTimestamp(timeSpec.tv_sec, timeSpec.tv_nsec);
-                auto protocol = record->GetConnection()->GetProtocol();
-                if (protocol == support_proto_e::ProtoHTTP) {
-                    auto* httpRecord = static_cast<HttpRecord*>(record);
-                    logEvent->SetContent(kHTTPMethod.LogKey(), httpRecord->GetMethod());
-                    logEvent->SetContent(kHTTPPath.LogKey(),
-                                         httpRecord->GetRealPath().size() ? httpRecord->GetRealPath()
-                                                                          : httpRecord->GetPath());
-                    logEvent->SetContent(kHTTPVersion.LogKey(), httpRecord->GetProtocolVersion());
-                    logEvent->SetContent(kStatusCode.LogKey(), std::to_string(httpRecord->GetStatusCode()));
-                    logEvent->SetContent(kHTTPReqBody.LogKey(), httpRecord->GetReqBody());
-                    logEvent->SetContent(kHTTPRespBody.LogKey(), httpRecord->GetRespBody());
-                } else if (protocol == support_proto_e::ProtoMySQL) {
-                    auto* mysqlRecord = static_cast<MysqlRecord*>(record);
-                    logEvent->SetContent(kDBSystemName.LogKey(), "mysql");
-                    logEvent->SetContent(kDBResponseStatusCode.LogKey(), std::to_string(mysqlRecord->GetStatusCode()));
-                    logEvent->SetContent(kDBStatement.LogKey(), mysqlRecord->GetSql());
-                }
+                // Fill protocol-specific log fields using polymorphism
+                record->FillProtocolSpecificLogFields(logEvent);
                 LOG_DEBUG(sLogger, ("add one log, log timestamp", timeSpec.tv_sec)("nano", timeSpec.tv_nsec));
                 needPush = true;
             }
@@ -1080,26 +1065,8 @@ bool NetworkObserverManager::ConsumeSpanAggregateTree() { // handler
                 }
 
                 spanEvent->SetName(record->GetSpanName());
-                auto protocol = record->GetConnection()->GetProtocol();
-                if (protocol == support_proto_e::ProtoHTTP) {
-                    auto* httpRecord = static_cast<HttpRecord*>(record);
-                    spanEvent->SetTag(kRpc.SpanKey(), httpRecord->GetConvSpanName());
-                    if (!ct->IsServer()) {
-                        spanEvent->SetTag(kEndpoint.SpanKey(), httpRecord->GetConvSpanName());
-                    }
-                    spanEvent->SetTag(kHTTPReqBody.SpanKey(), httpRecord->GetReqBody());
-                    spanEvent->SetTag(kHTTPRespBody.SpanKey(), httpRecord->GetRespBody());
-                    spanEvent->SetTag(kHTTPReqBodySize.SpanKey(), std::to_string(httpRecord->GetReqBodySize()));
-                    spanEvent->SetTag(kHTTPRespBodySize.SpanKey(), std::to_string(httpRecord->GetRespBodySize()));
-                    spanEvent->SetTag(kHTTPVersion.SpanKey(), httpRecord->GetProtocolVersion());
-                    // spanEvent->SetTag(kHTTPReqHeader.SpanKey(), httpRecord->GetReqHeaderMap());
-                    // spanEvent->SetTag(kHTTPRespHeader.SpanKey(), httpRecord->GetRespHeaders());
-                } else if (protocol == support_proto_e::ProtoMySQL) {
-                    auto* mysqlRecord = static_cast<MysqlRecord*>(record);
-                    spanEvent->SetTag(kDBSystemName.SpanKey(), "mysql");
-                    spanEvent->SetTag(kDBResponseStatusCode.SpanKey(), std::to_string(mysqlRecord->GetStatusCode()));
-                    spanEvent->SetTag(kDBStatement.SpanKey(), mysqlRecord->GetSql());
-                }
+                // Fill protocol-specific span fields using polymorphism
+                record->FillProtocolSpecificSpanFields(spanEvent, ct->IsServer());
 
                 struct timespec startTime = ConvertKernelTimeToUnixTime(record->GetStartTimeStamp());
                 struct timespec endTime = ConvertKernelTimeToUnixTime(record->GetEndTimeStamp());
