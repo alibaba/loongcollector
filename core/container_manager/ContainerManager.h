@@ -90,7 +90,6 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     mutable ReadWriteLock mContainerMapRWLock;
-    mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
