@@ -288,6 +288,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "file security: DynamicAttachBPFObject fail\n");
+                DeletePerfBuffers(arg->mPluginType);
                 return kErrDriverInternal;
             }
             ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
@@ -338,6 +339,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
             if (ret) {
                 EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "network security: DynamicAttachBPFObject fail\n");
+                DeletePerfBuffers(arg->mPluginType);
                 return kErrDriverInternal;
             }
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
@@ -392,6 +394,7 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                 EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                          "process security: DynamicAttachBPFObject fail ret:%d\n",
                          ret);
+                DeletePerfBuffers(arg->mPluginType);
                 return kErrDriverInternal;
             }
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG,
