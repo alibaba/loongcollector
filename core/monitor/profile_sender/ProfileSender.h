@@ -17,12 +17,9 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/Lock.h"
-#include "plugin/flusher/sls/FlusherSLS.h"
-#include "protobuf/sls/sls_logs.pb.h"
 
 namespace logtail {
 
@@ -45,21 +42,14 @@ public:
 
     bool IsProfileData(const std::string& region, const std::string& project, const std::string& logstore);
 
-    virtual void SendToProfileProject(const std::string& region, sls_logs::LogGroup& logGroup);
-
 protected:
     ProfileSender();
     ~ProfileSender() = default;
 
-    FlusherSLS* GetFlusher(const std::string& region);
-
     SpinLock mProfileLock;
     std::string mDefaultProfileProjectName;
     std::string mDefaultProfileRegion;
-    std::unordered_map<std::string, FlusherSLS> mRegionFlusherMap;
-
-private:
-    void SendRunningStatus(sls_logs::LogGroup& logGroup);
+    std::unordered_map<std::string, std::string> mRegionProjectNameMap;
 };
 
 } // namespace logtail

@@ -16,10 +16,14 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <future>
 #include <string>
 
-#include "collection_pipeline/CollectionPipeline.h"
-#include "monitor/Monitor.h"
+#include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
+#include "models/PipelineEventGroup.h"
+#include "monitor/metric_models/SelfMonitorMetricEvent.h"
 
 namespace logtail {
 
@@ -27,6 +31,8 @@ class SelfMonitorServer {
 public:
     SelfMonitorServer(const SelfMonitorServer&) = delete;
     SelfMonitorServer& operator=(const SelfMonitorServer&) = delete;
+    SelfMonitorServer(SelfMonitorServer&&) = delete;
+    SelfMonitorServer& operator=(SelfMonitorServer&&) = delete;
     static SelfMonitorServer* GetInstance();
 
     void Init();
@@ -60,7 +66,7 @@ private:
     // metrics
     void SendMetrics();
     bool ProcessSelfMonitorMetricEvent(SelfMonitorMetricEvent& event, const SelfMonitorMetricRule& rule);
-    void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& events);
+    void PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>&& events);
     void ReadAsPipelineEventGroup(PipelineEventGroup& pipelineEventGroup);
 
     mutable ReadWriteLock mMetricPipelineLock;
@@ -82,6 +88,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputInternalAlarmsUnittest;
     friend class InputInternalMetricsUnittest;
+    friend class AlarmDiskBufferUnittest;
 #endif
 };
 
