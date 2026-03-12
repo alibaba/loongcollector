@@ -47,8 +47,23 @@ public:
 
     // for plugin
     FileDiscoveryConfig GetFileDiscoveryConfig(const std::string& name) const;
-    const std::unordered_map<std::string, FileDiscoveryConfig>& GetAllFileDiscoveryConfigs() const {
-        return mPipelineNameFileDiscoveryConfigsMap;
+    // Read-only locked visitor: multiple threads may call this concurrently.
+    // Callers MUST NOT store the map reference beyond fn.
+    template <typename Func>
+    void WithFileDiscoveryConfigs(Func&& fn) const {
+        ReadLock lock(mReadWriteLock);
+        fn(mPipelineNameFileDiscoveryConfigsMap);
+    }
+    // Mutable locked visitor: exclusive access for mutating FileDiscoveryOptions internal
+    // state (mContainerInfos, mMatchedContainerInfo, etc.).  WriteLock excludes all
+    // concurrent ReadLock/WriteLock holders, so no separate per-field lock is needed.
+    // Lock-order rule: if the caller also needs mContainerMapRWLock, it must be acquired
+    // INSIDE fn (never before calling WithFileDiscoveryConfigsMutable), because
+    // computeMatchedContainersDiff acquires mContainerMapRWLock under this WriteLock.
+    template <typename Func>
+    void WithFileDiscoveryConfigsMutable(Func&& fn) {
+        WriteLock lock(mReadWriteLock);
+        fn(mPipelineNameFileDiscoveryConfigsMap);
     }
     void
     AddFileDiscoveryConfig(const std::string& name, FileDiscoveryOptions* opts, const CollectionPipelineContext* ctx);

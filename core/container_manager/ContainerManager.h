@@ -74,6 +74,7 @@ private:
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
                                  const ContainerFilters& filters,
                                  bool isStdio,
+                                 bool refrashAllContainers,
                                  ContainerDiff& diff);
 
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
@@ -89,7 +90,6 @@ private:
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     mutable ReadWriteLock mContainerMapRWLock;
-    mutable ReadWriteLock mFileDiscoveryConfigsRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 

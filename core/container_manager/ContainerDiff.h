@@ -36,6 +36,8 @@ struct ContainerDiff {
     std::vector<std::pair<std::string, std::shared_ptr<RawContainerInfo>>> mLegacyCheckpointAdded;
     std::vector<std::string> mRemoved;
 
+    bool mRefrashAllContainers;
+
     bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty() && mLegacyCheckpointAdded.empty(); }
 
     std::string ToString() const {
