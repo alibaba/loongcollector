@@ -128,7 +128,11 @@ func (c *ContainerDiscoverManager) fetchCRI() error {
 func (c *ContainerDiscoverManager) StartSyncContainers() {
 	if c.enableCRIDiscover {
 		logger.Debug(context.Background(), "discover manager start sync containers goroutine", "cri")
-		go criRuntimeWrapper.loopSyncContainers()
+		if criRuntimeWrapper.nativeClient != nil {
+			go criRuntimeWrapper.containerdEventListener()
+		} else {
+			go criRuntimeWrapper.loopSyncContainers()
+		}
 	}
 	if c.enableStaticDiscover {
 		logger.Debug(context.Background(), "discover manager start sync containers goroutine", "static")
