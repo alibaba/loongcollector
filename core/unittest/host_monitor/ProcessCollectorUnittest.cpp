@@ -31,11 +31,11 @@ public:
 
 protected:
     void SetUp() override {
-        bfs::create_directories("./12345");
-        bfs::create_directories("./12345/fd");
-        bfs::create_directories("./12345/fd/1");
-        bfs::create_directories("./12345/fd/2");
-        bfs::create_directories("./12345/fd/3");
+        fs::create_directories("./12345");
+        fs::create_directories("./12345/fd");
+        fs::create_directories("./12345/fd/1");
+        fs::create_directories("./12345/fd/2");
+        fs::create_directories("./12345/fd/3");
         // /proc/meminfo
         ofstream ofs_mem("./meminfo", std::ios::trunc);
         ofs_mem << "MemTotal:       31534908 kB\n";
@@ -118,8 +118,8 @@ protected:
     }
 
     void TearDown() override {
-        bfs::remove_all("./12345");
-        bfs::remove("./meminfo");
+        fs::remove_all("./12345");
+        fs::remove("./meminfo");
     }
 };
 

@@ -155,8 +155,6 @@ bool ExtractTopics(const std::string& val,
 
 bool NormalizeTopicRegFormat(std::string& regStr);
 
-void RemoveFilePathTrailingSlash(std::string& path);
-
 bool IsInt(const char* sz);
 
 inline bool IsInt(const std::string& str) {

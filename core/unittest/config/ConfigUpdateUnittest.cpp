@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -64,7 +63,7 @@ protected:
     }
 
     void SetUp() override {
-        filesystem::create_directories(configDir);
+        fs::create_directories(configDir);
         PipelineConfigWatcher::GetInstance()->AddSource(configDir.string());
 #ifdef __ENTERPRISE__
         builtinPipelineCnt = EnterpriseConfigProvider::GetInstance()->GetAllBuiltInPipelineConfigs().size();
@@ -75,7 +74,7 @@ protected:
         PipelineManagerMock::GetInstance()->ClearEnvironment();
         TaskPipelineManager::GetInstance()->ClearEnvironment();
         PipelineConfigWatcher::GetInstance()->ClearEnvironment();
-        filesystem::remove_all(configDir);
+        fs::remove_all(configDir);
     }
 
 private:
@@ -83,15 +82,15 @@ private:
     void GenerateInitialConfigs() const;
 
     size_t builtinPipelineCnt = 0;
-    filesystem::path configDir = "./continuous_pipeline_config";
-    vector<filesystem::path> pipelineConfigPaths = {configDir / "pipeline_invalid_format.json",
-                                                    configDir / "pipeline_invalid_detail.json",
-                                                    configDir / "pipeline_enabled_valid.json",
-                                                    configDir / "pipeline_disabled_valid.json"};
-    vector<filesystem::path> taskConfigPaths = {configDir / "task_invalid_format.json",
-                                                configDir / "task_invalid_detail.json",
-                                                configDir / "task_enabled_valid.json",
-                                                configDir / "task_disabled_valid.json"};
+    fs::path configDir = "./continuous_pipeline_config";
+    vector<fs::path> pipelineConfigPaths = {configDir / "pipeline_invalid_format.json",
+                                            configDir / "pipeline_invalid_detail.json",
+                                            configDir / "pipeline_enabled_valid.json",
+                                            configDir / "pipeline_disabled_valid.json"};
+    vector<fs::path> taskConfigPaths = {configDir / "task_invalid_format.json",
+                                        configDir / "task_invalid_detail.json",
+                                        configDir / "task_enabled_valid.json",
+                                        configDir / "task_disabled_valid.json"};
     const string invalidPipelineConfigWithInvalidFormat = R"({"inputs":{}})";
     const string invalidPipelineConfigWithInvalidDetail = R"(
 {
@@ -274,7 +273,7 @@ void ConfigUpdateUnittest::OnConfigDelete() const {
     APSARA_TEST_EQUAL(1U + builtinPipelineCnt, PipelineManagerMock::GetInstance()->GetAllConfigNames().size());
     APSARA_TEST_EQUAL(1U, TaskPipelineManager::GetInstance()->GetAllPipelineNames().size());
 
-    filesystem::remove_all(configDir);
+    fs::remove_all(configDir);
     auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     APSARA_TEST_TRUE(diff.first.HasDiff());
     APSARA_TEST_TRUE(diff.first.mAdded.empty());
@@ -433,12 +432,12 @@ void ConfigUpdateUnittest::OnConfigUnchanged() const {
     GenerateInitialConfigs();
     // mandatorily overwrite modify time in case of no update when file content remains the same.
     for (const auto& path : pipelineConfigPaths) {
-        filesystem::file_time_type fTime = filesystem::last_write_time(path);
-        filesystem::last_write_time(path, fTime + 1s);
+        fs::file_time_type fTime = fs::last_write_time(path);
+        fs::last_write_time(path, fTime + 1s);
     }
     for (const auto& path : taskConfigPaths) {
-        filesystem::file_time_type fTime = filesystem::last_write_time(path);
-        filesystem::last_write_time(path, fTime + 1s);
+        fs::file_time_type fTime = fs::last_write_time(path);
+        fs::last_write_time(path, fTime + 1s);
     }
     diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
     APSARA_TEST_TRUE(diff.first.HasDiff());

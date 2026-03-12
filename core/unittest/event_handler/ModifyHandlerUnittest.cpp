@@ -16,7 +16,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <filesystem>
 #include <memory>
 #include <string>
 #include <utility>
@@ -79,13 +78,13 @@ protected:
         if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1))
             gRootDir.resize(gRootDir.size() - 1);
         gRootDir += PATH_SEPARATOR + "ModifyHandlerUnittest";
-        filesystem::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
     }
 
     static void TearDownTestCase() {}
 
     void SetUp() override {
-        bfs::create_directories(gRootDir);
+        fs::create_directories(gRootDir);
         // create a file for reader
         std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
         writeLog(logPath, "a sample log\n");
@@ -171,7 +170,7 @@ protected:
         addContainerInfo("1");
     }
     void TearDown() override {
-        filesystem::remove_all(gRootDir);
+        fs::remove_all(gRootDir);
         ProcessQueueManager::GetInstance()->Clear();
     }
 
@@ -349,7 +348,7 @@ void ModifyHandlerUnittest::TestHandleBasicDeleteEvent() {
 
     // Actually delete the file
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
-    bfs::remove(logPath);
+    fs::remove(logPath);
 
     // Send DELETE event
     Event deleteEvent(gRootDir, gLogName, EVENT_DELETE, 0);
@@ -538,10 +537,10 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
     // Delete the physical file
     // In production, Linux marks the fd path with " (deleted)" suffix
     // In test environment, this may not be reliably detected
-    bfs::remove(logPath1);
+    fs::remove(logPath1);
 
     // Check if file still exists on filesystem
-    bool fileExists = bfs::exists(logPath1);
+    bool fileExists = fs::exists(logPath1);
     LOG_INFO(sLogger,
              ("File status", "after deletion")("file exists", fileExists)("fd is open", reader1->IsFileOpened()));
 
@@ -603,7 +602,7 @@ void ModifyHandlerUnittest::TestDoublePopFrontBugWhenFileDeletedWithMultipleRead
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode2.inode);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][1]->GetDevInode().inode, devInode3.inode);
 
-    // In this test scenario, the file was physically deleted via bfs::remove()
+    // In this test scenario, the file was physically deleted via fs::remove()
     // while the file descriptor was still open. With the refactored code, the
     // size > 1 condition is checked first, preventing the double pop_front bug.
     // CloseFilePtr should detect the deletion and return isFileReallyDeleted = true.
@@ -718,9 +717,9 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
 
     // Physically delete the file while fd is still open
     // This simulates the real scenario where file is deleted from filesystem
-    bfs::remove(logPath1);
+    fs::remove(logPath1);
 
-    bool fileExists = bfs::exists(logPath1);
+    bool fileExists = fs::exists(logPath1);
     LOG_INFO(
         sLogger,
         ("File status", "file physically deleted")("file exists", fileExists)("fd is open", reader1->IsFileOpened()));
@@ -745,7 +744,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     // 3. Enter the first branch (not IsFileDeleted branch)
     // 4. ForceReadLogAndPush called
     // 5. RemoveReaderFromArrayAndMap called - reader1 removed from array and map
-    // 6. CloseFilePtr called - detects file was deleted (bfs::remove was called)
+    // 6. CloseFilePtr called - detects file was deleted (fs::remove was called)
     // 7. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 8. reader1 NOT added to mRotatorReaderMap (because file really deleted)
     // Result: reader1 removed completely, only reader2 remains in array
@@ -768,7 +767,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileReallyDeleted() {
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mDevInodeReaderMap.count(devInode2), 1);
     APSARA_TEST_EQUAL_FATAL(handlerPtr->mNameReaderMap[gLogName][0]->GetDevInode().inode, devInode2.inode);
 
-    // In this test scenario, the file was physically deleted via bfs::remove()
+    // In this test scenario, the file was physically deleted via fs::remove()
     // while the file descriptor was still open. This means CloseFilePtr should
     // detect the deletion and return isFileReallyDeleted = true.
     // Therefore, reader1 should NOT be added to mRotatorReaderMap.
@@ -880,7 +879,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithTwoReaders_FileNotDeleted() {
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where DELETE event was received but file still exists
 
-    bool fileExists = bfs::exists(logPath1);
+    bool fileExists = fs::exists(logPath1);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
                  "fd is open", reader1->IsFileOpened())("deleted flag", reader1->IsFileDeleted()));
@@ -1013,9 +1012,9 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
 
     // Physically delete the file while fd is still open
-    bfs::remove(logPath);
+    fs::remove(logPath);
 
-    bool fileExists = bfs::exists(logPath);
+    bool fileExists = fs::exists(logPath);
     LOG_INFO(
         sLogger,
         ("File status", "file physically deleted")("file exists", fileExists)("fd is open", reader->IsFileOpened()));
@@ -1038,7 +1037,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileReallyDeleted() 
     // 1. hasMoreData = false (already at end)
     // 2. readerArrayPtr->size() > 1 is false (size is 1)
     // 3. IsFileDeleted() is true - enter the second branch
-    // 4. CloseFilePtr called - detects file was deleted (bfs::remove was called)
+    // 4. CloseFilePtr called - detects file was deleted (fs::remove was called)
     // 5. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 6. RemoveReaderFromArrayAndMap called - reader removed from array and map
     // Result: reader completely removed from both array and map
@@ -1138,7 +1137,7 @@ void ModifyHandlerUnittest::TestFileDeletedWithSingleReader_FileNotDeleted() {
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where DELETE event was received but file still exists
 
-    bool fileExists = bfs::exists(logPath);
+    bool fileExists = fs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
                  "fd is open", reader->IsFileOpened())("deleted flag", reader->IsFileDeleted()));
@@ -1270,9 +1269,9 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
     APSARA_TEST_TRUE_FATAL(reader->IsFileOpened());
 
     // Physically delete the file while fd is still open
-    bfs::remove(logPath);
+    fs::remove(logPath);
 
-    bool fileExists = bfs::exists(logPath);
+    bool fileExists = fs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file physically deleted")("file exists", fileExists)(
                  "fd is open", reader->IsFileOpened())("container stopped", reader->IsContainerStopped()));
@@ -1298,7 +1297,7 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileReallyDelet
     // 4. IsContainerStopped() is true - enter the third branch
     // 5. UpdateContainerInfo() - still stopped
     // 6. ForceReadLogAndPush called
-    // 7. CloseFilePtr called - detects file was deleted (bfs::remove was called)
+    // 7. CloseFilePtr called - detects file was deleted (fs::remove was called)
     // 8. isFileReallyDeleted = true (file physically deleted from filesystem)
     // 9. RemoveReaderFromArrayAndMap called - reader removed from array and map
     // Result: reader completely removed from both array and map
@@ -1408,7 +1407,7 @@ void ModifyHandlerUnittest::TestContainerStoppedWithSingleReader_FileNotDeleted(
     // DON'T delete the file - it still exists on filesystem
     // This simulates the case where container is stopped but file still exists
 
-    bool fileExists = bfs::exists(logPath);
+    bool fileExists = fs::exists(logPath);
     LOG_INFO(sLogger,
              ("File status", "file NOT physically deleted")("file exists", fileExists)(
                  "fd is open", reader->IsFileOpened())("container stopped", reader->IsContainerStopped()));
@@ -2043,7 +2042,7 @@ void ModifyHandlerUnittest::TestClearReaderWhenFileDeleted() {
     // Actually delete the file while file descriptor is still open
     // This simulates the real scenario where file is deleted but fd is held
     std::string logPath = gRootDir + PATH_SEPARATOR + gLogName;
-    bfs::remove(logPath);
+    fs::remove(logPath);
 
     // Verify reader exists before handling event
     APSARA_TEST_EQUAL_FATAL(mHandlerPtr->mDevInodeReaderMap.size(), 1);

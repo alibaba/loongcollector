@@ -962,8 +962,8 @@ void ConfigManager::GetRelatedConfigs(const std::string& path, std::vector<FileD
 }
 
 
-void ConfigManager::GetContainerStoppedEvents(std::vector<Event*>& eventVec) {
-    ContainerManager::GetInstance()->GetContainerStoppedEvents(eventVec);
+void ConfigManager::GetFileServerContainerStoppedEvents(std::vector<Event*>& eventVec) {
+    ContainerManager::GetInstance()->GetFileServerContainerStoppedEvents(eventVec);
 }
 
 

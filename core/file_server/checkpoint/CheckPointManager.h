@@ -157,7 +157,6 @@ public:
     }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ConfigUpdatorUnittest;
     void RemoveLocalCheckPoint();
     void PrintStatus();
 #endif

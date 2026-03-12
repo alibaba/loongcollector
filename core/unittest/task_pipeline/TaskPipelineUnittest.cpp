@@ -37,7 +37,7 @@ protected:
 
 private:
     const string configName = "test_config";
-    const filesystem::path filepath = "/path/to/test";
+    const fs::path filepath = "/path/to/test";
 };
 
 void TaskPipelineUnittest::OnSuccessfulInit() const {

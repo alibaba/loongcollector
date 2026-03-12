@@ -51,6 +51,8 @@ services:
       - %s:/usr/local/loongcollector/conf/default_flusher.json
       - %s:/usr/local/loongcollector/conf/continuous_pipeline_config/local
       - %s:/usr/local/loongcollector/conf/onetime_pipeline_config/local
+      - %s:/usr/local/loongcollector/log
+      - %s:/usr/local/loongcollector/data
       - /:/logtail_host
       - /var/run/docker.sock:/var/run/docker.sock
       - /sys/:/sys/
@@ -218,6 +220,14 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 			return err
 		}
 	}
+	// 确保日志目录存在，用于挂载 loongcollector 容器内日志到宿主机便于排查
+	if err := os.MkdirAll(config.LogDir, 0750); err != nil {
+		return err
+	}
+	// 确保 data 目录存在，用于挂载 loongcollector 容器内 data 到宿主机便于排查
+	if err := os.MkdirAll(config.DataDir, 0750); err != nil {
+		return err
+	}
 	_, err := os.Stat(config.CaseHome + config.DockerComposeFileName)
 	var bytes []byte
 	if err != nil {
@@ -284,7 +294,7 @@ func (c *ComposeBooter) createComposeFile(ctx context.Context) error {
 // getLogtailpluginConfig find the docker compose configuration of the loongcollector.
 func (c *ComposeBooter) getLogtailpluginConfig() map[string]interface{} {
 	cfg := make(map[string]interface{})
-	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir, config.OnetimeConfigDir)
+	str := fmt.Sprintf(template, config.FlusherFile, config.ConfigDir, config.OnetimeConfigDir, config.LogDir, config.DataDir)
 	if err := yaml.Unmarshal([]byte(str), &cfg); err != nil {
 		panic(err)
 	}

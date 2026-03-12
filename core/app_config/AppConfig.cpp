@@ -20,7 +20,6 @@
 #include <unordered_set>
 #include <utility>
 
-#include "boost/filesystem.hpp"
 #include "json/value.h"
 
 #include "RuntimeUtil.h"
@@ -29,7 +28,6 @@
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
-#include "common/version.h"
 #include "config/InstanceConfigManager.h"
 #include "config/watcher/InstanceConfigWatcher.h"
 #include "constants/Constants.h"
@@ -37,7 +35,6 @@
 #include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "monitor/Monitor.h"
 #ifdef __ENTERPRISE__
 #include "config/provider/EnterpriseConfigProvider.h"
 #endif
@@ -51,7 +48,6 @@ DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", true);
 #else
 DEFINE_FLAG_BOOL(logtail_mode, "logtail mode", false);
 #endif
-DEFINE_FLAG_INT32(max_buffer_num, "max size", 40);
 DEFINE_FLAG_INT32(default_send_byte_per_sec, "the max send speed per sec, replay buffer thread", 2 * 1024 * 1024);
 DEFINE_FLAG_INT32(default_buffer_file_num, "how many buffer files in default", 50);
 DEFINE_FLAG_INT32(default_local_file_size, "default size of one buffer file", 20 * 1024 * 1024);
@@ -121,16 +117,9 @@ DECLARE_FLAG_INT32(ignore_file_modify_timeout);
 DEFINE_FLAG_STRING(host_path_blacklist, "host path matches substring in blacklist will be ignored", "");
 DEFINE_FLAG_STRING(ALIYUN_LOG_FILE_TAGS, "default env file key to load tags", "");
 DEFINE_FLAG_STRING(LOONG_FILE_TAGS, "default env file key to load tags", "");
-DEFINE_FLAG_INT32(max_holded_data_size,
-                  "for every id and metric name, the max data size can be holded in memory (default 512KB)",
-                  512 * 1024);
-DEFINE_FLAG_STRING(metrics_report_method,
-                   "method to report metrics (default none, means logtail will not report metrics)",
-                   "sls");
 
 DEFINE_FLAG_STRING(operator_service, "loong collector operator service", "");
 DEFINE_FLAG_INT32(operator_service_port, "loong collector operator service port", 8888);
-DEFINE_FLAG_INT32(k8s_meta_service_port, "loong collector operator service port", 9000);
 
 DEFINE_FLAG_STRING(k8s_metadata_server_name,
                    "loong collector singleton service for k8s metadata server",
@@ -142,8 +131,6 @@ DEFINE_FLAG_STRING(app_info_file, "", "app_info.json");
 DEFINE_FLAG_STRING(crash_stack_file_name, "crash stack back trace file name", "backtrace.dat");
 DEFINE_FLAG_STRING(local_event_data_file_name, "local event data file name", "local_event.json");
 DEFINE_FLAG_STRING(inotify_watcher_dirs_dump_filename, "", "inotify_watcher_dirs");
-DEFINE_FLAG_STRING(logtail_snapshot_dir, "snapshot dir on local disk", "snapshot");
-DEFINE_FLAG_STRING(logtail_profile_snapshot, "reader profile on local disk", "logtail_profile_snapshot");
 DEFINE_FLAG_STRING(ilogtail_config_env_name, "config file path", "ALIYUN_LOGTAIL_CONFIG");
 
 #if defined(__linux__)
@@ -151,10 +138,6 @@ DEFINE_FLAG_STRING(check_point_filename, "", "/tmp/logtail_check_point");
 #elif defined(_MSC_VER)
 DEFINE_FLAG_STRING(check_point_filename, "", "C:\\LogtailData\\logtail_check_point");
 #endif
-
-DEFINE_FLAG_STRING(sls_observer_ebpf_host_path,
-                   "the backup real host path for store libebpf.so",
-                   "/etc/ilogtail/ebpf/");
 
 namespace logtail {
 const int32_t kDefaultMaxSendBytePerSec = 25 * 1024 * 1024; // the max send speed per sec, realtime thread
@@ -166,9 +149,6 @@ const double GLOBAL_CONCURRENCY_FREE_PERCENTAGE_FOR_ONE_REGION = 0.5;
 const int32_t MIN_SEND_REQUEST_CONCURRENCY = 15;
 // 单地域并发度最大值
 const int32_t MAX_SEND_REQUEST_CONCURRENCY = 80;
-// 并发度统计数量&&时间间隔
-const uint32_t CONCURRENCY_STATISTIC_THRESHOLD = 10;
-const uint32_t CONCURRENCY_STATISTIC_INTERVAL_THRESHOLD_SECONDS = 3;
 // 并发度不回退百分比阈值
 const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE = 10;
 // 并发度慢回退百分比阈值
@@ -496,14 +476,6 @@ string GetAgentLogName() {
 #endif
 }
 
-string GetObserverEbpfHostPath() {
-    if (BOOL_FLAG(logtail_mode)) {
-        return STRING_FLAG(sls_observer_ebpf_host_path);
-    } else {
-        return GetAgentDataDir();
-    }
-}
-
 string GetSendBufferFileNamePrefix() {
     if (BOOL_FLAG(logtail_mode)) {
         return "logtail_buffer_file_";
@@ -522,10 +494,10 @@ string GetLegacyUserLocalConfigFilePath() {
 
 string GetExactlyOnceCheckpoint() {
     if (BOOL_FLAG(logtail_mode)) {
-        auto fp = boost::filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
+        auto fp = filesystem::path(AppConfig::GetInstance()->GetLoongcollectorConfDir());
         return (fp / "checkpoint_v2").string();
     } else {
-        auto fp = boost::filesystem::path(GetAgentDataDir());
+        auto fp = filesystem::path(GetAgentDataDir());
         return (fp / "exactly_once_checkpoint").string();
     }
 }
@@ -606,22 +578,16 @@ std::string GetPluginBaseName() {
 AppConfig::AppConfig() {
     LOG_INFO(sLogger, ("AppConfig AppConfig", "success"));
     SetIlogtailConfigJson("");
-    // mStreamLogAddress = "0.0.0.0";
-    // mIsOldPubRegion = false;
-    // mOpenStreamLog = false;
     mSendRequestConcurrency = INT32_FLAG(send_request_concurrency);
     mProcessThreadCount = INT32_FLAG(process_thread_count);
-    // mMappingConfigPath = STRING_FLAG(default_mapping_config_path);
     mMachineCpuUsageThreshold = DOUBLE_FLAG(default_machine_cpu_usage_threshold);
     mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
     mScaledCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
     mMemUsageUpLimit = INT64_FLAG(memory_usage_up_limit);
     mResourceAutoScale = BOOL_FLAG(default_resource_auto_scale);
     mInputFlowControl = BOOL_FLAG(default_input_flow_control);
-    // mDefaultRegion = STRING_FLAG(default_region_name);
     mAcceptMultiConfigFlag = BOOL_FLAG(default_accept_multi_config);
     mMaxMultiConfigSize = INT32_FLAG(max_multi_config_size);
-    // mUserConfigPath = STRING_FLAG(user_log_config);
     mIgnoreDirInodeChanged = false;
     mLogParseAlarmFlag = true;
     mNoInotify = false;
@@ -915,16 +881,6 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     else
         mLocalFileSize = INT32_FLAG(default_local_file_size);
 
-    if (confJson.isMember("buffer_map_size") && confJson["buffer_map_size"].isInt())
-        mMaxHoldedDataSize = confJson["buffer_map_size"].asInt();
-    else
-        mMaxHoldedDataSize = INT32_FLAG(max_holded_data_size);
-
-    if (confJson.isMember("buffer_map_num") && confJson["buffer_map_num"].isInt())
-        mMaxBufferNum = confJson["buffer_map_num"].asInt();
-    else
-        mMaxBufferNum = INT32_FLAG(max_buffer_num);
-
     if (confJson.isMember("send_request_concurrency") && confJson["send_request_concurrency"].isInt())
         mSendRequestConcurrency = confJson["send_request_concurrency"].asInt();
     else
@@ -1030,55 +986,12 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
         mIgnoreDirInodeChanged = confJson["ignore_dir_inode_changed"].asBool();
     }
 
-    // LoadStringParameter(mUserConfigPath, confJson, "user_config_file_path", "ALIYUN_LOGTAIL_USER_CONIFG_PATH");
-
-    // LoadStringParameter(
-    //     mUserLocalConfigPath, confJson, "user_local_config_filename", "ALIYUN_LOGTAIL_USER_LOCAL_CONFIG_FILENAME");
-
     LoadBooleanParameter(
         BOOL_FLAG(ilogtail_discard_old_data), confJson, "discard_old_data", "ALIYUN_LOGTAIL_DISCARD_OLD_DATA");
 
-    // if (confJson.isMember("container_mount_path") && confJson["container_mount_path"].isString()) {
-    //     mContainerMountConfigPath = confJson["container_mount_path"].asString();
-    // } else {
-    //     mContainerMountConfigPath = GetProcessExecutionDir() + STRING_FLAG(default_container_mount_path);
-    // }
-
     LoadStringParameter(mConfigIP, confJson, "working_ip", "ALIYUN_LOGTAIL_WORKING_IP");
 
-    // LoadStringParameter(mCustomizedConfigIP, confJson, "customized_config_ip",
-    // "ALIYUN_LOGTAIL_CUSTOMIZED_CONFIG_IP");
-
     LoadStringParameter(mConfigHostName, confJson, "working_hostname", "ALIYUN_LOGTAIL_WORKING_HOSTNAME");
-
-    // // try to get zone env name from conf json
-    // if (confJson.isMember("alipay_zone_env_name") && confJson["alipay_zone_env_name"].isString()) {
-    //     STRING_FLAG(alipay_zone_env_name) = confJson["alipay_zone_env_name"].asString();
-    // }
-    // // get zone info from env, for ant
-    // do {
-    //     if (!STRING_FLAG(alipay_zone_env_name).empty()) {
-    //         const char* alipayZone = getenv(STRING_FLAG(alipay_zone_env_name).c_str());
-    //         if (alipayZone != NULL) {
-    //             mAlipayZone = alipayZone;
-    //             break;
-    //         }
-    //     }
-    //     const char* alipayZone = getenv(STRING_FLAG(alipay_app_zone).c_str());
-    //     if (alipayZone != NULL) {
-    //         mAlipayZone = alipayZone;
-    //         break;
-    //     }
-    //     alipayZone = getenv(STRING_FLAG(alipay_zone).c_str());
-    //     if (alipayZone != NULL) {
-    //         mAlipayZone = alipayZone;
-    //         break;
-    //     }
-    // } while (false);
-
-    // if (confJson.isMember("alipay_zone") && confJson["alipay_zone"].isString()) {
-    //     mAlipayZone = confJson["alipay_zone"].asString();
-    // }
 
     if (confJson.isMember("system_boot_time") && confJson["system_boot_time"].isInt()) {
         mSystemBootTime = confJson["system_boot_time"].asInt();
@@ -1158,25 +1071,10 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                        "check_point_dump_interval",
                        "ALIYUN_LOGTAIL_CHECKPOINT_DUMP_INTERVAL");
 
-    // if (confJson.isMember("rapid_retry_update_config") && confJson["rapid_retry_update_config"].isBool()) {
-    //     BOOL_FLAG(rapid_retry_update_config) = confJson["rapid_retry_update_config"].asBool();
-    //     LOG_INFO(sLogger, ("set rapid_retry_update_config", BOOL_FLAG(rapid_retry_update_config)));
-    // }
-
     if (confJson.isMember("check_profile_region") && confJson["check_profile_region"].isBool()) {
         BOOL_FLAG(check_profile_region) = confJson["check_profile_region"].asBool();
         LOG_INFO(sLogger, ("set check_profile_region", BOOL_FLAG(check_profile_region)));
     }
-
-    // if (confJson.isMember("enable_collection_mark") && confJson["enable_collection_mark"].isBool()) {
-    //     BOOL_FLAG(enable_collection_mark) = confJson["enable_collection_mark"].asBool();
-    //     LOG_INFO(sLogger, ("set enable_collection_mark", BOOL_FLAG(enable_collection_mark)));
-    // }
-
-    // LoadBooleanParameter(BOOL_FLAG(enable_collection_mark),
-    //                      confJson,
-    //                      "enable_env_ref_in_config",
-    //                      "ALIYUN_LOGTAIL_ENABLE_ENV_REF_IN_CONFIG");
 
     LoadBooleanParameter(
         mEnableHostIPReplace, confJson, "enable_host_ip_replace", "ALIYUN_LOGTAIL_ENABLE_HOST_IP_REPLACE");
@@ -1662,9 +1560,6 @@ bool AppConfig::IsInInotifyBlackList(const std::string& path) const {
     return rst;
 }
 
-// TODO: Use Boost instead.
-// boost::filesystem::directory_iterator end;
-// try { boost::filesystem::directory_iterator(path); } catch (...) { // failed } // OK
 void AppConfig::SetLoongcollectorConfDir(const std::string& dirPath) {
     mLoongcollectorConfDir = dirPath;
     if (dirPath.back() != '/' && dirPath.back() != '\\') {
@@ -1696,22 +1591,6 @@ void AppConfig::SetLoongcollectorConfDir(const std::string& dirPath) {
         mLoongcollectorConfDir = GetAgentConfDir();
     }
 #endif
-
-    // Update related configurations (local user config).
-    // if (STRING_FLAG(ilogtail_local_config).empty()) {
-    //     LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config must be non-empty"));
-    //     STRING_FLAG(ilogtail_local_config) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_FLAG_VALUE;
-    // }
-    // if (STRING_FLAG(ilogtail_local_config_dir).empty()) {
-    //     LOG_WARNING(sLogger, ("flag error", "ilogtail_local_config_dir must be non-empty"));
-    //     STRING_FLAG(ilogtail_local_config_dir) = DEFAULT_ILOGTAIL_LOCAL_CONFIG_DIR_FLAG_VALUE;
-    // }
-    // mUserLocalConfigPath = AbsolutePath(STRING_FLAG(ilogtail_local_config), mLogtailSysConfDir);
-    // mUserLocalConfigDirPath = AbsolutePath(STRING_FLAG(ilogtail_local_config_dir), mLogtailSysConfDir) +
-    // PATH_SEPARATOR; mUserLocalYamlConfigDirPath
-    //     = AbsolutePath(STRING_FLAG(ilogtail_local_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
-    // mUserRemoteYamlConfigDirPath
-    //     = AbsolutePath(STRING_FLAG(ilogtail_remote_yaml_config_dir), mLogtailSysConfDir) + PATH_SEPARATOR;
     LOG_INFO(sLogger, ("set " + GetAgentName() + " conf dir", mLoongcollectorConfDir));
 }
 

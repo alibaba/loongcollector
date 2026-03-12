@@ -626,9 +626,9 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormat() const {
     EXPECT_FALSE(foundImageName);
 
     // Verify config diffs are created
-    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find("##1.0##config1")
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(std::string("##1.0##config1"), size_t(0)))
                 != containerManager.mConfigContainerDiffMap.end());
-    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find("##1.0##config2")
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(std::string("##1.0##config2"), size_t(0)))
                 != containerManager.mConfigContainerDiffMap.end());
 }
 
@@ -709,10 +709,10 @@ void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithTags() c
     EXPECT_TRUE(foundContainerIp);
     EXPECT_TRUE(foundPodUid);
 
-    // Verify config diff is created
-    EXPECT_TRUE(
-        containerManager.mConfigContainerDiffMap.find("##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test")
-        != containerManager.mConfigContainerDiffMap.end());
+    // Verify config diff is created (key is pair<configName, inputIndex>, inputIndex defaults to 0)
+    EXPECT_TRUE(containerManager.mConfigContainerDiffMap.find(std::make_pair(
+                    std::string("##1.0##k8s-log-c84f2ea7e4b1641c882a67ea014247720$file-test"), size_t(0)))
+                != containerManager.mConfigContainerDiffMap.end());
 }
 
 void ContainerManagerUnittest::TestLoadContainerInfoFromDetailFormatWithMounts() const {
@@ -1587,9 +1587,9 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
     // Test scenarios:
     // 1. Thread 1: Continuously calls refreshAllContainersSnapshot() and incrementallyUpdateContainersSnapshot()
     //              (simulates real Polling thread behavior, updates mContainerMap with new RawContainerInfo)
-    // 2. Thread 2 (optional): Calls CheckContainerDiffForAllConfig() and ApplyContainerDiffs()
+    // 2. Thread 2 (optional): Calls CheckFileServerContainerDiffs() and ApplyFileServerContainerDiffs()
     //              (simulates FileServer::Resume() behavior, can trigger GetCustomExternalTags crash)
-    // 3. Thread 3 (optional): Calls GetContainerStoppedEvents()
+    // 3. Thread 3 (optional): Calls GetFileServerContainerStoppedEvents()
     //              (tests mRawContainerInfo access with proper locking)
     //
     // This test can expose race conditions including:
@@ -1600,7 +1600,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
     // - Null pointer dereference if mRawContainerInfo is not checked
     ContainerManager containerManager;
 
-    // Set running state so CheckContainerDiffForAllConfig can execute
+    // Set running state so CheckFileServerContainerDiffs can execute
     containerManager.mIsRunning = true;
 
     // Initialize with some containers
@@ -1612,7 +1612,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
         containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
     }
 
-    // Setup FileServer with a test config to enable CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    // Setup FileServer with a test config to enable CheckFileServerContainerDiffs and ApplyFileServerContainerDiffs
     ctx.SetConfigName(testName);
 
     // Create FileDiscoveryOptions with container discovery enabled
@@ -1640,7 +1640,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
             return true;
         });
 
-    // Add config to FileServer so CheckContainerDiffForAllConfig can find it
+    // Add config to FileServer so CheckFileServerContainerDiffs can find it
     FileServer::GetInstance()->AddFileDiscoveryConfig(testName, &mDiscoveryOpts, &ctx);
 
     std::atomic<bool> testRunning{true};
@@ -1722,7 +1722,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
         }
     };
 
-    // Thread 2: Continuously call CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    // Thread 2: Continuously call CheckFileServerContainerDiffs and ApplyFileServerContainerDiffs
     // This simulates the real FileServer::Resume() behavior
     auto readThread = [&]() {
         // Random initial delay (0-50ms) to vary thread interleaving
@@ -1731,13 +1731,13 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
         while (testRunning) {
             try {
                 // Check container diffs for all configs (fills mConfigContainerDiffMap)
-                containerManager.CheckContainerDiffForAllConfig();
+                containerManager.CheckFileServerContainerDiffs();
 
                 // Apply the diffs (reads and clears mConfigContainerDiffMap)
                 // This is where GetCustomExternalTags gets called and may crash
                 // When thread 1 replaces RawContainerInfo in mContainerMap, the old info's
                 // mEnv and mK8sInfo.mLabels may be accessed here causing use-after-free
-                containerManager.ApplyContainerDiffs();
+                containerManager.ApplyFileServerContainerDiffs();
 
                 iterationCount++;
 
@@ -1749,7 +1749,7 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
         }
     };
 
-    // Thread 3: Call GetContainerStoppedEvents to test concurrent access to mRawContainerInfo
+    // Thread 3: Call GetFileServerContainerStoppedEvents to test concurrent access to mRawContainerInfo
     // This tests the fix for accessing mRawContainerInfo->mID without proper locking
 
 
@@ -1767,10 +1767,10 @@ void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2
                     containerManager.mStoppedContainerIDs.push_back("dynamic_" + std::to_string(counter + 100));
                 }
 
-                // Call GetContainerStoppedEvents which accesses mRawContainerInfo
+                // Call GetFileServerContainerStoppedEvents which accesses mRawContainerInfo
                 // This method was also fixed in commit e0b33e88 to add proper locking
                 std::vector<Event*> events;
-                containerManager.GetContainerStoppedEvents(events);
+                containerManager.GetFileServerContainerStoppedEvents(events);
 
                 // Clean up events
                 for (auto* event : events) {
@@ -1846,13 +1846,13 @@ void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T2T3() {
 
 void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
     // This test verifies that after multiple refreshAllContainersSnapshot and incrementallyUpdateContainersSnapshot
-    // operations, CheckContainerDiffForAllConfig and ApplyContainerDiffs produce correct results.
+    // operations, CheckFileServerContainerDiffs and ApplyFileServerContainerDiffs produce correct results.
     //
     // Test flow:
     // 1. Setup FileServer with test config
     // 2. Execute refreshAllContainersSnapshot multiple times to simulate container updates
     // 3. Execute incrementallyUpdateContainersSnapshot to simulate incremental updates
-    // 4. Call CheckContainerDiffForAllConfig and ApplyContainerDiffs multiple times
+    // 4. Call CheckFileServerContainerDiffs and ApplyFileServerContainerDiffs multiple times
     // 5. Verify the FileDiscoveryOptions container info is correctly updated after each round
 
     const std::string testName = "test_sequential_diff_apply";
@@ -1909,7 +1909,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder1.str());
     containerManager.refreshAllContainersSnapshot();
-    containerManager.mLastFullUpdateTime = 100; // Manually set timestamp for predictable testing
+    containerManager.mLastFullUpdateTime.store(100); // Manually set timestamp for predictable testing
 
     // Verify mContainerMap has 5 containers
     {
@@ -1919,14 +1919,14 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Check diffs and apply (Round 1)
     mDiscoveryOpts.SetLastContainerUpdateTime(50); // Older than mLastFullUpdateTime
-    bool hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-    EXPECT_TRUE(hasUpdate) << "First CheckContainerDiffForAllConfig should detect new containers";
+    bool hasUpdate = containerManager.CheckFileServerContainerDiffs();
+    EXPECT_TRUE(hasUpdate) << "First CheckFileServerContainerDiffs should detect new containers";
 
-    auto diff = containerManager.mConfigContainerDiffMap[testName];
+    auto diff = containerManager.mConfigContainerDiffMap[std::make_pair(testName, 0)];
     EXPECT_TRUE(diff != nullptr);
     EXPECT_EQ(diff->mAdded.size(), 5) << "Should have 5 added containers in first round";
 
-    containerManager.ApplyContainerDiffs();
+    containerManager.ApplyFileServerContainerDiffs();
 
     // Verify FileDiscoveryOptions container info was populated
     auto containerInfo = mDiscoveryOpts.GetContainerInfo();
@@ -1952,7 +1952,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder1.str());
     containerManager.incrementallyUpdateContainersSnapshot();
-    containerManager.mLastIncrementalUpdateTime = 200; // Manually set timestamp
+    containerManager.mLastIncrementalUpdateTime.store(200); // Manually set timestamp
 
     // Verify incremental update in mContainerMap
     {
@@ -1965,10 +1965,10 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Check diffs and apply (Round 2)
     mDiscoveryOpts.SetLastContainerUpdateTime(150); // Between mLastFullUpdateTime and mLastIncrementalUpdateTime
-    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-    EXPECT_TRUE(hasUpdate) << "Second CheckContainerDiffForAllConfig should detect updates";
+    hasUpdate = containerManager.CheckFileServerContainerDiffs();
+    EXPECT_TRUE(hasUpdate) << "Second CheckFileServerContainerDiffs should detect updates";
 
-    diff = containerManager.mConfigContainerDiffMap[testName];
+    diff = containerManager.mConfigContainerDiffMap[std::make_pair(testName, 0)];
     EXPECT_TRUE(diff != nullptr);
     EXPECT_EQ(diff->mAdded.size(), 1) << "Should have 1 added container (container_5)";
     EXPECT_EQ(diff->mModified.size(), 1) << "Should have 1 modified container (container_0)";
@@ -1981,7 +1981,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
         EXPECT_EQ(diff->mModified[0]->mLogPath, "/var/log/container_0_updated");
     }
 
-    containerManager.ApplyContainerDiffs();
+    containerManager.ApplyFileServerContainerDiffs();
 
     // Verify state after second round
     containerInfo = mDiscoveryOpts.GetContainerInfo();
@@ -2006,7 +2006,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder2.str());
     containerManager.incrementallyUpdateContainersSnapshot();
-    containerManager.mLastIncrementalUpdateTime = 300; // Manually set timestamp
+    containerManager.mLastIncrementalUpdateTime.store(300); // Manually set timestamp
 
     // Verify deletions in mContainerMap
     {
@@ -2018,14 +2018,14 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Check diffs and apply (Round 3)
     mDiscoveryOpts.SetLastContainerUpdateTime(250); // Between 200 and 300
-    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-    EXPECT_TRUE(hasUpdate) << "Third CheckContainerDiffForAllConfig should detect deletions";
+    hasUpdate = containerManager.CheckFileServerContainerDiffs();
+    EXPECT_TRUE(hasUpdate) << "Third CheckFileServerContainerDiffs should detect deletions";
 
-    diff = containerManager.mConfigContainerDiffMap[testName];
+    diff = containerManager.mConfigContainerDiffMap[std::make_pair(testName, 0)];
     EXPECT_TRUE(diff != nullptr);
     EXPECT_EQ(diff->mRemoved.size(), 2) << "Should have 2 removed containers (container_1, container_2)";
 
-    containerManager.ApplyContainerDiffs();
+    containerManager.ApplyFileServerContainerDiffs();
 
     // Verify final state
     containerInfo = mDiscoveryOpts.GetContainerInfo();
@@ -2077,7 +2077,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder3.str());
     containerManager.refreshAllContainersSnapshot();
-    containerManager.mLastFullUpdateTime = 400; // Manually set timestamp
+    containerManager.mLastFullUpdateTime.store(400); // Manually set timestamp
 
     // Verify mContainerMap has 9 containers
     {
@@ -2093,15 +2093,15 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // Check diffs and apply (Round 4)
     mDiscoveryOpts.SetLastContainerUpdateTime(350); // Older than mLastFullUpdateTime
-    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-    EXPECT_TRUE(hasUpdate) << "Fourth CheckContainerDiffForAllConfig should detect full refresh changes";
+    hasUpdate = containerManager.CheckFileServerContainerDiffs();
+    EXPECT_TRUE(hasUpdate) << "Fourth CheckFileServerContainerDiffs should detect full refresh changes";
 
-    diff = containerManager.mConfigContainerDiffMap[testName];
+    diff = containerManager.mConfigContainerDiffMap[std::make_pair(testName, 0)];
     EXPECT_TRUE(diff != nullptr);
     // Full refresh resets baseline, so all 9 containers are treated as "added"
     EXPECT_EQ(diff->mAdded.size(), 9) << "Should have 9 added containers (full refresh resets baseline)";
 
-    containerManager.ApplyContainerDiffs();
+    containerManager.ApplyFileServerContainerDiffs();
 
     // Verify FileDiscoveryOptions has 9 containers
     containerInfo = mDiscoveryOpts.GetContainerInfo();
@@ -2153,8 +2153,8 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
     // ===== Round 5: Verify no changes when config is up-to-date =====
     mDiscoveryOpts.SetLastContainerUpdateTime(450); // Newer than mLastFullUpdateTime
-    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
-    EXPECT_FALSE(hasUpdate) << "CheckContainerDiffForAllConfig should not detect updates when config is up-to-date";
+    hasUpdate = containerManager.CheckFileServerContainerDiffs();
+    EXPECT_FALSE(hasUpdate) << "CheckFileServerContainerDiffs should not detect updates when config is up-to-date";
 
     // Cleanup
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);

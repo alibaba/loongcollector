@@ -18,7 +18,6 @@
 
 #include "boost/algorithm/string.hpp"
 #include "boost/exception/all.hpp"
-#include "boost/filesystem.hpp"
 
 #include "logger/Logger.h"
 #if defined(_MSC_VER)
@@ -387,20 +386,6 @@ bool NormalizeTopicRegFormat(std::string& topicFormat) {
         return false;
     }
     return true;
-}
-
-bool isRootDirectory(const std::string& pathStr) {
-    boost::filesystem::path path(pathStr);
-    return path.has_root_directory() && !path.has_parent_path();
-}
-
-void RemoveFilePathTrailingSlash(std::string& filePath) {
-    if (isRootDirectory(filePath)) {
-        return;
-    }
-    boost::filesystem::path path(filePath);
-    path.remove_trailing_separator();
-    filePath = path.string();
 }
 
 bool IsInt(const char* sz) {

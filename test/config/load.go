@@ -32,6 +32,7 @@ var (
 	ConfigDir        string
 	OnetimeConfigDir string
 	LogDir           string
+	DataDir          string
 )
 
 // Load E2E engine config and define the global variables.
@@ -47,6 +48,7 @@ func Load(path string) error {
 	reportDir := root + "/report/"
 	EngineLogFile = reportDir + CaseName + "_engine.log"
 	LogDir = reportDir + CaseName + "_log"
+	DataDir = reportDir + CaseName + "_data"
 
 	FlusherFile = reportDir + CaseName + "default_flusher.json"
 	return nil

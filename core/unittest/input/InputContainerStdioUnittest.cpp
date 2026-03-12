@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -89,9 +88,9 @@ void InputContainerStdioUnittest::TestTryGetRealPath() {
     STRING_FLAG(default_container_host_path) = "/tmp/home/admin";
 
     // 删除 rootDirectory 目录
-    std::filesystem::remove_all(rootDirectory);
+    fs::remove_all(rootDirectory);
     // 删除 STRING_FLAG(default_container_host_path)
-    std::filesystem::remove_all(STRING_FLAG(default_container_host_path));
+    fs::remove_all(STRING_FLAG(default_container_host_path));
 
     // 创建 /tmp/home/admin/test/test/test 目录
     create_directory(rootDirectory + path);

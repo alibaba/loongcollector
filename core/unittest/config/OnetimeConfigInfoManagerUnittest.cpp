@@ -29,12 +29,12 @@ public:
     void TestDumpCheckpointFile() const;
 
 protected:
-    static void SetUpTestCase() { sManager->mCheckpointFilePath = filesystem::path(".") / "onetime_config_info.json"; }
+    static void SetUpTestCase() { sManager->mCheckpointFilePath = fs::path(".") / "onetime_config_info.json"; }
 
     void TearDown() override {
         sManager->Clear();
         error_code ec;
-        filesystem::remove(sManager->mCheckpointFilePath, ec);
+        fs::remove(sManager->mCheckpointFilePath, ec);
     }
 
 private:
@@ -50,9 +50,9 @@ void OnetimeConfigInfoManagerUnittest::TestLoadCheckpointFile() const {
     }
     {
         // invalid checkpoint file
-        filesystem::create_directories("onetime_config_info.json");
+        fs::create_directories("onetime_config_info.json");
         APSARA_TEST_FALSE(sManager->LoadCheckpointFile());
-        filesystem::remove_all("onetime_config_info.json");
+        fs::remove_all("onetime_config_info.json");
     }
     {
         // empty content
@@ -167,37 +167,22 @@ void OnetimeConfigInfoManagerUnittest::TestGetOnetimeConfigStatusFromCheckpoint(
 }
 
 void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
-    filesystem::create_directories("test_config");
+    fs::create_directories("test_config");
     { ofstream fout("test_config/test_config_1.json"); }
     { ofstream fout("test_config/test_config_2.json"); }
 
     // restart
-    APSARA_TEST_TRUE(sManager->UpdateConfig("test_config_1",
-                                            ConfigType::Collection,
-                                            filesystem::path("test_config/test_config_1.json"),
-                                            1,
-                                            1000000000,
-                                            0,
-                                            3600));
-    APSARA_TEST_TRUE(sManager->UpdateConfig("test_config_2",
-                                            ConfigType::Collection,
-                                            filesystem::path("test_config/test_config_2.json"),
-                                            2,
-                                            1500000000,
-                                            0,
-                                            1800));
-    APSARA_TEST_TRUE(sManager->UpdateConfig("test_config_3",
-                                            ConfigType::Collection,
-                                            filesystem::path("test_config/test_config_3.json"),
-                                            3,
-                                            4000000000,
-                                            0,
-                                            7200));
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
+        "test_config_1", ConfigType::Collection, fs::path("test_config/test_config_1.json"), 1, 1000000000, 0, 3600));
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
+        "test_config_2", ConfigType::Collection, fs::path("test_config/test_config_2.json"), 2, 1500000000, 0, 1800));
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
+        "test_config_3", ConfigType::Collection, fs::path("test_config/test_config_3.json"), 3, 4000000000, 0, 7200));
     APSARA_TEST_EQUAL(3U, sManager->mConfigInfoMap.size());
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_1");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
-        APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
+        APSARA_TEST_EQUAL(fs::path("test_config/test_config_1.json"), info.mFilepath);
         APSARA_TEST_EQUAL(1U, info.mConfigHash);
         APSARA_TEST_EQUAL(1000000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
@@ -206,7 +191,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_2");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
-        APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_2.json"), info.mFilepath);
+        APSARA_TEST_EQUAL(fs::path("test_config/test_config_2.json"), info.mFilepath);
         APSARA_TEST_EQUAL(2U, info.mConfigHash);
         APSARA_TEST_EQUAL(1500000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
@@ -215,7 +200,7 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_3");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
-        APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_3.json"), info.mFilepath);
+        APSARA_TEST_EQUAL(fs::path("test_config/test_config_3.json"), info.mFilepath);
         APSARA_TEST_EQUAL(3U, info.mConfigHash);
         APSARA_TEST_EQUAL(4000000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
@@ -223,19 +208,14 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
     }
 
     // update
-    APSARA_TEST_TRUE(sManager->UpdateConfig("test_config_1",
-                                            ConfigType::Collection,
-                                            filesystem::path("test_config/test_config_1.json"),
-                                            1,
-                                            1200000000,
-                                            0,
-                                            3600));
+    APSARA_TEST_TRUE(sManager->UpdateConfig(
+        "test_config_1", ConfigType::Collection, fs::path("test_config/test_config_1.json"), 1, 1200000000, 0, 3600));
     APSARA_TEST_FALSE(sManager->RemoveConfig("test_config_4"));
     APSARA_TEST_EQUAL(3U, sManager->mConfigInfoMap.size());
     {
         const auto& info = sManager->mConfigInfoMap.at("test_config_1");
         APSARA_TEST_EQUAL(ConfigType::Collection, info.mType);
-        APSARA_TEST_EQUAL(filesystem::path("test_config/test_config_1.json"), info.mFilepath);
+        APSARA_TEST_EQUAL(fs::path("test_config/test_config_1.json"), info.mFilepath);
         APSARA_TEST_EQUAL(1U, info.mConfigHash);
         APSARA_TEST_EQUAL(1200000000U, info.mExpireTime);
         APSARA_TEST_EQUAL(0U, info.mInputsHash);
@@ -243,13 +223,13 @@ void OnetimeConfigInfoManagerUnittest::TestUpdateConfig() const {
     }
 
     // delete timeout config
-    filesystem::remove("test_config/test_config_1.json");
+    fs::remove("test_config/test_config_1.json");
     sManager->DeleteTimeoutConfigFiles();
     APSARA_TEST_EQUAL(1U, sManager->mConfigInfoMap.size());
     APSARA_TEST_NOT_EQUAL(sManager->mConfigInfoMap.end(), sManager->mConfigInfoMap.find("test_config_3"));
-    APSARA_TEST_FALSE(filesystem::exists("test_config/test_config_2.json"));
+    APSARA_TEST_FALSE(fs::exists("test_config/test_config_2.json"));
 
-    filesystem::remove_all("test_config");
+    fs::remove_all("test_config");
 }
 
 void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
@@ -288,29 +268,14 @@ void OnetimeConfigInfoManagerUnittest::TestDumpCheckpointFile() const {
     uint32_t expireTime = 0;
 
     sManager->GetOnetimeConfigStatus("test_config_1", 1U, false, 0U, 3600U, &expireTime);
-    sManager->UpdateConfig("test_config_1",
-                           ConfigType::Collection,
-                           filesystem::path("test_config/test_config_1.json"),
-                           1,
-                           2000000000,
-                           0,
-                           3600);
+    sManager->UpdateConfig(
+        "test_config_1", ConfigType::Collection, fs::path("test_config/test_config_1.json"), 1, 2000000000, 0, 3600);
     sManager->GetOnetimeConfigStatus("test_config_2", 2U, false, 0U, 1800U, &expireTime);
     sManager->GetOnetimeConfigStatus("test_config_3", 4U, false, 0U, 7200U, &expireTime);
-    sManager->UpdateConfig("test_config_3",
-                           ConfigType::Collection,
-                           filesystem::path("test_config/test_config_3.json"),
-                           4,
-                           2200000000,
-                           0,
-                           7200);
-    sManager->UpdateConfig("test_config_5",
-                           ConfigType::Collection,
-                           filesystem::path("test_config/test_config_5.json"),
-                           5,
-                           2100000000,
-                           0,
-                           600);
+    sManager->UpdateConfig(
+        "test_config_3", ConfigType::Collection, fs::path("test_config/test_config_3.json"), 4, 2200000000, 0, 7200);
+    sManager->UpdateConfig(
+        "test_config_5", ConfigType::Collection, fs::path("test_config/test_config_5.json"), 5, 2100000000, 0, 600);
 
     sManager->DumpCheckpointFile();
 

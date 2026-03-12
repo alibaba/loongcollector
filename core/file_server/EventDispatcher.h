@@ -278,14 +278,11 @@ protected:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class EventDispatcherTest;
-    friend class ConfigUpdatorUnittest;
     friend class ConfigMatchUnittest;
     friend class FuxiSceneUnittest;
     friend class LogtailWriterTest;
     friend class SymlinkInotifyTest;
-    friend class SenderUnittest;
     friend class FuseFileUnittest;
-    friend class MultiServerConfigUpdatorUnitest;
     friend class EventDispatcherDirUnittest;
     friend class ModifyHandlerUnittest;
     friend class PipelineUpdateUnittest;

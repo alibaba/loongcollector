@@ -16,7 +16,6 @@
 
 #include <set>
 
-#include "boost/filesystem.hpp"
 #include "json/json.h"
 #include "spdlog/async.h"
 #include "spdlog/sinks/rotating_file_sink.h"
@@ -426,10 +425,10 @@ void Logger::EnsureSnapshotDirExist(std::map<std::string, SinkConfig>& sinkCfgs)
         SinkConfig sinkCfg = sink.second;
 
         if (sinkName == "AsyncFileSinkStatus" || sinkName == "AsyncFileSinkProfile") {
-            boost::filesystem::path logFilePath(sinkCfg.logFilePath);
+            std::filesystem::path logFilePath(sinkCfg.logFilePath);
             try {
-                boost::filesystem::create_directories(logFilePath.parent_path());
-            } catch (const boost::filesystem::filesystem_error& e) {
+                std::filesystem::create_directories(logFilePath.parent_path());
+            } catch (const std::filesystem::filesystem_error& e) {
                 LogMsg(std::string("Create snapshot dir error ") + logFilePath.parent_path().string() + ", error"
                        + std::string(e.what()));
             }

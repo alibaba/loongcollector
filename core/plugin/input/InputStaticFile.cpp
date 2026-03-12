@@ -14,12 +14,6 @@
 
 #include "plugin/input/InputStaticFile.h"
 
-#if defined(__linux__)
-#include <fnmatch.h>
-#else
-#include "common/StringTools.h"
-#endif
-
 #include "app_config/AppConfig.h"
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/plugin/PluginRegistry.h"
@@ -33,26 +27,6 @@
 using namespace std;
 
 namespace logtail {
-
-static bool IsValidDir(const filesystem::path& dir) {
-    error_code ec;
-    filesystem::file_status s = filesystem::status(dir, ec);
-    if (ec) {
-        LOG_WARNING(sLogger,
-                    ("failed to get base dir path info",
-                     "skip")("dir path", dir.string())("error code", ec.value())("error msg", ec.message()));
-        return false;
-    }
-    if (!filesystem::exists(s)) {
-        LOG_WARNING(sLogger, ("base dir path not existed", "skip")("dir path", dir.string()));
-        return false;
-    }
-    if (!filesystem::is_directory(s)) {
-        LOG_WARNING(sLogger, ("base dir path is not a directory", "skip")("dir path", dir.string()));
-        return false;
-    }
-    return true;
-}
 
 const string InputStaticFile::sName = "input_static_file_onetime";
 
@@ -89,10 +63,21 @@ bool InputStaticFile::Init(const Json::Value& config, Json::Value& optionalGoPip
     }
     if (mEnableContainerDiscovery) {
         if (!mContainerDiscovery.Init(config, *mContext, sName)) {
-            // should not happen
-            return false;
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               "container discovery config is invalid",
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
         }
+        mContainerDiscovery.mIsStdio = false;
         mFileDiscovery.SetEnableContainerDiscoveryFlag(true);
+        mFileDiscovery.SetDeduceAndSetContainerBaseDirFunc(DeduceAndSetContainerBaseDir);
+        mContainerDiscovery.GenerateContainerMetaFetchingGoPipeline(
+            optionalGoPipeline, &mFileDiscovery, mContext->GetPipeline().GenNextPluginMeta(false));
+        mFileDiscovery.SetContainerDiscoveryOptions(std::move(mContainerDiscovery));
     }
 
     if (!mFileReader.Init(config, *mContext, sName)) {
@@ -144,19 +129,21 @@ bool InputStaticFile::Init(const Json::Value& config, Json::Value& optionalGoPip
 
 bool InputStaticFile::Start() {
     if (mEnableContainerDiscovery) {
-        // TODO: get container info
-        // mFileDiscovery.SetContainerInfo();
+        mFileDiscovery.SetContainerInfo(std::make_shared<vector<ContainerInfo>>());
+        mFileDiscovery.SetFullContainerList(std::make_shared<std::set<std::string>>());
     }
 
     // Add plugin metric manager
     FileServer::GetInstance()->AddPluginMetricManager(mContext->GetConfigName(), mPluginMetricManager);
 
-    optional<vector<filesystem::path>> files;
-    if (!mContext->IsOnetimePipelineRunningBeforeStart()) {
-        files = GetFiles();
-    }
-    StaticFileServer::GetInstance()->AddInput(
-        mContext->GetConfigName(), mIndex, files, &mFileDiscovery, &mFileReader, &mMultiline, &mFileTag, mContext);
+    StaticFileServer::GetInstance()->AddInput(mContext->GetConfigName(),
+                                              mIndex,
+                                              &mFileDiscovery,
+                                              &mFileReader,
+                                              &mMultiline,
+                                              &mFileTag,
+                                              mFileContainerMetaMap,
+                                              mContext);
     return true;
 }
 
@@ -170,171 +157,6 @@ bool InputStaticFile::Stop(bool isPipelineRemoving) {
     return true;
 }
 
-vector<filesystem::path> InputStaticFile::GetFiles() const {
-    vector<filesystem::path> res;
-    const auto& pathInfos = mFileDiscovery.GetBasePathInfos();
-
-    if (!mEnableContainerDiscovery) {
-        set<DevInode> visitedDirs;
-        // Process each path configuration
-        for (const auto& pathInfo : pathInfos) {
-            vector<filesystem::path> baseDirs;
-            if (pathInfo.hasWildcard()) {
-                GetValidBaseDirs(pathInfo, pathInfo.wildcardPaths[0], 0, baseDirs);
-                if (baseDirs.empty()) {
-                    LOG_WARNING(sLogger,
-                                ("no files found", "base dir path invalid")("base dir", pathInfo.basePath)(
-                                    "config", mContext->GetConfigName()));
-                    continue;
-                }
-            } else {
-                baseDirs.emplace_back(pathInfo.basePath);
-            }
-
-            for (const auto& dir : baseDirs) {
-                if (IsValidDir(dir)) {
-                    GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, nullptr, visitedDirs, res);
-                }
-            }
-        }
-        LOG_INFO(sLogger, ("total files cnt", res.size())("files", ToString(res))("config", mContext->GetConfigName()));
-    } else {
-        // TODO: support symlink in container
-        set<DevInode> visitedDirs;
-        for (const auto& item : *mFileDiscovery.GetContainerInfo()) {
-            // 遍历配置路径和对应的容器真实路径
-            for (size_t idx = 0; idx < pathInfos.size(); ++idx) {
-                if (idx >= item.mRealBaseDirs.size())
-                    break;
-
-                const auto& pathInfo = pathInfos[idx];
-                const string& realBaseDir = item.mRealBaseDirs[idx];
-
-                if (realBaseDir.empty())
-                    continue;
-
-                vector<filesystem::path> baseDirs;
-                if (pathInfo.hasWildcard()) {
-                    GetValidBaseDirs(pathInfo, realBaseDir, 0, baseDirs);
-                    if (baseDirs.empty()) {
-                        LOG_DEBUG(
-                            sLogger,
-                            ("no files found", "base dir path invalid")("container id", item.mRawContainerInfo->mID)(
-                                "real base dir", realBaseDir)("config", mContext->GetConfigName()));
-                        continue;
-                    }
-                } else {
-                    baseDirs.emplace_back(realBaseDir);
-                }
-
-                auto prevCnt = res.size();
-                for (const auto& dir : baseDirs) {
-                    if (IsValidDir(dir)) {
-                        GetFiles(dir, mFileDiscovery.mMaxDirSearchDepth, &pathInfo, &realBaseDir, visitedDirs, res);
-                    }
-                }
-                if (res.size() > prevCnt) {
-                    LOG_INFO(
-                        sLogger,
-                        ("container files cnt", res.size() - prevCnt)("container id", item.mRawContainerInfo->mID)(
-                            "real base dir", realBaseDir)("files", ToString(res))("config", mContext->GetConfigName()));
-                } else {
-                    LOG_DEBUG(sLogger,
-                              ("no files found, container id", item.mRawContainerInfo->mID)(
-                                  "real base dir", realBaseDir)("config", mContext->GetConfigName()));
-                }
-            }
-        }
-        LOG_INFO(sLogger, ("total files cnt", res.size())("config", mContext->GetConfigName()));
-    }
-    return res;
-}
-
-void InputStaticFile::GetValidBaseDirs(const BasePathInfo& pathInfo,
-                                       const filesystem::path& dir,
-                                       uint32_t depth,
-                                       vector<filesystem::path>& filepaths) const {
-    const auto& wildcardPaths = pathInfo.wildcardPaths;
-    bool finish = false;
-    if (depth + 2 == wildcardPaths.size()) {
-        finish = true;
-    }
-
-    if (depth == 0 && !IsValidDir(wildcardPaths[depth])) {
-        return;
-    }
-
-    const auto& subdir = pathInfo.constWildcardPaths[depth];
-    if (!subdir.empty()) {
-        auto path = dir / subdir;
-        error_code ec;
-        filesystem::file_status s = filesystem::status(path, ec);
-        if (ec || !filesystem::exists(s) || !filesystem::is_directory(s)) {
-            return;
-        }
-        if (finish) {
-            filepaths.emplace_back(path);
-        } else {
-            GetValidBaseDirs(pathInfo, path, depth + 1, filepaths);
-        }
-    } else {
-        auto pattern = filesystem::path(wildcardPaths[depth + 1]).filename();
-        error_code ec;
-        for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
-            const auto& path = entry.path();
-            const auto& status = entry.status();
-            if (filesystem::is_directory(status)
-                && (fnmatch(pattern.string().c_str(), path.filename().string().c_str(), FNM_PATHNAME) == 0)) {
-                if (finish) {
-                    filepaths.emplace_back(path);
-                } else {
-                    GetValidBaseDirs(pathInfo, path, depth + 1, filepaths);
-                }
-            }
-        }
-    }
-}
-
-void InputStaticFile::GetFiles(const filesystem::path& dir,
-                               uint32_t depth,
-                               const BasePathInfo* pathInfo,
-                               const string* containerBaseDir,
-                               set<DevInode>& visitedDir,
-                               vector<filesystem::path>& files) const {
-    error_code ec;
-    for (auto const& entry : filesystem::directory_iterator(dir, ec)) {
-        const auto& path = entry.path();
-        auto pathStr = path.string();
-        if (containerBaseDir && pathInfo) {
-            // Map container path to config path
-            pathStr = pathInfo->basePath + pathStr.substr(containerBaseDir->size());
-        }
-        const auto& status = entry.status();
-        if (filesystem::is_regular_file(status)) {
-            const auto& filename = path.filename().string();
-            if (pathInfo) {
-                // Use the specific pathInfo's filePattern if provided, otherwise check all patterns
-                bool filenameMatched = mFileDiscovery.IsFilenameMatched(filename, *pathInfo);
-
-                if (filenameMatched && !mFileDiscovery.IsFilenameInBlacklist(filename)
-                    && !mFileDiscovery.IsFilepathInBlacklist(pathStr)) {
-                    files.emplace_back(path);
-                }
-            }
-        } else if (filesystem::is_directory(status)) {
-            auto devInode = GetFileDevInode(path.string());
-            if (!devInode.IsValid() || visitedDir.find(devInode) != visitedDir.end()) {
-                // avoid loop
-                continue;
-            }
-            visitedDir.emplace(devInode);
-            if (depth > 0 && !AppConfig::GetInstance()->IsHostPathMatchBlacklist(path.string())
-                && !mFileDiscovery.IsDirectoryInBlacklist(pathStr)) {
-                GetFiles(path, depth - 1, pathInfo, containerBaseDir, visitedDir, files);
-            }
-        }
-    }
-}
 
 bool InputStaticFile::CreateInnerProcessors() {
     unique_ptr<ProcessorInstance> processor;
@@ -373,6 +195,12 @@ bool InputStaticFile::CreateInnerProcessors() {
         mInnerProcessors.emplace_back(std::move(processor));
     }
     return true;
+}
+
+bool InputStaticFile::DeduceAndSetContainerBaseDir(ContainerInfo& containerInfo,
+                                                   const CollectionPipelineContext*,
+                                                   const FileDiscoveryOptions* fileDiscovery) {
+    return SetContainerBaseDirs(containerInfo, fileDiscovery);
 }
 
 } // namespace logtail

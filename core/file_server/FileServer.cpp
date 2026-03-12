@@ -101,13 +101,13 @@ void FileServer::PauseInner() {
 // 恢复文件服务，重新注册事件处理程序和恢复日志输入
 void FileServer::Resume(bool isConfigUpdate, bool isContainerUpdate) {
     if (isConfigUpdate) {
-        if (ContainerManager::GetInstance()->CheckContainerDiffForAllConfig()) {
-            ContainerManager::GetInstance()->ApplyContainerDiffs();
+        if (ContainerManager::GetInstance()->CheckFileServerContainerDiffs()) {
+            ContainerManager::GetInstance()->ApplyFileServerContainerDiffs();
             ContainerManager::GetInstance()->SaveContainerInfo();
         }
     } else {
         if (isContainerUpdate) {
-            ContainerManager::GetInstance()->ApplyContainerDiffs();
+            ContainerManager::GetInstance()->ApplyFileServerContainerDiffs();
             ContainerManager::GetInstance()->SaveContainerInfo();
         }
     }
