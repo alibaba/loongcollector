@@ -44,6 +44,7 @@
 #endif
 
 DEFINE_FLAG_STRING(agent_host_id, "", "");
+DECLARE_FLAG_BOOL(disable_identity_detect);
 
 const std::string sRandomHostIdKey = "random-hostid";
 const std::string sECSAssistMachineIdKey = "ecs-assist-machine-id";
@@ -526,6 +527,10 @@ void InstanceIdentity::DumpInstanceIdentity() {
 }
 
 void InstanceIdentity::InitFromNetwork() {
+    if (BOOL_FLAG(disable_identity_detect)) {
+        LOG_INFO(sLogger, ("identity detect disabled, skip InitFromNetwork", ""));
+        return;
+    }
     ECSMeta ecsMeta;
     if (FetchECSMeta(ecsMeta)) {
         InstanceIdentity::Instance()->UpdateInstanceIdentity(ecsMeta);

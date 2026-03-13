@@ -25,6 +25,9 @@ DEFINE_FLAG_INT32(mem_limit_num, "memory violate limit num before shutdown", 10)
 DEFINE_FLAG_DOUBLE(cpu_usage_up_limit, "cpu usage upper limit, cores", 2.0);
 DEFINE_FLAG_INT64(memory_usage_up_limit, "memory usage upper limit, MB", 2 * 1024);
 
+// machine info
+DEFINE_FLAG_BOOL(disable_identity_detect, "disable identity detect", false);
+
 // checkpoint
 DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
 
