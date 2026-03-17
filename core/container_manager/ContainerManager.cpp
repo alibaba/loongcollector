@@ -118,7 +118,7 @@ void ContainerManager::ApplyContainerDiffs() {
 
                 LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
 
-                if (diff->mRefrashAllContainers) {
+                if (diff->mRefreshAllContainers) {
                     options->ClearContainerInfo();
                 }
 
@@ -635,7 +635,7 @@ void ContainerManager::computeMatchedContainersDiff(
     bool isStdio,
     bool refrashAllContainers,
     ContainerDiff& diff) {
-    diff.mRefrashAllContainers = refrashAllContainers;
+    diff.mRefreshAllContainers = refrashAllContainers;
     ReadLock lock(mContainerMapRWLock);
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {

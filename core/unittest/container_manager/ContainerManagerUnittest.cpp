@@ -2167,7 +2167,7 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
 
 void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
     // Verify that computeMatchedContainersDiff correctly propagates the refrashAllContainers
-    // parameter into diff.mRefrashAllContainers.
+    // parameter into diff.mRefreshAllContainers.
     ContainerManager containerManager;
 
     auto makeContainer = [](const std::string& id, const std::string& status = "running") {
@@ -2186,20 +2186,20 @@ void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
     ContainerFilters filters;
 
     {
-        // refrashAllContainers=false -> diff.mRefrashAllContainers must be false
+        // refrashAllContainers=false -> diff.mRefreshAllContainers must be false
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
-        EXPECT_FALSE(diff.mRefrashAllContainers);
+        EXPECT_FALSE(diff.mRefreshAllContainers);
         EXPECT_EQ(diff.mAdded.size(), 2u);
         fullList.clear();
         matchList.clear();
     }
 
     {
-        // refrashAllContainers=true -> diff.mRefrashAllContainers must be true
+        // refrashAllContainers=true -> diff.mRefreshAllContainers must be true
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, true, diff);
-        EXPECT_TRUE(diff.mRefrashAllContainers);
+        EXPECT_TRUE(diff.mRefreshAllContainers);
         EXPECT_EQ(diff.mAdded.size(), 2u);
         fullList.clear();
         matchList.clear();
@@ -2209,7 +2209,7 @@ void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
         // Verify independence: false does not inherit from a prior true call
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
-        EXPECT_FALSE(diff.mRefrashAllContainers);
+        EXPECT_FALSE(diff.mRefreshAllContainers);
     }
 }
 
@@ -2282,7 +2282,7 @@ void ContainerManagerUnittest::TestClearContainerInfo() const {
 
 void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleContainers() {
     // This test validates the core fix introduced in commit 6d1c1b5:
-    //   When a full refresh occurs (mRefrashAllContainers=true), ApplyContainerDiffs must call
+    //   When a full refresh occurs (mRefreshAllContainers=true), ApplyContainerDiffs must call
     //   ClearContainerInfo() before applying the diff so that containers present in the previous
     //   snapshot but absent from the new runtime snapshot are not retained as stale entries.
     //
@@ -2380,7 +2380,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
 
     auto diff1 = containerManager.mConfigContainerDiffMap[testName];
     ASSERT_NE(diff1, nullptr);
-    EXPECT_TRUE(diff1->mRefrashAllContainers) << "Full refresh must set mRefrashAllContainers=true";
+    EXPECT_TRUE(diff1->mRefreshAllContainers) << "Full refresh must set mRefreshAllContainers=true";
     EXPECT_EQ(diff1->mAdded.size(), 3u) << "All three containers must appear as added";
     EXPECT_EQ(diff1->mRemoved.size(), 0u) << "Empty matchList produces no removals in full refresh path";
 
@@ -2408,7 +2408,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
 
     auto diff2 = containerManager.mConfigContainerDiffMap[testName];
     ASSERT_NE(diff2, nullptr);
-    EXPECT_TRUE(diff2->mRefrashAllContainers) << "Second full refresh must also set mRefrashAllContainers=true";
+    EXPECT_TRUE(diff2->mRefreshAllContainers) << "Second full refresh must also set mRefreshAllContainers=true";
     // The full refresh path seeds an empty matchList, so no mRemoved entries are produced for
     // container_A / container_C even though they disappeared from the runtime.
     // ClearContainerInfo() inside ApplyContainerDiffs compensates for this gap.
@@ -2435,7 +2435,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
     EXPECT_EQ(resultIds.count("container_C"), 0u) << "Stale container_C must be removed by ClearContainerInfo()";
 
     // ===== Round 3: incremental update – add container_E via SetUpDiffContainersMeta =====
-    // Verifies the complementary path: mRefrashAllContainers=false and no ClearContainerInfo().
+    // Verifies the complementary path: mRefreshAllContainers=false and no ClearContainerInfo().
     LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(buildDiffMeta({"E"}, {}));
     containerManager.incrementallyUpdateContainersSnapshot();
     containerManager.mLastIncrementalUpdateTime = 300; // pin to predictable value
@@ -2447,7 +2447,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
 
     auto diff3 = containerManager.mConfigContainerDiffMap[testName];
     ASSERT_NE(diff3, nullptr);
-    EXPECT_FALSE(diff3->mRefrashAllContainers) << "Incremental update must set mRefrashAllContainers=false";
+    EXPECT_FALSE(diff3->mRefreshAllContainers) << "Incremental update must set mRefreshAllContainers=false";
     EXPECT_EQ(diff3->mAdded.size(), 1u) << "Only container_E should be added incrementally";
     EXPECT_EQ(diff3->mAdded[0]->mID, "container_E");
 
