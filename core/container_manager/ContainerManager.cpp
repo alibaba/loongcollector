@@ -1047,6 +1047,7 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
             WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmpContainerMap);
         }
+        mLastFullUpdateTime = time(nullptr);
 
         // Update config container diffs for each config
         for (const auto& configPair : configContainerMap) {
@@ -1088,6 +1089,7 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmp);
         }
+        mLastFullUpdateTime = time(nullptr);
         // Apply containers to all existing configs
         FileServer::GetInstance()->WithFileDiscoveryConfigsMutable(
             [&](std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {

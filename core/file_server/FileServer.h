@@ -55,8 +55,11 @@ public:
         fn(mPipelineNameFileDiscoveryConfigsMap);
     }
     // Mutable locked visitor: exclusive access for mutating FileDiscoveryOptions internal
-    // state (mContainerInfos, mMatchedContainerInfo, etc.).  WriteLock excludes all
-    // concurrent ReadLock/WriteLock holders, so no separate per-field lock is needed.
+    // state (mContainerInfos, etc.).  WriteLock excludes all concurrent ReadLock/WriteLock
+    // holders, so no separate per-field lock is needed.
+    // Note: mMatchedContainerInfo is updated under WithFileDiscoveryConfigs (ReadLock) in
+    // ContainerManager::ApplyContainerDiffs, which is safe because both the writer and the
+    // reader (sendAllMatchedContainerInfo) run on the single polling thread and never overlap.
     // Lock-order rule: if the caller also needs mContainerMapRWLock, it must be acquired
     // INSIDE fn (never before calling WithFileDiscoveryConfigsMutable), because
     // computeMatchedContainersDiff acquires mContainerMapRWLock under this WriteLock.
