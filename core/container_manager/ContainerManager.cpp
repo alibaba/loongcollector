@@ -100,10 +100,9 @@ void ContainerManager::pollingLoop() {
 }
 
 void ContainerManager::ApplyContainerDiffs() {
-    // WithFileDiscoveryConfigsMutable holds FileServer::mReadWriteLock as a WriteLock,
-    // which excludes all concurrent ReadLock holders (sendAllMatchedContainerInfo,
-    // GetContainerStoppedEvents).  No additional per-field lock is required.
     std::vector<std::shared_ptr<MatchedContainerInfo>> configResults;
+
+    // Write lock: apply structural mutations to each config's container info.
     FileServer::GetInstance()->WithFileDiscoveryConfigsMutable(
         [&](std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
             for (auto& pair : mConfigContainerDiffMap) {
@@ -113,7 +112,6 @@ void ContainerManager::ApplyContainerDiffs() {
                 }
                 const auto& options = itr->second.first;
                 const auto& ctx = itr->second.second;
-
                 const auto& diff = pair.second;
 
                 LOG_INFO(sLogger, ("ApplyContainerDiffs diff", diff->ToString())("configName", ctx->GetConfigName()));
@@ -137,6 +135,23 @@ void ContainerManager::ApplyContainerDiffs() {
                 for (const auto& container : diff->mRemoved) {
                     options->DeleteRawContainerInfo(container);
                 }
+            }
+        });
+
+    // Read lock: build MatchedContainerInfo from the now-stable container state.
+    // Filesystem existence checks (CheckExistance) can be slow, so they are kept
+    // outside the write lock to avoid blocking concurrent ReadLock holders.
+    // mMatchedContainerInfo is only written here and read in sendAllMatchedContainerInfo,
+    // both of which run on the single polling thread, so no write-under-read-lock hazard.
+    FileServer::GetInstance()->WithFileDiscoveryConfigs(
+        [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+            for (const auto& pair : mConfigContainerDiffMap) {
+                const auto& itr = nameConfigMap.find(pair.first);
+                if (itr == nameConfigMap.end()) {
+                    continue;
+                }
+                const auto& options = itr->second.first;
+                const auto& ctx = itr->second.second;
 
                 if (options->GetContainerDiscoveryOptions().mCollectingContainersMeta) {
                     std::vector<std::string> pathExistContainerIDs;
@@ -181,6 +196,7 @@ void ContainerManager::ApplyContainerDiffs() {
                 }
             }
         });
+
     sendMatchedContainerInfo(configResults);
     mConfigContainerDiffMap.clear();
 }
