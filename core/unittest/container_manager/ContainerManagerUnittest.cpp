@@ -66,9 +66,10 @@ public:
     void TestConcurrentContainerMapAccess_T1T3();
     void TestConcurrentContainerMapAccess_T1T2T3();
     void TestSequentialContainerDiffAndApply();
-    void TestRefrashAllContainersFlag() const;
+    void TestRefreshAllContainersFlag() const;
     void TestClearContainerInfo() const;
-    void TestApplyContainerDiffsRefrashAllClearsStaleContainers();
+    void TestApplyContainerDiffsRefreshAllClearsStaleContainers();
+    void TestLoadContainerInfoAfterConfigInit();
     void runTestFile(const std::string& testFilePath) const;
 
 private:
@@ -2165,8 +2166,8 @@ void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
     std::cout << "Sequential container diff and apply test completed successfully" << std::endl;
 }
 
-void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
-    // Verify that computeMatchedContainersDiff correctly propagates the refrashAllContainers
+void ContainerManagerUnittest::TestRefreshAllContainersFlag() const {
+    // Verify that computeMatchedContainersDiff correctly propagates the refreshAllContainers
     // parameter into diff.mRefreshAllContainers.
     ContainerManager containerManager;
 
@@ -2186,7 +2187,7 @@ void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
     ContainerFilters filters;
 
     {
-        // refrashAllContainers=false -> diff.mRefreshAllContainers must be false
+        // refreshAllContainers=false -> diff.mRefreshAllContainers must be false
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_FALSE(diff.mRefreshAllContainers);
@@ -2196,7 +2197,7 @@ void ContainerManagerUnittest::TestRefrashAllContainersFlag() const {
     }
 
     {
-        // refrashAllContainers=true -> diff.mRefreshAllContainers must be true
+        // refreshAllContainers=true -> diff.mRefreshAllContainers must be true
         ContainerDiff diff;
         containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, true, diff);
         EXPECT_TRUE(diff.mRefreshAllContainers);
@@ -2280,7 +2281,7 @@ void ContainerManagerUnittest::TestClearContainerInfo() const {
     }
 }
 
-void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleContainers() {
+void ContainerManagerUnittest::TestApplyContainerDiffsRefreshAllClearsStaleContainers() {
     // This test validates the core fix introduced in commit 6d1c1b5:
     //   When a full refresh occurs (mRefreshAllContainers=true), ApplyContainerDiffs must call
     //   ClearContainerInfo() before applying the diff so that containers present in the previous
@@ -2294,7 +2295,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
     // SetUpDiffContainersMeta) and fed through refreshAllContainersSnapshot() /
     // incrementallyUpdateContainersSnapshot(), mirroring the real production code path.
 
-    const std::string testName = "test_refrash_all_clears_stale";
+    const std::string testName = "test_refresh_all_clears_stale";
     ContainerManager containerManager;
     containerManager.mIsRunning = true;
 
@@ -2441,7 +2442,7 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
     containerManager.mLastIncrementalUpdateTime = 300; // pin to predictable value
 
     // lastConfigContainerUpdateTime(200) == mLastFullUpdateTime(200) < mLastIncrementalUpdateTime(300)
-    // -> incremental path (refrashAllContainers=false)
+    // -> incremental path (refreshAllContainers=false)
     mDiscoveryOpts.SetLastContainerUpdateTime(200);
     EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig());
 
@@ -2457,6 +2458,264 @@ void ContainerManagerUnittest::TestApplyContainerDiffsRefrashAllClearsStaleConta
 
     // Cleanup
     FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);
+}
+
+void ContainerManagerUnittest::TestLoadContainerInfoAfterConfigInit() {
+    // Validates the real startup sequence:
+    //   1. Pipeline config is registered with FileServer (ContainerManager Init).
+    //   2. ContainerManager::LoadContainerInfo() is called to restore the checkpoint.
+    //   3. LoadContainerInfo() internally calls ApplyContainerDiffs(); containers
+    //      must appear in FileDiscoveryOptions without any extra polling-loop step.
+    //
+    // Two checkpoint formats are exercised:
+    //
+    //   A. v1.0.0 format (Containers array, no per-config name):
+    //      loadContainerInfoFromContainersFormat calls checkContainerDiffForOneConfig
+    //      for every already-registered config, queuing a full-refresh diff.
+    //      The following ApplyContainerDiffs() applies it immediately.
+    //
+    //   B. v0.1.0 format (detail array, config name embedded):
+    //      loadContainerInfoFromDetailFormat creates mLegacyCheckpointAdded entries
+    //      keyed by config name.  ApplyContainerDiffs() finds the registered config
+    //      and applies them via UpdateRawContainerInfo(..., basePathInCheckpoint).
+
+    // In unit tests GetAgentDataDir() == GetProcessExecutionDir() (see AppConfig.cpp).
+    const std::string checkpointPath = PathJoin(GetProcessExecutionDir(), "docker_path_config.json");
+
+    // Helper: build and register a FileDiscoveryOptions for a given config name.
+    auto registerConfig = [&](const std::string& configName) {
+        ctx.SetConfigName(configName);
+        Json::Value cfgJson;
+        cfgJson["FilePaths"].append("/var/log/*.log");
+        mDiscoveryOpts = FileDiscoveryOptions();
+        mDiscoveryOpts.Init(cfgJson, ctx, "test");
+        mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+        ContainerDiscoveryOptions cdOpts;
+        cdOpts.Init(cfgJson, ctx, "test");
+        mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(cdOpts));
+        mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+        mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+        mDiscoveryOpts.SetLastContainerUpdateTime(0);
+        mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+            [](ContainerInfo& ci, const CollectionPipelineContext*, const FileDiscoveryOptions*) {
+                ci.mRealBaseDirs.push_back("/var/log");
+                return true;
+            });
+        FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &mDiscoveryOpts, &ctx);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sub-scenario A: v1.0.0 format written by SaveContainerInfo
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+        const std::string configName = "ckpt_init_test_v100";
+
+        // Step 1: write the checkpoint via a temporary ContainerManager.
+        {
+            ContainerManager writer;
+            auto c1 = std::make_shared<RawContainerInfo>();
+            c1->mID = "ckpt_v100_c1";
+            c1->mStatus = "running";
+            c1->mLogPath = "/var/log/ckpt_v100_c1.log";
+            c1->mUpperDir = "/overlay/ckpt_v100_c1";
+            writer.mContainerMap["ckpt_v100_c1"] = c1;
+
+            auto c2 = std::make_shared<RawContainerInfo>();
+            c2->mID = "ckpt_v100_c2";
+            c2->mStatus = "running";
+            c2->mLogPath = "/var/log/ckpt_v100_c2.log";
+            c2->mUpperDir = "/overlay/ckpt_v100_c2";
+            writer.mContainerMap["ckpt_v100_c2"] = c2;
+
+            writer.SaveContainerInfo();
+        }
+
+        // Step 2: register the collection config (pipeline Init) *before* loading.
+        registerConfig(configName);
+
+        // Step 3: load the checkpoint. loadContainerInfoFromContainersFormat iterates
+        // already-registered configs, calls checkContainerDiffForOneConfig for each
+        // (full-refresh path since both timestamps are 0), then ApplyContainerDiffs()
+        // applies the queued diff — all within the single LoadContainerInfo() call.
+        ContainerManager containerManager;
+        containerManager.LoadContainerInfo();
+
+        // Verify: containers must be visible in FileDiscoveryOptions immediately.
+        auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+        ASSERT_NE(containerInfo, nullptr);
+        EXPECT_EQ(containerInfo->size(), 2u) << "[v1.0.0] Both checkpoint containers must be in FileDiscoveryOptions "
+                                                "after LoadContainerInfo()";
+
+        std::set<std::string> resultIds;
+        for (const auto& ci : *containerInfo) {
+            ASSERT_NE(ci.mRawContainerInfo, nullptr);
+            resultIds.insert(ci.mRawContainerInfo->mID);
+            EXPECT_EQ(ci.mRawContainerInfo->mStatus, "running");
+        }
+        EXPECT_EQ(resultIds.count("ckpt_v100_c1"), 1u) << "[v1.0.0] ckpt_v100_c1 must be loaded";
+        EXPECT_EQ(resultIds.count("ckpt_v100_c2"), 1u) << "[v1.0.0] ckpt_v100_c2 must be loaded";
+
+        // mContainerMap must also reflect the checkpoint containers.
+        {
+            ReadLock lock(containerManager.mContainerMapRWLock);
+            EXPECT_EQ(containerManager.mContainerMap.size(), 2u);
+        }
+
+        // Step 4: simulate the polling loop starting up.
+        containerManager.mIsRunning = true;
+
+        // ── Phase 4a: before any real snapshot (both timestamps still 0) ──────
+        // ApplyContainerDiffs() set lastConfigContainerUpdateTime = 1 (sentinel).
+        // checkContainerDiffForOneConfig: 1 < 0 → false; (0==0 && 0==0 && 1==0) → false
+        // → returns false immediately.  No spurious re-trigger, no ClearContainerInfo.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must NOT re-trigger before first snapshot";
+        EXPECT_TRUE(containerManager.mConfigContainerDiffMap.empty())
+            << "[v1.0.0] No new diff must be queued when sentinel prevents re-trigger";
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v1.0.0] Containers must survive the non-triggering CheckContainerDiffForAllConfig";
+
+        // ── Phase 4b: first real snapshot arrives ─────────────────────────────
+        // Simulate refreshAllContainersSnapshot() setting a real timestamp.
+        containerManager.mLastFullUpdateTime = 100;
+
+        // lastConfigContainerUpdateTime(1) < mLastFullUpdateTime(100) → full refresh.
+        EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must trigger on first real snapshot";
+        {
+            auto diff = containerManager.mConfigContainerDiffMap[configName];
+            ASSERT_NE(diff, nullptr);
+            EXPECT_TRUE(diff->mRefreshAllContainers) << "[v1.0.0] First real snapshot must be a full refresh";
+            EXPECT_EQ(diff->mAdded.size(), 2u)
+                << "[v1.0.0] Checkpoint containers must be re-confirmed by real snapshot";
+        }
+        containerManager.ApplyContainerDiffs();
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v1.0.0] Containers must still be present after first real snapshot apply";
+        // lastConfigContainerUpdateTime must now be 100 (real timestamp).
+        EXPECT_EQ(mDiscoveryOpts.GetLastContainerUpdateTime(), 100)
+            << "[v1.0.0] lastConfigContainerUpdateTime must advance to mLastFullUpdateTime(100)";
+
+        // ── Phase 4c: no new snapshot — must not re-trigger ───────────────────
+        // lastConfigContainerUpdateTime(100) == mLastFullUpdateTime(100) → false.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must not fire again without a new snapshot";
+
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sub-scenario B: v0.1.0 format (detail array with per-config associations)
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+        const std::string configName = "ckpt_init_test_v010";
+
+        // Step 1: write the v0.1.0 checkpoint with config name associations.
+        // "params" must be a JSON *string* (double-serialised) as the parser expects.
+        auto makeParamsStr
+            = [](const std::string& id, const std::string& logPath, const std::string& upperDir) -> std::string {
+            Json::Value p;
+            p["ID"] = id;
+            p["Status"] = "running";
+            p["LogPath"] = logPath;
+            p["UpperDir"] = upperDir;
+            Json::StreamWriterBuilder wb;
+            wb["indentation"] = "";
+            return Json::writeString(wb, p);
+        };
+
+        Json::Value root;
+        root["version"] = "0.1.0";
+        Json::Value detail(Json::arrayValue);
+        for (const auto& id : {"ckpt_v010_c1", "ckpt_v010_c2"}) {
+            Json::Value item;
+            item["config_name"] = configName;
+            item["container_id"] = id;
+            item["params"] = makeParamsStr(id, std::string("/var/log/") + id + ".log", std::string("/overlay/") + id);
+            detail.append(item);
+        }
+        root["detail"] = detail;
+
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "  ";
+        ASSERT_TRUE(OverwriteFile(checkpointPath, Json::writeString(wb, root)))
+            << "Failed to write v0.1.0 checkpoint file";
+
+        // Step 2: register the collection config (pipeline Init) *before* loading.
+        registerConfig(configName);
+
+        // Step 3: load the checkpoint. loadContainerInfoFromDetailFormat creates
+        // mLegacyCheckpointAdded entries for the registered config name.
+        // ApplyContainerDiffs() calls UpdateRawContainerInfo(..., basePathInCheckpoint)
+        // for each entry — all within the single LoadContainerInfo() call.
+        ContainerManager containerManager;
+        containerManager.LoadContainerInfo();
+
+        // Verify: containers must be visible in FileDiscoveryOptions immediately.
+        auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+        ASSERT_NE(containerInfo, nullptr);
+        EXPECT_EQ(containerInfo->size(), 2u) << "[v0.1.0] Both checkpoint containers must be in FileDiscoveryOptions "
+                                                "after LoadContainerInfo()";
+
+        std::set<std::string> resultIds;
+        for (const auto& ci : *containerInfo) {
+            ASSERT_NE(ci.mRawContainerInfo, nullptr);
+            resultIds.insert(ci.mRawContainerInfo->mID);
+            EXPECT_EQ(ci.mRawContainerInfo->mStatus, "running");
+        }
+        EXPECT_EQ(resultIds.count("ckpt_v010_c1"), 1u) << "[v0.1.0] ckpt_v010_c1 must be loaded";
+        EXPECT_EQ(resultIds.count("ckpt_v010_c2"), 1u) << "[v0.1.0] ckpt_v010_c2 must be loaded";
+
+        // mContainerMap must also reflect the checkpoint containers.
+        {
+            ReadLock lock(containerManager.mContainerMapRWLock);
+            EXPECT_EQ(containerManager.mContainerMap.size(), 2u);
+        }
+
+        // Step 4: simulate the polling loop starting up.
+        containerManager.mIsRunning = true;
+
+        // ── Phase 4a: before any real snapshot (both timestamps still 0) ──────
+        // ApplyContainerDiffs() set lastConfigContainerUpdateTime = 1 (sentinel) via the
+        // unified sentinel check, even though loadContainerInfoFromDetailFormat never
+        // calls checkContainerDiffForOneConfig.
+        // checkContainerDiffForOneConfig: 1 < 0 → false; (0==0 && 0==0 && 1==0) → false
+        // → returns false.  No spurious re-trigger, containers unchanged.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must NOT re-trigger before first snapshot";
+        EXPECT_TRUE(containerManager.mConfigContainerDiffMap.empty())
+            << "[v0.1.0] No new diff must be queued when sentinel prevents re-trigger";
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v0.1.0] Containers must survive the non-triggering CheckContainerDiffForAllConfig";
+
+        // ── Phase 4b: first real snapshot arrives ─────────────────────────────
+        containerManager.mLastFullUpdateTime = 100;
+
+        // lastConfigContainerUpdateTime(1) < mLastFullUpdateTime(100) → full refresh.
+        EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must trigger on first real snapshot";
+        {
+            auto diff = containerManager.mConfigContainerDiffMap[configName];
+            ASSERT_NE(diff, nullptr);
+            EXPECT_TRUE(diff->mRefreshAllContainers) << "[v0.1.0] First real snapshot must be a full refresh";
+            EXPECT_EQ(diff->mAdded.size(), 2u)
+                << "[v0.1.0] Checkpoint containers must be re-confirmed by real snapshot";
+        }
+        containerManager.ApplyContainerDiffs();
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v0.1.0] Containers must still be present after first real snapshot apply";
+        EXPECT_EQ(mDiscoveryOpts.GetLastContainerUpdateTime(), 100)
+            << "[v0.1.0] lastConfigContainerUpdateTime must advance to mLastFullUpdateTime(100)";
+
+        // ── Phase 4c: no new snapshot — must not re-trigger ───────────────────
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must not fire again without a new snapshot";
+
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    }
+
+    // Remove the checkpoint file written during the test.
+    remove(checkpointPath.c_str());
 }
 
 void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {
@@ -2526,9 +2785,10 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T3)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2T3)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSequentialContainerDiffAndApply)
-UNIT_TEST_CASE(ContainerManagerUnittest, TestRefrashAllContainersFlag)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestRefreshAllContainersFlag)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestClearContainerInfo)
-UNIT_TEST_CASE(ContainerManagerUnittest, TestApplyContainerDiffsRefrashAllClearsStaleContainers)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestApplyContainerDiffsRefreshAllClearsStaleContainers)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoAfterConfigInit)
 
 } // namespace logtail
 

@@ -71,6 +71,7 @@ struct ContainerDiff {
                 ss << "}" << " ";
             }
         }
+        ss << "RefreshAllContainers: " << mRefreshAllContainers << " ";
         return ss.str();
     }
 };

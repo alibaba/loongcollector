@@ -309,15 +309,16 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
                                                       const CollectionPipelineContext* ctx) {
     // If this config's container update time is newer than or equal to global update time,
     // return the cached result if it exists
-    bool refrashAllContainers = false;
+    bool refreshAllContainers = false;
 
     int64_t lastConfigContainerUpdateTime = options->GetLastContainerUpdateTime();
     int64_t newContainerUpdateTime;
-    if (lastConfigContainerUpdateTime < mLastFullUpdateTime) {
-        refrashAllContainers = true;
-        newContainerUpdateTime = mLastFullUpdateTime;
+    if (lastConfigContainerUpdateTime < mLastFullUpdateTime
+        || (mLastFullUpdateTime == 0 && mLastIncrementalUpdateTime == 0 && lastConfigContainerUpdateTime == 0)) {
+        refreshAllContainers = true;
+        newContainerUpdateTime = (mLastFullUpdateTime == 0) ? static_cast<int64_t>(1) : mLastFullUpdateTime.load();
     } else if (lastConfigContainerUpdateTime < mLastIncrementalUpdateTime) {
-        refrashAllContainers = false;
+        refreshAllContainers = false;
         newContainerUpdateTime = mLastIncrementalUpdateTime;
     } else {
         return false;
@@ -327,7 +328,7 @@ bool ContainerManager::checkContainerDiffForOneConfig(FileDiscoveryOptions* opti
     std::vector<std::string> removedList;
     std::vector<std::string> matchAddedList;
     ContainerDiff diff;
-    if (refrashAllContainers) {
+    if (refreshAllContainers) {
         options->SetFullContainerList(std::make_shared<std::set<std::string>>());
         computeMatchedContainersDiff(*(options->GetFullContainerList()),
                                      containerInfoMap,
@@ -649,9 +650,9 @@ void ContainerManager::computeMatchedContainersDiff(
     const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
     const ContainerFilters& filters,
     bool isStdio,
-    bool refrashAllContainers,
+    bool refreshAllContainers,
     ContainerDiff& diff) {
-    diff.mRefreshAllContainers = refrashAllContainers;
+    diff.mRefreshAllContainers = refreshAllContainers;
     ReadLock lock(mContainerMapRWLock);
     // 移除已删除的容器
     for (auto it = fullContainerIDList.begin(); it != fullContainerIDList.end();) {
@@ -1047,8 +1048,6 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
             WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmpContainerMap);
         }
-        mLastFullUpdateTime = time(nullptr);
-
         // Update config container diffs for each config
         for (const auto& configPair : configContainerMap) {
             const std::string& configName = configPair.first;
@@ -1063,6 +1062,15 @@ void ContainerManager::loadContainerInfoFromDetailFormat(const Json::Value& root
                 mConfigContainerDiffMap[configName] = std::make_shared<ContainerDiff>(diff);
             }
         }
+
+        FileServer::GetInstance()->WithFileDiscoveryConfigsMutable(
+            [&](const std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
+                for (const auto& [name, cfg] : nameConfigMap) {
+                    if (cfg.first->IsContainerDiscoveryEnabled()) {
+                        cfg.first->SetLastContainerUpdateTime(1);
+                    }
+                }
+            });
 
         LOG_INFO(sLogger, ("load container state from docker_path_config.json (v0.1.0)", configPath));
     }
@@ -1089,7 +1097,6 @@ void ContainerManager::loadContainerInfoFromContainersFormat(const Json::Value& 
             WriteLock lock(mContainerMapRWLock);
             mContainerMap.swap(tmp);
         }
-        mLastFullUpdateTime = time(nullptr);
         // Apply containers to all existing configs
         FileServer::GetInstance()->WithFileDiscoveryConfigsMutable(
             [&](std::unordered_map<std::string, FileDiscoveryConfig>& nameConfigMap) {
