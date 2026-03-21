@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "repo": "",
+  "review_target": {
+    "type": "pr",
+    "id": "",
+    "base_ref": "",
+    "head_ref": "",
+    "base_sha": "",
+    "head_sha": ""
+  },
+  "strategy": {
+    "commit_map_threshold": 0.9,
+    "hunk_match_threshold": 0.8,
+    "fallback_on_low_confidence": true
+  },
+  "review_round": 1,
+  "generated_at": ""
+}
