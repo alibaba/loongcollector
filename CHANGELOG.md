@@ -35,5 +35,10 @@ your changes, such as:
 
 - [public] [both] [updated] add a new feature
 
+
+## [3.3.2] - 2026-03-22
+
+See [changes/v3.3.2.md](changes/v3.3.2.md) for details.
+
 ## [Unreleased]
-- [inner] [both] [updated] Support SLS Metricstore output
+
