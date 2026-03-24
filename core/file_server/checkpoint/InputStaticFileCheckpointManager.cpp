@@ -39,11 +39,13 @@ InputStaticFileCheckpointManager::InputStaticFileCheckpointManager()
     }
 }
 
-bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName,
-                                                        size_t idx,
-                                                        const optional<vector<filesystem::path>>& files,
-                                                        uint32_t startTime,
-                                                        uint32_t expireTime) {
+bool InputStaticFileCheckpointManager::CreateCheckpoint(
+    const string& configName,
+    size_t idx,
+    const optional<vector<filesystem::path>>& files,
+    uint32_t startTime,
+    uint32_t expireTime,
+    const std::unordered_map<std::string, FileCheckpoint::ContainerMeta>& fileContainerMetas) {
     if (!files.has_value()) {
         InputStaticFileCheckpoint cpt;
         if (RetrieveCheckpointFromFile(configName, idx, &cpt)) {
@@ -122,11 +124,20 @@ bool InputStaticFileCheckpointManager::CreateCheckpoint(const string& configName
         signature.resize(is.gcount());
         auto sigHash = static_cast<uint64_t>(HashSignatureString(signature.c_str(), signature.size()));
 
-        fileCpts.emplace_back(file, devInode, sigHash, signature.size(), initialSize);
+        // 查找文件对应的容器元信息
+        FileCheckpoint::ContainerMeta containerMeta;
+        if (!fileContainerMetas.empty()) {
+            auto cit = fileContainerMetas.find(file.string());
+            if (cit != fileContainerMetas.end()) {
+                containerMeta = cit->second;
+            }
+        }
+        fileCpts.emplace_back(file, devInode, sigHash, signature.size(), initialSize, containerMeta);
         LOG_INFO(sLogger,
-                 ("create file checkpoint succeeded, config",
-                  configName)("input idx", idx)("filepath", file)("device", devInode.dev)("inode", devInode.inode)(
-                     "signature hash", sigHash)("signature size", signature.size())("initial size", initialSize));
+                 ("create file checkpoint succeeded, config", configName)("input idx", idx)("filepath", file)(
+                     "device", devInode.dev)("inode", devInode.inode)("signature hash", sigHash)(
+                     "signature size", signature.size())("initial size", initialSize)("container id",
+                                                                                      containerMeta.mContainerID));
     }
     LOG_INFO(sLogger,
              ("create checkpoint succeeded, config", configName)("input idx", idx)("file count", fileCpts.size()));

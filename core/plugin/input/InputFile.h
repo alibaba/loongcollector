@@ -58,14 +58,6 @@ public:
 private:
     bool CreateInnerProcessors();
 
-    // 为 ContainerInfo 设置多个真实路径，与 FileDiscoveryOptions 的多路径对应
-    static bool SetContainerBaseDirs(ContainerInfo& containerInfo, const FileDiscoveryOptions* fileDiscovery);
-
-    // 计算单个配置路径在容器中的映射路径（不修改 containerInfo）
-    static bool SetContainerBaseDirForPath(const ContainerInfo& containerInfo,
-                                           const std::string& logPath,
-                                           std::string& outRealBaseDir);
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class InputFileUnittest;
 #endif

@@ -162,6 +162,7 @@ bool InputStaticFileCheckpoint::GetCurrentFileFingerprint(FileFingerprint* cpt) 
     cpt->mSignatureSize = fileCpt.mSignatureSize;
     cpt->mSize = fileCpt.mSize;
     cpt->mOffset = fileCpt.mOffset;
+    cpt->mContainerID = fileCpt.mContainerMeta.mContainerID;
     return true;
 }
 
@@ -201,6 +202,21 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
         file["dev"] = cpt.mDevInode.dev;
         file["inode"] = cpt.mDevInode.inode;
         file["size"] = cpt.mSize;
+        if (!cpt.mContainerMeta.mContainerID.empty()) {
+            file["container_id"] = cpt.mContainerMeta.mContainerID;
+        }
+        if (!cpt.mContainerMeta.mContainerName.empty()) {
+            file["container_name"] = cpt.mContainerMeta.mContainerName;
+        }
+        if (!cpt.mContainerMeta.mPodName.empty()) {
+            file["pod_name"] = cpt.mContainerMeta.mPodName;
+        }
+        if (!cpt.mContainerMeta.mNamespace.empty()) {
+            file["namespace"] = cpt.mContainerMeta.mNamespace;
+        }
+        if (!cpt.mContainerMeta.mContainerPath.empty()) {
+            file["container_path"] = cpt.mContainerMeta.mContainerPath;
+        }
         switch (cpt.mStatus) {
             case FileStatus::WAITING:
                 file["sig_hash"] = cpt.mSignatureHash;
@@ -375,6 +391,17 @@ bool InputStaticFileCheckpoint::Deserialize(const string& str, string* errMsg) {
                 *errMsg = "mandatory string param " + outerKey + ".status is not valid";
                 return false;
         }
+        // 读取可选的容器元信息
+        if (GetOptionalStringParam(fileCpt, outerKey + ".container_id", cpt.mContainerMeta.mContainerID, *errMsg)) {
+        }
+        if (GetOptionalStringParam(fileCpt, outerKey + ".container_name", cpt.mContainerMeta.mContainerName, *errMsg)) {
+        }
+        if (GetOptionalStringParam(fileCpt, outerKey + ".pod_name", cpt.mContainerMeta.mPodName, *errMsg)) {
+        }
+        if (GetOptionalStringParam(fileCpt, outerKey + ".namespace", cpt.mContainerMeta.mNamespace, *errMsg)) {
+        }
+        if (GetOptionalStringParam(fileCpt, outerKey + ".container_path", cpt.mContainerMeta.mContainerPath, *errMsg)) {
+        }
         mFileCheckpoints.emplace_back(std::move(cpt));
     }
 
@@ -393,6 +420,21 @@ string buildFileInfoJson(const FileCheckpoint& cpt) {
     fileInfo["sig_hash"] = cpt.mSignatureHash;
     fileInfo["sig_size"] = cpt.mSignatureSize;
     fileInfo["size"] = cpt.mSize;
+    if (!cpt.mContainerMeta.mContainerID.empty()) {
+        fileInfo["container_id"] = cpt.mContainerMeta.mContainerID;
+    }
+    if (!cpt.mContainerMeta.mContainerName.empty()) {
+        fileInfo["container_name"] = cpt.mContainerMeta.mContainerName;
+    }
+    if (!cpt.mContainerMeta.mPodName.empty()) {
+        fileInfo["pod_name"] = cpt.mContainerMeta.mPodName;
+    }
+    if (!cpt.mContainerMeta.mNamespace.empty()) {
+        fileInfo["namespace"] = cpt.mContainerMeta.mNamespace;
+    }
+    if (!cpt.mContainerMeta.mContainerPath.empty()) {
+        fileInfo["container_path"] = cpt.mContainerMeta.mContainerPath;
+    }
 
     switch (cpt.mStatus) {
         case FileStatus::WAITING:
@@ -483,6 +525,21 @@ bool InputStaticFileCheckpoint::SerializeToLogEvents() const {
             logEvent->SetContent("finish_time", ToString(mFinishTime));
         }
         logEvent->SetContent("file_info", buildFileInfoJson(cpt));
+        if (!cpt.mContainerMeta.mContainerID.empty()) {
+            logEvent->SetContent("container_id", cpt.mContainerMeta.mContainerID);
+        }
+        if (!cpt.mContainerMeta.mContainerName.empty()) {
+            logEvent->SetContent("container_name", cpt.mContainerMeta.mContainerName);
+        }
+        if (!cpt.mContainerMeta.mPodName.empty()) {
+            logEvent->SetContent("pod_name", cpt.mContainerMeta.mPodName);
+        }
+        if (!cpt.mContainerMeta.mNamespace.empty()) {
+            logEvent->SetContent("namespace", cpt.mContainerMeta.mNamespace);
+        }
+        if (!cpt.mContainerMeta.mContainerPath.empty()) {
+            logEvent->SetContent("container_path", cpt.mContainerMeta.mContainerPath);
+        }
 
         if (cpt.mStatus == FileStatus::FINISHED || cpt.mStatus == FileStatus::ABORT) {
             mLastSentIndex = i + 1;

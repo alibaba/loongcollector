@@ -47,6 +47,7 @@ private:
     uint64_t mInode;
     int64_t mHashKey;
     std::string mConfigName;
+    std::string mInputIndex;
     std::string mContainerID;
 
     // for read timeout
@@ -100,7 +101,7 @@ public:
 
     int GetWd() const { return mWd; }
 
-    const uint32_t GetCookie() const { return mCookie; }
+    uint32_t GetCookie() const { return mCookie; }
 
     int64_t GetHashKey() { return mHashKey; }
 
@@ -121,6 +122,8 @@ public:
     void SetHashKey(int64_t hashKey) { mHashKey = hashKey; }
 
     void SetConfigName(const std::string& configName) { mConfigName = configName; }
+
+    void SetInputIndex(const std::string& inputIndex) { mInputIndex = inputIndex; }
 
     void SetContainerID(const std::string& containerID) { mContainerID = containerID; }
 

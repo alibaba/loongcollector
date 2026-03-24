@@ -26,13 +26,13 @@ std::string kTestRootDir;
 class CheckpointManagerUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
-        kTestRootDir = (bfs::path(GetProcessExecutionDir()) / "CheckpointManagerUnittest").string();
-        bfs::remove_all(kTestRootDir);
-        bfs::create_directories(kTestRootDir);
+        kTestRootDir = (fs::path(GetProcessExecutionDir()) / "CheckpointManagerUnittest").string();
+        fs::remove_all(kTestRootDir);
+        fs::create_directories(kTestRootDir);
         AppConfig::GetInstance()->SetLoongcollectorConfDir(kTestRootDir);
     }
 
-    static void TearDownTestCase() { bfs::remove_all(kTestRootDir); }
+    static void TearDownTestCase() { fs::remove_all(kTestRootDir); }
 
     void TestSearchFilePathByDevInodeInDirectory();
 };
@@ -42,9 +42,9 @@ UNIT_TEST_CASE(CheckpointManagerUnittest, TestSearchFilePathByDevInodeInDirector
 void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
     const std::string kRotateFileName = "test.log.5";
     const std::string kFileName = "test.log";
-    const std::string kFilePath = (bfs::path(kTestRootDir) / kFileName).string();
-    const std::string kRotateFilePath = (bfs::path(kTestRootDir) / kRotateFileName).string();
-    const std::string kTempPath = (bfs::path(kTestRootDir) / ".." / kFileName).string();
+    const std::string kFilePath = (fs::path(kTestRootDir) / kFileName).string();
+    const std::string kRotateFilePath = (fs::path(kTestRootDir) / kRotateFileName).string();
+    const std::string kTempPath = (fs::path(kTestRootDir) / ".." / kFileName).string();
     std::ofstream(kFilePath) << "";
 
     fsutil::PathStat ps;
@@ -52,7 +52,7 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
     auto devInode = ps.GetDevInode();
 
     // Rotate file in current directory.
-    bfs::rename(kFilePath, kRotateFilePath);
+    fs::rename(kFilePath, kRotateFilePath);
 
     // Normal search.
     {
@@ -63,7 +63,7 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
 
     // Exceed limit when search.
     {
-        bfs::rename(kRotateFilePath, kTempPath);
+        fs::rename(kRotateFilePath, kTempPath);
         auto bakLimit = INT32_FLAG(checkpoint_find_max_file_count);
         INT32_FLAG(checkpoint_find_max_file_count) = 2;
 
@@ -76,14 +76,14 @@ void CheckpointManagerUnittest::TestSearchFilePathByDevInodeInDirectory() {
         EXPECT_EQ(cache.size(), INT32_FLAG(checkpoint_find_max_file_count) + 1);
 
         INT32_FLAG(checkpoint_find_max_file_count) = bakLimit;
-        bfs::rename(kTempPath, kRotateFilePath);
+        fs::rename(kTempPath, kRotateFilePath);
     }
 
     // File is moved to sub-directory.
-    const auto kSubDir = bfs::path(kTestRootDir) / "sub" / "sub";
-    bfs::create_directories(kSubDir);
+    const auto kSubDir = fs::path(kTestRootDir) / "sub" / "sub";
+    fs::create_directories(kSubDir);
     const auto kSubDirFilePath = (kSubDir / kRotateFileName).string();
-    bfs::rename(kRotateFilePath, kSubDirFilePath);
+    fs::rename(kRotateFilePath, kSubDirFilePath);
 
     // Search with depth.
     {

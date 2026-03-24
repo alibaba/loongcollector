@@ -180,10 +180,6 @@ private:
     int32_t mCpuArrayForScaleIdx;
     float mScaledCpuUsageStep;
 #endif
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    friend class ConfigUpdatorUnittest;
-#endif
 };
 
 class LoongCollectorMonitor {

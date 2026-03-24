@@ -145,7 +145,7 @@ void LogInput::TryReadEvents(bool forceRead) {
     }
 
     std::vector<Event*> containerStoppedEvents;
-    ConfigManager::GetInstance()->GetContainerStoppedEvents(containerStoppedEvents);
+    ConfigManager::GetInstance()->GetFileServerContainerStoppedEvents(containerStoppedEvents);
     if (containerStoppedEvents.size() > 0) {
         PushEventQueue(containerStoppedEvents);
     }

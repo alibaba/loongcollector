@@ -123,9 +123,7 @@ public:
     const std::string& GetConfigName() const { return mConfigName; }
 
 #ifdef APSARA_UNIT_TEST_MAIN
-    friend class ConfigUpdatorUnittest;
     friend class EventDispatcherTest;
-    friend class SenderUnittest;
     friend class ModifyHandlerUnittest;
     friend class ForceReadUnittest;
     friend class CreateModifyHandlerUnittest;
@@ -183,9 +181,7 @@ public:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CreateModifyHandlerUnittest;
-    friend class ConfigUpdatorUnittest;
     friend class EventDispatcherTest;
-    friend class SenderUnittest;
     friend class EventDispatcherContainerUnittest;
     friend class LogInputReaderUnittest;
 #endif

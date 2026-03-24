@@ -37,8 +37,16 @@ const std::string& FileStatusToString(FileStatus status);
 FileStatus GetFileStatusFromString(const std::string& status);
 
 struct FileCheckpoint {
+    // 容器场景下与文件绑定的元信息
+    struct ContainerMeta {
+        std::string mContainerID;
+        std::string mContainerName;
+        std::string mPodName;
+        std::string mNamespace;
+        std::string mContainerPath; // 容器内路径
+    };
+
     std::filesystem::path mFilePath;
-    // std::string mRealFileName;
     DevInode mDevInode;
     uint64_t mSignatureHash = 0;
     uint32_t mSignatureSize = 0;
@@ -47,18 +55,21 @@ struct FileCheckpoint {
     FileStatus mStatus = FileStatus::WAITING;
     int32_t mStartTime = 0;
     int32_t mLastUpdateTime = 0;
+    ContainerMeta mContainerMeta; // 容器场景下使用，非容器时各字段为空
 
     FileCheckpoint() = default;
     FileCheckpoint(const std::filesystem::path& filename,
                    const DevInode& devInode,
                    uint64_t signatureHash,
                    uint32_t signatureSize,
-                   uint64_t initialSize = 0)
+                   uint64_t initialSize = 0,
+                   const ContainerMeta& containerMeta = {})
         : mFilePath(filename),
           mDevInode(devInode),
           mSignatureHash(signatureHash),
           mSignatureSize(signatureSize),
-          mSize(initialSize) {}
+          mSize(initialSize),
+          mContainerMeta(containerMeta) {}
 };
 
 struct FileFingerprint {
@@ -68,6 +79,7 @@ struct FileFingerprint {
     uint64_t mSignatureHash;
     uint64_t mSize = 0; // 初始文件大小，用于限制 StaticFileServer reader 的读取范围
     uint64_t mOffset = 0;
+    std::string mContainerID; // 容器场景下当前文件所属容器 ID，非容器为空；用于读文件时校验容器是否变更/停止
 };
 
 } // namespace logtail

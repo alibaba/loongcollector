@@ -16,7 +16,7 @@
 #if defined(__linux__)
 #include <unistd.h>
 #endif
-#include <filesystem>
+
 #include <string>
 #include <vector>
 
@@ -54,14 +54,14 @@ protected:
             mTestRootDir.resize(mTestRootDir.size() - 1);
         }
         mTestRootDir += PATH_SEPARATOR + "ConfigManagerTest";
-        std::filesystem::remove_all(mTestRootDir);
-        std::filesystem::create_directories(mTestRootDir);
+        fs::remove_all(mTestRootDir);
+        fs::create_directories(mTestRootDir);
     }
 
     void TearDown() override {
         CheckPointManager::Instance()->RemoveAllCheckPoint();
         ConfigManager::GetInstance()->ClearFilePipelineMatchCache();
-        std::filesystem::remove_all(mTestRootDir);
+        fs::remove_all(mTestRootDir);
     }
 
     FileDiscoveryConfig CreateTestConfig(const string& basePath) {
@@ -89,7 +89,7 @@ void ConfigManagerUnittest::TestRegisterHandlersWithinDepthDanglingRef() {
     for (int i = 0; i < numSubdirs; ++i) {
         subdirs.push_back(baseDir + PS + "subdir" + ToString(i));
         for (int j = 0; j < 5; ++j) {
-            std::filesystem::create_directories(subdirs.back() + PS + "nested" + ToString(j));
+            fs::create_directories(subdirs.back() + PS + "nested" + ToString(j));
         }
     }
 
@@ -123,10 +123,10 @@ void ConfigManagerUnittest::TestRegisterHandlersWithinDepthDanglingRef() {
     int startIdx = numSubdirs / 10;
     int endIdx = numSubdirs * 9 / 10;
     for (int i = startIdx; i < endIdx; ++i) {
-        std::filesystem::remove_all(subdirs[i]);
-        std::filesystem::create_directories(subdirs[i]);
+        fs::remove_all(subdirs[i]);
+        fs::create_directories(subdirs[i]);
         for (int j = 0; j < 5; ++j) {
-            std::filesystem::create_directories(subdirs[i] + PS + "nested" + ToString(j));
+            fs::create_directories(subdirs[i] + PS + "nested" + ToString(j));
         }
     }
     LOG_INFO(sLogger, ("Subdirs recreated with new inode", "")("count", endIdx - startIdx));

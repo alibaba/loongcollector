@@ -182,7 +182,6 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CheckpointManagerV2Unittest;
     friend class ExactlyOnceReaderUnittest;
-    friend class SenderUnittest;
 
     void rebuild();
 #endif

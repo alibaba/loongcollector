@@ -20,14 +20,17 @@
 
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "json/json.h"
 
+#include "file_server/checkpoint/FileCheckpoint.h"
 #include "file_server/checkpoint/InputStaticFileCheckpoint.h"
 
 namespace logtail {
@@ -46,7 +49,9 @@ public:
                           size_t idx,
                           const std::optional<std::vector<std::filesystem::path>>& files = std::nullopt,
                           uint32_t startTime = 0,
-                          uint32_t expireTime = 0);
+                          uint32_t expireTime = 0,
+                          const std::unordered_map<std::string, FileCheckpoint::ContainerMeta>& fileContainerMetas
+                          = {});
     bool DeleteCheckpoint(const std::string& configName, size_t idx);
     bool UpdateCurrentFileCheckpoint(const std::string& configName, size_t idx, uint64_t offset);
     bool InvalidateCurrentFileCheckpoint(const std::string& configName, size_t idx);

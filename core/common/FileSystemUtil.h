@@ -71,9 +71,6 @@ bool IsRelativePath(const std::string& path);
 // . -> /usr/local/ilogtail/.
 // ./a.txt -> /usr/local/ilogtail/./a.txt
 std::string AbsolutePath(const std::string& path, const std::string& basepath);
-// /usr/local/ilogtail/. -> /usr/local/ilogtail
-// /usr/local/ilogtail/./a.txt -> /usr/local/ilogtail/a.txt
-std::string NormalizePath(const std::string& path);
 
 // FSeek, FTell that can handle file large than 2GB on 32bits OS.
 int FSeek(FILE* stream, int64_t offset, int origin);

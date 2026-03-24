@@ -20,7 +20,8 @@
 #endif
 #include <cstdlib>
 
-#include "boost/filesystem.hpp"
+#include <filesystem>
+
 #include "gtest/gtest.h"
 
 #include "common/HashUtil.h"
@@ -30,7 +31,7 @@
 #include "common/TimeUtil.h"
 #include "logger/Logger.h"
 
-namespace bfs = boost::filesystem;
+namespace fs = std::filesystem;
 
 #define APSARA_TEST_TRUE(condition) \
     do { \

@@ -16,20 +16,26 @@
 
 #pragma once
 
+#include <ctime>
+
 #include <condition_variable>
 #include <filesystem>
 #include <future>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
 #include "file_server/FileDiscoveryOptions.h"
 #include "file_server/FileTagOptions.h"
 #include "file_server/MultilineOptions.h"
+#include "file_server/checkpoint/FileCheckpoint.h"
 #include "file_server/reader/FileReaderOptions.h"
 #include "file_server/reader/LogFileReader.h"
 #include "monitor/MetricManager.h"
@@ -56,13 +62,30 @@ public:
 
     void AddInput(const std::string& configName,
                   size_t idx,
-                  const std::optional<std::vector<std::filesystem::path>>& files,
                   FileDiscoveryOptions* fileDiscoveryOpts,
                   const FileReaderOptions* fileReaderOpts,
                   const MultilineOptions* multilineOpts,
                   const FileTagOptions* fileTagOpts,
+                  std::unordered_map<std::string, FileCheckpoint::ContainerMeta>& fileContainerMetas,
                   const CollectionPipelineContext* ctx);
     void RemoveInput(const std::string& configName, size_t idx, bool keepingCheckpoint = false);
+
+    const std::map<std::pair<std::string, size_t>, FileDiscoveryConfig>& GetAllFileDiscoveryConfigs() const {
+        return mInputFileDiscoveryConfigsMap;
+    }
+
+    // Config maps only (same idea as FileServer::WithFileDiscoveryConfigs*).
+    template <typename Func>
+    void WithFileDiscoveryConfigs(Func&& fn) const {
+        ReadLock lock(mConfigReadWriteLock);
+        fn(mInputFileDiscoveryConfigsMap);
+    }
+
+    template <typename Func>
+    void WithFileDiscoveryConfigsMutable(Func&& fn) {
+        WriteLock lock(mConfigReadWriteLock);
+        fn(mInputFileDiscoveryConfigsMap);
+    }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     void Clear();
@@ -82,6 +105,32 @@ private:
     MultilineConfig GetMultilineConfig(const std::string& name, size_t idx) const;
     FileTagConfig GetFileTagConfig(const std::string& name, size_t idx) const;
 
+    // If container discovery is enabled, finds the container that owns hostPath and fills outContainerID/outStopped.
+    // Returns true when container discovery is enabled (caller should validate); outContainerID empty and outStopped
+    // true means path is no longer under any container (e.g. container removed).
+    bool GetCurrentContainerInfoForPath(const std::string& configName,
+                                        size_t idx,
+                                        const std::string& hostPath,
+                                        std::string* outContainerID,
+                                        bool* outStopped) const;
+
+    static std::vector<std::filesystem::path>
+    GetFiles(const FileDiscoveryOptions* fileDiscoveryOpts,
+             const CollectionPipelineContext* ctx,
+             std::unordered_map<std::string, FileCheckpoint::ContainerMeta>& fileContainerMetas);
+    static void GetFiles(const FileDiscoveryOptions* fileDiscoveryOpts,
+                         const std::filesystem::path& dir,
+                         uint32_t depth,
+                         const BasePathInfo* pathInfo,
+                         const std::string* containerBaseDir,
+                         std::set<DevInode>& visitedDir,
+                         std::vector<std::filesystem::path>& files);
+    static bool IsValidDir(const std::filesystem::path& dir);
+    static void GetValidBaseDirs(const BasePathInfo& pathInfo,
+                                 const std::filesystem::path& dir,
+                                 uint32_t depth,
+                                 std::vector<std::filesystem::path>& filepaths);
+
     std::future<void> mThreadRes;
     mutable std::mutex mThreadRunningMux;
     bool mIsThreadRunning = false;
@@ -94,16 +143,21 @@ private:
     time_t mStartTime = 0;
     bool mIsUnusedCheckpointsCleared = false;
 
-    std::multimap<std::string, std::pair<size_t, LogFileReaderPtr>> mPipelineNameReadersMap;
-
-    // accessed by main thread and input runner thread
+    // Runner state: multimap / mAddedInputs / mDeletedInputs.
+    // Lock order when both needed: mUpdateMux first, then mConfigReadWriteLock.
     mutable std::mutex mUpdateMux;
+    std::multimap<std::pair<std::string, size_t>, LogFileReaderPtr> mInputReadersMap;
+    std::multimap<std::pair<std::string, size_t>, const CollectionPipelineContext*> mAddedInputs;
+    std::set<std::pair<std::string, size_t>> mDeletedInputs;
+
+    // Plugin / config registration (same pattern as FileServer::mReadWriteLock).
+    mutable ReadWriteLock mConfigReadWriteLock;
     std::map<std::pair<std::string, size_t>, FileDiscoveryConfig> mInputFileDiscoveryConfigsMap;
+    std::map<std::pair<std::string, size_t>, std::unordered_map<std::string, FileCheckpoint::ContainerMeta>>
+        mFileContainerMetaMap;
     std::map<std::pair<std::string, size_t>, FileReaderConfig> mInputFileReaderConfigsMap;
     std::map<std::pair<std::string, size_t>, MultilineConfig> mInputMultilineConfigsMap;
     std::map<std::pair<std::string, size_t>, FileTagConfig> mInputFileTagConfigsMap;
-    std::multimap<std::string, size_t> mAddedInputs;
-    std::set<std::pair<std::string, size_t>> mDeletedInputs;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class StaticFileServerUnittest;

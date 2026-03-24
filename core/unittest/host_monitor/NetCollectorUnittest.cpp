@@ -41,7 +41,7 @@ protected:
         // UDPLITE: inuse 0
         // RAW: inuse 0
         // FRAG: inuse 0 memory 0
-        std::filesystem::create_directories("./net");
+        fs::create_directories("./net");
         ofstream ofs1("./net/sockstat", std::ios::trunc);
         ofs1 << "sockets: used 316\n";
         ofs1 << "TCP: inuse 25 orphan 0 tw 2 alloc 28 mem 4\n";
@@ -169,13 +169,13 @@ void NetCollectorUnittest::TestCollect() const {
 void NetCollectorUnittest::TestIpv6FileNoExist() const {
     // 删除单个文件
     std::error_code ec;
-    bool success = std::filesystem::remove("./net/sockstat6", ec);
+    bool success = fs::remove("./net/sockstat6", ec);
     if (!success && ec) {
         // 处理错误，比如文件不存在或权限不足
         std::cerr << "Failed to delete file: " << ec.message() << std::endl;
     }
 
-    success = std::filesystem::remove("./net/if_inet6", ec);
+    success = fs::remove("./net/if_inet6", ec);
     if (!success && ec) {
         // 处理错误，比如文件不存在或权限不足
         std::cerr << "Failed to delete file: " << ec.message() << std::endl;

@@ -32,14 +32,14 @@ public:
 protected:
     void SetUp() override {
         sManager = InputStaticFileCheckpointManager::GetInstance();
-        sManager->mCheckpointRootPath = filesystem::path("./input_static_file");
-        filesystem::create_directories(sManager->mCheckpointRootPath);
+        sManager->mCheckpointRootPath = fs::path("./input_static_file");
+        fs::create_directories(sManager->mCheckpointRootPath);
     }
 
     void TearDown() override {
         sManager->ClearUnusedCheckpoints();
         sManager->mInputCheckpointMap.clear();
-        filesystem::remove_all(sManager->mCheckpointRootPath);
+        fs::remove_all(sManager->mCheckpointRootPath);
     }
 
 private:
@@ -48,8 +48,8 @@ private:
 
 void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     // prepare logs
-    filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log"};
+    fs::create_directories("test_logs");
+    vector<fs::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log"};
     vector<string> contents{string(2000, 'a') + "\n", string(200, 'b') + "\n"};
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
@@ -101,7 +101,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
     // create config
     {
         // new config
-        optional<vector<filesystem::path>> filesOpt({files[0]});
+        optional<vector<fs::path>> filesOpt({files[0]});
         APSARA_TEST_TRUE(sManager->CreateCheckpoint("test_config_1", 0, filesOpt));
         APSARA_TEST_EQUAL(1U, sManager->mInputCheckpointMap.size());
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_1", 0));
@@ -120,11 +120,11 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
     }
     {
         // old config, but changed on restart
-        optional<vector<filesystem::path>> filesOpt({files[1]});
+        optional<vector<fs::path>> filesOpt({files[1]});
         APSARA_TEST_TRUE(sManager->CreateCheckpoint("test_config_2", 0, filesOpt));
         APSARA_TEST_EQUAL(2U, sManager->mInputCheckpointMap.size());
         const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config_2", 0));
@@ -143,8 +143,8 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(FileStatus::WAITING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_2@0.json"));
-        APSARA_TEST_NOT_EQUAL(0U, std::filesystem::file_size(sManager->mCheckpointRootPath / "test_config_2@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_2@0.json"));
+        APSARA_TEST_NOT_EQUAL(0U, fs::file_size(sManager->mCheckpointRootPath / "test_config_2@0.json"));
     }
     {
         // old config, no change
@@ -165,7 +165,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(FileStatus::READING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_EQUAL(1739349980, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_EQUAL(1739349981, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_3@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_3@0.json"));
     }
     {
         // old config, no change, but checkpoint file not existed
@@ -177,7 +177,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(StaticFileReadingStatus::ABORT, cpt.mStatus);
         APSARA_TEST_EQUAL(0U, cpt.mCurrentFileIndex);
         APSARA_TEST_TRUE(cpt.mFileCheckpoints.empty());
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_4@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_4@0.json"));
     }
 
     // delete config
@@ -187,24 +187,23 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpointMap() const {
         APSARA_TEST_EQUAL(3U, sManager->mInputCheckpointMap.size());
         APSARA_TEST_EQUAL(sManager->mInputCheckpointMap.end(),
                           sManager->mInputCheckpointMap.find(make_pair("test_config_1", 0)));
-        APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
+        APSARA_TEST_FALSE(fs::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
     }
     {
         // checkpoint file not existed
-        filesystem::remove(sManager->mCheckpointRootPath / "test_config_2@0.json");
+        fs::remove(sManager->mCheckpointRootPath / "test_config_2@0.json");
         APSARA_TEST_TRUE(sManager->DeleteCheckpoint("test_config_2", 0));
         APSARA_TEST_EQUAL(2U, sManager->mInputCheckpointMap.size());
         APSARA_TEST_EQUAL(sManager->mInputCheckpointMap.end(),
                           sManager->mInputCheckpointMap.find(make_pair("test_config_2", 0)));
     }
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     // prepare logs
-    filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{
-        "./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
+    fs::create_directories("test_logs");
+    vector<fs::path> files{"./test_logs/test_file_1.log", "./test_logs/test_file_2.log", "./test_logs/test_file_3.log"};
     vector<string> contents{string(2000, 'a') + "\n", string(200, 'b') + "\n", string(500, 'c') + "\n"};
     vector<FileFingerprint> fingerprints;
     for (size_t i = 0; i < files.size(); ++i) {
@@ -221,7 +220,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
     }
 
     sManager->CreateCheckpoint("test_config_1", 0, files);
-    sManager->CreateCheckpoint("test_config_2", 0, optional<vector<filesystem::path>>({files[0]}));
+    sManager->CreateCheckpoint("test_config_2", 0, optional<vector<fs::path>>({files[0]}));
     {
         // from waiting to reading
         uint64_t initialSize = static_cast<uint64_t>(contents[0].size());
@@ -235,7 +234,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
         APSARA_TEST_EQUAL(FileStatus::READING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
         InputStaticFileCheckpoint cptLoaded;
         sManager->LoadCheckpointFile(sManager->mCheckpointRootPath / "test_config_1@0.json", &cptLoaded);
         APSARA_TEST_EQUAL(cpt.mFileCheckpoints[0].mOffset, cptLoaded.mFileCheckpoints[0].mOffset);
@@ -263,7 +262,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
         APSARA_TEST_EQUAL(FileStatus::READING, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
         InputStaticFileCheckpoint cptLoaded;
         sManager->LoadCheckpointFile(sManager->mCheckpointRootPath / "test_config_1@0.json", &cptLoaded);
         APSARA_TEST_EQUAL(1000U, cptLoaded.mFileCheckpoints[0].mOffset);
@@ -287,7 +286,7 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
         APSARA_TEST_EQUAL(FileStatus::FINISHED, cpt.mFileCheckpoints[0].mStatus);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mStartTime);
         APSARA_TEST_NOT_EQUAL(0, cpt.mFileCheckpoints[0].mLastUpdateTime);
-        APSARA_TEST_TRUE(filesystem::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
+        APSARA_TEST_TRUE(fs::exists(sManager->mCheckpointRootPath / "test_config_1@0.json"));
         InputStaticFileCheckpoint cptLoaded;
         sManager->LoadCheckpointFile(sManager->mCheckpointRootPath / "test_config_1@0.json", &cptLoaded);
         APSARA_TEST_EQUAL(cpt.mFileCheckpoints[0].mSize, cptLoaded.mFileCheckpoints[0].mSize);
@@ -343,12 +342,12 @@ void InputStaticFileCheckpointManagerUnittest::TestUpdateCheckpoint() const {
         FileFingerprint fp;
         APSARA_TEST_FALSE(sManager->GetCurrentFileFingerprint("test_config_2", 0, &fp));
     }
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     // valid checkpoint root path
-    filesystem::create_directories(sManager->mCheckpointRootPath / "dir");
+    fs::create_directories(sManager->mCheckpointRootPath / "dir");
     { ofstream fout(sManager->mCheckpointRootPath / "unsupported_extenstion.yaml", std::ios_base::binary); }
     { ofstream fout(sManager->mCheckpointRootPath / "invalid_filename.json", std::ios_base::binary); }
     { ofstream fout(sManager->mCheckpointRootPath / "test_config@invalid_idx.json", std::ios_base::binary); }
@@ -365,14 +364,14 @@ void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
     APSARA_TEST_NOT_EQUAL(sManager->mCheckpointFileNamesOnInit.end(),
                           sManager->mCheckpointFileNamesOnInit.find(make_pair("test_config", 1)));
 
-    filesystem::remove(sManager->mCheckpointRootPath / "test_config@0.json");
+    fs::remove(sManager->mCheckpointRootPath / "test_config@0.json");
     sManager->ClearUnusedCheckpoints();
     APSARA_TEST_TRUE(sManager->mInputCheckpointMap.empty());
-    APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
-    APSARA_TEST_FALSE(filesystem::exists(sManager->mCheckpointRootPath / "test_config@1.json"));
+    APSARA_TEST_FALSE(fs::exists(sManager->mCheckpointRootPath / "test_config@0.json"));
+    APSARA_TEST_FALSE(fs::exists(sManager->mCheckpointRootPath / "test_config@1.json"));
 
     // no checkpoint root path
-    filesystem::remove_all(sManager->mCheckpointRootPath);
+    fs::remove_all(sManager->mCheckpointRootPath);
     EXPECT_NO_THROW(sManager->GetAllCheckpointFileNames());
 
     // invalid checkpoint root path
@@ -381,11 +380,11 @@ void InputStaticFileCheckpointManagerUnittest::TestCheckpointFileNames() const {
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
-    filesystem::create_directories("test_logs");
-    vector<filesystem::path> files{"./test_logs/test_file_1.log",
-                                   "./test_logs/test_file_2.log",
-                                   "./test_logs/test_file_3.log",
-                                   "./test_logs/test_file_4.log"};
+    fs::create_directories("test_logs");
+    vector<fs::path> files{"./test_logs/test_file_1.log",
+                           "./test_logs/test_file_2.log",
+                           "./test_logs/test_file_3.log",
+                           "./test_logs/test_file_4.log"};
     {
         ofstream fout(files[0], std::ios_base::binary);
         fout << string(2000, 'a') << endl;
@@ -409,7 +408,7 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
     sManager->InvalidateCurrentFileCheckpoint("test_config_1", 0);
     sManager->UpdateCurrentFileCheckpoint("test_config_1", 0, 100);
     // job_2 finished
-    optional<vector<filesystem::path>> filesOpt({files[0]});
+    optional<vector<fs::path>> filesOpt({files[0]});
     sManager->CreateCheckpoint("test_config_2", 0, filesOpt);
     sManager->UpdateCurrentFileCheckpoint("test_config_2", 0, file1InitialSize);
 
@@ -455,18 +454,18 @@ void InputStaticFileCheckpointManagerUnittest::TestDumpCheckpoints() const {
         APSARA_TEST_EQUAL(expectedCpt.mStatus, cpt.mStatus);
         APSARA_TEST_EQUAL(expectedCpt.mFileCheckpoints.size(), cpt.mFileCheckpoints.size());
     }
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const {
-    filesystem::path cptPath = sManager->mCheckpointRootPath / "test_config@0.json";
+    fs::path cptPath = sManager->mCheckpointRootPath / "test_config@0.json";
     InputStaticFileCheckpoint cpt;
     // no file
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
     // not regular file
-    filesystem::create_directories(cptPath);
+    fs::create_directories(cptPath);
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
-    filesystem::remove_all(cptPath);
+    fs::remove_all(cptPath);
     // empty file
     { ofstream fout(cptPath, std::ios_base::binary); }
     APSARA_TEST_FALSE(sManager->LoadCheckpointFile(cptPath, &cpt));
@@ -646,15 +645,15 @@ void InputStaticFileCheckpointManagerUnittest::TestInvalidCheckpointFile() const
 }
 
 void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
-    filesystem::create_directories("test_logs");
-    filesystem::path testFile = "./test_logs/test_file.log";
+    fs::create_directories("test_logs");
+    fs::path testFile = "./test_logs/test_file.log";
     string content = string(2000, 'a') + "\n";
     {
         ofstream fout(testFile, std::ios_base::binary);
         fout << content;
     }
 
-    optional<vector<filesystem::path>> filesOpt({testFile});
+    optional<vector<fs::path>> filesOpt({testFile});
     sManager->CreateCheckpoint("test_config", 0, filesOpt);
 
     const auto& cpt = sManager->mInputCheckpointMap.at(make_pair("test_config", 0));
@@ -675,7 +674,7 @@ void InputStaticFileCheckpointManagerUnittest::TestSizeRemainsConstant() const {
     sManager->UpdateCurrentFileCheckpoint("test_config", 0, initialSize);
     APSARA_TEST_EQUAL(initialSize, cpt.mFileCheckpoints[0].mSize);
 
-    filesystem::remove_all("test_logs");
+    fs::remove_all("test_logs");
 }
 
 UNIT_TEST_CASE(InputStaticFileCheckpointManagerUnittest, TestUpdateCheckpointMap)

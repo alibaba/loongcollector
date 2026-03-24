@@ -97,9 +97,7 @@ private:
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class LogInputUnittest;
     friend class EventDispatcherTest;
-    friend class ConfigUpdatorUnittest;
     friend class SymlinkInotifyTest;
-    friend class SenderUnittest;
     friend class FuxiSceneUnittest;
     friend class ConfigMatchUnittest;
     friend class FuseFileUnittest;

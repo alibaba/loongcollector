@@ -47,18 +47,23 @@ public:
     void Init();
     void Stop();
 
-    void ApplyContainerDiffs();
-    bool CheckContainerDiffForAllConfig();
+    // 由于获取容器信息可能耗时较大，这里通过更新时间是否更新过判断是否成功拉取过一次容器信息
+    bool IsReady() {
+        return mIsRunning.load() && (mLastFullUpdateTime.load() > 0 || mLastIncrementalUpdateTime.load() > 0);
+    }
 
-    void GetContainerStoppedEvents(std::vector<Event*>& eventVec);
+    // file server
+    void ApplyFileServerContainerDiffs();
+    bool CheckFileServerContainerDiffs();
+    void GetFileServerContainerStoppedEvents(std::vector<Event*>& eventVec);
+    // static file server
+    void ApplyStaticFileServerContainerDiffs();
+    bool CheckStaticFileServerContainerDiffs();
+    void GetStaticFileServerContainerStoppedEvents();
+
     // Persist/restore container runtime state
     void SaveContainerInfo();
     void LoadContainerInfo();
-
-    MatchedContainerInfo CreateMatchedContainerInfo(const FileDiscoveryOptions* options,
-                                                    const CollectionPipelineContext* ctx,
-                                                    const std::vector<std::string>& pathExistContainerIDs,
-                                                    const std::vector<std::string>& pathNotExistContainerIDs);
 
     void UpdateMatchedContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveMatchedContainerInfoPipeline();
@@ -68,7 +73,17 @@ private:
     void refreshAllContainersSnapshot();
     void incrementallyUpdateContainersSnapshot();
 
-    bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
+    bool checkContainerDiffForOneConfig(const std::string& configName,
+                                        size_t inputIndex,
+                                        FileDiscoveryOptions* options,
+                                        const CollectionPipelineContext* ctx);
+    void getContainerStoppedEventForOneConfig(const std::string& configName,
+                                              size_t inputIndex,
+                                              const std::string& containerID,
+                                              const FileDiscoveryConfig& config,
+                                              std::vector<Event*>* eventVec = nullptr);
+    void updateContainerInfoPointersInAllConfigs();
+    void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
     computeMatchedContainersDiff(std::set<std::string>& fullContainerIDList,
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
@@ -83,12 +98,28 @@ private:
     void sendMatchedContainerInfo(std::vector<std::shared_ptr<MatchedContainerInfo>> configResults);
     void sendAllMatchedContainerInfo();
 
-    // Helper method for joining container IDs
-    std::string joinContainerIDs(const std::vector<std::string>& containerIDs);
+    static std::string joinContainerIDs(const std::vector<std::string>& containerIDs);
+
+    static MatchedContainerInfo createMatchedContainerInfo(const std::string& configName,
+                                                           size_t inputIndex,
+                                                           const FileDiscoveryOptions* options,
+                                                           const CollectionPipelineContext* ctx,
+                                                           const std::vector<std::string>& pathExistContainerIDs,
+                                                           const std::vector<std::string>& pathNotExistContainerIDs);
+
+    static void appendMatchedContainerInfoForConfig(const std::string& configName,
+                                                    size_t inputIndex,
+                                                    FileDiscoveryOptions* options,
+                                                    const CollectionPipelineContext* ctx,
+                                                    std::vector<std::shared_ptr<MatchedContainerInfo>>& configResults);
+
+    static void applyContainerDiffToOptions(FileDiscoveryOptions* options,
+                                            const CollectionPipelineContext* ctx,
+                                            const std::shared_ptr<ContainerDiff>& diff);
 
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
-    std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
-    std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
+    std::map<std::pair<std::string, size_t>, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
+    std::map<std::pair<std::string, size_t>, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
     mutable ReadWriteLock mContainerMapRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
