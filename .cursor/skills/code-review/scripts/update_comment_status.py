@@ -160,10 +160,8 @@ def main() -> None:
         cid = comment.get("comment_id")
         if cid in previous_map:
             item = previous_map[cid]
-            # Preserve manual/model edits on status_tech/notes, only sync flow status.
-            source_flow = infer_flow_status_from_comment(comment)
-            if source_flow == "resolved" and item.get("status_flow") == "open":
-                item["status_flow"] = "resolved"
+            # Preserve manual/model edits on status_tech/notes, always sync flow status from source.
+            item["status_flow"] = infer_flow_status_from_comment(comment)
         else:
             item = default_status(comment)
 

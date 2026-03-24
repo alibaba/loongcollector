@@ -58,4 +58,4 @@ You are an expert in Go, microservices architecture, and clean backend developme
 - Enforce naming consistency and formatting with 'go fmt', 'goimports', and 'golangci-lint'.
 ### Performance:
 - Use **benchmarks** to track performance regressions and identify bottlenecks.
-- Minimize **allocations** and avoid premature optimization; profile befor
+- Minimize **allocations** and avoid premature optimization; profile before optimizing and focus on real bottlenecks.

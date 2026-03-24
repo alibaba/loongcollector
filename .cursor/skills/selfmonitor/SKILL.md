@@ -406,7 +406,7 @@ logger.Warning(ctx, "UNKNOWN_ALARM", "未知告警")
   - 包名使用小写: `selfmonitor`
   - 类型名使用PascalCase: `AlarmType`, `AlarmLevel`
   - 函数名使用camelCase: `Record`, `SerializeToPb`
-  - 常量使用SCREAMING_SNAKE_CASE: `AlarmLevelWaring`
+  - 常量使用SCREAMING_SNAKE_CASE: `AlarmLevelWarning`
 
 - **代码结构**:
   - 适当的错误处理

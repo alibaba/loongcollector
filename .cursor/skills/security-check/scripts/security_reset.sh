@@ -24,7 +24,7 @@ if [ ${#sensitive_commits[@]} -gt 0 ]; then
     
     # 获取要reset的目标commit
     # 找到最早的敏感commit（数组最后一个），并获取其父commit
-    earliest_sensitive="${sensitive_commits[-1]}"
+    earliest_sensitive="${sensitive_commits[${#sensitive_commits[@]}-1]}"
     parent_commit=$(git rev-parse --quiet "${earliest_sensitive}^")
 
     # 获取所有需要被squash的commits（从最早的敏感commit的parent到HEAD）
@@ -77,10 +77,13 @@ if [ ${#sensitive_commits[@]} -gt 0 ]; then
     if [ -n "$parent_commit" ]; then
         git reset --soft "$parent_commit"
     else
-        # 如果是root commit，reset到初始状态
-        git update-ref -d HEAD
-        # 清理暂存区，因为没有父节点可以比较
-        git rm --cached -r .
+        echo "❌ 检测到最早敏感 commit 为 root commit，自动清理会涉及高风险历史重写，已中止。"
+        echo "请手动执行更安全流程（例如 orphan 分支重建）后再提交。"
+        if [ "$stashed" = true ]; then
+            echo "⚠️  已为你恢复之前的工作区更改。"
+            git stash pop
+        fi
+        exit 1
     fi
     
     # 显示需要手动清理的文件
