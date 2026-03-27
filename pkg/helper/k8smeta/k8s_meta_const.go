@@ -5,6 +5,7 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -27,6 +28,8 @@ const (
 	STORAGECLASS          = "storageclass"
 	INGRESS               = "ingress"
 	CONTAINER             = "container"
+	// CUSTOM_RESOURCE_ARGO_WORKFLOW is the unified MetaCache key / event ResourceType for Argo Workflow CR entities.
+	CUSTOM_RESOURCE_ARGO_WORKFLOW = "customresource/argoproj.io/workflow"
 	// entity link type, the direction is from resource which will be trigger to linked resource
 	//revive:disable:var-naming
 	LINK_SPLIT_CHARACTER     = "->"
@@ -43,7 +46,20 @@ const (
 	POD_SERVICE              = "pod->service"
 	POD_CONTAINER            = "pod->container"
 	INGRESS_SERVICE          = "ingress->service"
+	POD_ARGO_WORKFLOW        = "pod->customresource/argoproj.io/workflow"
 	//revive:enable:var-naming
+
+	// ArgoWorkflowKind is the Kubernetes kind for argoproj.io Workflow CRs.
+	ArgoWorkflowKind = "Workflow"
+
+	// DefaultArgoWorkflowAPIGroup is the Workflow CRD API group (ownerRef APIVersion match + dynamic informer Group).
+	DefaultArgoWorkflowAPIGroup = "argoproj.io"
+	// DefaultArgoWorkflowAPIVersion is the Workflow informer API version.
+	DefaultArgoWorkflowAPIVersion = "v1alpha1"
+	// DefaultArgoWorkflowResource is the Workflow informer resource name (plural).
+	DefaultArgoWorkflowResource = "workflows"
+	// DefaultArgoWorkflowPodLabelKey is the Pod label used as fallback to resolve Workflow name.
+	DefaultArgoWorkflowPodLabelKey = "workflows.argoproj.io/workflow"
 
 	// add namespace link
 	//revive:disable:var-naming
@@ -200,6 +216,22 @@ type PersistentVolumeClaimNamespace struct {
 type IngressNamespace struct {
 	Ingress   *networking.Ingress
 	Namespace *v1.Namespace
+}
+
+// ArgoWorkflowCollectorOptions configures Pod↔Workflow link matching and the Workflow dynamic informer GVR.
+// A zero value means: use DefaultArgoWorkflowAPIGroup, DefaultArgoWorkflowAPIVersion, DefaultArgoWorkflowResource, DefaultArgoWorkflowPodLabelKey.
+// Apply via MetaManager.ConfigureArgoWorkflowCollector before the first EnsureArgoWorkflowInformerStarted.
+type ArgoWorkflowCollectorOptions struct {
+	APIGroup            string
+	APIVersion          string
+	Resource            string
+	PodWorkflowLabelKey string
+}
+
+// PodArgoWorkflow links a Pod to an Argo Workflow CR (unstructured).
+type PodArgoWorkflow struct {
+	Pod      *v1.Pod
+	Workflow *unstructured.Unstructured
 }
 
 const (

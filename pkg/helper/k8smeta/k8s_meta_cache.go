@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -34,6 +35,11 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
+
+	authFailMu     sync.Mutex
+	authFailCount  int
+	authGiveUp     chan struct{}
+	authGiveUpOnce sync.Once
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -44,6 +50,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
 	m.schema = runtime.NewScheme()
+	m.authGiveUp = make(chan struct{})
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
@@ -90,10 +97,38 @@ func (m *k8sMetaCache) UnRegisterSendFunc(key string) {
 }
 
 func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
+	_ = stopCh // MetaCache uses m.stopCh for global shutdown; parameter kept for interface compatibility.
 	defer panicRecover()
 	factory, informer := m.getFactoryInformer()
 	if informer == nil {
 		return
+	}
+	mergedStop := make(chan struct{})
+	go func() {
+		select {
+		case <-m.stopCh:
+		case <-m.authGiveUp:
+		}
+		close(mergedStop)
+	}()
+	if err := informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
+		if err != nil {
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
+			if isInformerAuthFailure(err) {
+				m.authFailMu.Lock()
+				m.authFailCount++
+				n := m.authFailCount
+				m.authFailMu.Unlock()
+				if n >= informerAuthFailureStopAfter {
+					m.authGiveUpOnce.Do(func() {
+						logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping informer after repeated RBAC/auth errors (no further retries)", "resourceType", m.resourceType, "failures", n)
+						close(m.authGiveUp)
+					})
+				}
+			}
+		}
+	}); err != nil {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set watch error handler", err)
 	}
 	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -137,11 +172,17 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			metaManager.deleteEventCount.Add(1)
 		},
 	})
-	go factory.Start(stopCh)
-	// wait infinite for first cache sync success
+	go factory.Start(mergedStop)
+	// wait for first cache sync success, or stop when RBAC limit merges stopCh
 	for {
-		if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout")
+		if !cache.WaitForCacheSync(mergedStop, informer.HasSynced) {
+			select {
+			case <-mergedStop:
+				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "informer cache sync aborted", "resourceType", m.resourceType)
+				return
+			default:
+			}
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout", "resourceType", m.resourceType)
 			time.Sleep(1 * time.Second)
 		} else {
 			break
@@ -171,10 +212,10 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 		informer = factory.Apps().V1().StatefulSets().Informer()
 	case DAEMONSET:
 		informer = factory.Apps().V1().DaemonSets().Informer()
-	case CRONJOB:
-		informer = m.getCronJobInformer(factory)
-	case JOB:
-		informer = factory.Batch().V1().Jobs().Informer()
+	// case CRONJOB:
+	// 	informer = m.getCronJobInformer(factory)
+	// case JOB:
+	// 	informer = factory.Batch().V1().Jobs().Informer()
 	case NODE:
 		informer = factory.Core().V1().Nodes().Informer()
 	case NAMESPACE:
@@ -197,15 +238,6 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	// 如果 informer 为 nil，直接返回，不再watch error
 	if informer == nil {
 		return factory, nil
-	}
-	// add watch error handler
-	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
-		if err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
-		}
-	})
-	if err != nil {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to handle watch error handler", err)
 	}
 	return factory, informer
 }

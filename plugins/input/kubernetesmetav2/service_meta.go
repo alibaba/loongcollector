@@ -31,7 +31,25 @@ type ServiceK8sMeta struct {
 	StorageClass          bool
 	Ingress               bool
 	Container             bool
-	// labels and annotations switch
+	// ArgoWorkflow enables collecting argoproj.io/v1alpha1 Workflow CRs as entities (dynamic informer).
+	ArgoWorkflow bool
+	// Workflow2Pod sets __relation_type__ for Pod–Argo Workflow entity links (non-empty to enable link collection when Pod is enabled).
+	Workflow2Pod string
+	// ArgoWorkflowAPIGroup overrides k8smeta.DefaultArgoWorkflowAPIGroup for ownerRef matching and informer Group (empty = default).
+	ArgoWorkflowAPIGroup string
+	// ArgoWorkflowAPIVersion overrides k8smeta.DefaultArgoWorkflowAPIVersion for the Workflow informer (empty = default).
+	ArgoWorkflowAPIVersion string
+	// ArgoWorkflowResource overrides k8smeta.DefaultArgoWorkflowResource for the Workflow informer (empty = default).
+	ArgoWorkflowResource string
+	// ArgoWorkflowPodLabelKey overrides k8smeta.DefaultArgoWorkflowPodLabelKey for Pod label fallback (empty = default).
+	ArgoWorkflowPodLabelKey string
+	// CustomResourceWorkflowLabelAllowList: if non-empty, only these label keys are emitted (subset); when empty, use EnableLabels for full labels like other entities.
+	CustomResourceWorkflowLabelAllowList []string
+	// CustomResourceWorkflowAnnotationAllowList: if non-empty, only these annotation keys are emitted (subset); when empty, use EnableAnnotations for full annotations.
+	CustomResourceWorkflowAnnotationAllowList []string
+	// CustomResourceWorkflowStatusPathAllowList: JSON paths under the object root (e.g. "status.phase", "status.startedAt").
+	CustomResourceWorkflowStatusPathAllowList []string
+	// EnableLabels / EnableAnnotations: when true, emit full labels/annotations on entities; Argo Workflow CR entities use the same flags when the allow lists above are empty.
 	EnableLabels      bool
 	EnableAnnotations bool
 	// link switch

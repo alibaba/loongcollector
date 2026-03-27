@@ -7,11 +7,16 @@ import (
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type LinkGenerator struct {
 	metaCache map[string]MetaCache
+	// ArgoWorkflowAPIGroup is matched as substring of owner reference APIVersion (empty => DefaultArgoWorkflowAPIGroup).
+	ArgoWorkflowAPIGroup string
+	// ArgoWorkflowPodLabelKey is the Pod label key for Workflow name fallback (empty => DefaultArgoWorkflowPodLabelKey).
+	ArgoWorkflowPodLabelKey string
 }
 
 func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
@@ -56,6 +61,8 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getReplicaSetDeploymentLink(events)
 	case INGRESS_SERVICE:
 		return g.getIngressServiceLink(events)
+	case POD_ARGO_WORKFLOW:
+		return g.getPodArgoWorkflowLink(events)
 	case POD_NAMESPACE:
 		return g.getPodNamespaceLink(events)
 	case SERVICE_NAMESPACE:
@@ -559,6 +566,78 @@ func (g *LinkGenerator) getIngressServiceLink(ingressList []*K8sMetaEvent) []*K8
 						},
 					})
 				}
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) argoWorkflowAPIGroup() string {
+	if g != nil && g.ArgoWorkflowAPIGroup != "" {
+		return g.ArgoWorkflowAPIGroup
+	}
+	return DefaultArgoWorkflowAPIGroup
+}
+
+func (g *LinkGenerator) argoWorkflowPodLabelKey() string {
+	if g != nil && g.ArgoWorkflowPodLabelKey != "" {
+		return g.ArgoWorkflowPodLabelKey
+	}
+	return DefaultArgoWorkflowPodLabelKey
+}
+
+// argoWorkflowNameFromPod resolves the Workflow name: prefer ownerReferences (Argo task pods),
+// fall back to configurable Pod label when owner ref is absent or non-standard.
+func (g *LinkGenerator) argoWorkflowNameFromPod(pod *v1.Pod) (namespace, name string, ok bool) {
+	apiGroup := g.argoWorkflowAPIGroup()
+	labelKey := g.argoWorkflowPodLabelKey()
+	for _, ref := range pod.OwnerReferences {
+		if ref.Kind == ArgoWorkflowKind && strings.Contains(ref.APIVersion, apiGroup) {
+			return pod.Namespace, ref.Name, true
+		}
+	}
+	if pod.Labels != nil {
+		if v := pod.Labels[labelKey]; v != "" {
+			return pod.Namespace, v, true
+		}
+	}
+	return "", "", false
+}
+
+func (g *LinkGenerator) getPodArgoWorkflowLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
+	crCache := g.metaCache[CUSTOM_RESOURCE_ARGO_WORKFLOW]
+	if crCache == nil {
+		return nil
+	}
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range podList {
+		pod, ok := data.Object.Raw.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		ns, wfName, found := g.argoWorkflowNameFromPod(pod)
+		if !found || wfName == "" {
+			continue
+		}
+		wfList := crCache.Get([]string{generateNameWithNamespaceKey(ns, wfName)})
+		for _, workflows := range wfList {
+			for _, w := range workflows {
+				u, ok := w.Raw.(*unstructured.Unstructured)
+				if !ok {
+					continue
+				}
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: POD_ARGO_WORKFLOW,
+						Raw: &PodArgoWorkflow{
+							Pod:      pod,
+							Workflow: u,
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
 			}
 		}
 	}
