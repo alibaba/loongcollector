@@ -212,10 +212,10 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 		informer = factory.Apps().V1().StatefulSets().Informer()
 	case DAEMONSET:
 		informer = factory.Apps().V1().DaemonSets().Informer()
-	// case CRONJOB:
-	// 	informer = m.getCronJobInformer(factory)
-	// case JOB:
-	// 	informer = factory.Batch().V1().Jobs().Informer()
+	case CRONJOB:
+		informer = m.getCronJobInformer(factory)
+	case JOB:
+		informer = factory.Batch().V1().Jobs().Informer()
 	case NODE:
 		informer = factory.Core().V1().Nodes().Informer()
 	case NAMESPACE:
