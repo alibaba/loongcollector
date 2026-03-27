@@ -18,14 +18,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 )
 
-// ArgoWorkflowGVR is the default GVR for Argo Workflows; override before first informer start via ConfigureArgoWorkflowCollector.
-var ArgoWorkflowGVR = schema.GroupVersionResource{
-	Group:    DefaultArgoWorkflowAPIGroup,
-	Version:  DefaultArgoWorkflowAPIVersion,
-	Resource: DefaultArgoWorkflowResource,
-}
-
-// crUnifiedCache is a single MetaCache for configured third-party CRs (currently Argo Workflow only).
+// crUnifiedCache is a MetaCache for one third-party API resource (dynamic informer + unstructured objects).
 type crUnifiedCache struct {
 	metaStore *DeferredDeletionMetaStore
 	eventCh   chan *K8sMetaEvent
@@ -63,12 +56,12 @@ func (c *crUnifiedCache) init(_ *kubernetes.Clientset) {
 	// Built-in clientset unused; dynamic client is wired via setRESTConfig from MetaManager.Init.
 }
 
-// SetWorkflowGVRIfNotStarted updates the Workflow informer GVR before the dynamic informer starts; later calls are ignored.
-func (c *crUnifiedCache) SetWorkflowGVRIfNotStarted(gvr schema.GroupVersionResource) {
+// SetGVRIfNotStarted updates the informer GVR before the dynamic informer starts; later calls are ignored.
+func (c *crUnifiedCache) SetGVRIfNotStarted(gvr schema.GroupVersionResource) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.watchStarted {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "argo workflow informer already started; GVR change ignored", "gvr", gvr.String())
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "custom resource informer already started; GVR change ignored", "gvr", gvr.String())
 		return
 	}
 	c.gvr = gvr
@@ -106,7 +99,7 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 	ready := c.dynamicClient != nil
 	c.mu.Unlock()
 	if !ready {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic client not ready, skip argo workflow informer; ensure MetaManager.Init completed")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic client not ready, skip custom resource informer; ensure MetaManager.Init completed")
 		return
 	}
 	c.watchStartOnce.Do(func() {

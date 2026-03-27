@@ -2,6 +2,7 @@ package k8smeta
 
 import (
 	"strings"
+	"sync"
 
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
@@ -13,16 +14,45 @@ import (
 
 type LinkGenerator struct {
 	metaCache map[string]MetaCache
-	// ArgoWorkflowAPIGroup is matched as substring of owner reference APIVersion (empty => DefaultArgoWorkflowAPIGroup).
-	ArgoWorkflowAPIGroup string
-	// ArgoWorkflowPodLabelKey is the Pod label key for Workflow name fallback (empty => DefaultArgoWorkflowPodLabelKey).
-	ArgoWorkflowPodLabelKey string
+
+	podCRMu         sync.RWMutex
+	podCRByLinkType map[string]*podCRLinkRuntime
+}
+
+type podCRLinkRuntime struct {
+	entityType          string
+	ownerKind           string
+	ownerAPIGroupSubstr string
+	podLabelKey         string
 }
 
 func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
 	return &LinkGenerator{
-		metaCache: metaCache,
+		metaCache:       metaCache,
+		podCRByLinkType: make(map[string]*podCRLinkRuntime),
 	}
+}
+
+func (g *LinkGenerator) registerPodCRLink(linkType string, rt *podCRLinkRuntime) {
+	if g == nil || linkType == "" || rt == nil {
+		return
+	}
+	g.podCRMu.Lock()
+	defer g.podCRMu.Unlock()
+	if g.podCRByLinkType == nil {
+		g.podCRByLinkType = make(map[string]*podCRLinkRuntime)
+	}
+	g.podCRByLinkType[linkType] = rt
+}
+
+func (g *LinkGenerator) podCRRuntimeForLinkType(linkType string) (*podCRLinkRuntime, bool) {
+	if g == nil {
+		return nil, false
+	}
+	g.podCRMu.RLock()
+	defer g.podCRMu.RUnlock()
+	rt, ok := g.podCRByLinkType[linkType]
+	return rt, ok
 }
 
 func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) []*K8sMetaEvent {
@@ -33,6 +63,9 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	// only generate link from the src entity
 	if !strings.HasPrefix(linkType, resourceType) {
 		return nil
+	}
+	if rt, ok := g.podCRRuntimeForLinkType(linkType); ok {
+		return g.getPodCustomResourceLink(events, rt, linkType)
 	}
 	switch linkType {
 	case POD_NODE:
@@ -61,8 +94,6 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getReplicaSetDeploymentLink(events)
 	case INGRESS_SERVICE:
 		return g.getIngressServiceLink(events)
-	case POD_ARGO_WORKFLOW:
-		return g.getPodArgoWorkflowLink(events)
 	case POD_NAMESPACE:
 		return g.getPodNamespaceLink(events)
 	case SERVICE_NAMESPACE:
@@ -572,40 +603,28 @@ func (g *LinkGenerator) getIngressServiceLink(ingressList []*K8sMetaEvent) []*K8
 	return result
 }
 
-func (g *LinkGenerator) argoWorkflowAPIGroup() string {
-	if g != nil && g.ArgoWorkflowAPIGroup != "" {
-		return g.ArgoWorkflowAPIGroup
+func (g *LinkGenerator) crNameFromPod(pod *v1.Pod, rt *podCRLinkRuntime) (namespace, name string, ok bool) {
+	if pod == nil || rt == nil {
+		return "", "", false
 	}
-	return DefaultArgoWorkflowAPIGroup
-}
-
-func (g *LinkGenerator) argoWorkflowPodLabelKey() string {
-	if g != nil && g.ArgoWorkflowPodLabelKey != "" {
-		return g.ArgoWorkflowPodLabelKey
-	}
-	return DefaultArgoWorkflowPodLabelKey
-}
-
-// argoWorkflowNameFromPod resolves the Workflow name: prefer ownerReferences (Argo task pods),
-// fall back to configurable Pod label when owner ref is absent or non-standard.
-func (g *LinkGenerator) argoWorkflowNameFromPod(pod *v1.Pod) (namespace, name string, ok bool) {
-	apiGroup := g.argoWorkflowAPIGroup()
-	labelKey := g.argoWorkflowPodLabelKey()
 	for _, ref := range pod.OwnerReferences {
-		if ref.Kind == ArgoWorkflowKind && strings.Contains(ref.APIVersion, apiGroup) {
+		if ref.Kind == rt.ownerKind && strings.Contains(ref.APIVersion, rt.ownerAPIGroupSubstr) {
 			return pod.Namespace, ref.Name, true
 		}
 	}
-	if pod.Labels != nil {
-		if v := pod.Labels[labelKey]; v != "" {
+	if rt.podLabelKey != "" && pod.Labels != nil {
+		if v := pod.Labels[rt.podLabelKey]; v != "" {
 			return pod.Namespace, v, true
 		}
 	}
 	return "", "", false
 }
 
-func (g *LinkGenerator) getPodArgoWorkflowLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
-	crCache := g.metaCache[CUSTOM_RESOURCE_ARGO_WORKFLOW]
+func (g *LinkGenerator) getPodCustomResourceLink(podList []*K8sMetaEvent, rt *podCRLinkRuntime, linkType string) []*K8sMetaEvent {
+	if rt == nil {
+		return nil
+	}
+	crCache := g.metaCache[rt.entityType]
 	if crCache == nil {
 		return nil
 	}
@@ -615,13 +634,13 @@ func (g *LinkGenerator) getPodArgoWorkflowLink(podList []*K8sMetaEvent) []*K8sMe
 		if !ok {
 			continue
 		}
-		ns, wfName, found := g.argoWorkflowNameFromPod(pod)
-		if !found || wfName == "" {
+		ns, resName, found := g.crNameFromPod(pod, rt)
+		if !found || resName == "" {
 			continue
 		}
-		wfList := crCache.Get([]string{generateNameWithNamespaceKey(ns, wfName)})
-		for _, workflows := range wfList {
-			for _, w := range workflows {
+		items := crCache.Get([]string{generateNameWithNamespaceKey(ns, resName)})
+		for _, group := range items {
+			for _, w := range group {
 				u, ok := w.Raw.(*unstructured.Unstructured)
 				if !ok {
 					continue
@@ -629,10 +648,10 @@ func (g *LinkGenerator) getPodArgoWorkflowLink(podList []*K8sMetaEvent) []*K8sMe
 				result = append(result, &K8sMetaEvent{
 					EventType: data.EventType,
 					Object: &ObjectWrapper{
-						ResourceType: POD_ARGO_WORKFLOW,
-						Raw: &PodArgoWorkflow{
-							Pod:      pod,
-							Workflow: u,
+						ResourceType: linkType,
+						Raw: &PodCustomResource{
+							Pod: pod,
+							CR:  u,
 						},
 						FirstObservedTime: data.Object.FirstObservedTime,
 						LastObservedTime:  data.Object.LastObservedTime,

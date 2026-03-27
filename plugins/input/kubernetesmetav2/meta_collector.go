@@ -29,11 +29,17 @@ type metaCollector struct {
 	entityBuffer     chan models.PipelineEvent
 	entityLinkBuffer chan models.PipelineEvent
 
-	stopCh          chan struct{}
-	entityProcessor map[string]ProcessFunc
+	stopCh             chan struct{}
+	namespacePolicyID  int
+	entityProcessor    map[string]ProcessFunc
+	crConfigs          map[string]k8smeta.CustomResourceCollectorConfig
 }
 
 func (m *metaCollector) Start() error {
+	m.namespacePolicyID = m.serviceK8sMeta.metaManager.RegisterNamespacePolicy(
+		m.serviceK8sMeta.NamespaceBlackList,
+		m.serviceK8sMeta.NamespaceWhiteList,
+	)
 	m.entityProcessor = map[string]ProcessFunc{
 		k8smeta.POD:                      m.processPodEntity,
 		k8smeta.NODE:                     m.processNodeEntity,
@@ -50,7 +56,6 @@ func (m *metaCollector) Start() error {
 		k8smeta.PERSISTENTVOLUMECLAIM:    m.processPersistentVolumeClaimEntity,
 		k8smeta.STORAGECLASS:             m.processStorageClassEntity,
 		k8smeta.INGRESS:                  m.processIngressEntity,
-		k8smeta.CUSTOM_RESOURCE_ARGO_WORKFLOW: m.processCustomResourceEntity,
 		k8smeta.POD_NODE:                 m.processPodNodeLink,
 		k8smeta.POD_DEPLOYMENT:           m.processPodDeploymentLink,
 		k8smeta.POD_REPLICASET:           m.processPodReplicaSetLink,
@@ -64,7 +69,6 @@ func (m *metaCollector) Start() error {
 		k8smeta.POD_SERVICE:              m.processPodServiceLink,
 		k8smeta.POD_CONTAINER:            m.processPodContainerLink,
 		k8smeta.INGRESS_SERVICE:          m.processIngressServiceLink,
-		k8smeta.POD_ARGO_WORKFLOW:        m.processPodArgoWorkflowLink,
 
 		// add namespace to xx link processor
 		k8smeta.POD_NAMESPACE:                   m.processPodNamespaceLink,
@@ -79,15 +83,26 @@ func (m *metaCollector) Start() error {
 		k8smeta.INGRESS_NAMESPACE:               m.processIngressNamespaceLink,
 	}
 
-	if needArgoWorkflowInformer(m.serviceK8sMeta) {
-		m.serviceK8sMeta.metaManager.ConfigureArgoWorkflowCollector(k8smeta.ArgoWorkflowCollectorOptions{
-			APIGroup:            m.serviceK8sMeta.ArgoWorkflowAPIGroup,
-			APIVersion:          m.serviceK8sMeta.ArgoWorkflowAPIVersion,
-			Resource:            m.serviceK8sMeta.ArgoWorkflowResource,
-			PodWorkflowLabelKey: m.serviceK8sMeta.ArgoWorkflowPodLabelKey,
-		})
-		m.serviceK8sMeta.metaManager.EnsureArgoWorkflowInformerStarted()
+	m.crConfigs = make(map[string]k8smeta.CustomResourceCollectorConfig)
+	for _, cfg := range m.serviceK8sMeta.resolvedCustomResources() {
+		if err := cfg.Normalize(); err != nil {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "invalid CustomResources entry", err, "entity", cfg.EntityType)
+			continue
+		}
+		if err := m.serviceK8sMeta.metaManager.RegisterCustomResourceCollector(cfg); err != nil {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "register custom resource collector", err, "entity", cfg.EntityType)
+			continue
+		}
+		m.crConfigs[cfg.EntityType] = cfg
+		if cfg.CollectEntity {
+			m.entityProcessor[cfg.EntityType] = m.processCustomResourceEntity
+		}
+		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			m.entityProcessor[k8smeta.PodLinkTypeForEntity(cfg.EntityType)] = m.processPodCustomResourceLink
+		}
+		m.serviceK8sMeta.metaManager.EnsureCustomResourceInformerStarted(cfg.EntityType)
 	}
+
 	if m.serviceK8sMeta.Pod {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
@@ -133,8 +148,13 @@ func (m *metaCollector) Start() error {
 	if m.serviceK8sMeta.Ingress {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.ArgoWorkflow {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.CUSTOM_RESOURCE_ARGO_WORKFLOW, m.handleEvent, m.serviceK8sMeta.Interval)
+	for entityType, cfg := range m.crConfigs {
+		if cfg.CollectEntity {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, entityType, m.handleEvent, m.serviceK8sMeta.Interval)
+		}
+		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PodLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+		}
 	}
 
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Node && m.serviceK8sMeta.Node2Pod != "" {
@@ -176,9 +196,6 @@ func (m *metaCollector) Start() error {
 	if m.serviceK8sMeta.Ingress && m.serviceK8sMeta.Service && m.serviceK8sMeta.Ingress2Service != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS_SERVICE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
-	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Workflow2Pod != "" {
-		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_ARGO_WORKFLOW, m.handleEvent, m.serviceK8sMeta.Interval)
-	}
 	if m.serviceK8sMeta.Namespace && m.serviceK8sMeta.Pod && m.serviceK8sMeta.Namespace2Pod != "" {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD_NAMESPACE, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
@@ -215,6 +232,8 @@ func (m *metaCollector) Start() error {
 }
 
 func (m *metaCollector) Stop() error {
+	m.serviceK8sMeta.metaManager.UnregisterNamespacePolicy(m.namespacePolicyID)
+	m.namespacePolicyID = -1
 	m.serviceK8sMeta.metaManager.UnRegisterAllSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName)
 	close(m.stopCh)
 	return nil
@@ -492,10 +511,6 @@ func (m *metaCollector) convertPipelineEvent2Log(event models.PipelineEvent) *pr
 
 func isEntity(resourceType string) bool {
 	return !strings.Contains(resourceType, k8smeta.LINK_SPLIT_CHARACTER)
-}
-
-func needArgoWorkflowInformer(s *ServiceK8sMeta) bool {
-	return s.ArgoWorkflow || (s.Pod && s.Workflow2Pod != "")
 }
 
 func safeGetInt32String(pointer *int32) string {

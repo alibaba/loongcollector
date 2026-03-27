@@ -215,6 +215,10 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
+	if !GetMetaManagerInstance().MetaObjectPassesNamespacePolicy(event.Object) {
+		m.purgeKey(key)
+		return
+	}
 	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	// should delete oldIdxKeys in two cases:
@@ -269,6 +273,10 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
+	if !GetMetaManagerInstance().MetaObjectPassesNamespacePolicy(event.Object) {
+		m.purgeKey(key)
+		return
+	}
 	m.lock.Lock()
 	if obj, ok := m.Items[key]; ok {
 		obj.Deleted = true
@@ -314,6 +322,25 @@ func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEven
 		}
 		// if deleted is false, there is a new add event between delete event and deferred delete event
 	}
+}
+
+// purgeKey removes an object from the store and index if present (no SendFunc).
+func (m *DeferredDeletionMetaStore) purgeKey(key string) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	obj, ok := m.Items[key]
+	if !ok {
+		return
+	}
+	for _, idxKey := range m.getIdxKeys(obj) {
+		if item, ok := m.Index[idxKey]; ok {
+			item.Remove(key)
+			if len(item.Keys) == 0 {
+				delete(m.Index, idxKey)
+			}
+		}
+	}
+	delete(m.Items, key)
 }
 
 func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
