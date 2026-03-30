@@ -29,10 +29,10 @@ type metaCollector struct {
 	entityBuffer     chan models.PipelineEvent
 	entityLinkBuffer chan models.PipelineEvent
 
-	stopCh             chan struct{}
-	namespacePolicyID  int
-	entityProcessor    map[string]ProcessFunc
-	crConfigs          map[string]k8smeta.CustomResourceCollectorConfig
+	stopCh            chan struct{}
+	namespacePolicyID int
+	entityProcessor   map[string]ProcessFunc
+	crConfigs         map[string]k8smeta.CustomResourceCollectorConfig
 }
 
 func (m *metaCollector) Start() error {
@@ -100,6 +100,9 @@ func (m *metaCollector) Start() error {
 		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
 			m.entityProcessor[k8smeta.PodLinkTypeForEntity(cfg.EntityType)] = m.processPodCustomResourceLink
 		}
+		if m.serviceK8sMeta.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			m.entityProcessor[k8smeta.NamespaceLinkTypeForEntity(cfg.EntityType)] = m.processNamespaceCustomResourceLink
+		}
 		m.serviceK8sMeta.metaManager.EnsureCustomResourceInformerStarted(cfg.EntityType)
 	}
 
@@ -154,6 +157,9 @@ func (m *metaCollector) Start() error {
 		}
 		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
 			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PodLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+		}
+		if m.serviceK8sMeta.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NamespaceLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
 		}
 	}
 

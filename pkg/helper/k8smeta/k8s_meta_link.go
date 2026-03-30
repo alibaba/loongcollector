@@ -64,6 +64,9 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	if !strings.HasPrefix(linkType, resourceType) {
 		return nil
 	}
+	// CustomResource links (third-party CR):
+	// 1) Pod→CR when linkType is registered via PodLink (before built-in switch).
+	// 2) namespaced CR→Namespace when linkType is "<EntityType>->namespace" (after switch, so built-in *->namespace kinds stay in cases above).
 	if rt, ok := g.podCRRuntimeForLinkType(linkType); ok {
 		return g.getPodCustomResourceLink(events, rt, linkType)
 	}
@@ -114,9 +117,13 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getPVCNamespaceLink(events)
 	case INGRESS_NAMESPACE:
 		return g.getIngressNamespaceLink(events)
-	default:
-		return nil
 	}
+	// CustomResource links (third-party CR):
+	// 2) namespaced CR→Namespace when linkType is "<EntityType>->namespace" (after switch, so built-in *->namespace kinds stay in cases above).
+	if strings.HasSuffix(linkType, LINK_SPLIT_CHARACTER+NAMESPACE) {
+		return g.getCustomResourceNamespaceLink(events)
+	}
+	return nil
 }
 
 func (g *LinkGenerator) getPodNodeLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
@@ -657,6 +664,48 @@ func (g *LinkGenerator) getPodCustomResourceLink(podList []*K8sMetaEvent, rt *po
 						LastObservedTime:  data.Object.LastObservedTime,
 					},
 				})
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) getCustomResourceNamespaceLink(events []*K8sMetaEvent) []*K8sMetaEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	entityType := events[0].Object.ResourceType
+	nsCache := g.metaCache[NAMESPACE]
+	if nsCache == nil {
+		return nil
+	}
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range events {
+		u, ok := data.Object.Raw.(*unstructured.Unstructured)
+		if !ok {
+			continue
+		}
+		nsName := u.GetNamespace()
+		if nsName == "" {
+			continue
+		}
+		nsList := nsCache.Get([]string{generateNameWithNamespaceKey("", nsName)})
+		for _, ns := range nsList {
+			for _, n := range ns {
+				if namespace, ok := n.Raw.(*v1.Namespace); ok {
+					result = append(result, &K8sMetaEvent{
+						EventType: data.EventType,
+						Object: &ObjectWrapper{
+							ResourceType: NamespaceLinkTypeForEntity(entityType),
+							Raw: &NamespaceCustomResource{
+								Namespace: namespace,
+								CR:        u,
+							},
+							FirstObservedTime: data.Object.FirstObservedTime,
+							LastObservedTime:  data.Object.LastObservedTime,
+						},
+					})
+				}
 			}
 		}
 	}

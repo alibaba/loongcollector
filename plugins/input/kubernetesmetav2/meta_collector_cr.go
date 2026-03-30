@@ -110,6 +110,25 @@ func (m *metaCollector) processCustomResourceEntity(data *k8smeta.ObjectWrapper,
 	return []models.PipelineEvent{log}
 }
 
+func (m *metaCollector) processNamespaceCustomResourceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
+	obj, ok := data.Raw.(*k8smeta.NamespaceCustomResource)
+	if !ok {
+		return nil
+	}
+	entityType := strings.TrimSuffix(data.ResourceType, k8smeta.LINK_SPLIT_CHARACTER+k8smeta.NAMESPACE)
+	cfg := m.crConfigs[entityType]
+	if cfg.EntityType == "" || cfg.Namespace2EntityRelation == "" {
+		return nil
+	}
+	log := &models.Log{}
+	log.Contents = models.NewLogContents()
+	m.processEntityLinkCommonPart(log.Contents, obj.Namespace.Kind, obj.Namespace.Namespace, obj.Namespace.Name,
+		cfg.EntityType, obj.CR.GetNamespace(), obj.CR.GetName(), method, data.FirstObservedTime, data.LastObservedTime)
+	log.Contents.Add(entityLinkRelationTypeFieldName, cfg.Namespace2EntityRelation)
+	log.Timestamp = uint64(time.Now().Unix())
+	return []models.PipelineEvent{log}
+}
+
 func (m *metaCollector) processPodCustomResourceLink(data *k8smeta.ObjectWrapper, method string) []models.PipelineEvent {
 	obj, ok := data.Raw.(*k8smeta.PodCustomResource)
 	if !ok {

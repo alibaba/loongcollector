@@ -17,10 +17,10 @@ type CustomResourceCollectorConfig struct {
 	// It drives __entity_type__, __entity_id__, and pod->{EntityType} links — set explicitly in pipeline config.
 	EntityType string `json:"EntityType,omitempty"`
 
-	APIGroup    string `json:"APIGroup,omitempty"`
-	APIVersion  string `json:"APIVersion,omitempty"`
-	Resource    string `json:"Resource,omitempty"` // plural resource name
-	Kind        string `json:"Kind,omitempty"`     // Kubernetes kind, for ownerReferences matching and export
+	APIGroup   string `json:"APIGroup,omitempty"`
+	APIVersion string `json:"APIVersion,omitempty"`
+	Resource   string `json:"Resource,omitempty"` // plural resource name
+	Kind       string `json:"Kind,omitempty"`     // Kubernetes kind, for ownerReferences matching and export
 
 	// PodLink, if set, registers a Pod → this CR link generator (link type: PodLinkTypeForEntity(EntityType)).
 	PodLink *PodToCustomResourceLinkConfig `json:"PodLink,omitempty"`
@@ -28,6 +28,8 @@ type CustomResourceCollectorConfig struct {
 	CollectEntity bool `json:"CollectEntity,omitempty"`
 	// Entity2PodRelation is __relation_type__ on entity_link logs (custom resource → Pod). Required when Pod link export is enabled together with PodLink.
 	Entity2PodRelation string `json:"Entity2PodRelation,omitempty"`
+	// Namespace2EntityRelation is __relation_type__ on entity_link logs (Namespace → this namespaced CR). Export when CollectEntity, Namespace input, and this string are all set. Cluster-scoped CRs are skipped.
+	Namespace2EntityRelation string `json:"Namespace2EntityRelation,omitempty"`
 
 	// EnableLabels, if true, exports full labels when LabelAllowList is empty. Ignores ServiceK8sMeta.EnableLabels. Default false.
 	EnableLabels bool `json:"EnableLabels,omitempty"`
@@ -55,6 +57,11 @@ func PodLinkTypeForEntity(entityType string) string {
 	return POD + LINK_SPLIT_CHARACTER + entityType
 }
 
+// NamespaceLinkTypeForEntity is the link ResourceType for Namespace → namespaced CR (e.g. argo.workflow->namespace).
+func NamespaceLinkTypeForEntity(entityType string) string {
+	return entityType + LINK_SPLIT_CHARACTER + NAMESPACE
+}
+
 // DefaultEntityType returns the conventional type string customresource/<lower(group)>/<lower(kind)>.
 // It does not apply automatically; EntityType must still be set on the config (Normalize requires it).
 func DefaultEntityType(apiGroup, kind string) string {
@@ -77,6 +84,7 @@ func (c *CustomResourceCollectorConfig) Normalize() error {
 	c.Resource = strings.TrimSpace(c.Resource)
 	c.Kind = strings.TrimSpace(c.Kind)
 	c.EntityType = strings.TrimSpace(c.EntityType)
+	c.Namespace2EntityRelation = strings.TrimSpace(c.Namespace2EntityRelation)
 
 	if c.APIGroup == "" || c.APIVersion == "" || c.Resource == "" || c.Kind == "" {
 		return fmt.Errorf("custom resource collector: APIGroup, APIVersion, Resource, and Kind are required")

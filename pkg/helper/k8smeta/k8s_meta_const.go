@@ -12,22 +12,22 @@ const (
 	EntityCollectorUserAgent = "loongcollector-singleton"
 
 	// entity type
-	POD                           = "pod"
-	SERVICE                       = "service"
-	DEPLOYMENT                    = "deployment"
-	REPLICASET                    = "replicaset"
-	STATEFULSET                   = "statefulset"
-	DAEMONSET                     = "daemonset"
-	CRONJOB                       = "cronjob"
-	JOB                           = "job"
-	NODE                          = "node"
-	NAMESPACE                     = "namespace"
-	CONFIGMAP                     = "configmap"
-	PERSISTENTVOLUME              = "persistentvolume"
-	PERSISTENTVOLUMECLAIM         = "persistentvolumeclaim"
-	STORAGECLASS                  = "storageclass"
-	INGRESS                       = "ingress"
-	CONTAINER                     = "container"
+	POD                   = "pod"
+	SERVICE               = "service"
+	DEPLOYMENT            = "deployment"
+	REPLICASET            = "replicaset"
+	STATEFULSET           = "statefulset"
+	DAEMONSET             = "daemonset"
+	CRONJOB               = "cronjob"
+	JOB                   = "job"
+	NODE                  = "node"
+	NAMESPACE             = "namespace"
+	CONFIGMAP             = "configmap"
+	PERSISTENTVOLUME      = "persistentvolume"
+	PERSISTENTVOLUMECLAIM = "persistentvolumeclaim"
+	STORAGECLASS          = "storageclass"
+	INGRESS               = "ingress"
+	CONTAINER             = "container"
 	//revive:disable:var-naming
 	LINK_SPLIT_CHARACTER     = "->"
 	POD_NODE                 = "pod->node"
@@ -206,6 +206,12 @@ type IngressNamespace struct {
 type PodCustomResource struct {
 	Pod *v1.Pod
 	CR  *unstructured.Unstructured
+}
+
+// NamespaceCustomResource links a Namespace to a namespaced CR (unstructured).
+type NamespaceCustomResource struct {
+	Namespace *v1.Namespace
+	CR        *unstructured.Unstructured
 }
 
 const (
