@@ -15,6 +15,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(processor_unittest)
 
+add_executable(processor_no_split_log_string_native_unittest ProcessorNoSplitLogStringNativeUnittest.cpp)
+target_link_libraries(processor_no_split_log_string_native_unittest ${UT_BASE_TARGET})
+
 add_executable(processor_split_log_string_native_unittest ProcessorSplitLogStringNativeUnittest.cpp)
 target_link_libraries(processor_split_log_string_native_unittest ${UT_BASE_TARGET})
 

@@ -27,6 +27,7 @@
 #include "file_server/ConfigManager.h"
 #include "file_server/FileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "plugin/processor/inner/ProcessorNoSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 
@@ -125,6 +126,19 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
         }
     }
 
+    // NoSplit
+    if (!GetOptionalBoolParam(config, "NoSplit", mNoSplit, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mNoSplit,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+
     // Tag
     if (!mFileTag.Init(config, *mContext, sName, mEnableContainerDiscovery)) {
         return false;
@@ -214,7 +228,10 @@ bool InputFile::CreateInnerProcessors() {
     unique_ptr<ProcessorInstance> processor;
     {
         Json::Value detail;
-        if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
+        if (mNoSplit) {
+            processor = PluginRegistry::GetInstance()->CreateProcessor(
+                ProcessorNoSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        } else if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
             mContext->SetRequiringJsonReaderFlag(true);
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
