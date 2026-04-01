@@ -1647,6 +1647,13 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             mCache.clear();
         } else {
             moreData = (nbytes == BUFFER_SIZE);
+
+            // NoSplit: when at end of file and not a timeout flush, cache all data for timeout flush
+            if (mMultilineConfig.first->mNoSplit && !moreData && allowRollback) {
+                mCache.assign(stringBuffer, stringBufferLen);
+                return;
+            }
+
             auto alignedBytes = nbytes;
             if (allowRollback) {
                 alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
@@ -1787,6 +1794,13 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             mCache.clear();
         } else {
             moreData = (readCharCount == BUFFER_SIZE);
+
+            // NoSplit: when at end of file and not a timeout flush, cache all data for timeout flush
+            if (mMultilineConfig.first->mNoSplit && !moreData && allowRollback) {
+                mCache.assign(gbkBuffer, originReadCount);
+                return;
+            }
+
             auto alignedBytes = readCharCount;
             if (allowRollback) {
                 alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
@@ -1997,6 +2011,9 @@ LogFileReader::FileCompareResult LogFileReader::CompareToFile(const string& file
 int32_t
 LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& rollbackLineFeedCount, bool allowRollback) {
     if (!allowRollback || size == 0) {
+        return size;
+    }
+    if (mMultilineConfig.first->mNoSplit) {
         return size;
     }
     int32_t endPs = 0; // the position of \n or \0

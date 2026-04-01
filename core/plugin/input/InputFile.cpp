@@ -108,24 +108,6 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
     // 过渡使用
     mFileDiscovery.SetTailingAllMatchedFiles(mFileReader.mTailingAllMatchedFiles);
 
-    // Multiline
-    const char* key = "Multiline";
-    const Json::Value* itr = config.find(key, key + strlen(key));
-    if (itr) {
-        if (!itr->isObject()) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 "param Multiline is not of type object",
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
-        } else if (!mMultiline.Init(*itr, *mContext, sName)) {
-            return false;
-        }
-    }
-
     // NoSplit
     if (!GetOptionalBoolParam(config, "NoSplit", mNoSplit, errorMsg)) {
         PARAM_WARNING_DEFAULT(mContext->GetLogger(),
@@ -137,6 +119,28 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
                               mContext->GetProjectName(),
                               mContext->GetLogstoreName(),
                               mContext->GetRegion());
+    }
+
+    if (mNoSplit) {
+        mMultiline.mNoSplit = true;
+    } else {
+        // Multiline (mutually exclusive with NoSplit)
+        const char* key = "Multiline";
+        const Json::Value* itr = config.find(key, key + strlen(key));
+        if (itr) {
+            if (!itr->isObject()) {
+                PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                     mContext->GetAlarm(),
+                                     "param Multiline is not of type object",
+                                     sName,
+                                     mContext->GetConfigName(),
+                                     mContext->GetProjectName(),
+                                     mContext->GetLogstoreName(),
+                                     mContext->GetRegion());
+            } else if (!mMultiline.Init(*itr, *mContext, sName)) {
+                return false;
+            }
+        }
     }
 
     // Tag

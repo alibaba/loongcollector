@@ -43,6 +43,7 @@ public:
     std::string mEndPattern;
     UnmatchedContentTreatment mUnmatchedContentTreatment = UnmatchedContentTreatment::SINGLE_LINE;
     bool mIgnoringUnmatchWarning = false;
+    bool mNoSplit = false;
 
 private:
     bool ParseRegex(const std::string& pattern, std::shared_ptr<boost::regex>& reg);
