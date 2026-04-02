@@ -48,7 +48,6 @@ public:
     bool mEnableContainerDiscovery = false;
     FileReaderOptions mFileReader;
     MultilineOptions mMultiline;
-    bool mNoSplit = false;
     FileTagOptions mFileTag;
     PluginMetricManagerPtr mPluginMetricManager;
     IntGaugePtr mMonitorFileTotal;
