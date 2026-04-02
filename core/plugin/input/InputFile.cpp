@@ -108,38 +108,21 @@ bool InputFile::Init(const Json::Value& config, Json::Value& optionalGoPipeline)
     // 过渡使用
     mFileDiscovery.SetTailingAllMatchedFiles(mFileReader.mTailingAllMatchedFiles);
 
-    // NoSplit
-    if (!GetOptionalBoolParam(config, "NoSplit", mNoSplit, errorMsg)) {
-        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
-                              mContext->GetAlarm(),
-                              errorMsg,
-                              mNoSplit,
-                              sName,
-                              mContext->GetConfigName(),
-                              mContext->GetProjectName(),
-                              mContext->GetLogstoreName(),
-                              mContext->GetRegion());
-    }
-
-    if (mNoSplit) {
-        mMultiline.mNoSplit = true;
-    } else {
-        // Multiline (mutually exclusive with NoSplit)
-        const char* key = "Multiline";
-        const Json::Value* itr = config.find(key, key + strlen(key));
-        if (itr) {
-            if (!itr->isObject()) {
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "param Multiline is not of type object",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
-            } else if (!mMultiline.Init(*itr, *mContext, sName)) {
-                return false;
-            }
+    // Multiline
+    const char* key = "Multiline";
+    const Json::Value* itr = config.find(key, key + strlen(key));
+    if (itr) {
+        if (!itr->isObject()) {
+            PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                                 mContext->GetAlarm(),
+                                 "param Multiline is not of type object",
+                                 sName,
+                                 mContext->GetConfigName(),
+                                 mContext->GetProjectName(),
+                                 mContext->GetLogstoreName(),
+                                 mContext->GetRegion());
+        } else if (!mMultiline.Init(*itr, *mContext, sName)) {
+            return false;
         }
     }
 
@@ -232,7 +215,7 @@ bool InputFile::CreateInnerProcessors() {
     unique_ptr<ProcessorInstance> processor;
     {
         Json::Value detail;
-        if (mNoSplit) {
+        if (mMultiline.mMode == MultilineOptions::Mode::NO_SPLIT) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorNoSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
         } else if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {

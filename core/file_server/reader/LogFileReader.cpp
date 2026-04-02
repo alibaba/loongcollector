@@ -1648,7 +1648,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         } else {
             moreData = (nbytes == BUFFER_SIZE);
 
-            if (mMultilineConfig.first->mNoSplit) {
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
                 if (!moreData && allowRollback) {
                     mCache.assign(stringBuffer, stringBufferLen);
                     return;
@@ -1819,7 +1819,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         } else {
             moreData = (readCharCount == BUFFER_SIZE);
 
-            if (mMultilineConfig.first->mNoSplit) {
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
                 if (!moreData && allowRollback) {
                     mCache.assign(gbkBuffer, originReadCount);
                     return;
@@ -1884,7 +1884,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             logBuffer.readOffset = mLastFilePos;
             return;
         }
-        if (mMultilineConfig.first->mNoSplit) {
+        if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
             if (readCharCount < originReadCount) {
                 mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
             } else {
@@ -2055,7 +2055,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     if (!allowRollback || size == 0) {
         return size;
     }
-    if (mMultilineConfig.first->mNoSplit) {
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
         return size;
     }
     int32_t endPs = 0; // the position of \n or \0
