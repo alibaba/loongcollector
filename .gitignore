@@ -106,7 +106,8 @@ license_coverage.txt
 /dist/
 /tags/
 
-### Cursor
+### IDE configs
 /.cursor/
-/.claude/
+/.claude/settings.local.json
+#/.claude/
 /.gemini/
