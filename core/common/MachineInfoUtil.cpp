@@ -208,7 +208,7 @@ std::unordered_set<std::string> GetNicIpv4IPSet() {
     return ipSet;
 }
 // Returns true for virtual/dataplane interfaces whose IPs should not be used as host identity.
-// "lo" is always ignored; other names come from AppConfig::host_identity_ignored_ifaces (default kube-ipvs0,
+// "lo" is always ignored; other names from AppConfig (kHostIdentityIgnoredIfacesKey, default kube-ipvs0,
 // nodelocaldns, docker0).
 static bool IsIgnoredHostIdentityInterface(const char* ifname) {
     if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {

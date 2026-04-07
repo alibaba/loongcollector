@@ -836,10 +836,10 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("process_thread_count", mProcessThreadCount, (int32_t)1);
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
 
-    const char* kIfaceEnv = "host_identity_ignored_ifaces";
-    char* ifaceEnv = getenv(kIfaceEnv);
+    char* ifaceEnv = getenv(kHostIdentityIgnoredIfacesKey);
     if (ifaceEnv == nullptr) {
-        ifaceEnv = getenv((LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(kIfaceEnv)).c_str());
+        ifaceEnv = getenv(
+            (LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(string(kHostIdentityIgnoredIfacesKey))).c_str());
     }
     if (ifaceEnv != nullptr && *ifaceEnv != '\0') {
         mHostIdentityIgnoredIfaces.clear();
@@ -849,7 +849,8 @@ void AppConfig::LoadEnvResourceLimit() {
                 mHostIdentityIgnoredIfaces.insert(std::move(t));
             }
         }
-        LOG_INFO(sLogger, ("host_identity_ignored_ifaces from env overrides json", string(ifaceEnv)));
+        LOG_INFO(sLogger,
+                 (kHostIdentityIgnoredIfacesKey, string(ifaceEnv))("source", "env_overrides_json"));
     }
 }
 
@@ -964,8 +965,8 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
     } else
         mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
 
-    if (confJson.isMember("host_identity_ignored_ifaces")) {
-        const auto& ifaceJson = confJson["host_identity_ignored_ifaces"];
+    if (confJson.isMember(kHostIdentityIgnoredIfacesKey)) {
+        const auto& ifaceJson = confJson[kHostIdentityIgnoredIfacesKey];
         if (ifaceJson.isArray()) {
             mHostIdentityIgnoredIfaces.clear();
             for (Json::ArrayIndex i = 0; i < ifaceJson.size(); ++i) {
@@ -976,11 +977,11 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
                     }
                 }
             }
-            LOG_INFO(sLogger, ("host_identity_ignored_ifaces from config", ifaceJson.toStyledString()));
+            LOG_INFO(sLogger, (kHostIdentityIgnoredIfacesKey, ifaceJson.toStyledString())("source", "config"));
         } else {
             LOG_WARNING(sLogger,
-                        ("host_identity_ignored_ifaces must be a JSON array of strings, ignored",
-                         ifaceJson.toStyledString()));
+                        (kHostIdentityIgnoredIfacesKey, "expected JSON array of strings, ignored")(
+                            "value", ifaceJson.toStyledString()));
         }
     }
 

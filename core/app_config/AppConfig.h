@@ -41,6 +41,9 @@ extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
 extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
 extern const std::string LOONGCOLLECTOR_ENV_PREFIX;
 
+/** ilogtail_config.json field and env key (with LOONG_ + uppercase) for ignored host-identity interfaces (Linux). */
+constexpr const char* kHostIdentityIgnoredIfacesKey = "host_identity_ignored_ifaces";
+
 void CreateAgentDir();
 
 std::string GetAgentLogDir();
@@ -224,8 +227,7 @@ private:
 
     std::string mBindInterface;
 
-    // Interface names excluded when picking host IP from hostname (Linux); configurable via
-    // host_identity_ignored_ifaces in ilogtail_config.json.
+    // Interface names excluded when picking host IP from hostname (Linux); see kHostIdentityIgnoredIfacesKey.
     std::unordered_set<std::string> mHostIdentityIgnoredIfaces;
 
     // /**
