@@ -27,6 +27,7 @@
 #include "file_server/FileServer.h"
 #include "file_server/StaticFileServer.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "plugin/processor/inner/ProcessorNoSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorSplitMultilineLogStringNative.h"
 
@@ -340,7 +341,10 @@ bool InputStaticFile::CreateInnerProcessors() {
     unique_ptr<ProcessorInstance> processor;
     {
         Json::Value detail;
-        if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
+        if (mMultiline.mMode == MultilineOptions::Mode::NO_SPLIT) {
+            processor = PluginRegistry::GetInstance()->CreateProcessor(
+                ProcessorNoSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+        } else if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
             mContext->SetRequiringJsonReaderFlag(true);
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));

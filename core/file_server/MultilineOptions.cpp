@@ -37,6 +37,8 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
     } else if (mode == "JSON") {
         mMode = Mode::JSON;
         mIsMultiline = true;
+    } else if (mode == "no_split") {
+        mMode = Mode::NO_SPLIT;
     } else if (!mode.empty() && mode != "custom") {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),

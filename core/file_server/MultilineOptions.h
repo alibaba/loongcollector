@@ -28,7 +28,7 @@ namespace logtail {
 
 class MultilineOptions {
 public:
-    enum class Mode { CUSTOM, JSON };
+    enum class Mode { CUSTOM, JSON, NO_SPLIT };
     enum class UnmatchedContentTreatment { DISCARD, SINGLE_LINE };
 
     bool Init(const Json::Value& config, const CollectionPipelineContext& ctx, const std::string& pluginType);

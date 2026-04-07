@@ -902,6 +902,264 @@ void LogMultiBytesUnittest::TestReadGBK() {
     APSARA_TEST_STREQ_FATAL(expectedPart.c_str(), logBuffer.rawBuffer.data());
 }
 
+class LogFileReaderNoSplitUnittest : public ::testing::Test {
+public:
+    static void SetUpTestCase() {
+        logPathDir = GetProcessExecutionDir();
+        if (PATH_SEPARATOR[0] == logPathDir.back()) {
+            logPathDir.resize(logPathDir.size() - 1);
+        }
+        logPathDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "LogFileReaderUnittest";
+        gbkFile = "gbk.txt";
+        utf8File = "utf8.txt";
+    }
+
+    static void TearDownTestCase() {}
+
+    void SetUp() override {
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        std::string filepath = logPathDir + PATH_SEPARATOR + utf8File;
+        std::unique_ptr<FILE, decltype(&std::fclose)> fp(std::fopen(filepath.c_str(), "rb"), &std::fclose);
+        if (!fp.get()) {
+            return;
+        }
+        std::fseek(fp.get(), 0, SEEK_END);
+        long filesize = std::ftell(fp.get());
+        std::fseek(fp.get(), 0, SEEK_SET);
+        expectedContent.reset(new char[filesize + 1]);
+        fread(expectedContent.get(), filesize, 1, fp.get());
+        expectedContent[filesize] = '\0';
+        for (long i = filesize - 1; i >= 0; --i) {
+            if (expectedContent[i] == '\n') {
+                expectedContent[i] = 0;
+                break;
+            };
+        }
+        FileServer::GetInstance()->AddFileDiscoveryConfig("", &discoveryOpts, &ctx);
+    }
+
+    void TearDown() override {
+        LogFileReader::BUFFER_SIZE = 1024 * 512;
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig("");
+    }
+
+    void TestReadUTF8NoSplit();
+    void TestReadGBKNoSplit();
+
+    std::unique_ptr<char[]> expectedContent;
+    static std::string logPathDir;
+    static std::string gbkFile;
+    static std::string utf8File;
+
+protected:
+    FileDiscoveryOptions discoveryOpts;
+    FileReaderOptions readerOpts;
+    FileTagOptions fileTagOpts;
+    CollectionPipelineContext ctx;
+};
+
+UNIT_TEST_CASE(LogFileReaderNoSplitUnittest, TestReadUTF8NoSplit);
+UNIT_TEST_CASE(LogFileReaderNoSplitUnittest, TestReadGBKNoSplit);
+
+std::string LogFileReaderNoSplitUnittest::logPathDir;
+std::string LogFileReaderNoSplitUnittest::gbkFile;
+std::string LogFileReaderNoSplitUnittest::utf8File;
+
+void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
+    { // NO_SPLIT, buffer big enough, force read: returns all data with \n preserved (not split by line)
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadUTF8(logBuffer, fileSize, moreData, false);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_TRUE_FATAL(logBuffer.rawBuffer.data() != NULL);
+        std::string result(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+        APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
+    }
+    { // NO_SPLIT, buffer too small: forced split at buffer boundary, moreData=true
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        LogFileReader::BUFFER_SIZE = 15;
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadUTF8(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        size_t firstReadLen = logBuffer.rawBuffer.size();
+        APSARA_TEST_GT_FATAL(firstReadLen, 0UL);
+        APSARA_TEST_LE_FATAL(firstReadLen, (size_t)LogFileReader::BUFFER_SIZE);
+    }
+    { // NO_SPLIT, buffer too small, read all: combined data equals expected
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        LogFileReader reader(logPathDir,
+                             utf8File,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogFileReader::BUFFER_SIZE = fileSize - 13;
+
+        std::string combined;
+        bool moreData = true;
+        while (moreData) {
+            LogBuffer logBuffer;
+            reader.ReadUTF8(logBuffer, fileSize, moreData);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                if (!combined.empty()) {
+                    combined += '\n';
+                }
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        if (combined.empty()) {
+            LogBuffer logBuffer;
+            reader.ReadUTF8(logBuffer, fileSize, moreData, false);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), combined.c_str());
+    }
+}
+
+void LogFileReaderNoSplitUnittest::TestReadGBKNoSplit() {
+    { // NO_SPLIT, GBK, buffer big enough, force read: returns all data with \n preserved
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadGBK(logBuffer, fileSize, moreData, false);
+        APSARA_TEST_FALSE_FATAL(moreData);
+        APSARA_TEST_TRUE_FATAL(logBuffer.rawBuffer.data() != NULL);
+        std::string result(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+        APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
+    }
+    { // NO_SPLIT, GBK, buffer too small: forced split, logTooLongSplitFlag triggered
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        LogFileReader::BUFFER_SIZE = 14;
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+
+        LogBuffer logBuffer;
+        bool moreData = false;
+        reader.ReadGBK(logBuffer, fileSize, moreData);
+        APSARA_TEST_TRUE_FATAL(moreData);
+        APSARA_TEST_GT_FATAL(logBuffer.rawBuffer.size(), 0UL);
+    }
+    { // NO_SPLIT, GBK, buffer too small, read all: combined data equals expected
+        Json::Value config;
+        config["Multiline.Mode"] = "no_split";
+        MultilineOptions multilineOpts;
+        multilineOpts.Init(config, ctx, "");
+        FileReaderOptions readerOpts;
+        readerOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        readerOpts.mFileEncoding = FileReaderOptions::Encoding::GBK;
+        LogFileReader reader(logPathDir,
+                             gbkFile,
+                             DevInode(),
+                             std::make_pair(&readerOpts, &ctx),
+                             std::make_pair(&multilineOpts, &ctx),
+                             std::make_pair(&fileTagOpts, &ctx));
+        reader.UpdateReaderManual();
+        reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+        int64_t fileSize = reader.mLogFileOp.GetFileSize();
+        reader.CheckFileSignatureAndOffset(true);
+        LogFileReader::BUFFER_SIZE = fileSize - 11;
+
+        std::string combined;
+        bool moreData = true;
+        while (moreData) {
+            LogBuffer logBuffer;
+            reader.ReadGBK(logBuffer, fileSize, moreData);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                if (!combined.empty()) {
+                    combined += '\n';
+                }
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        if (combined.empty()) {
+            LogBuffer logBuffer;
+            reader.ReadGBK(logBuffer, fileSize, moreData, false);
+            if (logBuffer.rawBuffer.data() != NULL) {
+                combined.append(logBuffer.rawBuffer.data(), logBuffer.rawBuffer.size());
+            }
+        }
+        APSARA_TEST_STREQ_FATAL(expectedContent.get(), combined.c_str());
+    }
+}
+
 class LogFileReaderCheckpointUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
