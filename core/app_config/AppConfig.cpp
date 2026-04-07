@@ -838,8 +838,8 @@ void AppConfig::LoadEnvResourceLimit() {
 
     char* ifaceEnv = getenv(kHostIdentityIgnoredIfacesKey);
     if (ifaceEnv == nullptr) {
-        ifaceEnv = getenv(
-            (LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(string(kHostIdentityIgnoredIfacesKey))).c_str());
+        ifaceEnv
+            = getenv((LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(string(kHostIdentityIgnoredIfacesKey))).c_str());
     }
     if (ifaceEnv != nullptr && *ifaceEnv != '\0') {
         mHostIdentityIgnoredIfaces.clear();
@@ -849,8 +849,7 @@ void AppConfig::LoadEnvResourceLimit() {
                 mHostIdentityIgnoredIfaces.insert(std::move(t));
             }
         }
-        LOG_INFO(sLogger,
-                 (kHostIdentityIgnoredIfacesKey, string(ifaceEnv))("source", "env_overrides_json"));
+        LOG_INFO(sLogger, (kHostIdentityIgnoredIfacesKey, string(ifaceEnv))("source", "env_overrides_json"));
     }
 }
 
@@ -980,8 +979,8 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             LOG_INFO(sLogger, (kHostIdentityIgnoredIfacesKey, ifaceJson.toStyledString())("source", "config"));
         } else {
             LOG_WARNING(sLogger,
-                        (kHostIdentityIgnoredIfacesKey, "expected JSON array of strings, ignored")(
-                            "value", ifaceJson.toStyledString()));
+                        (kHostIdentityIgnoredIfacesKey,
+                         "expected JSON array of strings, ignored")("value", ifaceJson.toStyledString()));
         }
     }
 
