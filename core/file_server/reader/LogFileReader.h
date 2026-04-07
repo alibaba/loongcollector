@@ -719,6 +719,7 @@ private:
     friend class LogSplitDiscardUnmatchUnittest;
     friend class LogSplitNoDiscardUnmatchUnittest;
     friend class RemoveLastIncompleteLogMultilineUnittest;
+    friend class LogFileReaderNoSplitUnittest;
     friend class LogFileReaderCheckpointUnittest;
     friend class GetLastLineUnittest;
     friend class LastMatchedContainerdTextLineUnittest;
