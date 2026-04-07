@@ -16,8 +16,9 @@
 #include "unittest/Unittest.h"
 
 #if defined(__linux__)
-#include "app_config/AppConfig.h"
 #include "json/value.h"
+
+#include "app_config/AppConfig.h"
 #endif
 
 namespace logtail {
