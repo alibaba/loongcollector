@@ -224,6 +224,9 @@ private:
 
     std::string mBindInterface;
 
+    // Interface names excluded when picking host IP from hostname (Linux); configurable via
+    // host_identity_ignored_ifaces in ilogtail_config.json.
+    std::unordered_set<std::string> mHostIdentityIgnoredIfaces;
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -532,6 +535,10 @@ public:
     const Json::Value& GetConfig() const { return mLocalInstanceConfig; }
 
     const std::string& GetBindInterface() const { return mBindInterface; }
+
+    bool IsHostIdentityIgnoredIface(const std::string& ifname) const {
+        return mHostIdentityIgnoredIfaces.find(ifname) != mHostIdentityIgnoredIfaces.end();
+    }
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;

@@ -612,6 +612,7 @@ AppConfig::AppConfig() {
 
     mPurageContainerMode = false;
     mForceQuitReadTimeout = 7200;
+    mHostIdentityIgnoredIfaces = {"kube-ipvs0", "nodelocaldns", "docker0"};
     LoadEnvTags();
     CheckPurageContainerMode();
 }
@@ -834,6 +835,22 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("max_bytes_per_sec", mMaxBytePerSec, (int32_t)(1024 * 1024));
     LoadSingleValueEnvConfig("process_thread_count", mProcessThreadCount, (int32_t)1);
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
+
+    const char* kIfaceEnv = "host_identity_ignored_ifaces";
+    char* ifaceEnv = getenv(kIfaceEnv);
+    if (ifaceEnv == nullptr) {
+        ifaceEnv = getenv((LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(kIfaceEnv)).c_str());
+    }
+    if (ifaceEnv != nullptr && *ifaceEnv != '\0') {
+        mHostIdentityIgnoredIfaces.clear();
+        for (auto& part : SplitString(string(ifaceEnv), ",")) {
+            string t = TrimString(part);
+            if (!t.empty()) {
+                mHostIdentityIgnoredIfaces.insert(std::move(t));
+            }
+        }
+        LOG_INFO(sLogger, ("host_identity_ignored_ifaces from env overrides json", string(ifaceEnv)));
+    }
 }
 
 /**
@@ -946,6 +963,26 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
     } else
         mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
+
+    if (confJson.isMember("host_identity_ignored_ifaces")) {
+        const auto& ifaceJson = confJson["host_identity_ignored_ifaces"];
+        if (ifaceJson.isArray()) {
+            mHostIdentityIgnoredIfaces.clear();
+            for (Json::ArrayIndex i = 0; i < ifaceJson.size(); ++i) {
+                if (ifaceJson[i].isString()) {
+                    string s = TrimString(ifaceJson[i].asString());
+                    if (!s.empty()) {
+                        mHostIdentityIgnoredIfaces.insert(std::move(s));
+                    }
+                }
+            }
+            LOG_INFO(sLogger, ("host_identity_ignored_ifaces from config", ifaceJson.toStyledString()));
+        } else {
+            LOG_WARNING(sLogger,
+                        ("host_identity_ignored_ifaces must be a JSON array of strings, ignored",
+                         ifaceJson.toStyledString()));
+        }
+    }
 
     if (confJson.isMember("mem_usage_limit") && confJson["mem_usage_limit"].isIntegral())
         mMemUsageUpLimit = confJson["mem_usage_limit"].asInt64();

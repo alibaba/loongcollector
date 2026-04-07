@@ -37,6 +37,8 @@
 #include <algorithm>
 #include <list>
 #include <map>
+#include <unordered_map>
+#include <vector>
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
 #include <Windows.h>
@@ -176,30 +178,43 @@ std::string GetHostName() {
 }
 
 #if defined(__linux__)
-std::unordered_set<std::string> GetNicIpv4IPSet() {
-    struct ifaddrs* ifAddrStruct = NULL;
-    void* tmpAddrPtr = NULL;
-    std::unordered_set<std::string> ipSet;
+// Shared with GetNicIpv4IPSet / GetHostIpByHostName: non-loopback AF_INET addresses and owning interface names.
+static std::unordered_map<std::string, std::vector<std::string>> GetIpv4NicIpToIfacesMap() {
+    std::unordered_map<std::string, std::vector<std::string>> ipToIfaces;
+    struct ifaddrs* ifAddrStruct = nullptr;
     getifaddrs(&ifAddrStruct);
-    for (struct ifaddrs* ifa = ifAddrStruct; ifa != NULL; ifa = ifa->ifa_next) {
-        if (ifa->ifa_addr == NULL) {
+    for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
             continue;
         }
-        if (ifa->ifa_addr->sa_family == AF_INET) {
-            tmpAddrPtr = &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr;
-            char addressBuffer[INET_ADDRSTRLEN] = "";
-            inet_ntop(AF_INET, tmpAddrPtr, addressBuffer, INET_ADDRSTRLEN);
-            std::string ip(addressBuffer);
-            // The loopback on most Linux distributions is lo, however it is not portable. For example loopback in OSX
-            // is lo0.
-            if (0 == strcmp("lo", ifa->ifa_name) || ip.empty() || StartWith(ip, "127.")) {
-                continue;
-            }
-            ipSet.insert(std::move(ip));
+        char addressBuffer[INET_ADDRSTRLEN] = "";
+        inet_ntop(AF_INET, &((struct sockaddr_in*)ifa->ifa_addr)->sin_addr, addressBuffer, sizeof(addressBuffer));
+        std::string ip(addressBuffer);
+        // The loopback on most Linux distributions is lo, however it is not portable. For example loopback in OSX
+        // is lo0.
+        if (strcmp("lo", ifa->ifa_name) == 0 || ip.empty() || StartWith(ip, "127.")) {
+            continue;
         }
+        ipToIfaces[std::move(ip)].push_back(ifa->ifa_name);
     }
     freeifaddrs(ifAddrStruct);
+    return ipToIfaces;
+}
+std::unordered_set<std::string> GetNicIpv4IPSet() {
+    std::unordered_set<std::string> ipSet;
+    for (const auto& kv : GetIpv4NicIpToIfacesMap()) {
+        ipSet.insert(kv.first);
+    }
     return ipSet;
+}
+// Returns true for virtual/dataplane interfaces whose IPs should not be used as host identity.
+// "lo" is always ignored; other names come from AppConfig::host_identity_ignored_ifaces (default kube-ipvs0,
+// nodelocaldns, docker0).
+static bool IsIgnoredHostIdentityInterface(const char* ifname) {
+    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
+        return true;
+    }
+    return AppConfig::GetInstance()->IsHostIdentityIgnoredIface(ifname);
 }
 #endif
 
@@ -233,19 +248,26 @@ std::string GetHostIpByHostName() {
     std::string firstIp;
     char ipStr[INET_ADDRSTRLEN + 1] = "";
 #if defined(__linux__)
-    auto ipSet = GetNicIpv4IPSet();
+    // Collect ip -> interface-name list so we can skip ignored dataplane interfaces.
+    std::unordered_map<std::string, std::vector<std::string>> ipToIfaces = GetIpv4NicIpToIfacesMap();
     for (size_t i = 0; i < addrs.size(); ++i) {
         auto p = inet_ntop(AF_INET, &addrs[i].sin_addr, ipStr, INET_ADDRSTRLEN);
         if (p == nullptr) {
             continue;
         }
         auto tmp = std::string(ipStr);
-        if (ipSet.find(tmp) != ipSet.end()) {
-            return tmp;
+        // Return the first IP that is bound on at least one non-ignored host interface.
+        auto it = ipToIfaces.find(tmp);
+        if (it != ipToIfaces.end()) {
+            for (const auto& ifn : it->second) {
+                if (!IsIgnoredHostIdentityInterface(ifn.c_str())) {
+                    return tmp;
+                }
+            }
         }
         if (i == 0) {
             firstIp = tmp;
-            if (ipSet.empty()) {
+            if (ipToIfaces.empty()) {
                 LOG_INFO(sLogger, ("no entry from getifaddrs", "use first entry from getaddrinfo"));
                 return firstIp;
             }
