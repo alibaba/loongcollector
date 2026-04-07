@@ -178,8 +178,7 @@ std::string GetHostName() {
 }
 
 #if defined(__linux__)
-// Shared with GetNicIpv4IPSet / GetHostIpByHostName: non-loopback AF_INET addresses and owning interface names.
-static std::unordered_map<std::string, std::vector<std::string>> GetIpv4NicIpToIfacesMap() {
+std::unordered_map<std::string, std::vector<std::string>> GetIpv4NicIpToIfacesMap() {
     std::unordered_map<std::string, std::vector<std::string>> ipToIfaces;
     struct ifaddrs* ifAddrStruct = nullptr;
     getifaddrs(&ifAddrStruct);

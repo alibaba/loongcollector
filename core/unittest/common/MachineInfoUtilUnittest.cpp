@@ -18,8 +18,6 @@
 #if defined(__linux__)
 #include "app_config/AppConfig.h"
 #include "json/value.h"
-
-#include <unordered_set>
 #endif
 
 namespace logtail {
@@ -170,8 +168,6 @@ public:
         conf[kHostIdentityIgnoredIfacesKey] = arr;
         AppConfig::GetInstance()->LoadResourceConf(conf);
 
-        std::unordered_set<std::string> ips = GetNicIpv4IPSet();
-        (void)ips;
         (void)GetAnyAvailableIP();
 
         EXPECT_TRUE(IsIgnoredHostIdentityInterface(nullptr));
