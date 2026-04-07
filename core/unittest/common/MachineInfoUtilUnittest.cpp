@@ -15,6 +15,13 @@
 #include "common/MachineInfoUtil.h"
 #include "unittest/Unittest.h"
 
+#if defined(__linux__)
+#include "app_config/AppConfig.h"
+#include "json/value.h"
+
+#include <unordered_set>
+#endif
+
 namespace logtail {
 class HostnameValidationUnittest : public ::testing::Test {
 public:
@@ -150,6 +157,33 @@ public:
 
 UNIT_TEST_CASE(HostnameValidationUnittest, DecHostnameValidationTest);
 UNIT_TEST_CASE(HostnameValidationUnittest, OctHostnameValidationTest);
+
+#if defined(__linux__)
+class MachineInfoUtilLinuxUnittest : public ::testing::Test {
+public:
+    void TestNicIpv4AndHostIdentityHelpers() {
+        Json::Value conf;
+        Json::Value arr(Json::arrayValue);
+        arr.append("kube-ipvs0");
+        arr.append("nodelocaldns");
+        arr.append("docker0");
+        conf[kHostIdentityIgnoredIfacesKey] = arr;
+        AppConfig::GetInstance()->LoadResourceConf(conf);
+
+        std::unordered_set<std::string> ips = GetNicIpv4IPSet();
+        (void)ips;
+        (void)GetAnyAvailableIP();
+
+        EXPECT_TRUE(IsIgnoredHostIdentityInterface(nullptr));
+        EXPECT_TRUE(IsIgnoredHostIdentityInterface(""));
+        EXPECT_TRUE(IsIgnoredHostIdentityInterface("lo"));
+        EXPECT_TRUE(IsIgnoredHostIdentityInterface("kube-ipvs0"));
+        EXPECT_FALSE(IsIgnoredHostIdentityInterface("unlikely_iface_name_ut_12345"));
+    }
+};
+
+UNIT_TEST_CASE(MachineInfoUtilLinuxUnittest, TestNicIpv4AndHostIdentityHelpers);
+#endif
 
 } // end of namespace logtail
 

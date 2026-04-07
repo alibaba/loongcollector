@@ -109,6 +109,14 @@ bool IsDigitsDotsHostname(const char* hostname);
 // NOTE: logger must be initialized before calling this.
 std::string GetAnyAvailableIP();
 
+#if defined(__linux__)
+std::unordered_set<std::string> GetNicIpv4IPSet();
+#endif
+#if defined(__linux__) && defined(APSARA_UNIT_TEST_MAIN)
+// Same helper as used by GetHostIpByHostName; declared only for unit tests (defined in .cpp).
+bool IsIgnoredHostIdentityInterface(const char* ifname);
+#endif
+
 class InstanceIdentity {
 public:
     InstanceIdentity();

@@ -42,8 +42,20 @@ public:
     void TestLoadSingleValueEnvConfig();
     void TestLoadStringParameter();
     void TestGenerateFileTagsDir();
+    void TestHostIdentityIgnoredIfacesConfig();
+    void TestHostIdentityIgnoredIfacesEnv();
 
 private:
+    static Json::Value MakeDefaultHostIdentityIfacesConfig() {
+        Json::Value arr(Json::arrayValue);
+        arr.append("kube-ipvs0");
+        arr.append("nodelocaldns");
+        arr.append("docker0");
+        Json::Value conf;
+        conf[kHostIdentityIgnoredIfacesKey] = arr;
+        return conf;
+    }
+
     void writeLogtailConfigJSON(const Json::Value& v) {
         LOG_INFO(sLogger, ("writeLogtailConfigJSON", v.toStyledString()));
         if (BOOL_FLAG(logtail_mode)) {
@@ -226,6 +238,53 @@ void AppConfigUnittest::TestLoadStringParameter() {
     APSARA_TEST_EQUAL(res, "0.7");
 }
 
+void AppConfigUnittest::TestHostIdentityIgnoredIfacesConfig() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("docker0"));
+
+    Json::Value bad;
+    bad[kHostIdentityIgnoredIfacesKey] = 42;
+    cfg->LoadResourceConf(bad);
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+
+    Json::Value good;
+    good[kHostIdentityIgnoredIfacesKey] = Json::arrayValue;
+    good[kHostIdentityIgnoredIfacesKey].append("iface-a");
+    good[kHostIdentityIgnoredIfacesKey].append("  iface-b  ");
+    cfg->LoadResourceConf(good);
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("iface-a"));
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("iface-b"));
+    APSARA_TEST_FALSE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+
+    Json::Value empty;
+    empty[kHostIdentityIgnoredIfacesKey] = Json::arrayValue;
+    cfg->LoadResourceConf(empty);
+    APSARA_TEST_FALSE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+
+    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+}
+
+void AppConfigUnittest::TestHostIdentityIgnoredIfacesEnv() {
+    AppConfig* cfg = AppConfig::GetInstance();
+    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+
+    SetEnv(kHostIdentityIgnoredIfacesKey, "env-a, env-b");
+    cfg->LoadEnvResourceLimit();
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("env-a"));
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("env-b"));
+    UnsetEnv(kHostIdentityIgnoredIfacesKey);
+
+    SetEnv("LOONG_HOST_IDENTITY_IGNORED_IFACES", "p,q");
+    cfg->LoadEnvResourceLimit();
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("p"));
+    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("q"));
+    UnsetEnv("LOONG_HOST_IDENTITY_IGNORED_IFACES");
+
+    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+}
+
 void AppConfigUnittest::TestGenerateFileTagsDir() {
     {
         STRING_FLAG(ALIYUN_LOG_FILE_TAGS) = "";
@@ -277,6 +336,8 @@ UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
+UNIT_TEST_CASE(AppConfigUnittest, TestHostIdentityIgnoredIfacesConfig);
+UNIT_TEST_CASE(AppConfigUnittest, TestHostIdentityIgnoredIfacesEnv);
 UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail
