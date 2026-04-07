@@ -101,8 +101,8 @@ bool ProcessorNoSplitLogStringNative::IsSupportedEvent(const PipelineEventPtr& e
 }
 
 void ProcessorNoSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
-                                                    PipelineEventPtr&& e,
-                                                    EventsContainer& newEvents) {
+                                                   PipelineEventPtr&& e,
+                                                   EventsContainer& newEvents) {
     if (!IsSupportedEvent(e)) {
         newEvents.emplace_back(std::move(e));
         return;
@@ -147,10 +147,10 @@ void ProcessorNoSplitLogStringNative::ProcessEvent(PipelineEventGroup& logGroup,
 }
 
 void ProcessorNoSplitLogStringNative::CreateNewEvent(const StringView& content,
-                                                      StringBuffer& sourceKey,
-                                                      const LogEvent& sourceEvent,
-                                                      PipelineEventGroup& logGroup,
-                                                      EventsContainer& newEvents) {
+                                                     StringBuffer& sourceKey,
+                                                     const LogEvent& sourceEvent,
+                                                     PipelineEventGroup& logGroup,
+                                                     EventsContainer& newEvents) {
     if (mEnableRawContent) {
         std::unique_ptr<RawEvent> targetEvent = logGroup.CreateRawEvent(true);
         targetEvent->SetContentNoCopy(content);
