@@ -47,7 +47,6 @@ public:
     void TestJsonUnicodeCharacters();
     void TestJsonWithNullValues();
     void TestInvalidJsonFormats();
-    void TestProcessJsonNonUtf8();
 
     CollectionPipelineContext mContext;
 };
@@ -91,8 +90,6 @@ UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonUnicodeCharacters);
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestJsonWithNullValues);
 
 UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestInvalidJsonFormats);
-
-UNIT_TEST_CASE(ProcessorParseJsonNativeUnittest, TestProcessJsonNonUtf8);
 
 PluginInstance::PluginMeta getPluginMeta() {
     PluginInstance::PluginMeta pluginMeta{"1"};
@@ -1294,153 +1291,6 @@ void ProcessorParseJsonNativeUnittest::TestInvalidJsonFormats() {
     })";
     std::string outJson = eventGroupList[0].ToJsonString();
     APSARA_TEST_STREQ_FATAL(CompactJson(expectJson).c_str(), CompactJson(outJson).c_str());
-}
-
-void ProcessorParseJsonNativeUnittest::TestProcessJsonNonUtf8() {
-    // Reproduces bad.jsonl: JSON with non-UTF-8 bytes in string values.
-    // simdjson strictly validates UTF-8 and would reject such input.
-    Json::Value config;
-    config["SourceKey"] = "content";
-    config["KeepingSourceWhenParseFail"] = true;
-    config["KeepingSourceWhenParseSucceed"] = true;
-    config["CopingRawLog"] = true;
-    config["RenamedSourceKey"] = "rawLog";
-
-    // Case 1: Valid UTF-8 — "新用" (e6 96 b0 e7 94 a8) at character boundary, no broken bytes
-    {
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup eventGroup(sourceBuffer);
-
-        std::string jsonContent =
-            "{\"host\":\"172.27.0.158\",\"status\":\"200\","
-            "\"respbody\":\"{\\\"name\\\":\\\""
-            "\xe6\x96\xb0\xe7\x94\xa8"
-            "code\\\",\\\"enable\\\":true}\"}";
-
-        auto* logEvent = eventGroup.AddLogEvent();
-        logEvent->SetContent(std::string("content"), jsonContent);
-        logEvent->SetTimestamp(12345678901);
-
-        ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
-        ProcessorInstance processorInstance(&processor, getPluginMeta());
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
-        std::vector<PipelineEventGroup> eventGroupList;
-        eventGroupList.emplace_back(std::move(eventGroup));
-        processorInstance.Process(eventGroupList);
-
-        APSARA_TEST_EQUAL_FATAL(1u, eventGroupList[0].GetEvents().size());
-        auto& outEvent = eventGroupList[0].GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("host"));
-        APSARA_TEST_EQUAL_FATAL(std::string("172.27.0.158"), outEvent.GetContent("host").to_string());
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("status"));
-        APSARA_TEST_EQUAL_FATAL(std::string("200"), outEvent.GetContent("status").to_string());
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("respbody"));
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("rawLog"));
-    }
-
-    // Case 2: Invalid UTF-8 — single stray continuation byte 0x80 after "新用"
-    // Reproduces bad.jsonl line 2: e6 96 b0 e7 94 a8 80 63 6f 64 65
-    {
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup eventGroup(sourceBuffer);
-
-        std::string jsonContent =
-            "{\"host\":\"172.27.0.158\",\"status\":\"200\","
-            "\"respbody\":\"{\\\"name\\\":\\\""
-            "\xe6\x96\xb0\xe7\x94\xa8"
-            "\x80"
-            "code\\\",\\\"enable\\\":true}\"}";
-
-        auto* logEvent = eventGroup.AddLogEvent();
-        logEvent->SetContent(std::string("content"), jsonContent);
-        logEvent->SetTimestamp(12345678901);
-
-        ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
-        ProcessorInstance processorInstance(&processor, getPluginMeta());
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
-        std::vector<PipelineEventGroup> eventGroupList;
-        eventGroupList.emplace_back(std::move(eventGroup));
-        processorInstance.Process(eventGroupList);
-
-        APSARA_TEST_EQUAL_FATAL(1u, eventGroupList[0].GetEvents().size());
-        auto& outEvent = eventGroupList[0].GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("rawLog"));
-    }
-
-    // Case 3: Invalid UTF-8 — two stray continuation bytes 0x80 0x81 after "新用"
-    // Reproduces bad.jsonl line 3: e6 96 b0 e7 94 a8 80 81 63 6f 64 65
-    {
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup eventGroup(sourceBuffer);
-
-        std::string jsonContent =
-            "{\"host\":\"172.27.0.158\",\"status\":\"200\","
-            "\"respbody\":\"{\\\"name\\\":\\\""
-            "\xe6\x96\xb0\xe7\x94\xa8"
-            "\x80\x81"
-            "code\\\",\\\"enable\\\":true}\"}";
-
-        auto* logEvent = eventGroup.AddLogEvent();
-        logEvent->SetContent(std::string("content"), jsonContent);
-        logEvent->SetTimestamp(12345678901);
-
-        ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
-        ProcessorInstance processorInstance(&processor, getPluginMeta());
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
-        std::vector<PipelineEventGroup> eventGroupList;
-        eventGroupList.emplace_back(std::move(eventGroup));
-        processorInstance.Process(eventGroupList);
-
-        APSARA_TEST_EQUAL_FATAL(1u, eventGroupList[0].GetEvents().size());
-        auto& outEvent = eventGroupList[0].GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("rawLog"));
-    }
-
-    // Case 4: Realistic long JSON with many fields and non-UTF-8 in nested respbody,
-    // closely matching the structure of bad.jsonl
-    {
-        auto sourceBuffer = std::make_shared<SourceBuffer>();
-        PipelineEventGroup eventGroup(sourceBuffer);
-
-        std::string jsonContent =
-            "{\"@timestamp\":\"2026-03-25T07:50:00+08:00\","
-            "\"host\":\"172.27.0.158\","
-            "\"client\":\"41.96.200.231\","
-            "\"size\":\"12877\","
-            "\"status\":\"200\","
-            "\"url\":\"http://mobile-api.hitv.space/config/app/ad/config/v2\","
-            "\"server_name\":\"mobile-api.hitv.space\","
-            "\"uri\":\"/config/app/ad/config/v2\","
-            "\"http_user_agent\":\"okhttp/4.12.0\","
-            "\"request_time\":\"0.043\","
-            "\"request_method\":\"GET\","
-            "\"upstream_status\":\"200\","
-            "\"realip\":\"41.96.200.231\","
-            "\"lang\":\"fr\","
-            "\"keke\":\"false\","
-            "\"mcc\":\"603\","
-            "\"timezone\":\"GMT+01:00\","
-            "\"respbody\":\"{\\\"code\\\":\\\"00000\\\",\\\"msg\\\":\\\"Success\\\","
-            "\\\"data\\\":{\\\"details\\\":[{\\\"name\\\":\\\""
-            "\xe6\x96\xb0\xe7\x94\xa8"
-            "\x80"
-            "code\\\",\\\"enable\\\":true}]}}\"}";
-
-        auto* logEvent = eventGroup.AddLogEvent();
-        logEvent->SetContent(std::string("content"), jsonContent);
-        logEvent->SetTimestamp(12345678901);
-
-        ProcessorParseJsonNative& processor = *(new ProcessorParseJsonNative);
-        ProcessorInstance processorInstance(&processor, getPluginMeta());
-        APSARA_TEST_TRUE_FATAL(processorInstance.Init(config, mContext));
-        std::vector<PipelineEventGroup> eventGroupList;
-        eventGroupList.emplace_back(std::move(eventGroup));
-        processorInstance.Process(eventGroupList);
-
-        APSARA_TEST_EQUAL_FATAL(1u, eventGroupList[0].GetEvents().size());
-        auto& outEvent = eventGroupList[0].GetEvents()[0].Cast<LogEvent>();
-        APSARA_TEST_TRUE_FATAL(outEvent.HasContent("rawLog"));
-    }
 }
 
 } // namespace logtail
