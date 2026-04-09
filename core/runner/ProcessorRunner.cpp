@@ -142,6 +142,9 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         // there are multiple inputs
         pipeline->Process(eventGroupList, item->mInputIndex);
 
+        LOG_INFO(sLogger, ("ProcessorRunner after Process", "debug")(
+                     "config", configName)("eventCount", eventGroupList[0].GetEvents().size())("isGoPipeline", pipeline->IsFlushingThroughGoPipeline())("isLog", isLog));
+
         if (pipeline->IsFlushingThroughGoPipeline()) {
             // TODO:
             // 1. allow all event types to be sent to Go pipelines

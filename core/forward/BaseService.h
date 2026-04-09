@@ -16,7 +16,14 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "json/value.h"
+
+namespace grpc {
+class Service;
+}
 
 namespace logtail {
 
@@ -28,6 +35,10 @@ public:
     virtual bool Update(std::string configName, const Json::Value& config) = 0;
     virtual bool Remove(std::string configName, const Json::Value& config) = 0;
     [[nodiscard]] virtual const std::string& Name() const = 0;
+
+    // Returns all gRPC services for registration with ServerBuilder.
+    // Override in derived classes to return a list of gRPC Service objects.
+    virtual std::vector<::grpc::Service*> GetGrpcServices() { return {}; }
 
 protected:
     std::string mAddress;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 iLogtail Authors
+ * Copyright 2025 iLogtail Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,21 @@
 
 #pragma once
 
+#include <string>
+
+#include "collection_pipeline/serializer/Serializer.h"
+
 namespace logtail {
 
-enum class SinkType { HTTP, GRPC, NONE };
+class OTLPEventGroupSerializer : public Serializer<BatchedEvents> {
+public:
+    OTLPEventGroupSerializer(Flusher* f) : Serializer<BatchedEvents>(f) {}
+
+    // Serialize to protobuf binary string (for http+protobuf transport).
+    bool SerializeToBinaryString(BatchedEvents&& p, std::string& res, std::string& errorMsg);
+
+private:
+    bool Serialize(BatchedEvents&& p, std::string& res, std::string& errorMsg) override;
+};
 
 } // namespace logtail

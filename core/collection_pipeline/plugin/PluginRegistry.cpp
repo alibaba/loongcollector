@@ -30,6 +30,8 @@
 #include "plugin/creator/StaticProcessorCreator.h"
 #include "plugin/flusher/blackhole/FlusherBlackHole.h"
 #include "plugin/flusher/file/FlusherFile.h"
+#include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
+#include "plugin/flusher/opentelemetry/FlusherOTLPHttpNative.h"
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
@@ -210,6 +212,8 @@ void PluginRegistry::LoadStaticPlugins() {
 #if defined(__linux__) && !defined(__ENTERPRISE__)
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
 #endif
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherOTLPNative>());
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherOTLPHttpNative>());
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());
 #endif

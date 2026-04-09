@@ -21,6 +21,12 @@ if (ENABLE_ENTERPRISE)
 endif ()
 target_link_libraries(flusher_sls_unittest ${UT_BASE_TARGET})
 
+add_executable(flusher_otlp_native_unittest FlusherOTLPNativeUnittest.cpp)
+target_link_libraries(flusher_otlp_native_unittest ${UT_BASE_TARGET})
+
+add_executable(flusher_otlp_http_native_unittest FlusherOTLPHttpNativeUnittest.cpp)
+target_link_libraries(flusher_otlp_http_native_unittest ${UT_BASE_TARGET})
+
 if(UNIX AND NOT ENABLE_ENTERPRISE)
     add_executable(flusher_kafka_unittest FlusherKafkaUnittest.cpp)
     target_link_libraries(flusher_kafka_unittest ${UT_BASE_TARGET})

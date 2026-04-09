@@ -147,10 +147,10 @@ set(SUB_DIRECTORIES_LIST
         application app_config constants container_manager metadata logger go_pipeline models
         config config/watcher
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
-        runner runner/sink/http
+        runner runner/sink/http runner/sink/grpc
         task_pipeline
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender monitor/task_status_constants
-        protobuf/sls protobuf/models protobuf/forward
+        protobuf/sls protobuf/models protobuf/forward protobuf/opentelemetry
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
         )
@@ -160,7 +160,7 @@ if (LINUX)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol/mysql ebpf/protocol/redis ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
+        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite forward/otlp protobuf/opentelemetry
         )
 elseif(MSVC)
 endif ()
@@ -171,6 +171,8 @@ endif()
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
+# protobuf/ is needed so that generated OTLP proto headers (which use #include "opentelemetry/proto/...") can be resolved
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/protobuf)
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})

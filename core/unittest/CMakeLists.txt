@@ -98,6 +98,11 @@ macro(ut_link ut_link_withspl)
 endmacro()
 
 set(SOURCE_FILES_CORE ${FRAMEWORK_SOURCE_FILES} ${PLUGIN_SOURCE_FILES_CORE})
+
+# OTLP protobuf source files (must list explicitly since subdirectory globs don't find them)
+file(GLOB_RECURSE OTLP_PROTO_SRCS ${CMAKE_SOURCE_DIR}/protobuf/opentelemetry/*.cc)
+list(APPEND SOURCE_FILES_CORE ${OTLP_PROTO_SRCS} ${CMAKE_SOURCE_DIR}/forward/otlp/OTLPForwardService.cpp ${CMAKE_SOURCE_DIR}/collection_pipeline/plugin/interface/Flusher.cpp)
+
 set(SOURCE_FILES_CORE_WITHSPL ${SOURCE_FILES_CORE} ${PLUGIN_SOURCE_FILES_SPL})
 
 # add provider

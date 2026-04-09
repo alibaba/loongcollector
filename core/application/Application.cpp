@@ -54,6 +54,7 @@
 #include "plugin/input/InputFeedbackInterfaceRegistry.h"
 #include "runner/FlusherRunner.h"
 #include "runner/ProcessorRunner.h"
+#include "runner/sink/grpc/GrpcSink.h"
 #include "runner/sink/http/HttpSink.h"
 #include "task_pipeline/TaskPipelineManager.h"
 #include "task_pipeline/TaskRegistry.h"
@@ -264,6 +265,7 @@ void Application::Start() { // GCOVR_EXCL_START
     // runner
     BoundedSenderQueueInterface::SetFeedback(ProcessQueueManager::GetInstance());
     HttpSink::GetInstance()->Init();
+    GrpcSink::GetInstance()->Init();
     FlusherRunner::GetInstance()->Init();
     ProcessorRunner::GetInstance()->Init();
 
@@ -441,6 +443,7 @@ void Application::Exit() {
     ContainerManager::GetInstance()->Stop();
     FlusherRunner::GetInstance()->Stop();
     HttpSink::GetInstance()->Stop();
+    GrpcSink::GetInstance()->Stop();
 
     // TODO: make it common
     FlusherSLS::RecycleResourceIfNotUsed();

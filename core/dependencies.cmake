@@ -135,7 +135,7 @@ logtail_define(protobuf_BIN "Absolute path to protoc" "${DEPS_BINARY_ROOT}/proto
 
 function(compile_proto PROTO_PATH OUTPUT_PATH PROTO_FILES)
     file(MAKE_DIRECTORY ${OUTPUT_PATH})
-    execute_process(COMMAND ${protobuf_BIN} 
+    execute_process(COMMAND ${protobuf_BIN}
         --proto_path=${PROTO_PATH}
         --cpp_out=${OUTPUT_PATH}
         ${PROTO_FILES})
@@ -143,13 +143,25 @@ endfunction()
 
 function(compile_proto_grpc PROTO_PATH OUTPUT_PATH PROTO_FILES)
     file(MAKE_DIRECTORY ${OUTPUT_PATH})
-    execute_process(COMMAND ${protobuf_BIN}  
+    execute_process(COMMAND ${protobuf_BIN}
         --plugin=protoc-gen-grpc=${DEPS_BINARY_ROOT}/grpc_cpp_plugin
         -I=${PROTO_PATH}
         --cpp_out=${OUTPUT_PATH}
         --grpc_out=${OUTPUT_PATH}
         ${PROTO_FILES})
 endfunction()
+
+compile_proto(
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf"
+    "opentelemetry/proto/common/v1/common.proto;opentelemetry/proto/resource/v1/resource.proto;opentelemetry/proto/logs/v1/logs.proto;opentelemetry/proto/metrics/v1/metrics.proto;opentelemetry/proto/trace/v1/trace.proto"
+)
+
+compile_proto_grpc(
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf"
+    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf"
+    "opentelemetry/proto/collector/logs/v1/logs_service.proto;opentelemetry/proto/collector/metrics/v1/metrics_service.proto;opentelemetry/proto/collector/trace/v1/trace_service.proto"
+)
 
 compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/sls"

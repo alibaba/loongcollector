@@ -45,6 +45,7 @@ public:
 
     // TODO: should be private
     bool PushToHttpSink(SenderQueueItem* item, bool withLimit = true);
+    bool PushToGrpcSink(SenderQueueItem* item, bool withLimit = true);
 
     int32_t GetSendingBufferCount() { return mHttpSendingCnt.load(); }
 
