@@ -101,18 +101,14 @@ void GetAllPids(std::unordered_set<int32_t>& pids);
 bool GetKernelInfo(std::string& kernelRelease, int64_t& kernelVersion);
 bool GetRedHatReleaseInfo(std::string& os, int64_t& osVersion, std::string bashPath = "");
 bool IsDigitsDotsHostname(const char* hostname);
-// GetAnyAvailableIP walks through all interfaces (AF_INET) to find an available IP.
+// GetAnyAvailableIP walks through interfaces (AF_INET) to find an available IP (Linux: excludes lo/127.* and
+// ignored_interfaces blacklist).
 // Priority:
 // - IP that does not start with "127.".
 // - IP from interface at first.
 //
 // NOTE: logger must be initialized before calling this.
 std::string GetAnyAvailableIP();
-
-#if defined(__linux__) && defined(APSARA_UNIT_TEST_MAIN)
-// Same helper as used by GetHostIpByHostName; declared only for unit tests (defined in .cpp).
-bool IsIgnoredHostIdentityInterface(const char* ifname);
-#endif
 
 class InstanceIdentity {
 public:

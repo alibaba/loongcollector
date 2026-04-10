@@ -37,7 +37,7 @@
 #include <algorithm>
 #include <list>
 #include <map>
-#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #elif defined(_MSC_VER)
 #include <WinSock2.h>
@@ -178,8 +178,19 @@ std::string GetHostName() {
 }
 
 #if defined(__linux__)
-std::unordered_map<std::string, std::vector<std::string>> GetIpv4NicIpToIfacesMap() {
-    std::unordered_map<std::string, std::vector<std::string>> ipToIfaces;
+// Returns true for virtual/dataplane interfaces whose IPs should not be used as host identity.
+// "lo" is always ignored; other names from STRING_FLAG(ignored_interfaces).
+static bool IsIgnoredHostIdentityInterface(const char* ifname) {
+    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
+        return true;
+    }
+    return AppConfig::GetInstance()->IsIgnoredInterfaces(ifname);
+}
+
+// Non-loopback AF_INET addresses from getifaddrs. Excludes lo/127.* and interfaces on the host-identity blacklist
+// (STRING_FLAG ignored_interfaces, plus implicit lo).
+std::unordered_set<std::string> GetNicIpv4IPSet() {
+    std::unordered_set<std::string> ipSet;
     struct ifaddrs* ifAddrStruct = nullptr;
     getifaddrs(&ifAddrStruct);
     for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
@@ -194,26 +205,13 @@ std::unordered_map<std::string, std::vector<std::string>> GetIpv4NicIpToIfacesMa
         if (strcmp("lo", ifa->ifa_name) == 0 || ip.empty() || StartWith(ip, "127.")) {
             continue;
         }
-        ipToIfaces[std::move(ip)].push_back(ifa->ifa_name);
+        if (IsIgnoredHostIdentityInterface(ifa->ifa_name)) {
+            continue;
+        }
+        ipSet.insert(std::move(ip));
     }
     freeifaddrs(ifAddrStruct);
-    return ipToIfaces;
-}
-std::unordered_set<std::string> GetNicIpv4IPSet() {
-    std::unordered_set<std::string> ipSet;
-    for (const auto& kv : GetIpv4NicIpToIfacesMap()) {
-        ipSet.insert(kv.first);
-    }
     return ipSet;
-}
-// Returns true for virtual/dataplane interfaces whose IPs should not be used as host identity.
-// "lo" is always ignored; other names from AppConfig (kHostIdentityIgnoredIfacesKey, default kube-ipvs0,
-// nodelocaldns, docker0).
-bool IsIgnoredHostIdentityInterface(const char* ifname) {
-    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
-        return true;
-    }
-    return AppConfig::GetInstance()->IsHostIdentityIgnoredIface(ifname);
 }
 #endif
 
@@ -247,26 +245,19 @@ std::string GetHostIpByHostName() {
     std::string firstIp;
     char ipStr[INET_ADDRSTRLEN + 1] = "";
 #if defined(__linux__)
-    // Collect ip -> interface-name list so we can skip ignored dataplane interfaces.
-    std::unordered_map<std::string, std::vector<std::string>> ipToIfaces = GetIpv4NicIpToIfacesMap();
+    std::unordered_set<std::string> nicIpSet = GetNicIpv4IPSet();
     for (size_t i = 0; i < addrs.size(); ++i) {
         auto p = inet_ntop(AF_INET, &addrs[i].sin_addr, ipStr, INET_ADDRSTRLEN);
         if (p == nullptr) {
             continue;
         }
         auto tmp = std::string(ipStr);
-        // Return the first IP that is bound on at least one non-ignored host interface.
-        auto it = ipToIfaces.find(tmp);
-        if (it != ipToIfaces.end()) {
-            for (const auto& ifn : it->second) {
-                if (!IsIgnoredHostIdentityInterface(ifn.c_str())) {
-                    return tmp;
-                }
-            }
+        if (nicIpSet.find(tmp) != nicIpSet.end()) {
+            return tmp;
         }
         if (i == 0) {
             firstIp = tmp;
-            if (ipToIfaces.empty()) {
+            if (nicIpSet.empty()) {
                 LOG_INFO(sLogger, ("no entry from getifaddrs", "use first entry from getaddrinfo"));
                 return firstIp;
             }

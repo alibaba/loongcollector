@@ -162,20 +162,11 @@ class MachineInfoUtilLinuxUnittest : public ::testing::Test {
 public:
     void TestNicIpv4AndHostIdentityHelpers() {
         Json::Value conf;
-        Json::Value arr(Json::arrayValue);
-        arr.append("kube-ipvs0");
-        arr.append("nodelocaldns");
-        arr.append("docker0");
-        conf[kHostIdentityIgnoredIfacesKey] = arr;
-        AppConfig::GetInstance()->LoadResourceConf(conf);
+        conf[kIgnoredInterfacesKey] = "kube-ipvs0,nodelocaldns,docker0";
+        AppConfig::GetInstance()->ParseJsonToFlags(conf);
 
+        EXPECT_TRUE(AppConfig::GetInstance()->IsIgnoredInterfaces("kube-ipvs0"));
         (void)GetAnyAvailableIP();
-
-        EXPECT_TRUE(IsIgnoredHostIdentityInterface(nullptr));
-        EXPECT_TRUE(IsIgnoredHostIdentityInterface(""));
-        EXPECT_TRUE(IsIgnoredHostIdentityInterface("lo"));
-        EXPECT_TRUE(IsIgnoredHostIdentityInterface("kube-ipvs0"));
-        EXPECT_FALSE(IsIgnoredHostIdentityInterface("unlikely_iface_name_ut_12345"));
     }
 };
 

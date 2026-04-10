@@ -16,6 +16,7 @@
 #include "common/FileSystemUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
@@ -42,17 +43,13 @@ public:
     void TestLoadSingleValueEnvConfig();
     void TestLoadStringParameter();
     void TestGenerateFileTagsDir();
-    void TestHostIdentityIgnoredIfacesConfig();
-    void TestHostIdentityIgnoredIfacesEnv();
+    void TestIgnoredInterfacesConfig();
+    void TestIgnoredInterfacesEnv();
 
 private:
-    static Json::Value MakeDefaultHostIdentityIfacesConfig() {
-        Json::Value arr(Json::arrayValue);
-        arr.append("kube-ipvs0");
-        arr.append("nodelocaldns");
-        arr.append("docker0");
+    static Json::Value MakeDefaultIgnoredInterfacesConfig() {
         Json::Value conf;
-        conf[kHostIdentityIgnoredIfacesKey] = arr;
+        conf[kIgnoredInterfacesKey] = "kube-ipvs0,nodelocaldns,docker0";
         return conf;
     }
 
@@ -238,51 +235,51 @@ void AppConfigUnittest::TestLoadStringParameter() {
     APSARA_TEST_EQUAL(res, "0.7");
 }
 
-void AppConfigUnittest::TestHostIdentityIgnoredIfacesConfig() {
+void AppConfigUnittest::TestIgnoredInterfacesConfig() {
     AppConfig* cfg = AppConfig::GetInstance();
-    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("docker0"));
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("docker0"));
 
+    // JSON array is not applied as a gflag; flag value stays unchanged.
     Json::Value bad;
-    bad[kHostIdentityIgnoredIfacesKey] = 42;
-    cfg->LoadResourceConf(bad);
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+    bad[kIgnoredInterfacesKey] = Json::arrayValue;
+    bad[kIgnoredInterfacesKey].append("x");
+    cfg->ParseJsonToFlags(bad);
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
 
     Json::Value good;
-    good[kHostIdentityIgnoredIfacesKey] = Json::arrayValue;
-    good[kHostIdentityIgnoredIfacesKey].append("iface-a");
-    good[kHostIdentityIgnoredIfacesKey].append("  iface-b  ");
-    cfg->LoadResourceConf(good);
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("iface-a"));
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("iface-b"));
-    APSARA_TEST_FALSE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+    good[kIgnoredInterfacesKey] = "iface-a, iface-b";
+    cfg->ParseJsonToFlags(good);
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("iface-a"));
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("iface-b"));
+    APSARA_TEST_FALSE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
 
     Json::Value empty;
-    empty[kHostIdentityIgnoredIfacesKey] = Json::arrayValue;
-    cfg->LoadResourceConf(empty);
-    APSARA_TEST_FALSE(cfg->IsHostIdentityIgnoredIface("kube-ipvs0"));
+    empty[kIgnoredInterfacesKey] = "";
+    cfg->ParseJsonToFlags(empty);
+    APSARA_TEST_FALSE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
 
-    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 }
 
-void AppConfigUnittest::TestHostIdentityIgnoredIfacesEnv() {
+void AppConfigUnittest::TestIgnoredInterfacesEnv() {
     AppConfig* cfg = AppConfig::GetInstance();
-    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 
-    SetEnv(kHostIdentityIgnoredIfacesKey, "env-a, env-b");
-    cfg->LoadEnvResourceLimit();
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("env-a"));
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("env-b"));
-    UnsetEnv(kHostIdentityIgnoredIfacesKey);
+    SetEnv(kIgnoredInterfacesKey, "env-a, env-b");
+    cfg->ParseEnvToFlags();
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("env-a"));
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("env-b"));
+    UnsetEnv(kIgnoredInterfacesKey);
 
-    SetEnv("LOONG_HOST_IDENTITY_IGNORED_IFACES", "p,q");
-    cfg->LoadEnvResourceLimit();
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("p"));
-    APSARA_TEST_TRUE(cfg->IsHostIdentityIgnoredIface("q"));
-    UnsetEnv("LOONG_HOST_IDENTITY_IGNORED_IFACES");
+    SetEnv("LOONG_IGNORED_INTERFACES", "p,q");
+    cfg->ParseEnvToFlags();
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("p"));
+    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("q"));
+    UnsetEnv("LOONG_IGNORED_INTERFACES");
 
-    cfg->LoadResourceConf(MakeDefaultHostIdentityIfacesConfig());
+    cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 }
 
 void AppConfigUnittest::TestGenerateFileTagsDir() {
@@ -336,8 +333,8 @@ UNIT_TEST_CASE(AppConfigUnittest, TestRecurseParseJsonToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestParseEnvToFlags);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadSingleValueEnvConfig);
 UNIT_TEST_CASE(AppConfigUnittest, TestLoadStringParameter);
-UNIT_TEST_CASE(AppConfigUnittest, TestHostIdentityIgnoredIfacesConfig);
-UNIT_TEST_CASE(AppConfigUnittest, TestHostIdentityIgnoredIfacesEnv);
+UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesConfig);
+UNIT_TEST_CASE(AppConfigUnittest, TestIgnoredInterfacesEnv);
 UNIT_TEST_CASE(AppConfigUnittest, TestGenerateFileTagsDir);
 
 } // namespace logtail

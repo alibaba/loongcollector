@@ -612,9 +612,22 @@ AppConfig::AppConfig() {
 
     mPurageContainerMode = false;
     mForceQuitReadTimeout = 7200;
-    mHostIdentityIgnoredIfaces = {"kube-ipvs0", "nodelocaldns", "docker0"};
     LoadEnvTags();
     CheckPurageContainerMode();
+}
+
+bool AppConfig::IsIgnoredInterfaces(const std::string& ifname) const {
+    const string& list = STRING_FLAG(ignored_interfaces);
+    if (list.empty()) {
+        return false;
+    }
+    for (auto& part : SplitString(list, ",")) {
+        string t = TrimString(part);
+        if (!t.empty() && t == ifname) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void AppConfig::MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson) {
@@ -835,22 +848,6 @@ void AppConfig::LoadEnvResourceLimit() {
     LoadSingleValueEnvConfig("max_bytes_per_sec", mMaxBytePerSec, (int32_t)(1024 * 1024));
     LoadSingleValueEnvConfig("process_thread_count", mProcessThreadCount, (int32_t)1);
     LoadSingleValueEnvConfig("send_request_concurrency", mSendRequestConcurrency, (int32_t)10);
-
-    char* ifaceEnv = getenv(kHostIdentityIgnoredIfacesKey);
-    if (ifaceEnv == nullptr) {
-        ifaceEnv
-            = getenv((LOONGCOLLECTOR_ENV_PREFIX + ToUpperCaseString(string(kHostIdentityIgnoredIfacesKey))).c_str());
-    }
-    if (ifaceEnv != nullptr && *ifaceEnv != '\0') {
-        mHostIdentityIgnoredIfaces.clear();
-        for (auto& part : SplitString(string(ifaceEnv), ",")) {
-            string t = TrimString(part);
-            if (!t.empty()) {
-                mHostIdentityIgnoredIfaces.insert(std::move(t));
-            }
-        }
-        LOG_INFO(sLogger, (kHostIdentityIgnoredIfacesKey, string(ifaceEnv))("source", "env_overrides_json"));
-    }
 }
 
 /**
@@ -963,26 +960,6 @@ void AppConfig::LoadResourceConf(const Json::Value& confJson) {
             mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
     } else
         mCpuUsageUpLimit = DOUBLE_FLAG(cpu_usage_up_limit);
-
-    if (confJson.isMember(kHostIdentityIgnoredIfacesKey)) {
-        const auto& ifaceJson = confJson[kHostIdentityIgnoredIfacesKey];
-        if (ifaceJson.isArray()) {
-            mHostIdentityIgnoredIfaces.clear();
-            for (Json::ArrayIndex i = 0; i < ifaceJson.size(); ++i) {
-                if (ifaceJson[i].isString()) {
-                    string s = TrimString(ifaceJson[i].asString());
-                    if (!s.empty()) {
-                        mHostIdentityIgnoredIfaces.insert(std::move(s));
-                    }
-                }
-            }
-            LOG_INFO(sLogger, (kHostIdentityIgnoredIfacesKey, ifaceJson.toStyledString())("source", "config"));
-        } else {
-            LOG_WARNING(sLogger,
-                        (kHostIdentityIgnoredIfacesKey,
-                         "expected JSON array of strings, ignored")("value", ifaceJson.toStyledString()));
-        }
-    }
 
     if (confJson.isMember("mem_usage_limit") && confJson["mem_usage_limit"].isIntegral())
         mMemUsageUpLimit = confJson["mem_usage_limit"].asInt64();

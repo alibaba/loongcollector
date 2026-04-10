@@ -41,8 +41,9 @@ extern const uint32_t NO_FALL_BACK_FAIL_PERCENTAGE;
 extern const uint32_t SLOW_FALL_BACK_FAIL_PERCENTAGE;
 extern const std::string LOONGCOLLECTOR_ENV_PREFIX;
 
-/** ilogtail_config.json field and env key (with LOONG_ + uppercase) for ignored host-identity interfaces (Linux). */
-constexpr const char* kHostIdentityIgnoredIfacesKey = "host_identity_ignored_ifaces";
+/** gflag / ilogtail_config.json key (string, comma-separated) / env key (with LOONG_ + uppercase) for ignored
+ *  host-identity interfaces (Linux). Loaded via ParseJsonToFlags / ParseEnvToFlags. */
+constexpr const char* kIgnoredInterfacesKey = "ignored_interfaces";
 
 void CreateAgentDir();
 
@@ -226,9 +227,6 @@ private:
     std::vector<std::string> mHostPathBlacklist;
 
     std::string mBindInterface;
-
-    // Interface names excluded when picking host IP from hostname (Linux); see kHostIdentityIgnoredIfacesKey.
-    std::unordered_set<std::string> mHostIdentityIgnoredIfaces;
 
     // /**
     //  * @brief Load ConfigServer, DataServer and network interface
@@ -538,9 +536,7 @@ public:
 
     const std::string& GetBindInterface() const { return mBindInterface; }
 
-    bool IsHostIdentityIgnoredIface(const std::string& ifname) const {
-        return mHostIdentityIgnoredIfaces.find(ifname) != mHostIdentityIgnoredIfaces.end();
-    }
+    bool IsIgnoredInterfaces(const std::string& ifname) const;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
