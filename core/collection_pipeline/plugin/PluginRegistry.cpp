@@ -47,7 +47,6 @@
 #include "plugin/processor/ProcessorParseTimestampNative.h"
 #include "plugin/processor/ProcessorTimestampFilterNative.h"
 #include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
-#include "plugin/processor/inner/ProcessorNoSplitLogStringNative.h"
 #include "plugin/processor/inner/ProcessorParseContainerLogNative.h"
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 #include "plugin/processor/inner/ProcessorSplitLogStringNative.h"
@@ -181,7 +180,6 @@ void PluginRegistry::LoadStaticPlugins() {
 #endif
     RegisterOnetimeInputCreator(new StaticInputCreator<InputStaticFile>());
 
-    RegisterProcessorCreator(new StaticProcessorCreator<ProcessorNoSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorSplitMultilineLogStringNative>());
     RegisterProcessorCreator(new StaticProcessorCreator<ProcessorMergeMultilineLogNative>());
