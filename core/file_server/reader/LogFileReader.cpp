@@ -1570,6 +1570,7 @@ void LogFileReader::setExactlyOnceCheckpointAfterRead(size_t readSize) {
 void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback, bool isStaticFile) {
     char* stringBuffer = nullptr;
     size_t nbytes = 0;
+    bool logTooLongSplitFlag = false;
 
     logBuffer.readOffset = mLastFilePos;
     if (!mLogFileOp.IsOpen()) {
@@ -1647,74 +1648,43 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             mCache.clear();
         } else {
             moreData = (nbytes == BUFFER_SIZE);
-
             if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
                 if (!moreData && allowRollback) {
                     mCache.assign(stringBuffer, stringBufferLen);
                     return;
                 }
-                auto alignedBytes = nbytes;
-                if (allowRollback) {
-                    alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
-                }
-                nbytes = alignedBytes ? alignedBytes : nbytes;
                 if (moreData) {
-                    LOG_WARNING(sLogger,
-                                ("Log is too long and forced to be split at offset: ",
-                                 mLastFilePos + nbytes)("file: ", mHostLogPath)("inode: ", mDevInode.inode)(
-                                    "first 1024B log: ", StringView(stringBuffer, std::min(nbytes, (size_t)1024))));
-                    std::ostringstream oss;
-                    oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
-                        << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
-                        << " first 1024B log: " << StringView(stringBuffer, std::min(nbytes, (size_t)1024))
-                        << std::endl;
-                    AlarmManager::GetInstance()->SendAlarmWarning(
-                        SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+                    logTooLongSplitFlag = true;
                 }
-                if (nbytes < stringBufferLen) {
-                    mCache.assign(stringBuffer + nbytes, stringBufferLen - nbytes);
-                } else {
-                    mCache.clear();
-                }
-            } else {
-                auto alignedBytes = nbytes;
-                if (allowRollback) {
-                    alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
-                }
-                if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-                    int32_t rollbackLineFeedCount = 0;
-                    nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
-                }
+            }
+            auto alignedBytes = nbytes;
+            if (allowRollback) {
+                alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
+            }
+            if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
+                int32_t rollbackLineFeedCount = 0;
+                nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
+            }
 
-                if (nbytes == 0) {
-                    if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
-                        nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
-                        if (mReaderConfig.second->RequiringJsonReader()) {
-                            int32_t rollbackLineFeedCount = 0;
-                            nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
-                        }
-                        LOG_WARNING(sLogger,
-                                    ("Log is too long and forced to be split at offset: ",
-                                     mLastFilePos + nbytes)("file: ", mHostLogPath)("inode: ", mDevInode.inode)(
-                                        "first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
-                        std::ostringstream oss;
-                        oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
-                            << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
-                            << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-                        AlarmManager::GetInstance()->SendAlarmWarning(
-                            SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
-                    } else {
-                        // line is not finished yet nor more data, put all data in cache
-                        mCache.assign(stringBuffer, stringBufferLen);
-                        return;
+            if (nbytes == 0) {
+                if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
+                    nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
+                    if (mReaderConfig.second->RequiringJsonReader()) {
+                        int32_t rollbackLineFeedCount = 0;
+                        nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
                     }
-                }
-                if (nbytes < stringBufferLen) {
-                    // rollback happend, put rollbacked part in cache
-                    mCache.assign(stringBuffer + nbytes, stringBufferLen - nbytes);
+                    logTooLongSplitFlag = true;
                 } else {
-                    mCache.clear();
+                    // line is not finished yet nor more data, put all data in cache
+                    mCache.assign(stringBuffer, stringBufferLen);
+                    return;
                 }
+            }
+            if (nbytes < stringBufferLen) {
+                // rollback happend, put rollbacked part in cache
+                mCache.assign(stringBuffer + nbytes, stringBufferLen - nbytes);
+            } else {
+                mCache.clear();
             }
         }
         if (!moreData && fromCpt && lastReadPos < end) {
@@ -1736,7 +1706,17 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     logBuffer.readLength = nbytes;
     setExactlyOnceCheckpointAfterRead(nbytes);
     mLastFilePos += nbytes;
-
+    if (logTooLongSplitFlag) {
+        LOG_WARNING(sLogger,
+                    ("Log is too long and forced to be split at offset: ", mLastFilePos)("file: ", mHostLogPath)(
+                        "inode: ", mDevInode.inode)("first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
+        std::ostringstream oss;
+        oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos)
+            << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
+            << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
+        AlarmManager::GetInstance()->SendAlarmWarning(
+            SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+    }
     LOG_DEBUG(sLogger, ("read size", nbytes)("last file pos", mLastFilePos));
 }
 
@@ -1818,37 +1798,30 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             mCache.clear();
         } else {
             moreData = (readCharCount == BUFFER_SIZE);
-
             if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
                 if (!moreData && allowRollback) {
                     mCache.assign(gbkBuffer, originReadCount);
                     return;
                 }
-                auto alignedBytes = readCharCount;
-                if (allowRollback) {
-                    alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
-                }
-                readCharCount = alignedBytes ? alignedBytes : readCharCount;
                 if (moreData) {
                     logTooLongSplitFlag = true;
                 }
-            } else {
-                auto alignedBytes = readCharCount;
-                if (allowRollback) {
-                    alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
-                }
-                if (alignedBytes == 0) {
-                    if (moreData) { // excessively long line without valid wchar
-                        logTooLongSplitFlag = true;
-                        alignedBytes = BUFFER_SIZE;
-                    } else {
-                        // line is not finished yet nor more data, put all data in cache
-                        mCache.assign(gbkBuffer, originReadCount);
-                        return;
-                    }
-                }
-                readCharCount = alignedBytes;
             }
+            auto alignedBytes = readCharCount;
+            if (allowRollback) {
+                alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
+            }
+            if (alignedBytes == 0) {
+                if (moreData) { // excessively long line without valid wchar
+                    logTooLongSplitFlag = true;
+                    alignedBytes = BUFFER_SIZE;
+                } else {
+                    // line is not finished yet nor more data, put all data in cache
+                    mCache.assign(gbkBuffer, originReadCount);
+                    return;
+                }
+            }
+            readCharCount = alignedBytes;
         }
     }
 
@@ -1884,47 +1857,38 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             logBuffer.readOffset = mLastFilePos;
             return;
         }
-        if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
-            if (readCharCount < originReadCount) {
-                mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
-            } else {
-                mCache.clear();
-            }
-        } else {
-            int32_t rollbackLineFeedCount = 0;
-            int32_t bakResultCharCount = resultCharCount;
-            if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-                resultCharCount
-                    = RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
-            }
-            if (resultCharCount == 0) {
-                if (moreData) {
-                    resultCharCount = bakResultCharCount;
-                    rollbackLineFeedCount = 0;
-                    if (mReaderConfig.second->RequiringJsonReader()) {
-                        int32_t rollbackLineFeedCount = 0;
-                        RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
-                    }
-                    // Cannot get the split position here, so just mark a flag and send alarm later
-                    logTooLongSplitFlag = true;
-                } else {
-                    // line is not finished yet nor more data, put all data in cache
-                    mCache.assign(gbkBuffer, originReadCount);
-                    return;
+        int32_t rollbackLineFeedCount = 0;
+        int32_t bakResultCharCount = resultCharCount;
+        if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
+            resultCharCount
+                = RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
+        }
+        if (resultCharCount == 0) {
+            if (moreData) {
+                resultCharCount = bakResultCharCount;
+                rollbackLineFeedCount = 0;
+                if (mReaderConfig.second->RequiringJsonReader()) {
+                    int32_t rollbackLineFeedCount = 0;
+                    RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
                 }
-            }
-
-            int32_t lineFeedCount = lineFeedPos.size();
-            if (rollbackLineFeedCount > 0 && lineFeedCount >= (1 + rollbackLineFeedCount)) {
-                readCharCount
-                    -= lineFeedPos[lineFeedCount - 1] - lineFeedPos[lineFeedCount - 1 - rollbackLineFeedCount];
-            }
-            if (readCharCount < originReadCount) {
-                // rollback happend, put rollbacked part in cache
-                mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
+                // Cannot get the split position here, so just mark a flag and send alarm later
+                logTooLongSplitFlag = true;
             } else {
-                mCache.clear();
+                // line is not finished yet nor more data, put all data in cache
+                mCache.assign(gbkBuffer, originReadCount);
+                return;
             }
+        }
+
+        int32_t lineFeedCount = lineFeedPos.size();
+        if (rollbackLineFeedCount > 0 && lineFeedCount >= (1 + rollbackLineFeedCount)) {
+            readCharCount -= lineFeedPos[lineFeedCount - 1] - lineFeedPos[lineFeedCount - 1 - rollbackLineFeedCount];
+        }
+        if (readCharCount < originReadCount) {
+            // rollback happend, put rollbacked part in cache
+            mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
+        } else {
+            mCache.clear();
         }
     }
     // cache is sealed, readCharCount should not change any more
