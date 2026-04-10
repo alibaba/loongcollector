@@ -42,16 +42,17 @@ flushers:
 
 ```json
 {
-    "field2":"field2",
-    "Index":"1",
-    "field1":"field1",
-    "__time__":"1658807050"
+    "field2": "field2",
+    "Index": "1",
+    "field1": "field1",
+    "__time__": "1658807050"
 }
+
 {
-    "field1":"field1",
-    "field2":"field2",
-    "Index":"2",
-    "__time__":"1658807051"
+    "field1": "field1",
+    "field2": "field2",
+    "Index": "2",
+    "__time__": "1658807051"
 }
 ```
 
@@ -78,17 +79,18 @@ flushers:
 
 ```json
 {
-    "__name__":"metrics_mock",
-    "__labels__":"field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
-    "__time_nano__":"1658806869597190887",
-    "__value__":"101",
-    "__time__":"1658806869"
+    "__name__": "metrics_mock",
+    "__labels__": "field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
+    "__time_nano__": "1658806869597190887",
+    "__value__": "101",
+    "__time__": "1658806869"
 }
+
 {
-    "__name__":"metrics_mock",
-    "__labels__":"field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
-    "__time_nano__":"1658806870597391426",
-    "__value__":"102",
-    "__time__":"1658806870"
+    "__name__": "metrics_mock",
+    "__labels__": "field1#$#field1|field2#$#field2|tag1#$#tag1|tag2#$#tag2",
+    "__time_nano__": "1658806870597391426",
+    "__value__": "102",
+    "__time__": "1658806870"
 }
 ```

@@ -4,9 +4,15 @@
 
 `flusher_kafka_native` 将事件序列化为 JSON 文本后异步投递到 Kafka，底层基于 librdkafka。
 
+源代码：[FlusherKafka.cpp](https://github.com/alibaba/loongcollector/blob/main/core/plugin/flusher/kafka/FlusherKafka.cpp)
+
 ## 版本
 
 [Alpha](../../stability-level.md)
+
+## 版本说明
+
+* 推荐版本：LoongCollector v3.2.6 及以上
 
 ## 配置参数
 

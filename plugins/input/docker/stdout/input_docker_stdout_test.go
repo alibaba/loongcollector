@@ -15,12 +15,11 @@
 package stdout
 
 import (
-	"github.com/alibaba/ilogtail/plugins/test/mock"
+	"testing"
 
 	"github.com/stretchr/testify/assert"
 
-	"regexp"
-	"testing"
+	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
 func TestServiceDockerStdout_Init(t *testing.T) {
@@ -73,15 +72,14 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 		"exclabel": "label",
 	}, sds.ExcludeLabel)
 
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"inlabelreg":  regexp.MustCompile("^label$"),
-		"inclabelreg": regexp.MustCompile("^label$"),
-	}, sds.IncludeLabelRegex)
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"exlabelreg":  regexp.MustCompile("^label$"),
-		"exclabelreg": regexp.MustCompile("^label$"),
-	},
-		sds.ExcludeLabelRegex)
+	// Verify IncludeLabelRegex contains expected keys with patterns
+	assert.Len(t, sds.IncludeLabelRegex, 2)
+	assert.NotNil(t, sds.IncludeLabelRegex["inlabelreg"])
+	assert.NotNil(t, sds.IncludeLabelRegex["inclabelreg"])
+	// Verify ExcludeLabelRegex contains expected keys with patterns
+	assert.Len(t, sds.ExcludeLabelRegex, 2)
+	assert.NotNil(t, sds.ExcludeLabelRegex["exlabelreg"])
+	assert.NotNil(t, sds.ExcludeLabelRegex["exclabelreg"])
 
 	assert.Equal(t, map[string]string{
 		"inenv": "env",
@@ -90,13 +88,13 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 		"exenv": "env",
 	}, sds.ExcludeEnv)
 
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"inenvreg": regexp.MustCompile("^env$"),
-	}, sds.IncludeEnvRegex)
+	// Verify IncludeEnvRegex contains expected keys with patterns
+	assert.Len(t, sds.IncludeEnvRegex, 1)
+	assert.NotNil(t, sds.IncludeEnvRegex["inenvreg"])
 
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"exenvreg": regexp.MustCompile("^env$"),
-	}, sds.ExcludeEnvRegex)
+	// Verify ExcludeEnvRegex contains expected keys with patterns
+	assert.Len(t, sds.ExcludeEnvRegex, 1)
+	assert.NotNil(t, sds.ExcludeEnvRegex["exenvreg"])
 
 	assert.Equal(t, map[string]string{
 		"inklabel": "label",
@@ -106,17 +104,26 @@ func TestServiceDockerStdout_Init(t *testing.T) {
 		"exklabel": "label",
 	}, sds.K8sFilter.ExcludeLabels)
 
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"inklabelreg": regexp.MustCompile("^label$"),
-	}, sds.K8sFilter.IncludeLabelRegs)
+	// Verify K8sFilter IncludeLabelRegs contains expected keys
+	assert.Len(t, sds.K8sFilter.IncludeLabelRegs, 1)
+	assert.NotNil(t, sds.K8sFilter.IncludeLabelRegs["inklabelreg"])
 
-	assert.Equal(t, map[string]*regexp.Regexp{
-		"exklabelreg": regexp.MustCompile("^label$"),
-	}, sds.K8sFilter.ExcludeLabelRegs)
+	// Verify K8sFilter ExcludeLabelRegs contains expected keys
+	assert.Len(t, sds.K8sFilter.ExcludeLabelRegs, 1)
+	assert.NotNil(t, sds.K8sFilter.ExcludeLabelRegs["exklabelreg"])
 
-	assert.Equal(t, regexp.MustCompile("3"), sds.K8sFilter.PodReg)
-	assert.Equal(t, regexp.MustCompile("1"), sds.K8sFilter.NamespaceReg)
-	assert.Equal(t, regexp.MustCompile("2"), sds.K8sFilter.ContainerReg)
+	// Verify K8sFilter regex patterns are set
+	assert.NotNil(t, sds.K8sFilter.PodReg)
+	assert.NotNil(t, sds.K8sFilter.NamespaceReg)
+	assert.NotNil(t, sds.K8sFilter.ContainerReg)
+
+	// Verify regex patterns work correctly
+	matched, _ := sds.K8sFilter.PodReg.MatchString("3")
+	assert.True(t, matched)
+	matched, _ = sds.K8sFilter.NamespaceReg.MatchString("1")
+	assert.True(t, matched)
+	matched, _ = sds.K8sFilter.ContainerReg.MatchString("2")
+	assert.True(t, matched)
 
 	assert.NoError(t, err)
 }

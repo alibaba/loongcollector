@@ -33,7 +33,7 @@
 * 输入
 
 ```bash
-echo '::1 - - [18/Jul/2022:07:28:01 +0000] "GET /hello/ilogtail HTTP/1.1" 404 153 "-" "curl/7.74.0" "-"' >> /home/test-log/nginx.log
+echo '::1 - - [18/Jul/2022:07:28:01 +0000] "GET /hello/loongcollector HTTP/1.1" 404 153 "-" "curl/7.74.0" "-"' >> /home/test-log/nginx.log
 ```
 
 * 采集配置
@@ -78,7 +78,7 @@ flushers:
 
 ```json
 {
-  "__labels__":"method#$#GET|nginx#$#test|url#$#/hello/ilogtail",
+  "__labels__":"method#$#GET|nginx#$#test|url#$#/hello/loongcollector",
   "__name__":"::1",
   "__value__":"404",
   "__time_nano__":"1688956340000000000",

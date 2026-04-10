@@ -4,14 +4,16 @@
 
 `flusher_doris` `flusher`插件可以实现将采集到的数据，经过处理后，通过 Stream Load API 发送到 Apache Doris。该插件支持并发刷新、Group Commit、进度监控等特性，适用于高吞吐量数据写入场景。
 
+源代码：[flusher_doris.go](https://github.com/alibaba/loongcollector/blob/main/plugins/flusher/doris/flusher_doris.go)
+
 ## 版本
 
 [Alpha](../../stability-level.md)
 
 ## 版本说明
 
-
-* Apache Doris：v2.0 及以上
+* 推荐版本：LoongCollector v3.2.6 及以上
+* **Apache Doris**：v2.0 及以上
 
 ## 配置参数
 
@@ -25,11 +27,11 @@
 | Authentication.PlainText.Username | String   | 是    | Doris 用户名                                                                                                                                                                               |
 | Authentication.PlainText.Password | String   | 是    | Doris 密码                                                                                                                                                                                |
 | Authentication.PlainText.Database | String   | 否    | 数据库名称（可覆盖顶层 Database 参数）                                                                                                                                                                |
-| Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                                                                                                                        |
-| Convert.Protocol                  | String   | 否    | ilogtail数据转换协议，可选值：`custom_single`、`otlp_log_v1`。默认值：`custom_single`                                                                                                                    |
-| Convert.Encoding                  | String   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                                                                                          |
+| Convert                           | Struct   | 否    | LoongCollector 数据转换协议相关配置                                                                                                                                                                       |
+| Convert.Protocol                  | String   | 否    | 数据转换协议，可选值：`custom_single`、`otlp_log_v1`。默认值：`custom_single`                                                                                                                    |
+| Convert.Encoding                  | String   | 否    | Flusher 侧数据编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                                                                                          |
 | Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                                                                                                                     |
-| Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可重命名的字段：`contents`、`tags`和`time`                                                                                                                                      |
+| Convert.ProtocolFieldsRename      | Map      | 否    | 日志协议字段重命名，可重命名的字段：`contents`、`tags` 和 `time`                                                                                                                                      |
 | LoadProperties                    | Map      | 否    | 额外的 Stream Load 属性（如 `strict_mode`、`max_filter_ratio`、`timeout` 等），将设置在 HTTP 请求头中，参考 [Doris Stream Load 文档](https://doris.apache.org/zh-CN/docs/data-operate/import/stream-load-manual) |
 | LogProgressInterval               | Int      | 否    | 进度日志输出间隔（秒），周期性输出总数据量、总行数、加载速度等统计信息，默认值：10，设置为 0 可禁用                                                                                                                                    |
 | GroupCommit                       | String   | 否    | Group Commit 模式，用于优化小批量加载。可选值：`off`（禁用，每次立即提交）、`sync`（同步提交，等待确认）、`async`（异步提交，立即返回）。默认值：`off`                                                                                           |

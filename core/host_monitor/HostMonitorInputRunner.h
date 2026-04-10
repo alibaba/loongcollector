@@ -20,10 +20,13 @@
 
 #include <atomic>
 #include <chrono>
+#include <future>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <shared_mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -87,6 +90,7 @@ public:
     void Init() override;
     void Stop() override;
     bool HasRegisteredPlugins() const override;
+    bool IsStarted() const { return mIsStarted.load(); }
 
     bool IsCollectTaskValid(const std::chrono::steady_clock::time_point& startTime,
                             const std::string& configName,
@@ -109,10 +113,12 @@ private:
     void PushQueue(CollectContextPtr context, PipelineEventGroup&& group);
     void PushNextTimerEvent(CollectContextPtr config);
     void AddHostLabels(PipelineEventGroup& group);
+    bool IsStopping() const;
 
     std::atomic_bool mIsStarted = false;
     std::unique_ptr<ThreadPool> mThreadPool;
     std::atomic_uint64_t mRunningPipelineCount = 0;
+    std::future<void> mStopFuture; // Future for async stop operation
 
     mutable std::shared_mutex mRegisteredCollectorMutex;
     std::map<CollectorKey, CollectorRunInfo> mRegisteredCollector;

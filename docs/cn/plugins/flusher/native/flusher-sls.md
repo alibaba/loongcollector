@@ -41,7 +41,7 @@
 
 采集`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将采集结果发送到SLS。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_file

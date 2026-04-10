@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "generated_at": "",
+  "review_target": {
+    "type": "pr",
+    "id": ""
+  },
+  "status": [
+    {
+      "comment_id": 0,
+      "path": "",
+      "line": 0,
+      "side": "RIGHT",
+      "body": "",
+      "snippet": "",
+      "snippet_fingerprint": "",
+      "status_flow": "open",
+      "status_tech": "not-fixed",
+      "mapped_finding_id": "",
+      "notes": ""
+    }
+  ]
+}

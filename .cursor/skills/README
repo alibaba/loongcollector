@@ -1,0 +1,49 @@
+# Cursor Skills 目录说明
+
+本 README 说明当前所有的技能文件。
+
+## 作用
+
+- `skills` 用于定义可复用的任务方法与执行流程（如评审、构建、安全检查）。
+- 与 `rules` 的区别：`rules` 约束行为，`skills` 指导执行步骤。
+
+## 顶层技能
+
+- `code-review/SKILL.md`：代码评审流程与方法。
+- `commit/SKILL.md`：提交信息编写。
+- `compile/SKILL.md`：构建相关操作。
+- `e2e-develop-guide/SKILL.md`：端到端开发指导。
+- `e2e-manual/SKILL.md`：端到端手工流程。
+- `mermaid/SKILL.md`：Mermaid 图表使用。
+- `riper5-protocol/SKILL.md`：RIPER-5 工作协议。
+- `security-check/SKILL.md`：安全检查流程。
+- `selfmonitor/SKILL.md`：自监控规范。
+
+## code-review/references/
+
+- `comment-status.template.json`
+- `failure-playbook.md`
+- `meta.template.json`
+- `review-plan.template.md`
+- `reviewed_commits.template.json`
+
+## code-review/scripts/
+
+- `build_snapshot.py`
+- `fetch_review_comments.py`
+- `generate_comment_status_report.py`
+- `incremental_review_mapper.py`
+- `init_review_workspace.py`
+- `update_comment_status.py`
+
+## security-check/scripts/
+
+- `security_check.sh`
+- `security_reset.sh`
+
+## 维护说明
+
+- 本文档记录当前所有的技能文件。
+- 顶层 `SKILL.md` 描述能力边界；`references/` 与 `scripts/` 记录配套模板和工具。
+- 新增或删除技能文件时，同步更新对应小节。
+- 文件描述保持“一行一句”，优先写清用途，不展开实现细节。

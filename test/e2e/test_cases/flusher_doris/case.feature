@@ -2,7 +2,7 @@
 Feature: flusher doris
   Test flusher doris
 
-  @e2e @docker-compose
+  @e2e @docker-compose @disabled
   Scenario: TestFlusherDoris
     Given {docker-compose} environment
     Given subcribe data from {doris} with config

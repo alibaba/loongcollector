@@ -21,11 +21,11 @@
 | Topic                                 | string   | 是    | Kafka Topic,支持动态topic, 例如: `test_%{content.appname}`                                                       |
 | Version                               | string   | 否    | Kafka协议版本号 ,例如：`2.0.0`，默认值：`1.0.0`                                                                         |
 | Headers                               | header数组 | 否    | kafka消息头 ，配置使用请参考本文中`Headers`配置用例                                                                          |
-| Convert                               | Struct   | 否    | iLogtail数据转换协议配置                                                                                           |
-| Convert.Protocol                      | string   | 否    | iLogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                      | string   | 否    | iLogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Convert                               | Struct   | 否    | LoongCollector数据转换协议配置                                                                                           |
+| Convert.Protocol                      | string   | 否    | LoongCollector数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding                      | string   | 否    | LoongCollector flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
 | Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
-| Convert.ProtocolFieldsRename          | Map      | 否    | iLogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
+| Convert.ProtocolFieldsRename          | Map      | 否    | LoongCollector日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | Authentication                        | Struct   | 否    | Kafka连接访问认证配置，支持`SASL/PLAIN`，根据kafka服务端认证方式选择配置                                                            |
 | Authentication.PlainText.Username     | string   | 否    | PlainText认证用户名                                                                                             |
 | Authentication.PlainText.Password     | string   | 否    | PlainText认证密码                                                                                              |
@@ -63,7 +63,7 @@
 | Metadata.Full                         | int      | 否    | 获取原数数据的策略，获取元数据时使用的策略，当此选项为`true`时，客户端将为所有可用主题维护一整套元数据，如果此选项设置为`false`，它将仅刷新已配置主题的元数据。默认值:`false`。         |
 | HashKeys                              | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                                                                       |
 | HashOnce                              | bool  | 否    |                                                                                                            |
-| ClientID                              | string   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                                                                    |
+| ClientID                              | string   | 否    | 写入 Kafka 的 Client ID，默认取值：`LogtailPlugin`（LoongCollector Go 插件模块历史命名）。                                                                    |
 
 * `Version`需要填写的是`kafka protocol version`版本号，`flusher_kafka_v2`当前支持的`kafka`版本范围：`0.8.2.x~3.3.1`。
   请根据自己的`kafka`版本号参照下面的`kafka protocol version`规则进行配置。**建议根据自己的`kafka`
@@ -118,13 +118,13 @@ flushers:
 
 ## 进阶配置
 
-以下面的一段日志为例，后来将展开介绍ilogtail kafka flusher的一些高阶配置
+以下面的一段日志为例，后文将展开介绍 LoongCollector 侧 Kafka Flusher 的一些高阶配置
 
 ```plain
 2022-07-22 10:19:23.684 ERROR [springboot-docker] [http-nio-8080-exec-10] com.benchmark.springboot.controller.LogController : error log
 ```
 
-以上面这行日志为例 , 我们通`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段：
+以上面这行日志为例，通过 LoongCollector 的 `processor_regex` 插件将日志解析为如下关键字段：
 
 * time
 * loglevel
@@ -164,12 +164,12 @@ flushers:
 Topic: test_%{content.application}
 ```
 
-最后`ilogtail`就自动将日志推送到`test_springboot-docker`这个`topic`中。
+最后 LoongCollector 会自动将日志推送到 `test_springboot-docker` 这个 `topic` 中。
 `topic`动态表达式规则：
 
 * `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
 * `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
-* `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。
+* `${env_name}`，读取系统变量绑定到动态 `topic` 上，自 **1.5.0** 起支持（同仓历史版本号；旧文档常标为 iLogtail）。
 * 其它方式暂不支持
 
 #### 动态topic中使用系统变量
@@ -184,10 +184,11 @@ Topic: test_%{content.application}
 
 **（1）将系统变量采集到日志中完成动态`topic`绑定**
 
-将系统变量采集添加到日志中有两种方式，一种是在`ilogtail`容器`env`添加，另一种是通过`processor_add_fields` 插件添加，
+将系统变量采集添加到日志中有两种方式，一种是在 LoongCollector **容器**的 `env` 中添加，另一种是通过 `processor_add_fields` 插件添加。
+
 两种方式不同的配置参考下面的介绍
 
-* 在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
+* 在 `DaemonSet` 或 `Sidecar` 方式部署的 LoongCollector 容器 `env` 中添加自定义系统变量，例如：
 
 ```yaml
 env:
@@ -210,11 +211,11 @@ processors:
     IgnoreIfExist: false
 ```
 
-这里`${env_name}`生效依赖于`ilogtail`的`enable_env_ref_in_config`配置，从`ilogtail 1.5.0`开始支持。
+此处 `${env_name}` 生效依赖 `enable_env_ref_in_config`，自 **1.5.0** 起支持（同仓历史版本号；旧文档常标为 iLogtail）。
 
 **（2）直接采用`$`符将系统变量绑定动态`topic`中**
 
-在`daemonset`或者`sidecar`方式部署的`ilogtail`容器`env`配置部分添加自定义的系统变量，配置参考案例如下：
+在 `DaemonSet` 或 `Sidecar` 方式部署的 LoongCollector 容器 `env` 中添加自定义系统变量，例如：
 
 ```yaml
 env:
@@ -238,7 +239,7 @@ flushers:
       - 192.XX.XX.1:9092
       - 192.XX.XX.2:9092
       - 192.XX.XX.3:9092
-    Topic: ilogtail_${app_name}
+    Topic: logs_${app_name}
 ```
 
 * `${app_name}`就是我们上面添加的系统变量。
@@ -267,7 +268,7 @@ flushers:
 
 ### ProtocolFieldsRename
 
-对`ilogtail`协议字段重命名，在`ilogtail`的数据转换协议中，
+对 **Agent 内置**协议字段重命名；在当前数据转换协议下，
 最外层三个字段`contents`,`tags`和`time`属于协议字段。`ProtocolFieldsRename`只能对
 `contents`,`tags`和`time`这个三个字段进行重命名。
 例如在使用`Elasticsearch`你可能想直接将`time`重命名为`@timestamp`，则配置参考如下：
@@ -294,7 +295,7 @@ flushers:
 
 ### 指定分区分发
 
-`ilogtail`一共支持三种分区分发方式：
+LoongCollector 一共支持三种分区分发方式：
 
 * `random`随机分发, 默认。
 * `roundrobin`轮询分发。
@@ -328,7 +329,7 @@ flushers:
 
 ### 配置Headers
 
-`iLogtail`中`Kafka`的消息头是以键值对数组的形式配置的。`header`中`value`仅支持字符串类型。
+`LoongCollector`中`Kafka`的消息头是以键值对数组的形式配置的。`header`中`value`仅支持字符串类型。
 
 ```yaml
 enable: true
@@ -352,7 +353,7 @@ flushers:
 
 ### 数据平铺
 
-`ilogtail 1.8.0`新增数据平铺协议`custom_single_flatten`，`contents`、`tags`和`time`三个`convert`层的协议字段中数据做一级打平。
+自 **1.8.0** 起（同仓历史版本号；旧文档常标为 iLogtail）新增数据平铺协议 `custom_single_flatten`，对 `contents`、`tags`、`time` 三个 `convert` 层协议字段做一级打平。
 当前`convert`协议在单条数据处理仅支持`json`编码，因此`custom_single_flatten`需要配合`json`编码一起使用。
 
 ```yaml
@@ -417,10 +418,12 @@ flushers:
 
 `flusher_kafka_v2`支持多种安全认证连接`kafka`服务端。
 
-* `PlainText`认证，`ilogtail v1.3.0`开始支持;
-* `SASL`认证，`ilogtail v1.3.0`开始支持;
-* `TLS`认证，`ilogtail v1.4.0`开始支持;
-* `Kerberos`认证(待测试验证)，`ilogtail v1.4.0`开始支持;
+* `PlainText` 认证，自 **v1.3.0** 起支持；
+* `SASL` 认证，自 **v1.3.0** 起支持；
+* `TLS` 认证，自 **v1.4.0** 起支持；
+* `Kerberos` 认证（待测试验证），自 **v1.4.0** 起支持；
+
+（上述版本号均为同仓历史版本号；旧文档常标为 iLogtail；与 LoongCollector 同仓演进，能力延续。）
 
 前面两种配置比较简单，下面主要介绍下`TLS`和`Kerberos`两种认证的配置。
 

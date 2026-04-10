@@ -21,9 +21,16 @@ import (
 	"io/fs"
 	"os"
 	"strings"
+
+	"github.com/alibaba/ilogtail/pkg/flags"
 )
 
-var DefaultLogtailMountPath string
+var DefaultLogtailMountPath string   // For container-related paths (stdout, files). Main mode: "/logtail_host" (will fail on default host mode)
+var DefaultLogtailMonitorPath string // For system monitoring (/proc). Auto-detects: "" on host, "/logtail_host" in container
+
+func GetMonitorFilePath(logPath string) string {
+	return GetMountedFilePathWithBasePath(DefaultLogtailMonitorPath, logPath)
+}
 
 func GetMountedFilePath(logPath string) string {
 	return GetMountedFilePathWithBasePath(DefaultLogtailMountPath, logPath)
@@ -76,9 +83,18 @@ func TryGetRealPath(path string) (string, fs.FileInfo) {
 
 func init() {
 	defaultPath := "/logtail_host"
-	_, err := os.Stat(defaultPath)
-	// only change default mount path when `/logtail_host` path exists.
-	if err == nil {
+	// as for monitor, keep logic unchanged
+	if _, err := os.Stat(defaultPath); err == nil {
+		DefaultLogtailMonitorPath = defaultPath
+	}
+
+	// as for stdout/file, using env to control
+	if val, exists := os.LookupEnv(flags.LoongcollectorEnvPrefix + "DEFAULT_CONTAINER_HOST_PATH"); exists {
+		DefaultLogtailMountPath = val
+	} else if val, exists := os.LookupEnv("default_container_host_path"); exists {
+		DefaultLogtailMountPath = val
+	} else {
+		// default to /logtail_host, if host mode want to collect container stdout/file, env must exists
 		DefaultLogtailMountPath = defaultPath
 	}
 }

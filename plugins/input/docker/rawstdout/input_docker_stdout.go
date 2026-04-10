@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dlclark/regexp2"
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -354,10 +355,10 @@ type ServiceDockerStdout struct {
 	K8sContainerRegex     string
 
 	// export from ilogtail-trace component
-	IncludeLabelRegex map[string]*regexp.Regexp
-	ExcludeLabelRegex map[string]*regexp.Regexp
-	IncludeEnvRegex   map[string]*regexp.Regexp
-	ExcludeEnvRegex   map[string]*regexp.Regexp
+	IncludeLabelRegex map[string]*regexp2.Regexp
+	ExcludeLabelRegex map[string]*regexp2.Regexp
+	IncludeEnvRegex   map[string]*regexp2.Regexp
+	ExcludeEnvRegex   map[string]*regexp2.Regexp
 	K8sFilter         *containercenter.K8SFilter
 
 	synerMap         map[string]*stdoutSyner

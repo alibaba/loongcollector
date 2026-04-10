@@ -198,30 +198,28 @@ bool InputStaticFileCheckpoint::Serialize(string* res) const {
         auto& file = files[files.size() - 1];
         file["filepath"] = cpt.mFilePath.string();
         file["status"] = FileStatusToString(cpt.mStatus);
+        file["dev"] = cpt.mDevInode.dev;
+        file["inode"] = cpt.mDevInode.inode;
+        file["size"] = cpt.mSize;
         switch (cpt.mStatus) {
             case FileStatus::WAITING:
-                file["dev"] = cpt.mDevInode.dev;
-                file["inode"] = cpt.mDevInode.inode;
                 file["sig_hash"] = cpt.mSignatureHash;
                 file["sig_size"] = cpt.mSignatureSize;
-                file["size"] = cpt.mSize;
                 break;
             case FileStatus::READING:
-                file["dev"] = cpt.mDevInode.dev;
-                file["inode"] = cpt.mDevInode.inode;
                 file["sig_hash"] = cpt.mSignatureHash;
                 file["sig_size"] = cpt.mSignatureSize;
-                file["size"] = cpt.mSize;
                 file["offset"] = cpt.mOffset;
                 file["start_time"] = cpt.mStartTime;
                 file["last_read_time"] = cpt.mLastUpdateTime;
                 break;
             case FileStatus::FINISHED:
-                file["size"] = cpt.mSize;
                 file["start_time"] = cpt.mStartTime;
                 file["finish_time"] = cpt.mLastUpdateTime;
                 break;
             case FileStatus::ABORT:
+                file["offset"] = cpt.mOffset;
+                file["start_time"] = cpt.mStartTime;
                 file["abort_time"] = cpt.mLastUpdateTime;
                 break;
             default:

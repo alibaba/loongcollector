@@ -36,8 +36,9 @@
 
 ```yaml
 enable: true
+inputs:
   - Type: input_file
-    FilePaths: 
+    FilePaths:
       - /home/test-log/*.log
 processors:
   - Type: processor_grok
@@ -58,7 +59,7 @@ flushers:
 * 输入1
 
 ```bash
-echo 'begin 123.456 end' >> /home/test-ilogtail/test-log/processor-grok.log
+echo 'begin 123.456 end' >> /home/test-loongcollector/test-log/processor-grok.log
 ```
 
 * 输出1
@@ -66,7 +67,7 @@ echo 'begin 123.456 end' >> /home/test-ilogtail/test-log/processor-grok.log
 ```json
 
 {
-  "__tag__:__path__":"/home/test-ilogtail/test-log/processor-grok.log",
+  "__tag__:__path__":"/home/test-loongcollector/test-log/processor-grok.log",
   "word1":"begin",
   "request_time":"123.456",
   "word2":"end",
@@ -77,14 +78,14 @@ echo 'begin 123.456 end' >> /home/test-ilogtail/test-log/processor-grok.log
 * 输入2
 
 ```bash
-echo '2019 June 24 "I am iron man"' >> /home/test-ilogtail/test-log/processor-grok.log
+echo '2019 June 24 "I am iron man"' >> /home/test-loongcollector/test-log/processor-grok.log
 ```
 
 * 输出2
 
 ```json
 {
-  "__tag__:__path__":"/home/test-ilogtail/test-log/processor-grok.log",
+  "__tag__:__path__":"/home/test-loongcollector/test-log/processor-grok.log",
   "year":"2019",
   "month":"June",
   "day":"24",
@@ -96,14 +97,14 @@ echo '2019 June 24 "I am iron man"' >> /home/test-ilogtail/test-log/processor-gr
 * 输入3
 
 ```bash
-echo 'WRONG LOG' >> /home/test-ilogtail/test-log/processor-grok.log
+echo 'WRONG LOG' >> /home/test-loongcollector/test-log/processor-grok.log
 ```
 
 * 输出3
 
 ```json
 {
-  "__tag__:__path__":"/home/test-ilogtail/test-log/processor-grok.log",
+  "__tag__:__path__":"/home/test-loongcollector/test-log/processor-grok.log",
   "__time__":"1662618069"
 }
 ```
@@ -111,14 +112,14 @@ echo 'WRONG LOG' >> /home/test-ilogtail/test-log/processor-grok.log
 * 输入4
 
 ```bash
-echo '10.0.0.0 GET /index.html 15824 0.043' >> /home/test-ilogtail/test-log/processor-grok.log
+echo '10.0.0.0 GET /index.html 15824 0.043' >> /home/test-loongcollector/test-log/processor-grok.log
 ```
 
 * 输出4
 
 ```json
 {
-  "__tag__:__path__":"/home/test-ilogtail/test-log/processor-grok.log",
+  "__tag__:__path__":"/home/test-loongcollector/test-log/processor-grok.log",
   "client":"10.0.0.0",
   "method":"GET",
   "request":"/index.html",

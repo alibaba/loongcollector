@@ -4,7 +4,7 @@
 
 `processor_regex processor`插件可以通过正则匹配的模式实现文本日志的字段提取。
 
-备注：当作为第一个日志解析插件时，建议使用[正则加速](../accelerator/regex-accelerate.md)插件替代。
+备注：当作为第一个日志解析插件时，建议使用[正则解析原生处理插件](../native/processor-parse-regex-native.md)替代。
 
 ## 版本
 

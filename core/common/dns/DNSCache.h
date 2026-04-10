@@ -29,10 +29,13 @@ DECLARE_FLAG_INT32(dns_cache_ttl_sec);
 namespace logtail {
 
 class DnsCache {
+    static constexpr int32_t kDnsRetryCooldownSec = 3; // DNS 解析重试冷却时间
+
     int32_t mUpdateTime;
     int32_t mDnsTTL;
     std::mutex mDnsCacheLock;
     std::map<std::string, std::pair<std::string, int32_t>> mDnsCacheData;
+    std::map<std::string, int32_t> mDnsFailedCache; // 失败缓存：host -> 失败时间
 
 public:
     static DnsCache* GetInstance() {
@@ -45,17 +48,26 @@ public:
         bool status = false;
         std::lock_guard<std::mutex> lock(mDnsCacheLock);
 
+        // 检查失败缓存，在冷却期内不重试 DNS
+        auto failedItr = mDnsFailedCache.find(host);
+        if (failedItr != mDnsFailedCache.end() && currentTime - failedItr->second < kDnsRetryCooldownSec) {
+            return false;
+        }
+
         auto itr = mDnsCacheData.find(host);
-        if (itr == mDnsCacheData.end() || currentTime - (itr->second).second >= 3) {
+        if (itr == mDnsCacheData.end() || currentTime - (itr->second).second >= kDnsRetryCooldownSec) {
             if (ParseHost(host.c_str(), address)) {
                 status = true;
                 mDnsCacheData[host] = std::make_pair(address, currentTime);
+                mDnsFailedCache.erase(host); // 解析成功，移除失败缓存
             } else {
-                if (itr == mDnsCacheData.end()) {
-                    status = false;
-                } else {
+                // DNS 解析失败，记录到失败缓存
+                mDnsFailedCache[host] = currentTime;
+                if (itr != mDnsCacheData.end()) {
+                    // 保留之前成功解析的 IP，更新时间戳
                     mDnsCacheData[host] = std::make_pair((itr->second).first, currentTime);
                 }
+                status = false;
             }
         }
 
@@ -102,6 +114,7 @@ private:
         if (currentTime - mUpdateTime >= mDnsTTL) {
             isTimeOut = true;
             mDnsCacheData.clear();
+            mDnsFailedCache.clear(); // 同时清理失败缓存
             mUpdateTime = currentTime;
         }
         return isTimeOut;

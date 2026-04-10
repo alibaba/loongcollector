@@ -43,7 +43,7 @@ inputs:
       - /home/test-log/json.log
 processors:
   - Type: processor_parse_json_native
-  SourceKey: content
+    SourceKey: content
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
@@ -54,14 +54,14 @@ flushers:
 ```json
 {
     "__tag__:__path__": "/home/test-log/json.log",
-    "url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1", 
-    "ip": "10.200.98.220", 
-    "user-agent": "aliyun-sdk-java", 
+    "url": "POST /PutData?Category=YunOsAccountOpLog HTTP/1.1",
+    "ip": "10.200.98.220",
+    "user-agent": "aliyun-sdk-java",
     "request": {
-        "status": "200", 
+        "status": "200",
         "latency": "18204"
-    }, 
-    "time": "07/Jul/2022:10:30:28", 
+    },
+    "time": "07/Jul/2022:10:30:28",
     "__time__": "1657161028"
 }
 ```

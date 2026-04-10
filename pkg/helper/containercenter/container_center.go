@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dlclark/regexp2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/api/types/image"
@@ -50,6 +51,7 @@ const DockerTimeFormat = "2006-01-02T15:04:05.999999999Z"
 
 var DefaultSyncContainersPeriod = time.Second * 3 // should be same as docker_config_update_interval gflag in C
 var ContainerInfoDeletedTimeout = time.Second * time.Duration(120)
+var ForceReleaseDeletedFileFDTimeout = time.Second * time.Duration(-1) // -1 means disabled, use stat-based detection
 var EventListenerTimeout = time.Second * time.Duration(3600)
 var envRegex = regexp.MustCompile(`(^KUBERNETES_.*|.*_SERVICE_HOST$|.*_SERVICE_PORT.*|.*_SERVICE_PORT_PORT$|.*_SERVICE_\d+_PORT.*|.*_PORT_\d+_(TCP|UDP)_ADDR$|.*_PORT_\d+_(TCP|UDP)_PORT$|.*_PORT_\d+_(TCP|UDP)_PROTO$|.*_PORT_\d+_(TCP|UDP)$|.*PORT$)`)
 
@@ -74,13 +76,13 @@ type EnvConfigInfo struct {
 
 // K8SFilter used for find specific container
 type K8SFilter struct {
-	NamespaceReg     *regexp.Regexp
-	PodReg           *regexp.Regexp
-	ContainerReg     *regexp.Regexp
+	NamespaceReg     *regexp2.Regexp
+	PodReg           *regexp2.Regexp
+	ContainerReg     *regexp2.Regexp
 	IncludeLabels    map[string]string
 	ExcludeLabels    map[string]string
-	IncludeLabelRegs map[string]*regexp.Regexp
-	ExcludeLabelRegs map[string]*regexp.Regexp
+	IncludeLabelRegs map[string]*regexp2.Regexp
+	ExcludeLabelRegs map[string]*regexp2.Regexp
 	hashKey          uint64
 }
 
@@ -90,21 +92,21 @@ func CreateK8SFilter(ns, pod, container string, includeK8sLabels, excludeK8sLabe
 	var err error
 	var hashStrBuilder strings.Builder
 	if len(ns) > 0 {
-		if filter.NamespaceReg, err = regexp.Compile(ns); err != nil {
+		if filter.NamespaceReg, err = regexp2.Compile(ns, 0); err != nil {
 			return nil, err
 		}
 	}
 	hashStrBuilder.WriteString(ns)
 	hashStrBuilder.WriteString("$$$")
 	if len(pod) > 0 {
-		if filter.PodReg, err = regexp.Compile(pod); err != nil {
+		if filter.PodReg, err = regexp2.Compile(pod, 0); err != nil {
 			return nil, err
 		}
 	}
 	hashStrBuilder.WriteString(pod)
 	hashStrBuilder.WriteString("$$$")
 	if len(container) > 0 {
-		if filter.ContainerReg, err = regexp.Compile(container); err != nil {
+		if filter.ContainerReg, err = regexp2.Compile(container, 0); err != nil {
 			return nil, err
 		}
 	}
@@ -227,14 +229,32 @@ func (info *K8SInfo) IsMatch(filter *K8SFilter) bool {
 
 // innerMatch ...
 func (info *K8SInfo) innerMatch(filter *K8SFilter) bool {
-	if filter.NamespaceReg != nil && !filter.NamespaceReg.MatchString(info.Namespace) {
-		return false
+	if filter.NamespaceReg != nil {
+		matched, err := filter.NamespaceReg.MatchString(info.Namespace)
+		if err != nil {
+			logger.Debug(context.Background(), "namespace regex match error", err, "namespace", info.Namespace, "pattern", filter.NamespaceReg.String())
+		}
+		if !matched {
+			return false
+		}
 	}
-	if filter.PodReg != nil && !filter.PodReg.MatchString(info.Pod) {
-		return false
+	if filter.PodReg != nil {
+		matched, err := filter.PodReg.MatchString(info.Pod)
+		if err != nil {
+			logger.Debug(context.Background(), "pod regex match error", err, "pod", info.Pod, "pattern", filter.PodReg.String())
+		}
+		if !matched {
+			return false
+		}
 	}
-	if filter.ContainerReg != nil && !filter.ContainerReg.MatchString(info.ContainerName) {
-		return false
+	if filter.ContainerReg != nil {
+		matched, err := filter.ContainerReg.MatchString(info.ContainerName)
+		if err != nil {
+			logger.Debug(context.Background(), "container regex match error", err, "container", info.ContainerName, "pattern", filter.ContainerReg.String())
+		}
+		if !matched {
+			return false
+		}
 	}
 	// if labels is nil, create an empty map
 	if info.Labels == nil {
@@ -288,9 +308,21 @@ func (did *DockerInfoDetail) MetadataHash() string {
 
 func (did *DockerInfoDetail) IsTimeout() bool {
 	nowTime := time.Now()
-	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout ||
-		(did.deleteFlag && nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout) {
+	if nowTime.Sub(did.lastUpdateTime) > fetchAllSuccessTimeout {
 		return true
+	}
+	if !did.deleteFlag {
+		return false
+	}
+
+	if ForceReleaseDeletedFileFDTimeout >= 0 {
+		if nowTime.Sub(did.lastUpdateTime) >= ForceReleaseDeletedFileFDTimeout {
+			return true
+		}
+	} else {
+		if nowTime.Sub(did.lastUpdateTime) > ContainerInfoDeletedTimeout {
+			return true
+		}
 	}
 	return false
 }
@@ -820,6 +852,22 @@ func getContainerCenterInstance() *ContainerCenter {
 		// containerFindingManager works in a producer-consumer model
 		// so even manager is not initialized, it will not affect consumers like service_stdout
 		go func() {
+			// Check if mount path exists before entering retry loop, to skip default host mode
+			if DefaultLogtailMountPath != "" {
+				if _, err := os.Stat(DefaultLogtailMountPath); err != nil {
+					if os.IsNotExist(err) {
+						logger.Infof(context.Background(),
+							"container discovery skipped: mount path does not exist",
+							"mount_path", DefaultLogtailMountPath)
+					} else {
+						logger.Warningf(context.Background(),
+							"container discovery skipped: failed to check mount path",
+							"mount_path", DefaultLogtailMountPath, "error", err)
+					}
+					return // Exit goroutine, no infinite retry needed
+				}
+			}
+
 			retryCount := 0
 			for {
 				if containerFindingManager.Init() {
@@ -891,8 +939,8 @@ func (dc *ContainerCenter) setLastError(err error, msg string) {
 
 func isMapLabelsMatch(includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	labels map[string]string) bool {
 	if len(includeLabel) != 0 || len(includeLabelRegex) != 0 {
 		matchedFlag := false
@@ -905,9 +953,15 @@ func isMapLabelsMatch(includeLabel map[string]string,
 		// if matched, do not need check regex
 		if !matchedFlag {
 			for key, reg := range includeLabelRegex {
-				if dockerVal, ok := labels[key]; ok && reg.MatchString(dockerVal) {
-					matchedFlag = true
-					break
+				if dockerVal, ok := labels[key]; ok {
+					matched, err := reg.MatchString(dockerVal)
+					if err != nil {
+						logger.Debug(context.Background(), "include label regex match error", err, "key", key, "value", dockerVal, "pattern", reg.String())
+					}
+					if matched {
+						matchedFlag = true
+						break
+					}
 				}
 			}
 		}
@@ -922,8 +976,14 @@ func isMapLabelsMatch(includeLabel map[string]string,
 		}
 	}
 	for key, reg := range excludeLabelRegex {
-		if dockerVal, ok := labels[key]; ok && reg.MatchString(dockerVal) {
-			return false
+		if dockerVal, ok := labels[key]; ok {
+			matched, err := reg.MatchString(dockerVal)
+			if err != nil {
+				logger.Debug(context.Background(), "exclude label regex match error", err, "key", key, "value", dockerVal, "pattern", reg.String())
+			}
+			if matched {
+				return false
+			}
 		}
 	}
 	return true
@@ -931,15 +991,15 @@ func isMapLabelsMatch(includeLabel map[string]string,
 
 func isContainerLabelMatch(includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	info *DockerInfoDetail) bool {
 	return isMapLabelsMatch(includeLabel, excludeLabel, includeLabelRegex, excludeLabelRegex, info.ContainerInfo.Config.Labels)
 }
 
 func isMathEnvItem(env string,
 	staticEnv map[string]string,
-	regexEnv map[string]*regexp.Regexp) bool {
+	regexEnv map[string]*regexp2.Regexp) bool {
 	var envKey, envValue string
 	splitArray := strings.SplitN(env, "=", 2)
 	if len(splitArray) < 2 {
@@ -956,8 +1016,14 @@ func isMathEnvItem(env string,
 	}
 
 	if len(regexEnv) > 0 {
-		if reg, ok := regexEnv[envKey]; ok && reg.MatchString(envValue) {
-			return true
+		if reg, ok := regexEnv[envKey]; ok {
+			matched, err := reg.MatchString(envValue)
+			if err != nil {
+				logger.Debug(context.Background(), "env regex match error", err, "key", envKey, "value", envValue, "pattern", reg.String())
+			}
+			if matched {
+				return true
+			}
 		}
 	}
 	return false
@@ -965,8 +1031,8 @@ func isMathEnvItem(env string,
 
 func isContainerEnvMatch(includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	info *DockerInfoDetail) bool {
 
 	if len(includeEnv) != 0 || len(includeEnvRegex) != 0 {
@@ -996,12 +1062,12 @@ func isContainerEnvMatch(includeEnv map[string]string,
 func (dc *ContainerCenter) getAllAcceptedInfo(
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) map[string]*DockerInfoDetail {
 	containerMap := make(map[string]*DockerInfoDetail)
@@ -1022,12 +1088,12 @@ func (dc *ContainerCenter) getAllAcceptedInfoV2(
 	matchList map[string]*DockerInfoDetail,
 	includeLabel map[string]string,
 	excludeLabel map[string]string,
-	includeLabelRegex map[string]*regexp.Regexp,
-	excludeLabelRegex map[string]*regexp.Regexp,
+	includeLabelRegex map[string]*regexp2.Regexp,
+	excludeLabelRegex map[string]*regexp2.Regexp,
 	includeEnv map[string]string,
 	excludeEnv map[string]string,
-	includeEnvRegex map[string]*regexp.Regexp,
-	excludeEnvRegex map[string]*regexp.Regexp,
+	includeEnvRegex map[string]*regexp2.Regexp,
+	excludeEnvRegex map[string]*regexp2.Regexp,
 	k8sFilter *K8SFilter,
 ) (newCount, delCount int, matchAddedList, matchDeletedList []string) {
 

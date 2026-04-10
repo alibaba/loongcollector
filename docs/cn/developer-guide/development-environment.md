@@ -20,7 +20,7 @@ LoongCollector 的大致目录结构如下：
 .
 ├── core                  # C++核心代码
 │   ├── CMakeLists.txt    # C++项目描述文件
-│   └── ilogtail.cpp      # C++主函数
+│   └── logtail.cpp       # C++ 主函数入口（当前仓库）
 ├── plugins               # Go插件代码
 ├── go.mod                # Go项目描述文件
 ├── docker                # 辅助编译的镜像描述目录
@@ -28,7 +28,7 @@ LoongCollector 的大致目录结构如下：
 └── Makefile              # 编译描述文件
 ```
 
-core目录包含了 LoongCollector C++核心代码，ilogtail.cpp是其主函数入口文件。C++项目使用CMake描述，CMakeLists.txt是总入口，各子目录中还有CMakeLists.txt描述子目录下的编译目标。
+`core` 目录包含 LoongCollector C++ 核心代码，主函数入口为 `logtail.cpp`。C++ 工程使用 CMake 描述，`CMakeLists.txt` 为总入口，各子目录中的 `CMakeLists.txt` 描述对应编译目标。
 
 顶层目录.本身就是一个Go项目，该项目为 LoongCollector 插件，go.mod为其描述文件。插件代码主体在plugins目录。
 
@@ -84,7 +84,7 @@ go install ...
 
 ```json
 {
-  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13",
+  "image": "sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -190,7 +190,7 @@ cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output
 ```bash
 docker run --name loongcollector-build -d \
   -v `pwd`:/src -w /src \
-  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.13 \
+  sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.15 \
   bash -c "sleep infinity"
 ```
 

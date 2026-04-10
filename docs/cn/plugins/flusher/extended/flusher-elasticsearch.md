@@ -18,11 +18,11 @@
 |-----------------------------------|----------|------|--------------------------------------------------------------------------------------------------------------------|
 | Type                              | string   | 是    | 插件类型，固定为`flusher_elasticsearch`                                                                                    |
 | Addresses                         | String数组 | 是    | ElasticSearch 地址                                                                                                   |
-| Convert                           | Struct   | 否    | ilogtail数据转换协议配置                                                                                                   |
-| Convert.Protocol                  | string   | 否    | ilogtail数据转换协议，elasticsearch flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                  | string   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                     |
+| Convert                           | Struct   | 否    | LoongCollector 数据转换协议配置                                                                                                   |
+| Convert.Protocol                  | string   | 否    | LoongCollector 数据转换协议，elasticsearch flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding                  | string   | 否    | LoongCollector Flusher 数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                                     |
 | Convert.TagFieldsRename           | Map      | 否    | 对日志中tags中的json字段重命名                                                                                                |
-| Convert.ProtocolFieldsRename      | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                              |
+| Convert.ProtocolFieldsRename      | Map      | 否    | LoongCollector 日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                              |
 | Index                             | string   | 是    | 插入数据目标索引 |
 | Authentication                    | Struct   | 是    | ElasticSearch 连接访问认证配置                                                                                             |
 | Authentication.PlainText.Username | string   | 是    | ElasticSearch 用户名                                                                                                  |
@@ -108,7 +108,7 @@ flushers:
 
 ### 数据平铺写入
 
-`ilogtail 1.8.0`新增数据平铺协议`custom_single_flatten`，`contents`、`tags`和`time`三个`convert`层的协议字段中数据做一级打平。
+自 **1.8.0** 起（同仓历史版本号，旧文档常写作 iLogtail）新增数据平铺协议 `custom_single_flatten`，对 `contents`、`tags` 和 `time` 三个 `convert` 层协议字段中的数据做一级打平。
 当前`convert`协议在单条数据处理仅支持`json`编码，因此`custom_single_flatten`需要配合`json`编码一起使用。
 
 ```yaml

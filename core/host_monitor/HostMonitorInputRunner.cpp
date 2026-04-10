@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "application/Application.h"
 #include "common/Flags.h"
 #include "common/MachineInfoUtil.h"
 #include "common/StringView.h"
@@ -158,7 +159,15 @@ void HostMonitorInputRunner::RemoveAllCollector() {
 }
 
 void HostMonitorInputRunner::Init() {
+    // Check if there is an ongoing Stop operation first, before modifying state
+    if (IsStopping()) {
+        LOG_ERROR(sLogger, ("Init", "previous stop is not completed, return directly"));
+        return;
+    }
+
+    // Check if already started and set to started atomically
     if (mIsStarted.exchange(true)) {
+        LOG_WARNING(sLogger, ("Init", "already started"));
         return;
     }
 
@@ -172,33 +181,51 @@ void HostMonitorInputRunner::Init() {
 
 void HostMonitorInputRunner::Stop() {
     if (!mIsStarted.exchange(false)) {
+        LOG_INFO(sLogger, ("Stop", "already stopped"));
         return;
     }
+
     RemoveAllCollector();
 #ifndef APSARA_UNIT_TEST_MAIN
-    // Use a shared flag to track completion status
-    auto completed = std::make_shared<std::atomic<bool>>(false);
-
-    // Start thread pool stop operation in detached thread
-    std::thread([this, completed]() {
-        try {
-            mThreadPool->Stop();
-            completed->store(true);
-        } catch (...) {
-            completed->store(true);
-        }
-    }).detach();
-
-    // Wait for completion or timeout
-    auto start = std::chrono::steady_clock::now();
-    while (!completed->load() && std::chrono::steady_clock::now() - start < std::chrono::seconds(3)) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // If previous stop operation is still running, just return (avoid duplicate stop)
+    if (IsStopping()) {
+        LOG_WARNING(sLogger, ("Stop", "previous stop operation still running, return directly"));
+        return;
     }
 
-    if (!completed->load()) {
-        LOG_ERROR(sLogger, ("host monitor runner stop timeout 3 seconds", "forced to stopped, may cause thread leak"));
+    // Start ThreadPool stop operation asynchronously
+    mStopFuture = std::async(std::launch::async, [this]() {
+        try {
+            if (mThreadPool) {
+                mThreadPool->Stop();
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR(sLogger, ("ThreadPool stop exception", e.what()));
+        } catch (...) {
+            LOG_ERROR(sLogger, ("ThreadPool stop unknown exception", ""));
+        }
+    });
+
+    // Wait for completion with timeout
+    std::future_status status = mStopFuture.wait_for(std::chrono::seconds(3));
+
+    if (status == std::future_status::ready) {
+        LOG_INFO(sLogger, ("HostMonitorInputRunner", "stop completed successfully"));
+    } else {
+        // Timeout - force process exit to prevent undefined behavior
+        LOG_ERROR(sLogger,
+                  ("host monitor runner stop timeout 3 seconds", "force exit process to ensure thread safety"));
+        Application::GetInstance()->SetForceExitFlag(true);
     }
 #endif
+}
+
+bool HostMonitorInputRunner::IsStopping() const {
+    if (mStopFuture.valid()) {
+        std::future_status status = mStopFuture.wait_for(std::chrono::seconds(0));
+        return status != std::future_status::ready;
+    }
+    return false;
 }
 
 bool HostMonitorInputRunner::ShouldRestart() {

@@ -321,9 +321,8 @@ void LogFileReader::SetContainerStopped() {
 bool LogFileReader::ShouldForceReleaseDeletedFileFd() {
     time_t now = time(NULL);
     return INT32_FLAG(force_release_deleted_file_fd_timeout) >= 0
-        && ((IsFileDeleted() && now - GetDeletedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout))
-            || (IsContainerStopped()
-                && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout)));
+        && (IsContainerStopped()
+            && now - GetContainerStoppedTime() >= INT32_FLAG(force_release_deleted_file_fd_timeout));
 }
 
 void LogFileReader::InitReader(bool tailExisted, FileReadPolicy policy, uint32_t eoConcurrency) {
@@ -959,7 +958,7 @@ void LogFileReader::skipCheckpointRelayHole() {
     mLastFilePos = readOffset;
 }
 
-bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
+bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isStaticFile) {
     // when event is read timeout and the file cannot be opened, simply flush the cache.
     if (!mLogFileOp.IsOpen() && (event == nullptr || !event->IsReaderFlushTimeout())) {
         if (!ShouldForceReleaseDeletedFileFd()) {
@@ -994,7 +993,7 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event) {
             return false;
         }
     }
-    bool moreData = GetRawData(logBuffer, mLastFileSize, tryRollback);
+    bool moreData = GetRawData(logBuffer, mLastFileSize, tryRollback, isStaticFile);
     if (!logBuffer.rawBuffer.empty()) {
         if (mEOOption) {
             // This read was replayed by checkpoint, adjust mLastFilePos to skip hole.
@@ -1089,16 +1088,8 @@ bool LogFileReader::UpdateFilePtr() {
     // move last update time before check IsValidToPush
     mLastUpdateTime = time(nullptr);
     if (mLogFileOp.IsOpen() == false) {
-        // In several cases we should revert file deletion flag:
-        // 1. File is appended after deletion. This happens when app is still logging, but a user deleted the log file.
-        // 2. File was rename/moved, but is rename/moved back later.
-        // 3. Log rotated. But iLogtail's logic will not remove the reader from readerArray on delete event.
-        //    It will be removed while the new file has modify event. The reader is still the head of readerArray,
-        //    thus it will be open again for reading.
-        // However, if the user explicitly set a delete timeout. We should not revert the flag.
-        if (INT32_FLAG(force_release_deleted_file_fd_timeout) < 0) {
-            SetFileDeleted(false);
-        }
+        // we may have mislabeled the deleted flag and then closed fd. Correct it here.
+        SetFileDeleted(false);
         if (GloablFileDescriptorManager::GetInstance()->GetOpenedFilePtrSize() > INT32_FLAG(max_reader_open_files)) {
             LOG_ERROR(sLogger,
                       ("open file failed, opened fd exceed limit, too many open files",
@@ -1462,7 +1453,7 @@ void LogFileReader::SetReadBufferSize(int32_t bufSize) {
  * "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\n" -> "SingleLineLog_1\nSingleLineLog_2\nSingleLineLog_3\0"
  * "SingleLineLog_1\nSingleLineLog_2\nxxx" -> "SingleLineLog_1\nSingleLineLog_2\0"
  */
-bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback) {
+bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback, bool isStaticFile) {
     // if the expected file size limit is set (StaticFileServer reader), use the smaller value
     int64_t effectiveFileSize = fileSize;
     if (mExpectedFileSize > 0) {
@@ -1480,11 +1471,11 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
 
     bool moreData = false;
     if (mReaderConfig.first->mFileEncoding == FileReaderOptions::Encoding::GBK) {
-        ReadGBK(logBuffer, effectiveFileSize, moreData, tryRollback);
+        ReadGBK(logBuffer, effectiveFileSize, moreData, tryRollback, isStaticFile);
     } else {
-        ReadUTF8(logBuffer, effectiveFileSize, moreData, tryRollback);
+        ReadUTF8(logBuffer, effectiveFileSize, moreData, tryRollback, isStaticFile);
     }
-    int64_t delta = fileSize - mLastFilePos;
+    int64_t delta = effectiveFileSize - mLastFilePos;
     if (delta > mReaderConfig.first->mReadDelayAlertThresholdBytes && !logBuffer.rawBuffer.empty()) {
         int32_t curTime = time(nullptr);
         if (mReadDelayTime == 0) {
@@ -1492,11 +1483,11 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
         } else if (curTime - mReadDelayTime >= INT32_FLAG(read_delay_alarm_duration)) {
             mReadDelayTime = curTime;
             LOG_WARNING(sLogger,
-                        ("read log delay", mHostLogPath)("fall behind bytes",
-                                                         delta)("file size", fileSize)("read pos", mLastFilePos));
+                        ("read log delay", mHostLogPath)("fall behind bytes", delta)("file size", effectiveFileSize)(
+                            "read pos", mLastFilePos));
             AlarmManager::GetInstance()->SendAlarmError(
                 READ_LOG_DELAY_ALARM,
-                std::string("fall behind ") + ToString(delta) + " bytes, file size:" + ToString(fileSize)
+                std::string("fall behind ") + ToString(delta) + " bytes, file size:" + ToString(effectiveFileSize)
                     + ", now position:" + ToString(mLastFilePos) + ", path:" + mHostLogPath
                     + ", now read log content:" + logBuffer.rawBuffer.substr(0, 256).to_string(),
                 GetRegion(),
@@ -1512,18 +1503,18 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
         && delta > mReaderConfig.first->mReadDelaySkipThresholdBytes) {
         LOG_WARNING(sLogger,
                     ("read log delay and force set file pos to file size", mHostLogPath)("fall behind bytes", delta)(
-                        "skip bytes config", mReaderConfig.first->mReadDelaySkipThresholdBytes)("file size", fileSize)(
-                        "read pos", mLastFilePos));
+                        "skip bytes config", mReaderConfig.first->mReadDelaySkipThresholdBytes)(
+                        "file size", effectiveFileSize)("read pos", mLastFilePos));
         AlarmManager::GetInstance()->SendAlarmError(
             READ_LOG_DELAY_ALARM,
             string("force set file pos to file size, fall behind ") + ToString(delta)
-                + " bytes, file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos)
+                + " bytes, file size:" + ToString(effectiveFileSize) + ", now position:" + ToString(mLastFilePos)
                 + ", path:" + mHostLogPath + ", now read log content:" + logBuffer.rawBuffer.substr(0, 256).to_string(),
             GetRegion(),
             GetProject(),
             GetConfigName(),
             GetLogstore());
-        mLastFilePos = fileSize;
+        mLastFilePos = effectiveFileSize;
         mCache.clear();
     }
 
@@ -1534,11 +1525,11 @@ bool LogFileReader::GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryR
             mReadStoppedContainerAlarmTime = curTime;
             LOG_WARNING(sLogger,
                         ("read stopped container file", mHostLogPath)("stopped time", mContainerStoppedTime)(
-                            "file size", fileSize)("read pos", mLastFilePos));
+                            "file size", effectiveFileSize)("read pos", mLastFilePos));
             AlarmManager::GetInstance()->SendAlarmWarning(
                 READ_STOPPED_CONTAINER_ALARM,
                 string("path: ") + mHostLogPath + ", stopped time:" + ToString(mContainerStoppedTime)
-                    + ", file size:" + ToString(fileSize) + ", now position:" + ToString(mLastFilePos),
+                    + ", file size:" + ToString(effectiveFileSize) + ", now position:" + ToString(mLastFilePos),
                 GetRegion(),
                 GetProject(),
                 GetConfigName(),
@@ -1576,7 +1567,7 @@ void LogFileReader::setExactlyOnceCheckpointAfterRead(size_t readSize) {
     cpt.set_read_length(readSize);
 }
 
-void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback) {
+void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback, bool isStaticFile) {
     char* stringBuffer = nullptr;
     size_t nbytes = 0;
 
@@ -1646,45 +1637,54 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
         const size_t stringBufferLen = nbytes;
         logBuffer.truncateInfo.reset(truncateInfo);
         lastReadPos = mLastFilePos + nbytes; // this doesn't seem right when ulogfs is used and a hole is skipped
-        LOG_DEBUG(sLogger, ("read bytes", nbytes)("last read pos", lastReadPos));
-        moreData = (nbytes == BUFFER_SIZE);
-        auto alignedBytes = nbytes;
-        if (allowRollback) {
-            alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
-        }
-        if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-            int32_t rollbackLineFeedCount = 0;
-            nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
-        }
+        LOG_DEBUG(sLogger,
+                  ("config", GetConfigName())("log reader queue name", mHostLogPath)("read bytes", nbytes)(
+                      "last read pos", lastReadPos)("last file pos", mLastFilePos)("read end offset", end));
 
-        if (nbytes == 0) {
-            if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
-                nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
-                if (mReaderConfig.second->RequiringJsonReader()) {
-                    int32_t rollbackLineFeedCount = 0;
-                    nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
-                }
-                LOG_WARNING(sLogger,
-                            ("Log is too long and forced to be split at offset: ",
-                             mLastFilePos + nbytes)("file: ", mHostLogPath)("inode: ", mDevInode.inode)(
-                                "first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
-                std::ostringstream oss;
-                oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
-                    << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
-                    << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
-                AlarmManager::GetInstance()->SendAlarmWarning(
-                    SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
-            } else {
-                // line is not finished yet nor more data, put all data in cache
-                mCache.assign(stringBuffer, stringBufferLen);
-                return;
-            }
-        }
-        if (nbytes < stringBufferLen) {
-            // rollback happend, put rollbacked part in cache
-            mCache.assign(stringBuffer + nbytes, stringBufferLen - nbytes);
-        } else {
+        // For static file, if we've reached the end, skip all rollback logic and process all data directly
+        if (isStaticFile && lastReadPos >= end) {
+            moreData = false;
             mCache.clear();
+        } else {
+            moreData = (nbytes == BUFFER_SIZE);
+            auto alignedBytes = nbytes;
+            if (allowRollback) {
+                alignedBytes = AlignLastCharacter(stringBuffer, nbytes);
+            }
+            if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
+                int32_t rollbackLineFeedCount = 0;
+                nbytes = RemoveLastIncompleteLog(stringBuffer, alignedBytes, rollbackLineFeedCount, allowRollback);
+            }
+
+            if (nbytes == 0) {
+                if (moreData) { // excessively long line without '\n' or multiline begin or valid wchar
+                    nbytes = alignedBytes ? alignedBytes : BUFFER_SIZE;
+                    if (mReaderConfig.second->RequiringJsonReader()) {
+                        int32_t rollbackLineFeedCount = 0;
+                        nbytes = RemoveLastIncompleteLog(stringBuffer, nbytes, rollbackLineFeedCount, false);
+                    }
+                    LOG_WARNING(sLogger,
+                                ("Log is too long and forced to be split at offset: ",
+                                 mLastFilePos + nbytes)("file: ", mHostLogPath)("inode: ", mDevInode.inode)(
+                                    "first 1024B log: ", logBuffer.rawBuffer.substr(0, 1024)));
+                    std::ostringstream oss;
+                    oss << "Log is too long and forced to be split at offset: " << ToString(mLastFilePos + nbytes)
+                        << " file: " << mHostLogPath << " inode: " << ToString(mDevInode.inode)
+                        << " first 1024B log: " << logBuffer.rawBuffer.substr(0, 1024) << std::endl;
+                    AlarmManager::GetInstance()->SendAlarmWarning(
+                        SPLIT_LOG_FAIL_ALARM, oss.str(), GetRegion(), GetProject(), GetConfigName(), GetLogstore());
+                } else {
+                    // line is not finished yet nor more data, put all data in cache
+                    mCache.assign(stringBuffer, stringBufferLen);
+                    return;
+                }
+            }
+            if (nbytes < stringBufferLen) {
+                // rollback happend, put rollbacked part in cache
+                mCache.assign(stringBuffer + nbytes, stringBufferLen - nbytes);
+            } else {
+                mCache.clear();
+            }
         }
         if (!moreData && fromCpt && lastReadPos < end) {
             moreData = true;
@@ -1709,7 +1709,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     LOG_DEBUG(sLogger, ("read size", nbytes)("last file pos", mLastFilePos));
 }
 
-void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback) {
+void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback, bool isStaticFile) {
     std::unique_ptr<char[]> gbkMemory;
     char* gbkBuffer = nullptr;
     size_t readCharCount = 0;
@@ -1780,22 +1780,29 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
         logBuffer.truncateInfo.reset(truncateInfo);
         lastReadPos = mLastFilePos + readCharCount;
         originReadCount = readCharCount;
-        moreData = (readCharCount == BUFFER_SIZE);
-        auto alignedBytes = readCharCount;
-        if (allowRollback) {
-            alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
-        }
-        if (alignedBytes == 0) {
-            if (moreData) { // excessively long line without valid wchar
-                logTooLongSplitFlag = true;
-                alignedBytes = BUFFER_SIZE;
-            } else {
-                // line is not finished yet nor more data, put all data in cache
-                mCache.assign(gbkBuffer, originReadCount);
-                return;
+
+        // For static file, if we've reached the end, skip all rollback logic and process all data directly
+        if (isStaticFile && lastReadPos >= end) {
+            moreData = false;
+            mCache.clear();
+        } else {
+            moreData = (readCharCount == BUFFER_SIZE);
+            auto alignedBytes = readCharCount;
+            if (allowRollback) {
+                alignedBytes = AlignLastCharacter(gbkBuffer, readCharCount);
             }
+            if (alignedBytes == 0) {
+                if (moreData) { // excessively long line without valid wchar
+                    logTooLongSplitFlag = true;
+                    alignedBytes = BUFFER_SIZE;
+                } else {
+                    // line is not finished yet nor more data, put all data in cache
+                    mCache.assign(gbkBuffer, originReadCount);
+                    return;
+                }
+            }
+            readCharCount = alignedBytes;
         }
-        readCharCount = alignedBytes;
     }
 
     vector<long> lineFeedPos = {-1}; // elements point to the last char of each line
@@ -1813,48 +1820,56 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     size_t resultCharCount = EncodingConverter::GetInstance()->ConvertGbk2Utf8(
         gbkBuffer, &srcLength, stringMemory.data, stringMemory.capacity, lineFeedPos);
     char* stringBuffer = stringMemory.data; // utf8 buffer
-    if (resultCharCount == 0) {
+
+    // For static file, if we've reached the end, skip all rollback logic and process all data directly
+    if (isStaticFile && lastReadPos >= end) {
+        moreData = false;
+        mCache.clear();
+    } else {
+        if (resultCharCount == 0) {
+            if (readCharCount < originReadCount) {
+                // skip unconvertable part, put rollbacked part in cache
+                mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
+            } else {
+                mCache.clear();
+            }
+            mLastFilePos += readCharCount;
+            logBuffer.readOffset = mLastFilePos;
+            return;
+        }
+        int32_t rollbackLineFeedCount = 0;
+        int32_t bakResultCharCount = resultCharCount;
+        if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
+            resultCharCount
+                = RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
+        }
+        if (resultCharCount == 0) {
+            if (moreData) {
+                resultCharCount = bakResultCharCount;
+                rollbackLineFeedCount = 0;
+                if (mReaderConfig.second->RequiringJsonReader()) {
+                    int32_t rollbackLineFeedCount = 0;
+                    RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
+                }
+                // Cannot get the split position here, so just mark a flag and send alarm later
+                logTooLongSplitFlag = true;
+            } else {
+                // line is not finished yet nor more data, put all data in cache
+                mCache.assign(gbkBuffer, originReadCount);
+                return;
+            }
+        }
+
+        int32_t lineFeedCount = lineFeedPos.size();
+        if (rollbackLineFeedCount > 0 && lineFeedCount >= (1 + rollbackLineFeedCount)) {
+            readCharCount -= lineFeedPos[lineFeedCount - 1] - lineFeedPos[lineFeedCount - 1 - rollbackLineFeedCount];
+        }
         if (readCharCount < originReadCount) {
-            // skip unconvertable part, put rollbacked part in cache
+            // rollback happend, put rollbacked part in cache
             mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
         } else {
             mCache.clear();
         }
-        mLastFilePos += readCharCount;
-        logBuffer.readOffset = mLastFilePos;
-        return;
-    }
-    int32_t rollbackLineFeedCount = 0;
-    int32_t bakResultCharCount = resultCharCount;
-    if (allowRollback || mReaderConfig.second->RequiringJsonReader()) {
-        resultCharCount = RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, allowRollback);
-    }
-    if (resultCharCount == 0) {
-        if (moreData) {
-            resultCharCount = bakResultCharCount;
-            rollbackLineFeedCount = 0;
-            if (mReaderConfig.second->RequiringJsonReader()) {
-                int32_t rollbackLineFeedCount = 0;
-                RemoveLastIncompleteLog(stringBuffer, resultCharCount, rollbackLineFeedCount, false);
-            }
-            // Cannot get the split position here, so just mark a flag and send alarm later
-            logTooLongSplitFlag = true;
-        } else {
-            // line is not finished yet nor more data, put all data in cache
-            mCache.assign(gbkBuffer, originReadCount);
-            return;
-        }
-    }
-
-    int32_t lineFeedCount = lineFeedPos.size();
-    if (rollbackLineFeedCount > 0 && lineFeedCount >= (1 + rollbackLineFeedCount)) {
-        readCharCount -= lineFeedPos[lineFeedCount - 1] - lineFeedPos[lineFeedCount - 1 - rollbackLineFeedCount];
-    }
-    if (readCharCount < originReadCount) {
-        // rollback happend, put rollbacked part in cache
-        mCache.assign(gbkBuffer + readCharCount, originReadCount - readCharCount);
-    } else {
-        mCache.clear();
     }
     // cache is sealed, readCharCount should not change any more
     size_t stringLen = resultCharCount;
@@ -2528,7 +2543,7 @@ bool LogFileReader::UpdateContainerInfo() {
         LOG_INFO(sLogger,
                  ("container info of file reader changed", "may be because container restart")(
                      "old container id", mContainerID)("new container id", containerInfo->mRawContainerInfo->mID)(
-                     "container status", containerInfo->mRawContainerInfo->mStopped ? "stopped" : "running"));
+                     "container status", containerInfo->mRawContainerInfo->mStopped.load() ? "stopped" : "running"));
         // if config have wildcard path, use wildcardPaths[0] as base path
         std::string dockerPath;
         size_t realBaseDirSize = 0;
@@ -2551,7 +2566,7 @@ bool LogFileReader::UpdateContainerInfo() {
         }
         SetDockerPath(dockerPath, realBaseDirSize);
         SetContainerID(containerInfo->mRawContainerInfo->mID);
-        mContainerStopped = containerInfo->mRawContainerInfo->mStopped;
+        mContainerStopped = containerInfo->mRawContainerInfo->mStopped.load();
         mContainerMetadatas.clear();
         mContainerExtraTags.clear();
         SetContainerMetadatas(containerInfo->mRawContainerInfo->mMetadatas);

@@ -1,0 +1,61 @@
+# Copyright 2021 iLogtail Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Docs CN Check
+
+on:
+  pull_request:
+    paths:
+      - "docs/cn/**"
+      - "scripts/check_docs_cn_relative_links.py"
+      - "scripts/validate_docs_cn_plugin_samples.py"
+      - ".github/workflows/docs-cn-check.yaml"
+  push:
+    branches:
+      - main
+      - 1.*
+      - 2.*
+      - 3.*
+    paths:
+      - "docs/cn/**"
+      - "scripts/check_docs_cn_relative_links.py"
+      - "scripts/validate_docs_cn_plugin_samples.py"
+      - ".github/workflows/docs-cn-check.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Relative markdown links (docs/cn)
+        run: python3 scripts/check_docs_cn_relative_links.py
+
+      - name: Plugin doc samples (JSON + YAML fences)
+        run: python3 scripts/validate_docs_cn_plugin_samples.py

@@ -13,12 +13,18 @@
 // limitations under the License.
 
 
+#include <cstdlib>
+
 #include <algorithm>
+#include <atomic>
 #include <boost/regex.hpp>
+#include <chrono>
 #include <fstream>
 #include <memory>
 #include <set>
+#include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -30,6 +36,8 @@
 #include "common/RuntimeUtil.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
 #include "container_manager/ContainerManager.h"
+#include "file_server/FileDiscoveryOptions.h"
+#include "file_server/FileServer.h"
 #include "unittest/Unittest.h"
 #include "unittest/pipeline/LogtailPluginMock.h"
 
@@ -52,12 +60,26 @@ public:
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
     void TestContainerMatchingConsistency() const;
+    void TestcomputeMatchedContainersDiffWithSnapshot() const;
+    void TestNullRawContainerInfoHandling() const;
+    void TestConcurrentContainerMapAccess_T1T2();
+    void TestConcurrentContainerMapAccess_T1T3();
+    void TestConcurrentContainerMapAccess_T1T2T3();
+    void TestSequentialContainerDiffAndApply();
+    void TestRefreshAllContainersFlag() const;
+    void TestClearContainerInfo() const;
+    void TestApplyContainerDiffsRefreshAllClearsStaleContainers();
+    void TestLoadContainerInfoAfterConfigInit();
     void runTestFile(const std::string& testFilePath) const;
 
 private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    CollectionPipelineContext ctx;
+
     void parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const;
     bool parseContainerFilterConfigFromTestJson(const Json::Value& filterJson, ContainerFilterConfig& config) const;
     std::string findTestDataDirectory() const;
+    void runConcurrentContainerMapAccessTest(bool enableT2, bool enableT3, const std::string& testName);
 };
 
 void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
@@ -71,7 +93,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // test empty filter
         ContainerFilters filters;
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 0);
         EXPECT_EQ(matchList.size(), 0);
     }
@@ -95,7 +117,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.mContainerMap["mod1"] = std::make_shared<RawContainerInfo>(newInfo);
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList2, matchList2, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList2, matchList2, filters, false, false, diff);
         EXPECT_EQ(diff.mModified.size(), 1);
         EXPECT_EQ(diff.mModified[0]->mLogPath, std::string("/var/lib/docker/containers/mod1/new-logs"));
     }
@@ -116,7 +138,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         containerManager.mContainerMap.erase("gone1");
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList3, matchList3, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList3, matchList3, filters, false, false, diff);
         EXPECT_EQ(std::count(diff.mRemoved.begin(), diff.mRemoved.end(), std::string("gone1")), 1);
         EXPECT_EQ(fullList3.count("gone1"), 0);
     }
@@ -144,7 +166,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mIncludeFields.mFieldsMap["test"] = "test";
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -161,7 +183,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // exclude key "test" with value "test" so only 1234 is added
         filters.mEnvFilter.mExcludeFields.mFieldsMap["test"] = "test";
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -177,7 +199,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mIncludeFields.mFieldsRegMap["test"] = std::make_shared<boost::regex>("^test2$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -193,7 +215,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
 
         filters.mEnvFilter.mExcludeFields.mFieldsRegMap["test"] = std::make_shared<boost::regex>("^test2$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -230,7 +252,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters.mK8SFilter.mNamespaceReg = std::make_shared<boost::regex>("^namespace1$");
         filters.mK8SFilter.mContainerReg = std::make_shared<boost::regex>("^container1$");
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
         EXPECT_EQ(fullList.size(), 2);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
@@ -260,7 +282,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include label
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff1);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
@@ -273,7 +295,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mK8SFilter.mK8sLabelFilter.mExcludeFields.mFieldsMap["tier"] = "backend";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, false, diff2);
         EXPECT_EQ(fullList.count("k8s1") + fullList.count("k8s2"), 2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
@@ -287,7 +309,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters3.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsRegMap["tier"]
             = std::make_shared<boost::regex>("^front.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, false, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "k8s1");
@@ -316,7 +338,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         // include map
         filters.mContainerLabelFilter.mIncludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff1;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff1);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff1);
         EXPECT_EQ(diff1.mAdded.size(), 1);
         if (diff1.mAdded.size() > 0) {
             EXPECT_EQ(diff1.mAdded[0]->mID, "cl1");
@@ -328,7 +350,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters2;
         filters2.mContainerLabelFilter.mExcludeFields.mFieldsMap["app"] = "nginx";
         ContainerDiff diff2;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, diff2);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters2, true, false, diff2);
         EXPECT_EQ(diff2.mAdded.size(), 1);
         if (diff2.mAdded.size() > 0) {
             EXPECT_EQ(diff2.mAdded[0]->mID, "cl2");
@@ -340,7 +362,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters3;
         filters3.mContainerLabelFilter.mIncludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^ng.*$");
         ContainerDiff diff3;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, diff3);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters3, true, false, diff3);
         EXPECT_EQ(diff3.mAdded.size(), 1);
         if (diff3.mAdded.size() > 0) {
             EXPECT_EQ(diff3.mAdded[0]->mID, "cl1");
@@ -352,7 +374,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         ContainerFilters filters4;
         filters4.mContainerLabelFilter.mExcludeFields.mFieldsRegMap["app"] = std::make_shared<boost::regex>("^re.*$");
         ContainerDiff diff4;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, true, diff4);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters4, true, false, diff4);
         EXPECT_EQ(diff4.mAdded.size(), 1);
         if (diff4.mAdded.size() > 0) {
             EXPECT_EQ(diff4.mAdded[0]->mID, "cl1");
@@ -396,7 +418,7 @@ void ContainerManagerUnittest::TestcomputeMatchedContainersDiff() const {
         filters.mK8SFilter.mK8sLabelFilter.mIncludeFields.mFieldsMap["tier"] = "frontend";
 
         ContainerDiff diff;
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
         EXPECT_EQ(diff.mAdded.size(), 1);
         if (diff.mAdded.size() > 0) {
             EXPECT_EQ(diff.mAdded[0]->mID, "combo1");
@@ -1204,7 +1226,7 @@ void ContainerManagerUnittest::runTestFile(const std::string& testFilePath) cons
         std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
         ContainerDiff diff;
 
-        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, diff);
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
 
         // Collect actual matched IDs
         std::set<std::string> actualMatchedIDs;
@@ -1291,6 +1313,1411 @@ bool ContainerManagerUnittest::parseContainerFilterConfigFromTestJson(const Json
     return true;
 }
 
+void ContainerManagerUnittest::TestcomputeMatchedContainersDiffWithSnapshot() const {
+    // This test verifies that computeMatchedContainersDiff uses a snapshot of mContainerMap
+    // to avoid race conditions when the map is modified concurrently
+    ContainerManager containerManager;
+
+    // Set up initial containers in mContainerMap
+    RawContainerInfo info1;
+    info1.mID = "snapshot1";
+    info1.mLogPath = "/var/lib/docker/containers/snapshot1/logs";
+    info1.mStatus = "running";
+    containerManager.mContainerMap["snapshot1"] = std::make_shared<RawContainerInfo>(info1);
+
+    RawContainerInfo info2;
+    info2.mID = "snapshot2";
+    info2.mLogPath = "/var/lib/docker/containers/snapshot2/logs";
+    info2.mStatus = "running";
+    containerManager.mContainerMap["snapshot2"] = std::make_shared<RawContainerInfo>(info2);
+
+    RawContainerInfo info3;
+    info3.mID = "snapshot3";
+    info3.mLogPath = "/var/lib/docker/containers/snapshot3/logs";
+    info3.mStatus = "exited";
+    containerManager.mContainerMap["snapshot3"] = std::make_shared<RawContainerInfo>(info3);
+
+    // Test 1: Verify that only running containers are added (isStdio = false)
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+
+        // Should only add running containers to both diff.mAdded and fullList
+        EXPECT_EQ(diff.mAdded.size(), 2);
+        EXPECT_EQ(fullList.size(), 2); // Only running containers are added to fullList when isStdio=false
+
+        std::set<std::string> addedIds;
+        for (const auto& container : diff.mAdded) {
+            addedIds.insert(container->mID);
+        }
+        EXPECT_TRUE(addedIds.find("snapshot1") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot2") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot3") == addedIds.end()); // exited container should not be added
+
+        // Verify fullList only contains running containers
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot3") == fullList.end());
+    }
+
+    // Test 2: Verify that isStdio=true includes non-running containers
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff);
+
+        // Should add all containers when isStdio=true (including exited)
+        EXPECT_EQ(diff.mAdded.size(), 3);
+        EXPECT_EQ(fullList.size(), 3); // All containers are added to fullList when isStdio=true
+
+        std::set<std::string> addedIds;
+        for (const auto& container : diff.mAdded) {
+            addedIds.insert(container->mID);
+        }
+        EXPECT_TRUE(addedIds.find("snapshot1") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot2") != addedIds.end());
+        EXPECT_TRUE(addedIds.find("snapshot3") != addedIds.end());
+
+        // Verify fullList contains all containers
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+        EXPECT_TRUE(fullList.find("snapshot3") != fullList.end());
+    }
+
+    // Test 3: Verify snapshot behavior - containers removed from fullList are detected
+    {
+        std::set<std::string> fullList;
+        fullList.insert("snapshot1");
+        fullList.insert("removed1"); // This container exists in fullList but not in mContainerMap
+
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        RawContainerInfo removedInfo;
+        removedInfo.mID = "removed1";
+        removedInfo.mLogPath = "/var/lib/docker/containers/removed1/logs";
+        matchList["removed1"] = std::make_shared<RawContainerInfo>(removedInfo);
+
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+
+        // The removed container should be in mRemoved list
+        EXPECT_TRUE(std::find(diff.mRemoved.begin(), diff.mRemoved.end(), "removed1") != diff.mRemoved.end());
+        // The removed container should no longer be in fullList
+        EXPECT_EQ(fullList.count("removed1"), 0);
+
+        // snapshot1 should still be in fullList
+        EXPECT_TRUE(fullList.find("snapshot1") != fullList.end());
+
+        // snapshot2 should be added to fullList (running container not previously in fullList)
+        EXPECT_TRUE(fullList.find("snapshot2") != fullList.end());
+
+        // snapshot3 should NOT be in fullList (exited container with isStdio=false)
+        EXPECT_TRUE(fullList.find("snapshot3") == fullList.end());
+
+        // Final fullList size should be 2 (snapshot1 and snapshot2)
+        EXPECT_EQ(fullList.size(), 2);
+
+        // diff.mAdded should contain snapshot2
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "snapshot2");
+        }
+    }
+
+    // Test 4: Verify snapshot behavior - modified containers are detected
+    {
+        std::set<std::string> fullList;
+        fullList.insert("snapshot1");
+
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        RawContainerInfo oldInfo;
+        oldInfo.mID = "snapshot1";
+        oldInfo.mLogPath = "/old/path"; // Different from current mContainerMap
+        matchList["snapshot1"] = std::make_shared<RawContainerInfo>(oldInfo);
+
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+
+        // The container should be in mModified list
+        EXPECT_EQ(diff.mModified.size(), 1);
+        if (diff.mModified.size() > 0) {
+            EXPECT_EQ(diff.mModified[0]->mID, "snapshot1");
+            EXPECT_EQ(diff.mModified[0]->mLogPath, "/var/lib/docker/containers/snapshot1/logs");
+        }
+    }
+}
+
+void ContainerManagerUnittest::TestNullRawContainerInfoHandling() const {
+    // This test verifies that null mRawContainerInfo pointers are handled gracefully
+    // as added in the race condition fix
+
+    // Note: This test is limited because ContainerInfo is typically managed internally
+    // and we cannot easily inject null mRawContainerInfo in the current implementation.
+    // However, we can test the defensive checks are in place by verifying the code
+    // doesn't crash with various edge cases.
+
+    ContainerManager containerManager;
+
+    // Test 1: Empty container map should not cause issues
+    {
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // Should not crash with empty map
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 0);
+        EXPECT_EQ(diff.mRemoved.size(), 0);
+        EXPECT_EQ(diff.mModified.size(), 0);
+    }
+
+    // Test 2: Container with minimal info
+    {
+        RawContainerInfo minimalInfo;
+        minimalInfo.mID = "minimal1";
+        minimalInfo.mStatus = "running";
+        containerManager.mContainerMap["minimal1"] = std::make_shared<RawContainerInfo>(minimalInfo);
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "minimal1");
+        }
+    }
+
+    // Test 3: Multiple containers with various states
+    {
+        containerManager.mContainerMap.clear();
+
+        RawContainerInfo running1;
+        running1.mID = "running1";
+        running1.mStatus = "running";
+        running1.mLogPath = "/var/log/running1";
+        containerManager.mContainerMap["running1"] = std::make_shared<RawContainerInfo>(running1);
+
+        RawContainerInfo exited1;
+        exited1.mID = "exited1";
+        exited1.mStatus = "exited";
+        exited1.mLogPath = "/var/log/exited1";
+        containerManager.mContainerMap["exited1"] = std::make_shared<RawContainerInfo>(exited1);
+
+        RawContainerInfo created1;
+        created1.mID = "created1";
+        created1.mStatus = "created";
+        created1.mLogPath = "/var/log/created1";
+        containerManager.mContainerMap["created1"] = std::make_shared<RawContainerInfo>(created1);
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // With isStdio=false, only running containers should be added
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+        EXPECT_EQ(diff.mAdded.size(), 1);
+        EXPECT_EQ(fullList.size(), 1); // Only running container in fullList
+        if (diff.mAdded.size() > 0) {
+            EXPECT_EQ(diff.mAdded[0]->mID, "running1");
+        }
+
+        // With isStdio=true, all containers should be added
+        fullList.clear();
+        matchList.clear();
+        ContainerDiff diff2;
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, true, false, diff2);
+        EXPECT_EQ(diff2.mAdded.size(), 3);
+        EXPECT_EQ(fullList.size(), 3); // All containers in fullList when isStdio=true
+    }
+
+    // Test 4: Verify thread-safe snapshot usage
+    {
+        containerManager.mContainerMap.clear();
+
+        // Add some containers
+        for (int i = 0; i < 10; i++) {
+            RawContainerInfo info;
+            info.mID = "container" + std::to_string(i);
+            info.mStatus = (i % 2 == 0) ? "running" : "exited";
+            info.mLogPath = "/var/log/container" + std::to_string(i);
+            containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
+        }
+
+        std::set<std::string> fullList;
+        std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+        ContainerFilters filters;
+        ContainerDiff diff;
+
+        // This should use a snapshot and not be affected by concurrent modifications
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+
+        // Only running containers (even indices: 0, 2, 4, 6, 8) should be added
+        EXPECT_EQ(diff.mAdded.size(), 5);
+        EXPECT_EQ(fullList.size(), 5); // Only running containers are added to fullList when isStdio=false
+
+        // Verify that only running containers are in fullList
+        for (int i = 0; i < 10; i++) {
+            std::string containerId = "container" + std::to_string(i);
+            if (i % 2 == 0) {
+                EXPECT_TRUE(fullList.find(containerId) != fullList.end());
+            } else {
+                EXPECT_TRUE(fullList.find(containerId) == fullList.end());
+            }
+        }
+    }
+}
+
+void ContainerManagerUnittest::runConcurrentContainerMapAccessTest(bool enableT2,
+                                                                   bool enableT3,
+                                                                   const std::string& testName) {
+    // This test simulates concurrent access to mContainerMap and mRawContainerInfo to reproduce
+    // race conditions related to container lifecycle management.
+    //
+    // Test scenarios:
+    // 1. Thread 1: Continuously calls refreshAllContainersSnapshot() and incrementallyUpdateContainersSnapshot()
+    //              (simulates real Polling thread behavior, updates mContainerMap with new RawContainerInfo)
+    // 2. Thread 2 (optional): Calls CheckContainerDiffForAllConfig() and ApplyContainerDiffs()
+    //              (simulates FileServer::Resume() behavior, can trigger GetCustomExternalTags crash)
+    // 3. Thread 3 (optional): Calls GetContainerStoppedEvents()
+    //              (tests mRawContainerInfo access with proper locking)
+    //
+    // This test can expose race conditions including:
+    // - Iterator invalidation when mContainerMap is modified during iteration
+    // - Use-after-free when accessing RawContainerInfo fields (mEnv, mK8sInfo.mLabels) after container replacement
+    // - Concurrent access to unordered_map fields without proper synchronization (in GetCustomExternalTags)
+    // - Concurrent access to mConfigContainerDiffMap without proper locking
+    // - Null pointer dereference if mRawContainerInfo is not checked
+    ContainerManager containerManager;
+
+    // Set running state so CheckContainerDiffForAllConfig can execute
+    containerManager.mIsRunning = true;
+
+    // Initialize with some containers
+    for (int i = 0; i < 20; i++) {
+        RawContainerInfo info;
+        info.mID = "container_" + std::to_string(i);
+        info.mStatus = "running";
+        info.mLogPath = "/var/log/container_" + std::to_string(i);
+        containerManager.mContainerMap[info.mID] = std::make_shared<RawContainerInfo>(info);
+    }
+
+    // Setup FileServer with a test config to enable CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    ctx.SetConfigName(testName);
+
+    // Create FileDiscoveryOptions with container discovery enabled
+    Json::Value inputConfigJson;
+    inputConfigJson["FilePaths"].append("/tmp/test/*.log");
+    inputConfigJson["ContainerFilters"]["IncludeEnv"]["ENV_KEY_1"] = "";
+    inputConfigJson["ContainerFilters"]["IncludeK8sLabel"]["app"] = "";
+    inputConfigJson["ExternalEnvTag"]["ENV_KEY_1"] = "custom_env_tag";
+    inputConfigJson["ExternalK8sLabelTag"]["app"] = "custom_k8s_tag";
+
+    mDiscoveryOpts = FileDiscoveryOptions();
+    mDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+
+    // Initialize ContainerDiscoveryOptions separately
+    ContainerDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(containerDiscoveryOpts));
+
+    mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+    mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+    mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+        [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
+            containerInfo.mRealBaseDirs.push_back("/tmp/test");
+            return true;
+        });
+
+    // Add config to FileServer so CheckContainerDiffForAllConfig can find it
+    FileServer::GetInstance()->AddFileDiscoveryConfig(testName, &mDiscoveryOpts, &ctx);
+
+    std::atomic<bool> testRunning{true};
+    std::atomic<int> iterationCount{0};
+    std::atomic<int> errorCount{0};
+
+    // Thread 1: Continuously call refreshAllContainersSnapshot and incrementallyUpdateContainersSnapshot
+    // This simulates the real polling thread behavior
+    auto modifyThread = [&]() {
+        int counter = 100;
+        while (testRunning) {
+            try {
+                // Alternate between full refresh and incremental updates (with some randomness)
+                if (counter % 2 == 0 || rand() % 3 == 0) {
+                    // Simulate refreshAllContainersSnapshot with subset of existing containers
+                    // This triggers RawContainerInfo object replacement for selected containers
+                    // Only update 5 containers per refresh to avoid huge JSON string building
+                    std::ostringstream metaBuilder;
+                    metaBuilder << R"({"All": [)";
+
+                    // Include 5 rotating containers with updated metadata
+                    for (int i = 0; i < 5; i++) {
+                        int containerId = (counter + i) % 20;
+                        if (i > 0)
+                            metaBuilder << ",";
+                        metaBuilder << R"({"ID": "container_)" << containerId << R"(", "Name": "test_container_)"
+                                    << containerId << R"(", "Status": "running")"
+                                    << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
+                                    << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
+                                    << R"(/diff")"
+                                    << R"(, "Env": {"ENV_KEY_1": "value_)" << counter << R"(", "COUNTER": ")" << counter
+                                    << R"("})"
+                                    << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
+                                    << R"(", "Labels": {"app": "app_)" << (counter % 5) << R"(", "version": "v)"
+                                    << (counter % 3) << R"("}}})";
+                    }
+
+                    metaBuilder << R"(]})";
+
+                    LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder.str());
+                    containerManager.refreshAllContainersSnapshot();
+                } else {
+                    // Simulate incrementallyUpdateContainersSnapshot with updates to existing containers
+                    // Update 2-3 existing containers to trigger RawContainerInfo replacement
+                    std::ostringstream diffBuilder;
+                    diffBuilder << R"({"Update": [)";
+
+                    int numUpdates = 2 + (counter % 2);
+                    for (int i = 0; i < numUpdates; i++) {
+                        int containerId = (counter + i) % 20;
+                        if (i > 0)
+                            diffBuilder << ",";
+                        diffBuilder << R"({"ID": "container_)" << containerId << R"(", "Name": "test_container_)"
+                                    << containerId << R"(", "Status": "running")"
+                                    << R"(, "LogPath": "/var/log/container_)" << containerId << R"(")"
+                                    << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << containerId
+                                    << R"(/diff")"
+                                    << R"(, "Env": {"ENV_KEY_1": "incremental_)" << counter
+                                    << R"(", "UPDATED_ENV": "new_)" << counter << R"("})"
+                                    << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << containerId
+                                    << R"(", "Labels": {"app": "incremental_)" << counter
+                                    << R"(", "updated": "true"}}})";
+                    }
+
+                    diffBuilder << R"(], "Delete": ["old_container_)" << (counter - 50) << R"("], "Stop": ["container_)"
+                                << (counter % 20) << R"("]})";
+
+                    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder.str());
+                    containerManager.incrementallyUpdateContainersSnapshot();
+                }
+
+                counter++;
+
+                // Random sleep interval (80-200us) to create more timing variations
+                std::this_thread::sleep_for(std::chrono::microseconds(80 + rand() % 120));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+    // Thread 2: Continuously call CheckContainerDiffForAllConfig and ApplyContainerDiffs
+    // This simulates the real FileServer::Resume() behavior
+    auto readThread = [&]() {
+        // Random initial delay (0-50ms) to vary thread interleaving
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 50));
+
+        while (testRunning) {
+            try {
+                // Check container diffs for all configs (fills mConfigContainerDiffMap)
+                containerManager.CheckContainerDiffForAllConfig();
+
+                // Apply the diffs (reads and clears mConfigContainerDiffMap)
+                // This is where GetCustomExternalTags gets called and may crash
+                // When thread 1 replaces RawContainerInfo in mContainerMap, the old info's
+                // mEnv and mK8sInfo.mLabels may be accessed here causing use-after-free
+                containerManager.ApplyContainerDiffs();
+
+                iterationCount++;
+
+                // Random sleep interval (50-150us) to create more varied race conditions
+                std::this_thread::sleep_for(std::chrono::microseconds(50 + rand() % 100));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+    // Thread 3: Call GetContainerStoppedEvents to test concurrent access to mRawContainerInfo
+    // This tests the fix for accessing mRawContainerInfo->mID without proper locking
+
+
+    auto stoppedEventsThread = [&]() {
+        // Random initial delay (0-80ms) to vary thread interleaving
+        std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 80));
+
+        int counter = 0;
+        while (testRunning) {
+            try {
+                // Periodically add some container IDs to mStoppedContainerIDs
+                if (counter % 5 == 0) {
+                    std::lock_guard<std::mutex> lock(containerManager.mStoppedContainerIDsMutex);
+                    containerManager.mStoppedContainerIDs.push_back("container_" + std::to_string(counter % 20));
+                    containerManager.mStoppedContainerIDs.push_back("dynamic_" + std::to_string(counter + 100));
+                }
+
+                // Call GetContainerStoppedEvents which accesses mRawContainerInfo
+                // This method was also fixed in commit e0b33e88 to add proper locking
+                std::vector<Event*> events;
+                containerManager.GetContainerStoppedEvents(events);
+
+                // Clean up events
+                for (auto* event : events) {
+                    delete event;
+                }
+
+                counter++;
+                iterationCount++;
+
+                // Random sleep interval (80-180us) to create more varied race conditions
+                std::this_thread::sleep_for(std::chrono::microseconds(80 + rand() % 100));
+            } catch (const std::exception& e) {
+                errorCount++;
+            }
+        }
+    };
+
+
+    // Start threads based on configuration
+    std::thread t1(modifyThread);
+    std::unique_ptr<std::thread> t2;
+    std::unique_ptr<std::thread> t3;
+
+    if (enableT2) {
+        t2 = std::make_unique<std::thread>(readThread);
+    }
+    if (enableT3) {
+        t3 = std::make_unique<std::thread>(stoppedEventsThread);
+    }
+
+    // Let them run for a short time
+    std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+
+    // Stop threads
+    testRunning = false;
+
+    t1.join();
+    if (t2) {
+        t2->join();
+    }
+    if (t3) {
+        t3->join();
+    }
+
+    // Cleanup FileServer config
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);
+    // With the fix (snapshot), there should be no errors
+    EXPECT_EQ(errorCount.load(), 0) << "Concurrent access caused " << errorCount.load() << " errors";
+
+    // Verify we actually ran many iterations
+    EXPECT_GT(iterationCount.load(), 100) << "Test should run many iterations to stress test concurrency";
+
+    std::string threadConfig = "T1";
+    if (enableT2)
+        threadConfig += "+T2";
+    if (enableT3)
+        threadConfig += "+T3";
+    std::cout << "Concurrent test (" << threadConfig << ") completed: " << iterationCount.load() << " iterations with "
+              << errorCount.load() << " errors" << std::endl;
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T2() {
+    runConcurrentContainerMapAccessTest(true, false, "test_concurrent_config_t1t2");
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T3() {
+    runConcurrentContainerMapAccessTest(false, true, "test_concurrent_config_t1t3");
+}
+
+void ContainerManagerUnittest::TestConcurrentContainerMapAccess_T1T2T3() {
+    runConcurrentContainerMapAccessTest(true, true, "test_concurrent_config_t1t2t3");
+}
+
+void ContainerManagerUnittest::TestSequentialContainerDiffAndApply() {
+    // This test verifies that after multiple refreshAllContainersSnapshot and incrementallyUpdateContainersSnapshot
+    // operations, CheckContainerDiffForAllConfig and ApplyContainerDiffs produce correct results.
+    //
+    // Test flow:
+    // 1. Setup FileServer with test config
+    // 2. Execute refreshAllContainersSnapshot multiple times to simulate container updates
+    // 3. Execute incrementallyUpdateContainersSnapshot to simulate incremental updates
+    // 4. Call CheckContainerDiffForAllConfig and ApplyContainerDiffs multiple times
+    // 5. Verify the FileDiscoveryOptions container info is correctly updated after each round
+
+    const std::string testName = "test_sequential_diff_apply";
+    ContainerManager containerManager;
+    containerManager.mIsRunning = true;
+
+    // Setup FileServer with a test config
+    ctx.SetConfigName(testName);
+
+    // Create FileDiscoveryOptions with container discovery enabled
+    Json::Value inputConfigJson;
+    inputConfigJson["FilePaths"].append("/tmp/test/*.log");
+    inputConfigJson["ContainerFilters"]["IncludeEnv"]["ENV_KEY_1"] = "";
+    inputConfigJson["ContainerFilters"]["IncludeK8sLabel"]["app"] = "";
+    inputConfigJson["ExternalEnvTag"]["ENV_KEY_1"] = "custom_env_tag";
+    inputConfigJson["ExternalK8sLabelTag"]["app"] = "custom_k8s_tag";
+
+    mDiscoveryOpts = FileDiscoveryOptions();
+    mDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+
+    // Initialize ContainerDiscoveryOptions separately
+    ContainerDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(containerDiscoveryOpts));
+
+    mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+    mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+    mDiscoveryOpts.SetLastContainerUpdateTime(0); // Set to 0 to trigger first check
+    mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+        [](ContainerInfo& containerInfo, const CollectionPipelineContext* ctx, const FileDiscoveryOptions* opts) {
+            containerInfo.mRealBaseDirs.push_back("/tmp/test");
+            return true;
+        });
+
+    // Add config to FileServer
+    FileServer::GetInstance()->AddFileDiscoveryConfig(testName, &mDiscoveryOpts, &ctx);
+
+    // ===== Round 1: Initial full refresh with 5 containers =====
+    std::ostringstream metaBuilder1;
+    metaBuilder1 << R"({"All": [)";
+    for (int i = 0; i < 5; i++) {
+        if (i > 0)
+            metaBuilder1 << ",";
+        metaBuilder1 << R"({"ID": "container_)" << i << R"(", "Name": "test_container_)" << i
+                     << R"(", "Status": "running")"
+                     << R"(, "LogPath": "/var/log/container_)" << i << R"(")"
+                     << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << i << R"(/diff")"
+                     << R"(, "Env": {"ENV_KEY_1": "value_)" << i << R"("})"
+                     << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << i << R"(", "Labels": {"app": "app_)"
+                     << i << R"("}}})";
+    }
+    metaBuilder1 << R"(]})";
+
+    LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder1.str());
+    containerManager.refreshAllContainersSnapshot();
+    containerManager.mLastFullUpdateTime = 100; // Manually set timestamp for predictable testing
+
+    // Verify mContainerMap has 5 containers
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 5);
+    }
+
+    // Check diffs and apply (Round 1)
+    mDiscoveryOpts.SetLastContainerUpdateTime(50); // Older than mLastFullUpdateTime
+    bool hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+    EXPECT_TRUE(hasUpdate) << "First CheckContainerDiffForAllConfig should detect new containers";
+
+    auto diff = containerManager.mConfigContainerDiffMap[testName];
+    EXPECT_TRUE(diff != nullptr);
+    EXPECT_EQ(diff->mAdded.size(), 5) << "Should have 5 added containers in first round";
+
+    containerManager.ApplyContainerDiffs();
+
+    // Verify FileDiscoveryOptions container info was populated
+    auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+    EXPECT_TRUE(containerInfo != nullptr);
+    EXPECT_EQ(containerInfo->size(), 5) << "FileDiscoveryOptions should have 5 containers after first apply";
+
+    // ===== Round 2: Incremental update (add container_5, update container_0) =====
+    std::ostringstream diffBuilder1;
+    diffBuilder1 << R"({"Update": [)";
+    diffBuilder1 << R"({"ID": "container_0", "Name": "test_container_0_v2", "Status": "running")"
+                 << R"(, "LogPath": "/var/log/container_0_updated")"
+                 << R"(, "UpperDir": "/var/lib/docker/overlay2/container_0/diff")"
+                 << R"(, "Env": {"ENV_KEY_1": "updated_0"})"
+                 << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-0")"
+                 << R"(, "Labels": {"app": "app_0"}}},)"
+                 << R"({"ID": "container_5", "Name": "test_container_5", "Status": "running")"
+                 << R"(, "LogPath": "/var/log/container_5")"
+                 << R"(, "UpperDir": "/var/lib/docker/overlay2/container_5/diff")"
+                 << R"(, "Env": {"ENV_KEY_1": "value_5"})"
+                 << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-5")"
+                 << R"(, "Labels": {"app": "app_5"}}})"
+                 << R"(], "Delete": [], "Stop": []})";
+
+    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder1.str());
+    containerManager.incrementallyUpdateContainersSnapshot();
+    containerManager.mLastIncrementalUpdateTime = 200; // Manually set timestamp
+
+    // Verify incremental update in mContainerMap
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 6); // 5 + 1 = 6
+        auto container0 = containerManager.mContainerMap["container_0"];
+        EXPECT_EQ(container0->mLogPath, "/var/log/container_0_updated");
+        EXPECT_EQ(container0->mName, "test_container_0_v2");
+    }
+
+    // Check diffs and apply (Round 2)
+    mDiscoveryOpts.SetLastContainerUpdateTime(150); // Between mLastFullUpdateTime and mLastIncrementalUpdateTime
+    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+    EXPECT_TRUE(hasUpdate) << "Second CheckContainerDiffForAllConfig should detect updates";
+
+    diff = containerManager.mConfigContainerDiffMap[testName];
+    EXPECT_TRUE(diff != nullptr);
+    EXPECT_EQ(diff->mAdded.size(), 1) << "Should have 1 added container (container_5)";
+    EXPECT_EQ(diff->mModified.size(), 1) << "Should have 1 modified container (container_0)";
+
+    if (diff->mAdded.size() > 0) {
+        EXPECT_EQ(diff->mAdded[0]->mID, "container_5");
+    }
+    if (diff->mModified.size() > 0) {
+        EXPECT_EQ(diff->mModified[0]->mID, "container_0");
+        EXPECT_EQ(diff->mModified[0]->mLogPath, "/var/log/container_0_updated");
+    }
+
+    containerManager.ApplyContainerDiffs();
+
+    // Verify state after second round
+    containerInfo = mDiscoveryOpts.GetContainerInfo();
+    EXPECT_EQ(containerInfo->size(), 6) << "FileDiscoveryOptions should have 6 containers after second apply";
+
+    std::unordered_map<std::string, ContainerInfo> containerInfoMap;
+    for (const auto& info : *containerInfo) {
+        containerInfoMap[info.mRawContainerInfo->mID] = info;
+    }
+
+    // Verify container_0 was updated
+    EXPECT_TRUE(containerInfoMap.find("container_0") != containerInfoMap.end());
+    EXPECT_EQ(containerInfoMap["container_0"].mRawContainerInfo->mLogPath, "/var/log/container_0_updated");
+    EXPECT_EQ(containerInfoMap["container_0"].mRawContainerInfo->mName, "test_container_0_v2");
+
+    // Verify container_5 was added
+    EXPECT_TRUE(containerInfoMap.find("container_5") != containerInfoMap.end());
+
+    // ===== Round 3: Incremental update (delete container_1, container_2) =====
+    std::ostringstream diffBuilder2;
+    diffBuilder2 << R"({"Update": [], "Delete": ["container_1", "container_2"], "Stop": []})";
+
+    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(diffBuilder2.str());
+    containerManager.incrementallyUpdateContainersSnapshot();
+    containerManager.mLastIncrementalUpdateTime = 300; // Manually set timestamp
+
+    // Verify deletions in mContainerMap
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 4); // 6 - 2 = 4
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_1") == containerManager.mContainerMap.end());
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_2") == containerManager.mContainerMap.end());
+    }
+
+    // Check diffs and apply (Round 3)
+    mDiscoveryOpts.SetLastContainerUpdateTime(250); // Between 200 and 300
+    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+    EXPECT_TRUE(hasUpdate) << "Third CheckContainerDiffForAllConfig should detect deletions";
+
+    diff = containerManager.mConfigContainerDiffMap[testName];
+    EXPECT_TRUE(diff != nullptr);
+    EXPECT_EQ(diff->mRemoved.size(), 2) << "Should have 2 removed containers (container_1, container_2)";
+
+    containerManager.ApplyContainerDiffs();
+
+    // Verify final state
+    containerInfo = mDiscoveryOpts.GetContainerInfo();
+    EXPECT_EQ(containerInfo->size(), 4) << "FileDiscoveryOptions should have 4 containers after third apply";
+
+    containerInfoMap.clear();
+    for (const auto& info : *containerInfo) {
+        containerInfoMap[info.mRawContainerInfo->mID] = info;
+    }
+
+    // Verify container_1 and container_2 were removed
+    EXPECT_TRUE(containerInfoMap.find("container_1") == containerInfoMap.end());
+    EXPECT_TRUE(containerInfoMap.find("container_2") == containerInfoMap.end());
+
+    // Verify remaining containers
+    EXPECT_TRUE(containerInfoMap.find("container_0") != containerInfoMap.end());
+    EXPECT_TRUE(containerInfoMap.find("container_3") != containerInfoMap.end());
+    EXPECT_TRUE(containerInfoMap.find("container_4") != containerInfoMap.end());
+    EXPECT_TRUE(containerInfoMap.find("container_5") != containerInfoMap.end());
+
+    // Save old pointers before full refresh to verify they are replaced with new pointers
+    // This is critical for memory safety - after full refresh, old RawContainerInfo objects should be replaced
+    std::unordered_map<std::string, RawContainerInfo*> oldRawPointers;
+    for (const auto& info : *containerInfo) {
+        oldRawPointers[info.mRawContainerInfo->mID] = info.mRawContainerInfo.get();
+    }
+    EXPECT_EQ(oldRawPointers.size(), 4) << "Should have saved 4 old pointers";
+
+    // ===== Round 4: Full refresh (refreshAllContainersSnapshot) =====
+    // Simulate a complete refresh from container runtime with 9 containers
+    // This tests that full refresh correctly handles existing + new containers
+    std::ostringstream metaBuilder3;
+    metaBuilder3 << R"({"All": [)";
+    // Include existing containers (0, 3, 4, 5) and new ones (6, 7, 8, 9, 10)
+    std::vector<int> containerIds = {0, 3, 4, 5, 6, 7, 8, 9, 10};
+    for (size_t i = 0; i < containerIds.size(); i++) {
+        int id = containerIds[i];
+        if (i > 0)
+            metaBuilder3 << ",";
+        metaBuilder3 << R"({"ID": "container_)" << id << R"(", "Name": "test_container_)" << id
+                     << R"(", "Status": "running")"
+                     << R"(, "LogPath": "/var/log/container_)" << id << R"(")"
+                     << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << id << R"(/diff")"
+                     << R"(, "Env": {"ENV_KEY_1": "fullrefresh2_)" << id << R"("})"
+                     << R"(, "K8sInfo": {"Namespace": "default", "Pod": "pod-)" << id << R"(", "Labels": {"app": "app_)"
+                     << id << R"("}}})";
+    }
+    metaBuilder3 << R"(]})";
+
+    LogtailPluginMock::GetInstance()->SetUpContainersMeta(metaBuilder3.str());
+    containerManager.refreshAllContainersSnapshot();
+    containerManager.mLastFullUpdateTime = 400; // Manually set timestamp
+
+    // Verify mContainerMap has 9 containers
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 9);
+        // Verify new containers exist
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_6") != containerManager.mContainerMap.end());
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_7") != containerManager.mContainerMap.end());
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_8") != containerManager.mContainerMap.end());
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_9") != containerManager.mContainerMap.end());
+        EXPECT_TRUE(containerManager.mContainerMap.find("container_10") != containerManager.mContainerMap.end());
+    }
+
+    // Check diffs and apply (Round 4)
+    mDiscoveryOpts.SetLastContainerUpdateTime(350); // Older than mLastFullUpdateTime
+    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+    EXPECT_TRUE(hasUpdate) << "Fourth CheckContainerDiffForAllConfig should detect full refresh changes";
+
+    diff = containerManager.mConfigContainerDiffMap[testName];
+    EXPECT_TRUE(diff != nullptr);
+    // Full refresh resets baseline, so all 9 containers are treated as "added"
+    EXPECT_EQ(diff->mAdded.size(), 9) << "Should have 9 added containers (full refresh resets baseline)";
+
+    containerManager.ApplyContainerDiffs();
+
+    // Verify FileDiscoveryOptions has 9 containers
+    containerInfo = mDiscoveryOpts.GetContainerInfo();
+    EXPECT_EQ(containerInfo->size(), 9) << "FileDiscoveryOptions should have 9 containers after fourth apply";
+
+    containerInfoMap.clear();
+    for (const auto& info : *containerInfo) {
+        containerInfoMap[info.mRawContainerInfo->mID] = info;
+    }
+
+    // Verify all 9 expected containers are present and validate their details
+    EXPECT_EQ(containerInfoMap.size(), 9);
+    for (int id : containerIds) {
+        std::string containerId = "container_" + std::to_string(id);
+        EXPECT_TRUE(containerInfoMap.find(containerId) != containerInfoMap.end())
+            << "Container " << containerId << " should be in FileDiscoveryOptions";
+
+        if (containerInfoMap.find(containerId) != containerInfoMap.end()) {
+            const auto& containerInfoEntry = containerInfoMap[containerId];
+
+            // Verify container details
+            EXPECT_EQ(containerInfoEntry.mRawContainerInfo->mID, containerId);
+            EXPECT_EQ(containerInfoEntry.mRawContainerInfo->mStatus, "running");
+            EXPECT_EQ(containerInfoEntry.mRawContainerInfo->mLogPath, "/var/log/container_" + std::to_string(id));
+
+            // CRITICAL: Verify that pointers were replaced with new ones after full refresh
+            // This ensures that refreshAllContainersSnapshot creates new RawContainerInfo objects
+            // rather than reusing old ones, which is essential for memory safety
+            auto oldPtrIt = oldRawPointers.find(containerId);
+            if (oldPtrIt != oldRawPointers.end()) {
+                RawContainerInfo* oldPtr = oldPtrIt->second;
+                RawContainerInfo* newPtr = containerInfoEntry.mRawContainerInfo.get();
+                EXPECT_NE(oldPtr, newPtr)
+                    << "Container " << containerId << " MUST have NEW pointer after full refresh. "
+                    << "Old pointer: " << oldPtr << ", New pointer: " << newPtr << ". "
+                    << "Same pointer means use-after-free risk!";
+
+                std::cout << "Container " << containerId << " pointer verification: Old=" << oldPtr
+                          << ", New=" << newPtr << " (different=OK)" << std::endl;
+            }
+        }
+    }
+
+    // Verify deleted containers (1, 2) are still not present
+    EXPECT_TRUE(containerInfoMap.find("container_1") == containerInfoMap.end())
+        << "Previously deleted container_1 should not reappear";
+    EXPECT_TRUE(containerInfoMap.find("container_2") == containerInfoMap.end())
+        << "Previously deleted container_2 should not reappear";
+
+    // ===== Round 5: Verify no changes when config is up-to-date =====
+    mDiscoveryOpts.SetLastContainerUpdateTime(450); // Newer than mLastFullUpdateTime
+    hasUpdate = containerManager.CheckContainerDiffForAllConfig();
+    EXPECT_FALSE(hasUpdate) << "CheckContainerDiffForAllConfig should not detect updates when config is up-to-date";
+
+    // Cleanup
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);
+
+    std::cout << "Sequential container diff and apply test completed successfully" << std::endl;
+}
+
+void ContainerManagerUnittest::TestRefreshAllContainersFlag() const {
+    // Verify that computeMatchedContainersDiff correctly propagates the refreshAllContainers
+    // parameter into diff.mRefreshAllContainers.
+    ContainerManager containerManager;
+
+    auto makeContainer = [](const std::string& id, const std::string& status = "running") {
+        auto info = std::make_shared<RawContainerInfo>();
+        info->mID = id;
+        info->mStatus = status;
+        info->mLogPath = "/var/log/" + id;
+        return info;
+    };
+
+    containerManager.mContainerMap["c1"] = makeContainer("c1");
+    containerManager.mContainerMap["c2"] = makeContainer("c2");
+
+    std::set<std::string> fullList;
+    std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> matchList;
+    ContainerFilters filters;
+
+    {
+        // refreshAllContainers=false -> diff.mRefreshAllContainers must be false
+        ContainerDiff diff;
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+        EXPECT_FALSE(diff.mRefreshAllContainers);
+        EXPECT_EQ(diff.mAdded.size(), 2u);
+        fullList.clear();
+        matchList.clear();
+    }
+
+    {
+        // refreshAllContainers=true -> diff.mRefreshAllContainers must be true
+        ContainerDiff diff;
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, true, diff);
+        EXPECT_TRUE(diff.mRefreshAllContainers);
+        EXPECT_EQ(diff.mAdded.size(), 2u);
+        fullList.clear();
+        matchList.clear();
+    }
+
+    {
+        // Verify independence: false does not inherit from a prior true call
+        ContainerDiff diff;
+        containerManager.computeMatchedContainersDiff(fullList, matchList, filters, false, false, diff);
+        EXPECT_FALSE(diff.mRefreshAllContainers);
+    }
+}
+
+void ContainerManagerUnittest::TestClearContainerInfo() const {
+    {
+        // Calling ClearContainerInfo when mContainerInfos is null must not crash.
+        FileDiscoveryOptions opts;
+        EXPECT_NO_THROW(opts.ClearContainerInfo());
+        EXPECT_EQ(opts.GetContainerInfo(), nullptr);
+    }
+
+    {
+        // Calling ClearContainerInfo on an already-empty vector leaves it empty.
+        FileDiscoveryOptions opts;
+        opts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+        EXPECT_NO_THROW(opts.ClearContainerInfo());
+        ASSERT_NE(opts.GetContainerInfo(), nullptr);
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 0u);
+    }
+
+    {
+        // Calling ClearContainerInfo removes all previously-added containers.
+        FileDiscoveryOptions opts;
+        auto containerInfos = std::make_shared<std::vector<ContainerInfo>>();
+        for (int i = 0; i < 3; ++i) {
+            ContainerInfo ci;
+            ci.mRawContainerInfo = std::make_shared<RawContainerInfo>();
+            ci.mRawContainerInfo->mID = "container_" + std::to_string(i);
+            ci.mRawContainerInfo->mStatus = "running";
+            containerInfos->push_back(ci);
+        }
+        opts.SetContainerInfo(containerInfos);
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 3u);
+
+        opts.ClearContainerInfo();
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 0u);
+    }
+
+    {
+        // After ClearContainerInfo the pointer itself must not be nulled;
+        // subsequent UpdateRawContainerInfo calls should still work.
+        CollectionPipelineContext ctx;
+        Json::Value cfg;
+        cfg["FilePaths"].append("/tmp/*.log");
+
+        FileDiscoveryOptions opts;
+        opts.Init(cfg, ctx, "test");
+        opts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+        opts.SetDeduceAndSetContainerBaseDirFunc(
+            [](ContainerInfo& ci, const CollectionPipelineContext*, const FileDiscoveryOptions*) {
+                ci.mRealBaseDirs.push_back("/tmp");
+                return true;
+            });
+
+        auto rawInfo = std::make_shared<RawContainerInfo>();
+        rawInfo->mID = "after_clear";
+        rawInfo->mStatus = "running";
+        opts.UpdateRawContainerInfo(rawInfo, &ctx);
+        ASSERT_NE(opts.GetContainerInfo(), nullptr);
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 1u);
+
+        opts.ClearContainerInfo();
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 0u);
+
+        // Re-add after clear
+        opts.UpdateRawContainerInfo(rawInfo, &ctx);
+        EXPECT_EQ(opts.GetContainerInfo()->size(), 1u);
+    }
+}
+
+void ContainerManagerUnittest::TestApplyContainerDiffsRefreshAllClearsStaleContainers() {
+    // This test validates the core fix introduced in commit 6d1c1b5:
+    //   When a full refresh occurs (mRefreshAllContainers=true), ApplyContainerDiffs must call
+    //   ClearContainerInfo() before applying the diff so that containers present in the previous
+    //   snapshot but absent from the new runtime snapshot are not retained as stale entries.
+    //
+    // Without the fix, stale containers (container_A, container_C) would survive the second full
+    // refresh because the full-refresh path seeds an empty matchList, which generates no mRemoved
+    // entries for containers that disappeared from the runtime.
+    //
+    // Container metadata is constructed via LogtailPluginMock (SetUpContainersMeta /
+    // SetUpDiffContainersMeta) and fed through refreshAllContainersSnapshot() /
+    // incrementallyUpdateContainersSnapshot(), mirroring the real production code path.
+
+    const std::string testName = "test_refresh_all_clears_stale";
+    ContainerManager containerManager;
+    containerManager.mIsRunning = true;
+
+    ctx.SetConfigName(testName);
+
+    Json::Value inputConfigJson;
+    inputConfigJson["FilePaths"].append("/tmp/test/*.log");
+
+    mDiscoveryOpts = FileDiscoveryOptions();
+    mDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+
+    ContainerDiscoveryOptions containerDiscoveryOpts;
+    containerDiscoveryOpts.Init(inputConfigJson, ctx, "test");
+    mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(containerDiscoveryOpts));
+
+    mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+    mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+    mDiscoveryOpts.SetLastContainerUpdateTime(0);
+    mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+        [](ContainerInfo& ci, const CollectionPipelineContext*, const FileDiscoveryOptions*) {
+            ci.mRealBaseDirs.push_back("/tmp/test");
+            return true;
+        });
+
+    FileServer::GetInstance()->AddFileDiscoveryConfig(testName, &mDiscoveryOpts, &ctx);
+
+    // Build a single container JSON object string.
+    auto buildContainerJson = [](const std::string& id) -> std::string {
+        std::ostringstream ss;
+        ss << R"({"ID": "container_)" << id << R"(", "Name": "name_)" << id << R"(", "Status": "running")"
+           << R"(, "LogPath": "/var/log/container_)" << id << R"(")"
+           << R"(, "UpperDir": "/var/lib/docker/overlay2/container_)" << id << R"(/diff"})";
+        return ss.str();
+    };
+
+    // Build the {"All": [...]} payload consumed by refreshAllContainersSnapshot().
+    auto buildAllMeta = [&buildContainerJson](const std::vector<std::string>& ids) -> std::string {
+        std::ostringstream ss;
+        ss << R"({"All": [)";
+        for (size_t i = 0; i < ids.size(); ++i) {
+            if (i > 0)
+                ss << ",";
+            ss << buildContainerJson(ids[i]);
+        }
+        ss << R"(]})";
+        return ss.str();
+    };
+
+    // Build the {"Update": [...], "Delete": [...], "Stop": []} payload consumed by
+    // incrementallyUpdateContainersSnapshot().
+    auto buildDiffMeta = [&buildContainerJson](const std::vector<std::string>& updates,
+                                               const std::vector<std::string>& deletes) -> std::string {
+        std::ostringstream ss;
+        ss << R"({"Update": [)";
+        for (size_t i = 0; i < updates.size(); ++i) {
+            if (i > 0)
+                ss << ",";
+            ss << buildContainerJson(updates[i]);
+        }
+        ss << R"(], "Delete": [)";
+        for (size_t i = 0; i < deletes.size(); ++i) {
+            if (i > 0)
+                ss << ",";
+            ss << R"("container_)" << deletes[i] << R"(")";
+        }
+        ss << R"(], "Stop": []})";
+        return ss.str();
+    };
+
+    // ===== Round 1: full refresh – runtime reports container_A, container_B, container_C =====
+    LogtailPluginMock::GetInstance()->SetUpContainersMeta(buildAllMeta({"A", "B", "C"}));
+    containerManager.refreshAllContainersSnapshot();
+    containerManager.mLastFullUpdateTime = 100; // pin to predictable value
+
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 3u);
+    }
+
+    mDiscoveryOpts.SetLastContainerUpdateTime(0); // 0 < 100 -> full refresh path
+    EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig());
+
+    auto diff1 = containerManager.mConfigContainerDiffMap[testName];
+    ASSERT_NE(diff1, nullptr);
+    EXPECT_TRUE(diff1->mRefreshAllContainers) << "Full refresh must set mRefreshAllContainers=true";
+    EXPECT_EQ(diff1->mAdded.size(), 3u) << "All three containers must appear as added";
+    EXPECT_EQ(diff1->mRemoved.size(), 0u) << "Empty matchList produces no removals in full refresh path";
+
+    containerManager.ApplyContainerDiffs();
+
+    ASSERT_NE(mDiscoveryOpts.GetContainerInfo(), nullptr);
+    EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 3u);
+
+    // ===== Round 2: full refresh – runtime now reports only container_B and container_D
+    //       container_A and container_C vanish from the runtime; container_D is new. =====
+    LogtailPluginMock::GetInstance()->SetUpContainersMeta(buildAllMeta({"B", "D"}));
+    containerManager.refreshAllContainersSnapshot();
+    containerManager.mLastFullUpdateTime = 200; // pin to predictable value
+
+    {
+        ReadLock lock(containerManager.mContainerMapRWLock);
+        EXPECT_EQ(containerManager.mContainerMap.size(), 2u);
+        EXPECT_NE(containerManager.mContainerMap.find("container_B"), containerManager.mContainerMap.end());
+        EXPECT_NE(containerManager.mContainerMap.find("container_D"), containerManager.mContainerMap.end());
+    }
+
+    // lastConfigContainerUpdateTime(100) < mLastFullUpdateTime(200) -> full refresh path
+    mDiscoveryOpts.SetLastContainerUpdateTime(100);
+    EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig());
+
+    auto diff2 = containerManager.mConfigContainerDiffMap[testName];
+    ASSERT_NE(diff2, nullptr);
+    EXPECT_TRUE(diff2->mRefreshAllContainers) << "Second full refresh must also set mRefreshAllContainers=true";
+    // The full refresh path seeds an empty matchList, so no mRemoved entries are produced for
+    // container_A / container_C even though they disappeared from the runtime.
+    // ClearContainerInfo() inside ApplyContainerDiffs compensates for this gap.
+    EXPECT_EQ(diff2->mAdded.size(), 2u) << "container_B and container_D must be added";
+    EXPECT_EQ(diff2->mRemoved.size(), 0u) << "Full refresh path produces no explicit removals";
+
+    containerManager.ApplyContainerDiffs();
+
+    // Critical assertion: only container_B and container_D must survive.
+    // Without the ClearContainerInfo() fix the stale container_A and container_C would remain,
+    // producing a size of 4 instead of 2.
+    auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+    ASSERT_NE(containerInfo, nullptr);
+    EXPECT_EQ(containerInfo->size(), 2u)
+        << "Stale containers A and C must be cleared by ClearContainerInfo() during full refresh";
+
+    std::set<std::string> resultIds;
+    for (const auto& info : *containerInfo) {
+        resultIds.insert(info.mRawContainerInfo->mID);
+    }
+    EXPECT_EQ(resultIds.count("container_B"), 1u) << "container_B must be present after full refresh";
+    EXPECT_EQ(resultIds.count("container_D"), 1u) << "container_D must be present after full refresh";
+    EXPECT_EQ(resultIds.count("container_A"), 0u) << "Stale container_A must be removed by ClearContainerInfo()";
+    EXPECT_EQ(resultIds.count("container_C"), 0u) << "Stale container_C must be removed by ClearContainerInfo()";
+
+    // ===== Round 3: incremental update – add container_E via SetUpDiffContainersMeta =====
+    // Verifies the complementary path: mRefreshAllContainers=false and no ClearContainerInfo().
+    LogtailPluginMock::GetInstance()->SetUpDiffContainersMeta(buildDiffMeta({"E"}, {}));
+    containerManager.incrementallyUpdateContainersSnapshot();
+    containerManager.mLastIncrementalUpdateTime = 300; // pin to predictable value
+
+    // lastConfigContainerUpdateTime(200) == mLastFullUpdateTime(200) < mLastIncrementalUpdateTime(300)
+    // -> incremental path (refreshAllContainers=false)
+    mDiscoveryOpts.SetLastContainerUpdateTime(200);
+    EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig());
+
+    auto diff3 = containerManager.mConfigContainerDiffMap[testName];
+    ASSERT_NE(diff3, nullptr);
+    EXPECT_FALSE(diff3->mRefreshAllContainers) << "Incremental update must set mRefreshAllContainers=false";
+    EXPECT_EQ(diff3->mAdded.size(), 1u) << "Only container_E should be added incrementally";
+    EXPECT_EQ(diff3->mAdded[0]->mID, "container_E");
+
+    containerManager.ApplyContainerDiffs();
+    EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 3u)
+        << "container_B, container_D, container_E must be present after incremental add";
+
+    // Cleanup
+    FileServer::GetInstance()->RemoveFileDiscoveryConfig(testName);
+}
+
+void ContainerManagerUnittest::TestLoadContainerInfoAfterConfigInit() {
+    // Validates the real startup sequence:
+    //   1. Pipeline config is registered with FileServer (ContainerManager Init).
+    //   2. ContainerManager::LoadContainerInfo() is called to restore the checkpoint.
+    //   3. LoadContainerInfo() internally calls ApplyContainerDiffs(); containers
+    //      must appear in FileDiscoveryOptions without any extra polling-loop step.
+    //
+    // Two checkpoint formats are exercised:
+    //
+    //   A. v1.0.0 format (Containers array, no per-config name):
+    //      loadContainerInfoFromContainersFormat calls checkContainerDiffForOneConfig
+    //      for every already-registered config, queuing a full-refresh diff.
+    //      The following ApplyContainerDiffs() applies it immediately.
+    //
+    //   B. v0.1.0 format (detail array, config name embedded):
+    //      loadContainerInfoFromDetailFormat creates mLegacyCheckpointAdded entries
+    //      keyed by config name.  ApplyContainerDiffs() finds the registered config
+    //      and applies them via UpdateRawContainerInfo(..., basePathInCheckpoint).
+
+    // In unit tests GetAgentDataDir() == GetProcessExecutionDir() (see AppConfig.cpp).
+    const std::string checkpointPath = PathJoin(GetProcessExecutionDir(), "docker_path_config.json");
+
+    // Helper: build and register a FileDiscoveryOptions for a given config name.
+    auto registerConfig = [&](const std::string& configName) {
+        ctx.SetConfigName(configName);
+        Json::Value cfgJson;
+        cfgJson["FilePaths"].append("/var/log/*.log");
+        mDiscoveryOpts = FileDiscoveryOptions();
+        mDiscoveryOpts.Init(cfgJson, ctx, "test");
+        mDiscoveryOpts.SetEnableContainerDiscoveryFlag(true);
+        ContainerDiscoveryOptions cdOpts;
+        cdOpts.Init(cfgJson, ctx, "test");
+        mDiscoveryOpts.SetContainerDiscoveryOptions(std::move(cdOpts));
+        mDiscoveryOpts.SetContainerInfo(std::make_shared<std::vector<ContainerInfo>>());
+        mDiscoveryOpts.SetFullContainerList(std::make_shared<std::set<std::string>>());
+        mDiscoveryOpts.SetLastContainerUpdateTime(0);
+        mDiscoveryOpts.SetDeduceAndSetContainerBaseDirFunc(
+            [](ContainerInfo& ci, const CollectionPipelineContext*, const FileDiscoveryOptions*) {
+                ci.mRealBaseDirs.push_back("/var/log");
+                return true;
+            });
+        FileServer::GetInstance()->AddFileDiscoveryConfig(configName, &mDiscoveryOpts, &ctx);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sub-scenario A: v1.0.0 format written by SaveContainerInfo
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+        const std::string configName = "ckpt_init_test_v100";
+
+        // Step 1: write the checkpoint via a temporary ContainerManager.
+        {
+            ContainerManager writer;
+            auto c1 = std::make_shared<RawContainerInfo>();
+            c1->mID = "ckpt_v100_c1";
+            c1->mStatus = "running";
+            c1->mLogPath = "/var/log/ckpt_v100_c1.log";
+            c1->mUpperDir = "/overlay/ckpt_v100_c1";
+            writer.mContainerMap["ckpt_v100_c1"] = c1;
+
+            auto c2 = std::make_shared<RawContainerInfo>();
+            c2->mID = "ckpt_v100_c2";
+            c2->mStatus = "running";
+            c2->mLogPath = "/var/log/ckpt_v100_c2.log";
+            c2->mUpperDir = "/overlay/ckpt_v100_c2";
+            writer.mContainerMap["ckpt_v100_c2"] = c2;
+
+            writer.SaveContainerInfo();
+        }
+
+        // Step 2: register the collection config (pipeline Init) *before* loading.
+        registerConfig(configName);
+
+        // Step 3: load the checkpoint. loadContainerInfoFromContainersFormat iterates
+        // already-registered configs, calls checkContainerDiffForOneConfig for each
+        // (full-refresh path since both timestamps are 0), then ApplyContainerDiffs()
+        // applies the queued diff — all within the single LoadContainerInfo() call.
+        ContainerManager containerManager;
+        containerManager.LoadContainerInfo();
+
+        // Verify: containers must be visible in FileDiscoveryOptions immediately.
+        auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+        ASSERT_NE(containerInfo, nullptr);
+        EXPECT_EQ(containerInfo->size(), 2u) << "[v1.0.0] Both checkpoint containers must be in FileDiscoveryOptions "
+                                                "after LoadContainerInfo()";
+
+        std::set<std::string> resultIds;
+        for (const auto& ci : *containerInfo) {
+            ASSERT_NE(ci.mRawContainerInfo, nullptr);
+            resultIds.insert(ci.mRawContainerInfo->mID);
+            EXPECT_EQ(ci.mRawContainerInfo->mStatus, "running");
+        }
+        EXPECT_EQ(resultIds.count("ckpt_v100_c1"), 1u) << "[v1.0.0] ckpt_v100_c1 must be loaded";
+        EXPECT_EQ(resultIds.count("ckpt_v100_c2"), 1u) << "[v1.0.0] ckpt_v100_c2 must be loaded";
+
+        // mContainerMap must also reflect the checkpoint containers.
+        {
+            ReadLock lock(containerManager.mContainerMapRWLock);
+            EXPECT_EQ(containerManager.mContainerMap.size(), 2u);
+        }
+
+        // Step 4: simulate the polling loop starting up.
+        containerManager.mIsRunning = true;
+
+        // ── Phase 4a: before any real snapshot (both timestamps still 0) ──────
+        // ApplyContainerDiffs() set lastConfigContainerUpdateTime = 1 (sentinel).
+        // checkContainerDiffForOneConfig: 1 < 0 → false; (0==0 && 0==0 && 1==0) → false
+        // → returns false immediately.  No spurious re-trigger, no ClearContainerInfo.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must NOT re-trigger before first snapshot";
+        EXPECT_TRUE(containerManager.mConfigContainerDiffMap.empty())
+            << "[v1.0.0] No new diff must be queued when sentinel prevents re-trigger";
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v1.0.0] Containers must survive the non-triggering CheckContainerDiffForAllConfig";
+
+        // ── Phase 4b: first real snapshot arrives ─────────────────────────────
+        // Simulate refreshAllContainersSnapshot() setting a real timestamp.
+        containerManager.mLastFullUpdateTime = 100;
+
+        // lastConfigContainerUpdateTime(1) < mLastFullUpdateTime(100) → full refresh.
+        EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must trigger on first real snapshot";
+        {
+            auto diff = containerManager.mConfigContainerDiffMap[configName];
+            ASSERT_NE(diff, nullptr);
+            EXPECT_TRUE(diff->mRefreshAllContainers) << "[v1.0.0] First real snapshot must be a full refresh";
+            EXPECT_EQ(diff->mAdded.size(), 2u)
+                << "[v1.0.0] Checkpoint containers must be re-confirmed by real snapshot";
+        }
+        containerManager.ApplyContainerDiffs();
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v1.0.0] Containers must still be present after first real snapshot apply";
+        // lastConfigContainerUpdateTime must now be 100 (real timestamp).
+        EXPECT_EQ(mDiscoveryOpts.GetLastContainerUpdateTime(), 100)
+            << "[v1.0.0] lastConfigContainerUpdateTime must advance to mLastFullUpdateTime(100)";
+
+        // ── Phase 4c: no new snapshot — must not re-trigger ───────────────────
+        // lastConfigContainerUpdateTime(100) == mLastFullUpdateTime(100) → false.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v1.0.0] CheckContainerDiffForAllConfig must not fire again without a new snapshot";
+
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sub-scenario B: v0.1.0 format (detail array with per-config associations)
+    // ─────────────────────────────────────────────────────────────────────────
+    {
+        const std::string configName = "ckpt_init_test_v010";
+
+        // Step 1: write the v0.1.0 checkpoint with config name associations.
+        // "params" must be a JSON *string* (double-serialised) as the parser expects.
+        auto makeParamsStr
+            = [](const std::string& id, const std::string& logPath, const std::string& upperDir) -> std::string {
+            Json::Value p;
+            p["ID"] = id;
+            p["Status"] = "running";
+            p["LogPath"] = logPath;
+            p["UpperDir"] = upperDir;
+            Json::StreamWriterBuilder wb;
+            wb["indentation"] = "";
+            return Json::writeString(wb, p);
+        };
+
+        Json::Value root;
+        root["version"] = "0.1.0";
+        Json::Value detail(Json::arrayValue);
+        for (const auto& id : {"ckpt_v010_c1", "ckpt_v010_c2"}) {
+            Json::Value item;
+            item["config_name"] = configName;
+            item["container_id"] = id;
+            item["params"] = makeParamsStr(id, std::string("/var/log/") + id + ".log", std::string("/overlay/") + id);
+            detail.append(item);
+        }
+        root["detail"] = detail;
+
+        Json::StreamWriterBuilder wb;
+        wb["indentation"] = "  ";
+        ASSERT_TRUE(OverwriteFile(checkpointPath, Json::writeString(wb, root)))
+            << "Failed to write v0.1.0 checkpoint file";
+
+        // Step 2: register the collection config (pipeline Init) *before* loading.
+        registerConfig(configName);
+
+        // Step 3: load the checkpoint. loadContainerInfoFromDetailFormat creates
+        // mLegacyCheckpointAdded entries for the registered config name.
+        // ApplyContainerDiffs() calls UpdateRawContainerInfo(..., basePathInCheckpoint)
+        // for each entry — all within the single LoadContainerInfo() call.
+        ContainerManager containerManager;
+        containerManager.LoadContainerInfo();
+
+        // Verify: containers must be visible in FileDiscoveryOptions immediately.
+        auto containerInfo = mDiscoveryOpts.GetContainerInfo();
+        ASSERT_NE(containerInfo, nullptr);
+        EXPECT_EQ(containerInfo->size(), 2u) << "[v0.1.0] Both checkpoint containers must be in FileDiscoveryOptions "
+                                                "after LoadContainerInfo()";
+
+        std::set<std::string> resultIds;
+        for (const auto& ci : *containerInfo) {
+            ASSERT_NE(ci.mRawContainerInfo, nullptr);
+            resultIds.insert(ci.mRawContainerInfo->mID);
+            EXPECT_EQ(ci.mRawContainerInfo->mStatus, "running");
+        }
+        EXPECT_EQ(resultIds.count("ckpt_v010_c1"), 1u) << "[v0.1.0] ckpt_v010_c1 must be loaded";
+        EXPECT_EQ(resultIds.count("ckpt_v010_c2"), 1u) << "[v0.1.0] ckpt_v010_c2 must be loaded";
+
+        // mContainerMap must also reflect the checkpoint containers.
+        {
+            ReadLock lock(containerManager.mContainerMapRWLock);
+            EXPECT_EQ(containerManager.mContainerMap.size(), 2u);
+        }
+
+        // Step 4: simulate the polling loop starting up.
+        containerManager.mIsRunning = true;
+
+        // ── Phase 4a: before any real snapshot (both timestamps still 0) ──────
+        // ApplyContainerDiffs() set lastConfigContainerUpdateTime = 1 (sentinel) via the
+        // unified sentinel check, even though loadContainerInfoFromDetailFormat never
+        // calls checkContainerDiffForOneConfig.
+        // checkContainerDiffForOneConfig: 1 < 0 → false; (0==0 && 0==0 && 1==0) → false
+        // → returns false.  No spurious re-trigger, containers unchanged.
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must NOT re-trigger before first snapshot";
+        EXPECT_TRUE(containerManager.mConfigContainerDiffMap.empty())
+            << "[v0.1.0] No new diff must be queued when sentinel prevents re-trigger";
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v0.1.0] Containers must survive the non-triggering CheckContainerDiffForAllConfig";
+
+        // ── Phase 4b: first real snapshot arrives ─────────────────────────────
+        containerManager.mLastFullUpdateTime = 100;
+
+        // lastConfigContainerUpdateTime(1) < mLastFullUpdateTime(100) → full refresh.
+        EXPECT_TRUE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must trigger on first real snapshot";
+        {
+            auto diff = containerManager.mConfigContainerDiffMap[configName];
+            ASSERT_NE(diff, nullptr);
+            EXPECT_TRUE(diff->mRefreshAllContainers) << "[v0.1.0] First real snapshot must be a full refresh";
+            EXPECT_EQ(diff->mAdded.size(), 2u)
+                << "[v0.1.0] Checkpoint containers must be re-confirmed by real snapshot";
+        }
+        containerManager.ApplyContainerDiffs();
+        EXPECT_EQ(mDiscoveryOpts.GetContainerInfo()->size(), 2u)
+            << "[v0.1.0] Containers must still be present after first real snapshot apply";
+        EXPECT_EQ(mDiscoveryOpts.GetLastContainerUpdateTime(), 100)
+            << "[v0.1.0] lastConfigContainerUpdateTime must advance to mLastFullUpdateTime(100)";
+
+        // ── Phase 4c: no new snapshot — must not re-trigger ───────────────────
+        EXPECT_FALSE(containerManager.CheckContainerDiffForAllConfig())
+            << "[v0.1.0] CheckContainerDiffForAllConfig must not fire again without a new snapshot";
+
+        FileServer::GetInstance()->RemoveFileDiscoveryConfig(configName);
+    }
+
+    // Remove the checkpoint file written during the test.
+    remove(checkpointPath.c_str());
+}
+
 void ContainerManagerUnittest::parseLabelFilters(const Json::Value& filtersJson, MatchCriteriaFilter& filter) const {
     // Clear existing filters to ensure clean state
     filter.mIncludeFields.mFieldsMap.clear();
@@ -1352,6 +2779,16 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersForm
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiffWithSnapshot)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestNullRawContainerInfoHandling)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T3)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestConcurrentContainerMapAccess_T1T2T3)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestSequentialContainerDiffAndApply)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestRefreshAllContainersFlag)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestClearContainerInfo)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestApplyContainerDiffsRefreshAllClearsStaleContainers)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoAfterConfigInit)
 
 } // namespace logtail
 

@@ -42,6 +42,7 @@ extern const std::string ACS_HEADER_PREFIX;
 extern const std::string X_LOG_KEYPROVIDER;
 extern const std::string X_LOG_APIVERSION;
 extern const std::string X_LOG_COMPRESSTYPE;
+extern const std::string X_LOG_PROJECT;
 extern const std::string X_LOG_BODYRAWSIZE;
 extern const std::string X_LOG_SIGNATUREMETHOD;
 extern const std::string X_LOG_MODE;

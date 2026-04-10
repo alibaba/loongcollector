@@ -14,7 +14,7 @@
 | - | - | - | - |
 | SourceKey | string | 是 | 原始字段名。 |
 | SourceFormat | string | 是 | 原始时间的格式。 |
-| SourceLocation | int | 否 | 原始时间的时区。参数值为空时，表示iLogtail所在主机或容器的时区。 |
+| SourceLocation | int | 否 | 原始时间的时区。参数值为空时，表示 LoongCollector 所在主机或容器的时区。 |
 | DestKey | string | 是 | 解析后的目标字段。 |
 | DestFormat | string | 是 | 解析后的时间格式。 |
 | DestLocation | int | 否 | 解析后的时区。参数值为空时，表示本机时区。 |

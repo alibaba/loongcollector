@@ -204,7 +204,7 @@ public:
                   const MultilineConfig& multilineConfig,
                   const FileTagConfig& tagConfig);
 
-    bool ReadLog(LogBuffer& logBuffer, const Event* event);
+    bool ReadLog(LogBuffer& logBuffer, const Event* event, bool isStaticFile = false);
     time_t GetLastUpdateTime() const // actually it's the time whenever ReadLogs is called
     {
         return mLastUpdateTime;
@@ -469,9 +469,10 @@ public:
     void ReportMetrics(uint64_t readSize);
 
 protected:
-    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true);
-    void ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
-    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true);
+    bool GetRawData(LogBuffer& logBuffer, int64_t fileSize, bool tryRollback = true, bool isStaticFile = false);
+    void
+    ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
+    void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
 
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);

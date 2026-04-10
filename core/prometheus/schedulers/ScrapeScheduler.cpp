@@ -133,6 +133,7 @@ bool ScrapeScheduler::ScheduleNext() {
             if ((duration <= mInterval && duration > 0) || mScrapeConfigPtr->UpdateAuthorization()) {
                 LOG_WARNING(sLogger, ("retry", GetId()));
                 this->ScheduleNext();
+                this->DelayExecTime(1);
                 return true;
             }
         }

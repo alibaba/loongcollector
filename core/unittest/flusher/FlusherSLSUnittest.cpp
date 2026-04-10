@@ -275,9 +275,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mEndpointMode);
     APSARA_TEST_EQUAL(EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap.end(),
                       EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap.find("test_region"));
-    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
-    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
-    APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mCandidateHostsInfo->GetMode());
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateDomainsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateDomainsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::ACCELERATE, flusher->mCandidateDomainsInfo->GetMode());
     SenderQueueManager::GetInstance()->Clear();
 
     // region remote endpoints not existed
@@ -302,9 +302,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
         = EnterpriseSLSClientManager::GetInstance()->mRegionCandidateEndpointsMap["test_region"].mRemoteEndpoints;
     APSARA_TEST_EQUAL(1U, endpoints.size());
     APSARA_TEST_EQUAL("test_region.log.aliyuncs.com", endpoints[0]);
-    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
-    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
-    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateDomainsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateDomainsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateDomainsInfo->GetMode());
     SenderQueueManager::GetInstance()->Clear();
 
     // region remote endpoints existed
@@ -329,9 +329,9 @@ void FlusherSLSUnittest::OnSuccessfulInit() {
     APSARA_TEST_EQUAL(2U, endpoints.size());
     APSARA_TEST_EQUAL("test_region.log.aliyuncs.com", endpoints[0]);
     APSARA_TEST_EQUAL("test_region-intranet.log.aliyuncs.com", endpoints[1]);
-    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateHostsInfo->GetProject());
-    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateHostsInfo->GetRegion());
-    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateHostsInfo->GetMode());
+    APSARA_TEST_EQUAL(flusher->mProject, flusher->mCandidateDomainsInfo->GetProject());
+    APSARA_TEST_EQUAL(flusher->mRegion, flusher->mCandidateDomainsInfo->GetRegion());
+    APSARA_TEST_EQUAL(EndpointMode::DEFAULT, flusher->mCandidateDomainsInfo->GetMode());
     SenderQueueManager::GetInstance()->Clear();
 #endif
 
@@ -900,18 +900,18 @@ void FlusherSLSUnittest::TestBuildRequest() {
     }
     {
         // no available host, initialized
-        flusher.mCandidateHostsInfo->SetInitialized();
+        flusher.mCandidateDomainsInfo->SetInitialized();
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL(nullptr, req);
         APSARA_TEST_TRUE(keepItem);
         APSARA_TEST_EQUAL(static_cast<uint32_t>(AppConfig::GetInstance()->GetSendRequestConcurrency()),
                           FlusherSLS::GetRegionConcurrencyLimiter(flusher.mRegion)->GetCurrentLimit());
     }
-    EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
-                                                                 EndpointMode::DEFAULT,
-                                                                 "test_project.test_region-b.log.aliyuncs.com",
-                                                                 chrono::milliseconds(100));
-    flusher.mCandidateHostsInfo->SelectBestHost();
+    EnterpriseSLSClientManager::GetInstance()->UpdateDomainLatency("test_project",
+                                                                   EndpointMode::DEFAULT,
+                                                                   "test_project.test_region-b.log.aliyuncs.com",
+                                                                   chrono::milliseconds(100));
+    flusher.mCandidateDomainsInfo->SelectBestDomain();
 #endif
     // log telemetry type
     {
@@ -1427,15 +1427,15 @@ void FlusherSLSUnittest::TestBuildRequest() {
         // region mode changed
         EnterpriseSLSClientManager::GetInstance()->CopyLocalRegionEndpointsAndHttpsInfoIfNotExisted("test_region",
                                                                                                     "test_region-b");
-        auto old = flusher.mCandidateHostsInfo.get();
+        auto old = flusher.mCandidateDomainsInfo.get();
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
-        APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
+        APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateDomainsInfo.get());
 
-        EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency("test_project",
-                                                                     EndpointMode::ACCELERATE,
-                                                                     "test_project." + kAccelerationDataEndpoint,
-                                                                     chrono::milliseconds(10));
-        flusher.mCandidateHostsInfo->SelectBestHost();
+        EnterpriseSLSClientManager::GetInstance()->UpdateDomainLatency("test_project",
+                                                                       EndpointMode::ACCELERATE,
+                                                                       "test_project." + kAccelerationDataEndpoint,
+                                                                       chrono::milliseconds(10));
+        flusher.mCandidateDomainsInfo->SelectBestDomain();
         APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project." + kAccelerationDataEndpoint, req->mHost);
     }
@@ -1508,13 +1508,13 @@ void FlusherSLSUnittest::TestBuildRequest() {
         endpoints.mMode = EndpointMode::CUSTOM;
         endpoints.mLocalEndpoints = {"custom.endpoint"};
 
-        auto old = flusher.mCandidateHostsInfo.get();
+        auto old = flusher.mCandidateDomainsInfo.get();
         APSARA_TEST_FALSE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
-        APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateHostsInfo.get());
+        APSARA_TEST_NOT_EQUAL(old, flusher.mCandidateDomainsInfo.get());
 
-        EnterpriseSLSClientManager::GetInstance()->UpdateHostLatency(
+        EnterpriseSLSClientManager::GetInstance()->UpdateDomainLatency(
             "test_project", EndpointMode::CUSTOM, "test_project.custom.endpoint", chrono::milliseconds(10));
-        flusher.mCandidateHostsInfo->SelectBestHost();
+        flusher.mCandidateDomainsInfo->SelectBestDomain();
         APSARA_TEST_TRUE(flusher.BuildRequest(&item, req, &keepItem, &errMsg));
         APSARA_TEST_EQUAL("test_project.custom.endpoint", req->mHost);
     }

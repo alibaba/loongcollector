@@ -109,19 +109,19 @@ private:
 
 #ifdef __ENTERPRISE__
     struct PointerHash {
-        std::size_t operator()(const std::shared_ptr<CandidateHostsInfo>& ptr) const {
-            return std::hash<CandidateHostsInfo*>()(ptr.get());
+        std::size_t operator()(const std::shared_ptr<CandidateDomainsInfo>& ptr) const {
+            return std::hash<CandidateDomainsInfo*>()(ptr.get());
         }
     };
 
     struct PointerEqual {
-        bool operator()(const std::shared_ptr<CandidateHostsInfo>& lhs,
-                        const std::shared_ptr<CandidateHostsInfo>& rhs) const {
+        bool operator()(const std::shared_ptr<CandidateDomainsInfo>& lhs,
+                        const std::shared_ptr<CandidateDomainsInfo>& rhs) const {
             return lhs.get() == rhs.get();
         }
     };
 
-    std::unordered_set<std::shared_ptr<CandidateHostsInfo>, PointerHash, PointerEqual> mCandidateHostsInfos;
+    std::unordered_set<std::shared_ptr<CandidateDomainsInfo>, PointerHash, PointerEqual> mCandidateDomainsInfos;
 #endif
 
     mutable std::mutex mBufferFileLock;
