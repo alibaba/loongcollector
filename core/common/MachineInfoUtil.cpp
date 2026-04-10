@@ -192,7 +192,9 @@ static bool IsIgnoredHostIdentityInterface(const char* ifname) {
 std::unordered_set<std::string> GetNicIpv4IPSet() {
     std::unordered_set<std::string> ipSet;
     struct ifaddrs* ifAddrStruct = nullptr;
-    getifaddrs(&ifAddrStruct);
+    if (getifaddrs(&ifAddrStruct) != 0) {
+        return ipToIfaces;
+    }
     for (struct ifaddrs* ifa = ifAddrStruct; ifa != nullptr; ifa = ifa->ifa_next) {
         if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
             continue;
