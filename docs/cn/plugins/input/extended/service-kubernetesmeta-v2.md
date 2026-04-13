@@ -161,6 +161,23 @@
 
 `CustomResources` 为数组，每一项对应一种 CR（**GVR + Kind**），由动态客户端监听；可选生成实体日志及 **Pod→CR**、**Namespace→CR** 链路。
 
+与内置资源相比，CR 在代码里走 **`crUnifiedCache`（dynamic informer + `unstructured`）**，内置走 **`k8sMetaCache`（typed informer）**；二者均实现 **`MetaCache`** 并共用 **`DeferredDeletionMetaStore`**，差异主要在客户端与启动时机。对比如下（**供开发与排障参考**）。
+
+### 内置缓存与 CR 缓存对比
+
+| 维度 | `k8sMetaCache`（内置资源） | `crUnifiedCache`（CustomResources） |
+|------|---------------------------|-------------------------------------|
+| **K8s 客户端** | `kubernetes.Clientset` | `dynamic.Interface`（`dynamic.NewForConfig`） |
+| **Informer** | `informers.SharedInformerFactory` + 各资源 Typed Informer | `dynamicinformer.DynamicSharedInformerFactory` + `ForResource(GVR).Informer()` |
+| **资源标识** | 内部 `resourceType` 常量 + `getFactoryInformer` 分支 | `schema.GroupVersionResource`（GVR），`resourceType` 多为配置中的 `EntityType` |
+| **对象形态** | 具体 API 类型（如 `*v1.Pod`），经 `preProcess` 等处理 | 统一 `*unstructured.Unstructured`，`objectToUnstructured` |
+| **REST / 内容协商** | 跟随 `MetaManager` 为 clientset 设置的配置（含 protobuf 等） | `restConfigForDynamicClient`：**Dynamic 使用 JSON**，与 clientset 的 protobuf 区分 |
+| **何时起 watch** | `init(clientset)` 内：`metaStore.Start()` + `watch()` | `init` 不占 clientset；`setRESTConfig` 后由 `EnsureWatchStarted()`（`sync.Once`）**延迟启动** |
+| **`watch` 方法** | 完整实现（factory、事件、`WaitForCacheSync` 等） | 空实现；逻辑在 `EnsureWatchStarted` 内 |
+| **索引** | `getIdxRules(resourceType)`（如 Host IP 等） | `generateCommonKey` 等 CR 侧规则 |
+| **体积优化** | 按资源类型的 `preProcess` | 如 `trimWorkflowObjectForCache`（裁剪 `spec`、`managedFields` 等） |
+| **与 `MetaManager.Init` 顺序 init** | 各内置 cache 的 `watch` 参与**顺序**初始化链 | `init` 轻量；避免 GVR / REST 未就绪即起 Informer |
+
 ### 子项字段
 
 | 字段 | 类型 | 说明 |
@@ -259,3 +276,15 @@ inputs:
   "__time__":"1723276913"
 }
 ```
+
+## CR 开发说明
+
+**实现上内置与 CR 的差异**见上文「**第三方自定义资源（CustomResources）**」中的 **「内置缓存与 CR 缓存对比」** 表；源码分别位于 `pkg/helper/k8smeta/k8s_meta_cache.go` 与 `k8s_meta_cr_unified_cache.go`。
+
+### 扩展 CR 时可关注的代码路径
+
+* **配置与注册**：`pkg/helper/k8smeta/k8s_meta_custom_resource.go`、`MetaManager.RegisterCustomResourceCollector`（`k8s_meta_manager.go`）。
+* **采集与投递**：`plugins/input/kubernetesmetav2/meta_collector.go` 中对 `EntityType` / 链路类型的处理。
+* **命名空间策略**：`k8s_meta_namespace_policy.go`（`ObjectMetaNamespaceForFilter` 对 `unstructured` 与内置类型均已覆盖）。
+
+新增 CR 时一般只需**配置层**声明 GVR 与链路字段；若需新索引、新裁剪或新事件语义，再在 **`crUnifiedCache`** 与 **`meta_collector`** 侧按现有模式扩展即可。

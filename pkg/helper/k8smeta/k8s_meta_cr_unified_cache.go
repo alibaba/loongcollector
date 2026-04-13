@@ -93,23 +93,19 @@ func (c *crUnifiedCache) setRESTConfig(cfg *rest.Config) error {
 }
 
 // EnsureWatchStarted starts the dynamic informer (once) when the dynamic client is ready.
-// Important: never enter sync.Once when dynamicClient is nil — Once would still count as done and block forever.
+// Important: never enter sync.Once when dynamicClient is nil.
 func (c *crUnifiedCache) EnsureWatchStarted() {
 	c.mu.Lock()
-	ready := c.dynamicClient != nil
+	dyn := c.dynamicClient
 	c.mu.Unlock()
-	if !ready {
+	if dyn == nil {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic client not ready, skip custom resource informer; ensure MetaManager.Init completed")
 		return
 	}
 	c.watchStartOnce.Do(func() {
 		c.mu.Lock()
-		if c.dynamicClient == nil {
-			c.mu.Unlock()
-			return
-		}
 		c.metaStore.Start()
-		c.factory = dynamicinformer.NewDynamicSharedInformerFactory(c.dynamicClient, time.Hour)
+		c.factory = dynamicinformer.NewDynamicSharedInformerFactory(dyn, time.Hour)
 		c.informer = c.factory.ForResource(c.gvr).Informer()
 		_, _ = c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {

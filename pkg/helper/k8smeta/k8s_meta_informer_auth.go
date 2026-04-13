@@ -5,7 +5,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Number of consecutive List/Watch errors treated as RBAC/auth failures before stopping this informer only.
+// Consecutive RBAC/auth (Forbidden/Unauthorized) watch errors before stopping this informer.
+// 3 balances a single flake vs. failing fast on permanent bad credentials/RBAC.
 const informerAuthFailureStopAfter = 3
 
 func isInformerAuthFailure(err error) bool {

@@ -159,6 +159,7 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	m.clientset = clientset
 	m.restConfig = config
 
+	// CR dynamic client: setRESTConfig errors are logged only; graceful degradation, built-in meta still starts.
 	m.cacheMu.Lock()
 	for _, c := range m.cacheMap {
 		if uc, ok := c.(*crUnifiedCache); ok {

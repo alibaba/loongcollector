@@ -119,6 +119,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 				m.authFailCount++
 				n := m.authFailCount
 				m.authFailMu.Unlock()
+				// Shut down this informer once RBAC/auth failures reach informerAuthFailureStopAfter.
 				if n >= informerAuthFailureStopAfter {
 					m.authGiveUpOnce.Do(func() {
 						logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping informer after repeated RBAC/auth errors (no further retries)", "resourceType", m.resourceType, "failures", n)
@@ -178,6 +179,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		if !cache.WaitForCacheSync(mergedStop, informer.HasSynced) {
 			select {
 			case <-mergedStop:
+				// Stop was signaled（stop or auth fail）: return so MetaManager's sequential cache init does not block other resource types.
 				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "informer cache sync aborted", "resourceType", m.resourceType)
 				return
 			default:

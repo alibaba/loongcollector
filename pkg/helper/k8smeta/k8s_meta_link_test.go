@@ -4,11 +4,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestGetPodNodeLink(t *testing.T) {
@@ -1646,4 +1649,195 @@ func generateMockPod(index string) *ObjectWrapper {
 			},
 		},
 	}
+}
+
+func testArgoWorkflowCR(name string) *unstructured.Unstructured {
+	u := &unstructured.Unstructured{}
+	u.SetAPIVersion("argoproj.io/v1alpha1")
+	u.SetKind("Workflow")
+	u.SetNamespace("default")
+	u.SetName(name)
+	return u
+}
+
+func testPodCRLinkRuntime(entityType string) *podCRLinkRuntime {
+	return &podCRLinkRuntime{
+		entityType:          entityType,
+		ownerKind:           "Workflow",
+		ownerAPIGroupSubstr: "argoproj.io",
+		podLabelKey:         "workflows.argoproj.io/workflow",
+	}
+}
+
+// TestGetPodCustomResourceLinkViaOwnerReference covers Pod→CR resolution when the Pod has a matching Workflow ownerReference.
+func TestGetPodCustomResourceLinkViaOwnerReference(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	crCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          testArgoWorkflowCR("my-wf"),
+		},
+	})
+
+	podW := generateMockPod("1")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "my-wf",
+		UID:        "uid-wf",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod1"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	require.Len(t, results, 1)
+	pcr, ok := results[0].Object.Raw.(*PodCustomResource)
+	require.True(t, ok)
+	assert.Equal(t, "my-wf", pcr.CR.GetName())
+	assert.Equal(t, "pod1", pcr.Pod.Name)
+	assert.Equal(t, linkType, results[0].Object.ResourceType)
+}
+
+// TestGetPodCustomResourceLinkViaLabelFallback covers Pod→CR when ownerReferences do not match but PodLabelKey is set.
+func TestGetPodCustomResourceLinkViaLabelFallback(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	crCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          testArgoWorkflowCR("wf-from-label"),
+		},
+	})
+
+	podW := generateMockPod("2")
+	podW.ResourceType = POD
+	pod := podW.Raw.(*corev1.Pod)
+	pod.OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "some-rs",
+	}}
+	pod.Labels = map[string]string{"workflows.argoproj.io/workflow": "wf-from-label"}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod2"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	require.Len(t, results, 1)
+	pcr := results[0].Object.Raw.(*PodCustomResource)
+	assert.Equal(t, "wf-from-label", pcr.CR.GetName())
+}
+
+// TestGetCustomResourceNamespaceLink covers Namespace→namespaced CR links using the namespace cache.
+func TestGetCustomResourceNamespaceLink(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := NamespaceLinkTypeForEntity(entityType)
+
+	nsCache := newK8sMetaCache(stopCh, NAMESPACE)
+	nsCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{
+		EventType: EventTypeAdd,
+		Object:    generateMockNamespace("default"),
+	})
+
+	wf := testArgoWorkflowCR("ns-linked-wf")
+	events := []*K8sMetaEvent{{
+		EventType: EventTypeAdd,
+		Object: &ObjectWrapper{
+			ResourceType: entityType,
+			Raw:          wf,
+		},
+	}}
+
+	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{NAMESPACE: nsCache})
+	results := lg.GenerateLinks(events, linkType)
+	require.Len(t, results, 1)
+	ncr, ok := results[0].Object.Raw.(*NamespaceCustomResource)
+	require.True(t, ok)
+	assert.Equal(t, "default", ncr.Namespace.Name)
+	assert.Equal(t, "ns-linked-wf", ncr.CR.GetName())
+	assert.Equal(t, linkType, results[0].Object.ResourceType)
+}
+
+// TestGetPodCustomResourceLinkMissingCRCache verifies GenerateLinks returns nil when the CR MetaCache entry is absent.
+func TestGetPodCustomResourceLinkMissingCRCache(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	podW := generateMockPod("3")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "ghost",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	// Intentionally omit entityType from metaCache (no CR cache registered).
+	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{POD: podCache})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod3"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	assert.Nil(t, results)
+}
+
+// TestGetPodCustomResourceLinkCRCacheHitMiss verifies no links when the CR is not present in cache (cache exists, Get empty).
+func TestGetPodCustomResourceLinkCRCacheHitMiss(t *testing.T) {
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	entityType := "argo.workflow"
+	linkType := PodLinkTypeForEntity(entityType)
+
+	podCache := newK8sMetaCache(stopCh, POD)
+	crCache := newCRUnifiedCache(stopCh, entityType, schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"})
+	// CR cache empty: Pod points to a workflow name not in cache.
+
+	podW := generateMockPod("4")
+	podW.ResourceType = POD
+	podW.Raw.(*corev1.Pod).OwnerReferences = []metav1.OwnerReference{{
+		APIVersion: "argoproj.io/v1alpha1",
+		Kind:       "Workflow",
+		Name:       "not-in-cache",
+	}}
+	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
+
+	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+		POD:        podCache,
+		entityType: crCache,
+	})
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+
+	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod4"]}}
+	results := lg.GenerateLinks(podList, linkType)
+	assert.Empty(t, results)
 }

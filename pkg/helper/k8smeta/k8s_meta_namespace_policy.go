@@ -58,6 +58,7 @@ func (p *namespacePolicy) allowsNamespace(ns string) bool {
 	if !p.hasWhite {
 		return !inB
 	}
+	// Allow if: (1) not in blacklist, OR (2) in whitelist
 	return !inB || inW
 }
 
