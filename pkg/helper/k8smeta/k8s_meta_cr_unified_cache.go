@@ -107,14 +107,14 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		c.metaStore.Start()
 		c.factory = dynamicinformer.NewDynamicSharedInformerFactory(dyn, time.Hour)
 		c.informer = c.factory.ForResource(c.gvr).Informer()
-		_, _ = c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				defer panicRecover()
 				u := objectToUnstructured(obj)
 				if u == nil {
 					return
 				}
-				trimWorkflowObjectForCache(u)
+				trimCRObjectForCache(u)
 				now := time.Now().Unix()
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeAdd,
@@ -133,7 +133,7 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 				if u == nil {
 					return
 				}
-				trimWorkflowObjectForCache(u)
+				trimCRObjectForCache(u)
 				now := time.Now().Unix()
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeUpdate,
@@ -152,7 +152,7 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 				if u == nil {
 					return
 				}
-				trimWorkflowObjectForCache(u)
+				trimCRObjectForCache(u)
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeDelete,
 					Object: &ObjectWrapper{
@@ -164,6 +164,9 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 				metaManager.deleteEventCount.Add(1)
 			},
 		})
+		if err != nil {
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to add dynamic informer event handler", err, "resourceType", c.resourceType, "gvr", c.gvr.String())
+		}
 		if err := c.informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
 			if err != nil {
 				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", c.resourceType, "watchError", err)
@@ -260,8 +263,8 @@ func objectToUnstructured(obj interface{}) *unstructured.Unstructured {
 	return nil
 }
 
-// trimWorkflowObjectForCache drops spec and managedFields to limit memory; metadata + status remain for linking and whitelisted export.
-func trimWorkflowObjectForCache(u *unstructured.Unstructured) {
+// trimCRObjectForCache drops spec and managedFields to limit memory; metadata + status remain for linking and whitelisted export.
+func trimCRObjectForCache(u *unstructured.Unstructured) {
 	if u == nil {
 		return
 	}

@@ -115,7 +115,14 @@ func (m *metaCollector) processNamespaceCustomResourceLink(data *k8smeta.ObjectW
 	if !ok {
 		return nil
 	}
-	entityType := strings.TrimSuffix(data.ResourceType, k8smeta.LINK_SPLIT_CHARACTER+k8smeta.NAMESPACE)
+	nsLinkSuffix := k8smeta.LINK_SPLIT_CHARACTER + k8smeta.NAMESPACE
+	if !strings.HasSuffix(data.ResourceType, nsLinkSuffix) {
+		return nil
+	}
+	entityType := strings.TrimSuffix(data.ResourceType, nsLinkSuffix)
+	if entityType == "" {
+		return nil
+	}
 	cfg := m.crConfigs[entityType]
 	if cfg.EntityType == "" || cfg.Namespace2EntityRelation == "" {
 		return nil
@@ -134,7 +141,14 @@ func (m *metaCollector) processPodCustomResourceLink(data *k8smeta.ObjectWrapper
 	if !ok {
 		return nil
 	}
-	entityType := strings.TrimPrefix(data.ResourceType, k8smeta.POD+k8smeta.LINK_SPLIT_CHARACTER)
+	podCRPrefix := k8smeta.POD + k8smeta.LINK_SPLIT_CHARACTER
+	if !strings.HasPrefix(data.ResourceType, podCRPrefix) {
+		return nil
+	}
+	entityType := strings.TrimPrefix(data.ResourceType, podCRPrefix)
+	if entityType == "" {
+		return nil
+	}
 	cfg := m.crConfigs[entityType]
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()

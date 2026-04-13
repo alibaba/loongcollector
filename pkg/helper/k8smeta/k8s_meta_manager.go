@@ -104,6 +104,7 @@ func (m *MetaManager) RegisterCustomResourceCollector(cfg CustomResourceCollecto
 		if m.restConfig != nil {
 			if uc, ok := m.cacheMap[cfg.EntityType].(*crUnifiedCache); ok {
 				if err := uc.setRESTConfig(m.restConfig); err != nil {
+					// Graceful degradation: dynamicClient unset; crUnifiedCache.EnsureWatchStarted skips when client is nil (this CR informer does not run).
 					logger.Error(context.Background(), K8sMetaUnifyErrorCode, "setRESTConfig for custom resource cache", err, "entityType", cfg.EntityType)
 				}
 			}
@@ -159,7 +160,8 @@ func (m *MetaManager) Init(configPath string) (err error) {
 	m.clientset = clientset
 	m.restConfig = config
 
-	// CR dynamic client: setRESTConfig errors are logged only; graceful degradation, built-in meta still starts.
+	// CR dynamic client: setRESTConfig errors are logged only (graceful degradation; built-in meta still starts).
+	// Failed caches keep dynamicClient nil; EnsureWatchStarted skips there (no CR informer until a successful setRESTConfig, e.g. after restart).
 	m.cacheMu.Lock()
 	for _, c := range m.cacheMap {
 		if uc, ok := c.(*crUnifiedCache); ok {
@@ -326,6 +328,13 @@ func GetMetaManagerMetrics() []map[string]string {
 
 func (m *MetaManager) runServer() {
 	go m.metadataHandler.K8sServerRun(m.stopCh)
+}
+
+func firstNonEmpty(val, def string) string {
+	if strings.TrimSpace(val) != "" {
+		return val
+	}
+	return def
 }
 
 func isEntity(resourceType string) bool {

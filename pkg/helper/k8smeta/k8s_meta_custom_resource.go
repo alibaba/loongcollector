@@ -105,10 +105,3 @@ func (c *CustomResourceCollectorConfig) Normalize() error {
 	}
 	return nil
 }
-
-func firstNonEmpty(val, def string) string {
-	if strings.TrimSpace(val) != "" {
-		return val
-	}
-	return def
-}

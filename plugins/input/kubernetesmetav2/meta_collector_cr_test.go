@@ -13,6 +13,19 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 )
 
+func testWorkflowUnstructured(t *testing.T) *unstructured.Unstructured {
+	t.Helper()
+	u := &unstructured.Unstructured{}
+	u.SetAPIVersion("argoproj.io/v1alpha1")
+	u.SetKind("Workflow")
+	u.SetNamespace("default")
+	u.SetName("wf-entity")
+	u.SetLabels(map[string]string{"keep": "yes", "drop": "no"})
+	u.SetAnnotations(map[string]string{"anno": "v"})
+	require.NoError(t, unstructured.SetNestedField(u.Object, "Running", "status", "phase"))
+	return u
+}
+
 func TestProcessPodCustomResourceLink(t *testing.T) {
 	entityType := "argo.workflow"
 	linkRT := k8smeta.POD + k8smeta.LINK_SPLIT_CHARACTER + entityType
@@ -107,6 +120,38 @@ func TestProcessNamespaceCustomResourceLinkSkipsWhenRelationUnset(t *testing.T) 
 	assert.Nil(t, m.processNamespaceCustomResourceLink(data, "update"))
 }
 
+func TestProcessNamespaceCustomResourceLinkRejectsNonNamespaceLinkResourceType(t *testing.T) {
+	m := &metaCollector{
+		crConfigs: map[string]k8smeta.CustomResourceCollectorConfig{
+			"argo.workflow": {EntityType: "argo.workflow", Namespace2EntityRelation: "contains"},
+		},
+	}
+	data := &k8smeta.ObjectWrapper{
+		ResourceType: "argo.workflow",
+		Raw: &k8smeta.NamespaceCustomResource{
+			Namespace: &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}},
+			CR:        &unstructured.Unstructured{},
+		},
+	}
+	assert.Nil(t, m.processNamespaceCustomResourceLink(data, "update"))
+}
+
+func TestProcessPodCustomResourceLinkRejectsNonPodCRResourceType(t *testing.T) {
+	m := &metaCollector{
+		crConfigs: map[string]k8smeta.CustomResourceCollectorConfig{
+			"argo.workflow": {EntityType: "argo.workflow", Entity2PodRelation: "contains"},
+		},
+	}
+	data := &k8smeta.ObjectWrapper{
+		ResourceType: "argo.workflow",
+		Raw: &k8smeta.PodCustomResource{
+			Pod: &corev1.Pod{},
+			CR:  &unstructured.Unstructured{},
+		},
+	}
+	assert.Nil(t, m.processPodCustomResourceLink(data, "update"))
+}
+
 func TestProcessPodCustomResourceLinkWrongRawType(t *testing.T) {
 	m := &metaCollector{
 		serviceK8sMeta: &ServiceK8sMeta{},
@@ -117,4 +162,129 @@ func TestProcessPodCustomResourceLinkWrongRawType(t *testing.T) {
 		Raw:          &corev1.Pod{},
 	}
 	assert.Nil(t, m.processPodCustomResourceLink(data, "update"))
+}
+
+func stringField(t *testing.T, log *models.Log, key string) string {
+	t.Helper()
+	v := log.Contents.Get(key)
+	require.NotNil(t, v)
+	s, ok := v.(string)
+	require.True(t, ok)
+	return s
+}
+
+func TestProcessCustomResourceEntityUnknownResourceType(t *testing.T) {
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{},
+	}
+	data := &k8smeta.ObjectWrapper{
+		ResourceType: "unknown.type",
+		Raw:          testWorkflowUnstructured(t),
+	}
+	assert.Nil(t, m.processCustomResourceEntity(data, "update"))
+}
+
+func TestProcessCustomResourceEntityWrongRawType(t *testing.T) {
+	entityType := "argo.workflow"
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs: map[string]k8smeta.CustomResourceCollectorConfig{
+			entityType: {EntityType: entityType, Kind: "Workflow"},
+		},
+	}
+	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: &corev1.Pod{}}
+	assert.Nil(t, m.processCustomResourceEntity(data, "update"))
+}
+
+func TestProcessCustomResourceEntityCoreFields(t *testing.T) {
+	entityType := "argo.workflow"
+	cfg := k8smeta.CustomResourceCollectorConfig{EntityType: entityType, Kind: "Workflow"}
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
+	}
+	data := &k8smeta.ObjectWrapper{
+		ResourceType:      entityType,
+		Raw:               testWorkflowUnstructured(t),
+		FirstObservedTime: 100,
+		LastObservedTime:  200,
+	}
+	events := m.processCustomResourceEntity(data, "update")
+	require.Len(t, events, 1)
+	log := events[0].(*models.Log)
+	assert.Equal(t, "Workflow", stringField(t, log, entityKindFieldName))
+	assert.Equal(t, "argoproj.io/v1alpha1", stringField(t, log, "api_version"))
+	assert.Equal(t, "default", stringField(t, log, "namespace"))
+	assert.False(t, log.Contents.Contains("labels"))
+	assert.False(t, log.Contents.Contains("annotations"))
+	assert.False(t, log.Contents.Contains("status"))
+}
+
+func TestProcessCustomResourceEntityEnableLabels(t *testing.T) {
+	entityType := "argo.workflow"
+	cfg := k8smeta.CustomResourceCollectorConfig{EntityType: entityType, Kind: "Workflow", EnableLabels: true}
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
+	}
+	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
+	events := m.processCustomResourceEntity(data, "update")
+	require.Len(t, events, 1)
+	log := events[0].(*models.Log)
+	labels := stringField(t, log, "labels")
+	assert.Contains(t, labels, "keep")
+	assert.Contains(t, labels, "drop")
+}
+
+func TestProcessCustomResourceEntityLabelAllowList(t *testing.T) {
+	entityType := "argo.workflow"
+	cfg := k8smeta.CustomResourceCollectorConfig{
+		EntityType: entityType, Kind: "Workflow",
+		LabelAllowList: []string{"keep"},
+	}
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
+	}
+	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
+	events := m.processCustomResourceEntity(data, "update")
+	require.Len(t, events, 1)
+	log := events[0].(*models.Log)
+	labels := stringField(t, log, "labels")
+	assert.Contains(t, labels, "keep")
+	assert.NotContains(t, labels, "drop")
+}
+
+func TestProcessCustomResourceEntityStatusPathAllowList(t *testing.T) {
+	entityType := "argo.workflow"
+	cfg := k8smeta.CustomResourceCollectorConfig{
+		EntityType: entityType, Kind: "Workflow",
+		StatusPathAllowList: []string{"status.phase"},
+	}
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
+	}
+	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
+	events := m.processCustomResourceEntity(data, "update")
+	require.Len(t, events, 1)
+	log := events[0].(*models.Log)
+	status := stringField(t, log, "status")
+	assert.Contains(t, status, "Running")
+}
+
+func TestProcessCustomResourceEntityEnableAnnotations(t *testing.T) {
+	entityType := "argo.workflow"
+	cfg := k8smeta.CustomResourceCollectorConfig{EntityType: entityType, Kind: "Workflow", EnableAnnotations: true}
+	m := &metaCollector{
+		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
+		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
+	}
+	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
+	events := m.processCustomResourceEntity(data, "update")
+	require.Len(t, events, 1)
+	log := events[0].(*models.Log)
+	annos := stringField(t, log, "annotations")
+	assert.Contains(t, annos, "anno")
 }

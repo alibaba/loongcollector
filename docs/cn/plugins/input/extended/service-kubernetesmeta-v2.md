@@ -175,7 +175,7 @@
 | **何时起 watch** | `init(clientset)` 内：`metaStore.Start()` + `watch()` | `init` 不占 clientset；`setRESTConfig` 后由 `EnsureWatchStarted()`（`sync.Once`）**延迟启动** |
 | **`watch` 方法** | 完整实现（factory、事件、`WaitForCacheSync` 等） | 空实现；逻辑在 `EnsureWatchStarted` 内 |
 | **索引** | `getIdxRules(resourceType)`（如 Host IP 等） | `generateCommonKey` 等 CR 侧规则 |
-| **体积优化** | 按资源类型的 `preProcess` | 如 `trimWorkflowObjectForCache`（裁剪 `spec`、`managedFields` 等） |
+| **体积优化** | 按资源类型的 `preProcess` | 如 `trimCRObjectForCache`（裁剪 `spec`、`managedFields` 等） |
 | **与 `MetaManager.Init` 顺序 init** | 各内置 cache 的 `watch` 参与**顺序**初始化链 | `init` 轻量；避免 GVR / REST 未就绪即起 Informer |
 
 ### 子项字段
