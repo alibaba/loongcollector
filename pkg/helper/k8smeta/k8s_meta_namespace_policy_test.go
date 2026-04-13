@@ -60,7 +60,7 @@ func TestObjectMetaNamespaceForFilter(t *testing.T) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "n1"},
 	}
-	ns, cluster = ObjectMetaNamespaceForFilter(NODE, node)
+	_, cluster = ObjectMetaNamespaceForFilter(NODE, node)
 	if !cluster {
 		t.Fatalf("node should be cluster scoped")
 	}

@@ -1662,7 +1662,8 @@ func testArgoWorkflowCR(name string) *unstructured.Unstructured {
 	return u
 }
 
-func testPodCRLinkRuntime(entityType string) *podCRLinkRuntime {
+func testPodCRLinkRuntime() *podCRLinkRuntime {
+	const entityType = "argo.workflow"
 	return &podCRLinkRuntime{
 		entityType:          entityType,
 		ownerKind:           "Workflow",
@@ -1702,7 +1703,7 @@ func TestGetPodCustomResourceLinkViaOwnerReference(t *testing.T) {
 		POD:        podCache,
 		entityType: crCache,
 	})
-	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
 
 	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod1"]}}
 	results := lg.GenerateLinks(podList, linkType)
@@ -1746,7 +1747,7 @@ func TestGetPodCustomResourceLinkViaLabelFallback(t *testing.T) {
 		POD:        podCache,
 		entityType: crCache,
 	})
-	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
 
 	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod2"]}}
 	results := lg.GenerateLinks(podList, linkType)
@@ -1806,7 +1807,7 @@ func TestGetPodCustomResourceLinkMissingCRCache(t *testing.T) {
 
 	// Intentionally omit entityType from metaCache (no CR cache registered).
 	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{POD: podCache})
-	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
 
 	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod3"]}}
 	results := lg.GenerateLinks(podList, linkType)
@@ -1837,7 +1838,7 @@ func TestGetPodCustomResourceLinkCRCacheHitMiss(t *testing.T) {
 		POD:        podCache,
 		entityType: crCache,
 	})
-	lg.registerPodCRLink(linkType, testPodCRLinkRuntime(entityType))
+	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
 
 	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod4"]}}
 	results := lg.GenerateLinks(podList, linkType)

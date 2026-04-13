@@ -30,7 +30,7 @@ type metaCollector struct {
 	entityLinkBuffer chan models.PipelineEvent
 
 	stopCh            chan struct{}
-	namespacePolicyID int
+	namespacePolicyID int // -1 when no namespace policy is registered
 	entityProcessor   map[string]ProcessFunc
 	crConfigs         map[string]k8smeta.CustomResourceCollectorConfig
 }
