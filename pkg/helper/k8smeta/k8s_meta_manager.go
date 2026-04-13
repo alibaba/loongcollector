@@ -40,9 +40,9 @@ type FlushCh struct {
 }
 
 type MetaManager struct {
-	clientset *kubernetes.Clientset
+	clientset  *kubernetes.Clientset
 	restConfig *rest.Config
-	stopCh    chan struct{}
+	stopCh     chan struct{}
 
 	ready atomic.Bool
 

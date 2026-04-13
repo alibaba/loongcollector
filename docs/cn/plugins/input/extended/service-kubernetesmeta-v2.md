@@ -14,7 +14,7 @@
 
 ## 配置参数
 
-**注意：** 本插件需要在 Kubernetes 集群中（或具备访问 apiserver 的配置）运行，且 ServiceAccount / kubeconfig 必须具备与开启能力及 **CustomResources** 相匹配的 **RBAC**（见下文「Kubernetes RBAC 权限」）。部署为单例时需配置环境变量 `DEPLOY_MODE=singleton`、`ENABLE_KUBERNETES_META=true`。
+**注意：** 本插件需要在 Kubernetes 集群中（或具备访问 apiserver 的配置）运行，且需要有访问Kubernetes API的权限。并且部署模式为单例模式，且配置环境变量 `DEPLOY_MODE=singleton`、`ENABLE_KUBERNETES_META=true`。
 
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
@@ -34,9 +34,9 @@
 | PersistentVolumeClaim | bool, false | 是否采集PersistentVolumeClaim元数据。 |
 | StorageClass | bool, false | 是否采集StorageClass元数据。 |
 | Ingress | bool, false | 是否采集Ingress元数据。 |
-| EnableLabels | bool, false | 是否采集**内置**Kubernetes 资源的标签（Labels）。**自定义资源（CustomResources）**是否导出标签由每条 `CustomResources.EnableLabels` 控制，不受本字段影响。 |
-| EnableAnnotations | bool, false | 是否采集**内置**资源的注解（Annotations）。自定义资源是否导出注解由每条 `CustomResources.EnableAnnotations` 控制。 |
-| NamespaceBlackList | []string，可选 | 全局命名空间过滤：名单内命名空间的对象**不进入 meta 缓存、不投递实体/链路事件**。`Node`、`PersistentVolume`、`StorageClass` 不按命名空间过滤。与 `NamespaceWhiteList` 同时配置时，命名空间允许条件为「未命中黑名单 **或** 在白名单中」（并集语义）；多条 Pipeline 各自注册的策略之间为 **OR**。 |
+| EnableLabels | bool, false | 是否采集**内置**Kubernetes 资源的标签（Labels）。 |
+| EnableAnnotations | bool, false | 是否采集**内置**资源的注解（Annotations）。 |
+| NamespaceBlackList | []string，可选 | 全局命名空间过滤：名单内命名空间的对象**不进入 meta 缓存、不投递实体/链路事件**。`Node`、`PersistentVolume`、`StorageClass` 不按命名空间过滤。与 `NamespaceWhiteList` 同时配置时，命名空间允许条件为「未命中黑名单 **或** 在白名单中」（并集语义）；|
 | NamespaceWhiteList | []string，可选 | 全局命名空间白名单，见上。均为空则不做命名空间限制。 |
 | CustomResources | []object，可选 | 第三方 CR（动态 Informer）采集与链路，见下文「**第三方自定义资源（CustomResources）**」与「**Kubernetes RBAC 权限**」。 |
 | Node2Pod | string, 无默认值（可选） | Node到Pod的关系名，不填则不生成关系。 |
@@ -82,7 +82,57 @@
 
 ### 内置资源
 
-与配置里打开的内置开关对应即可（如 `pods`、`namespaces`、`deployments` 等），按你集群现有 `ClusterRole` 规则维护。
+与配置里打开的内置开关对应即可（如 `pods`、`namespaces`、`deployments` 等）。权限请保持最小可用**`get`、`list`、`watch`** 权限，下面是示例。
+```yaml
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - nodes
+      - pods
+      - services
+      - persistentvolumeclaims
+      - persistentvolumes
+      - namespaces
+      - endpoints
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - cronjobs
+      - jobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - ingresses
+      - networkpolicies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+      - volumeattachments
+    verbs:
+      - get
+      - list
+      - watch
+```
 
 ### 自定义资源示例：Argo Workflow
 
@@ -141,22 +191,33 @@
 ### 配置示例：Argo Workflow
 
 ```yaml
+enable: true
+inputs:
+  - Type: service_kubernetes_meta
+    Interval: 600
+    Node: true
+    Pod: true
+    NamespaceBlackList:
+      - kube-system  
+    # NamespaceWhiteList:
+    #   - default
+    #   - production
+    # Third-party CRs: configure each GVR (and optional PodLink / Entity2PodRelation) under CustomResources.
     CustomResources:
-      - APIGroup: argoproj.io
-        APIVersion: v1alpha1
-        Resource: workflows
-        Kind: Workflow
-        # EntityType 必填：缓存键、__entity_type__、pod->{EntityType} 等
-        EntityType: argo.workflow
+      - APIGroup: argoproj.io     # API-Group
+        APIVersion: v1alpha1       # API version
+        Resource: workflows       # 资源类型
+        Kind: Workflow                 # kind信息
+        EntityType: argo.workflow    #实体类型
         CollectEntity: true
-        Entity2PodRelation: "contains"
-        Namespace2EntityRelation: "contains"
-        PodLink:
-          OwnerKind: Workflow
-          OwnerAPIGroupContains: argoproj.io
-          PodLabelKey: workflows.argoproj.io/workflow
-        EnableLabels: true
-        EnableAnnotations: true
+        Entity2PodRelation: "contains" 
+        Namespace2EntityRelation: "contains"     
+        PodLink:  # 和Pod的关联关系提取
+          OwnerKind: Workflow          # Pod OwnerReference  对应的资源Kind
+          OwnerAPIGroupContains: argoproj.io     # Pod OwnerReference 对应的 API-Group
+          PodLabelKey: workflows.argoproj.io/workflow  #  兜底逻辑，从label中提取关联关系
+        EnableLabels: true        # CR粒度配置是否上报标签
+        EnableAnnotations: true # CR粒度配置是否上报注释
 ```
 
 同时请确保 **RBAC** 已授予对 `argoproj.io` / `workflows` 的 `get、list、watch`（见上文「Kubernetes RBAC 权限」）。
