@@ -1651,6 +1651,8 @@ func generateMockPod(index string) *ObjectWrapper {
 	}
 }
 
+// Namespace policy is not tested here: CR link tests use handleAddOrUpdateEvent on the store only;
+// MetaObjectPassesNamespacePolicy runs on the global singleton with no registered policies (allow-all).
 func testArgoWorkflowCR(name string) *unstructured.Unstructured {
 	u := &unstructured.Unstructured{}
 	u.SetAPIVersion("argoproj.io/v1alpha1")
