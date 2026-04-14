@@ -1648,7 +1648,7 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
             mCache.clear();
         } else {
             moreData = (nbytes == BUFFER_SIZE);
-            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
                 if (!moreData && allowRollback) {
                     mCache.assign(stringBuffer, stringBufferLen);
                     return;
@@ -1798,7 +1798,7 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
             mCache.clear();
         } else {
             moreData = (readCharCount == BUFFER_SIZE);
-            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
+            if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
                 if (!moreData && allowRollback) {
                     mCache.assign(gbkBuffer, originReadCount);
                     return;
@@ -2019,7 +2019,7 @@ LogFileReader::RemoveLastIncompleteLog(char* buffer, int32_t size, int32_t& roll
     if (!allowRollback || size == 0) {
         return size;
     }
-    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::NO_SPLIT) {
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE) {
         return size;
     }
     int32_t endPs = 0; // the position of \n or \0

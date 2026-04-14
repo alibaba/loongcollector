@@ -966,9 +966,9 @@ std::string LogFileReaderNoSplitUnittest::gbkFile;
 std::string LogFileReaderNoSplitUnittest::utf8File;
 
 void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
-    { // NO_SPLIT, buffer big enough, force read: returns all data with \n preserved (not split by line)
+    { // WHOLE_FILE, buffer big enough, force read: returns all data with \n preserved (not split by line)
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
@@ -993,9 +993,9 @@ void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
         APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
         APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
     }
-    { // NO_SPLIT, buffer too small: forced split at buffer boundary, moreData=true
+    { // WHOLE_FILE, buffer too small: forced split at buffer boundary, moreData=true
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
@@ -1020,9 +1020,9 @@ void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
         APSARA_TEST_GT_FATAL(firstReadLen, 0UL);
         APSARA_TEST_LE_FATAL(firstReadLen, (size_t)LogFileReader::BUFFER_SIZE);
     }
-    { // NO_SPLIT, buffer too small, read all: combined data equals expected
+    { // WHOLE_FILE, buffer too small, read all: combined data equals expected
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
@@ -1063,9 +1063,9 @@ void LogFileReaderNoSplitUnittest::TestReadUTF8NoSplit() {
 }
 
 void LogFileReaderNoSplitUnittest::TestReadGBKNoSplit() {
-    { // NO_SPLIT, GBK, buffer big enough, force read: returns all data with \n preserved
+    { // WHOLE_FILE, GBK, buffer big enough, force read: returns all data with \n preserved
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
@@ -1091,9 +1091,9 @@ void LogFileReaderNoSplitUnittest::TestReadGBKNoSplit() {
         APSARA_TEST_TRUE_FATAL(result.find('\n') != std::string::npos);
         APSARA_TEST_STREQ_FATAL(expectedContent.get(), logBuffer.rawBuffer.data());
     }
-    { // NO_SPLIT, GBK, buffer too small: forced split, logTooLongSplitFlag triggered
+    { // WHOLE_FILE, GBK, buffer too small: forced split, logTooLongSplitFlag triggered
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
@@ -1117,9 +1117,9 @@ void LogFileReaderNoSplitUnittest::TestReadGBKNoSplit() {
         APSARA_TEST_TRUE_FATAL(moreData);
         APSARA_TEST_GT_FATAL(logBuffer.rawBuffer.size(), 0UL);
     }
-    { // NO_SPLIT, GBK, buffer too small, read all: combined data equals expected
+    { // WHOLE_FILE, GBK, buffer too small, read all: combined data equals expected
         Json::Value config;
-        config["Multiline.Mode"] = "no_split";
+        config["Multiline.Mode"] = "whole_file";
         MultilineOptions multilineOpts;
         multilineOpts.Init(config, ctx, "");
         FileReaderOptions readerOpts;
