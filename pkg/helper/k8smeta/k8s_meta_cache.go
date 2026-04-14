@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -493,26 +492,6 @@ func containsResource(resources []metav1.APIResource, name string) bool {
 	return false
 }
 
-// gvrDiscoveryAvailable checks discovery for a CRD/plural GVR before starting a dynamic informer
-// (same idea as getIngressInformer probing ServerResourcesForGroupVersion).
-func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersionResource) bool {
-	if d == nil {
-		return true
-	}
-	gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}.String()
-	resourceList, err := d.ServerResourcesForGroupVersion(gv)
-	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"custom resource API group/version not available on server; skipping informer", "gvr", gvr.String(), "error", err)
-		return false
-	}
-	if !containsResource(resourceList.APIResources, gvr.Resource) {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"custom resource plural not listed for group/version; skipping informer", "gvr", gvr.String())
-		return false
-	}
-	return true
-}
 func generateNodeKey(obj interface{}) ([]string, error) {
 	node, err := meta.Accessor(obj)
 	if err != nil {

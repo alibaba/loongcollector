@@ -267,13 +267,3 @@ inputs:
   "__time__":"1723276913"
 }
 ```
-
-## CR 开发说明
-
-**实现上内置与 CR 的差异**见上文「**第三方自定义资源（CustomResources）**」中的 **「内置缓存与 CR 缓存对比」** 表；源码分别位于 `pkg/helper/k8smeta/k8s_meta_cache.go` 与 `k8s_meta_cr_unified_cache.go`。
-
-### 扩展 CR 时可关注的代码路径
-
-* **配置与注册**：`pkg/helper/k8smeta/k8s_meta_custom_resource.go`、`MetaManager.RegisterCustomResourceCollector`（`k8s_meta_manager.go`）。
-* **采集与投递**：`plugins/input/kubernetesmetav2/meta_collector.go` 中对 `EntityType` / 链路类型的处理。
-新增 CR 时一般只需**配置层**声明 GVR 与链路字段；若需新索引、新裁剪或新事件语义，再在 **`crUnifiedCache`** 与 **`meta_collector`** 侧按现有模式扩展即可。

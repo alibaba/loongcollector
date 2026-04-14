@@ -316,25 +316,6 @@ func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEven
 	}
 }
 
-// purgeKey removes an object from the store and index if present (no SendFunc).
-func (m *DeferredDeletionMetaStore) purgeKey(key string) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	obj, ok := m.Items[key]
-	if !ok {
-		return
-	}
-	for _, idxKey := range m.getIdxKeys(obj) {
-		if item, ok := m.Index[idxKey]; ok {
-			item.Remove(key)
-			if len(item.Keys) == 0 {
-				delete(m.Index, idxKey)
-			}
-		}
-	}
-	delete(m.Items, key)
-}
-
 func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	timerEvent := event.Object.Raw.(*TimerEvent)
 	m.registerLock.RLock()

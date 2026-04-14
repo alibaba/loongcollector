@@ -101,6 +101,27 @@ func (c *crUnifiedCache) setRESTConfig(cfg *rest.Config) error {
 	return nil
 }
 
+// gvrDiscoveryAvailable checks discovery for a CRD/plural GVR before starting a dynamic informer
+// (same idea as getIngressInformer probing ServerResourcesForGroupVersion in k8s_meta_cache.go).
+func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersionResource) bool {
+	if d == nil {
+		return true
+	}
+	gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}.String()
+	resourceList, err := d.ServerResourcesForGroupVersion(gv)
+	if err != nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"custom resource API group/version not available on server; skipping informer", "gvr", gvr.String(), "error", err)
+		return false
+	}
+	if !containsResource(resourceList.APIResources, gvr.Resource) {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"custom resource plural not listed for group/version; skipping informer", "gvr", gvr.String())
+		return false
+	}
+	return true
+}
+
 // EnsureWatchStarted starts the dynamic informer (once) when the dynamic client is ready.
 // Important: never enter sync.Once when dynamicClient is nil.
 func (c *crUnifiedCache) EnsureWatchStarted() {
