@@ -14,6 +14,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
+#include "common/MachineInfoUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
@@ -238,27 +239,27 @@ void AppConfigUnittest::TestLoadStringParameter() {
 void AppConfigUnittest::TestIgnoredInterfacesConfig() {
     AppConfig* cfg = AppConfig::GetInstance();
     cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("docker0"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("docker0"));
 
     // JSON array is not applied as a gflag; flag value stays unchanged.
     Json::Value bad;
     bad[kIgnoredInterfacesKey] = Json::arrayValue;
     bad[kIgnoredInterfacesKey].append("x");
     cfg->ParseJsonToFlags(bad);
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
 
     Json::Value good;
     good[kIgnoredInterfacesKey] = "iface-a, iface-b";
     cfg->ParseJsonToFlags(good);
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("iface-a"));
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("iface-b"));
-    APSARA_TEST_FALSE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("iface-a"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("iface-b"));
+    APSARA_TEST_FALSE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
 
     Json::Value empty;
     empty[kIgnoredInterfacesKey] = "";
     cfg->ParseJsonToFlags(empty);
-    APSARA_TEST_FALSE(cfg->IsIgnoredInterfaces("kube-ipvs0"));
+    APSARA_TEST_FALSE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
 
     cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());
 }
@@ -269,14 +270,14 @@ void AppConfigUnittest::TestIgnoredInterfacesEnv() {
 
     SetEnv(kIgnoredInterfacesKey, "env-a, env-b");
     cfg->ParseEnvToFlags();
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("env-a"));
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("env-b"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("env-a"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("env-b"));
     UnsetEnv(kIgnoredInterfacesKey);
 
     SetEnv("LOONG_IGNORED_INTERFACES", "p,q");
     cfg->ParseEnvToFlags();
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("p"));
-    APSARA_TEST_TRUE(cfg->IsIgnoredInterfaces("q"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("p"));
+    APSARA_TEST_TRUE(IsIgnoredInterfaceForHostIdentity("q"));
     UnsetEnv("LOONG_IGNORED_INTERFACES");
 
     cfg->ParseJsonToFlags(MakeDefaultIgnoredInterfacesConfig());

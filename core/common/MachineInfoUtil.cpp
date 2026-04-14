@@ -16,12 +16,12 @@
 
 #include <cstring>
 
-#include "AppConfig.h"
 #include "EcsMetaData.h"
 #include "FileSystemUtil.h"
 #include "StringTools.h"
 #include "common/FileSystemUtil.h"
 #include "common/JsonUtil.h"
+#include "common/LogtailCommonFlags.h"
 #include "common/UUIDUtil.h"
 #include "logger/Logger.h"
 #if defined(__linux__)
@@ -72,6 +72,24 @@ bool GetRealOSVersion(POSVERSIONINFO osvi) {
 #endif
 
 namespace logtail {
+
+bool IsIgnoredInterfaceForHostIdentity(const char* ifname) {
+    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
+        return true;
+    }
+    const std::string& list = STRING_FLAG(ignored_interfaces);
+    if (list.empty()) {
+        return false;
+    }
+    std::string name(ifname);
+    for (auto& part : SplitString(list, ",")) {
+        std::string t = TrimString(part);
+        if (!t.empty() && t == name) {
+            return true;
+        }
+    }
+    return false;
+}
 
 std::string GetOsDetail() {
 #if defined(__linux__)
@@ -178,15 +196,6 @@ std::string GetHostName() {
 }
 
 #if defined(__linux__)
-// Returns true for virtual/dataplane interfaces whose IPs should not be used as host identity.
-// "lo" is always ignored; other names from STRING_FLAG(ignored_interfaces).
-static bool IsIgnoredHostIdentityInterface(const char* ifname) {
-    if (ifname == nullptr || *ifname == '\0' || strcmp(ifname, "lo") == 0) {
-        return true;
-    }
-    return AppConfig::GetInstance()->IsIgnoredInterfaces(ifname);
-}
-
 // Non-loopback AF_INET addresses from getifaddrs. Excludes lo/127.* and interfaces on the host-identity blacklist
 // (STRING_FLAG ignored_interfaces, plus implicit lo).
 std::unordered_set<std::string> GetNicIpv4IPSet() {
@@ -207,7 +216,7 @@ std::unordered_set<std::string> GetNicIpv4IPSet() {
         if (strcmp("lo", ifa->ifa_name) == 0 || ip.empty() || StartWith(ip, "127.")) {
             continue;
         }
-        if (IsIgnoredHostIdentityInterface(ifa->ifa_name)) {
+        if (IsIgnoredInterfaceForHostIdentity(ifa->ifa_name)) {
             continue;
         }
         ipSet.insert(std::move(ip));

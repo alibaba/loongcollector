@@ -640,19 +640,6 @@ AppConfig::AppConfig() {
     CheckPurageContainerMode();
 }
 
-bool AppConfig::IsIgnoredInterfaces(const std::string& ifname) const {
-    const string& list = STRING_FLAG(ignored_interfaces);
-    if (list.empty()) {
-        return false;
-    }
-    for (auto& part : SplitString(list, ",")) {
-        string t = TrimString(part);
-        if (!t.empty() && t == ifname) {
-            return true;
-        }
-    }
-    return false;
-}
 
 void AppConfig::MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson) {
     for (auto subkey : subConfJson.getMemberNames()) {

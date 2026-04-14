@@ -536,8 +536,6 @@ public:
 
     const std::string& GetBindInterface() const { return mBindInterface; }
 
-    bool IsIgnoredInterfaces(const std::string& ifname) const;
-
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class SenderUnittest;
     friend class ConfigUpdatorUnittest;

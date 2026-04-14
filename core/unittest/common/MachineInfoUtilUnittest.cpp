@@ -165,7 +165,7 @@ public:
         conf[kIgnoredInterfacesKey] = "kube-ipvs0,nodelocaldns,docker0";
         AppConfig::GetInstance()->ParseJsonToFlags(conf);
 
-        EXPECT_TRUE(AppConfig::GetInstance()->IsIgnoredInterfaces("kube-ipvs0"));
+        EXPECT_TRUE(IsIgnoredInterfaceForHostIdentity("kube-ipvs0"));
         (void)GetAnyAvailableIP();
     }
 };
