@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "review_rounds": [],
+  "commits": [
+    {
+      "commit_sha": "",
+      "patch_id": "",
+      "review_round": 1,
+      "reviewed_at": "",
+      "hunk_fingerprints": [],
+      "files": [],
+      "mapping": {
+        "method": "direct|patch-id|hunk-similarity|none",
+        "mapped_from_commit": "",
+        "confidence": 0.0
+      }
+    }
+  ]
+}

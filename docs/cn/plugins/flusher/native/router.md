@@ -36,7 +36,7 @@
 
 采集k8s集群中所有容器内`/home/test-log/`路径下的所有文件名匹配`*.log`规则的文件，并将default命名空间下的日志发送到sls的test_logstore_1，test命名空间下的日志发送到test_logstore_2。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_file

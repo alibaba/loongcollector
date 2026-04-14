@@ -17,9 +17,10 @@ package goprofile
 import (
 	"context"
 	"net"
-	"regexp"
 	"strconv"
 	"time"
+
+	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
@@ -43,10 +44,10 @@ type KubernetesConfig struct {
 	K8sPodRegex           string
 	K8sContainerRegex     string
 
-	includeContainerLabelRegex map[string]*regexp.Regexp
-	excludeContainerLabelRegex map[string]*regexp.Regexp
-	includeEnvRegex            map[string]*regexp.Regexp
-	excludeEnvRegex            map[string]*regexp.Regexp
+	includeContainerLabelRegex map[string]*regexp2.Regexp
+	excludeContainerLabelRegex map[string]*regexp2.Regexp
+	includeEnvRegex            map[string]*regexp2.Regexp
+	excludeEnvRegex            map[string]*regexp2.Regexp
 	k8sFilter                  *containercenter.K8SFilter
 
 	labelSet model.LabelSet

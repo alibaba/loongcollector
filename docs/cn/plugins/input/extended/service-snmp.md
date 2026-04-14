@@ -39,40 +39,74 @@
 
 ### 插件设置示例一
 
-在`config.json`中:
+* 采集配置（可与其它采集配置字段组合使用）
 
-```json
-  "inputs":[
-        {
-            "type":"service_snmp",
-            "detail":{
-            "Targets": ["127.0.0.1"],
-            "Port": "161",
-            "Community": "public",
-            "Timeout": 5,
-            "Version":2,
-            "Transport":"udp",
-            "MaxRepetitions":0,
-            "Oids":[
-            "1.3.6.1.2.1.1.3.0",
-            "1.3.6.1.2.1.1.4.0",
-            "1.3.6.1.2.1.1.7.0",
-            "1.3.6.1.2.1.1.1.0"
-            ]
-        }
-    }
-],
+```yaml
+enable: true
+inputs:
+  - Type: service_snmp
+    Targets:
+      - 127.0.0.1
+    Port: "161"
+    Community: public
+    Timeout: 5
+    Version: 2
+    Transport: udp
+    MaxRepetitions: 0
+    Oids:
+      - "1.3.6.1.2.1.1.3.0"
+      - "1.3.6.1.2.1.1.4.0"
+      - "1.3.6.1.2.1.1.7.0"
+      - "1.3.6.1.2.1.1.1.0"
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
 ```
 
 本示例采用了 SNMPV2 协议，团体名为`"public"`
 
-采集结果：
+采集结果（每行一条事件的 NDJSON 与下列 JSON 数组等价）：
 
-```text
-{"_target_":"127.0.0.1","_field_":"DISMAN-EXPRESSION-MIB::sysUpTimeInstance","_oid_":".1.3.6.1.2.1.1.3.0","_conversion_":"","_type_":"TimeTicks","_content_":"10522102","_targetindex_":"0"}
-{"_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysContact.0","_oid_":".1.3.6.1.2.1.1.4.0","_conversion_":"","_type_":"OctetString","_content_":"Me <me@example.org>","_targetindex_":"0"}
-{"_conversion_":"","_type_":"Integer","_content_":"72","_targetindex_":"0","_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysServices.0","_oid_":".1.3.6.1.2.1.1.7.0"}
-{"_targetindex_":"0","_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysDescr.0","_oid_":".1.3.6.1.2.1.1.1.0","_conversion_":"","_type_":"OctetString","_content_":"Linux 4be69bf59c36 5.10.25-linuxkit #1 SMP Tue Mar 23 09:27:39 UTC 2021 x86_64"}
+```json
+{
+    "_target_": "127.0.0.1",
+    "_field_": "DISMAN-EXPRESSION-MIB::sysUpTimeInstance",
+    "_oid_": ".1.3.6.1.2.1.1.3.0",
+    "_conversion_": "",
+    "_type_": "TimeTicks",
+    "_content_": "10522102",
+    "_targetindex_": "0"
+}
+
+{
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysContact.0",
+    "_oid_": ".1.3.6.1.2.1.1.4.0",
+    "_conversion_": "",
+    "_type_": "OctetString",
+    "_content_": "Me <me@example.org>",
+    "_targetindex_": "0"
+}
+
+{
+    "_conversion_": "",
+    "_type_": "Integer",
+    "_content_": "72",
+    "_targetindex_": "0",
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysServices.0",
+    "_oid_": ".1.3.6.1.2.1.1.7.0"
+}
+
+{
+    "_targetindex_": "0",
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysDescr.0",
+    "_oid_": ".1.3.6.1.2.1.1.1.0",
+    "_conversion_": "",
+    "_type_": "OctetString",
+    "_content_": "Linux 4be69bf59c36 5.10.25-linuxkit #1 SMP Tue Mar 23 09:27:39 UTC 2021 x86_64"
+}
 ```
 
 采集字段含义：
@@ -89,35 +123,33 @@
 
 ### 插件设置示例二
 
-在`config.json`中:
+* 采集配置（SNMPv3）
 
-```json
-  "inputs":[
-    {
-        "type":"service_snmp",
-        "detail":{
-        "Targets":["127.0.0.1"],
-        "Port": "161",
-        "Community": "public",
-        "Timeout": 5,
-        "Version":3,
-        "UserName":"snmpreadonly",
-        "AuthenticationProtocol":"SHA",
-        "AuthenticationPassphrase":"SecUREDpass",
-        "PrivacyProtocol":"AES",
-        "PrivacyPassphrase":"StRongPASS",
-        "Oids":[
-        "1.3.6.1.2.1.1.3.0",
-        "1.3.6.1.2.1.1.1.0"
-        ],
-        "Fields":[
-        "SNMPv2-MIB::sysContact.0",
-        "SNMPv2-MIB::sysServices.0"
-        ],
-        "Transport":"udp"
-        }
-    }
-],
+```yaml
+enable: true
+inputs:
+  - Type: service_snmp
+    Targets:
+      - 127.0.0.1
+    Port: "161"
+    Community: public
+    Timeout: 5
+    Version: 3
+    UserName: snmpreadonly
+    AuthenticationProtocol: SHA
+    AuthenticationPassphrase: SecUREDpass
+    PrivacyProtocol: AES
+    PrivacyPassphrase: StRongPASS
+    Oids:
+      - "1.3.6.1.2.1.1.3.0"
+      - "1.3.6.1.2.1.1.1.0"
+    Fields:
+      - "SNMPv2-MIB::sysContact.0"
+      - "SNMPv2-MIB::sysServices.0"
+    Transport: udp
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
 ```
 
 本示例采用了 SNMPV3 协议，查询的目标机器组仅有一台机器`"127.0.0.1"`即本机。用户名为`"snmpreadonly"`, 验证协议为`"SHA"`, 用户密码为`"SecUREDpass"`, 隐私协议为`"AES"`, 隐私密码为`"StRongPASS"`。
@@ -130,9 +162,44 @@ net-snmp-create-v3-user -ro -A SecUREDpass -a SHA -X StRongPASS -x AES snmpreado
 
 采集结果：
 
-```text
-{"_target_":"127.0.0.1","_field_":"DISMAN-EXPRESSION-MIB::sysUpTimeInstance","_oid_":".1.3.6.1.2.1.1.3.0","_conversion_":"","_type_":"TimeTicks","_content_":"10423593","_targetindex_":"0"}
-{"_type_":"OctetString","_content_":"Linux 4be69bf59c36 5.10.25-linuxkit #1 SMP Tue Mar 23 09:27:39 UTC 2021 x86_64","_targetindex_":"0","_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysDescr.0","_oid_":".1.3.6.1.2.1.1.1.0","_conversion_":""}
-{"_content_":"Me <me@example.org>","_targetindex_":"0","_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysContact.0","_oid_":".1.3.6.1.2.1.1.4.0","_conversion_":"","_type_":"OctetString"}
-{"_conversion_":"","_type_":"Integer","_content_":"72","_targetindex_":"0","_target_":"127.0.0.1","_field_":"SNMPv2-MIB::sysServices.0","_oid_":".1.3.6.1.2.1.1.7.0"}
+```json
+{
+    "_target_": "127.0.0.1",
+    "_field_": "DISMAN-EXPRESSION-MIB::sysUpTimeInstance",
+    "_oid_": ".1.3.6.1.2.1.1.3.0",
+    "_conversion_": "",
+    "_type_": "TimeTicks",
+    "_content_": "10423593",
+    "_targetindex_": "0"
+}
+
+{
+    "_type_": "OctetString",
+    "_content_": "Linux 4be69bf59c36 5.10.25-linuxkit #1 SMP Tue Mar 23 09:27:39 UTC 2021 x86_64",
+    "_targetindex_": "0",
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysDescr.0",
+    "_oid_": ".1.3.6.1.2.1.1.1.0",
+    "_conversion_": ""
+}
+
+{
+    "_content_": "Me <me@example.org>",
+    "_targetindex_": "0",
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysContact.0",
+    "_oid_": ".1.3.6.1.2.1.1.4.0",
+    "_conversion_": "",
+    "_type_": "OctetString"
+}
+
+{
+    "_conversion_": "",
+    "_type_": "Integer",
+    "_content_": "72",
+    "_targetindex_": "0",
+    "_target_": "127.0.0.1",
+    "_field_": "SNMPv2-MIB::sysServices.0",
+    "_oid_": ".1.3.6.1.2.1.1.7.0"
+}
 ```

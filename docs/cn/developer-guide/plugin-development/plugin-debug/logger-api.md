@@ -24,7 +24,7 @@ func Errorf(ctx context.Context, alarmType string, format string, params ...inte
 ```go
 func (p *plugin) func1() {
     logger.Debug(p.context.GetRuntimeContext(), "foo", "bar")
-    logger.Warningf(p.context.GetRuntimeContext()， "TEST_ALARM", "msg %s", "param ignored")
+    logger.Warningf(p.context.GetRuntimeContext(), "TEST_ALARM", "msg %s", "param ignored")
 }
 ```
 
@@ -35,7 +35,7 @@ func (p *plugin) func1() {
 
 ## 打印采集配置元信息
 
-对于 LoongCollector，具有多租户的特点，可以支持多份采集配置同时工作，LoongCollector 支持将采集配置的元信息打印到日志中，便于问题的排查与定位。
+对于 LoongCollector，具有多租户的特点，可以支持**多个采集配置**同时工作；LoongCollector 支持将采集配置的元信息打印到日志中，便于问题的排查与定位。
 
 ```go
 import (

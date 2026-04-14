@@ -18,10 +18,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dlclark/regexp2"
 
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper"
@@ -79,10 +80,10 @@ type Jmx struct {
 	DefaultJvmMetrics bool
 	Tags              map[string]string
 
-	includeContainerLabelRegex map[string]*regexp.Regexp
-	excludeContainerLabelRegex map[string]*regexp.Regexp
-	includeEnvRegex            map[string]*regexp.Regexp
-	excludeEnvRegex            map[string]*regexp.Regexp
+	includeContainerLabelRegex map[string]*regexp2.Regexp
+	excludeContainerLabelRegex map[string]*regexp2.Regexp
+	includeEnvRegex            map[string]*regexp2.Regexp
+	excludeEnvRegex            map[string]*regexp2.Regexp
 	k8sFilter                  *containercenter.K8SFilter
 	context                    pipeline.Context
 	stopChan                   chan struct{}

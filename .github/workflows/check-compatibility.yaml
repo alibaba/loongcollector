@@ -17,18 +17,24 @@ name: Check Compatibility
 on:
   pull_request:
     paths-ignore:
+      - "changes/**"
+      - "config_server/**"
       - "docs/**"
       - "example_config/**"
-      - "docker/**"
       - "k8s_template/**"
-      - "changes/**"
       - "licenses/**"
+      - "test/**"
       - "CHANGELOG.md"
   push:
     branches:
       - main
       - 1.*
       - 2.*
+      - 3.*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   CheckCompatibility:

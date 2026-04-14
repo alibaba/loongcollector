@@ -26,7 +26,7 @@
 |  ContainerFilters  |  object  |  否  |  空  |  容器过滤选项。多个选项之间为“且”的关系，详见表2。  |
 |  ExternalK8sLabelTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与Pod标签相关的tag。map中的key为Pod标签名，value为对应的tag名。 例如：在map中添加`app: k8s_label_app`，则若pod中包含`app=serviceA`的标签时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:k8s\_label\_app: serviceA；若不包含`app`标签，则会添加空字段\_\_tag\_\_:k8s\_label\_app:  |
 |  ExternalEnvTag  |  map[string]string  |  否  |  空  |  对于部署于K8s环境的容器，需要在日志中额外添加的与容器环境变量相关的tag。map中的key为环境变量名，value为对应的tag名。 例如：在map中添加`VERSION: env_version`，则当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag的形式添加到日志中，即添加字段\_\_tag\_\_:env\_version: v1.0.0；若不包含`VERSION`环境变量，则会添加空字段\_\_tag\_\_:env\_version:  |
-|  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志时，将当前读取缓存中的内容作为一条日志输出。  |
+|  FlushTimeoutSecs  |  uint  |  否  |  5  |  当文件超过指定时间未出现新的完整日志行时，将当前读取缓存中的内容作为**一条数据**输出。  |
 |  AllowingIncludedByMultiConfigs  |  bool  |  否  |  false  |  是否允许当前配置采集其它配置已匹配的容器的标准输出日志。  |
 |  Tags | map[string]string | 否 | 空 | 重命名或删除tag。map中的key为原tag名，value为新tag名。若value为空，则删除原tag。若value为`__default__`，则使用默认值。支持配置的Tag名和默认值参照后文的表3。  |
 
@@ -101,9 +101,9 @@ ctr -n k8s.io containers info
                 "NGINX_SERVICE_PORT=80",
 ```
 
-2\. 创建iLogtail采集配置。
+2\. 创建 LoongCollector 采集配置。
 
-iLogtail采集配置示例如下所示。
+LoongCollector 采集配置示例如下所示。
 
 ```yaml
 inputs:
@@ -131,9 +131,9 @@ inputs:
                 "io.kubernetes.container.name": "nginx",
 ```
 
-2\. 创建Logtail采集配置。
+2\. 创建LoongCollector 采集配置。
 
-Logtail采集配置示例如下所示。
+LoongCollector 采集配置示例如下所示。
 
 ```yaml
 inputs:
@@ -168,7 +168,7 @@ Containers:
     Container ID:...
 ```
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
 inputs:
@@ -195,7 +195,7 @@ Labels:       app=nginx
               ...
 ```
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
 inputs:
@@ -209,7 +209,7 @@ inputs:
           env: "^(test.*)$"
 ```
 
-### 示例5：多行日志的iLogtail采集配置 <a href="#title-asn-vuf-17z" id="title-asn-vuf-17z"></a>
+### 示例5：多行日志的采集配置 <a href="#title-asn-vuf-17z" id="title-asn-vuf-17z"></a>
 
 采集输出在标准错误流的Java异常堆栈（多行日志）。
 
@@ -228,7 +228,7 @@ at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterCha
 
 &#x20;   正则：`\d+-\d+-\d+.*`
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
 inputs:

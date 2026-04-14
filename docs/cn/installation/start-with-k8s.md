@@ -6,6 +6,10 @@
 
 具备访问Kubernetes集群的[kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 
+## 镜像与版本
+
+DaemonSet 中的镜像 tag **请与 [GitHub — alibaba/loongcollector Releases](https://github.com/alibaba/loongcollector/releases/latest) 当前版本一致**（Release 正文会列出 **`ghcr.io/alibaba/loongcollector:<tag>`** 与 **阿里云镜像 `.../loongcollector:<tag>`**）。**阿里云镜像仅保证版本号 tag**（如 `3.3.2`），**不要**对阿里云地址使用 **`:latest`**；需要 **`latest`** 时请使用 **GHCR**。本文内嵌 YAML 若写死 tag（例如 `3.3.2`），仅为与撰写时最新 release 对齐的示例，长期维护时仍应以 Releases 页面为准。
+
 ## 采集Kubernetes容器日志
 
 1. 创建部署 LoongCollector 的命名空间
@@ -154,7 +158,7 @@
                       key: access_key
                       optional: true
               image: >-
-                sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:0.2.0
+                sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector:3.3.2
               imagePullPolicy: IfNotPresent
               resources:
                 limits:

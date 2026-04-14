@@ -86,8 +86,6 @@ flushers:
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"4","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"5","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
 2023-03-13 20:42:04 {"content":"{\"a\":{\"b\":{}}}","Index":"6","instance_id_name":"id_xxx","instance_tag_prefix_tag_key":"tag_val","__time__":"1678711324"}
-}
-
 ```
 
 ### json 模式

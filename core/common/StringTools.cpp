@@ -99,6 +99,22 @@ std::string ToString(const std::vector<std::filesystem::path>& vec) {
     return ret;
 }
 
+std::string
+ToString(const std::map<std::string, std::string>& map, const std::string& kvDelim, const std::string& pairDelim) {
+    if (map.empty()) {
+        return "";
+    }
+    std::string ret;
+    for (const auto& kv : map) {
+        ret += kv.first + kvDelim + kv.second + pairDelim;
+    }
+    // Remove trailing pairDelim
+    if (!ret.empty() && ret.size() >= pairDelim.size()) {
+        ret.erase(ret.size() - pairDelim.size());
+    }
+    return ret;
+}
+
 std::vector<std::string> SplitString(const std::string& str, const std::string& delim) {
     std::vector<std::string> tokens;
     boost::split(tokens, str, boost::is_any_of(delim));

@@ -9,6 +9,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575
 	github.com/containerd/containerd v1.6.8
+	github.com/dlclark/regexp2 v1.11.5
 	github.com/docker/docker v28.1.1+incompatible
 	github.com/go-kit/kit v0.12.0
 	github.com/gofrs/uuid v4.2.0+incompatible

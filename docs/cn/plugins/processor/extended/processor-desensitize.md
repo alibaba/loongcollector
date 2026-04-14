@@ -31,7 +31,7 @@
 * 输入
   
 ```bash
-echo "[{'account':'1812213231432969','password':'04a23f38'}, {account':'1812213685634','password':'123a'}]" >> /home/test-ilogtail/test-log/processor-desensitize.log
+echo "[{'account':'1812213231432969','password':'04a23f38'}, {account':'1812213685634','password':'123a'}]" >> /home/test-loongcollector/test-log/processor-desensitize.log
 ```
 
 * 采集配置1
@@ -57,7 +57,7 @@ flushers:
 
 ```json
 {
-  "content":"********",
+  "content": "********"
 }
 ```
 
@@ -86,7 +86,7 @@ flushers:
 
 ```json
 {
-  "content":"[{'account':'1812213231432969','password':'********'}, {'account':'1812213685634','password':'********'}]",
+  "content": "[{'account':'1812213231432969','password':'********'}, {'account':'1812213685634','password':'********'}]"
 }
 ```
 
@@ -115,6 +115,6 @@ flushers:
 
 ```json
 {
-  "content":"[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]",
+  "content": "[{'account':'1812213231432969','password':'9c525f463ba1c89d6badcd78b2b7bd79'}, {'account':'1812213685634','password':'1552c03e78d38d5005d4ce7b8018addf'}]"
 }
 ```

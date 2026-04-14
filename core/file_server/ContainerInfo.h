@@ -18,6 +18,7 @@
 
 #include <cstdint>
 
+#include <atomic>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -66,9 +67,45 @@ struct RawContainerInfo {
     // 容器标签信息
     std::unordered_map<std::string, std::string> mContainerLabels;
 
-    bool mStopped = false;
+    std::atomic<bool> mStopped{false};
 
     std::string mStatus;
+
+    // Custom copy constructor to handle std::atomic<bool>
+    RawContainerInfo() = default;
+
+    RawContainerInfo(const RawContainerInfo& other)
+        : mID(other.mID),
+          mName(other.mName),
+          mLogPath(other.mLogPath),
+          mUpperDir(other.mUpperDir),
+          mMounts(other.mMounts),
+          mMetadatas(other.mMetadatas),
+          mCustomMetadatas(other.mCustomMetadatas),
+          mK8sInfo(other.mK8sInfo),
+          mEnv(other.mEnv),
+          mContainerLabels(other.mContainerLabels),
+          mStopped(other.mStopped.load()),
+          mStatus(other.mStatus) {}
+
+    // Custom copy assignment operator
+    RawContainerInfo& operator=(const RawContainerInfo& other) {
+        if (this != &other) {
+            mID = other.mID;
+            mName = other.mName;
+            mLogPath = other.mLogPath;
+            mUpperDir = other.mUpperDir;
+            mMounts = other.mMounts;
+            mMetadatas = other.mMetadatas;
+            mCustomMetadatas = other.mCustomMetadatas;
+            mK8sInfo = other.mK8sInfo;
+            mEnv = other.mEnv;
+            mContainerLabels = other.mContainerLabels;
+            mStopped.store(other.mStopped.load());
+            mStatus = other.mStatus;
+        }
+        return *this;
+    }
 
     bool operator==(const RawContainerInfo& rhs) const {
         if (mID != rhs.mID) {

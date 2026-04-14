@@ -181,6 +181,7 @@ flushers:
     "content": "{\"UNAME\":\"\",\"GID\":\"\",\"PAID\":\"\",\"UUID\":\"\",\"STARTTIME\":\"\",\"ENDTIME\":\"\",\"UID\":\"2154212790\",\"page_num\":1,\"page_size\":10}",
     "__time__": "1680353730"
 }
+
 {
     "__tag__:__path__": "/home/test_log/string_replace.log",
     "content": "啊啊啊",

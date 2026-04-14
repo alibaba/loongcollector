@@ -19,12 +19,19 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'docs/**'
-      - 'example_config/**'
-      - 'k8s_template/**'
-      - 'changes/**'
-      - 'licenses/**'
-      - 'CHANGELOG.md'
+      - "changes/**"
+      - "config_server/**"
+      - "docs/**"
+      - "example_config/**"
+      - "k8s_template/**"
+      - "licenses/**"
+      - "test/**"
+      - "tools/**"
+      - "CHANGELOG.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # 第一步：构建不同架构的安装包
@@ -90,6 +97,16 @@ jobs:
       contents: write
       packages: write
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo -E apt-get -qq autoremove --purge
+          sudo -E apt-get -qq clean
+          df -hT $PWD
+
       - name: Check out code
         uses: actions/checkout@v4
         with:

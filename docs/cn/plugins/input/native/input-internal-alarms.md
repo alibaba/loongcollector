@@ -24,7 +24,7 @@
 
 采集LoongCollector所有自监控告警，并将采集结果写到本地文件。
 
-``` yaml
+```yaml
 enable: true
 inputs:
   - Type: input_internal_alarms

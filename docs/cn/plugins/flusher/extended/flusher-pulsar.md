@@ -19,12 +19,12 @@
 | Type                                  | string   | 是    | 插件类型                                                                                                       |
 | Url                                   | string   | 是    | Pulsar url,多地址用逗号分隔，可以参考本文中的用例配置                                                                           |
 | Topic                                 | string   | 是    | Pulsar Topic,支持动态topic, 例如: `test_%{contents.appname}`                                                     |
-| Name                                  | string   | 否    | producer名称，默认ilogtail                                                                                      |
-| Convert                               | Struct   | 否    | ilogtail数据转换协议配置                                                                                           |
-| Convert.Protocol                      | string   | 否    | ilogtail数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding                      | string   | 否    | ilogtail flusher数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
+| Name                                  | string   | 否    | producer 名称，默认 `ilogtail`（LoongCollector 历史命名）                                                                                      |
+| Convert                               | Struct   | 否    | LoongCollector 数据转换协议配置                                                                                           |
+| Convert.Protocol                      | string   | 否    | LoongCollector 数据转换协议，kafka flusher 可选值：`custom_single`,`custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding                      | string   | 否    | LoongCollector Flusher 数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                             |
 | Convert.TagFieldsRename               | Map      | 否    | 对日志中tags中的json字段重命名                                                                                        |
-| Convert.ProtocolFieldsRename          | Map      | 否    | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
+| Convert.ProtocolFieldsRename          | Map      | 否    | LoongCollector 日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                                      |
 | EnableTLS                             | bool  | 否    | 是否启用TLS安全连接，对应采用TLS和Athenz两种认证模式都需要设置为true，默认值：`false`                                                     |
 | TLSTrustCertsFilePath                 | string   | 否    | TLS CA根证书文件路径，对应采用TLS和Athenz认证时需要指定                                                                        |
 | Authentication                        | Struct   | 否    | Pulsar连接访问认证配置                                                                                             |
@@ -55,7 +55,7 @@
 | BatchingMaxMessages                   | int      | 否    | 批量提交最大消息数，默认值：`1000`                                                                                       |
 | MaxCacheProducers                     | int      | 否    | 动态topic情况下最大Producer数量 ，默认最大数量：8,使用动态topic的使用可以根据自己的情况调整。                                                  |
 | PartitionKeys                         | String数组 | 否    | 指定消息分区分发的key。                                                                                              |
-| ClientID                              | string   | 否    | 写入Pulsar的Client ID，默认取值：`iLogtail`。                                                                        |
+| ClientID                              | string   | 否    | 写入 Pulsar 的 Client ID，默认取值：`iLogtail`（LoongCollector Go 插件模块历史命名）。                                                                        |
 
 ## 样例
 
@@ -75,13 +75,13 @@ flushers:
 
 ## 进阶配置
 
-以下面的一段日志为例，后来将展开介绍ilogtail pulsar flusher的一些高阶配置
+以下面的一段日志为例，后文将展开介绍 `flusher_pulsar` 的一些高阶配置
 
 ```plain
 2022-07-22 10:19:23.684 ERROR [springboot-docker] [http-nio-8080-exec-10] com.benchmark.springboot.controller.LogController : error log
 ```
 
-以上面这行日志为例 , 我们通`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段：
+以上面这行日志为例，通过 LoongCollector 的 `processor_regex` 插件，将上面的日志提取为若干关键字段：
 
 * time
 * loglevel
@@ -121,13 +121,13 @@ flushers:
 Topic: test_%{content.application}
 ```
 
-最后`ilogtail`就自动将日志推送到`test_springboot-docker`这个`topic`中。
+最后 LoongCollector 会自动将日志推送到 `test_springboot-docker` 这个 `topic` 中。
 
 `topic`动态表达式规则：
 
 * `%{content.fieldname}`。`content`代表从`contents`中取指定字段值
 * `%{tag.fieldname}`,`tag`表示从`tags`中取指定字段值，例如：`%{tag.k8s.namespace.name}`
-* `${env_name}`, 读取系统变量绑定到动态`topic`上，`ilogtail 1.5.0`开始支持。可以参考`flusher-kafka-v2`中的使用。
+* `${env_name}`，读取系统变量绑定到动态 `topic` 上，自 **1.5.0** 起支持（同仓历史版本号，旧文档常写作 iLogtail）。可参考 `flusher-kafka-v2` 中的用法。
 * 其它方式暂不支持
 
 ### TagFieldsRename
@@ -151,7 +151,7 @@ flushers:
 
 ### ProtocolFieldsRename
 
-对`ilogtail`协议字段重命名，在`ilogtail`的数据转换协议中，
+对 LoongCollector 数据协议字段重命名；在数据转换协议中，
 最外层三个字段`contents`,`tags`和`time`属于协议字段。`ProtocolFieldsRename`只能对
 `contents`,`tags`和`time`这个三个字段进行重命名。
 例如在使用`Elasticsearch`你可能想直接将`time`重命名为`@timestamp`，则配置参考如下：
@@ -175,7 +175,7 @@ flushers:
 
 ### 指定分区分发
 
-`ilogtail flusher pulsar`使用的官方`SDK`只支持`hash`方式分区投递，通过`HashingScheme`来选择不同的`hash`算法。
+`flusher_pulsar` 使用的官方 `SDK` 只支持 `hash` 方式分区投递，通过 `HashingScheme` 来选择不同的 `hash` 算法。
 分发是可以指定`PartitionKeys`，`PartitionKeys`的中配置的字段名只能是`contents`中的字段属性。
 
 配置用例：
@@ -199,7 +199,7 @@ flushers:
 
 ### 数据平铺
 
-`ilogtail 1.8.0`新增数据平铺协议`custom_single_flatten`，`contents`、`tags`和`time`三个`convert`层的协议字段中数据做一级打平。
+自 **1.8.0** 起（同仓历史版本号，旧文档常写作 iLogtail）新增数据平铺协议 `custom_single_flatten`，对 `contents`、`tags` 和 `time` 三个 `convert` 层协议字段中的数据做一级打平。
 当前`convert`协议在单条数据处理仅支持`json`编码，因此`custom_single_flatten`需要配合`json`编码一起使用。
 
 配置用例：

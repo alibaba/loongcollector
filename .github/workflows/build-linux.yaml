@@ -17,11 +17,11 @@ name: Build Linux
 on:
   pull_request:
     paths-ignore:
+      - "changes/**"
+      - "config_server/**"
       - "docs/**"
       - "example_config/**"
-      - "docker/**"
       - "k8s_template/**"
-      - "changes/**"
       - "licenses/**"
       - "CHANGELOG.md"
   push:
@@ -29,6 +29,11 @@ on:
       - main
       - 1.*
       - 2.*
+      - 3.*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   BuildCoreUT:

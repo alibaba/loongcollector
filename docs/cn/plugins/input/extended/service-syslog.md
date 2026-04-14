@@ -2,7 +2,7 @@
 
 ## 简介
 
-`service_syslog` 插件通过Logtail插件对指定的地址和端口进行监听后，Logtail开始采集数据，包括通过rsyslog采集的系统日志、 Nginx转发的访问日志或错误日志，以及通过syslog客户端转发的日志。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/syslog/syslog.go)
+`service_syslog` 插件在指定 **地址与端口** 上监听；LoongCollector 根据采集配置拉起该插件后，即可接收经 rsyslog 转发的系统日志、Nginx 转发的访问/错误日志，以及 syslog 客户端上报的日志。[源代码](https://github.com/alibaba/loongcollector/blob/main/plugins/input/syslog/syslog.go)
 
 ## 版本
 
@@ -17,7 +17,7 @@
 | 参数 | 类型，默认值 | 说明 |
 | - | - | - |
 | Type | string，无默认值（必填） | 插件类型，固定为`service_syslog`。 |
-| Address | string，`tcp://127.0.0.1:9999` | 指定Logtail插件监听的协议、地址和端口，Logtail插件会根据Logtail采集配置进行监听并获取日志数据。格式为`[tcp/udp]://[ip]:[port]`。注意，Logtail插件配置中设置的监听协议、地址和端口号必须与rsyslog配置文件设置的转发规则相同。如果安装Logtail的服务器有多个IP地址可接收日志，可以将地址配置为0.0.0.0，表示监听服务器的所有IP地址。 |
+| Address | string，`tcp://127.0.0.1:9999` | 指定本插件在 LoongCollector 进程内监听的 **协议、地址与端口**，格式为 `[tcp/udp]://[ip]:[port]`。**此处**与 rsyslog 等上游的转发目标必须一致。若运行 LoongCollector 的节点有多个可达 IP，可将地址设为 `0.0.0.0`，表示在所有网卡上监听。 |
 | MaxConnections | Integer，`100` | 最大链接数，仅使用于TCP。|
 | TimeoutSeconds | Integer，`0` | 在关闭远程连接之前的不活动秒数。|
 | MaxMessageSize | Integer，`64 * 1024` | 通过传输协议接收的信息的最大字节数。|

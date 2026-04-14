@@ -179,17 +179,18 @@ curl --location --request POST 'http://127.0.0.1:12345?QueryKey=queryValue' --he
 
 * 输出
 
-```plain
+```text
 [Event] event 1, metadata map[_header_prefix_HeaderKey:headerValue _param_prefix_QueryKey:queryValue], tags map[__hostname__:579ce1e01dea]
+```
 
+```json
 {
-    "eventType":"byteArray",
-    "name":"",
-    "timestamp":0,
-    "observedTimestamp":0,
-    "tags":{
-    },
-    "byteArray":"test_measurement,host=server01,region=cn value=0.5"
+    "eventType": "byteArray",
+    "name": "",
+    "timestamp": 0,
+    "observedTimestamp": 0,
+    "tags": {},
+    "byteArray": "test_measurement,host=server01,region=cn value=0.5"
 }
 ```
 

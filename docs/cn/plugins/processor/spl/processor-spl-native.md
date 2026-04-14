@@ -23,7 +23,7 @@
 
 ## 样例
 
-采集文件`/workspaces/ilogtail/debug/simple.log`，通过正则表达式解析日志内容并提取字段，并将结果输出到stdout。
+采集文件`/home/test-log/simple.log`，通过 SPL 解析日志内容并提取字段，将结果输出到标准输出。
 
 * 输入
 
@@ -38,7 +38,7 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths:
-      - /workspaces/ilogtail/debug/simple.log
+      - /home/test-log/simple.log
 processors:
   - Type: processor_spl
     Script: |

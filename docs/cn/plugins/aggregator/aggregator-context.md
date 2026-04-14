@@ -2,7 +2,7 @@
 
 ## 简介
 
-`aggregator_context` `aggregator`插件可以实现根据日志来源对单条日志进行聚合。
+`aggregator_context` `aggregator` 插件可以根据数据来源对**单条数据**进行聚合。
 
 ## 版本
 

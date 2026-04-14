@@ -140,6 +140,9 @@ func (p *ContextImp) ExportMetricRecords() []map[string]string {
 
 	records := make([]map[string]string, 0)
 	for _, metricsRecord := range p.MetricsRecords {
+		if metricsRecord == nil {
+			continue
+		}
 		records = append(records, metricsRecord.ExportMetricRecords())
 	}
 	return records

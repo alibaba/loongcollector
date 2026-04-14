@@ -4,8 +4,9 @@
 
 `processor_split_log_regex processor`插件实现多行日志（例如Java程序日志）的采集。
 
-备注：建议使用[正则加速](../accelerator/regex-accelerate.md)或[分隔符加速](../accelerator/delimiter-accelerate.md)插件中的多行切分功能替代。
-单独与非加速插件配合时，该插件必须设置为`processor`的第一个插件。
+备注：**推荐**在文件类等输入插件（如 [input_file](../../input/native/input-file.md)）的 `Multiline` 配置中完成多行聚合；该能力在读取路径上由主进程内置逻辑（含内部处理器）完成。
+
+若仍需使用本扩展插件在 Processor 阶段做多行切分，与其他 Processor 串联时，须将其置于 `processors` 列表的**第一项**。
 
 ## 版本
 
@@ -61,6 +62,7 @@ flushers:
     "content": "[2022-03-03 18:00:00] xxx1\nyyyyy\nzzzzzz\n",
     "__time__": "1657367638"
 }
+
 {
     "__tag__:__path__": "/home/test-log/multiline.log",
     "content": "[2022-03-03 18:00:01] xxx2\nyyyyy\nzzzzzz",

@@ -46,226 +46,233 @@ echo '{ "resource": { "attributes": [] }, "scopeMetrics": [ { "scope": { "name":
 * 输出
 
 ```json
-[
-  {
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_consumer_connections"
-      },
-      {
-        "Key": "__labels__",
-        "Value": ""
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "1"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_consumer_connections"
+        },
+        {
+            "Key": "__labels__",
+            "Value": ""
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "1"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_sum"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "14"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_sum"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "14"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_max"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "1"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_max"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "1"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_count"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_count"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#1|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#1|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#10|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#10|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#100|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#100|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#1000|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#1000|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#3000|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#3000|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  },
-  {
+}
+
+{
     "Time": 1694766431,
     "Contents": [
-      {
-        "Key": "__name__",
-        "Value": "rocketmq_rpc_latency_bucket"
-      },
-      {
-        "Key": "__labels__",
-        "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#+Inf|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
-      },
-      {
-        "Key": "__time_nano__",
-        "Value": "1694766431663946000"
-      },
-      {
-        "Key": "__value__",
-        "Value": "150"
-      }
+        {
+            "Key": "__name__",
+            "Value": "rocketmq_rpc_latency_bucket"
+        },
+        {
+            "Key": "__labels__",
+            "Value": "aggregation#$#delta|cluster#$#serverless-rocketmq-proxy-2|instance_id#$#rmq-cn-2093d0d6g05|le#$#+Inf|node_id#$#serverless-rocketmq-proxy-2-546c7c9777-gnh9s|node_type#$#proxy|otlp_metric_aggregation_temporality#$#AGGREGATION_TEMPORALITY_DELTA|otlp_metric_histogram_type#$#Histogram|protocol_type#$#remoting|request_code#$#get_consumer_list_by_group|response_code#$#system_error|uid#$#1936715356116916"
+        },
+        {
+            "Key": "__time_nano__",
+            "Value": "1694766431663946000"
+        },
+        {
+            "Key": "__value__",
+            "Value": "150"
+        }
     ],
     "Time_ns": 663946000
-  }
-]
+}
 ```

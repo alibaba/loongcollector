@@ -64,14 +64,14 @@
 | BeginLineCheckLength | Integer                            | 否    | <p>行首匹配的长度，单位：字节。</p><p>默认取值为10×1024字节。</p><p>如果行首匹配的正则表达式在前N个字节即可体现，推荐设置此参数，提升行首匹配效率。</p>                                                                                                                                                                    |
 | BeginLineTimeoutMs   | Integer                            | 否    | <p>行首匹配的超时时间，单位：毫秒。</p><p>默认取值为3000毫秒。</p><p>如果3000毫秒内没有出现新日志，则结束匹配，将最后一条日志上传到日志服务。</p>                                                                                                                                                                       |
 | MaxLogSize           | Integer                            | 否    | <p>日志最大长度<strong>，</strong>默认取值为0，单位：字节。</p><p>默认取值为512×1024字节。</p><p>如果日志长度超过该值，则不再继续查找行首，直接上传。</p>                                                                                                                                                          |
-| ExternalK8sLabelTag  | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>设置Kubernetes Label（定义在template.metadata中）日志标签后，iLogtail将在日志中新增Kubernetes Label相关字段。</p><p>例如设置LabelKey为app，LabelValue为`k8s_label_app`，当Pod中包含Label `app=serviceA`时，会将该信息iLogtail添加到日志中，即添加字段k8s_label_app: serviceA；若不包含名为app的label时，添加空字段k8s_label_app: 。</p> |
-| ExternalEnvTag       | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设置容器环境变量日志标签后，iLogtail将在日志中新增容器环境变量相关字段。</p><p>例如设置EnvKey为`VERSION`，EnvValue为`env_version`，当容器中包含环境变量`VERSION=v1.0.0`时，会将该信息以tag形式添加到日志中，即添加字段env_version: v1.0.0；若不包含名为VERSION的环境变量时，添加空字段env_version: 。</p>                                        |
+| ExternalK8sLabelTag  | Map，其中LabelKey和LabelValue为String类型 | 否    | <p>设置 Kubernetes Label（定义在 template.metadata 中）日志标签后，**LoongCollector** 将在日志中新增 Kubernetes Label 相关字段。</p><p>例如设置 LabelKey 为 app，LabelValue 为 `k8s_label_app`，当 Pod 中包含 Label `app=serviceA` 时，会写入字段 k8s_label_app: serviceA；若无名为 app 的 label，则添加空字段 k8s_label_app: 。</p> |
+| ExternalEnvTag       | Map，其中EnvKey和EnvValue为String类型     | 否    | <p>设置容器环境变量日志标签后，**LoongCollector** 将在日志中新增容器环境变量相关字段。</p><p>例如设置 EnvKey 为 `VERSION`，EnvValue 为 `env_version`，当容器中包含环境变量 `VERSION=v1.0.0` 时，会以 tag 形式添加字段 env_version: v1.0.0；若无该环境变量，则添加空字段 env_version: 。</p>                                        |
 
 ### 数据处理环境变量
 
 | 环境变量                   | 类型     | 是否必选 | 说明                                                                                                                                                                                                                       |
 | ---------------------- | ------ | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| ALIYUN\_LOG\_ENV\_TAGS | string | 否    | <p>设置全局环境变量日志标签后，iLogtail将在日志中新增iLogtail所在容器环境变量相关字段。多个环境变量名以`\|`分隔。</p><p>例如设置为node_name\|node_ip，当iLogtail容器中暴露相关环境变量时，会将该信息以tag形式添加到日志中，即添加字段node_ip:172.16.0.1和node_name:worknode。</p> |
+| ALIYUN\_LOG\_ENV\_TAGS | string | 否    | <p>设置全局环境变量日志标签后，在日志中新增 **Agent 所在容器**可见的环境变量相关字段。多个环境变量名以 `\|` 分隔。</p><p>例如设置为 node_name\|node_ip，当采集 Pod 内暴露对应环境变量时，会以 tag 形式添加字段 node_ip:172.16.0.1 与 node_name:worknode。</p> |
 
 ## 默认日志字段
 
@@ -113,9 +113,9 @@ ctr -n k8s.io containers info
                 "NGINX_SERVICE_PORT=80",
 ```
 
-2\. 创建iLogtail采集配置。
+2\. 创建 LoongCollector 采集配置。
 
-iLogtail采集配置示例如下所示。
+LoongCollector 采集配置示例如下所示。
 
 ```yaml
     inputs:
@@ -142,9 +142,9 @@ iLogtail采集配置示例如下所示。
                 "io.kubernetes.container.name": "nginx",
 ```
 
-2\. 创建Logtail采集配置。
+2\. 创建LoongCollector 采集配置。
 
-Logtail采集配置示例如下所示。
+LoongCollector 采集配置示例如下所示。
 
 ```yaml
     inputs:
@@ -178,7 +178,7 @@ Containers:
     Container ID:...
 ```
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
     inputs:
@@ -204,7 +204,7 @@ Labels:       app=nginx
               ...
 ```
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
     inputs:
@@ -217,7 +217,7 @@ Labels:       app=nginx
           env: "^(test.*)$"
 ```
 
-### 示例5：多行日志的iLogtail采集配置 <a href="#title-asn-vuf-17z" id="title-asn-vuf-17z"></a>
+### 示例5：多行日志的采集配置 <a href="#title-asn-vuf-17z" id="title-asn-vuf-17z"></a>
 
 采集输出在标准错误流的Java异常堆栈（多行日志）。
 
@@ -236,7 +236,7 @@ at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterCha
 
 &#x20;   正则：`\d+-\d+-\d+.*`
 
-2\. 创建Logtail采集配置。 Logtail采集配置示例如下所示。
+2\. 创建LoongCollector 采集配置。 LoongCollector 采集配置示例如下所示。
 
 ```yaml
     inputs:

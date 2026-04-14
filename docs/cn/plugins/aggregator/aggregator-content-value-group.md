@@ -2,7 +2,7 @@
 
 ## 简介
 
-`aggregator_content_value_group` `aggregator`插件可以实现对单条日志按照指定的 Key 进行聚合。
+`aggregator_content_value_group` `aggregator` 插件可以实现对**单条数据**按指定的 Key 进行聚合。
 
 ## 版本
 

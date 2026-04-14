@@ -17,15 +17,21 @@
 
 | 名称                                                                           | 提供方   | 功能简介                              |
 | ------------------------------------------------------------------------------ | -------- | ------------------------------------- |
+| `input_container_stdio`<br>[容器标准输出](native/input-container-stdio.md)    | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
 | `input_file`<br>[文本日志](native/input-file.md)                               | SLS 官方 | 文本采集。                            |
-| `input_static_file_onetime`<br>[一次性文件采集](native/input-static-file-onetime.md) | SLS 官方 | 一次性文件采集。                      |
-| `input_container_stdio`<br> [容器标准输出](native/input-container-stdio.md)    | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
 | `input_file_security`<br>[文件安全数据](native/input-file-security.md)         | SLS 官方 | 文件安全数据采集。                    |
+| `input_forward`<br>[转发输入](native/input-forward.md)                           | SLS 官方 | 接收来自其他实例或系统的数据转发。     |
+| `input_host_meta`<br>[主机元数据](native/input-host-meta.md)                   | SLS 官方 | 定时采集主机、进程及关联关系等元数据。 |
+| `input_host_monitor`<br>[主机监控数据](native/input-host-monitor.md)           | SLS 官方 | 采集主机 CPU/内存/磁盘/网络等指标。   |
+| `input_internal_alarms`<br>[自监控告警数据](native/input-internal-alarms.md)   | SLS 官方 | 导出自监控告警数据。                  |
+| `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS 官方 | 导出自监控指标数据。                  |
 | `input_network_observer`<br>[网络可观测数据](native/input-network-observer.md) | SLS 官方 | 网络可观测数据采集。                  |
 | `input_network_security`<br>[网络安全数据](native/input-network-security.md)   | SLS 官方 | 网络安全数据采集。                    |
 | `input_process_security`<br>[进程安全数据](native/input-process-security.md)   | SLS 官方 | 进程安全数据采集。                    |
-| `input_internal_metrics`<br>[自监控指标数据](native/input-internal-metrics.md) | SLS 官方 | 导出自监控指标数据。                  |
-| `input_internal_alarms`<br>[自监控告警数据](native/input-internal-alarms.md)   | SLS 官方 | 导出自监控告警数据。                  |
+| `input_prometheus`<br>[Prometheus 抓取](native/input-prometheus.md)             | SLS 官方 | 按 ScrapeConfig 抓取指标。            |
+| `input_static_file_onetime`<br>[一次性文件采集](native/input-static-file-onetime.md) | SLS 官方 | 一次性文件采集。                      |
+
+上表按插件 **Type** 字典序排列。
 
 ### 扩展插件
 
@@ -39,25 +45,28 @@
 | 名称                                                                                  | 提供方                                                | 功能简介                                                                         |
 | ------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `input_command`<br>[脚本执行数据](extended/input-command.md)                          | 社区<br>[didachuxing](https://github.com/didachuxing) | 采集脚本执行数据。                                                               |
-| `input_docker_stdout`<br>[容器标准输出](extended/service-docker-stdout.md)            | SLS 官方                                              | 从容器标准输出/标准错误流中采集日志。                                            |
 | `metric_debug_file`<br>[文本日志（debug）](extended/metric-debug-file.md)             | SLS 官方                                              | 用于调试的读取文件内容的插件。                                                   |
 | `metric_input_example`<br>[MetricInput 示例插件](extended/metric-input-example.md)    | SLS 官方                                              | MetricInput 示例插件。                                                           |
 | `metric_meta_host`<br>[主机 Meta 数据](extended/metric-meta-host.md)                  | SLS 官方                                              | 主机 Meta 数据。                                                                 |
 | `metric_mock`<br>[Mock 数据-Metric](extended/metric-mock.md)                          | SLS 官方                                              | 生成 metric 模拟数据的插件。                                                     |
 | `metric_system_v2`<br>[主机监控数据](extended/metric-system.md)                       | SLS 官方                                              | 主机监控数据。                                                                   |
-| `service_canal`<br>[MySQL Binlog](extended/service-canal.md)                          | SLS 官方                                              | 将 MySQL Binlog 输入到 iLogtail。                                                |
+| `service_canal`<br>[MySQL Binlog](extended/service-canal.md)                          | SLS 官方                                              | 将 MySQL Binlog 输入到 LoongCollector。                                                |
+| `service_docker_stdout`<br>[容器标准输出](extended/service-docker-stdout.md)            | SLS 官方                                              | 从容器标准输出/标准错误流中采集日志。                                            |
 | `service_go_profile`<br>[GO Profile](extended/service-goprofile.md)                   | SLS 官方                                              | 采集 Golang pprof 性能数据。                                                     |
 | `service_gpu_metric`<br>[GPU 数据](extended/service-gpu.md)                           | SLS 官方                                              | 支持收集英伟达 GPU 指标。                                                        |
 | `service_http_server`<br>[HTTP 数据](extended/service-http-server.md)                 | SLS 官方                                              | 接收来自 unix socket、http/https、tcp 的请求，并支持 sls 协议、otlp 等多种协议。 |
 | `service_input_example`<br>[ServiceInput 示例插件](extended/service-input-example.md) | SLS 官方                                              | ServiceInput 示例插件。                                                          |
 | `service_journal`<br>[Journal 数据](extended/service-journal.md)                      | SLS 官方                                              | 从原始的二进制文件中采集 Linux 系统的 Journal（systemd）日志。                   |
-| `service_kafka`<br>[Kafka](extended/service-kafka.md)                                 | SLS 官方                                              | 将 Kafka 数据输入到 iLogtail。                                                   |
+| `service_kafka`<br>[Kafka](extended/service-kafka.md)                                 | SLS 官方                                              | 将 Kafka 数据输入到 LoongCollector。                                                   |
+| `service_kubernetes_meta`<br>[Kubernetes 元数据](extended/service-kubernetesmeta-v2.md) | SLS 官方                                          | 在集群内采集 K8s 资源元数据并提供查询接口（插件 Type：`service_kubernetes_meta`）。 |
 | `service_mock`<br>[Mock 数据-Service](extended/service-mock.md)                       | SLS 官方                                              | 生成 service 模拟数据的插件。                                                    |
-| `service_mssql`<br>[SqlServer 查询数据](extended/service-mssql.md)                    | SLS 官方                                              | 将 Sql Server 数据输入到 iLogtail。                                              |
+| `service_mssql`<br>[SqlServer 查询数据](extended/service-mssql.md)                    | SLS 官方                                              | 将 Sql Server 数据输入到 LoongCollector。                                              |
 | `service_otlp`<br>[OTLP 数据](extended/service-otlp.md)                               | 社区<br>[Zhu Shunjia](https://github.com/shunjiazhu)  | 通过 http/grpc 协议，接收 OTLP 数据。                                            |
-| `service_pgsql`<br>[PostgreSQL 查询数据](extended/service-pgsql.md)                   | SLS 官方                                              | 将 PostgresSQL 数据输入到 iLogtail。                                             |
+| `service_pgsql`<br>[PostgreSQL 查询数据](extended/service-pgsql.md)                   | SLS 官方                                              | 将 PostgresSQL 数据输入到 LoongCollector。                                             |
 | `service_snmp`<br>[收集 SNMP 协议机器信息](extended/service-snmp.md)                  | SLS 官方                                              | 收集 SNMP 协议机器信息.                                                          |
 | `service_syslog`<br>[Syslog 数据](extended/service-syslog.md)                         | SLS 官方                                              | 采集 syslog 数据。                                                               |
+
+上表按插件 **Type** 字典序排列。
 
 ## 插件特性对比
 

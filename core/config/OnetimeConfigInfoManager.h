@@ -31,6 +31,7 @@ enum class OnetimeConfigStatus {
     NEW,
     OLD,
     OBSOLETE,
+    UPDATED,
 };
 
 class OnetimeConfigInfoManager {
@@ -43,13 +44,19 @@ public:
         return &instance;
     }
 
-    OnetimeConfigStatus
-    GetOnetimeConfigStatusFromCheckpoint(const std::string& configName, uint64_t hash, uint32_t* expireTime);
+    OnetimeConfigStatus GetOnetimeConfigStatus(const std::string& configName,
+                                               uint64_t hash,
+                                               bool forceRerunWhenUpdate,
+                                               uint64_t inputsHash,
+                                               uint32_t excutionTimeout,
+                                               uint32_t* expireTime);
     bool UpdateConfig(const std::string& configName,
                       ConfigType type,
                       const std::filesystem::path& filepath,
-                      uint64_t hash,
-                      uint32_t expireTime);
+                      uint64_t configHash,
+                      uint32_t expireTime,
+                      uint64_t inputsHash,
+                      uint32_t excutionTimeout);
     bool RemoveConfig(const std::string& configName);
     void DeleteTimeoutConfigFiles();
     bool LoadCheckpointFile();
@@ -65,11 +72,31 @@ private:
     struct ConfigInfo {
         ConfigType mType;
         std::filesystem::path mFilepath;
-        uint64_t mHash;
+        uint64_t mConfigHash;
         uint32_t mExpireTime;
+        uint64_t mInputsHash;
+        uint32_t mExcutionTimeout;
 
-        ConfigInfo(ConfigType type, const std::filesystem::path& filepath, uint64_t hash, uint32_t expireTime)
-            : mType(type), mFilepath(filepath), mHash(hash), mExpireTime(expireTime) {}
+        ConfigInfo(ConfigType type,
+                   const std::filesystem::path& filepath,
+                   uint64_t configHash,
+                   uint32_t expireTime,
+                   uint64_t inputsHash,
+                   uint32_t excutionTimeout)
+            : mType(type),
+              mFilepath(filepath),
+              mConfigHash(configHash),
+              mExpireTime(expireTime),
+              mInputsHash(inputsHash),
+              mExcutionTimeout(excutionTimeout) {}
+
+        // Constructor for checkpoint (only uses four key fields)
+        ConfigInfo(uint64_t configHash, uint32_t expireTime, uint64_t inputsHash, uint32_t excutionTimeout)
+            : mType(ConfigType::Collection),
+              mConfigHash(configHash),
+              mExpireTime(expireTime),
+              mInputsHash(inputsHash),
+              mExcutionTimeout(excutionTimeout) {}
     };
 
     OnetimeConfigInfoManager();
@@ -80,7 +107,8 @@ private:
     // only accessed by main thread, however, for protection, we still add a lock
     mutable std::mutex mMux;
     std::map<std::string, ConfigInfo> mConfigInfoMap;
-    std::map<std::string, std::pair<uint64_t, uint32_t>> mConfigExpireTimeCheckpoint;
+    // map: configName -> ConfigInfo (only mConfigHash, mExpireTime, mInputsHash, mExcutionTimeout are used)
+    std::map<std::string, ConfigInfo> mConfigCheckpointMap;
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;

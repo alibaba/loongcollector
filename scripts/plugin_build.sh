@@ -48,7 +48,12 @@ if [ $OS_FLAG = 1 ]; then
     LDFLAGS=$LDFLAGS' -extldflags "-Wl,--wrap=memcpy"'
   fi
   if [ $BUILDMODE = "c-shared" ]; then
-    NAME=libGoPluginBase.so
+    if [ "${ENABLE_CORP_FEATURE:-}" = "ON" ]; then
+      NAME=libPluginBase.so
+      BUILD_TAGS="${BUILD_TAGS} corp"
+    else
+      NAME=libGoPluginBase.so
+    fi
   fi
 elif [ $OS_FLAG = 3 ]; then
   export GOARCH=386

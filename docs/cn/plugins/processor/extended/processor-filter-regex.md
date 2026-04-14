@@ -2,7 +2,7 @@
 
 ## 简介
 
-`processor_filter_regex processor`插件可以实现对日志的过滤。一条日志只有完全匹配Include中的正则表达式，且不匹配Exclude中的正则表达式时才会被采集，否则直接丢弃。
+`processor_filter_regex` 插件可以实现对日志的过滤。**一条数据**只有完全匹配 Include 中的正则表达式，且不匹配 Exclude 中的正则表达式时才会被采集，否则直接丢弃。
 
 ## 版本
 
@@ -28,7 +28,7 @@
 ```bash
 echo '{"ip": "10.**.**.**", "method": "POST", "brower": "aliyun-sdk-java"}' >> /home/test-log/proccessor-filter-regex.log
 echo '{"ip": "10.**.**.**", "method": "POST", "brower": "chrome"}' >> /home/test-log/proccessor-filter-regex.log
-echo '{"ip": "192.168.**.**", "method": "POST", "brower": "aliyun-sls-ilogtail"}' >> /home/test-log/proccessor-filter-regex.log
+echo '{"ip": "192.168.**.**", "method": "POST", "brower": "aliyun-sls-loongcollector"}' >> /home/test-log/proccessor-filter-regex.log
 ```
 
 * 采集配置

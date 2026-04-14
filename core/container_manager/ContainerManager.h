@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <future>
 #include <string>
 #include <unordered_map>
@@ -23,6 +24,7 @@
 #include <vector>
 
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/Lock.h"
 #include "constants/TagConstants.h"
 #include "container_manager/ContainerDiff.h"
 #include "container_manager/ContainerDiscoveryOptions.h"
@@ -67,13 +69,12 @@ private:
     void incrementallyUpdateContainersSnapshot();
 
     bool checkContainerDiffForOneConfig(FileDiscoveryOptions* options, const CollectionPipelineContext* ctx);
-    void updateContainerInfoPointersInAllConfigs();
-    void updateContainerInfoPointersForContainers(const std::vector<std::string>& containerIDs);
     void
     computeMatchedContainersDiff(std::set<std::string>& fullContainerIDList,
                                  const std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>>& matchList,
                                  const ContainerFilters& filters,
                                  bool isStdio,
+                                 bool refrashAllContainers,
                                  ContainerDiff& diff);
 
     void loadContainerInfoFromDetailFormat(const Json::Value& root, const std::string& configPath);
@@ -88,11 +89,12 @@ private:
     std::unordered_map<std::string, std::shared_ptr<RawContainerInfo>> mContainerMap;
     std::unordered_map<std::string, std::shared_ptr<ContainerDiff>> mConfigContainerDiffMap;
     std::unordered_map<std::string, std::shared_ptr<MatchedContainerInfo>> mConfigContainerResultMap;
-    std::mutex mContainerMapMutex;
+    mutable ReadWriteLock mContainerMapRWLock;
     std::vector<std::string> mStoppedContainerIDs;
     std::mutex mStoppedContainerIDsMutex;
 
-    uint32_t mLastUpdateTime = 0;
+    std::atomic<int64_t> mLastIncrementalUpdateTime{0};
+    std::atomic<int64_t> mLastFullUpdateTime{0};
     std::future<void> mThreadRes;
 
     std::atomic<bool> mIsRunning{false};

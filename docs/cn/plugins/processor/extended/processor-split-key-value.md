@@ -79,7 +79,7 @@ flushers:
 * 输入
 
 ```bash
-echo -e 'class:main http_user_agent:"User Agent" "中文" "hello\t\"ilogtail\"\tworld"' >> /home/test-log/key_value.log
+echo -e 'class:main http_user_agent:"User Agent" "中文" "hello\t\"loongcollector\"\tworld"' >> /home/test-log/key_value.log
 ```
 
 * 采集配置
@@ -109,7 +109,7 @@ flushers:
     "class": "main",
     "http_user_agent": "User Agent",
     "no_separator_key_0": "中文",
-    "no_separator_key_1": "hello\t\"ilogtail\"\tworld",
+    "no_separator_key_1": "hello\t\"loongcollector\"\tworld",
     "__time__": "1657354602"
 }
 ```

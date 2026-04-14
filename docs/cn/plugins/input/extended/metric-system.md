@@ -47,7 +47,7 @@ inputs:
     OpenFd: true
     CPUPercent: true
     Labels:
-      cluster: ilogtail-test-cluster
+      cluster: loongcollector-test-cluster
 flushers:
   - Type: flusher_stdout
     FileName: /tmp/124.log
@@ -61,7 +61,7 @@ flushers:
 ```json
 {
     "__name__":"net_out_pkt",
-    "__labels__":"cluster#$#ilogtail-test-cluster|hostname#$#master-1-1.c-ca9717110efa1b40|hostname#$#test-1|interface#$#eth0|ip#$#10.1.37.31",
+    "__labels__":"cluster#$#loongcollector-test-cluster|hostname#$#master-1-1.c-ca9717110efa1b40|hostname#$#test-1|interface#$#eth0|ip#$#10.1.37.31",
     "__time_nano__":"1680079323040664058",
     "__value__":"32.764761658490045",
     "__time__":"1680079323"

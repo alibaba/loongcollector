@@ -56,6 +56,6 @@ flushers:
 {
     "__tag__:__path__":"/home/test-log/default.log",
     "content":"2022/07/14/11:32:47 test log",
-    "__time__":"1657769827"}
+    "__time__":"1657769827"
 }
 ```

@@ -17,11 +17,11 @@
 | 参数                           | 类型       | 是否必选          | 说明                                                                                            |
 |------------------------------|----------|---------------|-----------------------------------------------------------------------------------------------|
 | Type                         | string   | 是             | 插件类型                                                                                          |
-| Convert                      | Struct   | 否             | ilogtail数据转换协议配置                                                                              |
-| Convert.Protocol             | string   | 否             | ilogtail数据转换协议，可选值：`custom_single`, `custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
-| Convert.Encoding             | string   | 否             | ilogtail数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                        |
+| Convert                      | Struct   | 否             | LoongCollector 数据转换协议配置                                                                              |
+| Convert.Protocol             | string   | 否             | LoongCollector 数据转换协议，可选值：`custom_single`, `custom_single_flatten`,`otlp_log_v1`。默认值：`custom_single` |
+| Convert.Encoding             | string   | 否             | LoongCollector 数据转换编码，可选值：`json`、`none`、`protobuf`，默认值：`json`                                        |
 | Convert.TagFieldsRename      | Map      | 否             | 对日志中tags中的json字段重命名                                                                           |
-| Convert.ProtocolFieldsRename | Map      | 否             | ilogtail日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
+| Convert.ProtocolFieldsRename | Map      | 否             | LoongCollector 日志协议字段重命名，可当前可重命名的字段：`contents`,`tags`和`time`                                         |
 | Convert.OnlyContents         | Bool     | 否             | 仅发送contents中的字段，目前只能和`custom_single_flatten`协议一起使用，默认值：`false`                                |
 | URL                          | string   | 是             | Loki 推送地址，例如：`http://localhost:3100/loki/api/v1/push`                                         |
 | TenantID                     | string   | 否             | Loki 的租户 ID（需要 Loki 开启该功能），默认为空，表示单租户模式                                                       |
@@ -32,7 +32,7 @@
 | MaxBackoff                   | int      | 否             | 重试的最长退避时间，默认 `5`分钟                                                                            |
 | MaxRetries                   | int      | 否             | 最大重试次数，默认 `10`                                                                                |
 | DynamicLabels                | String数组 | 两种Label至少选择一项 | 需要从日志中动态解析的标签列表，例如：`content.field1`                                                           |
-| StaticLabels                 | Map      | 两种Label至少选择一项 | 需要添加到每条日志上的静态标签                                                                               |
+| StaticLabels                 | Map      | 两种Label至少选择一项 | 需要添加到**每条数据**上的静态标签                                                                               |
 
 ## 样例
 
@@ -58,7 +58,7 @@ flushers:
       source: ilogtail
 ```
 
-运行 `ilogtail` 并收集到日志后，在 `Grafana` 或 `Logcli` 中可以通过以下的命令查询日志：
+运行 LoongCollector 并采集到日志后，在 `Grafana` 或 `Logcli` 中可以通过以下的命令查询日志：
 
 ```plain
 { source="ilogtail" }
@@ -66,13 +66,13 @@ flushers:
 
 ## 进阶配置
 
-以下面的一段日志为例，后来将展开介绍ilogtail loki flusher的一些高阶配置
+以下面的一段日志为例，后文将展开介绍 `flusher_loki` 的一些高阶配置
 
 ```plain
 2022-07-22 10:19:23.684 ERROR [springboot-docker] [http-nio-8080-exec-10] com.benchmark.springboot.controller.LogController : error log
 ```
 
-接下来，我们通过`ilogtail`的`processor_regex`插件，将上面的日志提取处理后几个关键字段。
+接下来，通过 LoongCollector 的 `processor_regex` 插件，将上面的日志提取为若干关键字段。
 
 * time
 * level
@@ -120,7 +120,7 @@ DynamicLabels:
 
 ### tag 重命名
 
-`ilogtail` 中的 `converter` 支持通过配置对 `tags` 中的字段进行重命名。在 flusher_loki 中进行如下的配置，即可对存入 Loki 中动态 label 进行重命名：
+LoongCollector 中的 `converter` 支持通过配置对 `tags` 中的字段进行重命名。在 `flusher_loki` 中进行如下配置，即可对写入 Loki 的动态 label 进行重命名：
 
 ```yaml
 flushers:

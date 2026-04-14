@@ -73,8 +73,8 @@ std::string GetVersionTag();
 std::string GetGoPluginCheckpoint();
 std::string GetAgentName();
 std::string GetMonitorInfoFileName();
-std::string GetSymLinkName();
-std::string GetAgentPrefix();
+std::string GetPluginAdapterName();
+std::string GetPluginBaseName();
 std::string GenerateFileTagsDir();
 
 template <class T>

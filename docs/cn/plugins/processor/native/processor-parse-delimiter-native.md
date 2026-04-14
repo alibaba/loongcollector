@@ -45,7 +45,7 @@ enable: true
 inputs:
   - Type: input_file
     FilePaths: 
-      - /home/test-log/json.log
+      - /home/test-log/delimiter.log
 processors:
   - Type: processor_parse_delimiter_native
     SourceKey: content
@@ -71,7 +71,7 @@ flushers:
 
 ```json
 {
-    "__tag__:__path__": "/home/test-log/json.log",
+    "__tag__:__path__": "/home/test-log/delimiter.log",
     "ip": "127.0.0.1",
     "time": "07/Jul/2022:10:43:30 +0800",
     "method": "POST",

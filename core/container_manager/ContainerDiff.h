@@ -36,7 +36,12 @@ struct ContainerDiff {
     std::vector<std::pair<std::string, std::shared_ptr<RawContainerInfo>>> mLegacyCheckpointAdded;
     std::vector<std::string> mRemoved;
 
-    bool IsEmpty() { return mRemoved.empty() && mAdded.empty() && mModified.empty() && mLegacyCheckpointAdded.empty(); }
+    bool mRefreshAllContainers = false;
+
+    bool IsEmpty() {
+        return mRemoved.empty() && mAdded.empty() && mModified.empty() && mLegacyCheckpointAdded.empty()
+            && !mRefreshAllContainers;
+    }
 
     std::string ToString() const {
         std::stringstream ss;
@@ -66,6 +71,7 @@ struct ContainerDiff {
                 ss << "}" << " ";
             }
         }
+        ss << "RefreshAllContainers: " << mRefreshAllContainers << " ";
         return ss.str();
     }
 };

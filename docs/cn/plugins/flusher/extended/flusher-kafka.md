@@ -24,7 +24,7 @@
 | PartitionerType | string   | 否    | Partitioner类型。取值：`roundrobin`、`hash`、`random`。默认为：`random`。 |
 | HashKeys        | String数组 | 否    | PartitionerType为`hash`时，需指定HashKeys。                        |
 | HashOnce        | bool  | 否    |                                                             |
-| ClientID        | string   | 否    | 写入Kafka的Client ID，默认取值：`LogtailPlugin`。                     |
+| ClientID        | string   | 否    | 写入 Kafka 的 Client ID，默认取值：`LogtailPlugin`（LoongCollector Go 插件模块历史命名）。                     |
 
 ## 样例
 

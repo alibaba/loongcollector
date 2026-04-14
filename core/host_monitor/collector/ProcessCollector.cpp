@@ -94,6 +94,7 @@ bool ProcessCollector::Init(HostMonitorContext& collectContext) {
         return false;
     }
     mTotalMemory = meminfo.memStat.total;
+    mClearProcessCpuTimeCacheErrorCount = 0;
     return true;
 }
 
@@ -130,7 +131,7 @@ bool ProcessCollector::Collect(HostMonitorContext& collectContext, PipelineEvent
         allPidStats.push_back(stat);
     }
 
-    int processNum = allPidStats.size();
+    int processNum = pids.size();
 
     VMProcessNumStat processNumStat;
     processNumStat.vmProcessNum = processNum;
@@ -530,7 +531,12 @@ void ProcessCollector::ClearProcessCpuTimeCache() {
             }
         }
     } catch (const std::exception& e) {
-        LOG_ERROR(sLogger, ("ClearProcessCpuTimeCache error", e.what()));
+        if (++mClearProcessCpuTimeCacheErrorCount >= kWarningPrintInterval) {
+            LOG_ERROR(
+                sLogger,
+                ("ClearProcessCpuTimeCache error", e.what())("occurred_times", mClearProcessCpuTimeCacheErrorCount));
+            mClearProcessCpuTimeCacheErrorCount = 0;
+        }
     }
 
     return;
