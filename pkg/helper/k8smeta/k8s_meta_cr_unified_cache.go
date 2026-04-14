@@ -9,6 +9,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
@@ -27,17 +28,18 @@ type crUnifiedCache struct {
 	resourceType string
 	gvr          schema.GroupVersionResource
 
-	mu             sync.Mutex
-	dynamicClient  dynamic.Interface
-	informer       cache.SharedIndexInformer
-	factory        dynamicinformer.DynamicSharedInformerFactory
-	watchStarted   bool
-	watchStartOnce sync.Once
+	mu              sync.Mutex
+	dynamicClient   dynamic.Interface
+	discoveryClient discovery.DiscoveryInterface
+	informer        cache.SharedIndexInformer
+	factory         dynamicinformer.DynamicSharedInformerFactory
+	watchStarted    bool
+	watchStartOnce  sync.Once
 
-	authFailMu     sync.Mutex
-	authFailCount  int
-	authGiveUp     chan struct{}
-	authGiveUpOnce sync.Once
+	giveUpMu    sync.Mutex
+	giveUpCount int
+	giveUpCh    chan struct{}
+	giveUpOnce  sync.Once
 }
 
 func newCRUnifiedCache(stopCh chan struct{}, resourceType string, gvr schema.GroupVersionResource) *crUnifiedCache {
@@ -48,7 +50,7 @@ func newCRUnifiedCache(stopCh chan struct{}, resourceType string, gvr schema.Gro
 		eventCh:      make(chan *K8sMetaEvent, 100),
 	}
 	c.metaStore = NewDeferredDeletionMetaStore(c.eventCh, stopCh, 120, cache.MetaNamespaceKeyFunc, generateCommonKey)
-	c.authGiveUp = make(chan struct{})
+	c.giveUpCh = make(chan struct{})
 	return c
 }
 
@@ -89,6 +91,13 @@ func (c *crUnifiedCache) setRESTConfig(cfg *rest.Config) error {
 		return err
 	}
 	c.dynamicClient = dyn
+	disco, derr := discovery.NewDiscoveryClientForConfig(restConfigForDynamicClient(cfg))
+	if derr != nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "discovery client for custom resource informer unavailable; will not pre-check GVR", "resourceType", c.resourceType, "error", derr)
+		c.discoveryClient = nil
+	} else {
+		c.discoveryClient = disco
+	}
 	return nil
 }
 
@@ -105,6 +114,12 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 	c.watchStartOnce.Do(func() {
 		c.mu.Lock()
 		c.metaStore.Start()
+		gvr := c.gvr
+		if !gvrDiscoveryAvailable(c.discoveryClient, gvr) {
+			c.watchStarted = true
+			c.mu.Unlock()
+			return
+		}
 		c.factory = dynamicinformer.NewDynamicSharedInformerFactory(dyn, time.Hour)
 		c.informer = c.factory.ForResource(c.gvr).Informer()
 		_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -167,15 +182,15 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		if err := c.informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
 			if err != nil {
 				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", c.resourceType, "watchError", err)
-				if isInformerAuthFailure(err) {
-					c.authFailMu.Lock()
-					c.authFailCount++
-					n := c.authFailCount
-					c.authFailMu.Unlock()
-					if n >= informerAuthFailureStopAfter {
-						c.authGiveUpOnce.Do(func() {
-							logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping dynamic informer after repeated RBAC/auth errors (no further retries)", "resourceType", c.resourceType, "gvr", c.gvr.String(), "failures", n)
-							close(c.authGiveUp)
+				if isInformerGiveUpFailure(err) {
+					c.giveUpMu.Lock()
+					c.giveUpCount++
+					n := c.giveUpCount
+					c.giveUpMu.Unlock()
+					if n >= informerGiveUpFailureThreshold {
+						c.giveUpOnce.Do(func() {
+							logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping dynamic informer after repeated errors (RBAC/auth or missing API resource; no further retries)", "resourceType", c.resourceType, "gvr", c.gvr.String(), "failures", n)
+							close(c.giveUpCh)
 						})
 					}
 				}
@@ -185,19 +200,20 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		}
 		c.watchStarted = true
 		inf := c.informer
-		gvr := c.gvr
 		c.mu.Unlock()
 
 		mergedStop := make(chan struct{})
 		go func() {
 			select {
 			case <-c.stopCh:
-			case <-c.authGiveUp:
+			case <-c.giveUpCh:
 			}
 			close(mergedStop)
 		}()
 		go c.factory.Start(mergedStop)
 		go func() {
+			backoff := time.Second
+			const maxBackoff = 10 * time.Second
 			for {
 				if cache.WaitForCacheSync(mergedStop, inf.HasSynced) {
 					logger.Info(context.Background(), "dynamic informer cache synced", "gvr", gvr.String())
@@ -209,8 +225,14 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 					return
 				default:
 				}
-				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "dynamic informer cache sync timeout", "gvr", gvr.String())
-				time.Sleep(time.Second)
+				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "dynamic informer cache sync timeout", "gvr", gvr.String(), "nextRetryIn", backoff.String())
+				time.Sleep(backoff)
+				if backoff < maxBackoff {
+					backoff *= 2
+					if backoff > maxBackoff {
+						backoff = maxBackoff
+					}
+				}
 			}
 		}()
 	})

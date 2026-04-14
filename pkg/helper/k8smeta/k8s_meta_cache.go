@@ -16,6 +16,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -36,10 +38,10 @@ type k8sMetaCache struct {
 	resourceType string
 	schema       *runtime.Scheme
 
-	authFailMu     sync.Mutex
-	authFailCount  int
-	authGiveUp     chan struct{}
-	authGiveUpOnce sync.Once
+	giveUpMu    sync.Mutex
+	giveUpCount int
+	giveUpCh    chan struct{}
+	giveUpOnce  sync.Once
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -50,7 +52,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
 	m.schema = runtime.NewScheme()
-	m.authGiveUp = make(chan struct{})
+	m.giveUpCh = make(chan struct{})
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
@@ -107,23 +109,22 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 	go func() {
 		select {
 		case <-m.stopCh:
-		case <-m.authGiveUp:
+		case <-m.giveUpCh:
 		}
 		close(mergedStop)
 	}()
 	if err := informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
 		if err != nil {
 			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
-			if isInformerAuthFailure(err) {
-				m.authFailMu.Lock()
-				m.authFailCount++
-				n := m.authFailCount
-				m.authFailMu.Unlock()
-				// Shut down this informer once RBAC/auth failures reach informerAuthFailureStopAfter.
-				if n >= informerAuthFailureStopAfter {
-					m.authGiveUpOnce.Do(func() {
-						logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping informer after repeated RBAC/auth errors (no further retries)", "resourceType", m.resourceType, "failures", n)
-						close(m.authGiveUp)
+			if isInformerGiveUpFailure(err) {
+				m.giveUpMu.Lock()
+				m.giveUpCount++
+				n := m.giveUpCount
+				m.giveUpMu.Unlock()
+				if n >= informerGiveUpFailureThreshold {
+					m.giveUpOnce.Do(func() {
+						logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping informer after repeated errors (RBAC/auth or missing API resource; no further retries)", "resourceType", m.resourceType, "failures", n)
+						close(m.giveUpCh)
 					})
 				}
 			}
@@ -174,18 +175,26 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 	})
 	go factory.Start(mergedStop)
-	// wait for first cache sync success, or stop when RBAC limit merges stopCh
+	// wait for first cache sync success, or stop when give-up merges stopCh
+	backoff := time.Second
+	const maxBackoff = 10 * time.Second
 	for {
 		if !cache.WaitForCacheSync(mergedStop, informer.HasSynced) {
 			select {
 			case <-mergedStop:
-				// Stop was signaled（stop or auth fail）: return so MetaManager's sequential cache init does not block other resource types.
+				// Stop was signaled（stop or give-up）: return so MetaManager's sequential cache init does not block other resource types.
 				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "informer cache sync aborted", "resourceType", m.resourceType)
 				return
 			default:
 			}
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout", "resourceType", m.resourceType)
-			time.Sleep(1 * time.Second)
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout", "resourceType", m.resourceType, "nextRetryIn", backoff.String())
+			time.Sleep(backoff)
+			if backoff < maxBackoff {
+				backoff *= 2
+				if backoff > maxBackoff {
+					backoff = maxBackoff
+				}
+			}
 		} else {
 			break
 		}
@@ -482,6 +491,27 @@ func containsResource(resources []metav1.APIResource, name string) bool {
 		}
 	}
 	return false
+}
+
+// gvrDiscoveryAvailable checks discovery for a CRD/plural GVR before starting a dynamic informer
+// (same idea as getIngressInformer probing ServerResourcesForGroupVersion).
+func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersionResource) bool {
+	if d == nil {
+		return true
+	}
+	gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}.String()
+	resourceList, err := d.ServerResourcesForGroupVersion(gv)
+	if err != nil {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"custom resource API group/version not available on server; skipping informer", "gvr", gvr.String(), "error", err)
+		return false
+	}
+	if !containsResource(resourceList.APIResources, gvr.Resource) {
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+			"custom resource plural not listed for group/version; skipping informer", "gvr", gvr.String())
+		return false
+	}
+	return true
 }
 func generateNodeKey(obj interface{}) ([]string, error) {
 	node, err := meta.Accessor(obj)
