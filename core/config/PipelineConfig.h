@@ -17,8 +17,10 @@
 #pragma once
 
 #include <cstdint>
+#include <ctime>
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -54,7 +56,22 @@ protected:
     bool GetExpireTimeIfOneTime(const Json::Value& global);
 
 #ifdef APSARA_UNIT_TEST_MAIN
+    // Overridable clock for deterministic unit tests.
+    static std::function<time_t()> sCurrentTime;
+
+    // RAII guard that temporarily replaces the clock with a fixed value.
+    struct ScopedClockOverride {
+        explicit ScopedClockOverride(time_t fixedNow) : mPrev(sCurrentTime) {
+            sCurrentTime = [fixedNow]() -> time_t { return fixedNow; };
+        }
+        ~ScopedClockOverride() { sCurrentTime = mPrev; }
+
+    private:
+        std::function<time_t()> mPrev;
+    };
+
     friend class PipelineConfigUnittest;
+    friend class OnetimeConfigUpdateUnittest;
 #endif
 };
 
