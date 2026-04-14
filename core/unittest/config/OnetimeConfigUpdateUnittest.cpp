@@ -239,7 +239,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.HasDiff());
-        auto restartNow = static_cast<uint32_t>(time(nullptr));
+        auto restartNow = time(nullptr);
         {
             PipelineConfig::ScopedClockOverride clockGuard(restartNow);
             CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
@@ -249,14 +249,14 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-            APSARA_TEST_EQUAL(restartNow + 3600U, item.mExpireTime);
+            APSARA_TEST_EQUAL(static_cast<uint32_t>(restartNow) + 3600U, item.mExpireTime);
             APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("changed_config");
-            APSARA_TEST_EQUAL(restartNow + 7200U, item.mExpireTime);
+            APSARA_TEST_EQUAL(static_cast<uint32_t>(restartNow) + 7200U, item.mExpireTime);
             APSARA_TEST_EQUAL(configHash["changed_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);
@@ -338,7 +338,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
 
         auto diff = PipelineConfigWatcher::GetInstance()->CheckConfigDiff();
         APSARA_TEST_TRUE(diff.first.HasDiff());
-        auto updateNow = static_cast<uint32_t>(time(nullptr));
+        auto updateNow = time(nullptr);
         {
             PipelineConfig::ScopedClockOverride clockGuard(updateNow);
             CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
@@ -348,14 +348,14 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         APSARA_TEST_EQUAL(3U, sConfigManager->mConfigInfoMap.size());
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("new_config");
-            APSARA_TEST_EQUAL(updateNow + 1000U, item.mExpireTime);
+            APSARA_TEST_EQUAL(static_cast<uint32_t>(updateNow) + 1000U, item.mExpireTime);
             APSARA_TEST_EQUAL(configHash["new_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[0], item.mFilepath);
         }
         {
             const auto& item = sConfigManager->mConfigInfoMap.at("old_config");
-            APSARA_TEST_EQUAL(updateNow + 1200U, item.mExpireTime);
+            APSARA_TEST_EQUAL(static_cast<uint32_t>(updateNow) + 1200U, item.mExpireTime);
             APSARA_TEST_EQUAL(configHash["old_config.json"], item.mConfigHash);
             APSARA_TEST_EQUAL(ConfigType::Collection, item.mType);
             APSARA_TEST_EQUAL(mConfigDir / filenames[1], item.mFilepath);

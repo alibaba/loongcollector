@@ -66,6 +66,9 @@ protected:
         }
         ~ScopedClockOverride() { sCurrentTime = mPrev; }
 
+        ScopedClockOverride(const ScopedClockOverride&) = delete;
+        ScopedClockOverride& operator=(const ScopedClockOverride&) = delete;
+
     private:
         std::function<time_t()> mPrev;
     };
