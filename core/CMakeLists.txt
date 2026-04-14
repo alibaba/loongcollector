@@ -183,6 +183,10 @@ foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     list(APPEND FRAMEWORK_SOURCE_FILES ${TEMP_SOURCE_FILES})
 endforeach (DIR_NAME)
 
+# OTLP protobuf files are nested under proto/collector/*/v1/ — use GLOB_RECURSE
+file(GLOB_RECURSE OTLP_PROTO_FILES protobuf/opentelemetry/proto/*.c protobuf/opentelemetry/proto/*.cc protobuf/opentelemetry/proto/*.cpp)
+list(APPEND FRAMEWORK_SOURCE_FILES ${OTLP_PROTO_FILES})
+
 if (ENABLE_ENTERPRISE)
     # remove several files in shennong/sdk
     list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/shennong/sdk/sample.cpp)

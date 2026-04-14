@@ -111,3 +111,7 @@ license_coverage.txt
 /.claude/settings.local.json
 #/.claude/
 /.gemini/
+.omc/
+/code-review/
+testcase-compose.yaml
+*.pb.[ch]

@@ -65,5 +65,4 @@ RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
 
 USER $USERNAME
 
-ENTRYPOINT [ "/usr/local/share/docker-init.sh" ]
-
+# ENTRYPOINT [ "/usr/local/share/docker-init.sh" ]

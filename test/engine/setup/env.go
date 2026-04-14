@@ -38,7 +38,11 @@ func InitEnv(ctx context.Context, envType string) (context.Context, error) {
 	case "deployment":
 		Env = NewDeploymentEnv()
 	}
-	return SetAgentPID(ctx)
+	if envType == "host" || envType == "daemonset" || envType == "deployment" {
+		return SetAgentPID(ctx)
+	}
+	// For docker-compose, container hasn't started yet, PID will be set after StartDockerComposeEnv
+	return ctx, nil
 }
 
 func Mkdir(ctx context.Context, dir string) (context.Context, error) {
