@@ -36,8 +36,6 @@
 | Ingress | bool, false | 是否采集Ingress元数据。 |
 | EnableLabels | bool, false | 是否采集**内置**Kubernetes 资源的标签（Labels）。 |
 | EnableAnnotations | bool, false | 是否采集**内置**资源的注解（Annotations）。 |
-| NamespaceBlackList | []string，可选 | 全局命名空间过滤，见下文「**命名空间黑名单 / 白名单**」。`Node`、`PersistentVolume`、`StorageClass` 不按命名空间过滤。 |
-| NamespaceWhiteList | []string，可选 | 同上。 |
 | CustomResources | []object，可选 | 第三方 CR（动态 Informer）采集与链路，见下文「**第三方自定义资源（CustomResources）**」与「**Kubernetes RBAC 权限**」。 |
 | Node2Pod | string, 无默认值（可选） | Node到Pod的关系名，不填则不生成关系。 |
 | Deployment2Pod | string, 无默认值（可选） | Deployment到Pod的关系名，不填则不生成关系。 |
@@ -66,15 +64,6 @@
 | Cluster2Node | string, 无默认值（可选） | Cluster到Node的关系名，不填则不生成关系。 |
 | Cluster2PersistentVolume | string, 无默认值（可选） | Cluster到PersistentVolume的关系名，不填则不生成关系。 |
 | Cluster2StorageClass | string, 无默认值（可选） | Cluster到StorageClass的关系名，不填则不生成关系。 |
-
-### 命名空间黑名单 / 白名单
-
-对应参数 **`NamespaceBlackList`**、**`NamespaceWhiteList`**（均为可选字符串列表；名单项一般填命名空间名字符串）。
-
-1. **未配置限制**：若两项**均未配置**（未出现配置键，或列表解析后等价于「无有效条目」），则**不对命名空间做过滤**，相关命名空间作用域对象可进入 meta 缓存并参与实体/链路事件（集群作用域资源如 `Node`、`PersistentVolume`、`StorageClass` 本身不按命名空间过滤，行为不变）。
-2. **已配置策略**：若至少配置了其一（仅黑名单、仅白名单、或黑白名单同时存在），则对该插件实例生效一条命名空间策略——命名空间 **被允许** 的条件为：**（该命名空间不在黑名单中）或（该命名空间在白名单中）**（逻辑或，并集语义；与「先黑后白再取交集」的直觉不同）。仅黑名单时等价于「不在黑名单则允许」；仅白名单时等价于「在白名单则允许」。
-
-同一集群上若存在**多个** `service_kubernetes_meta` 配置实例，各自注册的策略在实现上为 **OR**：只要**任一**实例的策略允许该命名空间，对象即可通过（详见 `MetaManager.RegisterNamespacePolicy` 文档注释）。
 
 ## Kubernetes RBAC 权限
 
@@ -201,11 +190,8 @@
 | PodLink | object，可选 | 配置后，在开启 **Pod** 的前提下可生成 **Pod→CR** 链路；需同时配置 **`Entity2PodRelation`**。 |
 | Entity2PodRelation | string，可选 | entity_link 中 **`__relation_type__`**（CR 与 Pod 之间的业务关系名）；与 `PodLink` 同时非空时生效。 |
 | Namespace2EntityRelation | string，可选 | entity_link 中 **`__relation_type__`**（Namespace 与该 CR）；需 **`CollectEntity: true`**、顶层 **`Namespace: true`** 且本字段非空；仅**有命名空间**的 CR 会生成（集群级 CR 跳过）。 |
-| EnableLabels | bool | 为 true 且 `LabelAllowList` 为空时导出**全部** labels；不受顶层 `EnableLabels` 影响。默认不导出。 |
-| EnableAnnotations | bool | 同上，作用于 annotations。 |
-| LabelAllowList | []string | 非空时仅导出所列 label 键（与 `EnableLabels` 组合见实现逻辑）。 |
-| AnnotationAllowList | []string | 非空时仅导出所列 annotation 键。 |
-| StatusPathAllowList | []string | 可选，实体日志中 `status` 字段的白名单路径。 |
+| EnableLabels | bool | 为 true 时导出**全部** labels；不受顶层 `EnableLabels` 影响。默认不导出。 |
+| EnableAnnotations | bool | 为 true 时导出**全部** annotations；不受顶层 `EnableAnnotations` 影响。默认不导出。 |
 
 **PodLink** 子字段：
 
@@ -224,11 +210,6 @@ inputs:
     Interval: 600
     Node: true
     Pod: true
-    NamespaceBlackList:
-      - kube-system  
-    # NamespaceWhiteList:
-    #   - default
-    #   - production
     # Third-party CRs: configure each GVR (and optional PodLink / Entity2PodRelation) under CustomResources.
     CustomResources:
       - APIGroup: argoproj.io     # API-Group
@@ -295,6 +276,4 @@ inputs:
 
 * **配置与注册**：`pkg/helper/k8smeta/k8s_meta_custom_resource.go`、`MetaManager.RegisterCustomResourceCollector`（`k8s_meta_manager.go`）。
 * **采集与投递**：`plugins/input/kubernetesmetav2/meta_collector.go` 中对 `EntityType` / 链路类型的处理。
-* **命名空间策略**：`k8s_meta_namespace_policy.go`（`ObjectMetaNamespaceForFilter` 对 `unstructured` 与内置类型均已覆盖）。
-
 新增 CR 时一般只需**配置层**声明 GVR 与链路字段；若需新索引、新裁剪或新事件语义，再在 **`crUnifiedCache`** 与 **`meta_collector`** 侧按现有模式扩展即可。

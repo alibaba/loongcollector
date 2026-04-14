@@ -29,17 +29,12 @@ type metaCollector struct {
 	entityBuffer     chan models.PipelineEvent
 	entityLinkBuffer chan models.PipelineEvent
 
-	stopCh            chan struct{}
-	namespacePolicyID int // -1 when no namespace policy is registered
-	entityProcessor   map[string]ProcessFunc
+	stopCh          chan struct{}
+	entityProcessor map[string]ProcessFunc
 	crConfigs         map[string]k8smeta.CustomResourceCollectorConfig
 }
 
 func (m *metaCollector) Start() error {
-	m.namespacePolicyID = m.serviceK8sMeta.metaManager.RegisterNamespacePolicy(
-		m.serviceK8sMeta.NamespaceBlackList,
-		m.serviceK8sMeta.NamespaceWhiteList,
-	)
 	m.entityProcessor = map[string]ProcessFunc{
 		k8smeta.POD:                      m.processPodEntity,
 		k8smeta.NODE:                     m.processNodeEntity,
@@ -238,8 +233,6 @@ func (m *metaCollector) Start() error {
 }
 
 func (m *metaCollector) Stop() error {
-	m.serviceK8sMeta.metaManager.UnregisterNamespacePolicy(m.namespacePolicyID)
-	m.namespacePolicyID = -1
 	m.serviceK8sMeta.metaManager.UnRegisterAllSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName)
 	close(m.stopCh)
 	return nil

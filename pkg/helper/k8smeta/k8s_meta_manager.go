@@ -53,10 +53,6 @@ type MetaManager struct {
 	linkRegisterMap map[string][]string
 	registerLock    sync.RWMutex
 
-	nsPolicyMu     sync.RWMutex
-	nsPolicyRegs   []nsPolicyReg
-	nextNsPolicyID int
-
 	// self metrics
 	projectNames       map[string]int
 	metricRecord       selfmonitor.MetricsRecord

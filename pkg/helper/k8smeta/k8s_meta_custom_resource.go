@@ -31,15 +31,10 @@ type CustomResourceCollectorConfig struct {
 	// Namespace2EntityRelation is __relation_type__ on entity_link logs (Namespace → this namespaced CR). Export when CollectEntity, Namespace input, and this string are all set. Cluster-scoped CRs are skipped.
 	Namespace2EntityRelation string `json:"Namespace2EntityRelation,omitempty"`
 
-	// EnableLabels, if true, exports full labels when LabelAllowList is empty. Ignores ServiceK8sMeta.EnableLabels. Default false.
+	// EnableLabels, if true, exports full labels on entity logs. Ignores ServiceK8sMeta.EnableLabels. Default false.
 	EnableLabels bool `json:"EnableLabels,omitempty"`
-	// EnableAnnotations, if true, exports full annotations when AnnotationAllowList is empty. Ignores ServiceK8sMeta.EnableAnnotations. Default false.
+	// EnableAnnotations, if true, exports full annotations on entity logs. Ignores ServiceK8sMeta.EnableAnnotations. Default false.
 	EnableAnnotations bool `json:"EnableAnnotations,omitempty"`
-
-	// Export lists for entity logs (optional; when non-empty, only listed keys are exported regardless of Enable*).
-	LabelAllowList      []string `json:"LabelAllowList,omitempty"`
-	AnnotationAllowList []string `json:"AnnotationAllowList,omitempty"`
-	StatusPathAllowList []string `json:"StatusPathAllowList,omitempty"`
 }
 
 // PodToCustomResourceLinkConfig resolves which Workflow-like object a Pod belongs to.

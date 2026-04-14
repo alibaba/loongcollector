@@ -33,11 +33,6 @@ type ServiceK8sMeta struct {
 	Container             bool
 	// CustomResources registers third-party CRs (dynamic informer + optional CR→Pod links via PodLink). See k8smeta.CustomResourceCollectorConfig.
 	CustomResources []k8smeta.CustomResourceCollectorConfig `json:"CustomResources,omitempty"`
-	// NamespaceBlackList / NamespaceWhiteList: global namespace filter for meta cache and events (Node, PersistentVolume, StorageClass are not filtered).
-	// If both are set on this input, a namespace is allowed when it is not blacklisted OR whitelisted (union). Multiple pipelines OR their policies.
-	// Empty both: no restriction from this input. Cluster-scoped objects are always allowed.
-	NamespaceBlackList []string `json:"NamespaceBlackList,omitempty"`
-	NamespaceWhiteList []string `json:"NamespaceWhiteList,omitempty"`
 	// EnableLabels / EnableAnnotations: when true, emit full labels/annotations on built-in entity kinds (not CustomResources; those use CustomResources[].EnableLabels/EnableAnnotations).
 	EnableLabels      bool
 	EnableAnnotations bool
@@ -123,9 +118,8 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 		collector:         collector,
 		entityBuffer:      make(chan models.PipelineEvent, 100),
 		entityLinkBuffer:  make(chan models.PipelineEvent, 100),
-		stopCh:            make(chan struct{}),
-		namespacePolicyID: -1,
-		entityProcessor:   make(map[string]ProcessFunc),
+		stopCh:          make(chan struct{}),
+		entityProcessor: make(map[string]ProcessFunc),
 	}
 	return s.metaCollector.Start()
 }

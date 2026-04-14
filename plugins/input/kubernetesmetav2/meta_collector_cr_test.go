@@ -237,43 +237,6 @@ func TestProcessCustomResourceEntityEnableLabels(t *testing.T) {
 	assert.Contains(t, labels, "drop")
 }
 
-func TestProcessCustomResourceEntityLabelAllowList(t *testing.T) {
-	entityType := "argo.workflow"
-	cfg := k8smeta.CustomResourceCollectorConfig{
-		EntityType: entityType, Kind: "Workflow",
-		LabelAllowList: []string{"keep"},
-	}
-	m := &metaCollector{
-		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
-		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
-	}
-	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
-	events := m.processCustomResourceEntity(data, "update")
-	require.Len(t, events, 1)
-	log := events[0].(*models.Log)
-	labels := stringField(t, log, "labels")
-	assert.Contains(t, labels, "keep")
-	assert.NotContains(t, labels, "drop")
-}
-
-func TestProcessCustomResourceEntityStatusPathAllowList(t *testing.T) {
-	entityType := "argo.workflow"
-	cfg := k8smeta.CustomResourceCollectorConfig{
-		EntityType: entityType, Kind: "Workflow",
-		StatusPathAllowList: []string{"status.phase"},
-	}
-	m := &metaCollector{
-		serviceK8sMeta: &ServiceK8sMeta{Interval: 10},
-		crConfigs:      map[string]k8smeta.CustomResourceCollectorConfig{entityType: cfg},
-	}
-	data := &k8smeta.ObjectWrapper{ResourceType: entityType, Raw: testWorkflowUnstructured(t)}
-	events := m.processCustomResourceEntity(data, "update")
-	require.Len(t, events, 1)
-	log := events[0].(*models.Log)
-	status := stringField(t, log, "status")
-	assert.Contains(t, status, "Running")
-}
-
 func TestProcessCustomResourceEntityEnableAnnotations(t *testing.T) {
 	entityType := "argo.workflow"
 	cfg := k8smeta.CustomResourceCollectorConfig{EntityType: entityType, Kind: "Workflow", EnableAnnotations: true}

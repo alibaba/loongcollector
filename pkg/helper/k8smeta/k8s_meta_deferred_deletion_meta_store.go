@@ -215,13 +215,6 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
 		return
 	}
-	// Namespace policy after keyFunc: we need the store key for purgeKey. For standard namespaced
-	// objects, metadata.namespace is immutable, so MetaNamespaceKeyFunc keeps a stable key across
-	// updates; purgeKey removes Items[key] and index rows derived from the previously cached object.
-	if !GetMetaManagerInstance().MetaObjectPassesNamespacePolicy(event.Object) {
-		m.purgeKey(key)
-		return
-	}
 	newIdxKeys := m.getIdxKeys(event.Object)
 	m.lock.Lock()
 	// should delete oldIdxKeys in two cases:
@@ -274,11 +267,6 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	key, err := m.keyFunc(event.Object.Raw)
 	if err != nil {
 		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "handle k8s meta with keyFunc error", err)
-		return
-	}
-	// Same ordering assumption as handleAddOrUpdateEvent (namespace immutable for namespaced objects).
-	if !GetMetaManagerInstance().MetaObjectPassesNamespacePolicy(event.Object) {
-		m.purgeKey(key)
 		return
 	}
 	m.lock.Lock()
