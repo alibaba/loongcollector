@@ -36,10 +36,7 @@ type crUnifiedCache struct {
 	watchStarted    bool
 	watchStartOnce  sync.Once
 
-	giveUpMu    sync.Mutex
-	giveUpCount int
-	giveUpCh    chan struct{}
-	giveUpOnce  sync.Once
+	giveUp *informerGiveUp
 }
 
 func newCRUnifiedCache(stopCh chan struct{}, resourceType string, gvr schema.GroupVersionResource) *crUnifiedCache {
@@ -50,7 +47,7 @@ func newCRUnifiedCache(stopCh chan struct{}, resourceType string, gvr schema.Gro
 		eventCh:      make(chan *K8sMetaEvent, 100),
 	}
 	c.metaStore = NewDeferredDeletionMetaStore(c.eventCh, stopCh, 120, cache.MetaNamespaceKeyFunc, generateCommonKey)
-	c.giveUpCh = make(chan struct{})
+	c.giveUp = newInformerGiveUp()
 	return c
 }
 
@@ -200,22 +197,10 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		if err != nil {
 			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to add dynamic informer event handler", err, "resourceType", c.resourceType, "gvr", c.gvr.String())
 		}
-		if err := c.informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
-			if err != nil {
-				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", c.resourceType, "watchError", err)
-				if isInformerGiveUpFailure(err) {
-					c.giveUpMu.Lock()
-					c.giveUpCount++
-					n := c.giveUpCount
-					c.giveUpMu.Unlock()
-					if n >= informerGiveUpFailureThreshold {
-						c.giveUpOnce.Do(func() {
-							logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping dynamic informer after repeated errors (RBAC/auth or missing API resource; no further retries)", "resourceType", c.resourceType, "gvr", c.gvr.String(), "failures", n)
-							close(c.giveUpCh)
-						})
-					}
-				}
-			}
+		if err := attachWatchErrorHandler(c.informer, c.giveUp, watchErrorHandlerOpts{
+			ResourceType:  c.resourceType,
+			GVR:           c.gvr.String(),
+			GiveUpStopMsg: "stopping dynamic informer after repeated errors (RBAC/auth or missing API resource; no further retries)",
 		}); err != nil {
 			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set dynamic informer watch error handler", err)
 		}
@@ -223,39 +208,10 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		inf := c.informer
 		c.mu.Unlock()
 
-		mergedStop := make(chan struct{})
-		go func() {
-			select {
-			case <-c.stopCh:
-			case <-c.giveUpCh:
-			}
-			close(mergedStop)
-		}()
+		mergedStop := c.giveUp.mergedStop(c.stopCh)
 		go c.factory.Start(mergedStop)
-		go func() {
-			backoff := time.Second
-			const maxBackoff = 10 * time.Second
-			for {
-				if cache.WaitForCacheSync(mergedStop, inf.HasSynced) {
-					logger.Info(context.Background(), "dynamic informer cache synced", "gvr", gvr.String())
-					return
-				}
-				select {
-				case <-mergedStop:
-					logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic informer cache sync aborted", "gvr", gvr.String())
-					return
-				default:
-				}
-				logger.Error(context.Background(), K8sMetaUnifyErrorCode, "dynamic informer cache sync timeout", "gvr", gvr.String(), "nextRetryIn", backoff.String())
-				time.Sleep(backoff)
-				if backoff < maxBackoff {
-					backoff *= 2
-					if backoff > maxBackoff {
-						backoff = maxBackoff
-					}
-				}
-			}
-		}()
+		gvrStr := gvr.String()
+		go waitInformerCacheSync(mergedStop, inf.HasSynced, informerCacheSyncOpts{ResourceType: c.resourceType, GVR: gvrStr})
 	})
 }
 

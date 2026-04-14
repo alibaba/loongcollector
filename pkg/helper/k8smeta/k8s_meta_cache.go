@@ -3,7 +3,6 @@ package k8smeta
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -16,7 +15,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -37,10 +35,7 @@ type k8sMetaCache struct {
 	resourceType string
 	schema       *runtime.Scheme
 
-	giveUpMu    sync.Mutex
-	giveUpCount int
-	giveUpCh    chan struct{}
-	giveUpOnce  sync.Once
+	giveUp *informerGiveUp
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -51,7 +46,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
 	m.schema = runtime.NewScheme()
-	m.giveUpCh = make(chan struct{})
+	m.giveUp = newInformerGiveUp()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
@@ -104,30 +99,10 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 	if informer == nil {
 		return
 	}
-	mergedStop := make(chan struct{})
-	go func() {
-		select {
-		case <-m.stopCh:
-		case <-m.giveUpCh:
-		}
-		close(mergedStop)
-	}()
-	if err := informer.SetWatchErrorHandler(func(_ *cache.Reflector, err error) {
-		if err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
-			if isInformerGiveUpFailure(err) {
-				m.giveUpMu.Lock()
-				m.giveUpCount++
-				n := m.giveUpCount
-				m.giveUpMu.Unlock()
-				if n >= informerGiveUpFailureThreshold {
-					m.giveUpOnce.Do(func() {
-						logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "stopping informer after repeated errors (RBAC/auth or missing API resource; no further retries)", "resourceType", m.resourceType, "failures", n)
-						close(m.giveUpCh)
-					})
-				}
-			}
-		}
+	mergedStop := m.giveUp.mergedStop(m.stopCh)
+	if err := attachWatchErrorHandler(informer, m.giveUp, watchErrorHandlerOpts{
+		ResourceType:  m.resourceType,
+		GiveUpStopMsg: "stopping informer after repeated errors (RBAC/auth or missing API resource; no further retries)",
 	}); err != nil {
 		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set watch error handler", err)
 	}
@@ -174,30 +149,7 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 	})
 	go factory.Start(mergedStop)
-	// wait for first cache sync success, or stop when give-up merges stopCh
-	backoff := time.Second
-	const maxBackoff = 10 * time.Second
-	for {
-		if !cache.WaitForCacheSync(mergedStop, informer.HasSynced) {
-			select {
-			case <-mergedStop:
-				// Stop was signaled（stop or give-up）: return so MetaManager's sequential cache init does not block other resource types.
-				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "informer cache sync aborted", "resourceType", m.resourceType)
-				return
-			default:
-			}
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout", "resourceType", m.resourceType, "nextRetryIn", backoff.String())
-			time.Sleep(backoff)
-			if backoff < maxBackoff {
-				backoff *= 2
-				if backoff > maxBackoff {
-					backoff = maxBackoff
-				}
-			}
-		} else {
-			break
-		}
-	}
+	waitInformerCacheSync(mergedStop, informer.HasSynced, informerCacheSyncOpts{ResourceType: m.resourceType})
 }
 
 func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, cache.SharedIndexInformer) {
