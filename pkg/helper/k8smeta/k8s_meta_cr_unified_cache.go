@@ -110,11 +110,10 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		_, err := c.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				defer panicRecover()
-				u := objectToUnstructured(obj)
+				u := trimmedCRCopyFromInformer(obj, c.resourceType)
 				if u == nil {
 					return
 				}
-				trimCRObjectForCache(u)
 				now := time.Now().Unix()
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeAdd,
@@ -129,11 +128,10 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 			},
 			UpdateFunc: func(_, obj interface{}) {
 				defer panicRecover()
-				u := objectToUnstructured(obj)
+				u := trimmedCRCopyFromInformer(obj, c.resourceType)
 				if u == nil {
 					return
 				}
-				trimCRObjectForCache(u)
 				now := time.Now().Unix()
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeUpdate,
@@ -148,11 +146,10 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 			},
 			DeleteFunc: func(obj interface{}) {
 				defer panicRecover()
-				u := objectToUnstructured(obj)
+				u := trimmedCRCopyFromInformer(obj, c.resourceType)
 				if u == nil {
 					return
 				}
-				trimCRObjectForCache(u)
 				c.eventCh <- &K8sMetaEvent{
 					EventType: EventTypeDelete,
 					Object: &ObjectWrapper{
@@ -251,23 +248,50 @@ func (c *crUnifiedCache) UnRegisterSendFunc(key string) {
 	c.metaStore.UnRegisterSendFunc(key)
 }
 
-func objectToUnstructured(obj interface{}) *unstructured.Unstructured {
-	if u, ok := obj.(*unstructured.Unstructured); ok {
-		return u.DeepCopy()
-	}
-	if tombstone, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-		if u, ok := tombstone.Obj.(*unstructured.Unstructured); ok {
-			return u.DeepCopy()
+// trimmedCRCopyFromInformer builds a detached object for the meta cache without full-object DeepCopy:
+// copies apiVersion/kind, metadata (without managedFields), and status via NestedFieldCopy — spec is omitted.
+// This avoids mutating the informer-shared *unstructured.Unstructured and skips copying large spec blobs.
+func trimmedCRCopyFromInformer(obj interface{}, resourceType string) *unstructured.Unstructured {
+	switch t := obj.(type) {
+	case *unstructured.Unstructured:
+		return buildTrimmedCRCopy(t, resourceType)
+	case cache.DeletedFinalStateUnknown:
+		if u, ok := t.Obj.(*unstructured.Unstructured); ok {
+			return buildTrimmedCRCopy(u, resourceType)
 		}
 	}
 	return nil
 }
 
-// trimCRObjectForCache drops spec and managedFields to limit memory; metadata + status remain for linking and whitelisted export.
-func trimCRObjectForCache(u *unstructured.Unstructured) {
+func buildTrimmedCRCopy(u *unstructured.Unstructured, resourceType string) *unstructured.Unstructured {
 	if u == nil {
-		return
+		return nil
 	}
-	unstructured.RemoveNestedField(u.Object, "spec")
-	unstructured.RemoveNestedField(u.Object, "metadata", "managedFields")
+	out := &unstructured.Unstructured{Object: make(map[string]interface{})}
+	if gv := u.GetAPIVersion(); gv != "" {
+		out.SetAPIVersion(gv)
+	}
+	if k := u.GetKind(); k != "" {
+		out.SetKind(k)
+	}
+	metaVal, metaFound, metaErr := unstructured.NestedFieldCopy(u.Object, "metadata")
+	if metaErr != nil {
+		logger.Debug(context.Background(), K8sMetaUnifyErrorCode, "nested copy metadata for CR cache", metaErr, "resourceType", resourceType)
+	} else if metaFound {
+		if metaMap, ok := metaVal.(map[string]interface{}); ok {
+			delete(metaMap, "managedFields")
+			if err := unstructured.SetNestedMap(out.Object, metaMap, "metadata"); err != nil {
+				logger.Debug(context.Background(), K8sMetaUnifyErrorCode, "set metadata on trimmed CR", err, "resourceType", resourceType)
+			}
+		}
+	}
+	statusVal, statusFound, statusErr := unstructured.NestedFieldCopy(u.Object, "status")
+	if statusErr != nil {
+		logger.Debug(context.Background(), K8sMetaUnifyErrorCode, "nested copy status for CR cache", statusErr, "resourceType", resourceType)
+	} else if statusFound {
+		if err := unstructured.SetNestedField(out.Object, statusVal, "status"); err != nil {
+			logger.Debug(context.Background(), K8sMetaUnifyErrorCode, "set status on trimmed CR", err, "resourceType", resourceType)
+		}
+	}
+	return out
 }

@@ -32,6 +32,7 @@ func TestDeferredDeletion(t *testing.T) {
 			Raw: pod,
 		},
 	}
+	time.Sleep(10 * time.Millisecond)
 	cache.lock.RLock()
 	if _, ok := cache.Items["default/test"]; !ok {
 		t.Errorf("failed to add object to cache")

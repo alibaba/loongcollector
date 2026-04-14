@@ -36,8 +36,8 @@
 | Ingress | bool, false | 是否采集Ingress元数据。 |
 | EnableLabels | bool, false | 是否采集**内置**Kubernetes 资源的标签（Labels）。 |
 | EnableAnnotations | bool, false | 是否采集**内置**资源的注解（Annotations）。 |
-| NamespaceBlackList | []string，可选 | 全局命名空间过滤：名单内命名空间的对象**不进入 meta 缓存、不投递实体/链路事件**。`Node`、`PersistentVolume`、`StorageClass` 不按命名空间过滤。与 `NamespaceWhiteList` 同时配置时，命名空间允许条件为「未命中黑名单 **或** 在白名单中」（并集语义）；|
-| NamespaceWhiteList | []string，可选 | 全局命名空间白名单，见上。均为空则不做命名空间限制。 |
+| NamespaceBlackList | []string，可选 | 全局命名空间过滤，见下文「**命名空间黑名单 / 白名单**」。`Node`、`PersistentVolume`、`StorageClass` 不按命名空间过滤。 |
+| NamespaceWhiteList | []string，可选 | 同上。 |
 | CustomResources | []object，可选 | 第三方 CR（动态 Informer）采集与链路，见下文「**第三方自定义资源（CustomResources）**」与「**Kubernetes RBAC 权限**」。 |
 | Node2Pod | string, 无默认值（可选） | Node到Pod的关系名，不填则不生成关系。 |
 | Deployment2Pod | string, 无默认值（可选） | Deployment到Pod的关系名，不填则不生成关系。 |
@@ -67,6 +67,14 @@
 | Cluster2PersistentVolume | string, 无默认值（可选） | Cluster到PersistentVolume的关系名，不填则不生成关系。 |
 | Cluster2StorageClass | string, 无默认值（可选） | Cluster到StorageClass的关系名，不填则不生成关系。 |
 
+### 命名空间黑名单 / 白名单
+
+对应参数 **`NamespaceBlackList`**、**`NamespaceWhiteList`**（均为可选字符串列表；名单项一般填命名空间名字符串）。
+
+1. **未配置限制**：若两项**均未配置**（未出现配置键，或列表解析后等价于「无有效条目」），则**不对命名空间做过滤**，相关命名空间作用域对象可进入 meta 缓存并参与实体/链路事件（集群作用域资源如 `Node`、`PersistentVolume`、`StorageClass` 本身不按命名空间过滤，行为不变）。
+2. **已配置策略**：若至少配置了其一（仅黑名单、仅白名单、或黑白名单同时存在），则对该插件实例生效一条命名空间策略——命名空间 **被允许** 的条件为：**（该命名空间不在黑名单中）或（该命名空间在白名单中）**（逻辑或，并集语义；与「先黑后白再取交集」的直觉不同）。仅黑名单时等价于「不在黑名单则允许」；仅白名单时等价于「在白名单则允许」。
+
+同一集群上若存在**多个** `service_kubernetes_meta` 配置实例，各自注册的策略在实现上为 **OR**：只要**任一**实例的策略允许该命名空间，对象即可通过（详见 `MetaManager.RegisterNamespacePolicy` 文档注释）。
 
 ## Kubernetes RBAC 权限
 
@@ -79,6 +87,8 @@
 `cannot list resource "workflows" in API group "argoproj.io" ... User "system:serviceaccount:..." cannot list ...`
 
 说明当前身份**缺少该 API 组下对应复数资源**的权限，与 LoongCollector 配置无关，需在 RBAC 中补齐。
+
+若 **CustomResources** 中某一 CR 的 watch **连续出现 RBAC/鉴权类错误**并达到停止阈值，该 CR 的动态 Informer 会在当前进程内停止且不会自动恢复，修正权限后须**手动重启 LoongCollector 进程**方可继续采集该类型。
 
 ### 内置资源
 
