@@ -14,10 +14,10 @@
 
 #include "app_config/AppConfig.h"
 #include "common/FileSystemUtil.h"
-#include "common/MachineInfoUtil.h"
 #include "common/Flags.h"
 #include "common/JsonUtil.h"
 #include "common/LogtailCommonFlags.h"
+#include "common/MachineInfoUtil.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(checkpoint_find_max_file_count);
