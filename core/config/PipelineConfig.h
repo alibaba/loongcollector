@@ -60,6 +60,7 @@ struct PipelineConfig {
     static std::function<time_t()> sCurrentTime;
 
     // RAII guard that temporarily replaces the clock with a fixed value.
+    // Not thread-safe — intended for single-threaded unit tests only.
     struct ScopedClockOverride {
         explicit ScopedClockOverride(time_t fixedNow) : mPrev(sCurrentTime) {
             sCurrentTime = [fixedNow]() -> time_t { return fixedNow; };
