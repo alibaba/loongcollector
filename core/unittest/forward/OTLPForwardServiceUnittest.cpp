@@ -25,10 +25,11 @@
 #include <string>
 #include <thread>
 
+#include "json/reader.h"
+
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "forward/otlp/OTLPForwardService.h"
-#include "json/reader.h"
 #include "logger/Logger.h"
 #include "protobuf/opentelemetry/proto/collector/logs/v1/logs_service.grpc.pb.h"
 #include "protobuf/opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"

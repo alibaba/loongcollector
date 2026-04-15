@@ -16,12 +16,13 @@
 
 #pragma once
 
-#include <grpcpp/grpcpp.h>
 #include <grpcpp/channel.h>
+#include <grpcpp/grpcpp.h>
 
 #include <condition_variable>
 #include <memory>
 #include <mutex>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -59,16 +60,11 @@ struct OTLPGrpcCallContext {
 struct OTLPSenderQueueItem : public SenderQueueItem {
     OTLPGrpcCallContext::DataType dataType;
 
-    OTLPSenderQueueItem(std::string&& data,
-                        size_t rawSize,
-                        Flusher* flusher,
-                        QueueKey key,
-                        OTLPGrpcCallContext::DataType type)
-        : SenderQueueItem(std::move(data), rawSize, flusher, key, RawDataType::EVENT_GROUP),
-          dataType(type) {}
+    OTLPSenderQueueItem(
+        std::string&& data, size_t rawSize, Flusher* flusher, QueueKey key, OTLPGrpcCallContext::DataType type)
+        : SenderQueueItem(std::move(data), rawSize, flusher, key, RawDataType::EVENT_GROUP), dataType(type) {}
 
-    OTLPSenderQueueItem(const OTLPSenderQueueItem& other)
-        : SenderQueueItem(other), dataType(other.dataType) {}
+    OTLPSenderQueueItem(const OTLPSenderQueueItem& other) : SenderQueueItem(other), dataType(other.dataType) {}
 
     ~OTLPSenderQueueItem() override = default;
 
@@ -116,6 +112,10 @@ public:
     }
     int32_t InFlightCount() const { return mInFlightCnt.load(); }
 
+    void TrackContext(grpc::ClientContext* ctx);
+    void UntrackContext(grpc::ClientContext* ctx);
+    void CancelAllInFlight();
+
 private:
     std::string mEndpoint;
     int32_t mTimeoutMs = 30000;
@@ -131,6 +131,9 @@ private:
     std::mutex mStopMutex;
     std::condition_variable mStopCV;
     std::atomic<bool> mIsStopping{false};
+
+    std::mutex mContextsMutex;
+    std::set<grpc::ClientContext*> mInFlightContexts;
 
     CounterPtr mSendCnt;
     CounterPtr mSendSuccessCnt;

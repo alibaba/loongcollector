@@ -142,8 +142,10 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         // there are multiple inputs
         pipeline->Process(eventGroupList, item->mInputIndex);
 
-        LOG_INFO(sLogger, ("ProcessorRunner after Process", "debug")(
-                     "config", configName)("eventCount", eventGroupList[0].GetEvents().size())("isGoPipeline", pipeline->IsFlushingThroughGoPipeline())("isLog", isLog));
+        LOG_INFO(sLogger,
+                 ("ProcessorRunner after Process", "debug")("config", configName)("eventCount",
+                                                                                  eventGroupList[0].GetEvents().size())(
+                     "isGoPipeline", pipeline->IsFlushingThroughGoPipeline())("isLog", isLog));
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
             // TODO:

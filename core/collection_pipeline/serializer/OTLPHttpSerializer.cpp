@@ -16,10 +16,10 @@
 
 #include "collection_pipeline/serializer/OTLPHttpSerializer.h"
 
-#include "google/protobuf/json/json.h"
-#include "google/protobuf/message.h"
 #include "json/writer.h"
 
+#include "google/protobuf/json/json.h"
+#include "google/protobuf/message.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/RawEvent.h"
@@ -44,8 +44,8 @@ using namespace opentelemetry::proto::trace::v1;
 using namespace opentelemetry::proto::common::v1;
 using namespace opentelemetry::proto::resource::v1;
 
-using google::protobuf::json::PrintOptions;
 using google::protobuf::json::MessageToJsonString;
+using google::protobuf::json::PrintOptions;
 
 static void SetProtoAttribute(KeyValue& kv, const StringView& key, const StringView& value) {
     kv.set_key(std::string(key.data(), key.size()));
@@ -96,7 +96,7 @@ static void SerializeLogEvents(const BatchedEvents& batch, ScopeLogs& scopeLogs)
         }
         logRecord->set_time_unix_nano(timeUnixNano);
 
-        auto msg = logEvent.GetContent("message");
+        auto msg = logEvent.GetContent("content");
         if (!msg.empty()) {
             logRecord->mutable_body()->set_string_value(std::string(msg.data(), msg.size()));
         }
@@ -139,9 +139,7 @@ static void SerializeMetricEvents(const BatchedEvents& batch, ScopeMetrics& scop
             dp->set_as_double(0.0);
         }
 
-        for (size_t i = 0; i < metricEvent.TagsSize(); ++i) {
-            auto tagIt = metricEvent.TagsBegin();
-            std::advance(tagIt, i);
+        for (auto tagIt = metricEvent.TagsBegin(); tagIt != metricEvent.TagsEnd(); ++tagIt) {
             auto* attr = dp->add_attributes();
             SetProtoAttribute(*attr, tagIt->first, tagIt->second);
         }
@@ -158,8 +156,7 @@ static void SerializeSpanEvents(const BatchedEvents& batch, ScopeSpans& scopeSpa
 
         span->set_trace_id(std::string(spanEvent.GetTraceId().data(), spanEvent.GetTraceId().size()));
         span->set_span_id(std::string(spanEvent.GetSpanId().data(), spanEvent.GetSpanId().size()));
-        span->set_parent_span_id(
-            std::string(spanEvent.GetParentSpanId().data(), spanEvent.GetParentSpanId().size()));
+        span->set_parent_span_id(std::string(spanEvent.GetParentSpanId().data(), spanEvent.GetParentSpanId().size()));
         span->set_name(std::string(spanEvent.GetName().data(), spanEvent.GetName().size()));
         span->set_start_time_unix_nano(spanEvent.GetStartTimeNs());
         span->set_end_time_unix_nano(spanEvent.GetEndTimeNs());
@@ -197,9 +194,7 @@ static void SerializeSpanEvents(const BatchedEvents& batch, ScopeSpans& scopeSpa
                 break;
         }
 
-        for (size_t i = 0; i < spanEvent.TagsSize(); ++i) {
-            auto tagIt = spanEvent.TagsBegin();
-            std::advance(tagIt, i);
+        for (auto tagIt = spanEvent.TagsBegin(); tagIt != spanEvent.TagsEnd(); ++tagIt) {
             auto* attr = span->add_attributes();
             SetProtoAttribute(*attr, tagIt->first, tagIt->second);
         }
@@ -209,15 +204,17 @@ static void SerializeSpanEvents(const BatchedEvents& batch, ScopeSpans& scopeSpa
 // Scan batch to detect event types and build the corresponding protobuf message.
 // Returns event type index (0=logs, 1=metrics, 2=traces) or -1 if empty.
 // Caller owns the returned Message* and must delete it.
-static int BuildProtobufMessage(const BatchedEvents& batch,
-                                google::protobuf::Message*& msg,
-                                std::string& errorMsg) {
+static int BuildProtobufMessage(const BatchedEvents& batch, google::protobuf::Message*& msg, std::string& errorMsg) {
     bool hasLog = false, hasMetric = false, hasSpan = false, hasRaw = false;
     for (const auto& event : batch.mEvents) {
-        if (event.Is<LogEvent>()) hasLog = true;
-        else if (event.Is<MetricEvent>()) hasMetric = true;
-        else if (event.Is<SpanEvent>()) hasSpan = true;
-        else if (event.Is<RawEvent>()) hasRaw = true;
+        if (event.Is<LogEvent>())
+            hasLog = true;
+        else if (event.Is<MetricEvent>())
+            hasMetric = true;
+        else if (event.Is<SpanEvent>())
+            hasSpan = true;
+        else if (event.Is<RawEvent>())
+            hasRaw = true;
     }
 
     if (!hasLog && !hasMetric && !hasSpan && !hasRaw) {
@@ -262,9 +259,7 @@ static int BuildProtobufMessage(const BatchedEvents& batch,
     return -1;
 }
 
-bool OTLPEventGroupSerializer::SerializeToBinaryString(BatchedEvents&& batch,
-                                                       std::string& res,
-                                                       std::string& errorMsg) {
+bool OTLPEventGroupSerializer::SerializeToBinaryString(BatchedEvents&& batch, std::string& res, std::string& errorMsg) {
     errorMsg.clear();
 
     google::protobuf::Message* msg = nullptr;

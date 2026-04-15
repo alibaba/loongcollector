@@ -14,7 +14,6 @@
 
 #include "runner/sink/grpc/GrpcSink.h"
 
-#include "app_config/AppConfig.h"
 #include "collection_pipeline/queue/SenderQueueItem.h"
 #include "common/Flags.h"
 #include "logger/Logger.h"
@@ -110,12 +109,7 @@ void GrpcSink::DispatchRequests() {
         items = std::move(mPendingRequests);
     }
 
-    int32_t maxConcurrency = AppConfig::GetInstance()->GetSendRequestGlobalConcurrency();
     for (auto& ctx : items) {
-        while (mSendingCnt.load() >= maxConcurrency) {
-            this_thread::sleep_for(chrono::milliseconds(10));
-        }
-
         ADD_COUNTER(mInItemsTotal, 1);
         ADD_GAUGE(mSendingItemsTotal, 1);
         mSendingCnt.fetch_add(1);
@@ -139,6 +133,7 @@ void GrpcSink::DispatchRequests() {
         }
 
         flusher->IncInFlight();
+        flusher->TrackContext(rawCtx->context.get());
 
         switch (rawCtx->type) {
             case OTLPGrpcCallContext::DataType::Logs:

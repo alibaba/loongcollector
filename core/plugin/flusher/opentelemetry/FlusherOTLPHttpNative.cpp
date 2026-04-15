@@ -41,7 +41,59 @@ bool FlusherOTLPHttpNative::Init(const Json::Value& config, Json::Value& optiona
                            mContext->GetRegion());
     }
 
-    // Optional format: "json" (default) or "protobuf"
+    // Validate URL: reject IPv6 and verify port
+    {
+        std::string urlForCheck = mUrl;
+        size_t schemeEnd = urlForCheck.find("://");
+        if (schemeEnd != std::string::npos) {
+            urlForCheck = urlForCheck.substr(schemeEnd + 3);
+        }
+        size_t pathStart = urlForCheck.find('/');
+        std::string hostPort = (pathStart != std::string::npos) ? urlForCheck.substr(0, pathStart) : urlForCheck;
+
+        if (hostPort.find('[') != std::string::npos) {
+            errorMsg = "IPv6 addresses are not supported, Url: " + mUrl;
+            PARAM_ERROR_RETURN(mContext->GetLogger(),
+                               mContext->GetAlarm(),
+                               errorMsg,
+                               sName,
+                               mContext->GetConfigName(),
+                               mContext->GetProjectName(),
+                               mContext->GetLogstoreName(),
+                               mContext->GetRegion());
+        }
+
+        size_t portSep = hostPort.find(':');
+        if (portSep != std::string::npos) {
+            std::string portStr = hostPort.substr(portSep + 1);
+            try {
+                int port = std::stoi(portStr);
+                if (port <= 0 || port > 65535) {
+                    errorMsg = "invalid port number in Url: " + mUrl;
+                    PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                       mContext->GetAlarm(),
+                                       errorMsg,
+                                       sName,
+                                       mContext->GetConfigName(),
+                                       mContext->GetProjectName(),
+                                       mContext->GetLogstoreName(),
+                                       mContext->GetRegion());
+                }
+            } catch (const std::exception&) {
+                errorMsg = "invalid port in Url: " + mUrl;
+                PARAM_ERROR_RETURN(mContext->GetLogger(),
+                                   mContext->GetAlarm(),
+                                   errorMsg,
+                                   sName,
+                                   mContext->GetConfigName(),
+                                   mContext->GetProjectName(),
+                                   mContext->GetLogstoreName(),
+                                   mContext->GetRegion());
+            }
+        }
+    }
+
+    // Optional format: "protobuf" (default) or "json"
     std::string formatStr;
     if (config.isMember("Format")) {
         formatStr = config["Format"].asString();
@@ -51,8 +103,8 @@ bool FlusherOTLPHttpNative::Init(const Json::Value& config, Json::Value& optiona
             mFormat = OTLPHttpFormat::JSON;
         } else {
             LOG_WARNING(sLogger,
-                        ("FlusherOTLPHttpNative invalid Format value", formatStr)(
-                            "action", "use default json format")("plugin", sName));
+                        ("FlusherOTLPHttpNative invalid Format value",
+                         formatStr)("action", "use default json format")("plugin", sName));
         }
     }
 
@@ -82,9 +134,8 @@ bool FlusherOTLPHttpNative::Init(const Json::Value& config, Json::Value& optiona
     mSendFailCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
 
     LOG_INFO(sLogger,
-             ("FlusherOTLPHttpNative initialized", "success")("url", mUrl)("format",
-                                                                            formatStr.empty() ? "json" : formatStr)(
-                 "tls", mEnableTLS));
+             ("FlusherOTLPHttpNative initialized", "success")("url", mUrl)(
+                 "format", mFormat == OTLPHttpFormat::Protobuf ? "protobuf" : "json")("tls", mEnableTLS));
     return true;
 }
 
@@ -95,7 +146,7 @@ bool FlusherOTLPHttpNative::Start() {
 
 bool FlusherOTLPHttpNative::Stop(bool isPipelineRemoving) {
     LOG_INFO(sLogger, ("FlusherOTLPHttpNative stopped", "success"));
-    return true;
+    return Flusher::Stop(isPipelineRemoving);
 }
 
 bool FlusherOTLPHttpNative::Send(PipelineEventGroup&& g) {
@@ -128,11 +179,9 @@ bool FlusherOTLPHttpNative::SerializeAndPush(PipelineEventGroup&& group) {
         return false;
     }
 
-    auto item = std::make_unique<SenderQueueItem>(std::move(serializedData),
-                                                   serializedData.size(),
-                                                   this,
-                                                   mQueueKey,
-                                                   RawDataType::EVENT_GROUP);
+    const size_t rawSize = serializedData.size();
+    auto item = std::make_unique<SenderQueueItem>(
+        std::move(serializedData), rawSize, this, mQueueKey, RawDataType::EVENT_GROUP);
 
     return PushToQueue(std::move(item));
 }
@@ -159,11 +208,9 @@ bool FlusherOTLPHttpNative::SerializeAndPushProtobuf(PipelineEventGroup&& group)
         return false;
     }
 
-    auto item = std::make_unique<SenderQueueItem>(std::move(serializedData),
-                                                   serializedData.size(),
-                                                   this,
-                                                   mQueueKey,
-                                                   RawDataType::EVENT_GROUP);
+    const size_t rawSize = serializedData.size();
+    auto item = std::make_unique<SenderQueueItem>(
+        std::move(serializedData), rawSize, this, mQueueKey, RawDataType::EVENT_GROUP);
 
     return PushToQueue(std::move(item));
 }
@@ -177,9 +224,9 @@ bool FlusherOTLPHttpNative::FlushAll() {
 }
 
 bool FlusherOTLPHttpNative::BuildRequest(SenderQueueItem* item,
-                                   std::unique_ptr<HttpSinkRequest>& req,
-                                   bool* keepItem,
-                                   std::string* errMsg) {
+                                         std::unique_ptr<HttpSinkRequest>& req,
+                                         bool* keepItem,
+                                         std::string* errMsg) {
     *keepItem = true;
 
     if (item->mData.empty()) {
@@ -190,9 +237,7 @@ bool FlusherOTLPHttpNative::BuildRequest(SenderQueueItem* item,
     std::string body = item->mData;
 
     std::map<std::string, std::string> headers;
-    headers["Content-Type"] = (mFormat == OTLPHttpFormat::Protobuf)
-                                  ? "application/x-protobuf"
-                                  : "application/json";
+    headers["Content-Type"] = (mFormat == OTLPHttpFormat::Protobuf) ? "application/x-protobuf" : "application/json";
     for (const auto& [key, val] : mExtraHeaders) {
         headers[key] = val;
     }
@@ -226,15 +271,7 @@ bool FlusherOTLPHttpNative::BuildRequest(SenderQueueItem* item,
         host = host.substr(0, portSep);
     }
 
-    req = std::make_unique<HttpSinkRequest>("POST",
-                                            mEnableTLS,
-                                            host,
-                                            port,
-                                            path,
-                                            "",
-                                            headers,
-                                            std::move(body),
-                                            item);
+    req = std::make_unique<HttpSinkRequest>("POST", mEnableTLS, host, port, path, "", headers, std::move(body), item);
     return true;
 }
 
@@ -245,8 +282,7 @@ void FlusherOTLPHttpNative::OnSendDone(const HttpResponse& response, SenderQueue
         DealSenderQueueItemAfterSend(item, false);
     } else {
         ADD_COUNTER(mSendFailCnt, 1);
-        LOG_WARNING(sLogger,
-                    ("FlusherOTLPHttpNative response error", statusCode));
+        LOG_WARNING(sLogger, ("FlusherOTLPHttpNative response error", statusCode));
         DealSenderQueueItemAfterSend(item, true); // keep for retry
     }
 }

@@ -26,16 +26,16 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/memory/SourceBuffer.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "common/memory/SourceBuffer.h"
 #include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
 #include "runner/FlusherRunner.h"
-#include "unittest/pipeline/GrpcSinkMock.h"
 #include "unittest/Unittest.h"
+#include "unittest/pipeline/GrpcSinkMock.h"
 
 using namespace std;
 
@@ -51,9 +51,7 @@ public:
         GrpcSinkMock::GetInstance()->Init();
     }
 
-    void TearDown() override {
-        GrpcSinkMock::GetInstance()->Stop();
-    }
+    void TearDown() override { GrpcSinkMock::GetInstance()->Stop(); }
 
     void TestPushToGrpcSink_Success();
     void TestPushToGrpcSink_BuildRequestFailure();

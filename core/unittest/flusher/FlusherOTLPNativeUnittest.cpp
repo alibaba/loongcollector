@@ -24,13 +24,13 @@
 
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
+#include "common/memory/SourceBuffer.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEventGroup.h"
 #include "models/RawEvent.h"
 #include "models/SpanEvent.h"
-#include "common/memory/SourceBuffer.h"
 #include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
 #include "protobuf/opentelemetry/proto/collector/logs/v1/logs_service.grpc.pb.h"
 #include "protobuf/opentelemetry/proto/collector/metrics/v1/metrics_service.grpc.pb.h"
@@ -46,10 +46,9 @@ namespace logtail {
 
 // ==================== Mock gRPC Collector Service ====================
 
-class MockOTLPCollectorService
-    : public LogsService::CallbackService,
-      public MetricsService::CallbackService,
-      public TraceService::CallbackService {
+class MockOTLPCollectorService : public LogsService::CallbackService,
+                                 public MetricsService::CallbackService,
+                                 public TraceService::CallbackService {
 public:
     grpc::ServerUnaryReactor* Export(grpc::CallbackServerContext* context,
                                      const ExportLogsServiceRequest* request,
@@ -174,9 +173,12 @@ protected:
     void StartServer() {
         grpc::ServerBuilder builder;
         builder.AddListeningPort(mServerAddress, grpc::InsecureServerCredentials());
-        builder.RegisterService(static_cast<grpc::Service*>(static_cast<LogsService::CallbackService*>(mMockService.get())));
-        builder.RegisterService(static_cast<grpc::Service*>(static_cast<MetricsService::CallbackService*>(mMockService.get())));
-        builder.RegisterService(static_cast<grpc::Service*>(static_cast<TraceService::CallbackService*>(mMockService.get())));
+        builder.RegisterService(
+            static_cast<grpc::Service*>(static_cast<LogsService::CallbackService*>(mMockService.get())));
+        builder.RegisterService(
+            static_cast<grpc::Service*>(static_cast<MetricsService::CallbackService*>(mMockService.get())));
+        builder.RegisterService(
+            static_cast<grpc::Service*>(static_cast<TraceService::CallbackService*>(mMockService.get())));
         mServer = builder.BuildAndStart();
         ASSERT_NE(mServer, nullptr);
         mServerThread = thread([this]() { mServer->Wait(); });
@@ -211,7 +213,7 @@ protected:
         auto group = PipelineEventGroup(make_shared<SourceBuffer>());
         auto* logEvent = group.AddLogEvent(true);
         logEvent->SetTimestamp(1748313840, 259486017);
-        logEvent->SetContent(string("message"), string("Test log message"));
+        logEvent->SetContent(string("content"), string("Test log message"));
         logEvent->SetContent(string("key1"), string("value1"));
         group.SetTag(string("service.name"), string("unittest"));
         return group;

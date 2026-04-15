@@ -91,16 +91,22 @@ bool FlusherOTLPNative::Start() {
 bool FlusherOTLPNative::Stop(bool isPipelineRemoving) {
     mIsStopping.store(true);
 
-    // Wait for in-flight requests to drain
-    std::unique_lock<std::mutex> lock(mStopMutex);
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-    mStopCV.wait_until(lock, deadline, [this]() {
-        return mInFlightCnt.load() == 0;
-    });
+    {
+        std::unique_lock<std::mutex> lock(mStopMutex);
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        mStopCV.wait_until(lock, deadline, [this]() { return mInFlightCnt.load() == 0; });
+    }
 
     if (mInFlightCnt.load() > 0) {
-        LOG_WARNING(sLogger,
-                    ("FlusherOTLPNative Stop timeout", "force cleanup")("remainingInFlight", mInFlightCnt.load()));
+        LOG_WARNING(sLogger, ("FlusherOTLPNative Stop timeout, cancelling in-flight RPCs", mInFlightCnt.load()));
+        CancelAllInFlight();
+
+        std::unique_lock<std::mutex> lock(mStopMutex);
+        auto cancelDeadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        mStopCV.wait_until(lock, cancelDeadline, [this]() { return mInFlightCnt.load() == 0; });
+        if (mInFlightCnt.load() > 0) {
+            LOG_ERROR(sLogger, ("FlusherOTLPNative cancelled RPCs still not drained", mInFlightCnt.load()));
+        }
     }
 
     mChannel.reset();
@@ -144,8 +150,9 @@ bool FlusherOTLPNative::Send(PipelineEventGroup&& g) {
             LOG_WARNING(sLogger, ("failed to serialize OTLP logs", errMsg)("config", mContext->GetConfigName()));
             allOk = false;
         } else {
+            const size_t rawSize = data.size();
             auto item = std::make_unique<OTLPSenderQueueItem>(
-                std::move(data), data.size(), this, mQueueKey, OTLPGrpcDataType::Logs);
+                std::move(data), rawSize, this, mQueueKey, OTLPGrpcDataType::Logs);
             allOk &= PushToQueue(std::move(item));
         }
     }
@@ -156,8 +163,9 @@ bool FlusherOTLPNative::Send(PipelineEventGroup&& g) {
             LOG_WARNING(sLogger, ("failed to serialize OTLP metrics", errMsg)("config", mContext->GetConfigName()));
             allOk = false;
         } else {
+            const size_t rawSize = data.size();
             auto item = std::make_unique<OTLPSenderQueueItem>(
-                std::move(data), data.size(), this, mQueueKey, OTLPGrpcDataType::Metrics);
+                std::move(data), rawSize, this, mQueueKey, OTLPGrpcDataType::Metrics);
             allOk &= PushToQueue(std::move(item));
         }
     }
@@ -168,8 +176,9 @@ bool FlusherOTLPNative::Send(PipelineEventGroup&& g) {
             LOG_WARNING(sLogger, ("failed to serialize OTLP traces", errMsg)("config", mContext->GetConfigName()));
             allOk = false;
         } else {
+            const size_t rawSize = data.size();
             auto item = std::make_unique<OTLPSenderQueueItem>(
-                std::move(data), data.size(), this, mQueueKey, OTLPGrpcDataType::Traces);
+                std::move(data), rawSize, this, mQueueKey, OTLPGrpcDataType::Traces);
             allOk &= PushToQueue(std::move(item));
         }
     }
@@ -198,7 +207,7 @@ bool FlusherOTLPNative::SerializeLogsToOTLP(const PipelineEventGroup& group,
             }
             logRecord->set_time_unix_nano(timeUnixNano);
             auto* body = logRecord->mutable_body();
-            auto msg = logEvent.GetContent("message");
+            auto msg = logEvent.GetContent("content");
             if (!msg.empty()) {
                 body->set_string_value(std::string(msg.data(), msg.size()));
             }
@@ -264,9 +273,7 @@ bool FlusherOTLPNative::SerializeMetricsToOTLP(const PipelineEventGroup& group,
             dp->set_as_double(0.0);
         }
 
-        for (size_t i = 0; i < metricEvent.TagsSize(); ++i) {
-            auto tagIt = metricEvent.TagsBegin();
-            std::advance(tagIt, i);
+        for (auto tagIt = metricEvent.TagsBegin(); tagIt != metricEvent.TagsEnd(); ++tagIt) {
             auto* label = dp->add_attributes();
             label->set_key(std::string(tagIt->first.data(), tagIt->first.size()));
             label->mutable_value()->set_string_value(std::string(tagIt->second.data(), tagIt->second.size()));
@@ -295,8 +302,7 @@ bool FlusherOTLPNative::SerializeTracesToOTLP(const PipelineEventGroup& group,
 
         span->set_trace_id(std::string(spanEvent.GetTraceId().data(), spanEvent.GetTraceId().size()));
         span->set_span_id(std::string(spanEvent.GetSpanId().data(), spanEvent.GetSpanId().size()));
-        span->set_parent_span_id(
-            std::string(spanEvent.GetParentSpanId().data(), spanEvent.GetParentSpanId().size()));
+        span->set_parent_span_id(std::string(spanEvent.GetParentSpanId().data(), spanEvent.GetParentSpanId().size()));
         span->set_name(std::string(spanEvent.GetName().data(), spanEvent.GetName().size()));
         span->set_start_time_unix_nano(spanEvent.GetStartTimeNs());
         span->set_end_time_unix_nano(spanEvent.GetEndTimeNs());
@@ -334,9 +340,7 @@ bool FlusherOTLPNative::SerializeTracesToOTLP(const PipelineEventGroup& group,
                 break;
         }
 
-        for (size_t i = 0; i < spanEvent.TagsSize(); ++i) {
-            auto tagIt = spanEvent.TagsBegin();
-            std::advance(tagIt, i);
+        for (auto tagIt = spanEvent.TagsBegin(); tagIt != spanEvent.TagsEnd(); ++tagIt) {
             auto* attr = span->add_attributes();
             attr->set_key(std::string(tagIt->first.data(), tagIt->first.size()));
             attr->mutable_value()->set_string_value(std::string(tagIt->second.data(), tagIt->second.size()));
@@ -363,10 +367,8 @@ bool FlusherOTLPNative::BuildGrpcRequest(SenderQueueItem* item,
 
     switch (otlpItem->dataType) {
         case OTLPGrpcDataType::Logs: {
-            ctx->logsReq = std::make_unique<
-                opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest>();
-            ctx->logsResp = std::make_unique<
-                opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>();
+            ctx->logsReq = std::make_unique<opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest>();
+            ctx->logsResp = std::make_unique<opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse>();
             if (!ctx->logsReq->ParseFromString(item->mData)) {
                 *errMsg = "failed to parse logs request from binary";
                 *keepItem = false;
@@ -375,10 +377,10 @@ bool FlusherOTLPNative::BuildGrpcRequest(SenderQueueItem* item,
             break;
         }
         case OTLPGrpcDataType::Metrics: {
-            ctx->metricsReq = std::make_unique<
-                opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest>();
-            ctx->metricsResp = std::make_unique<
-                opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse>();
+            ctx->metricsReq
+                = std::make_unique<opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest>();
+            ctx->metricsResp
+                = std::make_unique<opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse>();
             if (!ctx->metricsReq->ParseFromString(item->mData)) {
                 *errMsg = "failed to parse metrics request from binary";
                 *keepItem = false;
@@ -387,10 +389,8 @@ bool FlusherOTLPNative::BuildGrpcRequest(SenderQueueItem* item,
             break;
         }
         case OTLPGrpcDataType::Traces: {
-            ctx->traceReq = std::make_unique<
-                opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest>();
-            ctx->traceResp = std::make_unique<
-                opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>();
+            ctx->traceReq = std::make_unique<opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest>();
+            ctx->traceResp = std::make_unique<opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse>();
             if (!ctx->traceReq->ParseFromString(item->mData)) {
                 *errMsg = "failed to parse traces request from binary";
                 *keepItem = false;
@@ -420,17 +420,42 @@ void FlusherOTLPNative::OnSendDone(const grpc::Status& status, SenderQueueItem* 
 // ==================== HandleGrpcCallback (called by GrpcSink) ====================
 
 void FlusherOTLPNative::HandleGrpcCallback(grpc::Status&& status, OTLPGrpcCallContext* ctx) {
+    UntrackContext(ctx->context.get());
+
     if (status.ok()) {
         ADD_COUNTER(mSendSuccessCnt, 1);
     } else {
         ADD_COUNTER(mSendFailCnt, 1);
-        LOG_WARNING(sLogger,
-                    ("FlusherOTLPNative async Export failed", status.error_message())("code", status.error_code()));
+        if (status.error_code() == grpc::StatusCode::CANCELLED && mIsStopping.load()) {
+            LOG_INFO(sLogger, ("FlusherOTLPNative RPC cancelled during shutdown", ""));
+        } else {
+            LOG_WARNING(sLogger,
+                        ("FlusherOTLPNative async Export failed", status.error_message())("code", status.error_code()));
+        }
     }
 
     OnSendDone(status, ctx->item);
     DecInFlight();
     delete ctx;
+}
+
+// ==================== In-flight context tracking ====================
+
+void FlusherOTLPNative::TrackContext(grpc::ClientContext* ctx) {
+    std::lock_guard<std::mutex> lock(mContextsMutex);
+    mInFlightContexts.insert(ctx);
+}
+
+void FlusherOTLPNative::UntrackContext(grpc::ClientContext* ctx) {
+    std::lock_guard<std::mutex> lock(mContextsMutex);
+    mInFlightContexts.erase(ctx);
+}
+
+void FlusherOTLPNative::CancelAllInFlight() {
+    std::lock_guard<std::mutex> lock(mContextsMutex);
+    for (auto* ctx : mInFlightContexts) {
+        ctx->TryCancel();
+    }
 }
 
 // ==================== gRPC Channel ====================

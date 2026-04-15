@@ -27,8 +27,8 @@
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/MetricValue.h"
-#include "models/SpanEvent.h"
 #include "models/PipelineEventGroup.h"
+#include "models/SpanEvent.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace opentelemetry::proto::collector::logs::v1;
@@ -98,10 +98,9 @@ bool OTLPForwardServiceImpl::Remove(std::string configName, const Json::Value& c
 
 // ==================== Logs Export ====================
 
-grpc::ServerUnaryReactor* OTLPLogsGrpcService::Export(
-    grpc::CallbackServerContext* context,
-    const ExportLogsServiceRequest* request,
-    ExportLogsServiceResponse* response) {
+grpc::ServerUnaryReactor* OTLPLogsGrpcService::Export(grpc::CallbackServerContext* context,
+                                                      const ExportLogsServiceRequest* request,
+                                                      ExportLogsServiceResponse* response) {
     auto* reactor = context->DefaultReactor();
     grpc::Status status(grpc::StatusCode::NOT_FOUND, "No matching config");
 
@@ -127,33 +126,42 @@ grpc::ServerUnaryReactor* OTLPLogsGrpcService::Export(
 }
 
 void OTLPForwardServiceImpl::ProcessLogExport(const ExportLogsServiceRequest* request,
-                                               const std::shared_ptr<OTLPForwardConfig>& config,
-                                               grpc::Status& status) {
-    auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
-    int eventCount = 0;
-    size_t totalBytes = 0;
+                                              const std::shared_ptr<OTLPForwardConfig>& config,
+                                              grpc::Status& status) {
+    int totalEventCount = 0;
+    size_t totalBytes = request->ByteSizeLong();
+    ADD_COUNTER(mLogInSizeBytes, totalBytes);
+    bool allQueued = true;
 
+    // TODO: one OTLP request with N resources produces N PipelineEventGroups.
+    // Partial enqueue failure returns UNAVAILABLE which may cause the sender to
+    // retry the entire request, leading to duplicates for already-enqueued groups.
     for (const auto& resourceLogs : request->resource_logs()) {
+        auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+        int eventCount = 0;
+
+        // resource attributes as real tags on eventGroup
+        for (const auto& attr : resourceLogs.resource().attributes()) {
+            if (attr.value().has_string_value()) {
+                eventGroup.SetTag(attr.key(), attr.value().string_value());
+            }
+        }
+
         for (const auto& scopeLogs : resourceLogs.scope_logs()) {
             for (const auto& logRecord : scopeLogs.log_records()) {
                 auto* logEvent = eventGroup.AddLogEvent(true);
 
-                // timestamp in nanoseconds
                 uint64_t timeUnixNano = logRecord.time_unix_nano();
-                logEvent->SetTimestamp(timeUnixNano / 1000000000,
-                                       (timeUnixNano % 1000000000) / 1000);
+                logEvent->SetTimestamp(timeUnixNano / 1000000000, static_cast<uint32_t>(timeUnixNano % 1000000000));
 
-                // body
                 if (logRecord.has_body() && logRecord.body().has_string_value()) {
-                    logEvent->SetContent("message", logRecord.body().string_value());
+                    logEvent->SetContent("content", logRecord.body().string_value());
                 }
 
-                // severity
                 if (!logRecord.severity_text().empty()) {
                     logEvent->SetContent("severity", logRecord.severity_text());
                 }
 
-                // trace/span ids
                 if (!logRecord.trace_id().empty()) {
                     logEvent->SetContent("trace_id", logRecord.trace_id());
                 }
@@ -161,7 +169,6 @@ void OTLPForwardServiceImpl::ProcessLogExport(const ExportLogsServiceRequest* re
                     logEvent->SetContent("span_id", logRecord.span_id());
                 }
 
-                // attributes
                 for (const auto& attr : logRecord.attributes()) {
                     if (attr.value().has_string_value()) {
                         logEvent->SetContent(attr.key(), attr.value().string_value());
@@ -172,37 +179,40 @@ void OTLPForwardServiceImpl::ProcessLogExport(const ExportLogsServiceRequest* re
                     }
                 }
 
+                // scope attributes as pseudo-tags on each event
+                if (scopeLogs.has_scope()) {
+                    for (const auto& attr : scopeLogs.scope().attributes()) {
+                        if (attr.value().has_string_value()) {
+                            logEvent->SetContent("__tag__:" + attr.key(), attr.value().string_value());
+                        }
+                    }
+                }
+
                 eventCount++;
             }
         }
 
-        // resource attributes as tags
-        for (const auto& attr : resourceLogs.resource().attributes()) {
-            if (attr.value().has_string_value()) {
-                eventGroup.SetTag(attr.key(), attr.value().string_value());
+        if (eventCount > 0) {
+            totalEventCount += eventCount;
+            if (!ProcessorRunner::GetInstance()->PushQueue(
+                    config->queueKey, config->inputIndex, std::move(eventGroup), 3)) {
+                allQueued = false;
             }
         }
     }
 
-    totalBytes = request->ByteSizeLong();
-    ADD_COUNTER(mLogInSizeBytes, totalBytes);
-
-    if (eventCount == 0) {
+    if (totalEventCount == 0) {
         status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "No log events");
-        return;
+    } else {
+        status = allQueued ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
     }
-
-    bool result = ProcessorRunner::GetInstance()->PushQueue(
-        config->queueKey, config->inputIndex, std::move(eventGroup), 3);
-    status = result ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
 }
 
 // ==================== Metrics Export ====================
 
-grpc::ServerUnaryReactor* OTLPMetricsGrpcService::Export(
-    grpc::CallbackServerContext* context,
-    const ExportMetricsServiceRequest* request,
-    ExportMetricsServiceResponse* response) {
+grpc::ServerUnaryReactor* OTLPMetricsGrpcService::Export(grpc::CallbackServerContext* context,
+                                                         const ExportMetricsServiceRequest* request,
+                                                         ExportMetricsServiceResponse* response) {
     auto* reactor = context->DefaultReactor();
     grpc::Status status(grpc::StatusCode::NOT_FOUND, "No matching config");
 
@@ -215,7 +225,8 @@ grpc::ServerUnaryReactor* OTLPMetricsGrpcService::Export(
     auto before = TimeKeeper::GetInstance()->NowMs();
     ADD_COUNTER(mImpl->mMetricInEventsTotal, 1);
 
-    LOG_INFO(sLogger, ("OTLPMetricsGrpcService Export", "processing")("resourceMetrics", request->resource_metrics().size()));
+    LOG_DEBUG(sLogger,
+              ("OTLPMetricsGrpcService Export", "processing")("resourceMetrics", request->resource_metrics().size()));
 
     std::shared_ptr<OTLPForwardConfig> config;
     if (mImpl->FindMatchingConfig(context, config)) {
@@ -230,13 +241,16 @@ grpc::ServerUnaryReactor* OTLPMetricsGrpcService::Export(
 }
 
 void OTLPForwardServiceImpl::ProcessMetricExport(const ExportMetricsServiceRequest* request,
-                                                  const std::shared_ptr<OTLPForwardConfig>& config,
-                                                  grpc::Status& status) {
-    auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
-    int eventCount = 0;
+                                                 const std::shared_ptr<OTLPForwardConfig>& config,
+                                                 grpc::Status& status) {
+    int totalEventCount = 0;
+    bool allQueued = true;
 
+    // TODO: same partial-enqueue caveat as ProcessLogExport.
     for (const auto& resourceMetrics : request->resource_metrics()) {
-        // resource attributes as tags
+        auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+        int eventCount = 0;
+
         for (const auto& attr : resourceMetrics.resource().attributes()) {
             if (attr.value().has_string_value()) {
                 eventGroup.SetTag(attr.key(), attr.value().string_value());
@@ -244,14 +258,24 @@ void OTLPForwardServiceImpl::ProcessMetricExport(const ExportMetricsServiceReque
         }
 
         for (const auto& scopeMetrics : resourceMetrics.scope_metrics()) {
+            auto addScopeTags = [&](MetricEvent* metricEvent) {
+                if (scopeMetrics.has_scope()) {
+                    for (const auto& attr : scopeMetrics.scope().attributes()) {
+                        if (attr.value().has_string_value()) {
+                            metricEvent->SetTag("__tag__:" + attr.key(), attr.value().string_value());
+                        }
+                    }
+                }
+            };
+
             for (const auto& metric : scopeMetrics.metrics()) {
-                // handle different metric types
                 switch (metric.data_case()) {
                     case opentelemetry::proto::metrics::v1::Metric::DataCase::kGauge: {
                         for (const auto& dp : metric.gauge().data_points()) {
                             auto* metricEvent = eventGroup.AddMetricEvent(true);
                             metricEvent->SetName(metric.name());
                             metricEvent->SetValue<UntypedSingleValue>(dp.as_double());
+                            addScopeTags(metricEvent);
                             eventCount++;
                         }
                         break;
@@ -261,6 +285,7 @@ void OTLPForwardServiceImpl::ProcessMetricExport(const ExportMetricsServiceReque
                             auto* metricEvent = eventGroup.AddMetricEvent(true);
                             metricEvent->SetName(metric.name());
                             metricEvent->SetValue<UntypedSingleValue>(dp.as_double());
+                            addScopeTags(metricEvent);
                             eventCount++;
                         }
                         break;
@@ -270,6 +295,7 @@ void OTLPForwardServiceImpl::ProcessMetricExport(const ExportMetricsServiceReque
                             auto* metricEvent = eventGroup.AddMetricEvent(true);
                             metricEvent->SetName(metric.name());
                             metricEvent->SetValue<UntypedSingleValue>(dp.sum());
+                            addScopeTags(metricEvent);
                             eventCount++;
                         }
                         break;
@@ -279,24 +305,28 @@ void OTLPForwardServiceImpl::ProcessMetricExport(const ExportMetricsServiceReque
                 }
             }
         }
+
+        if (eventCount > 0) {
+            totalEventCount += eventCount;
+            if (!ProcessorRunner::GetInstance()->PushQueue(
+                    config->queueKey, config->inputIndex, std::move(eventGroup), 3)) {
+                allQueued = false;
+            }
+        }
     }
 
-    if (eventCount == 0) {
+    if (totalEventCount == 0) {
         status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "No metric events");
-        return;
+    } else {
+        status = allQueued ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
     }
-
-    bool result = ProcessorRunner::GetInstance()->PushQueue(
-        config->queueKey, config->inputIndex, std::move(eventGroup), 3);
-    status = result ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
 }
 
 // ==================== Traces Export ====================
 
-grpc::ServerUnaryReactor* OTLPTraceGrpcService::Export(
-    grpc::CallbackServerContext* context,
-    const ExportTraceServiceRequest* request,
-    ExportTraceServiceResponse* response) {
+grpc::ServerUnaryReactor* OTLPTraceGrpcService::Export(grpc::CallbackServerContext* context,
+                                                       const ExportTraceServiceRequest* request,
+                                                       ExportTraceServiceResponse* response) {
     auto* reactor = context->DefaultReactor();
     grpc::Status status(grpc::StatusCode::NOT_FOUND, "No matching config");
 
@@ -322,28 +352,35 @@ grpc::ServerUnaryReactor* OTLPTraceGrpcService::Export(
 }
 
 void OTLPForwardServiceImpl::ProcessTraceExport(const ExportTraceServiceRequest* request,
-                                                 const std::shared_ptr<OTLPForwardConfig>& config,
-                                                 grpc::Status& status) {
-    auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
-    int eventCount = 0;
+                                                const std::shared_ptr<OTLPForwardConfig>& config,
+                                                grpc::Status& status) {
+    int totalEventCount = 0;
+    bool allQueued = true;
 
+    // TODO: same partial-enqueue caveat as ProcessLogExport.
     for (const auto& resourceSpans : request->resource_spans()) {
+        auto eventGroup = PipelineEventGroup(std::make_shared<SourceBuffer>());
+        int eventCount = 0;
+
+        for (const auto& attr : resourceSpans.resource().attributes()) {
+            if (attr.value().has_string_value()) {
+                eventGroup.SetTag(attr.key(), attr.value().string_value());
+            }
+        }
+
         for (const auto& scopeSpans : resourceSpans.scope_spans()) {
             for (const auto& span : scopeSpans.spans()) {
                 auto* spanEvent = eventGroup.AddSpanEvent(true);
                 eventCount++;
 
-                // trace_id, span_id
                 spanEvent->SetTraceId(span.trace_id());
                 spanEvent->SetSpanId(span.span_id());
                 spanEvent->SetParentSpanId(span.parent_span_id());
                 spanEvent->SetName(span.name());
 
-                // timestamps
                 spanEvent->SetStartTimeNs(span.start_time_unix_nano());
                 spanEvent->SetEndTimeNs(span.end_time_unix_nano());
 
-                // status
                 if (span.has_status()) {
                     switch (span.status().code()) {
                         case opentelemetry::proto::trace::v1::Status::STATUS_CODE_OK:
@@ -358,7 +395,6 @@ void OTLPForwardServiceImpl::ProcessTraceExport(const ExportTraceServiceRequest*
                     }
                 }
 
-                // kind
                 switch (span.kind()) {
                     case opentelemetry::proto::trace::v1::Span::SPAN_KIND_CLIENT:
                         spanEvent->SetKind(SpanEvent::Kind::Client);
@@ -377,7 +413,6 @@ void OTLPForwardServiceImpl::ProcessTraceExport(const ExportTraceServiceRequest*
                         break;
                 }
 
-                // attributes as tags
                 for (const auto& attr : span.attributes()) {
                     if (attr.value().has_string_value()) {
                         spanEvent->SetTag(attr.key(), attr.value().string_value());
@@ -385,29 +420,31 @@ void OTLPForwardServiceImpl::ProcessTraceExport(const ExportTraceServiceRequest*
                         spanEvent->SetTag(attr.key(), std::to_string(attr.value().int_value()));
                     }
                 }
+
+                if (scopeSpans.has_scope()) {
+                    for (const auto& attr : scopeSpans.scope().attributes()) {
+                        if (attr.value().has_string_value()) {
+                            spanEvent->SetTag("__tag__:" + attr.key(), attr.value().string_value());
+                        }
+                    }
+                }
             }
         }
 
-        // resource attributes as tags on eventGroup
-        for (const auto& attr : resourceSpans.resource().attributes()) {
-            if (attr.value().has_string_value()) {
-                eventGroup.SetTag(attr.key(), attr.value().string_value());
+        if (eventCount > 0) {
+            totalEventCount += eventCount;
+            if (!ProcessorRunner::GetInstance()->PushQueue(
+                    config->queueKey, config->inputIndex, std::move(eventGroup), 3)) {
+                allQueued = false;
             }
         }
     }
 
-    if (eventCount == 0) {
+    if (totalEventCount == 0) {
         status = grpc::Status(grpc::StatusCode::INVALID_ARGUMENT, "No span events");
-        return;
+    } else {
+        status = allQueued ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
     }
-
-    LOG_INFO(sLogger,
-             ("OTLPForwardService ProcessTraceExport", "sending to queue")("config", config->configName)(
-                 "queueKey", config->queueKey)("inputIndex", config->inputIndex)("spanCount", eventCount));
-
-    bool result = ProcessorRunner::GetInstance()->PushQueue(
-        config->queueKey, config->inputIndex, std::move(eventGroup), 3);
-    status = result ? grpc::Status::OK : grpc::Status(grpc::StatusCode::UNAVAILABLE, "Queue full, retry");
 }
 
 // ==================== Common ====================
@@ -424,7 +461,7 @@ bool OTLPForwardServiceImpl::AddToIndex(std::string& configName, OTLPForwardConf
 }
 
 bool OTLPForwardServiceImpl::FindMatchingConfig(grpc::CallbackServerContext* context,
-                                                 std::shared_ptr<OTLPForwardConfig>& config) const {
+                                                std::shared_ptr<OTLPForwardConfig>& config) const {
     std::shared_lock<std::shared_mutex> lock(mMatchIndexMutex);
 
     // Try to match via x-otlp-apm-configname metadata first

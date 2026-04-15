@@ -23,12 +23,12 @@
 #include "collection_pipeline/CollectionPipeline.h"
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "common/http/HttpResponse.h"
+#include "common/memory/SourceBuffer.h"
 #include "models/LogEvent.h"
 #include "models/MetricEvent.h"
 #include "models/MetricValue.h"
 #include "models/PipelineEventGroup.h"
 #include "models/SpanEvent.h"
-#include "common/memory/SourceBuffer.h"
 #include "plugin/flusher/opentelemetry/FlusherOTLPHttpNative.h"
 #include "runner/sink/http/HttpSinkRequest.h"
 #include "unittest/Unittest.h"
@@ -81,7 +81,7 @@ protected:
         auto group = PipelineEventGroup(std::make_shared<SourceBuffer>());
         auto* logEvent = group.AddLogEvent(true);
         logEvent->SetTimestamp(1748313840, 259486017);
-        logEvent->SetContent(std::string("message"), std::string("Test log message"));
+        logEvent->SetContent(std::string("content"), std::string("Test log message"));
         group.SetTag(std::string("service.name"), std::string("unittest"));
         return group;
     }
@@ -157,7 +157,8 @@ void FlusherOTLPHttpNativeUnittest::TestBuildRequestLogs() {
     APSARA_TEST_TRUE(flusher != nullptr);
 
     // Build a test SenderQueueItem with serialized OTLP JSON data
-    std::string testData = R"({"resource_logs":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_logs":[{"log_records":[{"time_unix_nano":"1748313840259486017","body":{"string_value":"Test log message"}}]}]}]})";
+    std::string testData
+        = R"({"resource_logs":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_logs":[{"log_records":[{"time_unix_nano":"1748313840259486017","body":{"string_value":"Test log message"}}]}]}]})";
     SenderQueueItem testItem(std::string(testData), testData.size(), flusher.get(), 0, RawDataType::EVENT_GROUP);
 
     std::unique_ptr<HttpSinkRequest> req;
@@ -194,7 +195,8 @@ void FlusherOTLPHttpNativeUnittest::TestBuildRequestMetrics() {
     auto flusher = CreateAndInitFlusher(config);
     APSARA_TEST_TRUE(flusher != nullptr);
 
-    std::string testData = R"({"resource_metrics":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_metrics":[{"metrics":[{"name":"test.metric.value","gauge":{"data_points":[{"as_double":42.5}]}}]}]}]})";
+    std::string testData
+        = R"({"resource_metrics":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_metrics":[{"metrics":[{"name":"test.metric.value","gauge":{"data_points":[{"as_double":42.5}]}}]}]}]})";
     SenderQueueItem testItem(std::string(testData), testData.size(), flusher.get(), 0, RawDataType::EVENT_GROUP);
 
     std::unique_ptr<HttpSinkRequest> req;
@@ -218,7 +220,8 @@ void FlusherOTLPHttpNativeUnittest::TestBuildRequestTraces() {
     auto flusher = CreateAndInitFlusher(config);
     APSARA_TEST_TRUE(flusher != nullptr);
 
-    std::string testData = R"({"resource_spans":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_spans":[{"spans":[{"trace_id":"unittest1234567890abcdef12345678","span_id":"unittest12345678","name":"/test/api","kind":2,"status":{"code":1}}]}]}]})";
+    std::string testData
+        = R"({"resource_spans":[{"resource":{"attributes":[{"key":"service.name","value":{"string_value":"unittest"}}]},"scope_spans":[{"spans":[{"trace_id":"unittest1234567890abcdef12345678","span_id":"unittest12345678","name":"/test/api","kind":2,"status":{"code":1}}]}]}]})";
     SenderQueueItem testItem(std::string(testData), testData.size(), flusher.get(), 0, RawDataType::EVENT_GROUP);
 
     std::unique_ptr<HttpSinkRequest> req;
