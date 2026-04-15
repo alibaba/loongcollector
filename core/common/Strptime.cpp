@@ -82,11 +82,7 @@ static const unsigned char* find_string(const unsigned char*, int*, const char* 
 // Modify from https://github.com/tnodir/luasys/blob/master/src/win32/strptime.c
 const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* nanosecond, int* nanosecondLength) {
     // Replenish %s support.
-    bool withFraction = false;
-    bool withDot = false;
-    if (0 == strcmp("%s", fmt) || 0 == strcmp("%s%f", fmt) || 0 == strcmp("%s.%f", fmt)) {
-        withFraction = (0 != strcmp("%s", fmt));
-        withDot = (0 == strcmp("%s.%f", fmt));
+    if (0 == strcmp("%s", fmt) || 0 == strcmp("%s%f", fmt)) {
         char* cp;
         long long n;
         n = strtoll(buf, &cp, 10);
@@ -112,21 +108,8 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
         *nanosecond = 0;
         *nanosecondLength = 0;
         const unsigned char* fractionStart = (const unsigned char*)(buf + secondTimestampLength);
-        if (!withFraction) {
-            conv_nanosecond(fractionStart, nanosecond, nanosecondLength);
-            return ((const char*)cp);
-        }
-        if (withDot) {
-            if (*fractionStart != '.') {
-                return NULL;
-            }
-            ++fractionStart;
-        }
-        const unsigned char* fractionEnd = conv_nanosecond(fractionStart, nanosecond, nanosecondLength);
-        if (fractionEnd == NULL) {
-            return NULL;
-        }
-        return ((const char*)fractionEnd);
+        conv_nanosecond(fractionStart, nanosecond, nanosecondLength);
+        return ((const char*)cp);
     }
 
     unsigned char c;
@@ -599,7 +582,7 @@ static const unsigned char* conv_num(const unsigned char* buf, int* dest, unsign
 static const unsigned char* conv_nanosecond(const unsigned char* buf, long* dest, int* nanosecondLength) {
     unsigned int result = 0;
     unsigned char ch;
-    int digitNum = 0;
+    int precisionDigitNum = 0;
     const unsigned char* start = buf;
 
     ch = *buf;
@@ -607,15 +590,14 @@ static const unsigned char* conv_nanosecond(const unsigned char* buf, long* dest
         return NULL;
 
     do {
-        if (digitNum >= 9) {
-            break;
+        if (precisionDigitNum < 9) {
+            result *= 10;
+            result += ch - '0';
+            ++precisionDigitNum;
         }
-        result *= 10;
-        result += ch - '0';
-        ++digitNum;
         ch = *++buf;
     } while (ch >= '0' && ch <= '9');
-    for (int i = 0; i < 9 - digitNum; i++) {
+    for (int i = 0; i < 9 - precisionDigitNum; i++) {
         result *= 10;
     }
     *dest = result;
