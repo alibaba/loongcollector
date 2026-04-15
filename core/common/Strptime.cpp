@@ -82,7 +82,11 @@ static const unsigned char* find_string(const unsigned char*, int*, const char* 
 // Modify from https://github.com/tnodir/luasys/blob/master/src/win32/strptime.c
 const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* nanosecond, int* nanosecondLength) {
     // Replenish %s support.
-    if (0 == strcmp("%s", fmt)) {
+    bool withFraction = false;
+    bool withDot = false;
+    if (0 == strcmp("%s", fmt) || 0 == strcmp("%s%f", fmt) || 0 == strcmp("%s.%f", fmt)) {
+        withFraction = (0 != strcmp("%s", fmt));
+        withDot = (0 == strcmp("%s.%f", fmt));
         char* cp;
         long long n;
         n = strtoll(buf, &cp, 10);
@@ -107,15 +111,33 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
 
         *nanosecond = 0;
         *nanosecondLength = 0;
-        conv_nanosecond((const unsigned char*)(buf + secondTimestampLength), nanosecond, nanosecondLength);
-        return ((const char*)cp);
+        const unsigned char* fractionStart = (const unsigned char*)(buf + secondTimestampLength);
+        if (!withFraction) {
+            conv_nanosecond(fractionStart, nanosecond, nanosecondLength);
+            return ((const char*)cp);
+        }
+        if (withDot) {
+            if (*fractionStart != '.') {
+                return NULL;
+            }
+            ++fractionStart;
+        }
+        const unsigned char* fractionEnd = conv_nanosecond(fractionStart, nanosecond, nanosecondLength);
+        if (fractionEnd == NULL) {
+            return NULL;
+        }
+        return ((const char*)fractionEnd);
     }
 
     unsigned char c;
     const unsigned char *bp, *ep;
     int alt_format, i, split_year = 0, neg = 0, offs;
+    char* cp = nullptr;
+    long long n;
+    time_t t;
     const char* new_fmt;
     *nanosecond = 0;
+    *nanosecondLength = 0;
 
     bp = (const unsigned char*)buf;
 
@@ -289,6 +311,22 @@ const char* strptime_ns(const char* buf, const char* fmt, struct tm* tm, long* n
             case 'S': /* The seconds. */
                 bp = conv_num(bp, &tm->tm_sec, 0, 61);
                 LEGAL_ALT(ALT_O);
+                continue;
+
+            case 's': /* Seconds since epoch. */
+                n = strtoll((const char*)bp, &cp, 10);
+                if (n == 0 || (long long)(t = n) != n) {
+                    return NULL;
+                }
+#ifdef _MSC_VER
+                if (localtime_s(tm, &t) != 0)
+                    return NULL;
+#else
+                if (NULL == localtime_r(&t, tm))
+                    return NULL;
+#endif
+                bp = (const unsigned char*)cp;
+                LEGAL_ALT(0);
                 continue;
 
             case 'U': /* The week of year, beginning on sunday. */
@@ -569,6 +607,9 @@ static const unsigned char* conv_nanosecond(const unsigned char* buf, long* dest
         return NULL;
 
     do {
+        if (digitNum >= 9) {
+            break;
+        }
         result *= 10;
         result += ch - '0';
         ++digitNum;
