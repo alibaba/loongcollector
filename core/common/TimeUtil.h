@@ -17,6 +17,7 @@
 #pragma once
 #include <ctime>
 
+#include <chrono>
 #include <optional>
 #include <string>
 #include <thread>
@@ -51,11 +52,11 @@ extern std::function<uint64_t()> gCurrentTimeNs;
 
 // RAII guard that temporarily pins the clock to a fixed value for the duration
 // of a test and restores the previous value on destruction.
-// Accepts a second-granular time_t for convenience; precision is stored as nanoseconds.
 // Not thread-safe — intended for single-threaded unit tests only.
 struct ScopedClockOverride {
-    explicit ScopedClockOverride(time_t fixedNow) : mPrev(gCurrentTimeNs) {
-        const uint64_t fixedNs = static_cast<uint64_t>(fixedNow) * 1000000000ULL;
+    explicit ScopedClockOverride(std::chrono::system_clock::time_point fixedNow) : mPrev(gCurrentTimeNs) {
+        const uint64_t fixedNs = static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(fixedNow.time_since_epoch()).count());
         gCurrentTimeNs = [fixedNs]() -> uint64_t { return fixedNs; };
     }
     ~ScopedClockOverride() { gCurrentTimeNs = mPrev; }
