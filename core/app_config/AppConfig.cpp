@@ -640,7 +640,6 @@ AppConfig::AppConfig() {
     CheckPurageContainerMode();
 }
 
-
 void AppConfig::MergeJson(Json::Value& mainConfJson, const Json::Value& subConfJson) {
     for (auto subkey : subConfJson.getMemberNames()) {
         mainConfJson[subkey] = subConfJson[subkey];
