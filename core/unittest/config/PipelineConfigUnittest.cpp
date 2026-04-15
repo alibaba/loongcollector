@@ -71,9 +71,11 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = true;
 
+        auto now = time(nullptr);
+        PipelineConfig::ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(now) + 604800U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -81,9 +83,11 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 1U;
 
+        auto now = time(nullptr);
+        PipelineConfig::ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 600U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(now) + 600U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
     {
@@ -91,9 +95,11 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 1000000U;
 
+        auto now = time(nullptr);
+        PipelineConfig::ScopedClockOverride clockGuard(now);
         ConfigMock config("test", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 604800U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(static_cast<uint32_t>(now) + 604800U, config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
     }
 
