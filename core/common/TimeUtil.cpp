@@ -19,6 +19,9 @@
 
 #include <atomic>
 #include <chrono>
+#ifdef APSARA_UNIT_TEST_MAIN
+#include <functional>
+#endif
 #include <limits>
 #if defined(__linux__)
 #include <ctime>
@@ -34,6 +37,10 @@
 namespace logtail {
 
 const std::string PRECISE_TIMESTAMP_DEFAULT_KEY = "precise_timestamp";
+
+#ifdef APSARA_UNIT_TEST_MAIN
+std::function<time_t()> gCurrentTime = []() -> time_t { return time(nullptr); };
+#endif
 
 std::string ConvertToTimeStamp(const time_t& t, const std::string& format) {
     return GetTimeStamp(t, format);
@@ -59,14 +66,30 @@ std::string GetTimeStamp(time_t t, const std::string& format, bool isLocal) {
     return (0 == ret) ? "" : std::string(buf, ret);
 }
 
+uint64_t GetCurrentTimeInSeconds() {
+#ifdef APSARA_UNIT_TEST_MAIN
+    return static_cast<uint64_t>(gCurrentTime());
+#else
+    return static_cast<uint64_t>(time(nullptr));
+#endif
+}
+
 uint64_t GetCurrentTimeInMicroSeconds() {
+#ifdef APSARA_UNIT_TEST_MAIN
+    return static_cast<uint64_t>(gCurrentTime()) * 1000000ULL;
+#else
     return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
+#endif
 }
 
 uint64_t GetCurrentTimeInMilliSeconds() {
+#ifdef APSARA_UNIT_TEST_MAIN
+    return static_cast<uint64_t>(gCurrentTime()) * 1000ULL;
+#else
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
+#endif
 }
 
 int GetLocalTimeZoneOffsetSecond() {
@@ -365,8 +388,12 @@ uint64_t GetPreciseTimestamp(uint64_t secondTimestamp,
 }
 
 uint64_t GetCurrentTimeInNanoSeconds() {
+#ifdef APSARA_UNIT_TEST_MAIN
+    return static_cast<uint64_t>(gCurrentTime()) * 1000000000ULL;
+#else
     return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
+#endif
 }
 
 bool ParseTimeZoneOffsetSecond(const std::string& logTZ, int& logTZSecond) {

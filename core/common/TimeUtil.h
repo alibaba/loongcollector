@@ -21,6 +21,10 @@
 #include <string>
 #include <thread>
 
+#ifdef APSARA_UNIT_TEST_MAIN
+#include <functional>
+#endif
+
 #include "common/Strptime.h"
 #include "protobuf/sls/sls_logs.pb.h"
 
@@ -41,11 +45,33 @@ struct PreciseTimestampConfig {
 
 typedef timespec LogtailTime;
 
+#ifdef APSARA_UNIT_TEST_MAIN
+// Injectable clock for deterministic unit tests. Defaults to time(nullptr).
+extern std::function<time_t()> gCurrentTime;
+
+// RAII guard that temporarily pins the clock to a fixed value for the duration
+// of a test and restores the previous value on destruction.
+// Not thread-safe — intended for single-threaded unit tests only.
+struct ScopedClockOverride {
+    explicit ScopedClockOverride(time_t fixedNow) : mPrev(gCurrentTime) {
+        gCurrentTime = [fixedNow]() -> time_t { return fixedNow; };
+    }
+    ~ScopedClockOverride() { gCurrentTime = mPrev; }
+
+    ScopedClockOverride(const ScopedClockOverride&) = delete;
+    ScopedClockOverride& operator=(const ScopedClockOverride&) = delete;
+
+private:
+    std::function<time_t()> mPrev;
+};
+#endif
+
 // Convert @tm to string according to @format. TODO: Merge ConvertToTimeStamp and GetTimeStamp.
 std::string ConvertToTimeStamp(const time_t& tm, const std::string& format = "%Y%m%d%H%M%S");
 std::string GetTimeStamp(time_t tm, const std::string& format = "%Y%m%d%H%M%S", bool isLocal = true);
 
-// Get current time in us or ms.
+// Get current time in s, us, ms, or ns.
+uint64_t GetCurrentTimeInSeconds();
 uint64_t GetCurrentTimeInMicroSeconds();
 uint64_t GetCurrentTimeInMilliSeconds();
 uint64_t GetCurrentTimeInNanoSeconds();

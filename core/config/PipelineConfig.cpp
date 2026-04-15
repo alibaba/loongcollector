@@ -15,24 +15,13 @@
 #include "config/PipelineConfig.h"
 
 #include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
 #include "logger/Logger.h"
 
 using namespace std;
 
 namespace logtail {
-
-#ifdef APSARA_UNIT_TEST_MAIN
-std::function<time_t()> PipelineConfig::sCurrentTime = []() -> time_t { return time(nullptr); };
-
-static time_t GetCurrentTime() {
-    return PipelineConfig::sCurrentTime();
-}
-#else
-static time_t GetCurrentTime() {
-    return time(nullptr);
-}
-#endif
 
 static constexpr uint32_t minExpireTime = 600; // 10 minutes
 static constexpr uint32_t maxExpireTime = 604800; // 1 week
@@ -108,12 +97,12 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
             return true;
         case OnetimeConfigStatus::NEW:
             // NEW状态表示是新配置，或已有配置Rerun了
-            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTime());
+            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTimeInSeconds());
             mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             return true;
         case OnetimeConfigStatus::UPDATED:
             // UPDATED状态表示配置hash改变但input hash未变，保持原有checkpoint，但是更新过期时间
-            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTime());
+            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTimeInSeconds());
             mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger,

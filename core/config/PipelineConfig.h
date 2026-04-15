@@ -17,10 +17,8 @@
 #pragma once
 
 #include <cstdint>
-#include <ctime>
 
 #include <filesystem>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -51,29 +49,6 @@ struct PipelineConfig {
     virtual ~PipelineConfig() = default;
 
     virtual bool Parse() = 0;
-
-#ifdef APSARA_UNIT_TEST_MAIN
-    // Overridable clock for deterministic unit tests.
-    // Placed in the public section so that the free helper GetCurrentTime() in
-    // PipelineConfig.cpp can access it even under MSVC, which (unlike GCC/Clang
-    // with -fno-access-control) enforces protected-member access strictly.
-    static std::function<time_t()> sCurrentTime;
-
-    // RAII guard that temporarily replaces the clock with a fixed value.
-    // Not thread-safe — intended for single-threaded unit tests only.
-    struct ScopedClockOverride {
-        explicit ScopedClockOverride(time_t fixedNow) : mPrev(sCurrentTime) {
-            sCurrentTime = [fixedNow]() -> time_t { return fixedNow; };
-        }
-        ~ScopedClockOverride() { sCurrentTime = mPrev; }
-
-        ScopedClockOverride(const ScopedClockOverride&) = delete;
-        ScopedClockOverride& operator=(const ScopedClockOverride&) = delete;
-
-    private:
-        std::function<time_t()> mPrev;
-    };
-#endif
 
 protected:
     bool GetExpireTimeIfOneTime(const Json::Value& global);

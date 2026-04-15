@@ -14,8 +14,8 @@
 
 #include "collection_pipeline/CollectionPipelineManager.h"
 #include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
-#include "config/PipelineConfig.h"
 #include "config/watcher/PipelineConfigWatcher.h"
 #include "unittest/Unittest.h"
 #include "unittest/plugin/PluginMock.h"
@@ -241,7 +241,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         APSARA_TEST_TRUE(diff.first.HasDiff());
         auto restartNow = time(nullptr);
         {
-            PipelineConfig::ScopedClockOverride clockGuard(restartNow);
+            ScopedClockOverride clockGuard(restartNow);
             CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         }
         sConfigManager->DumpCheckpointFile();
@@ -340,7 +340,7 @@ void OnetimeConfigUpdateUnittest::OnCollectionConfigUpdate() const {
         APSARA_TEST_TRUE(diff.first.HasDiff());
         auto updateNow = time(nullptr);
         {
-            PipelineConfig::ScopedClockOverride clockGuard(updateNow);
+            ScopedClockOverride clockGuard(updateNow);
             CollectionPipelineManager::GetInstance()->UpdatePipelines(diff.first);
         }
         sConfigManager->DumpCheckpointFile();
