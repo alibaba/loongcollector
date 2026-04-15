@@ -158,9 +158,14 @@ void PipelineConfigUnittest::TestOnetimeConfig() const {
         auto configJson = make_unique<Json::Value>();
         (*configJson)["global"]["ExcutionTimeout"] = 3600U;
 
+        auto now = std::chrono::system_clock::now();
+        ScopedClockOverride clockGuard(now);
         ConfigMock config("new_config", std::move(configJson), filepath);
         APSARA_TEST_TRUE(config.GetExpireTimeIfOneTime((*config.mDetail)["global"]));
-        APSARA_TEST_EQUAL(time(nullptr) + 3600U, config.mOnetimeExpireTime);
+        APSARA_TEST_EQUAL(
+            static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count())
+                + 3600U,
+            config.mOnetimeExpireTime);
         APSARA_TEST_FALSE(config.mIsRunningBeforeStart);
         APSARA_TEST_EQUAL(sConfigManager->mConfigCheckpointMap.end(),
                           sConfigManager->mConfigCheckpointMap.find("new_config"));

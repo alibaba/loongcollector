@@ -48,11 +48,13 @@ typedef timespec LogtailTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
 // Injectable clock for deterministic unit tests. Returns nanoseconds since Unix epoch.
-extern std::function<uint64_t()> gCurrentTimeNs;
+// thread_local ensures background threads spawned by pipelines always use the real clock,
+// while the test thread can safely override without data races.
+extern thread_local std::function<uint64_t()> gCurrentTimeNs;
 
 // RAII guard that temporarily pins the clock to a fixed value for the duration
 // of a test and restores the previous value on destruction.
-// Not thread-safe — intended for single-threaded unit tests only.
+// Safe even when pipelines start background threads — each thread has its own copy.
 struct ScopedClockOverride {
     explicit ScopedClockOverride(std::chrono::system_clock::time_point fixedNow) : mPrev(gCurrentTimeNs) {
         const uint64_t fixedNs = static_cast<uint64_t>(

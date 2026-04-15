@@ -55,7 +55,6 @@ protected:
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class PipelineConfigUnittest;
-    friend class OnetimeConfigUpdateUnittest;
 #endif
 };
 

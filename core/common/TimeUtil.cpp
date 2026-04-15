@@ -39,7 +39,7 @@ namespace logtail {
 const std::string PRECISE_TIMESTAMP_DEFAULT_KEY = "precise_timestamp";
 
 #ifdef APSARA_UNIT_TEST_MAIN
-std::function<uint64_t()> gCurrentTimeNs = []() -> uint64_t {
+thread_local std::function<uint64_t()> gCurrentTimeNs = []() -> uint64_t {
     return static_cast<uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch())
             .count());
