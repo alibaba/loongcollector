@@ -46,23 +46,25 @@ struct PreciseTimestampConfig {
 typedef timespec LogtailTime;
 
 #ifdef APSARA_UNIT_TEST_MAIN
-// Injectable clock for deterministic unit tests. Defaults to time(nullptr).
-extern std::function<time_t()> gCurrentTime;
+// Injectable clock for deterministic unit tests. Returns nanoseconds since Unix epoch.
+extern std::function<uint64_t()> gCurrentTimeNs;
 
 // RAII guard that temporarily pins the clock to a fixed value for the duration
 // of a test and restores the previous value on destruction.
+// Accepts a second-granular time_t for convenience; precision is stored as nanoseconds.
 // Not thread-safe — intended for single-threaded unit tests only.
 struct ScopedClockOverride {
-    explicit ScopedClockOverride(time_t fixedNow) : mPrev(gCurrentTime) {
-        gCurrentTime = [fixedNow]() -> time_t { return fixedNow; };
+    explicit ScopedClockOverride(time_t fixedNow) : mPrev(gCurrentTimeNs) {
+        const uint64_t fixedNs = static_cast<uint64_t>(fixedNow) * 1000000000ULL;
+        gCurrentTimeNs = [fixedNs]() -> uint64_t { return fixedNs; };
     }
-    ~ScopedClockOverride() { gCurrentTime = mPrev; }
+    ~ScopedClockOverride() { gCurrentTimeNs = mPrev; }
 
     ScopedClockOverride(const ScopedClockOverride&) = delete;
     ScopedClockOverride& operator=(const ScopedClockOverride&) = delete;
 
 private:
-    std::function<time_t()> mPrev;
+    std::function<uint64_t()> mPrev;
 };
 #endif
 
