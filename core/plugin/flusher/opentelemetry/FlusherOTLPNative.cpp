@@ -18,6 +18,7 @@
 
 #include <chrono>
 
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "common/Flags.h"
 #include "common/ParamExtractor.h"
@@ -27,6 +28,8 @@
 #include "models/MetricValue.h"
 #include "models/RawEvent.h"
 #include "models/SpanEvent.h"
+
+DECLARE_FLAG_INT32(discard_send_fail_interval);
 
 namespace logtail {
 
@@ -411,10 +414,32 @@ bool FlusherOTLPNative::BuildGrpcRequest(SenderQueueItem* item,
 
 void FlusherOTLPNative::OnSendDone(const grpc::Status& status, SenderQueueItem* item) {
     if (status.ok()) {
-        DealSenderQueueItemAfterSend(item, false); // release item
-    } else {
-        DealSenderQueueItemAfterSend(item, true); // keep for retry by SenderQueue
+        SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+        DealSenderQueueItemAfterSend(item, false);
+        return;
     }
+
+    bool shouldDiscard = false;
+    auto code = status.error_code();
+    if (code == grpc::StatusCode::INVALID_ARGUMENT || code == grpc::StatusCode::UNIMPLEMENTED
+        || code == grpc::StatusCode::PERMISSION_DENIED || code == grpc::StatusCode::UNAUTHENTICATED) {
+        shouldDiscard = true;
+    }
+    auto age
+        = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - item->mFirstEnqueTime)
+              .count();
+    if (age > INT32_FLAG(discard_send_fail_interval)) {
+        shouldDiscard = true;
+    }
+
+    if (shouldDiscard) {
+        LOG_WARNING(sLogger,
+                    ("FlusherOTLPNative discard item", status.error_message())("code", code)("age_s", age)(
+                        "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
+    }
+    SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+    DealSenderQueueItemAfterSend(item, !shouldDiscard);
 }
 
 // ==================== HandleGrpcCallback (called by GrpcSink) ====================

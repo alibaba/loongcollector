@@ -16,12 +16,16 @@
 
 #include "plugin/flusher/opentelemetry/FlusherOTLPHttpNative.h"
 
+#include "collection_pipeline/queue/QueueKeyManager.h"
 #include "collection_pipeline/queue/SenderQueueManager.h"
 #include "collection_pipeline/serializer/OTLPHttpSerializer.h"
+#include "common/Flags.h"
 #include "common/ParamExtractor.h"
 #include "common/http/HttpRequest.h"
 #include "logger/Logger.h"
 #include "runner/sink/http/HttpSinkRequest.h"
+
+DECLARE_FLAG_INT32(discard_send_fail_interval);
 
 namespace logtail {
 
@@ -132,6 +136,7 @@ bool FlusherOTLPHttpNative::Init(const Json::Value& config, Json::Value& optiona
     mSendCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     mSendSuccessCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_SUCCESSFUL_EVENTS_TOTAL);
     mSendFailCnt = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_OUT_FAILED_EVENTS_TOTAL);
+    mDiscardedEventsTotal = GetMetricsRecordRef().CreateCounter(METRIC_PLUGIN_DISCARDED_EVENTS_TOTAL);
 
     LOG_INFO(sLogger,
              ("FlusherOTLPHttpNative initialized", "success")("url", mUrl)(
@@ -279,12 +284,33 @@ void FlusherOTLPHttpNative::OnSendDone(const HttpResponse& response, SenderQueue
     int32_t statusCode = response.GetStatusCode();
     if (statusCode >= 200 && statusCode < 300) {
         ADD_COUNTER(mSendSuccessCnt, 1);
+        SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
         DealSenderQueueItemAfterSend(item, false);
-    } else {
-        ADD_COUNTER(mSendFailCnt, 1);
-        LOG_WARNING(sLogger, ("FlusherOTLPHttpNative response error", statusCode));
-        DealSenderQueueItemAfterSend(item, true); // keep for retry
+        return;
     }
+
+    ADD_COUNTER(mSendFailCnt, 1);
+    bool shouldDiscard = false;
+    if (statusCode == 400 || statusCode == 413 || statusCode == 403 || statusCode == 404) {
+        shouldDiscard = true;
+    }
+    auto age
+        = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - item->mFirstEnqueTime)
+              .count();
+    if (age > INT32_FLAG(discard_send_fail_interval)) {
+        shouldDiscard = true;
+    }
+
+    if (shouldDiscard) {
+        LOG_WARNING(sLogger,
+                    ("FlusherOTLPHttpNative discard item", statusCode)("age_s", age)(
+                        "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+        ADD_COUNTER(mDiscardedEventsTotal, 1);
+    } else {
+        LOG_WARNING(sLogger, ("FlusherOTLPHttpNative response error, will retry", statusCode));
+    }
+    SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+    DealSenderQueueItemAfterSend(item, !shouldDiscard);
 }
 
 } // namespace logtail

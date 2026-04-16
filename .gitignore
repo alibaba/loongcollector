@@ -109,10 +109,9 @@ license_coverage.txt
 ### IDE configs
 /.cursor/
 /.claude/settings.local.json
-#/.claude/
+/.claude/
 /.gemini/
 .omc/
 /code-review/
 testcase-compose.yaml
 *.pb.[ch]
-.home/

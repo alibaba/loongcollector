@@ -25,7 +25,7 @@ description: Testing standards for LoongCollector: unit tests, e2e tests, benchm
 ### 3. E2E Tests
 - BDD Godog framework
 - Configuration-driven via `.feature` files
-- See `.claude/skills/e2e-develop-guide/` and `.claude/skills/e2e-manual/` for details
+- See `.claude/skills/e2e/SKILL.md` for complete guide (design → write → run → debug)
 
 ### 4. Benchmarks
 - Required for performance-sensitive code paths

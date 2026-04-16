@@ -55,6 +55,7 @@ private:
     CounterPtr mSendCnt;
     CounterPtr mSendSuccessCnt;
     CounterPtr mSendFailCnt;
+    CounterPtr mDiscardedEventsTotal;
 
     std::unique_ptr<OTLPEventGroupSerializer> mSerializer;
 

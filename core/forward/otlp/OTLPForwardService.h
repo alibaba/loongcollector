@@ -18,9 +18,9 @@
 
 #include <memory>
 #include <shared_mutex>
-#include <vector>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "forward/BaseService.h"
@@ -42,40 +42,37 @@ class OTLPForwardServiceImpl;
 // gRPC service wrappers for Logs, Metrics, and Traces.
 // Each inherits from exactly one CallbackService to avoid vtable method index conflicts
 // (all three CallbackService types use method index 0).
-class OTLPLogsGrpcService
-    : public opentelemetry::proto::collector::logs::v1::LogsService::CallbackService {
+class OTLPLogsGrpcService : public opentelemetry::proto::collector::logs::v1::LogsService::CallbackService {
 public:
     explicit OTLPLogsGrpcService(OTLPForwardServiceImpl* impl) : mImpl(impl) {}
-    grpc::ServerUnaryReactor* Export(
-        grpc::CallbackServerContext* context,
-        const opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest* request,
-        opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse* response) override;
+    grpc::ServerUnaryReactor*
+    Export(grpc::CallbackServerContext* context,
+           const opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest* request,
+           opentelemetry::proto::collector::logs::v1::ExportLogsServiceResponse* response) override;
 
 private:
     OTLPForwardServiceImpl* mImpl;
 };
 
-class OTLPMetricsGrpcService
-    : public opentelemetry::proto::collector::metrics::v1::MetricsService::CallbackService {
+class OTLPMetricsGrpcService : public opentelemetry::proto::collector::metrics::v1::MetricsService::CallbackService {
 public:
     explicit OTLPMetricsGrpcService(OTLPForwardServiceImpl* impl) : mImpl(impl) {}
-    grpc::ServerUnaryReactor* Export(
-        grpc::CallbackServerContext* context,
-        const opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest* request,
-        opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse* response) override;
+    grpc::ServerUnaryReactor*
+    Export(grpc::CallbackServerContext* context,
+           const opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest* request,
+           opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceResponse* response) override;
 
 private:
     OTLPForwardServiceImpl* mImpl;
 };
 
-class OTLPTraceGrpcService
-    : public opentelemetry::proto::collector::trace::v1::TraceService::CallbackService {
+class OTLPTraceGrpcService : public opentelemetry::proto::collector::trace::v1::TraceService::CallbackService {
 public:
     explicit OTLPTraceGrpcService(OTLPForwardServiceImpl* impl) : mImpl(impl) {}
-    grpc::ServerUnaryReactor* Export(
-        grpc::CallbackServerContext* context,
-        const opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest* request,
-        opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse* response) override;
+    grpc::ServerUnaryReactor*
+    Export(grpc::CallbackServerContext* context,
+           const opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest* request,
+           opentelemetry::proto::collector::trace::v1::ExportTraceServiceResponse* response) override;
 
 private:
     OTLPForwardServiceImpl* mImpl;
@@ -113,18 +110,15 @@ private:
 
     bool AddToIndex(std::string& configName, OTLPForwardConfig&& config, std::string& errorMsg);
     bool FindMatchingConfig(grpc::CallbackServerContext* context, std::shared_ptr<OTLPForwardConfig>& config) const;
-    void ProcessLogExport(
-        const opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest* request,
-        const std::shared_ptr<OTLPForwardConfig>& config,
-        grpc::Status& status);
-    void ProcessMetricExport(
-        const opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest* request,
-        const std::shared_ptr<OTLPForwardConfig>& config,
-        grpc::Status& status);
-    void ProcessTraceExport(
-        const opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest* request,
-        const std::shared_ptr<OTLPForwardConfig>& config,
-        grpc::Status& status);
+    void ProcessLogExport(const opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest* request,
+                          const std::shared_ptr<OTLPForwardConfig>& config,
+                          grpc::Status& status);
+    void ProcessMetricExport(const opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest* request,
+                             const std::shared_ptr<OTLPForwardConfig>& config,
+                             grpc::Status& status);
+    void ProcessTraceExport(const opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest* request,
+                            const std::shared_ptr<OTLPForwardConfig>& config,
+                            grpc::Status& status);
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class OTLPForwardServiceUnittest;

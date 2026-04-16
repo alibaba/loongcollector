@@ -76,17 +76,19 @@ flushers:
 #### 数据映射
 
 **Logs：**
-- `time_unix_nano` → LogEvent 时间戳
-- `body.string_value` → `SetContent("message", ...)`
+- `time_unix_nano` → LogEvent 时间戳（秒 + 亚秒纳秒）
+- `body.string_value` → `SetContent("content", ...)`
 - `severity_text` → `SetContent("severity", ...)`
 - `trace_id`, `span_id` → `SetContent("trace_id"/"span_id", ...)`
-- `attributes[]` → `SetContent(key, value)`
-- `resource.attributes[]` → `eventGroup.SetTag(key, value)`
+- `log_record.attributes[]` → `SetContent(key, value)`
+- `scope.attributes[]` → `SetContent("__tag__:" + key, value)`（假 tag，scope 层不常用）
+- `resource.attributes[]` → `eventGroup.SetTag(key, value)`（真 tag）
 
 **Metrics：**
 - `name` → `SetName(...)`
 - `gauge/sum/histogram.data_points[].as_double()` → `SetValue<UntypedSingleValue>(...)`
-- `resource.attributes[]` → `eventGroup.SetTag(key, value)`
+- `scope.attributes[]` → `SetTag("__tag__:" + key, value)`（假 tag）
+- `resource.attributes[]` → `eventGroup.SetTag(key, value)`（真 tag）
 
 **Traces：**
 - `trace_id`, `span_id`, `parent_span_id` → `SetTraceId/SetSpanId/SetParentSpanId`
@@ -94,8 +96,9 @@ flushers:
 - `start_time_unix_nano`, `end_time_unix_nano` → `SetStartTimeNs/SetEndTimeNs`
 - `status.code` → `SetStatus(Ok/Error/Unset)`
 - `kind` → `SetKind(Client/Server/...)`
-- `attributes[]` → `SetTag(key, value)`
-- `resource.attributes[]` → `eventGroup.SetTag(key, value)`
+- `span.attributes[]` → `SetTag(key, value)`
+- `scope.attributes[]` → `SetTag("__tag__:" + key, value)`（假 tag）
+- `resource.attributes[]` → `eventGroup.SetTag(key, value)`（真 tag）
 
 #### 配置匹配
 

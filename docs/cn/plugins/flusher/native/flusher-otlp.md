@@ -29,10 +29,10 @@
 | 内部 LogEvent 字段 | OTLP LogRecord 字段 |
 |---|---|
 | `GetTimestamp()` + `GetTimestampNanosecond()` | `set_time_unix_nano` |
-| `GetContent("message")` | `mutable_body()->set_string_value` |
+| `GetContent("content")` | `mutable_body()->set_string_value` |
 | `GetLevel()` | `set_severity_text` |
 | 遍历 Content | `add_attributes()` |
-| PipelineEventGroup Tags | `resource.attributes[]` |
+| PipelineEventGroup Tags（真 tag） | `resource.attributes[]` |
 
 ### Metrics
 
@@ -51,7 +51,7 @@
 | `GetStatus()` | `mutable_status()->set_code` |
 | `GetKind()` | `set_kind` |
 | Tags | `add_attributes()` |
-| PipelineEventGroup Tags | `resource.attributes[]` |
+| PipelineEventGroup Tags（真 tag） | `resource.attributes[]` |
 
 ### RawEvents
 
