@@ -147,10 +147,10 @@ set(SUB_DIRECTORIES_LIST
         application app_config constants container_manager metadata logger go_pipeline models
         config config/watcher
         collection_pipeline collection_pipeline/batch collection_pipeline/limiter collection_pipeline/plugin collection_pipeline/plugin/creator collection_pipeline/plugin/instance collection_pipeline/plugin/interface collection_pipeline/queue collection_pipeline/route collection_pipeline/serializer
-        runner runner/sink/http runner/sink/grpc
+        runner runner/sink/http
         task_pipeline
         monitor monitor/metric_constants monitor/metric_models monitor/profile_sender monitor/task_status_constants
-        protobuf/sls protobuf/models protobuf/forward protobuf/opentelemetry
+        protobuf/sls protobuf/models protobuf/forward
         file_server file_server/event file_server/event_handler file_server/event_listener file_server/reader file_server/polling file_server/checkpoint
         parser
         )
@@ -160,7 +160,7 @@ if (LINUX)
     endif()
     set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol/mysql ebpf/protocol/redis ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
-        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite forward/otlp protobuf/opentelemetry
+        host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite forward/otlp runner/sink/grpc protobuf/opentelemetry
         )
 elseif(MSVC)
 endif ()
@@ -183,9 +183,11 @@ foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     list(APPEND FRAMEWORK_SOURCE_FILES ${TEMP_SOURCE_FILES})
 endforeach (DIR_NAME)
 
-# OTLP protobuf files are nested under proto/collector/*/v1/ — use GLOB_RECURSE
-file(GLOB_RECURSE OTLP_PROTO_FILES protobuf/opentelemetry/proto/*.c protobuf/opentelemetry/proto/*.cc protobuf/opentelemetry/proto/*.cpp)
-list(APPEND FRAMEWORK_SOURCE_FILES ${OTLP_PROTO_FILES})
+# OTLP protobuf files are nested under proto/collector/*/v1/ — use GLOB_RECURSE (Linux-only)
+if (LINUX)
+    file(GLOB_RECURSE OTLP_PROTO_FILES protobuf/opentelemetry/proto/*.c protobuf/opentelemetry/proto/*.cc protobuf/opentelemetry/proto/*.cpp)
+    list(APPEND FRAMEWORK_SOURCE_FILES ${OTLP_PROTO_FILES})
+endif()
 
 if (ENABLE_ENTERPRISE)
     # remove several files in shennong/sdk
@@ -199,6 +201,9 @@ if(MSVC)
     # remove linux event listener
     file(GLOB REMOVE_EVENT_LISTENER_SOURCES file_server/event_listener/*_Linux.cpp file_server/event_listener/*_Linux.h)
     list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${REMOVE_EVENT_LISTENER_SOURCES})
+    # remove OTLP serializer (depends on protobuf/grpc not available on Windows)
+    file(GLOB REMOVE_OTLP_SERIALIZER_SOURCES collection_pipeline/serializer/OTLP*.cpp collection_pipeline/serializer/OTLP*.h)
+    list(REMOVE_ITEM FRAMEWORK_SOURCE_FILES ${REMOVE_OTLP_SERIALIZER_SOURCES})
 elseif(UNIX)
     # remove windows event listener
     file(GLOB REMOVE_EVENT_LISTENER_SOURCES file_server/event_listener/*_Windows.cpp file_server/event_listener/*_Windows.h)

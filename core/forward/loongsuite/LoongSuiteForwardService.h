@@ -17,10 +17,10 @@
 #pragma once
 
 #include <mutex>
-#include <vector>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "forward/BaseService.h"

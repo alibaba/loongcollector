@@ -27,10 +27,12 @@
 #include "common/http/HttpRequest.h"
 #include "logger/Logger.h"
 #include "monitor/AlarmManager.h"
-#include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
-#include "runner/sink/grpc/GrpcSink.h"
 #include "runner/sink/http/HttpSink.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
+#include "runner/sink/grpc/GrpcSink.h"
+#endif
 
 DEFINE_FLAG_INT32(flusher_runner_exit_timeout_sec, "", 60);
 
@@ -116,6 +118,7 @@ void FlusherRunner::DecreaseHttpSendingCnt() {
     SenderQueueManager::GetInstance()->Trigger();
 }
 
+#if defined(__linux__) && !defined(__ANDROID__)
 bool FlusherRunner::PushToGrpcSink(SenderQueueItem* item, bool withLimit) {
     while (withLimit && !Application::GetInstance()->IsExiting()
            && GrpcSink::GetInstance()->GetInFlightCount()
@@ -160,6 +163,7 @@ bool FlusherRunner::PushToGrpcSink(SenderQueueItem* item, bool withLimit) {
     GrpcSink::GetInstance()->AddRequest(std::move(ctx));
     return true;
 }
+#endif
 
 bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     // TODO: use semaphore instead
@@ -275,11 +279,13 @@ bool FlusherRunner::Dispatch(SenderQueueItem* item) {
             } else {
                 return PushToHttpSink(item);
             }
+#if defined(__linux__) && !defined(__ANDROID__)
         case SinkType::GRPC:
             // TODO(TomYu): add a shutdown bypass like flusher_sls (DiskBufferWriter) so that
             // GRPC flusher doesn't block FlusherRunner::Stop() (60s timeout) when
             // SenderQueue has a large backlog during process exit.
             return PushToGrpcSink(item);
+#endif
         default:
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
             return false;

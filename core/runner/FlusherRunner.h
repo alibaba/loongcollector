@@ -45,7 +45,9 @@ public:
 
     // TODO: should be private
     bool PushToHttpSink(SenderQueueItem* item, bool withLimit = true);
+#if defined(__linux__) && !defined(__ANDROID__)
     bool PushToGrpcSink(SenderQueueItem* item, bool withLimit = true);
+#endif
 
     int32_t GetSendingBufferCount() { return mHttpSendingCnt.load(); }
 
