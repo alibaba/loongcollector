@@ -76,7 +76,10 @@ func (m *metaCollector) processPodCustomResourceLink(data *k8smeta.ObjectWrapper
 	if entityType == "" {
 		return nil
 	}
-	cfg := m.crConfigs[entityType]
+	cfg, ok := m.crConfigs[entityType]
+	if !ok || cfg.Entity2PodRelation == "" {
+		return nil
+	}
 	log := &models.Log{}
 	log.Contents = models.NewLogContents()
 	m.processEntityLinkCommonPart(log.Contents, entityType, obj.CR.GetNamespace(), obj.CR.GetName(),

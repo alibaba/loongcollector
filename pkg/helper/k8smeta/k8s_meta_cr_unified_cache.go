@@ -100,6 +100,11 @@ func (c *crUnifiedCache) setRESTConfig(cfg *rest.Config) error {
 
 // gvrDiscoveryAvailable checks discovery for a CRD/plural GVR before starting a dynamic informer
 // (same idea as getIngressInformer probing ServerResourcesForGroupVersion in k8s_meta_cache.go).
+//
+// By design:
+//   - when discovery reports this GVR unavailable at startup (CRD not installed yet, or plural mismatch),
+//     this process does not auto-retry to start the informer later;
+//   - operator should fix CRD/Resource and restart LoongCollector to enable this CR watcher.
 func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersionResource) bool {
 	if d == nil {
 		return true
@@ -134,6 +139,9 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 		c.metaStore.Start()
 		gvr := c.gvr
 		if !gvrDiscoveryAvailable(c.discoveryClient, gvr) {
+			// By design: discovery failure is treated as terminal for this process lifetime.
+			// We intentionally mark watch as started to avoid repeated start attempts and log storms.
+			// After CRD/resource is fixed, restart LoongCollector to recover this CR informer.
 			c.watchStarted = true
 			c.mu.Unlock()
 			return

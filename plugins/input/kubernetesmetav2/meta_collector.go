@@ -34,6 +34,34 @@ type metaCollector struct {
 	crConfigs       map[string]k8smeta.CustomResourceCollectorConfig
 }
 
+func validateCustomResourceEntityTypeUniqueness(
+	cfg k8smeta.CustomResourceCollectorConfig, seenEntityTypes map[string]struct{},
+) error {
+	if _, exists := seenEntityTypes[cfg.EntityType]; exists {
+		return fmt.Errorf("duplicated CustomResources EntityType %q", cfg.EntityType)
+	}
+	seenEntityTypes[cfg.EntityType] = struct{}{}
+	return nil
+}
+
+func prepareNormalizedCustomResourceConfigs(
+	customResources []k8smeta.CustomResourceCollectorConfig,
+) ([]k8smeta.CustomResourceCollectorConfig, error) {
+	seenCustomResourceEntityTypes := make(map[string]struct{})
+	normalizedConfigs := make([]k8smeta.CustomResourceCollectorConfig, 0, len(customResources))
+	for _, cfg := range customResources {
+		if err := cfg.Normalize(); err != nil {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "invalid CustomResources entry", err, "entity", cfg.EntityType)
+			continue
+		}
+		if err := validateCustomResourceEntityTypeUniqueness(cfg, seenCustomResourceEntityTypes); err != nil {
+			return nil, err
+		}
+		normalizedConfigs = append(normalizedConfigs, cfg)
+	}
+	return normalizedConfigs, nil
+}
+
 func (m *metaCollector) Start() error {
 	m.entityProcessor = map[string]ProcessFunc{
 		k8smeta.POD:                      m.processPodEntity,
@@ -78,12 +106,13 @@ func (m *metaCollector) Start() error {
 		k8smeta.INGRESS_NAMESPACE:               m.processIngressNamespaceLink,
 	}
 
+	normalizedCRConfigs, err := prepareNormalizedCustomResourceConfigs(m.serviceK8sMeta.resolvedCustomResources())
+	if err != nil {
+		return err
+	}
+
 	m.crConfigs = make(map[string]k8smeta.CustomResourceCollectorConfig)
-	for _, cfg := range m.serviceK8sMeta.resolvedCustomResources() {
-		if err := cfg.Normalize(); err != nil {
-			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "invalid CustomResources entry", err, "entity", cfg.EntityType)
-			continue
-		}
+	for _, cfg := range normalizedCRConfigs {
 		if err := m.serviceK8sMeta.metaManager.RegisterCustomResourceCollector(cfg); err != nil {
 			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "register custom resource collector", err, "entity", cfg.EntityType)
 			continue

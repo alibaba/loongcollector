@@ -26,6 +26,61 @@ func testWorkflowUnstructured(t *testing.T) *unstructured.Unstructured {
 	return u
 }
 
+func TestValidateCustomResourceEntityTypeUniqueness(t *testing.T) {
+	seen := make(map[string]struct{})
+	cfg := k8smeta.CustomResourceCollectorConfig{EntityType: "customresource/argoproj.io/workflow"}
+	require.NoError(t, validateCustomResourceEntityTypeUniqueness(cfg, seen))
+	err := validateCustomResourceEntityTypeUniqueness(cfg, seen)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicated CustomResources EntityType")
+}
+
+func TestPrepareNormalizedCustomResourceConfigsReturnErrorOnDuplicateEntityType(t *testing.T) {
+	cfg1 := k8smeta.CustomResourceCollectorConfig{
+		EntityType:    "customresource/argoproj.io/workflow",
+		APIGroup:      "argoproj.io",
+		APIVersion:    "v1alpha1",
+		Resource:      "workflows",
+		Kind:          "Workflow",
+		PodLink:       &k8smeta.PodToCustomResourceLinkConfig{},
+		CollectEntity: true,
+	}
+	cfg2 := k8smeta.CustomResourceCollectorConfig{
+		EntityType: "customresource/argoproj.io/workflow",
+		APIGroup:   "argoproj.io",
+		APIVersion: "v1alpha1",
+		Resource:   "workflows",
+		Kind:       "Workflow",
+	}
+
+	normalized, err := prepareNormalizedCustomResourceConfigs([]k8smeta.CustomResourceCollectorConfig{cfg1, cfg2})
+	require.Error(t, err)
+	assert.Nil(t, normalized)
+	assert.Contains(t, err.Error(), "duplicated CustomResources EntityType")
+}
+
+func TestPrepareNormalizedCustomResourceConfigsSkipsInvalidEntries(t *testing.T) {
+	invalid := k8smeta.CustomResourceCollectorConfig{
+		EntityType: "customresource/argoproj.io/workflow",
+	}
+	valid := k8smeta.CustomResourceCollectorConfig{
+		EntityType: "customresource/argoproj.io/rollout",
+		APIGroup:   "argoproj.io",
+		APIVersion: "v1alpha1",
+		Resource:   "rollouts",
+		Kind:       "Rollout",
+		PodLink:    &k8smeta.PodToCustomResourceLinkConfig{},
+	}
+
+	normalized, err := prepareNormalizedCustomResourceConfigs([]k8smeta.CustomResourceCollectorConfig{invalid, valid})
+	require.NoError(t, err)
+	require.Len(t, normalized, 1)
+	assert.Equal(t, "customresource/argoproj.io/rollout", normalized[0].EntityType)
+	// Normalize should fill PodLink defaults from CR config.
+	assert.Equal(t, "Rollout", normalized[0].PodLink.OwnerKind)
+	assert.Equal(t, "argoproj.io", normalized[0].PodLink.OwnerAPIGroupContains)
+}
+
 func TestProcessPodCustomResourceLink(t *testing.T) {
 	entityType := "argo.workflow"
 	linkRT := k8smeta.POD + k8smeta.LINK_SPLIT_CHARACTER + entityType

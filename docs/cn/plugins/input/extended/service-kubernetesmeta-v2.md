@@ -79,6 +79,8 @@
 
 若 **CustomResources** 中某一 CR 的 watch **连续出现 RBAC/鉴权类错误**并达到停止阈值，该 CR 的动态 Informer 会在当前进程内停止且不会自动恢复，修正权限后须**手动重启 LoongCollector 进程**方可继续采集该类型。
 
+同样地，若启动时 discovery 检测到该 CR 的 **APIGroup/APIVersion/Resource 不可用**（例如 CRD 尚未安装），该 CR 的动态 Informer 在当前进程内也不会自动恢复。这是 **by-design** 行为（用于避免重复启动与日志风暴），修正后需**手动重启 LoongCollector**。
+
 ### 内置资源
 
 与配置里打开的内置开关对应即可（如 `pods`、`namespaces`、`deployments` 等）。权限请保持最小可用**`get`、`list`、`watch`** 权限，下面是示例。
