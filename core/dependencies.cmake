@@ -850,7 +850,7 @@ macro(link_spl target_name)
     target_link_libraries(${target_name} "libpresto_server_lib.a")
     target_link_libraries(${target_name} "libpresto_sls_rpc.a")
 
-    # log reduced
+    # log reduced 
     target_link_libraries(${target_name} "libvelox.a")
     target_link_libraries(${target_name} "libfolly.a")
     
