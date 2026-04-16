@@ -182,18 +182,6 @@ compile_proto(
     "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/config_server/v2"
     "agentV2.proto"
 )
-
-compile_proto(
-    "${CMAKE_CURRENT_SOURCE_DIR}/../config_server/protocol/enterprise"
-    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/config_server/enterprise"
-    "agentEnterprise.proto"
-)
-
-compile_proto(
-    "${CMAKE_CURRENT_SOURCE_DIR}/../config_server/protocol/enterprise"
-    "${CMAKE_CURRENT_SOURCE_DIR}/protobuf/config_server/enterprise"
-    "agentLocal.proto"
-)
 # re2
 macro(link_re2 target_name)
     if (re2_${LINK_OPTION_SUFFIX})
