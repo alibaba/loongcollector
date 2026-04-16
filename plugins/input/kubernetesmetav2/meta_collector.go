@@ -31,7 +31,7 @@ type metaCollector struct {
 
 	stopCh          chan struct{}
 	entityProcessor map[string]ProcessFunc
-	crConfigs         map[string]k8smeta.CustomResourceCollectorConfig
+	crConfigs       map[string]k8smeta.CustomResourceCollectorConfig
 }
 
 func (m *metaCollector) Start() error {
