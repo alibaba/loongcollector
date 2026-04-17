@@ -16,14 +16,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <mutex>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "common/Lock.h"
-#include "models/PipelineEventGroup.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "monitor/metric_models/MetricRecord.h"
 #include "monitor/metric_models/SelfMonitorMetricEvent.h"
@@ -42,8 +38,8 @@ private:
 public:
     ~WriteMetrics();
     static WriteMetrics* GetInstance() {
-        static WriteMetrics* ptr = new WriteMetrics();
-        return ptr;
+        static auto* sPtr = new WriteMetrics();
+        return sPtr;
     }
 
     // First, create a MetricsRecordRef using the CreateMetricsRecordRef method and Labels. Then add counter and gauge
@@ -75,8 +71,8 @@ private:
 public:
     ~ReadMetrics();
     static ReadMetrics* GetInstance() {
-        static ReadMetrics* ptr = new ReadMetrics();
-        return ptr;
+        static auto* sPtr = new ReadMetrics();
+        return sPtr;
     }
     void ReadAsSelfMonitorMetricEvents(std::vector<SelfMonitorMetricEvent>& metricEventList) const;
     void UpdateMetrics();

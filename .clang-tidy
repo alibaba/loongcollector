@@ -279,26 +279,29 @@ CheckOptions:
   readability-identifier-naming.ClassCase: CamelCase
   readability-identifier-naming.ClassConstantCase: CamelCase
   readability-identifier-naming.ClassConstantPrefix: k
+  readability-identifier-naming.ClassConstantIgnoredRegexp: '^[A-Z0-9]+(_[A-Z0-9]+)*$'
   readability-identifier-naming.PrivateMemberCase: CamelCase
   readability-identifier-naming.PrivateMemberPrefix: m
   readability-identifier-naming.ProtectedMemberCase: CamelCase
   readability-identifier-naming.ProtectedMemberPrefix: m
   readability-identifier-naming.PublicMemberCase: camelBack
-  readability-identifier-naming.PrivateMethodCase: camelBack
+  readability-identifier-naming.PrivateMethodCase: CamelCase
   readability-identifier-naming.ProtectedMethodCase: camelBack
   readability-identifier-naming.PublicMethodCase: CamelCase
   readability-identifier-naming.EnumCase: CamelCase
   readability-identifier-naming.EnumConstantCase: CamelCase
   readability-identifier-naming.EnumConstantPrefix: k
+  readability-identifier-naming.EnumConstantIgnoredRegexp: '^[A-Z0-9]+(_[A-Z0-9]+)*$'
   readability-identifier-naming.ScopedEnumConstantCase: CamelCase
   readability-identifier-naming.ScopedEnumConstantPrefix: k
+  readability-identifier-naming.ScopedEnumConstantIgnoredRegexp: '^[A-Z0-9]+(_[A-Z0-9]+)*$'
   readability-identifier-naming.FunctionCase: CamelCase
-  readability-identifier-naming.GlobalVariableCase: CamelCase
-  readability-identifier-naming.GlobalVariablePrefix: g
+  readability-identifier-naming.GlobalVariableCase: camelBack
+  readability-identifier-naming.GlobalVariablePrefix: ''
   readability-identifier-naming.GlobalVariableIgnoredRegexp: sLogger
   readability-identifier-naming.GlobalConstantCase: CamelCase
   readability-identifier-naming.GlobalConstantPrefix: k
-  readability-identifier-naming.GlobalConstantIgnoredRegexp: (MIS|ARK)_.*
+  readability-identifier-naming.GlobalConstantIgnoredRegexp: '^[A-Z0-9]+(_[A-Z0-9]+)*$'
   readability-identifier-naming.ParameterCase: camelBack
   readability-identifier-naming.ParameterIgnoredRegexp: .*_$
   readability-identifier-naming.VariableCase: camelBack
@@ -308,6 +311,7 @@ CheckOptions:
   readability-identifier-naming.StaticVariablePrefix: s
   readability-identifier-naming.StaticConstantCase: CamelCase
   readability-identifier-naming.StaticConstantPrefix: k
+  readability-identifier-naming.StaticConstantIgnoredRegexp: '^[A-Z0-9]+(_[A-Z0-9]+)*$'
   readability-function-size.ParameterThreshold: 7
   readability-function-cognitive-complexity.IgnoreMacros: true
   misc-throw-by-value-catch-by-reference.CheckThrowTemporaries: false
