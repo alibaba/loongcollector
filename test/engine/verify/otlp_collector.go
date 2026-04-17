@@ -91,8 +91,14 @@ func resolveLocalPath(caseHome, containerPath string) string {
 
 // countOTLPFileRecords reads the file exporter output and counts records of the given type.
 func countOTLPFileRecords(filePath string, dataType string) (int, error) {
+	cleanPath, err := validateOTLPExportPath(filePath)
+	if err != nil {
+		return 0, err
+	}
+
 	// Read and parse the JSON Lines file
-	file, err := os.Open(filePath)
+	// #nosec G304 -- path is validated by validateOTLPExportPath before opening.
+	file, err := os.Open(cleanPath)
 	if err != nil {
 		// File may not exist yet (no data flushed)
 		if os.IsNotExist(err) {
@@ -135,6 +141,20 @@ func countOTLPFileRecords(filePath string, dataType string) (int, error) {
 	}
 
 	return count, nil
+}
+
+func validateOTLPExportPath(filePath string) (string, error) {
+	baseDir := filepath.Clean(filepath.Join(config.CaseHome, "otel-export"))
+	cleanPath := filepath.Clean(filePath)
+
+	relPath, err := filepath.Rel(baseDir, cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve otlp file path: %v", err)
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("otlp file path is outside allowed directory: %s", cleanPath)
+	}
+	return cleanPath, nil
 }
 
 // countFromArray tries to parse the line as an array and count items.
