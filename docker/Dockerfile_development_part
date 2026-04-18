@@ -18,30 +18,36 @@ ARG HOST_OS=Linux
 ARG VERSION=0.0.1
 
 USER root
-WORKDIR /loongcollector
+ENV container=docker
 
-RUN mkdir -p /loongcollector/conf/instance_config/local
-RUN mkdir -p /loongcollector/log
-RUN mkdir -p /loongcollector/data
-RUN mkdir -p /loongcollector/run
+RUN yum update -y && yum -y install systemd initscripts && yum -y clean all && rm -fr /var/cache
 
-COPY --from=build /src/core/build/loongcollector /loongcollector/
+RUN mkdir -p /usr/local/loongcollector/conf/instance_config/local
+RUN mkdir -p /usr/local/loongcollector/log
+RUN mkdir -p /usr/local/loongcollector/data
+RUN mkdir -p /usr/local/loongcollector/run
+
+COPY --from=build /src/core/build/loongcollector /usr/local/loongcollector/
+COPY ./scripts/loongcollector_control.sh /usr/local/loongcollector/
 COPY ./scripts/download_ebpflib.sh /tmp/
 
-RUN chown -R $(whoami) /loongcollector && \
-    chmod 755 /loongcollector/loongcollector && \
-    mkdir /loongcollector/data/checkpoint && \
-    if [ `uname -m` = "x86_64" ]; then /tmp/download_ebpflib.sh /loongcollector; fi && \
+RUN chown -R $(whoami) /usr/local/loongcollector && \
+    chmod 755 /usr/local/loongcollector/loongcollector && \
+    mkdir -p /usr/local/loongcollector/data/checkpoint && \
+    if [ `uname -m` = "x86_64" ]; then /tmp/download_ebpflib.sh /usr/local/loongcollector; fi && \
     rm /tmp/download_ebpflib.sh
 
-COPY --from=build /src/output/libGoPluginBase.so /loongcollector/
-COPY --from=build /src/example_config/quick_start/loongcollector_config.json /loongcollector/conf/instance_config/local/loongcollector_config.json
-COPY --from=build /src/core/build/go_pipeline/libGoPluginAdapter.so /loongcollector/
-COPY --from=build /src/core/build/ebpf/driver/libeBPFDriver.so /loongcollector/
+COPY --from=build /src/output/libGoPluginBase.so /usr/local/loongcollector/
+COPY --from=build /src/example_config/quick_start/loongcollector_config.json /usr/local/loongcollector/conf/instance_config/local/loongcollector_config.json
+COPY --from=build /src/core/build/go_pipeline/libGoPluginAdapter.so /usr/local/loongcollector/
+COPY --from=build /src/core/build/ebpf/driver/libeBPFDriver.so /usr/local/loongcollector/
 
-ENV HOST_OS=$HOST_OS
-ENV LOGTAIL_VERSION=$VERSION
+ENV HOST_OS=$HOST_OS \
+    LOONGCOLLECTOR_VERSION=$VERSION \
+    HTTP_PROBE_PORT=7953 \
+    ALIYUN_LOGTAIL_USER_DEFINED_ID=default \
+    docker_file_cache_path=checkpoint/docker_path_config.json
 
 EXPOSE 18689
 
-ENTRYPOINT ["/loongcollector/loongcollector"]
+CMD ["/usr/local/loongcollector/loongcollector_control.sh", "start_and_block"]

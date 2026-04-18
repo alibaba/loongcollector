@@ -59,9 +59,7 @@ _deps
 # Custom
 /build/
 core/build/
-core/protobuf/config_server/*/*.pb.*
-core/protobuf/*/*.pb.*
-core/log_pb/*.pb.*
+*.pb.*
 core/common/Version.cpp
 !/Makefile
 # Enterprise
@@ -90,9 +88,11 @@ plugins/all/
 *.go.mod.sum
 # Custom
 plugin_logger.xml
+go_plugin.LOG
 
 ### E2E
 /*-test/
+testcase-compose.yaml
 
 ### License
 find_licenses/
@@ -106,7 +106,10 @@ license_coverage.txt
 /dist/
 /tags/
 
-### Cursor
+### IDE configs
 /.cursor/
+/.claude/settings.local.json
 /.claude/
 /.gemini/
+.omc/
+/code-review/
