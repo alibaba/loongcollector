@@ -27,6 +27,3 @@ fi
 # 3. Start Docker daemon via the DinD init script
 /usr/local/share/docker-init.sh
 sleep 2
-
-# 4. Ensure non-root users can access the socket
-chmod 666 /var/run/docker.sock 2>/dev/null || true

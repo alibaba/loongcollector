@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-SENSITIVE_PATTERNS="(sk-[a-zA-Z0-9]|AIzaSy[a-zA-Z0-9]|pk_[a-zA-Z0-9]|ghp_[a-zA-Z0-9]|gho_[a-zA-Z0-9]|ghu_[a-zA-Z0-9]|ghs_[a-zA-Z0-9]|ghr_[a-zA-Z0-9])"
+SENSITIVE_PATTERNS="(sk-[a-zA-Z0-9]{20,}|AIzaSy[a-zA-Z0-9_-]{30,}|pk_[a-zA-Z0-9]{10,}|ghp_[a-zA-Z0-9]{36,}|gho_[a-zA-Z0-9]{36,}|ghu_[a-zA-Z0-9]{36,}|ghs_[a-zA-Z0-9]{36,}|ghr_[a-zA-Z0-9]{36,})"
 MODE="${1:-}"
 
 if [ "$MODE" != "commit" ] && [ "$MODE" != "push" ]; then

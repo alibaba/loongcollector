@@ -3,7 +3,7 @@
 # 用法: bash .cursor/skills/e2e/scripts/e2e-cleanup.sh [case_name]
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 E2E_DIR="$REPO_ROOT/test/e2e"
 CASE_NAME="${1:-}"
 

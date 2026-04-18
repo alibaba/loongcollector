@@ -14,11 +14,10 @@
   ],
   "runArgs": [
     "--cap-add=SYS_PTRACE",
-    "--security-opt", "seccomp=unconfined",
-    "--privileged"
+    "--security-opt", "seccomp=unconfined"
   ],
   "onCreateCommand": "sudo chown -R $(id -un):$(id -gn) /root",
-  "postStartCommand": "sudo bash /workspaces/loongcollector-github/.devcontainer/start-dind.sh",
+  "postStartCommand": "sudo bash ${containerWorkspaceFolder}/.devcontainer/start-dind.sh",
   "postCreateCommand": "sudo /usr/sbin/sshd",
   "customizations": {
     "vscode": {

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # E2E 测试环境清理脚本
-# 用法: bash .cursor/skills/e2e/scripts/e2e-cleanup.sh [case_name]
+# 用法: bash .claude/skills/e2e/scripts/e2e-cleanup.sh [case_name]
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 E2E_DIR="$REPO_ROOT/test/e2e"
 CASE_NAME="${1:-}"
 
