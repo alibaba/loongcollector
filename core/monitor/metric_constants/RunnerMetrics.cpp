@@ -27,6 +27,7 @@ const string METRIC_LABEL_KEY_THREAD_NO = "thread_no";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER = "file_server";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER = "flusher_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK = "http_sink";
+const string METRIC_LABEL_VALUE_RUNNER_NAME_GRPC_SINK = "grpc_sink";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR = "processor_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS = "prometheus_runner";
 const string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER = "ebpf_runner";

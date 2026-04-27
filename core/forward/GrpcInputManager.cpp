@@ -33,6 +33,7 @@
 #include "common/Flags.h"
 #include "common/StringTools.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
+#include "forward/otlp/OTLPForwardService.h"
 #include "logger/Logger.h"
 #ifdef APSARA_UNIT_TEST_MAIN
 #include "unittest/forward/MockServiceImpl.h"
@@ -134,8 +135,14 @@ bool GrpcInputManager::AddListenInput(const std::string& configName,
         factories.emplace_back(std::make_unique<InFlightCountInterceptorFactory>(it->second.mInFlightCnt));
         builder.experimental().SetInterceptorCreators(std::move(factories));
         builder.AddListeningPort(address, grpc::InsecureServerCredentials());
-        // TODO: multi-service server is complex and lacks isolation, only support one service per server for now
-        builder.RegisterService(service.get());
+        // Register all gRPC services (e.g. OTLP has Logs + Metrics + Traces as separate services).
+        auto grpcServices = service->GetGrpcServices();
+        for (auto* grpcSvc : grpcServices) {
+            builder.RegisterService(grpcSvc);
+        }
+        LOG_INFO(sLogger,
+                 ("GrpcInputManager", "registered gRPC services")("address", address)("service", service->Name())(
+                     "serviceCount", grpcServices.size()));
         auto server = builder.BuildAndStart();
         if (!server) {
             LOG_ERROR(sLogger,
@@ -219,6 +226,8 @@ bool GrpcInputManager::ShutdownGrpcServer(grpc::Server* server, std::shared_ptr<
 template bool GrpcInputManager::AddListenInput<LoongSuiteForwardServiceImpl>(const std::string&,
                                                                              const std::string&,
                                                                              const Json::Value&);
+template bool
+GrpcInputManager::AddListenInput<OTLPForwardServiceImpl>(const std::string&, const std::string&, const Json::Value&);
 
 #ifdef APSARA_UNIT_TEST_MAIN
 template bool

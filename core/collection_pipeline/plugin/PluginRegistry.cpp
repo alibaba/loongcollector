@@ -33,7 +33,6 @@
 #include "plugin/flusher/sls/FlusherSLS.h"
 #include "plugin/input/InputContainerStdio.h"
 #include "plugin/input/InputFile.h"
-#include "plugin/input/InputForward.h"
 #include "plugin/input/InputInternalAlarms.h"
 #include "plugin/input/InputInternalMatchedContainerInfo.h"
 #include "plugin/input/InputInternalMetrics.h"
@@ -56,7 +55,10 @@
 #include "plugin/flusher/kafka/FlusherKafka.h"
 #endif
 #if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/flusher/opentelemetry/FlusherOTLPHttpNative.h"
+#include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
 #include "plugin/input/InputFileSecurity.h"
+#include "plugin/input/InputForward.h"
 #include "plugin/input/InputHostMeta.h"
 #include "plugin/input/InputHostMonitor.h"
 #include "plugin/input/InputNetworkObserver.h"
@@ -209,6 +211,10 @@ void PluginRegistry::LoadStaticPlugins() {
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherFile>());
 #if defined(__linux__) && !defined(__ENTERPRISE__)
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherKafka>());
+#endif
+#if defined(__linux__) && !defined(__ANDROID__)
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherOTLPNative>());
+    RegisterFlusherCreator(new StaticFlusherCreator<FlusherOTLPHttpNative>());
 #endif
 #ifdef __ENTERPRISE__
     RegisterFlusherCreator(new StaticFlusherCreator<FlusherSLSMonitor>());

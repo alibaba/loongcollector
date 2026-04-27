@@ -16,11 +16,11 @@
 
 #pragma once
 
-#include <atomic>
 #include <mutex>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "collection_pipeline/queue/QueueKey.h"
 #include "forward/BaseService.h"
@@ -84,7 +84,8 @@ public:
 
     bool Update(std::string configName, const Json::Value& config) override;
     bool Remove(std::string configName, const Json::Value& config) override;
-    [[nodiscard]] const std::string& Name() const override { return sName; };
+    [[nodiscard]] const std::string& Name() const override { return sName; }
+    std::vector<::grpc::Service*> GetGrpcServices() override { return {this}; }
 
     grpc::ServerUnaryReactor* Forward(grpc::CallbackServerContext* context,
                                       const LoongSuiteForwardRequest* request,

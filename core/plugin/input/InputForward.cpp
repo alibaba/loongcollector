@@ -23,6 +23,7 @@
 #include "common/ParamExtractor.h"
 #include "forward/GrpcInputManager.h"
 #include "forward/loongsuite/LoongSuiteForwardService.h"
+#include "forward/otlp/OTLPForwardService.h"
 #include "logger/Logger.h"
 #include "plugin/processor/inner/ProcessorParseFromPBNative.h"
 
@@ -32,7 +33,7 @@ const std::string InputForward::sName = "input_forward";
 
 const std::unordered_set<std::string> InputForward::sSupportedProtocols = {
     "LoongSuite",
-    // TODO: add more protocols here
+    "OTLP",
 };
 
 bool InputForward::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
@@ -96,6 +97,9 @@ bool InputForward::Start() {
             return false;
         }
         mInnerProcessors.emplace_back(std::move(processor));
+    } else if (mProtocol == "OTLP") {
+        result = GrpcInputManager::GetInstance()->AddListenInput<OTLPForwardServiceImpl>(
+            mConfigName, mEndpoint, mForwardConfig);
     } else {
         LOG_WARNING(sLogger, ("Protocol not fully implemented, should not happen", mProtocol)("config", mConfigName));
     }

@@ -22,6 +22,8 @@ LoongCollector 提供两类输出插件：
 | `flusher_blackhole`<br>[黑洞](native/flusher-blackhole.md) | SLS 官方 | 丢弃事件，常用于压测或占位。 |
 | `flusher_file`<br>[本地文件](native/flusher-file.md) | SLS 官方 | 将数据写入本地文件（如自监控指标落盘）。 |
 | `flusher_kafka_native`<br>[Kafka](native/flusher-kafka.md) | [ChaoEcho](https://github.com/ChaoEcho) | 使用 C++ 实现将数据输出到 Kafka。 |
+| `flusher_otlp`<br>[OTLP gRPC](native/flusher-otlp.md) | SLS 官方 | 通过 OTLP/gRPC 协议发送 Logs/Metrics/Traces 到 OTel Collector。 |
+| `flusher_otlp_http`<br>[OTLP HTTP](native/flusher-otlp-http.md) | SLS 官方 | 通过 OTLP/HTTP 协议发送 Logs/Metrics/Traces 到 OTel Collector。 |
 | `flusher_sls`<br>[SLS](native/flusher-sls.md) | SLS 官方 | 将数据写入阿里云日志服务（SLS）。 |
 | `router`<br>[多 Flusher 路由](native/router.md) | SLS 官方 | 在原生处理链路与支持的 Flusher 上按事件类型或 Tag 分流。 |
 

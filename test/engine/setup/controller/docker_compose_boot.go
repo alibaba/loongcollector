@@ -17,12 +17,35 @@ package controller
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
 )
+
+// ensureFlusherFile ensures the FlusherFile exists as a regular file before
+// docker-compose starts. If the path does not exist, Docker would create it as
+// a directory when bind-mounting, which breaks LoongCollector startup.
+func ensureFlusherFile() error {
+	if config.FlusherFile == "" {
+		return nil
+	}
+	info, err := os.Stat(config.FlusherFile)
+	if err == nil && !info.IsDir() {
+		return nil
+	}
+	if err == nil && info.IsDir() {
+		if removeErr := os.RemoveAll(config.FlusherFile); removeErr != nil {
+			return removeErr
+		}
+	}
+	if err := os.MkdirAll(filepath.Dir(config.FlusherFile), 0750); err != nil {
+		return err
+	}
+	return os.WriteFile(config.FlusherFile, []byte("{}"), 0600)
+}
 
 type BootController struct {
 }
@@ -53,6 +76,10 @@ func (c *BootController) Start(ctx context.Context) error {
 			return err
 		}
 	} else if err != nil {
+		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
+		return err
+	}
+	if err := ensureFlusherFile(); err != nil {
 		logger.Error(context.Background(), "BOOT_START_ALARM", "err", err)
 		return err
 	}

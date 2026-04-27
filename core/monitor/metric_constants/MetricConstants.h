@@ -295,6 +295,7 @@ extern const std::string METRIC_LABEL_KEY_THREAD_NO;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_FILE_SERVER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_FLUSHER;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_HTTP_SINK;
+extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_GRPC_SINK;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROCESSOR;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_PROMETHEUS;
 extern const std::string METRIC_LABEL_VALUE_RUNNER_NAME_EBPF_SERVER;

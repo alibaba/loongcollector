@@ -18,5 +18,13 @@ project(sender_unittest)
 add_executable(flusher_runner_unittest FlusherRunnerUnittest.cpp)
 target_link_libraries(flusher_runner_unittest ${UT_BASE_TARGET})
 
+if(LINUX)
+    add_executable(flusher_runner_grpc_unittest FlusherRunnerGrpcUnittest.cpp)
+    target_link_libraries(flusher_runner_grpc_unittest ${UT_BASE_TARGET})
+endif()
+
 include(GoogleTest)
 gtest_discover_tests(flusher_runner_unittest)
+if(LINUX)
+    gtest_discover_tests(flusher_runner_grpc_unittest)
+endif()

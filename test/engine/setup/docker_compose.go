@@ -54,7 +54,9 @@ func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.
 			logger.Error(ctx, "BOOT_START_ALARM", "err", err)
 			return ctx, err
 		}
-		return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
+		ctx = context.WithValue(ctx, config.StartTimeContextKey, int32(startTime))
+		// Set agent PID after container starts
+		return SetAgentPID(ctx)
 	}
 	return ctx, fmt.Errorf("env is not docker-compose")
 }

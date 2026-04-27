@@ -19,10 +19,13 @@ include_directories(flusher)
 # Add source files
 if (NOT ENABLE_ENTERPRISE AND UNIX)
     file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
-else()
-    # Exclude kafka files on non-UNIX systems
+elseif(UNIX)
     file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
     list(FILTER THIS_SOURCE_FILES_LIST EXCLUDE REGEX ".*kafka.*")
+else()
+    file(GLOB_RECURSE THIS_SOURCE_FILES_LIST ${CMAKE_SOURCE_DIR}/plugin/flusher/*.c ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cc ${CMAKE_SOURCE_DIR}/plugin/flusher/*.cpp ${CMAKE_SOURCE_DIR}/plugin/flusher/*.h)
+    list(FILTER THIS_SOURCE_FILES_LIST EXCLUDE REGEX ".*kafka.*")
+    list(FILTER THIS_SOURCE_FILES_LIST EXCLUDE REGEX ".*opentelemetry.*")
 endif()
 
 # Set source files to parent

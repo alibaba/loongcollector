@@ -18,9 +18,18 @@ ARG USERNAME=admin
 ARG USER_PASSWORD
 USER root
 
+RUN sed -i '/mirrors.aliyuncs.com\|mirrors.cloud.aliyuncs.com/d' /etc/yum.repos.d/CentOS-Base.repo
 RUN yum -y install openssh-server && \
     ssh-keygen -A
     
+# Feature Docker-in-Docker
+COPY dind-install.sh /tmp/dind-install.sh
+RUN chmod +x /tmp/dind-install.sh && \
+    MOBY=false \
+    DOCKERDASHCOMPOSEVERSION=none \
+    INSTALLDOCKERBUILDX=false \
+    /tmp/dind-install.sh
+
 # Create the user
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys
@@ -51,7 +60,9 @@ RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
     echo "export PATH=/usr/local/go/bin:/opt/logtail/deps/bin:$PATH" >> /home/$USERNAME/.bashrc; \
     su - $USERNAME -c "\
     go env -w GO111MODULE=on && \
-    go env -w GOPROXY=https://goproxy.cn,direct"
+    go env -w GOPROXY=https://goproxy.cn,direct" && \
+    usermod -aG docker $USERNAME
 
 USER $USERNAME
 
+# ENTRYPOINT [ "/usr/local/share/docker-init.sh" ]

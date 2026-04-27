@@ -16,6 +16,7 @@ import (
 	"github.com/alibaba/ilogtail/test/engine/trigger"
 	"github.com/alibaba/ilogtail/test/engine/trigger/ebpf"
 	"github.com/alibaba/ilogtail/test/engine/trigger/log"
+	"github.com/alibaba/ilogtail/test/engine/trigger/otlp"
 	"github.com/alibaba/ilogtail/test/engine/verify"
 )
 
@@ -79,6 +80,9 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.When(`^wait monitor until log processing finished$`, monitor.WaitMonitorUntilProcessingFinished)
 	ctx.When(`^change log rotate interval to \{(\d+)\}s$`, log.ChangeRotateInterval)
 
+	// otlp
+	ctx.When(`^generate \{(\d+)\} OTLP \{(logs|metrics|traces)\} via otelgen to endpoint \{(.*)\}, protocol \{(grpc|http)\}$`, otlp.OtelgenSend)
+
 	// ebpf
 	ctx.When(`^execute \{(\d+)\} commands \{(.*)\} in parallel`, ebpf.ExecveCommandsParallel)
 	ctx.When(`^execute \{(\d+)\} commands \{(.*)\} in sequence`, ebpf.ExecveCommandsSerial)
@@ -113,6 +117,9 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 	ctx.Then(`^the logtail log contains \{(\d+)\} times of \{(.*)\}$`, verify.LogtailPluginLog)
 	ctx.Then(`^the log is in order$`, verify.LogOrder)
 
+	// otlp collector verification
+	ctx.Then(`^otlp collector received at least \{(\d+)\} (logs|metrics|traces) from file \{(.*)\}$`, verify.OTLPCollectorReceived)
+
 	// metric
 	ctx.Then(`^there is more than \{(\d+)\} metrics in \{(\d+)\} seconds$`, verify.MetricCount)
 
@@ -129,7 +136,11 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 		return ctx, nil
 	})
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+		ctx, verifyErr := verify.AgentNotCrash(ctx)
 		cleanup.All()
-		return verify.AgentNotCrash(ctx)
+		if verifyErr != nil {
+			return ctx, verifyErr
+		}
+		return ctx, nil
 	})
 }

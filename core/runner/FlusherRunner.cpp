@@ -29,6 +29,10 @@
 #include "monitor/AlarmManager.h"
 #include "plugin/flusher/sls/DiskBufferWriter.h"
 #include "runner/sink/http/HttpSink.h"
+#if defined(__linux__) && !defined(__ANDROID__)
+#include "plugin/flusher/opentelemetry/FlusherOTLPNative.h"
+#include "runner/sink/grpc/GrpcSink.h"
+#endif
 
 DEFINE_FLAG_INT32(flusher_runner_exit_timeout_sec, "", 60);
 
@@ -113,6 +117,53 @@ void FlusherRunner::DecreaseHttpSendingCnt() {
     --mHttpSendingCnt;
     SenderQueueManager::GetInstance()->Trigger();
 }
+
+#if defined(__linux__) && !defined(__ANDROID__)
+bool FlusherRunner::PushToGrpcSink(SenderQueueItem* item, bool withLimit) {
+    while (withLimit && !Application::GetInstance()->IsExiting()
+           && GrpcSink::GetInstance()->GetInFlightCount()
+               >= AppConfig::GetInstance()->GetSendRequestGlobalConcurrency()) {
+        this_thread::sleep_for(chrono::milliseconds(10));
+    }
+
+    unique_ptr<OTLPGrpcCallContext> ctx;
+    bool keepItem = false;
+    string errMsg;
+    if (!static_cast<FlusherOTLPNative*>(item->mFlusher)->BuildGrpcRequest(item, ctx, &keepItem, &errMsg)) {
+        if (keepItem
+            && chrono::duration_cast<chrono::seconds>(chrono::system_clock::now() - item->mFirstEnqueTime).count()
+                < INT32_FLAG(discard_send_fail_interval)) {
+            item->mStatus = SendingStatus::IDLE;
+            ++item->mTryCnt;
+            const int64_t kInitialBackoffMs = 100;
+            const int64_t kMaxBackoffMs = 10000;
+            int64_t shift = std::max(0U, std::min(item->mTryCnt - 2, 7U));
+            int64_t backoffMs = std::min(kInitialBackoffMs * (1 << shift), kMaxBackoffMs);
+            auto now = chrono::system_clock::now();
+            item->mQuickFailNextRetryTime = now + chrono::milliseconds(backoffMs);
+            LOG_DEBUG(sLogger,
+                      ("failed to build grpc request", "retry later")("item address", item)(
+                          "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))(
+                          "errMsg", errMsg)("tryCnt", item->mTryCnt)("backoffMs", backoffMs));
+            SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+        } else {
+            LOG_WARNING(
+                sLogger,
+                ("failed to build grpc request", "discard item")("item address", item)(
+                    "config-flusher-dst", QueueKeyManager::GetInstance()->GetName(item->mQueueKey))("errMsg", errMsg));
+            SenderQueueManager::GetInstance()->DecreaseConcurrencyLimiterInSendingCnt(item->mQueueKey);
+            SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
+        }
+        return false;
+    }
+
+    LOG_TRACE(sLogger,
+              ("send item to grpc sink, item address", item)("config-flusher-dst",
+                                                             QueueKeyManager::GetInstance()->GetName(item->mQueueKey)));
+    GrpcSink::GetInstance()->AddRequest(std::move(ctx));
+    return true;
+}
+#endif
 
 bool FlusherRunner::PushToHttpSink(SenderQueueItem* item, bool withLimit) {
     // TODO: use semaphore instead
@@ -228,6 +279,13 @@ bool FlusherRunner::Dispatch(SenderQueueItem* item) {
             } else {
                 return PushToHttpSink(item);
             }
+#if defined(__linux__) && !defined(__ANDROID__)
+        case SinkType::GRPC:
+            // TODO(TomYu): add a shutdown bypass like flusher_sls (DiskBufferWriter) so that
+            // GRPC flusher doesn't block FlusherRunner::Stop() (60s timeout) when
+            // SenderQueue has a large backlog during process exit.
+            return PushToGrpcSink(item);
+#endif
         default:
             SenderQueueManager::GetInstance()->RemoveItem(item->mQueueKey, item);
             return false;

@@ -27,6 +27,7 @@ public:
     bool Update(std::string configName, const Json::Value& config) override { return true; }
     bool Remove(std::string configName, const Json::Value& config) override { return true; }
     [[nodiscard]] const std::string& Name() const override { return sName; }
+    std::vector<::grpc::Service*> GetGrpcServices() override { return {this}; }
 
     grpc::ServerUnaryReactor* Forward(grpc::CallbackServerContext* context,
                                       const LoongSuiteForwardRequest* request,
