@@ -15,6 +15,7 @@
 #include "config/PipelineConfig.h"
 
 #include "common/JsonUtil.h"
+#include "common/TimeUtil.h"
 #include "config/OnetimeConfigInfoManager.h"
 #include "logger/Logger.h"
 
@@ -96,12 +97,12 @@ bool PipelineConfig::GetExpireTimeIfOneTime(const Json::Value& global) {
             return true;
         case OnetimeConfigStatus::NEW:
             // NEW状态表示是新配置，或已有配置Rerun了
-            mOnetimeStartTime = time(nullptr);
+            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTimeInSeconds());
             mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             return true;
         case OnetimeConfigStatus::UPDATED:
             // UPDATED状态表示配置hash改变但input hash未变，保持原有checkpoint，但是更新过期时间
-            mOnetimeStartTime = time(nullptr);
+            mOnetimeStartTime = static_cast<uint32_t>(GetCurrentTimeInSeconds());
             mOnetimeExpireTime = mOnetimeStartTime.value() + mExcutionTimeout;
             mIsRunningBeforeStart = true;
             LOG_INFO(sLogger,
