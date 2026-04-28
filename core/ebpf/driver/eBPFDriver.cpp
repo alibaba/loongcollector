@@ -115,6 +115,7 @@ int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::NETWORK_OBSERVE:
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
         default:
             return kErrDriverInternal;
     }
@@ -398,6 +399,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                      "process security: DynamicAttachBPFObject success\n");
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[start plugin] unknown plugin type, please check. \n");
@@ -409,6 +412,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms) {
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
+    }
+    if (type == logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE) {
+        return 0;
     }
     // find pbs
     std::vector<void*> pbs = gPluginPbs.at(static_cast<size_t>(type));
@@ -481,6 +487,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[resume plugin] unknown plugin type, please check. \n");
@@ -493,7 +501,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
 int update_plugin(logtail::ebpf::PluginConfig* arg) {
     auto pluginType = arg->mPluginType;
     if (pluginType == logtail::ebpf::PluginType::NETWORK_OBSERVE
-        || pluginType == logtail::ebpf::PluginType::PROCESS_SECURITY) {
+        || pluginType == logtail::ebpf::PluginType::PROCESS_SECURITY
+        || pluginType == logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE) {
         return 0;
     }
 
@@ -608,6 +617,8 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             DeletePerfBuffers(pluginType);
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            return 0;
         case logtail::ebpf::PluginType::FILE_SECURITY: {
             // 1. dynamic detach
             auto callNames = gPluginCallNames[int(pluginType)];
@@ -678,6 +689,8 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[suspend plugin] unknown plugin type, please check. \n");

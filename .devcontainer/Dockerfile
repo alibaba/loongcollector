@@ -20,7 +20,26 @@ USER root
 
 RUN yum -y install openssh-server && \
     ssh-keygen -A
-    
+
+# AgentSight (openssl-sys vendored): OpenSSL Perl steps need IPC::Cmd + Data::Dumper. Base image may use
+# devtoolset Perl with an @INC that does not see core modules; install perl-Data-Dumper and pin PERL/PERL5LIB.
+RUN if command -v dnf >/dev/null 2>&1; then \
+        dnf install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconf-pkg-config && dnf clean all; \
+    elif command -v yum >/dev/null 2>&1; then \
+        yum install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconfig && yum clean all; \
+    elif command -v apt-get >/dev/null 2>&1; then \
+        apt-get update \
+        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            perl libdata-dumper-perl libipc-cmd-perl libssl-dev pkg-config \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "No dnf/yum/apt-get; install perl + IPC::Cmd + openssl dev for AgentSight manually." >&2; \
+        exit 1; \
+    fi
+
+ENV PERL=/usr/bin/perl
+ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
+
 # Create the user
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys
@@ -49,6 +68,8 @@ RUN cp /opt/logtail/deps/lib/libssl.so.1.0.0 /usr/lib64; \
     chown -R $USERNAME:$GROUPNAME /opt $(eval echo ~$USERNAME); \
     rm /tmp/authorized_keys; \
     echo "export PATH=/usr/local/go/bin:/opt/logtail/deps/bin:$PATH" >> /home/$USERNAME/.bashrc; \
+    echo "export PERL=/usr/bin/perl" >> /home/$USERNAME/.bashrc; \
+    echo "export PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5" >> /home/$USERNAME/.bashrc; \
     su - $USERNAME -c "\
     go env -w GO111MODULE=on && \
     go env -w GOPROXY=https://goproxy.cn,direct"

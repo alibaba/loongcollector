@@ -94,6 +94,10 @@ macro(ut_link ut_link_withspl)
     target_link_libraries(${UT_BASE_TARGET} provider_unittest_base)
     if (LINUX)
         add_dependencies(${UT_BASE_TARGET} install_coolbpf)
+        # Ensure cbindgen/cargo may refresh agentsight.h before compiling ebpf/plugin/agentsight.
+        if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
+            add_dependencies(${UT_BASE_TARGET} libagentsight)
+        endif()
     endif()
 endmacro()
 

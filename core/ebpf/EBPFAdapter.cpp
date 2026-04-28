@@ -21,10 +21,15 @@
 
 #include "spdlog/common.h"
 
+#include "common/Flags.h"
 #include "common/RuntimeUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/driver/eBPFDriver.h"
 #include "logger/Logger.h"
+
+DEFINE_FLAG_STRING(ebpf_agentsight_dylib_base_name,
+                   "Base name for AgentSight shared library (resolved as ${dir}/lib${name}.so under binary dir)",
+                   "agentsight");
 
 namespace logtail::ebpf {
 
@@ -135,6 +140,10 @@ void EBPFAdapter::Init() {
         }
         return 0;
     };
+
+#if defined(__linux__)
+    tryLoadAgentSightDylib();
+#endif
 }
 
 bool EBPFAdapter::loadDynamicLib(const std::string& libName) {
@@ -225,6 +234,50 @@ bool EBPFAdapter::loadCoolBPF() {
 
     mCoolbpfLib = std::move(tmpLib);
 
+    return true;
+}
+
+bool EBPFAdapter::tryLoadAgentSightDylib() {
+    if (mAgentSightSymbols) {
+        return true;
+    }
+    std::shared_ptr<DynamicLibLoader> tmpLib = std::make_shared<DynamicLibLoader>();
+    std::string loadErr;
+    if (!tmpLib->LoadDynLib(STRING_FLAG(ebpf_agentsight_dylib_base_name), loadErr, mBinaryPath)) {
+        LOG_WARNING(sLogger, ("[EBPFAdapter] optional AgentSight library not loaded", loadErr)("path", mBinaryPath));
+        return false;
+    }
+
+    AgentSightSymbolTable sym;
+    std::string symErr;
+    sym.last_error = reinterpret_cast<decltype(sym.last_error)>(tmpLib->LoadMethod("agentsight_last_error", symErr));
+    sym.config_new = reinterpret_cast<decltype(sym.config_new)>(tmpLib->LoadMethod("agentsight_config_new", symErr));
+    sym.config_free = reinterpret_cast<decltype(sym.config_free)>(tmpLib->LoadMethod("agentsight_config_free", symErr));
+    sym.config_set_verbose = reinterpret_cast<decltype(sym.config_set_verbose)>(
+        tmpLib->LoadMethod("agentsight_config_set_verbose", symErr));
+    sym.config_set_log_path = reinterpret_cast<decltype(sym.config_set_log_path)>(
+        tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
+    sym.handle_new = reinterpret_cast<decltype(sym.handle_new)>(tmpLib->LoadMethod("agentsight_new", symErr));
+    sym.handle_free = reinterpret_cast<decltype(sym.handle_free)>(tmpLib->LoadMethod("agentsight_free", symErr));
+    sym.handle_start = reinterpret_cast<decltype(sym.handle_start)>(tmpLib->LoadMethod("agentsight_start", symErr));
+    sym.handle_stop = reinterpret_cast<decltype(sym.handle_stop)>(tmpLib->LoadMethod("agentsight_stop", symErr));
+    sym.handle_get_eventfd
+        = reinterpret_cast<decltype(sym.handle_get_eventfd)>(tmpLib->LoadMethod("agentsight_get_eventfd", symErr));
+    sym.handle_read = reinterpret_cast<decltype(sym.handle_read)>(tmpLib->LoadMethod("agentsight_read", symErr));
+
+    const bool ok = sym.last_error && sym.config_new && sym.config_free && sym.config_set_verbose
+        && sym.config_set_log_path && sym.handle_new && sym.handle_free && sym.handle_start && sym.handle_stop
+        && sym.handle_get_eventfd && sym.handle_read;
+
+    if (!ok) {
+        LOG_WARNING(sLogger,
+                    ("[EBPFAdapter] AgentSight library present but symbols incomplete", symErr)("path", mBinaryPath));
+        return false;
+    }
+
+    mAgentSightLib = std::move(tmpLib);
+    mAgentSightSymbols = std::make_unique<AgentSightSymbolTable>(sym);
+    LOG_INFO(sLogger, ("[EBPFAdapter] AgentSight symbols loaded", STRING_FLAG(ebpf_agentsight_dylib_base_name)));
     return true;
 }
 

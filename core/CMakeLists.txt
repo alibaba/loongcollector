@@ -41,6 +41,9 @@ set(UNITTEST_PATH ${CMAKE_CURRENT_SOURCE_DIR}/unittest CACHE PATH "Path to the u
 
 # Option to enable/disable treating warnings as errors
 option(ENABLE_WERROR "Treat warnings as errors" ON)
+# Forwarded to vendored coolbpf via the shared CMake cache (coolbpf must define libagentsight when ON).
+# AgentSight (Cargo, vendored openssl-sys) needs Perl IPC::Cmd on the build host; see docker/Dockerfile_build.
+cmake_dependent_option(ENABLE_AGENTSIGHT "Build coolbpf with AgentSight FFI (libagentsight)" ON "LINUX" OFF)
 
 if (BUILD_LOGTAIL_SHARED_LIBRARY AND WITHSPL)
     message(FATEL_ERROR, "Generating logtail shared library is not supported to be linked with SPL. WITHSPL should be set OFF.")
@@ -158,7 +161,7 @@ if (LINUX)
     if (ENABLE_ENTERPRISE)
         set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} shennong shennong/sdk apm/forward)
     endif()
-    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol/mysql ebpf/protocol/redis ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin ebpf/observer ebpf/security
+    set(SUB_DIRECTORIES_LIST ${SUB_DIRECTORIES_LIST} ebpf ebpf/type ebpf/type/table ebpf/util ebpf/util/sampler ebpf/protocol/http ebpf/protocol/mysql ebpf/protocol/redis ebpf/protocol ebpf/plugin/file_security ebpf/plugin/network_observer ebpf/plugin/process_security ebpf/plugin/network_security ebpf/plugin/agentsight ebpf/plugin ebpf/observer ebpf/security
         prometheus prometheus/labels prometheus/schedulers prometheus/async prometheus/component
         host_monitor host_monitor/collector host_monitor/common forward forward/loongsuite
         )
@@ -171,6 +174,15 @@ endif()
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
+# AgentSight C FFI header: vendored at _thirdparty/coolbpf/src/agentsight/include/agentsight.h
+# (ebpf/plugin/agentsight/* always #include it; see agentsight_api.h). This path must be on the
+# compile line for all Linux builds — not only when ENABLE_AGENTSIGHT is ON, otherwise a cached or
+# overridden -DENABLE_AGENTSIGHT=OFF drops the include and agentsight.h is "not found" even though
+# the workflow set ENABLE_AGENTSIGHT=ON. ENABLE_AGENTSIGHT still controls the cargo/CMake
+# coolbpf agent target (libagentsight) and link/install behavior.
+if (LINUX)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_thirdparty/coolbpf/src/agentsight/include)
+endif ()
 
 foreach (DIR_NAME ${SUB_DIRECTORIES_LIST})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${DIR_NAME})
@@ -270,6 +282,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     target_link_libraries(${LOGTAIL_TARGET} provider)
     if (LINUX)
         add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
+        if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
+            add_dependencies(${LOGTAIL_TARGET} libagentsight)
+        endif ()
     endif()
 endif()
 

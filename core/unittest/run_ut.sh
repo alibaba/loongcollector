@@ -99,6 +99,63 @@ cd profiler
 ./profiler_data_integrity_unittest >> $output 2>&1
 cd ..
 echo "====================================" >> $output
+
+# eBPF unittest (gtest); requires BUILD_LOGTAIL_UT on Linux. Keep targets in sync with
+# core/unittest/ebpf/CMakeLists.txt (add_unittest / add_driver_unittest).
+# Use absolute paths: earlier sections may leave the shell cwd outside unittest/ if a cd failed.
+UT_DIR_FOR_EBPF="$absoluteBuildDir/unittest"
+EBPF_UT_DIR="$UT_DIR_FOR_EBPF/ebpf"
+echo "============== ebpf ==============" >> $output
+if [ -d "$EBPF_UT_DIR" ]; then
+	EBPF_DRIVER_LIB_DIR="$absoluteBuildDir/ebpf/driver"
+	COOLBPF_LIB_DIR="$absoluteBuildDir/_thirdparty/coolbpf/src"
+	export LD_LIBRARY_PATH="${EBPF_UT_DIR}:${UT_DIR_FOR_EBPF}:${EBPF_DRIVER_LIB_DIR}:${COOLBPF_LIB_DIR}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+	if cd "$EBPF_UT_DIR"; then
+		./aggregator_unittest >> $output 2>&1
+		./ebpf_adapter_unittest >> $output 2>&1
+		./ebpf_server_unittest >> $output 2>&1
+		./sampler_unittest >> $output 2>&1
+		./converger_unittest >> $output 2>&1
+		./table_unittest >> $output 2>&1
+		./protocol_parser_unittest >> $output 2>&1
+		./common_util_unittest >> $output 2>&1
+		./trace_id_benchmark >> $output 2>&1
+		./network_observer_event_unittest >> $output 2>&1
+		./network_observer_manager_unittest >> $output 2>&1
+		./network_observer_config_update_unittest >> $output 2>&1
+		./connection_unittest >> $output 2>&1
+		./connection_manager_unittest >> $output 2>&1
+		./process_cache_unittest >> $output 2>&1
+		./process_cache_value_unittest >> $output 2>&1
+		./process_cache_manager_unittest >> $output 2>&1
+		./process_data_map_unittest >> $output 2>&1
+		./process_cleanup_retryable_event_unittest >> $output 2>&1
+		./process_clone_retryable_event_unittest >> $output 2>&1
+		./process_execve_retryable_event_unittest >> $output 2>&1
+		./process_exit_retryable_event_unittest >> $output 2>&1
+		./process_sync_retryable_event_unittest >> $output 2>&1
+		./file_retryable_event_unittest >> $output 2>&1
+		./file_security_manager_unittest >> $output 2>&1
+		./process_security_manager_unittest >> $output 2>&1
+		./network_security_manager_unittest >> $output 2>&1
+		./agentsight_manager_unittest >> $output 2>&1
+		./retryable_event_unittest >> $output 2>&1
+		./http_retryable_event_unittest >> $output 2>&1
+		./id_allocator_unittest >> $output 2>&1
+		./ebpf_driver_log_unittest >> $output 2>&1
+		./ebpf_driver_unittest >> $output 2>&1
+		./bpf_map_traits_unittest >> $output 2>&1
+		./bpf_wrapper_unittest >> $output 2>&1
+		cd "$UT_DIR_FOR_EBPF" || {
+			echo "cd back to unittest from ebpf failed" >> $output
+		}
+	else
+		echo "cd to ebpf unittest failed" >> $output
+	fi
+else
+	echo "ebpf unittest dir not found ($EBPF_UT_DIR), skip (Linux + BUILD_LOGTAIL_UT for ebpf UTs)" >> $output
+fi
+echo "====================================" >> $output
 echo "====================================" >> $output
 
 # Collect logs.

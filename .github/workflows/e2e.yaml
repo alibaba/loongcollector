@@ -96,6 +96,7 @@ jobs:
             --file ./docker/Dockerfile_edge_linux \
             --build-arg VERSION=0.0.1 \
             --build-arg BUILD_LOGTAIL_UT=OFF \
+            --build-arg ENABLE_AGENTSIGHT=ON \
             --build-arg ENABLE_COMPATIBLE_MODE=ON \
             --build-arg ENABLE_STATIC_LINK_CRT=ON \
             --build-arg WITHOUTGDB=ON \
