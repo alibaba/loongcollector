@@ -9,6 +9,7 @@ require (
 	github.com/alibaba/ilogtail/pkg v0.0.0
 	github.com/apache/doris/sdk/go-doris-sdk v0.0.0-20251128023530-ff9100777811
 	github.com/apache/pulsar-client-go v0.10.0
+	github.com/bi-zone/etw v0.0.0-20210519083747-fe9042eb0ea8
 	github.com/buger/jsonparser v1.1.1
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cihub/seelog v0.0.0-20170130134532-f561c5e57575

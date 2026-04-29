@@ -1,4 +1,4 @@
-# Copyright 2023 iLogtail Authors
+﻿# Copyright 2023 iLogtail Authors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,3 +122,4 @@ plugins:
     - import: "github.com/alibaba/ilogtail/plugins/input/telegraf"
   windows:
     - import: "github.com/alibaba/ilogtail/plugins/input/input_wineventlog"
+    - import: "github.com/alibaba/ilogtail/plugins/input/input_dns_etw"
