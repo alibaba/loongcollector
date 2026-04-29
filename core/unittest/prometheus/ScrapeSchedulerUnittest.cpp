@@ -99,8 +99,7 @@ void ScrapeSchedulerUnittest::TestProcess() {
     targetInfo.mHash = "test_hash";
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
-    HttpResponse httpResponse = HttpResponse(
-        &streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     // APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
@@ -162,8 +161,7 @@ void ScrapeSchedulerUnittest::TestStreamMetricWriteCallback() {
     targetInfo.mHash = "test_hash";
     ScrapeScheduler event(mScrapeConfig, "localhost", 8080, "http", "/metrics", 15, 15, 0, 0, targetInfo);
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
-    HttpResponse httpResponse = HttpResponse(
-        &streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     // APSARA_TEST_EQUAL(event.GetId(), "test_jobhttp://localhost:8080/metrics" + ToString(labels.Hash()));
 
     string body1 = "# HELP go_gc_duration_seconds A summary of the pause duration of garbage collection cycles.\n"
@@ -269,8 +267,7 @@ void ScrapeSchedulerUnittest::TestTokenUpdate() {
     event.ScheduleNext();
 
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), nullptr, std::chrono::system_clock::now());
-    HttpResponse httpResponse = HttpResponse(
-        &streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     httpResponse.SetStatusCode(401);
@@ -319,8 +316,7 @@ void ScrapeSchedulerUnittest::TestTokenUpdateNoInfiniteLoop() {
     APSARA_TEST_EQUAL(1UL, Timer::GetInstance()->mQueue.size());
 
     auto streamScraper = prom::StreamScraper(labels, 0, 0, event.GetId(), &eventPool, std::chrono::system_clock::now());
-    HttpResponse httpResponse = HttpResponse(
-        &streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
+    HttpResponse httpResponse = HttpResponse(&streamScraper, [](void*) {}, prom::StreamScraper::MetricWriteCallback);
     auto defaultLabels = MetricLabels();
     event.InitSelfMonitor(defaultLabels);
     httpResponse.SetStatusCode(401);

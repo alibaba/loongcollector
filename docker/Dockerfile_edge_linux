@@ -20,6 +20,24 @@ ENV MAKE_JOBS=$MAKE_JOBS
 ENV VERSION=$VERSION
 
 USER root
+# AgentSight (coolbpf Rust): openssl crate with "vendored" runs OpenSSL Configure, which needs Perl IPC::Cmd.
+# Same layer as docker/Dockerfile_build; the edge image previously omitted it and E2E (ENABLE_AGENTSIGHT=ON) failed.
+RUN if command -v dnf >/dev/null 2>&1; then \
+        dnf install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconf-pkg-config && dnf clean all; \
+    elif command -v yum >/dev/null 2>&1; then \
+        yum install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconfig && yum clean all; \
+    elif command -v apt-get >/dev/null 2>&1; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends perl libdata-dumper-perl libipc-cmd-perl libssl-dev pkg-config \
+        && rm -rf /var/lib/apt/lists/*; \
+    else \
+        echo "No dnf/yum/apt-get; install perl + IPC::Cmd + OpenSSL dev + pkg-config for AgentSight manually." && exit 1; \
+    fi
+ENV PERL=/usr/bin/perl
+ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
+# openssl-sys (agentsight): vendored build from Cargo.toml unless overridden
+ENV OPENSSL_NO_VENDOR=0
+
 WORKDIR /src
 COPY . .
 

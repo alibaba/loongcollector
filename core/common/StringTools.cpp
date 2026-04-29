@@ -431,8 +431,7 @@ std::string trimCopy(const std::string& str, UnaryPredicate pred, bool left, boo
 }
 
 std::string Trim(const std::string& str, const std::string& trimCharacters, bool trimLeft, bool trimRight) {
-    return trimCopy(
-        str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
+    return trimCopy(str, [&](char ch) { return std::string::npos != trimCharacters.find(ch); }, trimLeft, trimRight);
 }
 
 std::string DoubleToString(double value) {

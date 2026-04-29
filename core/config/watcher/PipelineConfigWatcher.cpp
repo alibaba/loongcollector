@@ -493,15 +493,13 @@ void PipelineConfigWatcher::PushPipelineConfig(CollectionConfig&& config,
     switch (diffEnum) {
         case ConfigDiffEnum::Added:
         case ConfigDiffEnum::IgnoredModified:
-        case ConfigDiffEnum::IgnoredUnchanged:
-            // IgnoredUnchanged: file unchanged on disk, but no running pipeline (e.g. first add failed, or
-            // never scheduled). CheckUnchangedConfig re-parses and must enqueue Add; see that else-branch.
             pDiff.mAdded.push_back(std::move(config));
             break;
         case ConfigDiffEnum::AppliedModified:
             pDiff.mModified.push_back(std::move(config));
             break;
         default:
+            // Includes IgnoredUnchanged: do not push to mAdded (singleton path still uses IgnoredUnchanged above).
             break;
     }
 }

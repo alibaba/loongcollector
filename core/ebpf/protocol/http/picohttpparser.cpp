@@ -50,7 +50,7 @@
 #define ALIGNED(n) __attribute__((aligned(n)))
 #endif
 
-#define IS_PRINTABLE_ASCII(c) ((unsigned char)(c)-040u < 0137u)
+#define IS_PRINTABLE_ASCII(c) ((unsigned char)(c) - 040u < 0137u)
 
 #define CHECK_EOF() \
     if (buf == buf_end) { \

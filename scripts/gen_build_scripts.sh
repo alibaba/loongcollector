@@ -109,6 +109,23 @@ fi
 perl -MIPC::Cmd -e1 && perl -MData::Dumper -e1 || { echo "ERROR: perl IPC::Cmd or Data::Dumper missing after install (AgentSight / OpenSSL)." >&2; exit 1; }
 export PERL=/usr/bin/perl
 export PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
+# Cargo: some build images set crates.io to rsproxy.cn, which can time out on non-CN networks (e.g. arc-runner-ilogtail in CI). Do not touch coolbpf; only adjust global Cargo config in the build container.
+for c in \
+  "${CARGO_HOME:-$HOME/.cargo}"/config.toml \
+  "${CARGO_HOME:-$HOME/.cargo}"/config \
+  /root/.cargo/config.toml \
+  /root/.cargo/config \
+  /.cargo/config.toml \
+  /.cargo/config; do
+  if [ -f "$c" ] && grep -q 'rsproxy' "$c" 2>/dev/null; then
+    d=$(dirname "$c")
+    # Remove rsproxy-only config; do not add [source] replace-with to sparse+https://index.crates.io/ —
+    # new Cargo errors: source loongcollector_* "defines source registry crates-io" but that source
+    # is already defined (duplicate registry).
+    echo "loongcollector: back up rsproxy Cargo config, use default crates.io index: $c" >&2
+    mv -f "$c" "$c.bak-loongcollector"
+  fi
+done
 # --- end AgentSight build deps ---
 AGENTSIGHT_BUILD_DEPS_EOF
   fi

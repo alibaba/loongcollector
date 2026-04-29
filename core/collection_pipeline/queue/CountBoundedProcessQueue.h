@@ -37,10 +37,8 @@ public:
 
 private:
     size_t Size() const override { return mQueue.size(); }
-    void AddSize(ProcessQueueItem*) override { /* do nothing */
-    }
-    void SubSize(ProcessQueueItem*) override { /* do nothing */
-    }
+    void AddSize(ProcessQueueItem*) override {}
+    void SubSize(ProcessQueueItem*) override {}
 
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class CountBoundedProcessQueueUnittest;
