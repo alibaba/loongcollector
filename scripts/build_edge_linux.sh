@@ -83,6 +83,20 @@ done
 
 echo "echo 'StrictHostkeyChecking no' >> /etc/ssh/ssh_config" >> generated_files/gen_build.sh
 chmod 755 generated_files/gen_build.sh
+
+# Before CMake compiles C++ that includes agentsight.h: run the AgentSight crate so build.rs
+# executes cbindgen and writes include/agentsight.h (see coolbpf agentsight/build.rs).
+# This avoids any race with parallel make before libagentsight / header sync steps.
+# ENABLE_AGENTSIGHT is expanded at gen_build.sh generation time (this script's env).
+if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then
+  cat >> generated_files/gen_build.sh <<AGENTSIGHT_PREGEN
+# ---- AgentSight: generate include/agentsight.h (cbindgen in build.rs) before main CMake build ----
+if [ -d core/_thirdparty/coolbpf/src/agentsight ]; then
+  ( cd core/_thirdparty/coolbpf/src/agentsight && cargo build --release --no-default-features ) || { echo "build_edge_linux: AgentSight cargo build failed" >&2; exit 1; }
+fi
+AGENTSIGHT_PREGEN
+fi
+
 echo "mkdir -p core/build && cd core/build && cmake -DCMAKE_BUILD_TYPE=Release -DLOGTAIL_VERSION=${VERSION} -DBUILD_LOGTAIL_UT=OFF -DENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} -DENABLE_COMPATIBLE_MODE=${ENABLE_COMPATIBLE_MODE} -DENABLE_STATIC_LINK_CRT=${ENABLE_STATIC_LINK_CRT} -DWITHOUTGDB=${WITHOUTGDB} -DWITHSPL=${WITHSPL} .. && make -sj${MAKE_JOBS} && cd - && ./scripts/upgrade_adapter_lib.sh && ./scripts/plugin_build.sh mod c-shared output ${VERSION} plugins.yml,external_plugins.yml go.mod" >> generated_files/gen_build.sh
 
 ./generated_files/gen_build.sh
