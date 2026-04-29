@@ -1,4 +1,4 @@
-# Licenses of dependencies
+﻿# Licenses of dependencies
 
 When distributed in a binary form, iLogtail may contain portions of the following works:
 
@@ -174,6 +174,7 @@ When distributed in a binary form, iLogtail may contain portions of the followin
 - [github.com/Microsoft/go-winio](https://pkg.go.dev/github.com/Microsoft/go-winio?tab=licenses)
 - [github.com/Microsoft/hcsshim](https://pkg.go.dev/github.com/Microsoft/hcsshim?tab=licenses)
 - [github.com/IBM/sarama](https://pkg.go.dev/github.com/IBM/sarama?tab=licenses)
+- [github.com/bi-zone/etw](https://pkg.go.dev/github.com/bi-zone/etw?tab=licenses)
 - [github.com/buger/jsonparser](https://pkg.go.dev/github.com/buger/jsonparser?tab=licenses)
 - [github.com/cespare/xxhash](https://pkg.go.dev/github.com/cespare/xxhash?tab=licenses)
 - [github.com/eapache/go-resiliency](https://pkg.go.dev/github.com/eapache/go-resiliency?tab=licenses)
