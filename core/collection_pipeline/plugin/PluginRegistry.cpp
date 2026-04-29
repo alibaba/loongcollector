@@ -177,7 +177,8 @@ void PluginRegistry::LoadStaticPlugins() {
         RegisterContinuousInputCreator(new StaticInputCreator<InputNetworkSecurity>(), true);
     }
     if (BOOL_FLAG(enable_ebpf_agentsight)) {
-        RegisterContinuousInputCreator(new StaticInputCreator<InputAgentSight>(), false);
+        // Match other eBPF security inputs: one winning pipeline per input_agentsight across config files.
+        RegisterContinuousInputCreator(new StaticInputCreator<InputAgentSight>(), true);
     }
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMeta>(), true);
     RegisterContinuousInputCreator(new StaticInputCreator<InputHostMonitor>(), false);
