@@ -61,8 +61,13 @@ private:
     // (e.g. Operation not permitted) so run_core_ut / CI without CAP_BPF stays green.
     void SkipTestUnlessBpfInitOk() {
         if (mWrapper->Init() != 0) {
+#if defined(GTEST_HAS_SKIP) && GTEST_HAS_SKIP
             GTEST_SKIP() << "BPF skeleton init failed; need kernel BPF support and permission to load "
                             "(e.g. CAP_BPF, sufficient memlock) in this environment";
+#else
+            GTEST_LOG_(INFO) << "Skipped: BPF init failed in this environment (no GTEST_SKIP in this gtest build)";
+            return;
+#endif
         }
     }
 };

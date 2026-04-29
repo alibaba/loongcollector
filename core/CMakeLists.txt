@@ -174,12 +174,7 @@ endif()
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
-# AgentSight C FFI header: vendored at _thirdparty/coolbpf/src/agentsight/include/agentsight.h
-# (ebpf/plugin/agentsight/* always #include it; see agentsight_api.h). This path must be on the
-# compile line for all Linux builds — not only when ENABLE_AGENTSIGHT is ON, otherwise a cached or
-# overridden -DENABLE_AGENTSIGHT=OFF drops the include and agentsight.h is "not found" even though
-# the workflow set ENABLE_AGENTSIGHT=ON. ENABLE_AGENTSIGHT still controls the cargo/CMake
-# coolbpf agent target (libagentsight) and link/install behavior.
+# cbindgen output: core/_thirdparty/coolbpf/src/agentsight/include/agentsight.h (see agentsight_api.h)
 if (LINUX)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_thirdparty/coolbpf/src/agentsight/include)
 endif ()
@@ -271,15 +266,6 @@ if(MSVC)
     endif()
 endif()
 
-# When ENABLE_AGENTSIGHT is ON, agentsight.h is produced by the libagentsight (cargo/cbindgen) build.
-# Every target that compiles a translation unit including that header must depend on libagentsight
-# so the header exists before any C++ compile of that target (Ninja can otherwise race).
-function(core_require_libagentsight_for_generated_header tgt)
-    if (LINUX AND ENABLE_AGENTSIGHT AND TARGET libagentsight)
-        add_dependencies(${tgt} libagentsight)
-    endif()
-endfunction()
-
 # Link libraries.
 if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     input_link(${LOGTAIL_TARGET})
@@ -291,7 +277,9 @@ if(BUILD_LOGTAIL OR BUILD_LOGTAIL_SHARED_LIBRARY)
     target_link_libraries(${LOGTAIL_TARGET} provider)
     if (LINUX)
         add_dependencies(${LOGTAIL_TARGET} install_coolbpf)
-        core_require_libagentsight_for_generated_header(${LOGTAIL_TARGET})
+        if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
+            add_dependencies(${LOGTAIL_TARGET} libagentsight)
+        endif ()
     endif()
 endif()
 

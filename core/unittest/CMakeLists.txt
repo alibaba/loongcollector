@@ -94,8 +94,9 @@ macro(ut_link ut_link_withspl)
     target_link_libraries(${UT_BASE_TARGET} provider_unittest_base)
     if (LINUX)
         add_dependencies(${UT_BASE_TARGET} install_coolbpf)
-        # Same as LOGTAIL: sources include agentsight.h via agentsight_api.h; must not compile before cbindgen.
-        core_require_libagentsight_for_generated_header(${UT_BASE_TARGET})
+        if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
+            add_dependencies(${UT_BASE_TARGET} libagentsight)
+        endif ()
     endif()
 endmacro()
 
@@ -127,15 +128,6 @@ if (UNIX)
         add_core_subdir()
         set(UT_LINK_WITHSPL OFF)
         ut_link(${UT_LINK_WITHSPL})
-        # EBPFAdapter.h -> agentsight_api.h -> agentsight.h. Parent core/CMakeLists.txt adds
-        # include_directories for this path, but global dirs do not always propagate to this
-        # subproject in CI; set explicitly for unittest link lines.
-        get_filename_component(_CORE_FOR_UT_INCLUDES "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
-        set(_AGENTSIGHT_C_INCLUDE_DIR "${_CORE_FOR_UT_INCLUDES}/_thirdparty/coolbpf/src/agentsight/include")
-        if (TARGET unittest_base_withspl)
-            target_include_directories(unittest_base_withspl PRIVATE "${_AGENTSIGHT_C_INCLUDE_DIR}")
-        endif ()
-        target_include_directories(unittest_base PRIVATE "${_AGENTSIGHT_C_INCLUDE_DIR}")
     else ()
         # add core subdir
         set(UT_BASE_TARGET "unittest_base")
