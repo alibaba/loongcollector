@@ -17,8 +17,10 @@ project(container_manager_unittest)
 
 add_executable(container_discovery_options_unittest ContainerDiscoveryOptionsUnittest.cpp)
 add_executable(container_manager_unittest ContainerManagerUnittest.cpp)
+add_executable(container_diff_unittest ContainerDiffUnittest.cpp)
 target_link_libraries(container_discovery_options_unittest ${UT_BASE_TARGET})
 target_link_libraries(container_manager_unittest ${UT_BASE_TARGET})
+target_link_libraries(container_diff_unittest ${UT_BASE_TARGET})
 
 if (UNIX)
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/testDataSet)
@@ -31,4 +33,5 @@ endif ()
 include(GoogleTest)
 gtest_discover_tests(container_discovery_options_unittest)
 gtest_discover_tests(container_manager_unittest)
+gtest_discover_tests(container_diff_unittest)
 

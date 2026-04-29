@@ -31,6 +31,7 @@ public:
     void TestPush();
     void TestPop();
     void TestMetric();
+    void TestAddSizeSubSizeNoop();
 
 protected:
     static void SetUpTestCase() { sCtx.SetConfigName("test_config"); }
@@ -143,9 +144,15 @@ void CountBoundedProcessQueueUnittest::TestMetric() {
     APSARA_TEST_EQUAL(1U, mQueue->mValidToPushFlag->GetValue());
 }
 
+void CountBoundedProcessQueueUnittest::TestAddSizeSubSizeNoop() {
+    mQueue->AddSize(nullptr);
+    mQueue->SubSize(nullptr);
+}
+
 UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPush)
 UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestPop)
 UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestMetric)
+UNIT_TEST_CASE(CountBoundedProcessQueueUnittest, TestAddSizeSubSizeNoop)
 
 } // namespace logtail
 

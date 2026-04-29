@@ -19,6 +19,7 @@
 #include "common/StringTools.h"
 #include "common/http/AsynCurlRunner.h"
 #include "common/queue/blockingconcurrentqueue.h"
+#include "ebpf/Config.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/ProcessCacheManager.h"
@@ -48,6 +49,7 @@ public:
     void BenchmarkConsumeTask();
     void TestReportAgentInfo();
     void TestConverge();
+    void TestAddOrUpdateConfigWrongOptionsVariant();
 
 protected:
     void SetUp() override {
@@ -982,6 +984,15 @@ void NetworkObserverManagerUnittest::TestConverge() {
     APSARA_TEST_TRUE(cnt > 0);
 }
 
+void NetworkObserverManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("c-wrong-opt");
+    ctx.SetProcessQueueKey(1);
+    SecurityOptions bad{};
+    APSARA_TEST_NOT_EQUAL(
+        0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&bad)));
+}
+
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestEventHandling);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestWhitelistManagement);
@@ -993,6 +1004,7 @@ UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestSaeScenario);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, BenchmarkConsumeTask);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestReportAgentInfo);
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestConverge);
+UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestAddOrUpdateConfigWrongOptionsVariant);
 
 class NetworkObserverManagerConfigPairUnittest : public NetworkObserverManagerUnittestBase {
 protected:
