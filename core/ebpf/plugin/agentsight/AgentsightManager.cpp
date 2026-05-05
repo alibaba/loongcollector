@@ -14,6 +14,8 @@
 
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
+#include <algorithm>
+
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringView.h"
@@ -30,32 +32,70 @@ namespace logtail::ebpf {
 
 namespace {
 
-std::string HostFromRequestUrl(const std::string& url) {
-    const auto pos = url.find("://");
-    size_t start = (pos == std::string::npos) ? 0 : pos + 3;
-    const size_t slash = url.find('/', start);
-    const size_t colon = url.find(':', start);
-    size_t end
-        = std::min(slash == std::string::npos ? url.size() : slash, colon == std::string::npos ? url.size() : colon);
-    if (end <= start) {
-        return {};
+bool ParseHostAndPortFromRequestUrl(const std::string& url, std::string& host, std::string& port) {
+    host.clear();
+    port.clear();
+    const auto schemePos = url.find("://");
+    const size_t authorityStart = (schemePos == std::string::npos) ? 0 : schemePos + 3;
+    const size_t pathPos = url.find('/', authorityStart);
+    const size_t queryPos = url.find('?', authorityStart);
+    const size_t fragmentPos = url.find('#', authorityStart);
+    size_t authorityEnd = url.size();
+    if (pathPos != std::string::npos) {
+        authorityEnd = std::min(authorityEnd, pathPos);
     }
-    return url.substr(start, end - start);
-}
-
-std::string PortFromRequestUrl(const std::string& url) {
-    const auto pos = url.find("://");
-    size_t start = (pos == std::string::npos) ? 0 : pos + 3;
-    const size_t colon = url.find(':', start);
-    if (colon == std::string::npos) {
-        return {};
+    if (queryPos != std::string::npos) {
+        authorityEnd = std::min(authorityEnd, queryPos);
     }
-    const size_t slash = url.find('/', colon + 1);
-    size_t end = slash == std::string::npos ? url.size() : slash;
-    if (end <= colon + 1) {
-        return {};
+    if (fragmentPos != std::string::npos) {
+        authorityEnd = std::min(authorityEnd, fragmentPos);
     }
-    return url.substr(colon + 1, end - colon - 1);
+    if (authorityEnd <= authorityStart) {
+        return false;
+    }
+    std::string authority = url.substr(authorityStart, authorityEnd - authorityStart);
+    const size_t atPos = authority.rfind('@');
+    if (atPos != std::string::npos) {
+        if (atPos + 1 >= authority.size()) {
+            return false;
+        }
+        authority = authority.substr(atPos + 1);
+    }
+    if (authority.empty()) {
+        return false;
+    }
+    if (authority[0] == '[') {
+        const size_t closingBracket = authority.find(']');
+        if (closingBracket == std::string::npos || closingBracket <= 1) {
+            return false;
+        }
+        host = authority.substr(1, closingBracket - 1);
+        if (closingBracket + 1 == authority.size()) {
+            return !host.empty();
+        }
+        if (authority[closingBracket + 1] != ':') {
+            return false;
+        }
+        if (closingBracket + 2 >= authority.size()) {
+            return false;
+        }
+        port = authority.substr(closingBracket + 2);
+        return !host.empty();
+    }
+    const size_t colonPos = authority.rfind(':');
+    if (colonPos == std::string::npos) {
+        host = authority;
+        return !host.empty();
+    }
+    if (colonPos == 0) {
+        return false;
+    }
+    host = authority.substr(0, colonPos);
+    if (colonPos + 1 >= authority.size()) {
+        return false;
+    }
+    port = authority.substr(colonPos + 1);
+    return !host.empty();
 }
 
 } // namespace
@@ -380,40 +420,40 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     setStr(StringView("session.id"), rec->mSessionId);
     setStr(StringView("gen_ai.conversation.id"), rec->mConversationId);
     setStr(StringView("gen_ai.response.id"), rec->mResponseId);
-    log->SetContent("gen_ai.system", rec->mProvider);
+
+    if (rec->mPid != 0) {
+        log->SetContent("pid", std::to_string(rec->mPid));
+    }
+    setStr(StringView("process_name"), rec->mProcessName);
+    setStr(StringView("gen_ai.agent.name"), rec->mAgentName);
+
+    log->SetContent("gen_ai.request.timestamp_ns", std::to_string(rec->mTimestampNs));
+    log->SetContent("gen_ai.response.duration_ns", std::to_string(rec->mDurationNs));
+
+    if (!rec->mRequestUrl.empty()) {
+        std::string host;
+        std::string port;
+        if (ParseHostAndPortFromRequestUrl(rec->mRequestUrl, host, port)) {
+            setStr(StringView("server.address"), host);
+            setStr(StringView("server.port"), port);
+        }
+    }
+
+    log->SetContent("gen_ai.provider.name", rec->mProvider);
     log->SetContent("gen_ai.request.model", rec->mModel);
-    log->SetContent("gen_ai.response.model", rec->mModel);
-    setStr(StringView("gen_ai.response.finish_reason"), rec->mFinishReason);
-    log->SetContent(std::string("gen_ai.request.is_stream"), std::string(rec->mIsSse ? "true" : "false"));
+    log->SetContent("status_code", std::to_string(rec->mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec->mIsSse ? "1" : "0"));
+    setStr(StringView("gen_ai.response.finish_reasons"), rec->mFinishReason);
     log->SetContent(std::string("is_usage_from_api"), std::string(rec->mLlmUsage ? "true" : "false"));
 
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec->mInputTokens));
     log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec->mOutputTokens));
     log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec->mTotalTokens));
-    log->SetContent("http.response.status_code", std::to_string(rec->mStatusCode));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec->mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec->mCacheReadInputTokens));
 
     setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
     setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
-
-    if (!rec->mRequestUrl.empty()) {
-        setStr(StringView("url.full"), rec->mRequestUrl);
-        const std::string host = HostFromRequestUrl(rec->mRequestUrl);
-        const std::string port = PortFromRequestUrl(rec->mRequestUrl);
-        setStr(StringView("server.address"), host);
-        if (!port.empty()) {
-            setStr(StringView("server.port"), port);
-        }
-    }
-
-    if (rec->mDurationNs > 0) {
-        log->SetContent("gen_ai.duration_ms", std::to_string(rec->mDurationNs / 1000000ULL));
-    }
-
-    if (rec->mPid != 0) {
-        log->SetContent("process.pid", std::to_string(rec->mPid));
-    }
-    setStr(StringView("process.executable.name"), rec->mProcessName);
-    setStr(StringView("agent.name"), rec->mAgentName);
 
     if (mPushLogsTotal) {
         ADD_COUNTER(mPushLogsTotal, 1);

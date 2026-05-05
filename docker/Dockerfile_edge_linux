@@ -56,6 +56,12 @@ RUN sh ./scripts/build_edge_linux.sh && \
     cp "core/build/go_pipeline/libGoPluginAdapter.so" "dist/loongcollector-edge" && \
     cp "output/libGoPluginBase.so" "dist/loongcollector-edge" && \
     cp "example_config/start_with_docker/loongcollector_config.json" "dist/loongcollector-edge/conf/instance_config/local/" && \
+    if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then \
+        test -f "core/build/ebpf/driver/libagentsight.so" \
+            || { echo "Dockerfile_edge_linux: ENABLE_AGENTSIGHT=ON but core/build/ebpf/driver/libagentsight.so missing" >&2; exit 1; }; \
+        cp "core/build/ebpf/driver/libagentsight.so" "dist/loongcollector-edge" && \
+        strip "dist/loongcollector-edge/libagentsight.so"; \
+    fi && \
     if file "dist/loongcollector-edge/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "dist/loongcollector-edge"; fi &&\
     strip "dist/loongcollector-edge/loongcollector" && \
     strip "dist/loongcollector-edge/libGoPluginAdapter.so" && \

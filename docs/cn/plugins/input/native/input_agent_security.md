@@ -1,8 +1,8 @@
-# input-agent-security 插件
+# input-agentsight 插件
 
 ## 简介
 
-input_agent_security插件实现对当前openclaw，hermes等agent工具等采集，支持的大模型供应商包括openai，antronpic，以及国内的厂商协议
+`input_agentsight` 插件实现对当前openclaw，hermes等agent工具等采集，支持的大模型供应商包括OpenAI，Anthropic，以及国内的厂商协议
 
 ## 版本
 
@@ -16,10 +16,10 @@ dev
 
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
-|  Type  |  string  |  是  |  /  |  插件类型。固定为input\_agent\_security  |
-|  ProbeConfig  |  object  |  是  |  /  |  插件配置参数列表  |
+|  Type  |  string  |  是  |  /  |  插件类型。固定为 `input_agentsight`  |
+|  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
-|  ProbeConfig.LogPath  |  string  |  否  |  false  | ebpf日志的输出位置 |
+|  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置 |
 
 ## 输出格式
 
@@ -33,7 +33,7 @@ dev
 | `gen_ai.agent.name` | string | agent 名称 |
 | `gen_ai.request.timestamp_ns` | uint64 | 一次对大模型请求开始的时间 |
 | `gen_ai.response.duration_ns` | uint64 | 一次对大模型请求到大模型回复的时间 |
-| `server.address` | string | 请求大模型厂商的 url |
+| `server.address` | string | 从请求 URL 解析出的服务端主机名（有请求 URL 时输出） |
 | `gen_ai.provider.name` | string | 大模型厂商名称 |
 | `gen_ai.request.model` | string | 大模型厂商使用的模型名称 |
 | `status_code` | uint16 | 一次请求的状态码，同 http 状态码 |
@@ -62,7 +62,7 @@ dev
 ```yaml
 enable: true
 inputs:
-  - Type: input_agent_security
+  - Type: input_agentsight
     ProbeConfig:
       Verbose: 1
       LogPath: ""
@@ -75,9 +75,8 @@ flushers:
 - 输出
 
 {
-  "agent.name": "OpenClaw",
+  "gen_ai.agent.name": "OpenClaw",
   "gen_ai.conversation.id": "c47ac487c54c2da859ba2a0e873eeeae",
-  "gen_ai.duration_ms": 3548,
   "gen_ai.input.messages": [
     {
       "role": "system",
@@ -105,20 +104,22 @@ flushers:
       "finish_reason": "stop"
     }
   ],
-  "gen_ai.request.is_stream": true,
+  "gen_ai.provider.name": "openai",
   "gen_ai.request.model": "qwen3.5-plus",
-  "gen_ai.response.finish_reason": "stop",
+  "gen_ai.request.timestamp_ns": "1749123456789000000",
+  "gen_ai.response.duration_ns": "3548000000",
+  "gen_ai.response.finish_reasons": "stop",
   "gen_ai.response.id": "chatcmpl-3cd5d2d2-d2f5-91e9-a5e4-7fb740bb47f6",
-  "gen_ai.response.model": "qwen3.5-plus",
-  "gen_ai.system": "openai",
-  "gen_ai.usage.input_tokens": 27466,
-  "gen_ai.usage.output_tokens": 195,
-  "gen_ai.usage.total_tokens": 27661,
-  "http.response.status_code": 200,
-  "is_usage_from_api": true,
-  "process.executable.name": "openclaw-gatewa",
-  "process.pid": 705127,
+  "gen_ai.usage.cache_creation.input_tokens": "0",
+  "gen_ai.usage.cache_read.input_tokens": "0",
+  "gen_ai.usage.input_tokens": "27466",
+  "gen_ai.usage.output_tokens": "195",
+  "gen_ai.usage.total_tokens": "27661",
+  "is_sse": "1",
+  "is_usage_from_api": "true",
+  "pid": "705127",
+  "process_name": "openclaw-gatewa",
   "server.address": "dashscope.aliyuncs.com",
   "session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
-  "url.full": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
+  "status_code": "200"
 }
