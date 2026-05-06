@@ -60,7 +60,7 @@ func (c *crUnifiedCache) SetGVRIfNotStarted(gvr schema.GroupVersionResource) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.watchStarted {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "custom resource informer already started; GVR change ignored", "gvr", gvr.String())
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg", "custom resource informer already started; GVR change ignored", "gvr", gvr.String())
 		return
 	}
 	c.gvr = gvr
@@ -90,7 +90,7 @@ func (c *crUnifiedCache) setRESTConfig(cfg *rest.Config) error {
 	c.dynamicClient = dyn
 	disco, derr := discovery.NewDiscoveryClientForConfig(restConfigForDynamicClient(cfg))
 	if derr != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "discovery client for custom resource informer unavailable; will not pre-check GVR", "resourceType", c.resourceType, "error", derr)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg", "discovery client for custom resource informer unavailable; will not pre-check GVR", "resourceType", c.resourceType, "error", derr)
 		c.discoveryClient = nil
 	} else {
 		c.discoveryClient = disco
@@ -112,12 +112,12 @@ func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersi
 	gv := schema.GroupVersion{Group: gvr.Group, Version: gvr.Version}.String()
 	resourceList, err := d.ServerResourcesForGroupVersion(gv)
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg",
 			"custom resource API group/version not available on server; skipping informer", "gvr", gvr.String(), "error", err)
 		return false
 	}
 	if !containsResource(resourceList.APIResources, gvr.Resource) {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg",
 			"custom resource plural not listed for group/version; skipping informer", "gvr", gvr.String())
 		return false
 	}
@@ -131,7 +131,7 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 	dyn := c.dynamicClient
 	c.mu.Unlock()
 	if dyn == nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic client not ready, skip custom resource informer; ensure MetaManager.Init completed")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg", "dynamic client not ready, skip custom resource informer; ensure MetaManager.Init completed")
 		return
 	}
 	c.watchStartOnce.Do(func() {
@@ -203,14 +203,14 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 			},
 		})
 		if err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to add dynamic informer event handler", err, "resourceType", c.resourceType, "gvr", c.gvr.String())
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "msg", "fail to add dynamic informer event handler", "error", err, "resourceType", c.resourceType, "gvr", c.gvr.String())
 		}
 		if err := attachWatchErrorHandler(c.informer, c.giveUp, watchErrorHandlerOpts{
 			ResourceType:  c.resourceType,
 			GVR:           c.gvr.String(),
 			GiveUpStopMsg: "stopping dynamic informer after repeated errors (RBAC/auth or missing API resource; no further retries)",
 		}); err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set dynamic informer watch error handler", err)
+			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "msg", "fail to set dynamic informer watch error handler", "error", err)
 		}
 		c.watchStarted = true
 		inf := c.informer

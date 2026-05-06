@@ -73,13 +73,15 @@ func attachWatchErrorHandler(informer cache.SharedIndexInformer, g *informerGive
 			var wkvs []interface{}
 			if o.GVR != "" {
 				wkvs = []interface{}{
-					o.GiveUpStopMsg, "resourceType", o.ResourceType,
+					"msg", o.GiveUpStopMsg,
+					"resourceType", o.ResourceType,
 					"gvr", o.GVR,
 					"failures", n,
 				}
 			} else {
 				wkvs = []interface{}{
-					o.GiveUpStopMsg, "resourceType", o.ResourceType,
+					"msg", o.GiveUpStopMsg,
+					"resourceType", o.ResourceType,
 					"failures", n,
 				}
 			}
@@ -104,16 +106,16 @@ func waitInformerCacheSync(mergedStop <-chan struct{}, hasSynced cache.InformerS
 	for {
 		if cache.WaitForCacheSync(mergedStop, hasSynced) {
 			if o.GVR != "" {
-				logger.Info(context.Background(), "dynamic informer cache synced", "gvr", o.GVR)
+				logger.Info(context.Background(), "msg", "dynamic informer cache synced", "gvr", o.GVR)
 			}
 			return
 		}
 		select {
 		case <-mergedStop:
 			if o.GVR != "" {
-				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "dynamic informer cache sync aborted", "gvr", o.GVR)
+				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg", "dynamic informer cache sync aborted", "gvr", o.GVR)
 			} else {
-				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "informer cache sync aborted", "resourceType", o.ResourceType)
+				logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "msg", "informer cache sync aborted", "resourceType", o.ResourceType)
 			}
 			return
 		default:
