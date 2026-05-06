@@ -13,7 +13,8 @@ import (
 )
 
 type LinkGenerator struct {
-	metaCache map[string]MetaCache
+	metaCache   map[string]MetaCache
+	metaCacheMu *sync.RWMutex // same mutex as MetaManager.cacheMu; guards map structure for RegisterCustomResourceCollector
 
 	podCRMu         sync.RWMutex
 	podCRByLinkType map[string]*podCRLinkRuntime
@@ -26,9 +27,10 @@ type podCRLinkRuntime struct {
 	podLabelKey         string
 }
 
-func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
+func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache, metaCacheMu *sync.RWMutex) *LinkGenerator {
 	return &LinkGenerator{
 		metaCache:       metaCache,
+		metaCacheMu:     metaCacheMu,
 		podCRByLinkType: make(map[string]*podCRLinkRuntime),
 	}
 }
@@ -63,6 +65,10 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	// only generate link from the src entity
 	if !strings.HasPrefix(linkType, resourceType) {
 		return nil
+	}
+	if g.metaCacheMu != nil {
+		g.metaCacheMu.RLock()
+		defer g.metaCacheMu.RUnlock()
 	}
 	// CustomResource links (third-party CR):
 	// 1) Pod→CR when linkType is registered via PodLink (before built-in switch).

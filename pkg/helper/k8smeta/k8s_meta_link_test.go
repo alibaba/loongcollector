@@ -14,6 +14,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// testLinkGenerator returns a LinkGenerator for unit tests (nil metaCacheMu; tests do not
+// concurrently mutate the shared cache map).
+func testLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
+	return NewK8sMetaLinkGenerator(metaCache, nil)
+}
+
 func TestGetPodNodeLink(t *testing.T) {
 	podCache := newK8sMetaCache(make(chan struct{}), POD)
 	nodeCache := newK8sMetaCache(make(chan struct{}), NODE)
@@ -49,7 +55,7 @@ func TestGetPodNodeLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:  podCache,
 		NODE: nodeCache,
 	})
@@ -165,7 +171,7 @@ func TestGetPodDeploymentLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		REPLICASET: replicasetCache,
 		DEPLOYMENT: deploymentCache,
@@ -259,7 +265,7 @@ func TestGetReplicaSetDeploymentLink(t *testing.T) {
 			},
 		},
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		REPLICASET: replicasetCache,
 		DEPLOYMENT: deploymentCache,
 	})
@@ -340,7 +346,7 @@ func TestGetPodReplicaSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		REPLICASET: replicasetCache,
 	})
@@ -407,7 +413,7 @@ func TestGetPodDaemonSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		DAEMONSET: daemonsetCache,
 	})
@@ -474,7 +480,7 @@ func TestGetPodStatefulSetLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:         podCache,
 		STATEFULSET: statefulsetCache,
 	})
@@ -541,7 +547,7 @@ func TestGetPodJobLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD: podCache,
 		JOB: jobCache,
 	})
@@ -622,7 +628,7 @@ func TestGetJobCronJobLink(t *testing.T) {
 		EventType: "add",
 		Object:    job2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		JOB:     jobCache,
 		CRONJOB: cronJobCache,
 	})
@@ -697,7 +703,7 @@ func TestGetPodPVCLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:                   podCache,
 		PERSISTENTVOLUMECLAIM: pvcCache,
 	})
@@ -776,7 +782,7 @@ func TestGetPodConfigMapLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		CONFIGMAP: configMapCache,
 	})
@@ -847,7 +853,7 @@ func TestGetPodServiceLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod2,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:     podCache,
 		SERVICE: serviceCache,
 	})
@@ -877,7 +883,7 @@ func TestGetPodContainerLink(t *testing.T) {
 		EventType: "add",
 		Object:    generateMockPod("2"),
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD: podCache,
 	})
 	podList := []*K8sMetaEvent{
@@ -991,7 +997,7 @@ func TestGetIngressServiceLink(t *testing.T) {
 			},
 		},
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		INGRESS: ingressCache,
 		SERVICE: serviceCache,
 	})
@@ -1040,7 +1046,7 @@ func TestGetPodNamespaceLink(t *testing.T) {
 		EventType: "add",
 		Object:    pod3,
 	})
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		POD:       podCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1125,7 +1131,7 @@ func TestGetServiceNamespaceLink(t *testing.T) {
 			Object:    service2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		SERVICE:   serviceCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1186,7 +1192,7 @@ func TestGetDeploymentNamespaceLink(t *testing.T) {
 			Object:    deployment2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DEPLOYMENT: deploymentCache,
 		NAMESPACE:  namespaceCache,
 	})
@@ -1247,7 +1253,7 @@ func TestGetDaemonSetNamespaceLink(t *testing.T) {
 			Object:    daemonset2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DAEMONSET: daemonSetCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1307,7 +1313,7 @@ func TestGetStatefulSetNamespaceLink(t *testing.T) {
 			Object:    statefulSet2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		DAEMONSET: statefulSetCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1367,7 +1373,7 @@ func TestGetConfigMapNamespaceLink(t *testing.T) {
 			Object:    configmap2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		CONFIGMAP: configmapCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1427,7 +1433,7 @@ func TestGetJobNamespaceLink(t *testing.T) {
 			Object:    job2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		JOB:       jobCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1487,7 +1493,7 @@ func TestGetCronJobNamespaceLink(t *testing.T) {
 			Object:    cronjob2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		CRONJOB:   cronjobCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1547,7 +1553,7 @@ func TestGetPVCNamespaceLink(t *testing.T) {
 			Object:    pvc2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		PERSISTENTVOLUMECLAIM: pvcCache,
 		NAMESPACE:             namespaceCache,
 	})
@@ -1607,7 +1613,7 @@ func TestGetIngressNamespaceLink(t *testing.T) {
 			Object:    ingress2,
 		},
 	}
-	linkGenerator := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	linkGenerator := testLinkGenerator(map[string]MetaCache{
 		INGRESS:   ingressCache,
 		NAMESPACE: namespaceCache,
 	})
@@ -1697,7 +1703,7 @@ func TestGetPodCustomResourceLinkViaOwnerReference(t *testing.T) {
 	}}
 	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
 
-	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	lg := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		entityType: crCache,
 	})
@@ -1741,7 +1747,7 @@ func TestGetPodCustomResourceLinkViaLabelFallback(t *testing.T) {
 	pod.Labels = map[string]string{"workflows.argoproj.io/workflow": "wf-from-label"}
 	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
 
-	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	lg := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		entityType: crCache,
 	})
@@ -1776,7 +1782,7 @@ func TestGetCustomResourceNamespaceLink(t *testing.T) {
 		},
 	}}
 
-	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{NAMESPACE: nsCache})
+	lg := testLinkGenerator(map[string]MetaCache{NAMESPACE: nsCache})
 	results := lg.GenerateLinks(events, linkType)
 	require.Len(t, results, 1)
 	ncr, ok := results[0].Object.Raw.(*NamespaceCustomResource)
@@ -1804,7 +1810,7 @@ func TestGetPodCustomResourceLinkMissingCRCache(t *testing.T) {
 	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
 
 	// Intentionally omit entityType from metaCache (no CR cache registered).
-	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{POD: podCache})
+	lg := testLinkGenerator(map[string]MetaCache{POD: podCache})
 	lg.registerPodCRLink(linkType, testPodCRLinkRuntime())
 
 	podList := []*K8sMetaEvent{{EventType: EventTypeUpdate, Object: podCache.metaStore.Items["default/pod3"]}}
@@ -1832,7 +1838,7 @@ func TestGetPodCustomResourceLinkCRCacheHitMiss(t *testing.T) {
 	}}
 	podCache.metaStore.handleAddOrUpdateEvent(&K8sMetaEvent{EventType: EventTypeAdd, Object: podW})
 
-	lg := NewK8sMetaLinkGenerator(map[string]MetaCache{
+	lg := testLinkGenerator(map[string]MetaCache{
 		POD:        podCache,
 		entityType: crCache,
 	})

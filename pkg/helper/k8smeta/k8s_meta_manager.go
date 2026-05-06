@@ -76,7 +76,7 @@ func GetMetaManagerInstance() *MetaManager {
 		for _, resource := range AllResources {
 			metaManager.cacheMap[resource] = newK8sMetaCache(metaManager.stopCh, resource)
 		}
-		metaManager.linkGenerator = NewK8sMetaLinkGenerator(metaManager.cacheMap)
+		metaManager.linkGenerator = NewK8sMetaLinkGenerator(metaManager.cacheMap, &metaManager.cacheMu)
 		metaManager.linkRegisterMap = make(map[string][]string)
 		metaManager.projectNames = make(map[string]int)
 	})
