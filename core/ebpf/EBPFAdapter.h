@@ -22,9 +22,9 @@
 #include <memory>
 #include <string>
 
+#include "agentsight.h"
 #include "common/DynamicLibHelper.h"
 #include "ebpf/include/export.h"
-#include "ebpf/plugin/agentsight/agentsight_api.h"
 
 namespace logtail::ebpf {
 

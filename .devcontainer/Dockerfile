@@ -12,20 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
 USER root
 
-# AgentSight (openssl-sys vendored): OpenSSL's Configure is Perl; devtoolset @INC may omit IPC::Cmd / Data::Dumper.
-# Vendored build does not need system openssl-devel (C++ uses /opt/logtail/deps). PERL/PERL5LIB below pin system perl.
-RUN yum -y install openssh-server perl perl-IPC-Cmd perl-Data-Dumper && \
+RUN yum -y install openssh-server && \
     ssh-keygen -A
-
-ENV PERL=/usr/bin/perl
-ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
-
+    
 # Create the user
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys

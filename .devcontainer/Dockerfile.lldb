@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17
 
 ARG USERNAME=admin
 ARG USER_PASSWORD
@@ -31,24 +31,7 @@ RUN wget https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/toolcha
     
 RUN yum -y install openssh-server && \
     ssh-keygen -A
-
-RUN if command -v dnf >/dev/null 2>&1; then \
-        dnf install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconf-pkg-config && dnf clean all; \
-    elif command -v yum >/dev/null 2>&1; then \
-        yum install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconfig && yum clean all; \
-    elif command -v apt-get >/dev/null 2>&1; then \
-        apt-get update \
-        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            perl libdata-dumper-perl libipc-cmd-perl libssl-dev pkg-config \
-        && rm -rf /var/lib/apt/lists/*; \
-    else \
-        echo "No dnf/yum/apt-get; install perl + IPC::Cmd + openssl dev for AgentSight manually." >&2; \
-        exit 1; \
-    fi
-
-ENV PERL=/usr/bin/perl
-ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
-
+    
 # Create the user
 COPY .env /tmp/.env
 COPY authorized_keys /tmp/authorized_keys

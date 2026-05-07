@@ -52,7 +52,6 @@ public:
     // Valid when mProbeType == SecurityProbeType::AGENTSIGHT_OBSERVE (AgentSight input).
     int32_t mVerbose = 0;
     std::string mLogPath;
-    bool mEnableHttps = false;
 };
 
 ///////////////////// Process Level Config /////////////////////

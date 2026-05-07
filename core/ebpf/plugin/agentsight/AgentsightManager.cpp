@@ -129,15 +129,15 @@ void AgentsightManager::releaseMetricRefs() {
     }
     mRefAndLabels.clear();
     mMetricMgr.reset();
+    mPluginInEventsTotal.reset();
     mPushLogsTotal.reset();
     mPushLogGroupTotal.reset();
 }
 
 void AgentsightManager::StopAgentSightLocked() {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
-    if (mUsesExternalEventFd && mEventFd >= 0) {
+    if (mEventFd >= 0) {
         EBPFServer::GetInstance()->UnregisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, mEventFd);
-        mUsesExternalEventFd = false;
     }
     mEventFd = -1;
     if (mHandle && sym && sym->handle_stop) {
@@ -152,7 +152,8 @@ void AgentsightManager::StopAgentSightLocked() {
 
 bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
-    if (!sym || !sym->config_new || !sym->handle_new || !sym->handle_start || !sym->handle_read) {
+    if (!sym || !sym->config_new || !sym->handle_new || !sym->handle_start || !sym->handle_read
+        || !sym->handle_get_eventfd) {
         LOG_ERROR(sLogger, ("AgentSight", "symbols not available"));
         return false;
     }
@@ -185,19 +186,15 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
         StopAgentSightLocked();
         return false;
     }
-    mRunning = true;
 
-    // Prefer event-driven I/O: if the shared library exports handle_get_eventfd, EBPFServer polls that fd
-    // on the unified epoll (OnEpollReadable). Otherwise EBPFServer::pollPerfBuffers calls PollPerfBuffer as fallback.
-    if (sym->handle_get_eventfd) {
-        mEventFd = sym->handle_get_eventfd(mHandle);
-    } else {
-        mEventFd = -1;
+    mEventFd = sym->handle_get_eventfd(mHandle);
+    if (mEventFd < 0) {
+        LogAgentSightError("agentsight_get_eventfd returned invalid fd");
+        StopAgentSightLocked();
+        return false;
     }
-    if (mEventFd >= 0) {
-        EBPFServer::GetInstance()->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, mEventFd);
-        mUsesExternalEventFd = true;
-    }
+    EBPFServer::GetInstance()->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, mEventFd);
+    mRunning = true;
     return true;
 }
 
@@ -227,15 +224,10 @@ int AgentsightManager::OnEpollReadable() {
     return DrainReadsLocked();
 }
 
-// Used only when no external fd: EBPFServer::pollPerfBuffers drives periodic non-blocking handle_read.
-// When mUsesExternalEventFd is true, epoll invokes OnEpollReadable instead; avoid double-draining here.
+// AgentSight I/O is epoll-driven only (OnEpollReadable); no perf-buffer poll path.
 int AgentsightManager::PollPerfBuffer(int maxWaitTimeMs) {
     (void)maxWaitTimeMs;
-    std::lock_guard<std::mutex> lock(mLibMutex);
-    if (mUsesExternalEventFd || !mRunning || !mHandle) {
-        return 0;
-    }
-    return DrainReadsLocked();
+    return 0;
 }
 
 void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_data) {
@@ -243,11 +235,13 @@ void AgentsightManager::OnLlmCallback(const AgentsightLLMData* data, void* user_
         return;
     }
     auto* self = static_cast<AgentsightManager*>(user_data);
-    // Do not lock mLibMutex here: this runs synchronously inside handle_read → DrainReadsLocked, while
-    // OnEpollReadable / PollPerfBuffer already hold mLibMutex. A second lock would deadlock (non-recursive).
+    // Do not lock mLibMutex here: runs inside handle_read → DrainReadsLocked while OnEpollReadable holds mLibMutex.
     const std::string configName = self->mConfigName;
     auto evt = std::make_shared<AgentsightLlmRecord>(configName, *data);
-    if (!self->mCommonEventQueue.try_enqueue(evt)) {
+    if (self->mCommonEventQueue.try_enqueue(evt)) {
+        ADD_COUNTER(self->mPluginInEventsTotal, 1);
+    } else {
+        ADD_COUNTER(self->mLossKernelEventsTotal, 1);
         LOG_WARNING(sLogger, ("AgentSight LLM event enqueue failed", ""));
     }
 }
@@ -275,6 +269,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
         MetricLabels eventTypeLabels = {{METRIC_LABEL_KEY_EVENT_TYPE, METRIC_LABEL_VALUE_EVENT_TYPE_LOG}};
         auto ref = metricMgr->GetOrCreateReentrantMetricsRecordRef(eventTypeLabels);
         mRefAndLabels.emplace_back(eventTypeLabels);
+        mPluginInEventsTotal = ref->GetCounter(METRIC_PLUGIN_IN_EVENTS_TOTAL);
         mPushLogsTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENTS_TOTAL);
         mPushLogGroupTotal = ref->GetCounter(METRIC_PLUGIN_OUT_EVENT_GROUPS_TOTAL);
     }
@@ -417,8 +412,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         }
     };
 
-    setStr(StringView("session.id"), rec->mSessionId);
-    setStr(StringView("gen_ai.conversation.id"), rec->mConversationId);
+    setStr(StringView("gen_ai.session.id"), rec->mSessionId);
+    setStr(StringView("gen_ai.turn.id"), rec->mConversationId);
     setStr(StringView("gen_ai.response.id"), rec->mResponseId);
 
     if (rec->mPid != 0) {
@@ -449,21 +444,17 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec->mInputTokens));
     log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec->mOutputTokens));
     log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec->mTotalTokens));
-    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec->mCacheCreationInputTokens));
-    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec->mCacheReadInputTokens));
+    log->SetContent("gen_ai.usage.cache_write_tokens", std::to_string(rec->mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read_tokens", std::to_string(rec->mCacheReadInputTokens));
 
     setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
     setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
 
-    if (mPushLogsTotal) {
-        ADD_COUNTER(mPushLogsTotal, 1);
-    }
-    if (mPushLogGroupTotal) {
-        ADD_COUNTER(mPushLogGroupTotal, 1);
-    }
-
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
-    if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+    if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
+        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogGroupTotal, 1);
+    } else {
         if (mPushLogFailedTotal) {
             ADD_COUNTER(mPushLogFailedTotal, 1);
         }

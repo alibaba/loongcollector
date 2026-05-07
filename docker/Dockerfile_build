@@ -12,21 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16 AS build
+# AgentSight (coolbpf / vendored openssl-sys): perl + IPC::Cmd + Data::Dumper + openssl-devel are preinstalled
+# in loongcollector-build-linux 2.1.17+; gen_build.sh still verifies required Perl modules.
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS build
 
 USER root
-# AgentSight (coolbpf Rust): vendored OpenSSL Perl build needs IPC::Cmd, Data::Dumper, etc. Install full perl.
-RUN if command -v dnf >/dev/null 2>&1; then \
-        dnf install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconf-pkg-config && dnf clean all; \
-    elif command -v yum >/dev/null 2>&1; then \
-        yum install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconfig && yum clean all; \
-    elif command -v apt-get >/dev/null 2>&1; then \
-        apt-get update \
-        && apt-get install -y --no-install-recommends perl libdata-dumper-perl libipc-cmd-perl libssl-dev pkg-config \
-        && rm -rf /var/lib/apt/lists/*; \
-    else \
-        echo "No dnf/yum/apt-get; install perl + IPC::Cmd + OpenSSL dev + pkg-config for AgentSight manually." && exit 1; \
-    fi
 ENV PERL=/usr/bin/perl
 ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
 # openssl-sys (agentsight): avoid system LibreSSL/OpenSSL mismatch; vendored build unless overridden.

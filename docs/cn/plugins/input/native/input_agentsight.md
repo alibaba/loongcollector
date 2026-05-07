@@ -25,8 +25,8 @@ dev
 
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `session.id` | string | 用户的会话 id |
-| `gen_ai.conversation.id` | string | 同一会话中其中一次对话的 id |
+| `gen_ai.session.id` | string | 用户的会话 id |
+| `gen_ai.turn.id` | string | 同一会话中其中一次对话的 id |
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
 | `pid` | int32 | 进程号 |
 | `process_name` | string | 进程名称 |
@@ -34,6 +34,7 @@ dev
 | `gen_ai.request.timestamp_ns` | uint64 | 一次对大模型请求开始的时间 |
 | `gen_ai.response.duration_ns` | uint64 | 一次对大模型请求到大模型回复的时间 |
 | `server.address` | string | 从请求 URL 解析出的服务端主机名（有请求 URL 时输出） |
+| `server.port` | string | 从请求 URL 解析出的端口（URL 中含显式端口时输出） |
 | `gen_ai.provider.name` | string | 大模型厂商名称 |
 | `gen_ai.request.model` | string | 大模型厂商使用的模型名称 |
 | `status_code` | uint16 | 一次请求的状态码，同 http 状态码 |
@@ -43,8 +44,8 @@ dev
 | `gen_ai.usage.input_tokens` | uint32 | 发送给模型的 token 数量 |
 | `gen_ai.usage.output_tokens` | uint32 | 模型实际生成的回复内容长度 |
 | `gen_ai.usage.total_tokens` | uint32 | 一次请求消耗的 Token 总量 |
-| `gen_ai.usage.cache_creation.input_tokens` | uint32 | 本次请求中，被系统新写入缓存的那部分输入 Token 数量 |
-| `gen_ai.usage.cache_read.input_tokens` | uint32 | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量 |
+| `gen_ai.usage.cache_write_tokens` | uint32 | 本次请求中，被系统新写入缓存的那部分输入 Token 数量 |
+| `gen_ai.usage.cache_read_tokens` | uint32 | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量 |
 | `gen_ai.input.messages` | string | 大模型请求 message 的序列化 json |
 | `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json |
 
@@ -76,7 +77,7 @@ flushers:
 
 {
   "gen_ai.agent.name": "OpenClaw",
-  "gen_ai.conversation.id": "c47ac487c54c2da859ba2a0e873eeeae",
+  "gen_ai.turn.id": "c47ac487c54c2da859ba2a0e873eeeae",
   "gen_ai.input.messages": [
     {
       "role": "system",
@@ -110,8 +111,8 @@ flushers:
   "gen_ai.response.duration_ns": "3548000000",
   "gen_ai.response.finish_reasons": "stop",
   "gen_ai.response.id": "chatcmpl-3cd5d2d2-d2f5-91e9-a5e4-7fb740bb47f6",
-  "gen_ai.usage.cache_creation.input_tokens": "0",
-  "gen_ai.usage.cache_read.input_tokens": "0",
+  "gen_ai.usage.cache_write_tokens": "0",
+  "gen_ai.usage.cache_read_tokens": "0",
   "gen_ai.usage.input_tokens": "27466",
   "gen_ai.usage.output_tokens": "195",
   "gen_ai.usage.total_tokens": "27661",
@@ -120,6 +121,7 @@ flushers:
   "pid": "705127",
   "process_name": "openclaw-gatewa",
   "server.address": "dashscope.aliyuncs.com",
-  "session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
+  "server.port": "80",
+  "gen_ai.session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
   "status_code": "200"
 }

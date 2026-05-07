@@ -20,10 +20,10 @@
 #include <mutex>
 #include <string>
 
+#include "agentsight.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
-#include "ebpf/plugin/agentsight/agentsight_api.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
@@ -73,10 +73,10 @@ public:
     std::unique_ptr<PluginConfig>
     GeneratePluginConfig(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
 
-    void SetMetrics(CounterPtr pushLogFailedTotal) { mPushLogFailedTotal = std::move(pushLogFailedTotal); }
-
-    // True when libagentsight supplied an fd registered on EBPFServer unified epoll (no pollPerfBuffers fallback).
-    bool UsesExternalEventFd() const { return mUsesExternalEventFd; }
+    void SetMetrics(CounterPtr lossKernelEventsTotal, CounterPtr pushLogFailedTotal) {
+        mLossKernelEventsTotal = std::move(lossKernelEventsTotal);
+        mPushLogFailedTotal = std::move(pushLogFailedTotal);
+    }
 
 protected:
     int update(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
@@ -104,10 +104,11 @@ private:
 
     AgentsightHandle* mHandle = nullptr;
     int mEventFd = -1;
-    bool mUsesExternalEventFd = false;
     bool mRunning = false;
 
+    CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
+    CounterPtr mPluginInEventsTotal;
     CounterPtr mPushLogsTotal;
     CounterPtr mPushLogGroupTotal;
     std::vector<MetricLabels> mRefAndLabels;

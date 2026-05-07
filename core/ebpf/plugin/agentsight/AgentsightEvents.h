@@ -18,8 +18,8 @@
 
 #include <string>
 
+#include "agentsight.h"
 #include "ebpf/include/export.h"
-#include "ebpf/plugin/agentsight/agentsight_api.h"
 #include "ebpf/type/CommonDataEvent.h"
 
 namespace logtail::ebpf {

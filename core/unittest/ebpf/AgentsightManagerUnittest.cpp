@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <cstring>
+#include <sys/eventfd.h>
+#include <unistd.h>
 
 #include <memory>
 #include <variant>
@@ -42,6 +44,9 @@ struct FakeReadControl {
 } gRead;
 
 bool g_config_new_null = false;
+
+int gFakeAgentSightEventFd = -1;
+bool gForceInvalidAgentSightEventFd = false;
 
 const char* fake_last_error() {
     return "ut";
@@ -86,7 +91,10 @@ int fake_handle_stop(AgentsightHandle* h) {
 
 int fake_get_eventfd(AgentsightHandle* h) {
     (void)h;
-    return -1;
+    if (gForceInvalidAgentSightEventFd) {
+        return -1;
+    }
+    return gFakeAgentSightEventFd;
 }
 
 // Static so pointers remain valid in LLM callback
@@ -174,6 +182,9 @@ class AgentsightManagerUnittest : public ManagerUnittestWithProcessCacheManager 
 public:
     void SetUp() override {
         ManagerUnittestWithProcessCacheManager::SetUp();
+        gFakeAgentSightEventFd = static_cast<int>(::eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
+        APSARA_TEST_TRUE(gFakeAgentSightEventFd >= 0);
+        gForceInvalidAgentSightEventFd = false;
         mAgentSightAdapter = std::make_shared<AgentSightTestEBPFAdapter>();
         mAgentSightAdapter->setAgentSightSymbols(makeFullSymbolTable());
         gRead = decltype(gRead){};
@@ -182,6 +193,10 @@ public:
     }
 
     void TearDown() override {
+        if (gFakeAgentSightEventFd >= 0) {
+            ::close(gFakeAgentSightEventFd);
+            gFakeAgentSightEventFd = -1;
+        }
         mAgentSightAdapter.reset();
         ManagerUnittestWithProcessCacheManager::TearDown();
     }
@@ -215,8 +230,9 @@ public:
     void TestConfigNewNull();
     void TestAddRemoveDestroy();
     void TestSecondAddOrUpdate();
-    void TestOnEpollAndPollDrain();
+    void TestOnEpollDrain();
     void TestOnEpollNoHandle();
+    void TestAddOrUpdateInvalidEventFd();
     void TestHandleEventBranches();
     void TestResumeInvalidOptions();
     void TestResumeWithNoRegistration();
@@ -331,7 +347,7 @@ void AgentsightManagerUnittest::TestOnEpollNoHandle() {
     mgr->Destroy();
 }
 
-void AgentsightManagerUnittest::TestOnEpollAndPollDrain() {
+void AgentsightManagerUnittest::TestOnEpollDrain() {
     auto mgr = makeManager();
     CollectionPipelineContext ctx;
     ctx.SetConfigName("p1");
@@ -350,6 +366,18 @@ void AgentsightManagerUnittest::TestOnEpollAndPollDrain() {
     gRead = decltype(gRead){};
 
     APSARA_TEST_EQUAL(0, mgr->PollPerfBuffer(0));
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestAddOrUpdateInvalidEventFd() {
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    gForceInvalidAgentSightEventFd = true;
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    gForceInvalidAgentSightEventFd = false;
+    APSARA_TEST_EQUAL(0, mgr->RegisteredConfigCount());
     mgr->Destroy();
 }
 
@@ -424,7 +452,8 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestConfigNewNull);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddRemoveDestroy);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSecondAddOrUpdate);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollNoHandle);
-UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollAndPollDrain);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestOnEpollDrain);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateInvalidEventFd);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestHandleEventBranches);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeInvalidOptions);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeWithNoRegistration);

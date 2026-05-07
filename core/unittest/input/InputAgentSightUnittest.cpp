@@ -59,9 +59,7 @@ void InputAgentSightUnittest::TestInitWithProbeConfig() {
     Json::Value configJson;
     Json::Value optionalGoPipeline;
     APSARA_TEST_TRUE(
-        ParseJsonTable(R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","EnableHttps":false}})",
-                       configJson,
-                       err));
+        ParseJsonTable(R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":""}})", configJson, err));
     InputAgentSight input;
     input.SetContext(mContex);
     input.CreateMetricsRecordRef("t", "1");

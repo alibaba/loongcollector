@@ -1,7 +1,8 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16 AS builder
+# AgentSight deps: perl + openssl-devel preinstalled in loongcollector-build-linux 2.1.17+ (see docker/Dockerfile_build).
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS builder
 
 # Build arguments
 ARG VERSION=edge
@@ -20,23 +21,6 @@ ENV MAKE_JOBS=$MAKE_JOBS
 ENV VERSION=$VERSION
 
 USER root
-# AgentSight (coolbpf Rust): openssl crate with "vendored" runs OpenSSL Configure, which needs Perl IPC::Cmd.
-# Same layer as docker/Dockerfile_build; the edge image previously omitted it and E2E (ENABLE_AGENTSIGHT=ON) failed.
-RUN if command -v dnf >/dev/null 2>&1; then \
-        dnf install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconf-pkg-config && dnf clean all; \
-    elif command -v yum >/dev/null 2>&1; then \
-        yum install -y perl perl-IPC-Cmd perl-Data-Dumper openssl-devel pkgconfig && yum clean all; \
-    elif command -v apt-get >/dev/null 2>&1; then \
-        apt-get update \
-        && apt-get install -y --no-install-recommends perl libdata-dumper-perl libipc-cmd-perl libssl-dev pkg-config \
-        && rm -rf /var/lib/apt/lists/*; \
-    else \
-        echo "No dnf/yum/apt-get; install perl + IPC::Cmd + OpenSSL dev + pkg-config for AgentSight manually." && exit 1; \
-    fi
-ENV PERL=/usr/bin/perl
-ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
-# openssl-sys (agentsight): vendored build from Cargo.toml unless overridden
-ENV OPENSSL_NO_VENDOR=0
 
 WORKDIR /src
 COPY . .
@@ -57,9 +41,9 @@ RUN sh ./scripts/build_edge_linux.sh && \
     cp "output/libGoPluginBase.so" "dist/loongcollector-edge" && \
     cp "example_config/start_with_docker/loongcollector_config.json" "dist/loongcollector-edge/conf/instance_config/local/" && \
     if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then \
-        test -f "core/build/ebpf/driver/libagentsight.so" \
-            || { echo "Dockerfile_edge_linux: ENABLE_AGENTSIGHT=ON but core/build/ebpf/driver/libagentsight.so missing" >&2; exit 1; }; \
-        cp "core/build/ebpf/driver/libagentsight.so" "dist/loongcollector-edge" && \
+        test -f "/opt/logtail/deps/lib/libagentsight.so" \
+            || { echo "Dockerfile_edge_linux: ENABLE_AGENTSIGHT=ON but /opt/logtail/deps/lib/libagentsight.so missing (coolbpf install prefix; see core/dependencies.cmake DEPS_ROOT)" >&2; exit 1; }; \
+        cp "/opt/logtail/deps/lib/libagentsight.so" "dist/loongcollector-edge" && \
         strip "dist/loongcollector-edge/libagentsight.so"; \
     fi && \
     if file "dist/loongcollector-edge/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "dist/loongcollector-edge"; fi &&\

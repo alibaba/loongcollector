@@ -29,8 +29,15 @@ if (LINUX)
     endif()
 
     # LoongCollector Linux: build AgentSight (cargo → libagentsight.so + agentsight.h) with coolbpf.
-    # Default ON in core/CMakeLists.txt; this keeps the cache entry consistent before coolbpf's option().
-    set(ENABLE_AGENTSIGHT ON CACHE BOOL "Build AgentSight library (libagentsight.so + agentsight.h)")
+    # coolbpf/CMakeLists.txt uses option(ENABLE_AGENTSIGHT OFF) on the same cache key as
+    # core/CMakeLists.txt cmake_dependent_option. Without CACHE+FORCE here, a stale OFF (e.g. leftover
+    # cache from a standalone coolbpf configure) keeps add_subdirectory(agentsight) disabled and
+    # no libagentsight target is created.
+    if (NOT DEFINED ENABLE_AGENTSIGHT)
+        set(ENABLE_AGENTSIGHT OFF)
+    endif ()
+    set(ENABLE_AGENTSIGHT "${ENABLE_AGENTSIGHT}" CACHE BOOL "Build AgentSight library (libagentsight.so + agentsight.h)" FORCE)
+    message(STATUS "ebpf/driver: ENABLE_AGENTSIGHT=${ENABLE_AGENTSIGHT} (coolbpf agentsight / libagentsight)")
 
     # Now add the coolbpf subdirectory (adds agentsight/ when ENABLE_AGENTSIGHT is on).
     add_subdirectory(${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf)
@@ -46,28 +53,6 @@ if (LINUX)
     set(CMAKE_C_FLAGS ${ORIGINAL_CMAKE_C_FLAGS})
     
     set(_coolbpf_install_deps coolbpf coolbpf_static)
-    # $<TARGET_FILE:...> only works for SHARED/MODULE (and EXECUTABLE). coolbpf may define a stub
-    # INTERFACE/OBJECT target named libagentsight; skip install/copy hooks in that case.
-    set(_libagentsight_file_target "")
-    if (TARGET libagentsight)
-        get_target_property(_as_type libagentsight TYPE)
-        set(_as_file_target libagentsight)
-        if (_as_type STREQUAL "ALIAS_LIBRARY")
-            get_target_property(_as_aliased libagentsight ALIASED_TARGET)
-            if (_as_aliased AND TARGET ${_as_aliased})
-                set(_as_file_target ${_as_aliased})
-                get_target_property(_as_type ${_as_file_target} TYPE)
-            endif ()
-        endif ()
-        if (_as_type STREQUAL "SHARED_LIBRARY" OR _as_type STREQUAL "MODULE_LIBRARY")
-            set(_libagentsight_file_target "${_as_file_target}")
-        elseif (ENABLE_AGENTSIGHT AND NOT (_as_type STREQUAL "UTILITY"))
-            message(
-                STATUS
-                "AgentSight: target 'libagentsight' has TYPE=${_as_type}; expected SHARED/MODULE/UTILITY(cargo). "
-                "Skipping install dep and copy beside driver.")
-        endif ()
-    endif ()
     # coolbpf installs libagentsight.so via install(FILES ...): the producer may be UTILITY (cargo) or a real SHARED
     # target. Either way install_coolbpf must depend on it so `cmake --install` runs after the .so exists.
     if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
@@ -93,62 +78,4 @@ if (LINUX)
     target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf)
     add_dependencies(${EBPF_DIRVER_TARGET} install_coolbpf)
     target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC)
-
-    # Extra copy beside libeBPFDriver.so in the build tree (core/build/ebpf/driver), in addition
-    # to install_coolbpf -> CMAKE_INSTALL_PREFIX (default /opt/logtail/deps/lib).
-    # Cannot use TARGET coolbpf POST_BUILD here: coolbpf is defined in a subdirectory (CMake policy).
-    set(_coolbpf_soname_stamp "${CMAKE_CURRENT_BINARY_DIR}/.coolbpf_soname_copied_to_driver")
-    add_custom_command(
-        OUTPUT ${_coolbpf_soname_stamp}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_SONAME_FILE:coolbpf>
-                ${CMAKE_CURRENT_BINARY_DIR}
-        COMMAND ${CMAKE_COMMAND} -E touch ${_coolbpf_soname_stamp}
-        DEPENDS coolbpf
-        COMMENT "Copy versioned libcoolbpf.so.* next to libeBPFDriver in build tree"
-        VERBATIM)
-    set(_copy_ebpf_dep_stamps "${_coolbpf_soname_stamp}")
-    if (_libagentsight_file_target)
-        set(_libagentsight_stamp "${CMAKE_CURRENT_BINARY_DIR}/.libagentsight_copied_to_driver")
-        add_custom_command(
-            OUTPUT ${_libagentsight_stamp}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    $<TARGET_FILE:${_libagentsight_file_target}>
-                    ${CMAKE_CURRENT_BINARY_DIR}
-            COMMAND ${CMAKE_COMMAND} -E touch ${_libagentsight_stamp}
-            DEPENDS ${_libagentsight_file_target}
-            COMMENT "Copy libagentsight next to libeBPFDriver in build tree"
-            VERBATIM)
-        list(APPEND _copy_ebpf_dep_stamps "${_libagentsight_stamp}")
-    elseif (ENABLE_AGENTSIGHT AND TARGET libagentsight)
-        # coolbpf: add_custom_target + cargo -> UTILITY; no $<TARGET_FILE:...>. Same path as coolbpf install(FILES ...).
-        set(_agentsight_cargo_so "${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so")
-        set(_libagentsight_stamp "${CMAKE_CURRENT_BINARY_DIR}/.libagentsight_copied_to_driver")
-        add_custom_command(
-            OUTPUT ${_libagentsight_stamp}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${_agentsight_cargo_so}
-                    ${CMAKE_CURRENT_BINARY_DIR}
-            COMMAND ${CMAKE_COMMAND} -E touch ${_libagentsight_stamp}
-            DEPENDS libagentsight
-            COMMENT "Copy cargo-built libagentsight.so next to libeBPFDriver in build tree"
-            VERBATIM)
-        list(APPEND _copy_ebpf_dep_stamps "${_libagentsight_stamp}")
-    endif ()
-    # Sync cbindgen header next to the plugin (gitignored) for IDE / diff; compile still uses include path.
-    if (ENABLE_AGENTSIGHT AND TARGET libagentsight)
-        set(_agentsight_hdr_src "${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf/src/agentsight/include/agentsight.h")
-        set(_agentsight_hdr_plugin "${CMAKE_SOURCE_DIR}/ebpf/plugin/agentsight/agentsight_from_coolbpf.h")
-        set(_agentsight_hdr_sync_stamp "${CMAKE_CURRENT_BINARY_DIR}/.agentsight_header_synced")
-        add_custom_command(
-            OUTPUT ${_agentsight_hdr_sync_stamp}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${_agentsight_hdr_src} ${_agentsight_hdr_plugin}
-            COMMAND ${CMAKE_COMMAND} -E touch ${_agentsight_hdr_sync_stamp}
-            DEPENDS libagentsight
-            COMMENT "Sync coolbpf agentsight.h next to ebpf/plugin/agentsight"
-            VERBATIM)
-        list(APPEND _copy_ebpf_dep_stamps "${_agentsight_hdr_sync_stamp}")
-    endif ()
-    add_custom_target(_loongcollector_copy_ebpf_deps_to_driver DEPENDS ${_copy_ebpf_dep_stamps})
-    add_dependencies(${EBPF_DIRVER_TARGET} _loongcollector_copy_ebpf_deps_to_driver)
 endif ()

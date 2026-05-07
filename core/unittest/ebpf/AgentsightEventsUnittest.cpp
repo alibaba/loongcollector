@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "agentsight.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
-#include "ebpf/plugin/agentsight/agentsight_api.h"
 #include "unittest/Unittest.h"
 
 using namespace logtail::ebpf;

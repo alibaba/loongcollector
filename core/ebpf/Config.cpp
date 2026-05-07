@@ -526,7 +526,6 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mOptionList.clear();
         mVerbose = 0;
         mLogPath.clear();
-        mEnableHttps = false;
     }
 
     SecurityOption thisSecurityOption;
@@ -553,9 +552,6 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                     mVerbose = 0;
                 }
                 if (!GetOptionalStringParam(innerConfig, "LogPath", mLogPath, errorMsg)) {
-                    warnOptionalParse();
-                }
-                if (!GetOptionalBoolParam(innerConfig, "EnableHttps", mEnableHttps, errorMsg)) {
                     warnOptionalParse();
                 }
                 return true;

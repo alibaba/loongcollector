@@ -53,9 +53,8 @@ function check_docker_buildkit_support {
 # production: build ilogtail production images.
 # multi-arch-production: build ilogtail multi-arch production images.
 #
-# AgentSight (coolbpf vendored openssl-sys): needs full perl (Data::Dumper), perl-IPC-Cmd, openssl-devel.
-# Install RUN lives in docker/Dockerfile_build before RUN gen_build.sh; keep in sync with
-# scripts/gen_build_scripts.sh (AGENTSIGHT block) and .devcontainer/Dockerfile.
+# AgentSight (coolbpf vendored openssl-sys): perl + openssl-devel come from loongcollector-build-linux 2.1.17+.
+# gen_build.sh verifies required Perl modules (scripts/gen_build_scripts.sh).
 ARCH=$(arch)
 CATEGORY=$1
 GENERATED_HOME=$2
@@ -104,13 +103,10 @@ elif [[ $CATEGORY = "multi-arch-production" ]]; then
     cat $ROOTDIR/docker/Dockerfile_production | grep -v "^#" >> $GEN_DOCKERFILE;
 fi
 
-# Fail-soft check: Dockerfile_build should still declare AgentSight Perl/OpenSSL packages after grep -v "^#".
+# Fail-soft check: base image tag should be new enough to ship AgentSight perl/openssl build deps.
 if [[ "$CATEGORY" = "build" || "$CATEGORY" = "development" ]]; then
-    if ! grep -qE 'perl-IPC-Cmd|libipc-cmd-perl' "$GEN_DOCKERFILE"; then
-        echo "WARNING: generated Dockerfile may be missing AgentSight deps (perl-IPC-Cmd / libipc-cmd-perl); check docker/Dockerfile_build." >&2
-    fi
-    if ! grep -qE 'perl-Data-Dumper|yum install -y perl perl-IPC|apt-get install -y --no-install-recommends perl libdata-dumper-perl libipc' "$GEN_DOCKERFILE"; then
-        echo "WARNING: generated Dockerfile may be missing full perl for OpenSSL (Data::Dumper); check docker/Dockerfile_build." >&2
+    if ! grep -qE 'loongcollector-build-linux:2\.1\.(1[7-9]|[2-9][0-9])|loongcollector-build-linux:2\.[2-9]|loongcollector-build-linux:[3-9]' "$GEN_DOCKERFILE"; then
+        echo "WARNING: AgentSight expects loongcollector-build-linux 2.1.17+ in Dockerfile_build FROM; check generated Dockerfile." >&2
     fi
 fi
 

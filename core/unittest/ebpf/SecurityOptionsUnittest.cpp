@@ -37,7 +37,6 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigReturnsTrue() {
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(opt.mVerbose, 0);
     APSARA_TEST_TRUE(opt.mLogPath.empty());
-    APSARA_TEST_FALSE(opt.mEnableHttps);
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeWarns() {
@@ -56,12 +55,10 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigParsesOptionalFields() {
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(
-        ParseJsonTable(R"({"ProbeConfig": {"Verbose": 2, "LogPath": "/tmp/as", "EnableHttps": true}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": {"Verbose": 2, "LogPath": "/tmp/as"}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(opt.mVerbose, 2);
     APSARA_TEST_EQUAL(opt.mLogPath, "/tmp/as");
-    APSARA_TEST_TRUE(opt.mEnableHttps);
     // AGENTSIGHT branch returns before mOptionList.emplace_back (see Config.cpp).
     APSARA_TEST_EQUAL(0UL, opt.mOptionList.size());
 }
@@ -72,8 +69,7 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigOptionalInvalidTypes() {
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(
-        ParseJsonTable(R"({"ProbeConfig": {"Verbose": "bad", "LogPath": 1, "EnableHttps": "nope"}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": {"Verbose": "bad", "LogPath": 1}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(0UL, opt.mOptionList.size());
 }

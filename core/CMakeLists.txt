@@ -174,7 +174,7 @@ endif()
 # Module includes & set files.
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
-# cbindgen output: core/_thirdparty/coolbpf/src/agentsight/include/agentsight.h (see agentsight_api.h)
+# cbindgen output: core/_thirdparty/coolbpf/src/agentsight/include/agentsight.h
 if (LINUX)
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/_thirdparty/coolbpf/src/agentsight/include)
 endif ()

@@ -30,7 +30,6 @@ RUN_CORE_UT_USE_SUDO=${RUN_CORE_UT_USE_SUDO:-1}
 BLACKLIST_DIRS=(
     # "pipeline"
     # "host_monitor"
-    # Do not list "ebpf" — required for agentsight_manager_unittest and other eBPF UTs.
 )
 
 # Get CPU core count for parallel execution

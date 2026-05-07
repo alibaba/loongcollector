@@ -356,7 +356,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr
                         = AgentsightManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
-                    mgr->SetMetrics(mPushLogFailedTotal);
+                    mgr->SetMetrics(mLossKernelEventsTotal, mPushLogFailedTotal);
                     pluginMgr = mgr;
                 }
                 break;
@@ -549,9 +549,8 @@ void EBPFServer::handleEpollEvents() {
             continue;
         }
 
-        // AgentSight: when libagentsight exposes a readable fd (handle_get_eventfd), it is registered on
-        // mUnifiedEpollFd (see RegisterExternalEpollFd). Wakeups are edge-style; drain via handle_read here.
-        // This is the same unified epoll as other plugins; data path differs from eBPF perf ConsumePerfBufferData.
+        // AgentSight: readable fd from handle_get_eventfd (when >= 0) is on mUnifiedEpollFd (RegisterExternalEpollFd).
+        // Edge-triggered wakeups; drain via handle_read here. Data path differs from eBPF perf ConsumePerfBufferData.
         if (type == PluginType::AGENTSIGHT_OBSERVE) {
             // Take mMtx before reading mManager. mValid was read here without the lock before, which could
             // race with updatePluginState / pluginMgr.reset and skip OnEpollReadable while epoll still fires.
@@ -592,22 +591,6 @@ void EBPFServer::pollPerfBuffers() {
                 if (pluginState.mManager) {
                     auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
                     mgr->PollPerfBuffer(0); // 0 means non-blocking
-                }
-            }
-        }
-        // AgentSight fallback: if libagentsight does not provide handle_get_eventfd (or returns <0), nothing is
-        // added to mUnifiedEpollFd, so epoll will never signal readiness. Poll handle_read non-blockingly here
-        // so older or minimal libagentsight builds still make progress. When UsesExternalEventFd() is true,
-        // OnEpollReadable() above owns draining and this block is skipped (see AgentsightManager::PollPerfBuffer).
-        {
-            auto& agentSightState = getPluginState(PluginType::AGENTSIGHT_OBSERVE);
-            if (agentSightState.mValid.load(std::memory_order_acquire)) {
-                std::shared_lock<std::shared_mutex> asLock(agentSightState.mMtx);
-                if (agentSightState.mManager) {
-                    auto* asMgr = static_cast<AgentsightManager*>(agentSightState.mManager.get());
-                    if (!asMgr->UsesExternalEventFd()) {
-                        asMgr->PollPerfBuffer(0);
-                    }
                 }
             }
         }
