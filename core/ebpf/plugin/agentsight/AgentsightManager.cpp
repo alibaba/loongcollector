@@ -444,8 +444,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec->mInputTokens));
     log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec->mOutputTokens));
     log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec->mTotalTokens));
-    log->SetContent("gen_ai.usage.cache_write_tokens", std::to_string(rec->mCacheCreationInputTokens));
-    log->SetContent("gen_ai.usage.cache_read_tokens", std::to_string(rec->mCacheReadInputTokens));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec->mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec->mCacheReadInputTokens));
 
     setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
     setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
