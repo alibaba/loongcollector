@@ -1,17 +1,27 @@
 #########################################################################################################################
 # Step 1: Build
 #########################################################################################################################
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16 AS builder
+# AgentSight deps: perl + openssl-devel preinstalled in loongcollector-build-linux 2.1.17+ (see docker/Dockerfile_build).
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS builder
 
 # Build arguments
 ARG VERSION=edge
+ARG ENABLE_AGENTSIGHT=ON
 ARG ENABLE_COMPATIBLE_MODE=OFF
 ARG ENABLE_STATIC_LINK_CRT=OFF
 ARG WITHOUTGDB=ON
 ARG WITHSPL=ON
 ARG MAKE_JOBS=16
+ENV ENABLE_AGENTSIGHT=$ENABLE_AGENTSIGHT
+ENV ENABLE_COMPATIBLE_MODE=$ENABLE_COMPATIBLE_MODE
+ENV ENABLE_STATIC_LINK_CRT=$ENABLE_STATIC_LINK_CRT
+ENV WITHOUTGDB=$WITHOUTGDB
+ENV WITHSPL=$WITHSPL
+ENV MAKE_JOBS=$MAKE_JOBS
+ENV VERSION=$VERSION
 
 USER root
+
 WORKDIR /src
 COPY . .
 
@@ -30,6 +40,12 @@ RUN sh ./scripts/build_edge_linux.sh && \
     cp "core/build/go_pipeline/libGoPluginAdapter.so" "dist/loongcollector-edge" && \
     cp "output/libGoPluginBase.so" "dist/loongcollector-edge" && \
     cp "example_config/start_with_docker/loongcollector_config.json" "dist/loongcollector-edge/conf/instance_config/local/" && \
+    if [ "${ENABLE_AGENTSIGHT}" = "ON" ]; then \
+        test -f "/opt/logtail/deps/lib/libagentsight.so" \
+            || { echo "Dockerfile_edge_linux: ENABLE_AGENTSIGHT=ON but /opt/logtail/deps/lib/libagentsight.so missing (coolbpf install prefix; see core/dependencies.cmake DEPS_ROOT)" >&2; exit 1; }; \
+        cp "/opt/logtail/deps/lib/libagentsight.so" "dist/loongcollector-edge" && \
+        strip "dist/loongcollector-edge/libagentsight.so"; \
+    fi && \
     if file "dist/loongcollector-edge/loongcollector" | grep x86-64; then ./scripts/download_ebpflib.sh "dist/loongcollector-edge"; fi &&\
     strip "dist/loongcollector-edge/loongcollector" && \
     strip "dist/loongcollector-edge/libGoPluginAdapter.so" && \

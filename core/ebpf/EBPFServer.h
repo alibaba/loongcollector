@@ -113,6 +113,9 @@ public:
     void RegisterPluginPerfBuffers(PluginType type);
     void UnregisterPluginPerfBuffers(PluginType type);
 
+    void RegisterExternalEpollFd(PluginType type, int fd);
+    void UnregisterExternalEpollFd(PluginType type, int fd);
+
 private:
     bool startPluginInternal(const std::string& pipelineName,
                              uint32_t pluginIndex,

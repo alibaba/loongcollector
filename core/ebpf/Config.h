@@ -14,6 +14,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 #include <string>
 #include <variant>
 #include <vector>
@@ -35,7 +37,7 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 /////////////////////  /////////////////////
 
-enum class SecurityProbeType { PROCESS, FILE, NETWORK, MAX };
+enum class SecurityProbeType { PROCESS, FILE, NETWORK, AGENTSIGHT_OBSERVE, MAX };
 
 class SecurityOptions {
 public:
@@ -45,7 +47,11 @@ public:
               const std::string& sName);
 
     std::vector<SecurityOption> mOptionList;
-    SecurityProbeType mProbeType;
+    SecurityProbeType mProbeType = SecurityProbeType::PROCESS;
+
+    // Valid when mProbeType == SecurityProbeType::AGENTSIGHT_OBSERVE (AgentSight input).
+    int32_t mVerbose = 0;
+    std::string mLogPath;
 };
 
 ///////////////////// Process Level Config /////////////////////

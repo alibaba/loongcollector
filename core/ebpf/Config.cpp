@@ -498,30 +498,64 @@ bool CheckProbeConfigValid(const Json::Value& config, std::string& errorMsg) {
     return true;
 }
 
+namespace {
+
+void WarnSecurityProbeConfigIgnore(const CollectionPipelineContext* mContext,
+                                   const std::string& msg,
+                                   const std::string& sName) {
+    PARAM_WARNING_IGNORE(mContext->GetLogger(),
+                         mContext->GetAlarm(),
+                         msg,
+                         sName,
+                         mContext->GetConfigName(),
+                         mContext->GetProjectName(),
+                         mContext->GetLogstoreName(),
+                         mContext->GetRegion());
+}
+
+} // namespace
+
 bool SecurityOptions::Init(SecurityProbeType probeType,
                            const Json::Value& config,
                            const CollectionPipelineContext* mContext,
                            const std::string& sName) {
     std::string errorMsg;
+
+    if (probeType == SecurityProbeType::AGENTSIGHT_OBSERVE) {
+        mProbeType = probeType;
+        mOptionList.clear();
+        mVerbose = 0;
+        mLogPath.clear();
+    }
+
     SecurityOption thisSecurityOption;
 
     // ProbeConfig (Optional)
     if (!CheckProbeConfigValid(config, errorMsg)) {
         if (!errorMsg.empty()) {
-            PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                 mContext->GetAlarm(),
-                                 errorMsg,
-                                 sName,
-                                 mContext->GetConfigName(),
-                                 mContext->GetProjectName(),
-                                 mContext->GetLogstoreName(),
-                                 mContext->GetRegion());
+            WarnSecurityProbeConfigIgnore(mContext, errorMsg, sName);
+        }
+        if (probeType == SecurityProbeType::AGENTSIGHT_OBSERVE) {
+            return true;
         }
     } else {
         const auto& innerConfig = config["ProbeConfig"];
         // Genral Filter (Optional)
         std::variant<std::monostate, SecurityFileFilter, SecurityNetworkFilter> thisFilter;
         switch (probeType) {
+            case SecurityProbeType::AGENTSIGHT_OBSERVE: {
+                const auto warnOptionalParse = [&]() { WarnSecurityProbeConfigIgnore(mContext, errorMsg, sName); };
+                if (!GetOptionalIntParam(innerConfig, "Verbose", mVerbose, errorMsg)) {
+                    warnOptionalParse();
+                }
+                if (mVerbose < 0) {
+                    mVerbose = 0;
+                }
+                if (!GetOptionalStringParam(innerConfig, "LogPath", mLogPath, errorMsg)) {
+                    warnOptionalParse();
+                }
+                return true;
+            }
             case SecurityProbeType::FILE: {
                 SecurityFileFilter thisFileFilter;
                 InitSecurityFileFilter(innerConfig, thisFileFilter, mContext, sName);
@@ -538,14 +572,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 break;
             }
             default:
-                PARAM_WARNING_IGNORE(mContext->GetLogger(),
-                                     mContext->GetAlarm(),
-                                     "Unknown security eBPF probe type",
-                                     sName,
-                                     mContext->GetConfigName(),
-                                     mContext->GetProjectName(),
-                                     mContext->GetLogstoreName(),
-                                     mContext->GetRegion());
+                WarnSecurityProbeConfigIgnore(mContext, "Unknown security eBPF probe type", sName);
         }
         thisSecurityOption.mFilter = thisFilter;
     }

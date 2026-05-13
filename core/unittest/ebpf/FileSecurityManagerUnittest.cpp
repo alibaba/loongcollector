@@ -23,6 +23,7 @@
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "collection_pipeline/queue/QueueKeyManager.h"
 #include "coolbpf/security/type.h"
+#include "ebpf/Config.h"
 #include "ebpf/plugin/ProcessCacheValue.h"
 #include "ebpf/plugin/file_security/FileSecurityManager.h"
 #include "ebpf/type/FileEvent.h"
@@ -60,6 +61,8 @@ public:
     void TestFileSecurityManagerEventHandling();
     void TestFileSecurityManagerAggregation();
     void TestFileSecurityManagerErrorHandling();
+    void TestAddOrUpdateConfigWrongOptionsVariant();
+    void TestGeneratePluginConfigNullOptions();
 
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
@@ -250,6 +253,24 @@ void FileSecurityManagerUnittest::TestFileSecurityManagerEventHandling() {
     manager->Destroy();
 }
 
+void FileSecurityManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() {
+    auto manager = createAndInitManagerInstance();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("c1");
+    ObserverNetworkOption o{};
+    APSARA_TEST_EQUAL(
+        -1, manager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&o)));
+    manager->Destroy();
+}
+
+void FileSecurityManagerUnittest::TestGeneratePluginConfigNullOptions() {
+    auto manager = createAndInitManagerInstance();
+    std::variant<SecurityOptions*, ObserverNetworkOption*> v{static_cast<SecurityOptions*>(nullptr)};
+    auto pc = static_cast<FileSecurityManager*>(manager.get())->GeneratePluginConfig(v);
+    APSARA_TEST_TRUE(pc != nullptr);
+    manager->Destroy();
+}
+
 void FileSecurityManagerUnittest::TestFileSecurityManagerErrorHandling() {
     auto manager = createAndInitManagerInstance();
 
@@ -345,6 +366,8 @@ UNIT_TEST_CASE(FileSecurityManagerUnittest, TestSendEvents);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerEventHandling);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerAggregation);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestFileSecurityManagerErrorHandling);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestAddOrUpdateConfigWrongOptionsVariant);
+UNIT_TEST_CASE(FileSecurityManagerUnittest, TestGeneratePluginConfigNullOptions);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestDifferentConfigNamesReplacement);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestSameConfigNameUpdate);
 UNIT_TEST_CASE(FileSecurityManagerUnittest, TestBasicConfigUpdate);

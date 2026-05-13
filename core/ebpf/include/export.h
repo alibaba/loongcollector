@@ -76,6 +76,7 @@ enum class PluginType {
     PROCESS_SECURITY,
     FILE_SECURITY,
     NETWORK_SECURITY,
+    AGENTSIGHT_OBSERVE,
     MAX,
 };
 

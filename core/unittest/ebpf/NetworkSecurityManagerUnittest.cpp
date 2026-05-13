@@ -30,6 +30,7 @@ public:
     void TestNetworkSecurityManagerEventHandling();
     void TestNetworkSecurityManagerAggregation();
     void TestNetworkSecurityManagerErrorHandling();
+    void TestGeneratePluginConfigNullOptions();
 
 protected:
     std::shared_ptr<AbstractManager> createManagerInstance() override {
@@ -163,6 +164,14 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerErrorHandling() {
     manager->Destroy();
 }
 
+void NetworkSecurityManagerUnittest::TestGeneratePluginConfigNullOptions() {
+    auto manager = createAndInitManagerInstance();
+    std::variant<SecurityOptions*, ObserverNetworkOption*> v{static_cast<SecurityOptions*>(nullptr)};
+    auto pc = static_cast<NetworkSecurityManager*>(manager.get())->GeneratePluginConfig(v);
+    APSARA_TEST_TRUE(pc != nullptr);
+    manager->Destroy();
+}
+
 void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerAggregation() {
     auto manager = createAndInitManagerInstance();
 
@@ -219,6 +228,7 @@ void NetworkSecurityManagerUnittest::TestNetworkSecurityManagerAggregation() {
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestNetworkSecurityManagerEventHandling);
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestNetworkSecurityManagerAggregation);
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestNetworkSecurityManagerErrorHandling);
+UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestGeneratePluginConfigNullOptions);
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestDifferentConfigNamesReplacement);
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestSameConfigNameUpdate);
 UNIT_TEST_CASE(NetworkSecurityManagerUnittest, TestBasicConfigUpdate);

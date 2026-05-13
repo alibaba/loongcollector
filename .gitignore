@@ -39,6 +39,8 @@ core/out/*
 *.app
 
 ### C++
+# Copied from coolbpf cbindgen on each build (see core/ebpf/driver/CMakeLists.txt)
+core/ebpf/plugin/agentsight/agentsight_from_coolbpf.h
 # Prerequisites
 *.d
 # Compiled Object files

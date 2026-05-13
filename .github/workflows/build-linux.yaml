@@ -81,6 +81,7 @@ jobs:
         env:
           BUILD_LOGTAIL: OFF
           BUILD_LOGTAIL_UT: ON
+          ENABLE_AGENTSIGHT: ON
           ENABLE_COMPATIBLE_MODE: OFF
           ENABLE_STATIC_LINK_CRT: ON
           WITHOUTGDB: ON
