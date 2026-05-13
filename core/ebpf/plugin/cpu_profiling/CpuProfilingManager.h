@@ -30,15 +30,18 @@ public:
     CpuProfilingManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                         const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                         moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                        EventPool* pool);
+                        EventPool* pool,
+                        std::string hostRootPath);
     ~CpuProfilingManager() override = default;
 
     static std::shared_ptr<CpuProfilingManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-           EventPool* pool) {
-        return std::make_shared<CpuProfilingManager>(processCacheManager, eBPFAdapter, queue, pool);
+           EventPool* pool,
+            std::string hostRootPath) {
+        return std::make_shared<CpuProfilingManager>(
+            processCacheManager, eBPFAdapter, queue, pool, std::move(hostRootPath));
     }
 
     int Init() override;
@@ -120,6 +123,7 @@ private:
 
     std::mutex mMutex;
     std::unordered_map<uint32_t, std::unordered_set<ConfigKey>> mRouter;
+    std::string mHostRootPath;
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;
