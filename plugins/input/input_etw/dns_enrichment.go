@@ -50,71 +50,108 @@ func (d *EtwInput) isDNSProvider() bool {
 func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 	switch eventID {
 	case 256: // QUERY_RECEIVED
-		if src, ok := fields["Source"]; ok && src != "" && src != "0.0.0.0" {
-			fields["SrcIpAddr"] = src
+		if src, ok := fields["source"]; ok && src != "" && src != "0.0.0.0" {
+			fields["src_ip_addr"] = src
 		}
-		if dst, ok := fields["InterfaceIP"]; ok && dst != "" && dst != "0.0.0.0" {
-			fields["DstIpAddr"] = dst
+		if dst, ok := fields["interface_ip"]; ok && dst != "" && dst != "0.0.0.0" {
+			fields["dst_ip_addr"] = dst
+			fields["dvc_ip_addr"] = dst
 			if dst != "127.0.0.1" {
 				d.serverIP = dst
 			}
 		}
-		if port, ok := fields["Port"]; ok && port != "" {
-			fields["SrcPortNumber"] = port
+		if port, ok := fields["port"]; ok && port != "" {
+			fields["src_port_number"] = port
 		}
-		fields["EventSubType"] = "request"
+		fields["event_sub_type"] = "request"
 
 	case 260: // RECURSE_QUERY_OUT
-		if dst, ok := fields["Destination"]; ok && dst != "" && dst != "0.0.0.0" {
-			fields["DstIpAddr"] = dst
+		if dst, ok := fields["destination"]; ok && dst != "" && dst != "0.0.0.0" {
+			fields["dst_ip_addr"] = dst
 		}
-		if src, ok := fields["InterfaceIP"]; ok && src != "" && src != "0.0.0.0" {
-			fields["SrcIpAddr"] = src
+		if src, ok := fields["interface_ip"]; ok && src != "" && src != "0.0.0.0" {
+			fields["src_ip_addr"] = src
+			fields["dvc_ip_addr"] = src
 		} else if d.serverIP != "" {
-			fields["SrcIpAddr"] = d.serverIP
+			fields["src_ip_addr"] = d.serverIP
+			fields["dvc_ip_addr"] = d.serverIP
 		}
-		fields["EventSubType"] = "request"
+		fields["event_sub_type"] = "request"
 
 	case 261: // RECURSE_RESPONSE_IN
-		if src, ok := fields["Source"]; ok && src != "" && src != "0.0.0.0" {
-			fields["SrcIpAddr"] = src
+		if src, ok := fields["source"]; ok && src != "" && src != "0.0.0.0" {
+			fields["src_ip_addr"] = src
 		}
-		if dst, ok := fields["InterfaceIP"]; ok && dst != "" && dst != "0.0.0.0" {
-			fields["DstIpAddr"] = dst
+		if dst, ok := fields["interface_ip"]; ok && dst != "" && dst != "0.0.0.0" {
+			fields["dst_ip_addr"] = dst
+			fields["dvc_ip_addr"] = dst
 		} else if d.serverIP != "" {
-			fields["DstIpAddr"] = d.serverIP
+			fields["dst_ip_addr"] = d.serverIP
+			fields["dvc_ip_addr"] = d.serverIP
 		}
-		fields["EventSubType"] = "response"
+		fields["event_sub_type"] = "response"
 
 	case 279: // RESPONSE_TO_CLIENT
-		if src, ok := fields["InterfaceIP"]; ok && src != "" && src != "0.0.0.0" {
-			fields["SrcIpAddr"] = src
+		if src, ok := fields["interface_ip"]; ok && src != "" && src != "0.0.0.0" {
+			fields["src_ip_addr"] = src
+			fields["dvc_ip_addr"] = src
 		} else if d.serverIP != "" {
-			fields["SrcIpAddr"] = d.serverIP
+			fields["src_ip_addr"] = d.serverIP
+			fields["dvc_ip_addr"] = d.serverIP
 		}
-		if dst, ok := fields["Source"]; ok && dst != "" && dst != "0.0.0.0" {
-			fields["DstIpAddr"] = dst
+		if dst, ok := fields["source"]; ok && dst != "" && dst != "0.0.0.0" {
+			fields["dst_ip_addr"] = dst
 		}
-		if port, ok := fields["Port"]; ok && port != "" {
-			fields["DstPortNumber"] = port
+		if port, ok := fields["port"]; ok && port != "" {
+			fields["dst_port_number"] = port
 		}
-		fields["EventSubType"] = "response"
+		fields["event_sub_type"] = "response"
 	}
 
-	if qname, ok := fields["QNAME"]; ok && qname != "" {
-		fields["DnsQuery"] = strings.TrimSuffix(qname, ".")
+	if qname, ok := fields["qname"]; ok && qname != "" {
+		fields["dns_query"] = strings.TrimSuffix(qname, ".")
 	}
 
-	if qtype, ok := fields["QTYPE"]; ok && qtype != "" {
-		fields["DnsQueryTypeName"] = mapDNSQueryType(qtype)
+	if qtype, ok := fields["qtype"]; ok && qtype != "" {
+		fields["dns_query_type_name"] = mapDNSQueryType(qtype)
 	}
 
 	if d.hostname != "" {
-		fields["DvcHostname"] = d.hostname
+		fields["dvc_hostname"] = d.hostname
+	}
+	if d.domain != "" {
+		fields["dvc_domain"] = d.domain
+	}
+	if d.domainType != "" {
+		fields["dvc_domain_type"] = d.domainType
+	}
+	if d.osName != "" {
+		fields["dvc_os"] = d.osName
+	}
+	if d.osVersion != "" {
+		fields["dvc_os_version"] = d.osVersion
 	}
 
-	if packetHex, ok := fields["PacketData"]; ok && packetHex != "" {
+	if protocol := normalizeDNSNetworkProtocol(fields["tcp"]); protocol != "" {
+		fields["network_protocol"] = protocol
+	}
+	if _, ok := fields["event_result_details"]; !ok {
+		fields["event_result_details"] = "NA"
+	}
+
+	if packetHex, ok := fields["packet_data"]; ok && packetHex != "" {
 		d.parseDNSPacketData(fields, packetHex, eventID)
+	}
+}
+
+func normalizeDNSNetworkProtocol(tcp string) string {
+	switch strings.ToLower(strings.TrimSpace(tcp)) {
+	case "0", "false", "udp":
+		return "udp"
+	case "1", "true", "tcp":
+		return "tcp"
+	default:
+		return ""
 	}
 }
 
@@ -135,17 +172,19 @@ func (d *EtwInput) parseDNSPacketData(fields map[string]string, packetHex string
 	}
 
 	rcode := msg.Rcode
-	fields["DnsResponseCode"] = fmt.Sprintf("%d", rcode)
-	fields["DnsResponseCodeName"] = mapDNSResponseCode(rcode)
+	fields["dns_response_code"] = fmt.Sprintf("%d", rcode)
+	rcodeName := mapDNSResponseCode(rcode)
+	fields["dns_response_code_name"] = rcodeName
+	fields["event_result_details"] = rcodeName
 
 	if rcode == dns.RcodeSuccess {
-		fields["EventResult"] = "Success"
+		fields["event_result"] = "Success"
 	} else {
-		fields["EventResult"] = "Failure"
+		fields["event_result"] = "Failure"
 	}
 
 	if msg.Response {
-		fields["DnsFlags"] = fmt.Sprintf("0x%04X", uint16(raw[2])<<8|uint16(raw[3]))
+		fields["dns_flags"] = fmt.Sprintf("0x%04X", uint16(raw[2])<<8|uint16(raw[3]))
 	}
 
 	if eventID == 261 || eventID == 279 || msg.Response {
@@ -154,7 +193,7 @@ func (d *EtwInput) parseDNSPacketData(fields map[string]string, packetHex string
 			answers = append(answers, formatRR(rr))
 		}
 		if len(answers) > 0 {
-			fields["DnsResponseName"] = strings.Join(answers, "; ")
+			fields["dns_response_name"] = strings.Join(answers, "; ")
 		}
 	}
 }

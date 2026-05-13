@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 
 	"github.com/bi-zone/etw"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -57,6 +59,10 @@ type EtwInput struct {
 	context    pipeline.Context
 	collector  pipeline.Collector
 	hostname   string
+	domain     string
+	domainType string
+	osName     string
+	osVersion  string
 	serverIP   string
 	mu         sync.Mutex
 	stopped    bool
@@ -65,6 +71,9 @@ type EtwInput struct {
 func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	d.context = context
 	d.hostname, _ = os.Hostname()
+	d.domain, d.domainType = getWindowsDomainInfo()
+	d.osName = "Windows"
+	d.osVersion = getWindowsOSVersion()
 
 	var guidStr string
 	if d.ProviderName != "" {
@@ -95,6 +104,56 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 		"service_etw init: guid=%s level=%d keywords=0x%X",
 		guidStr, d.Level, uint64(d.Keywords))
 	return 0, nil
+}
+
+func getWindowsDomainInfo() (string, string) {
+	if domain := strings.TrimSpace(os.Getenv("USERDNSDOMAIN")); domain != "" {
+		return domain, "FQDN"
+	}
+	if domain, ok := readRegistryString(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`, "Domain"); ok {
+		return domain, "FQDN"
+	}
+	if domain, ok := readRegistryString(registry.LOCAL_MACHINE, `SYSTEM\CurrentControlSet\Services\Tcpip\Parameters`, "NV Domain"); ok {
+		return domain, "FQDN"
+	}
+	if domain := strings.TrimSpace(os.Getenv("USERDOMAIN")); domain != "" && !strings.EqualFold(domain, os.Getenv("COMPUTERNAME")) {
+		return domain, "NetBIOS"
+	}
+	return "", ""
+}
+
+func getWindowsOSVersion() string {
+	key, err := registry.OpenKey(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, registry.QUERY_VALUE)
+	if err != nil {
+		return ""
+	}
+	defer key.Close()
+
+	major, _, err := key.GetIntegerValue("CurrentMajorVersionNumber")
+	if err != nil || major == 0 {
+		major = 10
+	}
+	minor, _, err := key.GetIntegerValue("CurrentMinorVersionNumber")
+	if err != nil {
+		minor = 0
+	}
+	build, ok := readRegistryString(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "CurrentBuildNumber")
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%d.%d.%s.0", major, minor, build)
+}
+
+func readRegistryString(root registry.Key, path, name string) (string, bool) {
+	key, err := registry.OpenKey(root, path, registry.QUERY_VALUE)
+	if err != nil {
+		return "", false
+	}
+	defer key.Close()
+
+	value, _, err := key.GetStringValue(name)
+	value = strings.TrimSpace(value)
+	return value, err == nil && value != ""
 }
 
 func (d *EtwInput) Description() string {
@@ -161,7 +220,7 @@ func (d *EtwInput) handleEvent(e *etw.Event) {
 	fields["thread_id"] = strconv.FormatUint(uint64(e.Header.ThreadID), 10)
 
 	for k, v := range data {
-		fields[k] = fmt.Sprintf("%v", v)
+		fields[normalizeETWFieldName(k)] = fmt.Sprintf("%v", v)
 	}
 
 	if d.isDNSProvider() {
@@ -170,6 +229,40 @@ func (d *EtwInput) handleEvent(e *etw.Event) {
 
 	tags := map[string]string{"source": "etw"}
 	d.collector.AddData(tags, fields, e.Header.TimeStamp)
+}
+
+func normalizeETWFieldName(name string) string {
+	if name == "" {
+		return ""
+	}
+
+	var builder strings.Builder
+	runes := []rune(name)
+	for i, r := range runes {
+		if r == '-' || r == ' ' || r == '.' {
+			if builder.Len() > 0 {
+				builder.WriteRune('_')
+			}
+			continue
+		}
+		if r == '_' {
+			if builder.Len() > 0 {
+				builder.WriteRune('_')
+			}
+			continue
+		}
+		if unicode.IsUpper(r) {
+			prevLowerOrDigit := i > 0 && (unicode.IsLower(runes[i-1]) || unicode.IsDigit(runes[i-1]))
+			nextLower := i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if builder.Len() > 0 && (prevLowerOrDigit || nextLower) {
+				builder.WriteRune('_')
+			}
+			builder.WriteRune(unicode.ToLower(r))
+			continue
+		}
+		builder.WriteRune(unicode.ToLower(r))
+	}
+	return strings.Trim(builder.String(), "_")
 }
 
 func init() {
