@@ -19,7 +19,6 @@
 #include <chrono>
 #include <thread>
 
-#include "ebpf/plugin/cpu_profiling/ProcessEntry.h"
 #include "logger/Logger.h"
 
 namespace logtail {
