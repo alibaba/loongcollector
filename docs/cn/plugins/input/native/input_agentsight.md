@@ -28,27 +28,28 @@ dev
 | `gen_ai.session.id` | string | 用户的会话 id |
 | `gen_ai.turn.id` | string | 同一会话中其中一次对话的 id |
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
-| `pid` | int32 | 进程号 |
+| `pid` | string | 进程号（十进制字符串） |
 | `process_name` | string | 进程名称 |
 | `gen_ai.agent.name` | string | agent 名称 |
-| `gen_ai.request.timestamp_ns` | uint64 | 一次对大模型请求开始的时间 |
-| `gen_ai.response.duration_ns` | uint64 | 一次对大模型请求到大模型回复的时间 |
+| `gen_ai.request.timestamp` | string | 一次对大模型请求开始的时间，毫秒时间戳（十进制字符串） |
+| `gen_ai.response.duration` | string | 一次对大模型请求到大模型回复的耗时，毫秒（十进制字符串） |
 | `server.address` | string | 从请求 URL 解析出的服务端主机名（有请求 URL 时输出） |
 | `server.port` | string | 从请求 URL 解析出的端口（URL 中含显式端口时输出） |
 | `gen_ai.provider.name` | string | 大模型厂商名称 |
 | `gen_ai.request.model` | string | 大模型厂商使用的模型名称 |
-| `status_code` | uint16 | 一次请求的状态码，同 http 状态码 |
-| `is_sse` | uint8 | 是否为 SSE（Server-Sent Events）连接，1 表示是，0 表示否 |
+| `status_code` | string | 一次请求的状态码，同 HTTP 状态码（十进制字符串，如 `200`） |
+| `is_sse` | string | 是否为 SSE（Server-Sent Events）连接；日志中取值为 `1`（是）或 `0`（否） |
 | `gen_ai.response.finish_reasons` | string | 大模型停止产生 token 的原因 |
 | `is_usage_from_api` | string | 数据来源标识，true 表示来自 LLM API response usage 字段（精确值），false 表示由 AgentSight 本地 tokenizer 计算（近似值） |
-| `gen_ai.usage.input_tokens` | uint32 | 发送给模型的 token 数量 |
-| `gen_ai.usage.output_tokens` | uint32 | 模型实际生成的回复内容长度 |
-| `gen_ai.usage.total_tokens` | uint32 | 一次请求消耗的 Token 总量 |
-| `ggen_ai.usage.cache_creation.input_tokens` | uint32 | 本次请求中，被系统新写入缓存的那部分输入 Token 数量 |
-| `ggen_ai.usage.cache_read.input_tokens` | uint32 | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量 |
+| `gen_ai.usage.input_tokens` | string | 发送给模型的 token 数量（十进制字符串） |
+| `gen_ai.usage.output_tokens` | string | 模型实际生成的回复内容长度（十进制字符串） |
+| `gen_ai.usage.total_tokens` | string | 一次请求消耗的 Token 总量（十进制字符串） |
+| `gen_ai.usage.cache_creation.input_tokens` | string | 本次请求中，被系统新写入缓存的那部分输入 Token 数量（十进制字符串） |
+| `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
 | `gen_ai.input.messages` | string | 大模型请求 message 的序列化 json |
 | `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json |
 
+本表字段均由插件 `SetContent` 写入日志内容，**键值类型均为字符串**。其中带数值语义的字段以十进制文本（或 `is_sse` 的 `1`/`0`）落盘，与实现一致；并非日志 schema 中的强类型整型/浮点列。
 
 ## 样例
 
@@ -107,8 +108,8 @@ flushers:
   ],
   "gen_ai.provider.name": "openai",
   "gen_ai.request.model": "qwen3.5-plus",
-  "gen_ai.request.timestamp_ns": "1749123456789000000",
-  "gen_ai.response.duration_ns": "3548000000",
+  "gen_ai.request.timestamp": "1749123456789",
+  "gen_ai.response.duration": "3548",
   "gen_ai.response.finish_reasons": "stop",
   "gen_ai.response.id": "chatcmpl-3cd5d2d2-d2f5-91e9-a5e4-7fb740bb47f6",
   "gen_ai.usage.cache_creation.input_tokens": "0",

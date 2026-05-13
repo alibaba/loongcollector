@@ -154,6 +154,7 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
     if (!sym || !sym->config_new || !sym->handle_new || !sym->handle_start || !sym->handle_read
         || !sym->handle_get_eventfd) {
+        StopAgentSightLocked();
         LOG_ERROR(sLogger, ("AgentSight", "symbols not available"));
         return false;
     }
@@ -276,9 +277,13 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
 
     if (mRegisteredConfigCount != 0) {
         if (update(opt) != 0) {
+            std::lock_guard<std::mutex> lock(mLibMutex);
+            releaseMetricRefs();
             return 1;
         }
         if (resume(opt) != 0) {
+            std::lock_guard<std::mutex> lock(mLibMutex);
+            releaseMetricRefs();
             return 1;
         }
         return 0;
@@ -422,8 +427,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     setStr(StringView("process_name"), rec->mProcessName);
     setStr(StringView("gen_ai.agent.name"), rec->mAgentName);
 
-    log->SetContent("gen_ai.request.timestamp_ns", std::to_string(rec->mTimestampNs));
-    log->SetContent("gen_ai.response.duration_ns", std::to_string(rec->mDurationNs));
+    log->SetContent("gen_ai.request.timestamp", std::to_string(rec->mTimestampNs / 1000000ULL));
+    log->SetContent("gen_ai.response.duration", std::to_string(rec->mDurationNs / 1000000ULL));
 
     if (!rec->mRequestUrl.empty()) {
         std::string host;

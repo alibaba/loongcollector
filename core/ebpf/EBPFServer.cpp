@@ -549,8 +549,6 @@ void EBPFServer::handleEpollEvents() {
             continue;
         }
 
-        // AgentSight: readable fd from handle_get_eventfd (when >= 0) is on mUnifiedEpollFd (RegisterExternalEpollFd).
-        // Edge-triggered wakeups; drain via handle_read here. Data path differs from eBPF perf ConsumePerfBufferData.
         if (type == PluginType::AGENTSIGHT_OBSERVE) {
             // Take mMtx before reading mManager. mValid was read here without the lock before, which could
             // race with updatePluginState / pluginMgr.reset and skip OnEpollReadable while epoll still fires.
