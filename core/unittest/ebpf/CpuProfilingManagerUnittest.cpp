@@ -251,7 +251,7 @@ void CpuProfilingManagerUnittest::TestAddContentToEventBasic() {
     APSARA_TEST_EQUAL(event->GetContent("val"), "10000000");
     APSARA_TEST_EQUAL(event->GetContent("valueTypes"), "cpu");
     APSARA_TEST_EQUAL(event->GetContent("valueTypes_cn"), "");
-    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__": "testApp", "thread": "testComm"})");
+    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__":"testApp","thread":"testComm"})");
 }
 
 void CpuProfilingManagerUnittest::TestAddContentToEventEmptyStack() {
@@ -277,7 +277,7 @@ void CpuProfilingManagerUnittest::TestAddContentToEventEmptyNameAndComm() {
     APSARA_TEST_EQUAL(event->GetContent("val"), "10000000");
     APSARA_TEST_EQUAL(event->GetContent("valueTypes"), "cpu");
     APSARA_TEST_EQUAL(event->GetContent("valueTypes_cn"), "");
-    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__": "", "thread": ""})");
+    APSARA_TEST_EQUAL(event->GetContent("labels"), R"({"__name__":"","thread":""})");
 }
 
 void CpuProfilingManagerUnittest::TestParseStackCnt() {
