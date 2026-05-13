@@ -57,8 +57,9 @@ void handleCpuProfilingEvent(uint32_t pid, const char* comm, const char* stack, 
 CpuProfilingManager::CpuProfilingManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                          const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                          moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                         EventPool* pool)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool) {
+                                         EventPool* pool,
+                                         std::string hostRootPath)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool), mHostRootPath(std::move(hostRootPath)) {
 }
 
 int CpuProfilingManager::Init() {
@@ -67,8 +68,9 @@ int CpuProfilingManager::Init() {
     }
     mInited = true;
     mEBPFAdapter->StartPlugin(PluginType::CPU_PROFILING,
-                              buildCpuProfilingConfig({}, GetContainerHostPath(), handleCpuProfilingEvent, this));
-    ProcessDiscoveryManager::GetInstance()->Start([this](auto v) { HandleProcessDiscoveryEvent(std::move(v)); });
+                              buildCpuProfilingConfig({}, mHostRootPath, handleCpuProfilingEvent, this));
+    ProcessDiscoveryManager::GetInstance()->Start(
+        [this](auto v) { HandleProcessDiscoveryEvent(std::move(v)); }, 15000, mHostRootPath);
     LOG_INFO(sLogger, ("CpuProfilingManager", "init"));
     return 0;
 }

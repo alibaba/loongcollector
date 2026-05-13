@@ -17,12 +17,16 @@
 #include <atomic>
 #include <functional>
 #include <future>
+#include <map>
+#include <mutex>
 #include <optional>
+#include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "app_config/AppConfig.h"
-#include "common/LogtailCommonFlags.h"
 #include "common/ProcParser.h"
 #include "common/StringTools.h"
 #include "container_manager/ContainerDiff.h"
@@ -64,22 +68,13 @@ private:
     }
 };
 
-inline std::optional<std::string> GetContainerHostPath() {
-    if (AppConfig::GetInstance()->IsPurageContainerMode()) {
-        return STRING_FLAG(default_container_host_path);
-    }
-    return std::nullopt;
-}
-
 class ProcessDiscoveryManager {
 public:
     using DiscoverEntry = std::pair<size_t, std::set<uint32_t>>;
     using DiscoverResult = std::vector<DiscoverEntry>;
     using NotifyFn = std::function<void(DiscoverResult)>;
 
-    ProcessDiscoveryManager()
-        : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()),
-          mProcParser(GetContainerHostPath().value_or("/")) {}
+    ProcessDiscoveryManager() : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()) {}
 
     ProcessDiscoveryManager(const ProcessDiscoveryManager&) = delete;
     ProcessDiscoveryManager& operator=(const ProcessDiscoveryManager&) = delete;
@@ -93,7 +88,7 @@ public:
         return &sInstance;
     }
 
-    void Start(NotifyFn fn, size_t milliseconds = 15000);
+    void Start(NotifyFn fn, size_t milliseconds = 15000, const std::string& hostRootPath = "/");
     void Stop();
 
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
@@ -124,7 +119,7 @@ private:
     NotifyFn mCallback;
 
     bool mIsContainerMode;
-    ProcParser mProcParser;
+    std::optional<ProcParser> mProcParser;
     size_t mSleepMilliseconds;
 };
 

@@ -72,7 +72,7 @@ protected:
         WriteMetrics::GetInstance()->CommitMetricsRecordRef(mMetricRef);
 
         mManager = std::make_shared<CpuProfilingManager>(
-            mWrapper.mProcessCacheManager, mEBPFAdapter, *mEventQueue, &mEventPool);
+            mWrapper.mProcessCacheManager, mEBPFAdapter, *mEventQueue, &mEventPool, "/");
     }
 
     void TearDown() override {

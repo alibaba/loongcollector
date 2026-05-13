@@ -25,10 +25,11 @@
 namespace logtail {
 namespace ebpf {
 
-void ProcessDiscoveryManager::Start(NotifyFn fn, size_t milliseconds) {
+void ProcessDiscoveryManager::Start(NotifyFn fn, size_t milliseconds, const std::string& hostRootPath) {
     if (mRunning) {
         return;
     }
+    mProcParser.emplace(hostRootPath);
     mRunning = true;
     mCallback = std::move(fn);
     mSleepMilliseconds = milliseconds;
@@ -84,9 +85,13 @@ bool ProcessDiscoveryManager::CheckDiscoveryExist(const std::string& configName)
 }
 
 void ProcessDiscoveryManager::run() {
+    if (!mProcParser.has_value()) {
+        LOG_ERROR(sLogger, ("ProcessDiscoveryManager", "ProcParser is not initialized"));
+        return;
+    }
     while (mRunning) {
         std::vector<ProcessEntry> procs;
-        ListAllProcesses(mProcParser, procs);
+        ListAllProcesses(*mProcParser, procs);
         std::sort(procs.begin(), procs.end(), [](const auto& a, const auto& b) { return a.mPid < b.mPid; });
 
         std::vector<DiscoverEntry> result;
