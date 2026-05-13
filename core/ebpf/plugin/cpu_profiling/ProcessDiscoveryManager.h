@@ -107,7 +107,8 @@ private:
         std::set<uint32_t> mPrevPids;
         std::map<uint32_t, bool> mPidMatchCache;
 
-        void FindAllMatch(const std::vector<ProcessEntry>& procsOrdered,
+        void FindAllMatch(const std::vector<uint32_t>& pids,
+                          ProcParser& procParser,
                           std::vector<DiscoverEntry>& results,
                           bool isContainerMode);
     };
