@@ -90,9 +90,9 @@ void ProcessDiscoveryManager::run() {
         return;
     }
     while (mRunning) {
-        std::vector<ProcessEntry> procs;
-        ListAllProcesses(*mProcParser, procs);
-        std::sort(procs.begin(), procs.end(), [](const auto& a, const auto& b) { return a.mPid < b.mPid; });
+        auto pidsUnorder = mProcParser->GetAllPids();
+        std::vector<uint32_t> pids(pidsUnorder.begin(), pidsUnorder.end());
+        std::sort(pids.begin(), pids.end());
 
         std::vector<DiscoverEntry> result;
 
@@ -100,7 +100,7 @@ void ProcessDiscoveryManager::run() {
             std::lock_guard<std::mutex> guard(mLock);
 
             for (auto& [_, state] : mStates) {
-                state.FindAllMatch(procs, result, mIsContainerMode);
+                state.FindAllMatch(pids, *mProcParser, result, mIsContainerMode);
             }
         }
 
@@ -113,42 +113,67 @@ void ProcessDiscoveryManager::run() {
 }
 
 
-void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<ProcessEntry>& procsOrdered,
+void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<uint32_t>& pids,
+                                                       ProcParser& procParser,
                                                        std::vector<DiscoverEntry>& results,
                                                        bool isContainerMode) {
     std::set<uint32_t> matchedPids;
-    auto it = procsOrdered.begin();
+    auto it = pids.begin();
     auto cacheIt = mPidMatchCache.begin();
-    while (it != procsOrdered.end() && cacheIt != mPidMatchCache.end()) {
-        if (it->mPid == cacheIt->first) {
+
+    while (it != pids.end() && cacheIt != mPidMatchCache.end()) {
+        if (*it == cacheIt->first) {
             // Cache hit, use the cached result
             if (cacheIt->second) {
-                matchedPids.insert(it->mPid);
+                matchedPids.insert(*it);
             }
             ++it;
             ++cacheIt;
-        } else if (it->mPid < cacheIt->first) {
-            // New process, check and insert into cache
-            bool isMatch = mConfig.IsMatch(it->mCmdline, it->mContainerId, isContainerMode);
-            mPidMatchCache[it->mPid] = isMatch;
-            if (isMatch) {
-                matchedPids.insert(it->mPid);
+        } else if (*it < cacheIt->first) {
+            // New process, fetch cmdline and containerId, then check
+            std::string cmdline = procParser.GetPIDCmdline(*it);
+            if (!cmdline.empty()) { // Empty means process exit or no permission
+                // /proc/<pid>/cmdline use '\0' as separator, replace it with space
+                std::replace(cmdline.begin(), cmdline.end(), '\0', ' ');
+
+                std::string containerId;
+                procParser.GetPIDDockerId(*it, containerId);
+
+                bool isMatch = mConfig.IsMatch(cmdline, containerId, isContainerMode);
+                mPidMatchCache[*it] = isMatch;
+                if (isMatch) {
+                    matchedPids.insert(*it);
+                }
             }
             ++it;
-        } else { // it->mPid > cacheIt->first
+        } else { // *it > cacheIt->first
             // Process disappeared, remove from cache
             cacheIt = mPidMatchCache.erase(cacheIt);
         }
     }
-    while (it != procsOrdered.end()) {
+
+    while (it != pids.end()) {
         // New processes after the last cached one
-        bool isMatch = mConfig.IsMatch(it->mCmdline, it->mContainerId, isContainerMode);
-        mPidMatchCache[it->mPid] = isMatch;
+        std::string cmdline = procParser.GetPIDCmdline(*it);
+        if (cmdline.empty()) {
+            // Process exit or no permission
+            ++it;
+            continue;
+        }
+        // /proc/<pid>/cmdline use '\0' as separator, replace it with space
+        std::replace(cmdline.begin(), cmdline.end(), '\0', ' ');
+
+        std::string containerId;
+        procParser.GetPIDDockerId(*it, containerId);
+
+        bool isMatch = mConfig.IsMatch(cmdline, containerId, isContainerMode);
+        mPidMatchCache[*it] = isMatch;
         if (isMatch) {
-            matchedPids.insert(it->mPid);
+            matchedPids.insert(*it);
         }
         ++it;
     }
+
     while (cacheIt != mPidMatchCache.end()) {
         // Processes disappeared after the last one in the current list
         cacheIt = mPidMatchCache.erase(cacheIt);
@@ -157,8 +182,8 @@ void ProcessDiscoveryManager::InnerState::FindAllMatch(const std::vector<Process
     if (mPrevPids == matchedPids) {
         return;
     }
-    results.emplace_back(mConfig.mConfigKey, matchedPids); // copy
-    mPrevPids = std::move(matchedPids); // move
+    results.emplace_back(mConfig.mConfigKey, matchedPids);
+    mPrevPids = std::move(matchedPids);
 }
 
 } // namespace ebpf
