@@ -30,7 +30,6 @@
 #include "common/ProcParser.h"
 #include "common/StringTools.h"
 #include "container_manager/ContainerDiff.h"
-#include "ebpf/plugin/cpu_profiling/ProcessEntry.h"
 #include "logger/Logger.h"
 
 namespace logtail {
