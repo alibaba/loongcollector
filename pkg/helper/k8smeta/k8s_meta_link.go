@@ -2,22 +2,59 @@ package k8smeta
 
 import (
 	"strings"
+	"sync"
 
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type LinkGenerator struct {
-	metaCache map[string]MetaCache
+	metaCache   map[string]MetaCache
+	metaCacheMu *sync.RWMutex // same mutex as MetaManager.cacheMu; guards map structure for RegisterCustomResourceCollector
+
+	podCRMu         sync.RWMutex
+	podCRByLinkType map[string]*podCRLinkRuntime
 }
 
-func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache) *LinkGenerator {
+type podCRLinkRuntime struct {
+	entityType          string
+	ownerKind           string
+	ownerAPIGroupSubstr string
+	podLabelKey         string
+}
+
+func NewK8sMetaLinkGenerator(metaCache map[string]MetaCache, metaCacheMu *sync.RWMutex) *LinkGenerator {
 	return &LinkGenerator{
-		metaCache: metaCache,
+		metaCache:       metaCache,
+		metaCacheMu:     metaCacheMu,
+		podCRByLinkType: make(map[string]*podCRLinkRuntime),
 	}
+}
+
+func (g *LinkGenerator) registerPodCRLink(linkType string, rt *podCRLinkRuntime) {
+	if g == nil || linkType == "" || rt == nil {
+		return
+	}
+	g.podCRMu.Lock()
+	defer g.podCRMu.Unlock()
+	if g.podCRByLinkType == nil {
+		g.podCRByLinkType = make(map[string]*podCRLinkRuntime)
+	}
+	g.podCRByLinkType[linkType] = rt
+}
+
+func (g *LinkGenerator) podCRRuntimeForLinkType(linkType string) (*podCRLinkRuntime, bool) {
+	if g == nil {
+		return nil, false
+	}
+	g.podCRMu.RLock()
+	defer g.podCRMu.RUnlock()
+	rt, ok := g.podCRByLinkType[linkType]
+	return rt, ok
 }
 
 func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) []*K8sMetaEvent {
@@ -28,6 +65,16 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 	// only generate link from the src entity
 	if !strings.HasPrefix(linkType, resourceType) {
 		return nil
+	}
+	if g.metaCacheMu != nil {
+		g.metaCacheMu.RLock()
+		defer g.metaCacheMu.RUnlock()
+	}
+	// CustomResource links (third-party CR):
+	// 1) Pod→CR when linkType is registered via PodLink (before built-in switch).
+	// 2) namespaced CR→Namespace when linkType is "<EntityType>->namespace" (after switch, so built-in *->namespace kinds stay in cases above).
+	if rt, ok := g.podCRRuntimeForLinkType(linkType); ok {
+		return g.getPodCustomResourceLink(events, rt, linkType)
 	}
 	switch linkType {
 	case POD_NODE:
@@ -76,9 +123,13 @@ func (g *LinkGenerator) GenerateLinks(events []*K8sMetaEvent, linkType string) [
 		return g.getPVCNamespaceLink(events)
 	case INGRESS_NAMESPACE:
 		return g.getIngressNamespaceLink(events)
-	default:
-		return nil
 	}
+	// CustomResource links (third-party CR):
+	// 2) namespaced CR→Namespace when linkType is "<EntityType>->namespace" (after switch, so built-in *->namespace kinds stay in cases above).
+	if strings.HasSuffix(linkType, LINK_SPLIT_CHARACTER+NAMESPACE) {
+		return g.getCustomResourceNamespaceLink(events)
+	}
+	return nil
 }
 
 func (g *LinkGenerator) getPodNodeLink(podList []*K8sMetaEvent) []*K8sMetaEvent {
@@ -553,6 +604,108 @@ func (g *LinkGenerator) getIngressServiceLink(ingressList []*K8sMetaEvent) []*K8
 							Raw: &IngressService{
 								Ingress: ingress,
 								Service: serviceObj,
+							},
+							FirstObservedTime: data.Object.FirstObservedTime,
+							LastObservedTime:  data.Object.LastObservedTime,
+						},
+					})
+				}
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) crNameFromPod(pod *v1.Pod, rt *podCRLinkRuntime) (namespace, name string, ok bool) {
+	if pod == nil || rt == nil {
+		return "", "", false
+	}
+	for _, ref := range pod.OwnerReferences {
+		if ref.Kind == rt.ownerKind && strings.Contains(ref.APIVersion, rt.ownerAPIGroupSubstr) {
+			return pod.Namespace, ref.Name, true
+		}
+	}
+	if rt.podLabelKey != "" && pod.Labels != nil {
+		if v := pod.Labels[rt.podLabelKey]; v != "" {
+			return pod.Namespace, v, true
+		}
+	}
+	return "", "", false
+}
+
+func (g *LinkGenerator) getPodCustomResourceLink(podList []*K8sMetaEvent, rt *podCRLinkRuntime, linkType string) []*K8sMetaEvent {
+	if rt == nil {
+		return nil
+	}
+	crCache := g.metaCache[rt.entityType]
+	if crCache == nil {
+		return nil
+	}
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range podList {
+		pod, ok := data.Object.Raw.(*v1.Pod)
+		if !ok {
+			continue
+		}
+		ns, resName, found := g.crNameFromPod(pod, rt)
+		if !found || resName == "" {
+			continue
+		}
+		items := crCache.Get([]string{generateNameWithNamespaceKey(ns, resName)})
+		for _, group := range items {
+			for _, w := range group {
+				u, ok := w.Raw.(*unstructured.Unstructured)
+				if !ok {
+					continue
+				}
+				result = append(result, &K8sMetaEvent{
+					EventType: data.EventType,
+					Object: &ObjectWrapper{
+						ResourceType: linkType,
+						Raw: &PodCustomResource{
+							Pod: pod,
+							CR:  u,
+						},
+						FirstObservedTime: data.Object.FirstObservedTime,
+						LastObservedTime:  data.Object.LastObservedTime,
+					},
+				})
+			}
+		}
+	}
+	return result
+}
+
+func (g *LinkGenerator) getCustomResourceNamespaceLink(events []*K8sMetaEvent) []*K8sMetaEvent {
+	if len(events) == 0 {
+		return nil
+	}
+	entityType := events[0].Object.ResourceType
+	nsCache := g.metaCache[NAMESPACE]
+	if nsCache == nil {
+		return nil
+	}
+	result := make([]*K8sMetaEvent, 0)
+	for _, data := range events {
+		u, ok := data.Object.Raw.(*unstructured.Unstructured)
+		if !ok {
+			continue
+		}
+		nsName := u.GetNamespace()
+		if nsName == "" {
+			continue
+		}
+		nsList := nsCache.Get([]string{generateNameWithNamespaceKey("", nsName)})
+		for _, ns := range nsList {
+			for _, n := range ns {
+				if namespace, ok := n.Raw.(*v1.Namespace); ok {
+					result = append(result, &K8sMetaEvent{
+						EventType: data.EventType,
+						Object: &ObjectWrapper{
+							ResourceType: NamespaceLinkTypeForEntity(entityType),
+							Raw: &NamespaceCustomResource{
+								Namespace: namespace,
+								CR:        u,
 							},
 							FirstObservedTime: data.Object.FirstObservedTime,
 							LastObservedTime:  data.Object.LastObservedTime,

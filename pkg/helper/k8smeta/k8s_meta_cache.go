@@ -34,6 +34,8 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
+
+	giveUp *informerGiveUp
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -44,6 +46,7 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 	m.metaStore = NewDeferredDeletionMetaStore(m.eventCh, m.stopCh, 120, cache.MetaNamespaceKeyFunc, idxRules...)
 	m.resourceType = resourceType
 	m.schema = runtime.NewScheme()
+	m.giveUp = newInformerGiveUp()
 	_ = v1.AddToScheme(m.schema)
 	_ = batch.AddToScheme(m.schema)
 	_ = batchv1beta1.AddToScheme(m.schema)
@@ -90,10 +93,18 @@ func (m *k8sMetaCache) UnRegisterSendFunc(key string) {
 }
 
 func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
+	_ = stopCh // MetaCache uses m.stopCh for global shutdown; parameter kept for interface compatibility.
 	defer panicRecover()
 	factory, informer := m.getFactoryInformer()
 	if informer == nil {
 		return
+	}
+	mergedStop := m.giveUp.mergedStop(m.stopCh)
+	if err := attachWatchErrorHandler(informer, m.giveUp, watchErrorHandlerOpts{
+		ResourceType:  m.resourceType,
+		GiveUpStopMsg: "stopping informer after repeated errors (RBAC/auth or missing API resource; no further retries)",
+	}); err != nil {
+		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to set watch error handler", err)
 	}
 	_, _ = informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -137,16 +148,8 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			metaManager.deleteEventCount.Add(1)
 		},
 	})
-	go factory.Start(stopCh)
-	// wait infinite for first cache sync success
-	for {
-		if !cache.WaitForCacheSync(stopCh, informer.HasSynced) {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "service cache sync timeout")
-			time.Sleep(1 * time.Second)
-		} else {
-			break
-		}
-	}
+	go factory.Start(mergedStop)
+	waitInformerCacheSync(mergedStop, informer.HasSynced, informerCacheSyncOpts{ResourceType: m.resourceType})
 }
 
 func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, cache.SharedIndexInformer) {
@@ -197,15 +200,6 @@ func (m *k8sMetaCache) getFactoryInformer() (informers.SharedInformerFactory, ca
 	// 如果 informer 为 nil，直接返回，不再watch error
 	if informer == nil {
 		return factory, nil
-	}
-	// add watch error handler
-	err := informer.SetWatchErrorHandler(func(r *cache.Reflector, err error) {
-		if err != nil {
-			logger.Error(context.Background(), K8sMetaUnifyErrorCode, "resourceType", m.resourceType, "watchError", err)
-		}
-	})
-	if err != nil {
-		logger.Error(context.Background(), K8sMetaUnifyErrorCode, "fail to handle watch error handler", err)
 	}
 	return factory, informer
 }
@@ -449,6 +443,7 @@ func containsResource(resources []metav1.APIResource, name string) bool {
 	}
 	return false
 }
+
 func generateNodeKey(obj interface{}) ([]string, error) {
 	node, err := meta.Accessor(obj)
 	if err != nil {
