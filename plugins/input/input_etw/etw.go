@@ -6,6 +6,7 @@ package input_etw
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,12 +56,15 @@ type EtwInput struct {
 	session    *etw.Session
 	context    pipeline.Context
 	collector  pipeline.Collector
+	hostname   string
+	serverIP   string
 	mu         sync.Mutex
 	stopped    bool
 }
 
 func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	d.context = context
+	d.hostname, _ = os.Hostname()
 
 	var guidStr string
 	if d.ProviderName != "" {
@@ -146,16 +150,24 @@ func (d *EtwInput) handleEvent(e *etw.Event) {
 	if err != nil {
 		return
 	}
-	fields := make(map[string]string, len(data)+6)
-	fields["event_id"] = strconv.FormatUint(uint64(e.Header.EventDescriptor.ID), 10)
+
+	eventID := e.Header.EventDescriptor.ID
+	fields := make(map[string]string, len(data)+20)
+	fields["event_id"] = strconv.FormatUint(uint64(eventID), 10)
 	fields["opcode"] = strconv.FormatUint(uint64(e.Header.EventDescriptor.OpCode), 10)
 	fields["level"] = strconv.FormatUint(uint64(e.Header.EventDescriptor.Level), 10)
 	fields["keywords"] = fmt.Sprintf("0x%X", e.Header.EventDescriptor.Keyword)
 	fields["process_id"] = strconv.FormatUint(uint64(e.Header.ProcessID), 10)
 	fields["thread_id"] = strconv.FormatUint(uint64(e.Header.ThreadID), 10)
+
 	for k, v := range data {
 		fields[k] = fmt.Sprintf("%v", v)
 	}
+
+	if d.isDNSProvider() {
+		d.enrichDNSFields(fields, eventID)
+	}
+
 	tags := map[string]string{"source": "etw"}
 	d.collector.AddData(tags, fields, e.Header.TimeStamp)
 }

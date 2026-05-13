@@ -190,6 +190,7 @@ require (
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/linkedin/goavro/v2 v2.9.8 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
+	github.com/miekg/dns v1.1.62
 	github.com/miekg/pkcs11 v1.1.1 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
