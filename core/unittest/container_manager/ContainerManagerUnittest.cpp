@@ -59,6 +59,7 @@ public:
     void TestLoadContainerInfoFromContainersFormat() const;
     void TestLoadContainerInfoVersionHandling() const;
     void TestSaveContainerInfoWithVersion() const;
+    void TestAddAndRemoveContainerHandler() const;
     void TestContainerMatchingConsistency() const;
     void TestcomputeMatchedContainersDiffWithSnapshot() const;
     void TestNullRawContainerInfoHandling() const;
@@ -1071,6 +1072,40 @@ void ContainerManagerUnittest::TestSaveContainerInfoWithVersion() const {
     }
     EXPECT_TRUE(foundTestKey);
     EXPECT_TRUE(foundAnotherKey);
+}
+
+void ContainerManagerUnittest::TestAddAndRemoveContainerHandler() const {
+    ContainerManager containerManager;
+
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
+
+    FileDiscoveryOptions options1;
+    FileDiscoveryOptions options2;
+
+    containerManager.AddContainerHandler(
+        "configA", {&options1, nullptr}, [](std::shared_ptr<ContainerDiff>) {});
+
+    ASSERT_EQ(containerManager.mContainerHandlers.size(), 1);
+    auto itr = containerManager.mContainerHandlers.find("configA");
+    ASSERT_TRUE(itr != containerManager.mContainerHandlers.end());
+    EXPECT_EQ(itr->second.first.first, &options1);
+    EXPECT_EQ(itr->second.first.second, nullptr);
+
+    // Add the same key again, should overwrite the old handler/config.
+    containerManager.AddContainerHandler(
+        "configA", {&options2, nullptr}, [](std::shared_ptr<ContainerDiff>) {});
+
+    ASSERT_EQ(containerManager.mContainerHandlers.size(), 1);
+    itr = containerManager.mContainerHandlers.find("configA");
+    ASSERT_TRUE(itr != containerManager.mContainerHandlers.end());
+    EXPECT_EQ(itr->second.first.first, &options2);
+
+    containerManager.RemoveContainerHandler("configA");
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
+
+    // Removing a non-existing key should be a no-op.
+    containerManager.RemoveContainerHandler("not_exist");
+    EXPECT_TRUE(containerManager.mContainerHandlers.empty());
 }
 
 std::string ContainerManagerUnittest::findTestDataDirectory() const {
@@ -2778,6 +2813,7 @@ UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromDetailFormatPa
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoFromContainersFormat)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestLoadContainerInfoVersionHandling)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestSaveContainerInfoWithVersion)
+UNIT_TEST_CASE(ContainerManagerUnittest, TestAddAndRemoveContainerHandler)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestContainerMatchingConsistency)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestcomputeMatchedContainersDiffWithSnapshot)
 UNIT_TEST_CASE(ContainerManagerUnittest, TestNullRawContainerInfoHandling)
