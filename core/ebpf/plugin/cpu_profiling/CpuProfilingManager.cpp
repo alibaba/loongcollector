@@ -14,6 +14,8 @@
 
 #include "ebpf/plugin/cpu_profiling/CpuProfilingManager.h"
 
+#include "json/json.h"
+
 #include "collection_pipeline/CollectionPipelineContext.h"
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
@@ -261,15 +263,12 @@ void CpuProfilingManager::addContentToEvent(LogEvent* event,
     event->SetContent(kVal.LogKey(), std::to_string(valNs));
     event->SetContentNoCopy(kValueTypes.LogKey(), StringView(CpuProfilingManager::kCpuValue));
     event->SetContentNoCopy(kValueTypesCN.LogKey(), StringView(CpuProfilingManager::kEmptyValue));
-    // {"__name__": "xxx", "thread": "comm"}
-    std::string jsonLabels;
-    jsonLabels.reserve(30 + appName.size() + comm.size());
-    jsonLabels += R"({"__name__": ")";
-    jsonLabels += appName;
-    jsonLabels += R"(", "thread": ")";
-    jsonLabels += comm;
-    jsonLabels += R"("})";
-    event->SetContent(kLabels.LogKey(), jsonLabels);
+    Json::Value labelsJson;
+    labelsJson["__name__"] = appName;
+    labelsJson["thread"] = comm;
+    Json::StreamWriterBuilder writerBuilder;
+    writerBuilder["indentation"] = "";
+    event->SetContent(kLabels.LogKey(), Json::writeString(writerBuilder, labelsJson));
 }
 
 void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm, const char* stack, uint32_t cnt) {
