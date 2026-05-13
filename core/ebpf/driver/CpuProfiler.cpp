@@ -93,11 +93,9 @@ void CpuProfiler::Poll() {
                  "[CpuProfiler][Poll] profiler is not initialized or handler is null, cannot poll");
         return;
     }
-    if (mPids.empty()) {
-        return;
-    }
 
-    ebpf_log(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[CpuProfiler][Poll] poll");
+    ebpf_log(
+        logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "[CpuProfiler][Poll] poll, pids count: %zu", mPids.size());
     livetrace_profiler_read(mProfiler, handler_without_ctx);
 }
 
