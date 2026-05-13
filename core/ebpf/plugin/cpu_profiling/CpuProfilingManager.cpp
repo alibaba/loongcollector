@@ -173,7 +173,12 @@ void CpuProfilingManager::parseStackCnt(char const* symbol, std::vector<StackCnt
     StringView symbolView(symbol);
     StringViewSplitter splitter(symbolView, "\n");
     for (const auto& line : splitter) {
-        auto pos1 = line.find(';');
+        auto pos = line.find(':');
+        if (pos == StringView::npos) {
+            LOG_ERROR(sLogger, ("Invalid symbol format", line));
+            continue;
+        }
+        auto pos1 = line.find(';', pos + 1);
         if (pos1 == StringView::npos) {
             LOG_ERROR(sLogger, ("Invalid symbol format", line));
             continue;
