@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -187,7 +188,7 @@ func (p *pluginv2Runner) addAggregator(pluginMeta *pipeline.PluginMeta, aggregat
 	wrapper.Aggregator = aggregator
 	err := wrapper.Init(pluginMeta)
 	if err != nil {
-		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorInitErrorAlarm, "Aggregator failed to initialize", aggregator.Description(), "error", err)
+		logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.AggregatorInitErrorAlarm, "Aggregator failed to initialize", aggregator.Description(), "error", err)
 		return err
 	}
 	p.AggregatorPlugins = append(p.AggregatorPlugins, &wrapper)
@@ -223,7 +224,7 @@ func (p *pluginv2Runner) runInput() {
 			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "start run service", service)
 			defer panicRecover(service.Input.Description())
 			if err := service.StartService(p.InputPipeContext); err != nil {
-				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.PluginAlarm, "start service error, err", err)
+				logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.PluginAlarm, "start service error, err", err)
 			}
 			logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "service done", service.Input.Description())
 		})
@@ -241,7 +242,7 @@ func (p *pluginv2Runner) runMetricInput(control *pipeline.AsyncControl) {
 				}, cc)
 			})
 		} else {
-			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.MetricInputV2StartFailureAlarm, "type assertion", "failure")
+			logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.MetricInputV2StartFailureAlarm, "type assertion", "failure")
 		}
 	}
 }
@@ -294,7 +295,7 @@ func (p *pluginv2Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 						}
 						// wait until shutdown is active
 						if tryCount%100 == 0 {
-							logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorAddAlarm, "error", err)
+							logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.AggregatorAddAlarm, "error", err)
 						}
 						time.Sleep(time.Millisecond * 10)
 					}
@@ -362,7 +363,7 @@ func (p *pluginv2Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 					for _, flusher := range p.FlusherPlugins {
 						err := flusher.Export(data, p.FlushPipeContext)
 						if err != nil {
-							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.FlushDataAlarm, "flush data error",
+							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.FlushDataAlarm, "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)
 						}
 					}
@@ -415,8 +416,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	}
 	for idx, flusher := range p.FlusherPlugins {
 		if err := flusher.Flusher.Stop(); err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.StopFlusherAlarm,
-				"Failed to stop %vth flusher (description: %v): %v",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.StopFlusherAlarm, "Failed to stop %vth flusher (description: %v): %v",
 				idx, flusher.Flusher.Description(), err)
 		}
 	}
@@ -425,8 +425,7 @@ func (p *pluginv2Runner) Stop(exit bool) error {
 	for _, extension := range p.ExtensionPlugins {
 		err := extension.Stop()
 		if err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.StopExtensionAlarm,
-				"failed to stop extension (description: %v): %v", extension.Description(), err)
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.StopExtensionAlarm, "failed to stop extension (description: %v): %v", extension.Description(), err)
 		}
 	}
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "extension plugins stop", "done")
@@ -442,7 +441,7 @@ func (p *pluginv2Runner) ReceiveLogGroup(in pipeline.LogGroupWithContext) {
 		for k, v := range in.Context {
 			value, ok := v.(string)
 			if !ok {
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
 				continue
 			}
 			meta.Add(k, value)
@@ -482,7 +481,7 @@ func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
 					tags.Add(tag.GetKey(), tag.GetValue())
 				}
 			default:
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.ReceiveRawLogAlarm, "unknown values found in context, type is %T", v)
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveRawLogAlarm, "unknown values found in context, type is %T", v)
 			}
 		}
 	}

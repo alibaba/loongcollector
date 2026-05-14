@@ -102,7 +102,7 @@ func (p *Alarm) Update(project, logstore, config string) {
 
 func (p *Alarm) Record(alarmType AlarmType, level AlarmLevel, message string) {
 	// donot record empty alarmType
-	if len(alarmType) == 0 || !level.IsValid() {
+	if alarmType.String() == "" || !level.IsValid() {
 		return
 	}
 	alarmMutex.Lock()

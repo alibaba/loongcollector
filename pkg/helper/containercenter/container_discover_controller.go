@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -153,7 +154,7 @@ func (c *ContainerDiscoverManager) Clean() {
 
 func (c *ContainerDiscoverManager) LogAlarm(err error, msg string) {
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), selfmonitor.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -164,7 +165,7 @@ func (c *ContainerDiscoverManager) Init() bool {
 
 	// discover which runtime is valid
 	if wrapper, err := NewCRIRuntimeWrapper(containerCenterInstance); err != nil {
-		logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "[CRIRuntime] creare cri-runtime client error: %v", err)
+		logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "[CRIRuntime] creare cri-runtime client error: %v", err)
 		criRuntimeWrapper = nil
 	} else {
 		logger.Infof(context.Background(), "[CRIRuntime] create cri-runtime client successfully")
@@ -261,13 +262,13 @@ func (c *ContainerDiscoverManager) Init() bool {
 	if c.enableDockerDiscover {
 		if err = c.fetchDocker(); err != nil {
 			c.enableDockerDiscover = false
-			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch docker containers error, close docker discover, will retry")
+			logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "fetch docker containers error, close docker discover, will retry")
 		}
 	}
 	if c.enableCRIDiscover {
 		if err = c.fetchCRI(); err != nil {
 			c.enableCRIDiscover = false
-			logger.Warningf(context.Background(), "DOCKER_CENTER_ALARM", "fetch cri containers error, close cri discover, will retry")
+			logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "fetch cri containers error, close cri discover, will retry")
 		}
 	}
 	if c.enableStaticDiscover {

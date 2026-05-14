@@ -20,6 +20,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorBase64Encoding struct {
@@ -60,7 +61,7 @@ func (p *ProcessorBase64Encoding) ProcessLogs(logArray []*protocol.Log) []*proto
 			}
 		}
 		if !found && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "BASE64_E_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.Base64EFindAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 	return logArray

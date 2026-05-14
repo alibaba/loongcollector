@@ -27,6 +27,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/signals"
 	"github.com/alibaba/ilogtail/pkg/util"
 	_ "github.com/alibaba/ilogtail/plugin_main/wrapmemcpy"
@@ -119,7 +120,7 @@ func changePluginConfigIO(pluginCfg string) string {
 			cfg, _ := json.Marshal(newCfg)
 			pluginCfg = string(cfg)
 		} else {
-			logger.Warning(context.Background(), util.PluginUnmarshalAlarm, "err", err)
+			logger.Warning(context.Background(), selfmonitor.PluginUnmarshalAlarm, "err", err)
 		}
 		return pluginCfg
 	}
@@ -166,7 +167,7 @@ func main() {
 		l := fmt.Sprintf("PluginLogstore_%d", i)
 		c := fmt.Sprintf("1.0#PluginProject_%d##Config%d", i, i)
 		if LoadPipeline(p, l, c, 123, cfg) != 0 {
-			logger.Warningf(context.Background(), util.StartPluginAlarm, "%s_%s_%s start fail, config is %s", p, l, c, cfg)
+			logger.Warningf(context.Background(), selfmonitor.StartPluginAlarm, "%s_%s_%s start fail, config is %s", p, l, c, cfg)
 			return
 		}
 		Start(c)

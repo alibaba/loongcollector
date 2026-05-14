@@ -31,6 +31,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -73,7 +74,7 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 
 	client, err := NewRuntimeServiceClient(defaultContextTimeout, maxMsgSize)
 	if err != nil {
-		logger.Warningf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Connect remote cri-runtime failed: %v", err)
+		logger.Warningf(context.Background(), selfmonitor.ConnectCriRuntimeAlarm, "Connect remote cri-runtime failed: %v", err)
 		return nil, err
 	}
 
@@ -82,11 +83,11 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 
 	containerResp, err := client.ListContainers(ctx)
 	if err != nil {
-		logger.Errorf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "List containers from cri-runtime failed: %v", err)
+		logger.Errorf(context.Background(), selfmonitor.ConnectCriRuntimeAlarm, "List containers from cri-runtime failed: %v", err)
 		return nil, err
 	} else if len(containerResp.Containers) == 0 {
 		err = errors.New("remote cri-runtime has no container")
-		logger.Warningf(context.Background(), "CONNECT_CRI_RUNTIME_ALARM", "Remote cri-runtime is invalid: %v", err)
+		logger.Warningf(context.Background(), selfmonitor.ConnectCriRuntimeAlarm, "Remote cri-runtime is invalid: %v", err)
 		return nil, err
 	}
 
@@ -99,7 +100,7 @@ func NewCRIRuntimeWrapper(containerCenter *ContainerCenter) (*CRIRuntimeWrapper,
 			_, err = containerdClient.Version(ctx)
 		}
 		if err != nil {
-			logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "Connect containerd failed", err)
+			logger.Warning(context.Background(), selfmonitor.ContainerdClientAlarm, "Connect containerd failed", err)
 			containerdClient = nil
 		}
 	}
@@ -133,13 +134,13 @@ func (cw *CRIRuntimeWrapper) createContainerInfo(containerID string) (detail *Do
 			foundInfo = true
 			ci, err = parseContainerInfo(info)
 			if err != nil {
-				logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to parse container info, containerId: %s, data: %s, error: %v", containerID, info, err)
+				logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "failed to parse container info, containerId: %s, data: %s, error: %v", containerID, info, err)
 			}
 		}
 	}
 
 	if !foundInfo {
-		logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
+		logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 		return nil, "", ContainerStateContainerUnknown, fmt.Errorf("can not find container info from CRI::ContainerStatus, containerId: %s", containerID)
 	}
 
@@ -271,11 +272,11 @@ func (cw *CRIRuntimeWrapper) fetchAll() error {
 
 		dockerContainer, _, _, err := cw.createContainerInfo(c.ID)
 		if err != nil {
-			logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
+			logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "Create container info from cri-runtime error, Container Info: %+v, err: %v", c, err)
 			continue
 		}
 		if dockerContainer == nil || dockerContainer.ContainerInfo.ContainerJSONBase == nil {
-			logger.Warning(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "Create container info from cri-runtime error, Container Info:%+v", c)
+			logger.Warning(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "Create container info from cri-runtime error, Container Info:%+v", c)
 			continue
 		}
 		if dockerContainer.Status() != ContainerStatusRunning {
@@ -327,7 +328,7 @@ func (cw *CRIRuntimeWrapper) loopSyncContainers() {
 			return
 		case <-ticker.C:
 			if err := cw.syncContainers(); err != nil {
-				logger.Criticalf(context.Background(), "SYNC_CONTAINERD_ALARM", "syncContainers error: %v", err)
+				logger.Criticalf(context.Background(), selfmonitor.SyncContainerdAlarm, "syncContainers error: %v", err)
 			}
 		}
 	}
@@ -384,7 +385,7 @@ func (cw *CRIRuntimeWrapper) syncContainers() error {
 			continue
 		}
 		if err := cw.fetchOne(id); err != nil {
-			logger.Warningf(context.Background(), "CREATE_CONTAINERD_INFO_ALARM", "failed to createContainerInfo, containerId: %s, error: %v", id, err)
+			logger.Warningf(context.Background(), selfmonitor.CreateContainerdInfoAlarm, "failed to createContainerInfo, containerId: %s, error: %v", id, err)
 		}
 	}
 
@@ -567,7 +568,7 @@ func (cw *CRIRuntimeWrapper) getContainerUpperDir(containerid, snapshotter strin
 	defer cancel()
 	mounts, err := si.Mounts(ctx, containerid)
 	if err != nil {
-		logger.Warning(context.Background(), "CONTAINERD_CLIENT_ALARM", "cannot get snapshot info, containerID", containerid, "errInfo", err)
+		logger.Warning(context.Background(), selfmonitor.ContainerdClientAlarm, "cannot get snapshot info, containerID", containerid, "errInfo", err)
 		return ""
 	}
 	for _, m := range mounts {

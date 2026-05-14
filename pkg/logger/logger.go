@@ -33,25 +33,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg"
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/alibaba/ilogtail/pkg/util"
 
 	"github.com/cihub/seelog"
 )
-
-func normalizeAlarmType(alarmType interface{}) selfmonitor.AlarmType {
-	switch v := alarmType.(type) {
-	case selfmonitor.AlarmType:
-		return v
-	case util.AlarmType:
-		return selfmonitor.AlarmType(v.String())
-	case fmt.Stringer:
-		return selfmonitor.AlarmType(v.String())
-	case string:
-		return selfmonitor.AlarmType(v)
-	default:
-		return selfmonitor.AlarmType(fmt.Sprint(v))
-	}
-}
 
 // seelog template
 const (
@@ -201,28 +185,26 @@ func Infof(ctx context.Context, format string, params ...interface{}) {
 	}
 }
 
-func Warning(ctx context.Context, alarmType interface{}, kvPairs ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Warning(ctx context.Context, alarmType selfmonitor.TypedAlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelWaring, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelWaring, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", normalizedAlarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelWaring, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelWaring, msg)
 		}
 	}
 }
 
-func Warningf(ctx context.Context, alarmType interface{}, format string, params ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Warningf(ctx context.Context, alarmType selfmonitor.TypedAlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -230,40 +212,38 @@ func Warningf(ctx context.Context, alarmType interface{}, format string, params 
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType, "\t", msg)
+		_ = logtailLogger.Warn(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelWaring, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelWaring, msg)
 		}
 	} else {
-		_ = logtailLogger.Warn("AlarmType:", normalizedAlarmType, "\t", msg)
+		_ = logtailLogger.Warn("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelWaring, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelWaring, msg)
 		}
 	}
 }
 
-func Error(ctx context.Context, alarmType interface{}, kvPairs ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Error(ctx context.Context, alarmType selfmonitor.TypedAlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelError, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelError, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelError, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelError, msg)
 		}
 	}
 }
 
-func Errorf(ctx context.Context, alarmType interface{}, format string, params ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Errorf(ctx context.Context, alarmType selfmonitor.TypedAlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -271,40 +251,38 @@ func Errorf(ctx context.Context, alarmType interface{}, format string, params ..
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Error(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelError, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelError, msg)
 		}
 	} else {
-		_ = logtailLogger.Error("AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Error("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelError, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelError, msg)
 		}
 	}
 }
 
-func Critical(ctx context.Context, alarmType interface{}, kvPairs ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Critical(ctx context.Context, alarmType selfmonitor.TypedAlarmType, kvPairs ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		kvPairs = append(kvPairs, "logstore", ltCtx.GetLogStore(), "config", ltCtx.GetConfigName())
 	}
 	msg := generateLog(kvPairs...)
 	if ok {
-		_ = logtailLogger.Critical(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Critical(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelCritical, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelCritical, msg)
 		}
 	} else {
-		_ = logtailLogger.Critical("AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Critical("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelCritical, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelCritical, msg)
 		}
 	}
 }
 
-func Criticalf(ctx context.Context, alarmType interface{}, format string, params ...interface{}) {
-	normalizedAlarmType := normalizeAlarmType(alarmType)
+func Criticalf(ctx context.Context, alarmType selfmonitor.TypedAlarmType, format string, params ...interface{}) {
 	ltCtx, ok := ctx.Value(pkg.LogTailMeta).(*pkg.LogtailContextMeta)
 	if ok {
 		format += "\tlogstore:%v\tconfig:%v"
@@ -312,14 +290,14 @@ func Criticalf(ctx context.Context, alarmType interface{}, format string, params
 	}
 	msg := fmt.Sprintf(format, params...)
 	if ok {
-		_ = logtailLogger.Critical(ltCtx.LoggerHeader(), "AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Critical(ltCtx.LoggerHeader(), "AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			ltCtx.RecordAlarm(normalizedAlarmType, selfmonitor.AlarmLevelCritical, msg)
+			ltCtx.RecordAlarm(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelCritical, msg)
 		}
 	} else {
-		_ = logtailLogger.Critical("AlarmType:", normalizedAlarmType.String(), "\t", msg)
+		_ = logtailLogger.Critical("AlarmType:", alarmType.String(), "\t", msg)
 		if remoteFlag {
-			selfmonitor.GlobalAlarm.Record(normalizedAlarmType, selfmonitor.AlarmLevelCritical, msg)
+			selfmonitor.GlobalAlarm.Record(selfmonitor.AlarmType(alarmType.String()), selfmonitor.AlarmLevelCritical, msg)
 		}
 	}
 }
@@ -436,7 +414,7 @@ func catchStandardOutput() {
 					time.Sleep(100 * time.Millisecond)
 					continue
 				} else if errRead != nil {
-					Error(context.Background(), "CATCH_STANDARD_OUTPUT_ALARM", "err", errRead)
+					Error(context.Background(), selfmonitor.CatchStandardOutputAlarm, "err", errRead)
 					break
 				}
 				logger(line)
@@ -458,7 +436,7 @@ func catchStandardOutput() {
 			_, _ = fmt.Fprint(os.Stdout, "recover stdout\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDOUT_ALARM", "err", err)
+		Error(context.Background(), selfmonitor.InitCatchStdoutAlarm, "err", err)
 		return
 	}
 	err = catch(
@@ -468,14 +446,14 @@ func catchStandardOutput() {
 			return
 		},
 		func(text []byte) {
-			Error(context.Background(), "STDERR_ALARM", "stderr", string(text))
+			Error(context.Background(), selfmonitor.StderrAlarm, "stderr", string(text))
 		},
 		func(old *os.File) {
 			os.Stderr = old
 			_, _ = fmt.Fprint(os.Stderr, "recover stderr\n")
 		})
 	if err != nil {
-		Error(context.Background(), "INIT_CATCH_STDERR_ALARM", "err", err)
+		Error(context.Background(), selfmonitor.InitCatchStderrAlarm, "err", err)
 	}
 }
 

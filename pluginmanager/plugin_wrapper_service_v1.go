@@ -19,7 +19,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	"time"
 )
@@ -44,7 +44,7 @@ func (wrapper *ServiceWrapperV1) Run(cc *pipeline.AsyncControl) {
 		defer panicRecover(wrapper.Input.Description())
 		err := wrapper.Input.Start(wrapper)
 		if err != nil {
-			logger.Error(wrapper.Config.Context.GetRuntimeContext(), util.PluginAlarm, "start service error, err", err)
+			logger.Error(wrapper.Config.Context.GetRuntimeContext(), selfmonitor.PluginAlarm, "start service error, err", err)
 		}
 		logger.Info(wrapper.Config.Context.GetRuntimeContext(), "service done", wrapper.Input.Description())
 	}()
@@ -54,7 +54,7 @@ func (wrapper *ServiceWrapperV1) Run(cc *pipeline.AsyncControl) {
 func (wrapper *ServiceWrapperV1) Stop() error {
 	err := wrapper.Input.Stop()
 	if err != nil {
-		logger.Error(wrapper.Config.Context.GetRuntimeContext(), util.PluginAlarm, "stop service error, err", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), selfmonitor.PluginAlarm, "stop service error, err", err)
 	}
 	return err
 }

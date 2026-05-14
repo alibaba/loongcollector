@@ -33,9 +33,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
-const AlarmType = "PYROSCOPE_ALARM"
+const AlarmType = selfmonitor.PyroscopeAlarm
 
 type Decoder struct {
 }

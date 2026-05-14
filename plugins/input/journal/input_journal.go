@@ -32,6 +32,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/coreos/go-systemd/sdjournal"
 )
 
@@ -126,9 +127,9 @@ func (sj *ServiceJournal) SaveCheckpoint(forceFlag bool) {
 		sj.ResetIntervalSecond = defaultResetInterval
 	}
 	if cursor, err := sj.journal.GetCursor(); err != nil {
-		logger.Warning(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "get cursor error", err)
+		logger.Warning(sj.context.GetRuntimeContext(), selfmonitor.SaveCheckpointAlarm, "get cursor error", err)
 	} else if err := sj.context.SaveCheckPoint(checkPointKey, []byte(cursor)); err != nil {
-		logger.Warning(sj.context.GetRuntimeContext(), "SAVE_CHECKPOINT_ALARM", "save checkpoint error", err)
+		logger.Warning(sj.context.GetRuntimeContext(), selfmonitor.SaveCheckpointAlarm, "save checkpoint error", err)
 	}
 }
 
@@ -194,7 +195,7 @@ func (sj *ServiceJournal) initJournal() error {
 		if err == nil {
 			logger.Infof(sj.context.GetRuntimeContext(), "Seek to [%s] successful", position)
 		} else {
-			logger.Warningf(sj.context.GetRuntimeContext(), "JOURNAL_SEEK_ALARM", "Could not seek to %s: %v", position, err)
+			logger.Warningf(sj.context.GetRuntimeContext(), selfmonitor.JournalSeekAlarm, "Could not seek to %s: %v", position, err)
 		}
 		return err
 	}
@@ -261,18 +262,18 @@ func (sj *ServiceJournal) initJournal() error {
 		default:
 			err = seekToHelper(SeekPositionTail, sj.journal.SeekTail())
 			if err != nil {
-				logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "seek to tail fail with error", err)
+				logger.Warning(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "seek to tail fail with error", err)
 			}
 			_, err = sj.journal.Previous() // seek tail will move pointer after last entry, sets the read pointer into the journal back by one entry is necessary for ubuntu.
 			if err != nil {
-				logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "seek to previous pointer fail with error", err)
+				logger.Warning(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "seek to previous pointer fail with error", err)
 			}
 		}
 	} else {
 		_ = seekToHelper(sj.lastCPCursor, sj.journal.SeekCursor(sj.lastCPCursor))
 		_, err = sj.journal.Next()
 		if err != nil {
-			logger.Warning(sj.context.GetRuntimeContext(), "JOURNAL_READ_ALARM", "call next when init error", err)
+			logger.Warning(sj.context.GetRuntimeContext(), selfmonitor.JournalReadAlarm, "call next when init error", err)
 			err = nil
 		}
 	}

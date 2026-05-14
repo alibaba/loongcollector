@@ -33,6 +33,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	goping "github.com/go-ping/ping"
 )
 
@@ -212,12 +213,12 @@ func (m *NetPing) Init(context pipeline.Context) (int, error) {
 			}
 			u, err := url.Parse(c.Target)
 			if err != nil {
-				logger.Warning(context.GetRuntimeContext(), "netping failed to parse httping target")
+				logger.Warning(context.GetRuntimeContext(), selfmonitor.FailToRunHttping, "netping failed to parse httping target")
 				continue
 			}
 
 			if u.Host == "" {
-				logger.Warning(context.GetRuntimeContext(), "netping failed to parse httping target, get empty host")
+				logger.Warning(context.GetRuntimeContext(), selfmonitor.FailToRunHttping, "netping failed to parse httping target, get empty host")
 				continue
 			}
 
@@ -406,7 +407,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 
 	pinger, err := goping.NewPinger(m.getRealTarget(config.Target))
 	if err != nil {
-		logger.Warning(m.context.GetRuntimeContext(), "FAIL_TO_INIT_PING", err.Error())
+		logger.Warning(m.context.GetRuntimeContext(), selfmonitor.FailToInitPing, err.Error())
 		label.Append("err", err.Error())
 		m.resultChannel <- &Result{
 			Valid:  true,
@@ -425,7 +426,7 @@ func (m *NetPing) doICMPing(config *ICMPConfig) {
 	pinger.Count = config.Count
 	err = pinger.Run() // Blocks until finished or timeout.
 	if err != nil {
-		logger.Warning(m.context.GetRuntimeContext(), "FAIL_TO_RUN_PING", err.Error())
+		logger.Warning(m.context.GetRuntimeContext(), selfmonitor.FailToRunPing, err.Error())
 		label.Append("err", err.Error())
 		m.resultChannel <- &Result{
 			Valid:  true,
@@ -594,7 +595,7 @@ func (m *NetPing) doHTTPing(config *HTTPConfig) {
 	now := time.Now()
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		logger.Warning(m.context.GetRuntimeContext(), "FAIL_TO_RUN_HTTPING", err.Error())
+		logger.Warning(m.context.GetRuntimeContext(), selfmonitor.FailToRunHttping, err.Error())
 		label.Append("err", err.Error())
 		m.resultChannel <- &Result{
 			Valid:   true,

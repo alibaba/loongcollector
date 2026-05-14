@@ -38,6 +38,7 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/processor/anchor"
 	_ "github.com/alibaba/ilogtail/plugins/processor/regex"
 
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -91,7 +92,7 @@ func GetTestConfig(configName string) string {
 	fileName := "./test_config/" + configName + ".json"
 	byteStr, err := os.ReadFile(fileName)
 	if err != nil {
-		logger.Warning(context.Background(), "read", fileName, "error", err)
+		logger.Warning(context.Background(), selfmonitor.ReadFileAlarm, fileName, "error", err)
 	}
 	return string(byteStr)
 }

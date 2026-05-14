@@ -25,6 +25,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -58,21 +59,21 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 	// check SourceKey
 	if p.SourceKey == "" {
 		err = errors.New("parameter SourceKey should not be empty")
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 		return err
 	}
 
 	// check Method
 	if p.Method != "const" && p.Method != "md5" {
 		err = errors.New("parameter Method should be \"const\" or \"md5\"")
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 		return err
 	}
 
 	// check Method
 	if p.Method == "const" && p.ReplaceString == "" {
 		err = errors.New("parameter ReplaceString should not be empty when Method is \"const\"")
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 		return err
 	}
 
@@ -88,12 +89,12 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 		// check RegexBegin
 		if p.RegexBegin == "" {
 			err = errors.New("need parameter RegexBegin")
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 			return err
 		}
 		p.regexBegin, err = regexp2.Compile(p.RegexBegin, regexp2.RE2)
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 			return err
 		}
 		p.regexBegin.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
@@ -101,25 +102,25 @@ func (p *ProcessorDesensitize) Init(context pipeline.Context) error {
 		// check RegexContent
 		if p.RegexContent == "" {
 			err = errors.New("need parameter RegexContent")
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 			return err
 		}
 		p.regexContent, err = regexp2.Compile(p.RegexContent, regexp2.RE2)
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 			return err
 		}
 		p.regexContent.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
 
 		// warn about zero-width RegexContent which may cause performance issues
 		if ok, _ := p.regexContent.MatchString(""); ok {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "RegexContent is zero-width (matching empty string), may cause performance issues", "pattern", p.RegexContent)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "RegexContent is zero-width (matching empty string), may cause performance issues", "pattern", p.RegexContent)
 		}
 
 		return nil
 	default:
 		err = errors.New("parameter Match should be \"full\" or \"regex\"")
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init processor_desensitize error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init processor_desensitize error", err)
 		return err
 	}
 }
@@ -163,7 +164,7 @@ func (p *ProcessorDesensitize) desensitize(val string) string {
 	beginMatch, _ := p.regexBegin.FindRunesMatchStartingAt(runeVal, pos)
 	for beginMatch != nil {
 		if time.Now().After(deadline) {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_DESENSITIZE_ALARM", "error", "desensitize total timeout exceeded",
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorDesensitizeAlarm, "error", "desensitize total timeout exceeded",
 				"source_key", p.SourceKey, "content", val)
 			break
 		}

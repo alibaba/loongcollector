@@ -74,7 +74,7 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 	var err error
 	if len(sds.BeginLineRegex) > 0 {
 		if reg, err = regexp.Compile(sds.BeginLineRegex); err != nil {
-			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_REGEX_COMPILE_ALARM", "compile begin line regex error, regex", sds.BeginLineRegex, "error", err)
+			logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.DockerRegexCompileAlarm, "compile begin line regex error, regex", sds.BeginLineRegex, "error", err)
 		}
 	}
 
@@ -96,11 +96,11 @@ func NewDockerFileSyner(sds *ServiceDockerStdout,
 		// first watch this container
 		realPath, stat := containercenter.TryGetRealPath(checkpoint.Path)
 		if realPath == "" {
-			logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_STAT_ALARM", "stat log file error, path", checkpoint.Path, "error", "path not found")
+			logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.DockerStdoutStatAlarm, "stat log file error, path", checkpoint.Path, "error", "path not found")
 		} else {
 			checkpoint.Offset = stat.Size()
 			if checkpoint.Offset > sds.StartLogMaxOffset {
-				logger.Warning(sds.context.GetRuntimeContext(), "DOCKER_STDOUT_START_ALARM", "log file too big, path", checkpoint.Path, "offset", checkpoint.Offset)
+				logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.DockerStdoutStartAlarm, "log file too big, path", checkpoint.Path, "offset", checkpoint.Offset)
 				checkpoint.Offset -= sds.StartLogMaxOffset
 			} else {
 				checkpoint.Offset = 0
@@ -212,11 +212,11 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	var err error
 	sds.IncludeEnv, sds.IncludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.IncludeEnv)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include env regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "init include env regex error", err)
 	}
 	sds.ExcludeEnv, sds.ExcludeEnvRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeEnv)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude env regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "init exclude env regex error", err)
 	}
 	if sds.IncludeLabel != nil {
 		for k, v := range sds.IncludeContainerLabel {
@@ -234,12 +234,12 @@ func (sds *ServiceDockerStdout) Init(context pipeline.Context) (int, error) {
 	}
 	sds.IncludeLabel, sds.IncludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.IncludeLabel)
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init include label regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "init include label regex error", err)
 	}
 	sds.ExcludeLabel, sds.ExcludeLabelRegex, err = containercenter.SplitRegexFromMap(sds.ExcludeLabel)
 
 	if err != nil {
-		logger.Warning(sds.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "init exclude label regex error", err)
+		logger.Warning(sds.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "init exclude label regex error", err)
 	}
 	sds.K8sFilter, err = containercenter.CreateK8SFilter(sds.K8sNamespaceRegex, sds.K8sPodRegex, sds.K8sContainerRegex, sds.IncludeK8sLabel, sds.ExcludeK8sLabel)
 	return 0, err

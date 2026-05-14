@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"sync"
 	"time"
 )
@@ -102,7 +103,7 @@ func (p *AggregatorSkywalking) Add(log *protocol.Log, ctx map[string]interface{}
 		case "otlp.name":
 			return p.logAgg.Add(log, ctx)
 		default:
-			logger.Warning(p.context.GetRuntimeContext(), "SKYWALKING_TOPIC_NOT_RECOGNIZED", "error", "topic not recognized", "topic", routeKey.Value)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.SkywalkingTopicNotRecognized, "error", "topic not recognized", "topic", routeKey.Value)
 			return p.logAgg.Add(log, ctx)
 		}
 	}

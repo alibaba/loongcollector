@@ -32,6 +32,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	// third-party
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	g "github.com/gosnmp/gosnmp"
 )
 
@@ -471,7 +472,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 			err := func() error {
 				err := thisGsAgent.Connect()
 				if err != nil {
-					logger.Warningf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", "%v", err)
+					logger.Warningf(context.Background(), selfmonitor.InputSnmpConnectionError, "%v", err)
 					return err
 				}
 
@@ -547,9 +548,9 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 					translatedType := Asn1BER2String(variable.Type)
 
 					if translatedType == "Null" || translatedType == "" {
-						logger.Warning(context.Background(), "result of %v is probably empty", s.fieldContents[i].Name)
+						logger.Warning(context.Background(), selfmonitor.InputSnmpConnectionError, "result of %v is probably empty", s.fieldContents[i].Name)
 						if s.Version == 1 {
-							logger.Warning(context.Background(), "snmp v1 will not return any `GET` result while one of them is empty, please check `Oids`, `Fields`, `Tables` or change `Version` into `2`")
+							logger.Warning(context.Background(), selfmonitor.InputSnmpConnectionError, "snmp v1 will not return any `GET` result while one of them is empty, please check `Oids`, `Fields`, `Tables` or change `Version` into `2`")
 						}
 					}
 
@@ -565,7 +566,7 @@ func (s *Agent) Start(collector pipeline.Collector) error {
 				return nil
 			}()
 			if err != nil {
-				logger.Warningf(context.Background(), "INPUT_SNMP_CONNECTION_ERROR", fmt.Sprintf("%v", err))
+				logger.Warningf(context.Background(), selfmonitor.InputSnmpConnectionError, fmt.Sprintf("%v", err))
 			}
 		}()
 	}

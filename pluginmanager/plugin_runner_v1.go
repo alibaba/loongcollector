@@ -22,6 +22,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -282,7 +283,7 @@ func (p *pluginv1Runner) runProcessorInternal(cc *pipeline.AsyncControl) {
 							}
 							// wait until shutdown is active
 							if tryCount%100 == 0 {
-								logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), util.AggregatorAddAlarm, "error", err)
+								logger.Warning(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.AggregatorAddAlarm, "error", err)
 							}
 							time.Sleep(time.Millisecond * 10)
 						}
@@ -352,7 +353,7 @@ func (p *pluginv1Runner) runFlusherInternal(cc *pipeline.AsyncControl) {
 						err := flusher.Flush(p.LogstoreConfig.ProjectName,
 							p.LogstoreConfig.LogstoreName, p.LogstoreConfig.ConfigName, logGroups)
 						if err != nil {
-							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), util.FlushDataAlarm, "flush data error",
+							logger.Error(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.FlushDataAlarm, "flush data error",
 								p.LogstoreConfig.ProjectName, p.LogstoreConfig.LogstoreName, err)
 						}
 					}
@@ -405,8 +406,7 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	}
 	for idx, flusher := range p.FlusherPlugins {
 		if err := flusher.Flusher.Stop(); err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.StopFlusherAlarm,
-				"Failed to stop %vth flusher (description: %v): %v",
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.StopFlusherAlarm, "Failed to stop %vth flusher (description: %v): %v",
 				idx, flusher.Flusher.Description(), err)
 		}
 	}
@@ -415,8 +415,7 @@ func (p *pluginv1Runner) Stop(exit bool) error {
 	for _, extension := range p.ExtensionPlugins {
 		err := extension.Stop()
 		if err != nil {
-			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), util.StopExtensionAlarm,
-				"failed to stop extension (description: %v): %v", extension.Description(), err)
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.StopExtensionAlarm, "failed to stop extension (description: %v): %v", extension.Description(), err)
 		}
 	}
 	logger.Info(p.LogstoreConfig.Context.GetRuntimeContext(), "extension plugins stop", "done")

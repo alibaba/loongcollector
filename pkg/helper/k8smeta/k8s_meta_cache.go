@@ -392,13 +392,11 @@ func (m *k8sMetaCache) getCronJobInformer(factory informers.SharedInformerFactor
 	// 2. 如不支持v1，那么 fallback到 v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("batch/v1beta1")
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither batch/v1 nor batch/v1beta1 CronJob API found", "error", err)
 		return nil
 	}
 	if !containsResource(resourceList.APIResources, "cronjobs") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"CronJob API not found in both v1 and v1beta1")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "CronJob API not found in both v1 and v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using CronJob v1beta1 API")
@@ -421,13 +419,11 @@ func (m *k8sMetaCache) getIngressInformer(factory informers.SharedInformerFactor
 	// 2. 如不支持networking.k8s.io/v1，那么 fallback到 extensions/v1beta1
 	resourceList, err = m.clientset.Discovery().ServerResourcesForGroupVersion("extensions/v1beta1")
 	if err != nil {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Neither networking.k8s.io/v1 nor extensions/v1beta1 Ingress API found", "error", err)
 		return nil
 	}
 	if !containsResource(resourceList.APIResources, "ingresses") {
-		logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
-			"Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
+		logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "Ingress API not found in both networking.k8s.io/v1 and extensions/v1beta1")
 		return nil
 	}
 	logger.Info(context.Background(), "Using Ingress extensions/v1beta1 API")

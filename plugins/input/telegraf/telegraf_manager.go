@@ -110,8 +110,7 @@ func shouldCreatePath(p string) bool {
 	if err == nil {
 		return !ret
 	}
-	logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-		"stat path %v err: %v", p, err)
+	logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "stat path %v err: %v", p, err)
 	return false
 }
 
@@ -136,8 +135,7 @@ const defaultConfig = `
 func (tm *Manager) initAgentDir() {
 	if newDir, err := makeSureDirectoryExist(tm.telegrafConfPath); newDir {
 		if err != nil {
-			logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-				"create conf dir error, path %v, err: %v", tm.telegrafConfPath, err)
+			logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "create conf dir error, path %v, err: %v", tm.telegrafConfPath, err)
 		}
 	} else {
 		// Clean config files (outdated) in conf directory.
@@ -147,19 +145,16 @@ func (tm *Manager) initAgentDir() {
 				if err = os.Remove(filePath); err == nil {
 					logger.Infof(telegrafManager.GetContext(), "delete outdated agent config file: %v", filePath)
 				} else {
-					logger.Warningf(telegrafManager.GetContext(), "deleted outdated agent config file err, path: %v, err: %v",
-						filePath, err)
+					logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRemoveConfigAlarm, "delete outdated agent config file err, path: %v, err: %v", filePath, err)
 				}
 			}
 		} else {
-			logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-				"clean conf dir error, path %v, err: %v", tm.telegrafConfPath, err)
+			logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "clean conf dir error, path %v, err: %v", tm.telegrafConfPath, err)
 		}
 	}
 	defaultConfigPath := path.Join(tm.telegrafPath, defaultConfFileName)
 	if err := os.WriteFile(defaultConfigPath, []byte(fmt.Sprintf(defaultConfig, logger.DebugFlag())), 0600); err != nil {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-			"write default config error, path: %v, err: %v", defaultConfigPath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "write default config error, path: %v, err: %v", defaultConfigPath, err)
 	}
 }
 
@@ -257,13 +252,11 @@ func (tm *Manager) concatConfFilePath(name string) string {
 func (tm *Manager) overwriteConfigFile(cfg *Config) bool {
 	filePath := tm.concatConfFilePath(cfg.Name)
 	if _, err := makeSureDirectoryExist(tm.telegrafConfPath); err != nil {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_OVERWRITE_CONFIG_ALARM",
-			"overwrite local config file error, path: %v err: %v", filePath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafOverwriteConfigAlarm, "overwrite local config file error, path: %v err: %v", filePath, err)
 		return false
 	}
 	if err := os.WriteFile(filePath, []byte(cfg.Detail), 0600); err != nil {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_OVERWRITE_CONFIG_ALARM",
-			"overwrite local config file error, path: %v err: %v", filePath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafOverwriteConfigAlarm, "overwrite local config file error, path: %v err: %v", filePath, err)
 		return false
 	}
 
@@ -274,8 +267,7 @@ func (tm *Manager) overwriteConfigFile(cfg *Config) bool {
 func (tm *Manager) removeConfigFile(name string) {
 	filePath := path.Join(tm.telegrafConfPath, fmt.Sprintf("%v.conf", name))
 	if err := os.Remove(filePath); err != nil {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_REMOVE_CONFIG_ALARM",
-			"remove local config file error, path: %v, err: %v", filePath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRemoveConfigAlarm, "remove local config file error, path: %v, err: %v", filePath, err)
 		return
 	}
 
@@ -294,8 +286,7 @@ func (tm *Manager) runTelegrafd(command string, needOutput bool) (output []byte,
 	// Workaround: exec.Command throws wait:no child process error always under c-shared buildmode.
 	// TODO: try cgo, implement exec with C and popen.
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-			"%v error, output: %v, error: %v", command, string(output), err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "%v error, output: %v, error: %v", command, string(output), err)
 	}
 	return
 }
@@ -303,8 +294,7 @@ func (tm *Manager) runTelegrafd(command string, needOutput bool) (output []byte,
 // install returns true if agent has been installed.
 func (tm *Manager) install() bool {
 	if exist, err := isPathExist(tm.telegrafdPath); err != nil {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-			"stat path %v err when install: %v", tm.telegrafdPath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "stat path %v err when install: %v", tm.telegrafdPath, err)
 		return false
 	} else if exist {
 		return true
@@ -312,8 +302,7 @@ func (tm *Manager) install() bool {
 
 	scriptPath := path.Join(tm.telegrafPath, "install.sh")
 	if exist, err := isPathExist(scriptPath); err != nil || !exist {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-			"can not find install script %v, maybe stat error: %v", scriptPath, err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "can not find install script %v, maybe stat error: %v", scriptPath, err)
 		return false
 	}
 
@@ -321,8 +310,7 @@ func (tm *Manager) install() bool {
 	cmd := exec.Command(scriptPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(err.Error(), "no child process") {
-		logger.Warningf(telegrafManager.GetContext(), "SERVICE_TELEGRAF_RUNTIME_ALARM",
-			"install agent error, output: %v, error: %v", string(output), err)
+		logger.Warningf(telegrafManager.GetContext(), selfmonitor.ServiceTelegrafRuntimeAlarm, "install agent error, output: %v, error: %v", string(output), err)
 		return false
 	}
 	tm.initAgentDir()

@@ -20,6 +20,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/util"
 
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"regexp"
 	"sort"
 	"time"
@@ -68,7 +69,7 @@ func (ip *InputProcess) Init(context pipeline.Context) (int, error) {
 		if reg, err := regexp.Compile(regStr); err == nil {
 			ip.regexpList = append(ip.regexpList, reg)
 		} else {
-			logger.Warning(ip.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "invalid regex", regStr, "error", err)
+			logger.Warning(ip.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "invalid regex", regStr, "error", err)
 		}
 	}
 	ip.commonLabels.Append("hostname", util.GetHostName())
@@ -115,7 +116,7 @@ func (ip *InputProcess) Collect(collector pipeline.Collector) error {
 func (ip *InputProcess) filterMatchedProcesses() (matchedProcesses []processCache, err error) {
 	caches, err := findAllProcessCache(ip.MaxProcessCount)
 	if err != nil {
-		logger.Warning(ip.context.GetRuntimeContext(), "PROCESS_LIST_ALARM", "error", err)
+		logger.Warning(ip.context.GetRuntimeContext(), selfmonitor.ProcessListAlarm, "error", err)
 		return
 	}
 	matchedProcesses = ip.filterRegexMatchedProcess(caches)

@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/doc"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const gRPCName = "grpc"
@@ -84,7 +85,7 @@ func (g *GrpcSubscriber) Start() error {
 		time.Sleep(delayDuration)
 		err = g.server.Serve(listener)
 		if err != nil {
-			logger.Error(context.Background(), "GRPC_SERVER_ALARM", "err", err)
+			logger.Error(context.Background(), selfmonitor.GRPCServerAlarm, "err", err)
 		}
 	}()
 	return nil

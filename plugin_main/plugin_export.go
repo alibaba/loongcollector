@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 )
@@ -173,7 +174,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		if err := recover(); err != nil {
 			trace := make([]byte, 2048)
 			runtime.Stack(trace, true)
-			logger.Critical(context.Background(), util.PluginRuntimeAlarm, "panicked", err, "stack", string(trace))
+			logger.Critical(context.Background(), selfmonitor.PluginRuntimeAlarm, "panicked", err, "stack", string(trace))
 		}
 	}()
 
@@ -182,7 +183,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		// Make deep copy if you want to save it in Go in the future.
 		logstoreKey, jsonStr)
 	if err != nil {
-		logger.Critical(context.Background(), util.ConfigLoadAlarm, "load config error, project",
+		logger.Critical(context.Background(), selfmonitor.ConfigLoadAlarm, "load config error, project",
 			project, "logstore", logstore, "config", configName, "error", err)
 		return 1
 	}
@@ -216,7 +217,7 @@ func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
 	config, flag := pluginmanager.LogtailConfig[configName]
 	pluginmanager.LogtailConfigLock.RUnlock()
 	if !flag {
-		logger.Critical(context.Background(), util.PluginAlarm, "config not found", configName)
+		logger.Critical(context.Background(), selfmonitor.PluginAlarm, "config not found", configName)
 		return -1
 	}
 	return config.ProcessLogGroup(logBytes, util.StringDeepCopy(packID))
@@ -227,7 +228,7 @@ func StopAllPipelines(withInputFlag int) {
 	logger.Info(context.Background(), "Stop all", "start", "with input", withInputFlag)
 	err := pluginmanager.StopAllPipelines(withInputFlag != 0)
 	if err != nil {
-		logger.Error(context.Background(), util.PluginAlarm, "stop all error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "stop all error", err)
 	}
 	logger.Info(context.Background(), "Stop all", "success", "with input", withInputFlag)
 	// Stop with input first, without input last.
@@ -243,7 +244,7 @@ func Stop(configName string, removedFlag int) {
 	logger.Info(context.Background(), "Stop", "start", "config", configName, "removed", removedFlag)
 	err := pluginmanager.Stop(configName, removedFlag != 0)
 	if err != nil {
-		logger.Error(context.Background(), util.PluginAlarm, "stop error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "stop error", err)
 	}
 }
 
@@ -257,7 +258,7 @@ func Start(configName string) {
 	logger.Info(context.Background(), "Start", "start", "config", configName)
 	err := pluginmanager.Start(configName)
 	if err != nil {
-		logger.Error(context.Background(), util.PluginAlarm, "start error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "start error", err)
 	}
 	logger.Info(context.Background(), "Start", "success", "config", configName)
 }
@@ -409,7 +410,7 @@ func initPluginBase(cfgStr string) int {
 			instance.Run(stopCh)
 		}
 		if err := pluginmanager.Init(); err != nil {
-			logger.Critical(context.Background(), util.PluginAlarm, "init plugin error", err)
+			logger.Critical(context.Background(), selfmonitor.PluginAlarm, "init plugin error", err)
 			rst = 1
 		}
 		if pluginmanager.ContainerConfig != nil {
@@ -417,7 +418,7 @@ func initPluginBase(cfgStr string) int {
 		}
 		err := pluginmanager.CheckPointManager.Init()
 		if err != nil {
-			logger.Error(context.Background(), util.CheckpointInitAlarm, "init checkpoint manager error", err)
+			logger.Error(context.Background(), selfmonitor.CheckpointInitAlarm, "init checkpoint manager error", err)
 		}
 		pluginmanager.CheckPointManager.Start()
 	})

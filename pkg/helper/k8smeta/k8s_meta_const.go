@@ -1,6 +1,7 @@
 package k8smeta
 
 import (
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	app "k8s.io/api/apps/v1"
 	batch "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -221,7 +222,7 @@ const (
 	EventTypeDeferredDelete = "deferredDelete"
 	EventTypeTimer          = "timer"
 
-	K8sMetaUnifyErrorCode = "K8S_META_COLLECTOR_ERROR"
+	K8sMetaUnifyErrorCode = selfmonitor.K8sMetaCollectorError
 )
 
 type PodMetadata struct {

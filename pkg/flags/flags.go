@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -60,7 +61,7 @@ const (
 // LogInfo contains metadata about a log message
 type LogInfo struct {
 	LogType   LogType
-	AlarmType util.AlarmType
+	AlarmType selfmonitor.AlarmType
 	Content   string
 }
 
@@ -270,7 +271,7 @@ func LoadEnvToFlags() {
 		if !ok {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 				LogType:   LogTypeError,
-				AlarmType: util.EnvFlagAlarm,
+				AlarmType: selfmonitor.EnvFlagAlarm,
 				Content:   fmt.Sprintf("Flag does not support Get operation, flag: %s, value: %s", flagName, oldValue),
 			})
 			continue
@@ -294,7 +295,7 @@ func LoadEnvToFlags() {
 		default:
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 				LogType:   LogTypeError,
-				AlarmType: util.EnvFlagAlarm,
+				AlarmType: selfmonitor.EnvFlagAlarm,
 				Content:   fmt.Sprintf("Unsupported flag type: %s (%T)", flagName, actualValue),
 			})
 			continue
@@ -303,7 +304,7 @@ func LoadEnvToFlags() {
 		if err != nil {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 				LogType:   LogTypeError,
-				AlarmType: util.EnvFlagAlarm,
+				AlarmType: selfmonitor.EnvFlagAlarm,
 				Content:   fmt.Sprintf("Invalid value for flag %s (%T): %s - %v", flagName, actualValue, value, err),
 			})
 			continue
@@ -312,7 +313,7 @@ func LoadEnvToFlags() {
 		if err := f.Value.Set(value); err != nil {
 			LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 				LogType:   LogTypeError,
-				AlarmType: util.EnvFlagAlarm,
+				AlarmType: selfmonitor.EnvFlagAlarm,
 				Content:   fmt.Sprintf("Failed to set flag %s: %v (old: %s, new: %s)", flagName, err, oldValue, value),
 			})
 			continue
@@ -320,7 +321,7 @@ func LoadEnvToFlags() {
 
 		LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 			LogType:   LogTypeInfo,
-			AlarmType: util.EnvFlagAlarm,
+			AlarmType: selfmonitor.EnvFlagAlarm,
 			Content:   fmt.Sprintf("Updated flag %s (%T): %s -> %s", flagName, actualValue, oldValue, f.Value.String()),
 		})
 	}
@@ -360,7 +361,7 @@ func init() {
 		*DefaultRegion = util.GuessRegionByEndpoint(*LogServiceEndpoint, "cn-hangzhou")
 		LogsWaitToPrint = append(LogsWaitToPrint, LogInfo{
 			LogType:   LogTypeInfo,
-			AlarmType: util.EnvFlagAlarm,
+			AlarmType: selfmonitor.EnvFlagAlarm,
 			Content:   fmt.Sprintf("guess region by endpoint, endpoint: %s, region: %s", *LogServiceEndpoint, *DefaultRegion),
 		})
 	}
@@ -381,7 +382,7 @@ func GetFlusherConfiguration() (flusherCategory string, flusherOptions map[strin
 			m := make(map[string]interface{})
 			err := json.Unmarshal(cfg, &m)
 			if err != nil {
-				logger.Error(context.Background(), util.DefaultFlusherAlarm, "err", err)
+				logger.Error(context.Background(), selfmonitor.DefaultFlusherAlarm, "err", err)
 				return "", nil, false
 			}
 			c, ok := m["type"].(string)

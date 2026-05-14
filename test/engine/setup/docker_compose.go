@@ -11,6 +11,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup/controller"
 	"github.com/alibaba/ilogtail/test/engine/setup/dockercompose"
@@ -26,7 +27,7 @@ type DockerComposeEnv struct {
 func SetDockerComposeBootType(t dockercompose.BootType) error {
 	if dockerComposeEnv, ok := Env.(*DockerComposeEnv); ok {
 		if t != dockercompose.DockerComposeBootTypeE2E && t != dockercompose.DockerComposeBootTypeBenchmark {
-			logger.Error(context.Background(), "BOOT_LOAD_ALARM", "err", "invalid docker compose boot type, not e2e or benchmark")
+			logger.Error(context.Background(), selfmonitor.BootLoadAlarm, "err", "invalid docker compose boot type, not e2e or benchmark")
 			return fmt.Errorf("invalid docker compose boot type, not e2e or benchmark")
 		}
 		dockerComposeEnv.BootType = t
@@ -40,18 +41,18 @@ func StartDockerComposeEnv(ctx context.Context, dependencyName string) (context.
 		path := dependencyHome + "/" + dependencyName
 		err := config.Load(path)
 		if err != nil {
-			logger.Error(ctx, "LOAD_CONFIG_ALARM", "err", err)
+			logger.Error(ctx, selfmonitor.LoadConfigAlarm, "err", err)
 			return ctx, err
 		}
 		dockerComposeEnv.BootController = new(controller.BootController)
 		if err = dockerComposeEnv.BootController.Init(dockerComposeEnv.BootType); err != nil {
-			logger.Error(ctx, "BOOT_INIT_ALARM", "err", err)
+			logger.Error(ctx, selfmonitor.BootInitAlarm, "err", err)
 			return ctx, err
 		}
 
 		startTime := time.Now().Unix()
 		if err = dockerComposeEnv.BootController.Start(ctx); err != nil {
-			logger.Error(ctx, "BOOT_START_ALARM", "err", err)
+			logger.Error(ctx, selfmonitor.BootStartAlarm, "err", err)
 			return ctx, err
 		}
 		return context.WithValue(ctx, config.StartTimeContextKey, int32(startTime)), nil
@@ -64,7 +65,7 @@ func SetDockerComposeDependOn(ctx context.Context, dependOnContainers string) (c
 		containers := make([]string, 0)
 		err := yaml.Unmarshal([]byte(dependOnContainers), &containers)
 		if err != nil {
-			logger.Error(ctx, "LOAD_CONFIG_ALARM", "err", err)
+			logger.Error(ctx, selfmonitor.LoadConfigAlarm, "err", err)
 			return ctx, err
 		}
 		ctx = context.WithValue(ctx, config.DependOnContainerKey, containers)
