@@ -57,9 +57,6 @@ LogtailPlugin::LogtailPlugin() {
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
     mGetGoAlarmsFun = NULL;
-    mPluginAlarmConfig.mLogstore = "logtail_alarm";
-    mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
-    mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
     mPluginContainerConfig.mLogstore = "logtail_containers";
     mPluginContainerConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginContainerConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -234,7 +231,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             int32_t lines,
                             const char* shardHash,
                             int shardHashSize) {
-    static FlusherSLS* alarmConfig = &(LogtailPlugin::GetInstance()->mPluginAlarmConfig);
+    (void)lines;
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
@@ -246,14 +243,7 @@ int LogtailPlugin::SendPbV2(const char* configName,
 
     // LOG_DEBUG(sLogger, ("send pb", configNameStr)("pb size", pbSize)("lines", lines));
     FlusherSLS* pConfig = NULL;
-    if (configNameStr == alarmConfig->mLogstore) {
-        pConfig = alarmConfig;
-        pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
-        pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();
-        if (pConfig->mProject.empty()) {
-            return 0;
-        }
-    } else if (configNameStr == containerConfig->mLogstore) {
+    if (configNameStr == containerConfig->mLogstore) {
         pConfig = containerConfig;
         pConfig->mProject = GetProfileSender()->GetDefaultProfileProjectName();
         pConfig->mRegion = GetProfileSender()->GetDefaultProfileRegion();

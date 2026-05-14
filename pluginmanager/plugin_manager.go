@@ -46,29 +46,6 @@ var DisabledLogtailConfig = make(map[*LogstoreConfig]struct{})
 
 var LastUnsendBuffer = make(map[string]PluginRunner)
 
-// Two built-in logtail configs to report statistics and alarm (from system and other logtail configs).
-var AlarmConfig *LogstoreConfig
-
-var alarmConfigJSON = `{
-    "global": {
-        "InputIntervalMs" :  30000,
-        "AggregatIntervalMs": 1000,
-        "FlushIntervalMs": 1000,
-        "DefaultLogQueueSize": 4,
-		"DefaultLogGroupQueueSize": 4,
-		"Tags" : {
-			"base_version" : "` + config.BaseVersion + `",
-			"` + config.LoongcollectorGlobalConfig.LoongCollectorVersionTag + `" : "` + config.BaseVersion + `"
-		}
-    },
-	"inputs" : [
-		{
-			"type" : "metric_alarm",
-			"detail" : null
-		}
-	]
-}`
-
 var containerConfigJSON = `{
     "global": {
         "InputIntervalMs" :  30000,
@@ -102,11 +79,6 @@ func Init() (err error) {
 	logger.Info(context.Background(), "init plugin, local env tags", helper.EnvTags)
 
 	if err = CheckPointManager.Init(); err != nil {
-		return
-	}
-	if AlarmConfig, err = loadBuiltinConfig("alarm", "sls-admin", "logtail_alarm",
-		"logtail_alarm", alarmConfigJSON); err != nil {
-		logger.Error(context.Background(), util.LoadPluginAlarm, "load alarm config fail", err)
 		return
 	}
 	if ContainerConfig, err = loadBuiltinConfig("container", "sls-admin", "logtail_containers", "logtail_containers", containerConfigJSON); err != nil {
@@ -245,18 +217,8 @@ func DeleteLogstoreConfigFromLogtailConfig(configName string, removedFlag bool) 
 	LogtailConfigLock.Unlock()
 }
 
-// StopBuiltInModulesConfig stops built-in services (self monitor, alarm, container and checkpoint manager).
+// StopBuiltInModulesConfig stops built-in services (container and checkpoint manager).
 func StopBuiltInModulesConfig() {
-	if AlarmConfig != nil {
-		if *flags.ForceSelfCollect {
-			logger.Info(context.Background(), "force collect the alarm metrics")
-			control := pipeline.NewAsyncControl()
-			AlarmConfig.PluginRunner.RunPlugins(pluginMetricInput, control)
-			control.WaitCancel()
-		}
-		_ = AlarmConfig.Stop(true)
-		AlarmConfig = nil
-	}
 	if ContainerConfig != nil {
 		if *flags.ForceSelfCollect {
 			logger.Info(context.Background(), "force collect the container metrics")

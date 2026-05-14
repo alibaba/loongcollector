@@ -412,9 +412,6 @@ func initPluginBase(cfgStr string) int {
 			logger.Critical(context.Background(), util.PluginAlarm, "init plugin error", err)
 			rst = 1
 		}
-		if pluginmanager.AlarmConfig != nil {
-			pluginmanager.AlarmConfig.Start()
-		}
 		if pluginmanager.ContainerConfig != nil {
 			pluginmanager.ContainerConfig.Start()
 		}
