@@ -218,6 +218,53 @@ func TestIsDNSProvider(t *testing.T) {
 	}
 }
 
+func TestMatchDNSQueryDomain(t *testing.T) {
+	filters := []string{
+		"*.azure.cn",
+		"*.azure-automation.cn",
+		"*.trafficmanager.cn",
+		"*.chinacloudapi.cn",
+		"*.chinacloudapp.cn",
+		"*.reddog.microsoft.com",
+		"*.azk8s.cn",
+	}
+
+	tests := []struct {
+		query string
+		want  bool
+	}{
+		{query: "login.azure.cn", want: true},
+		{query: "a.b.azure.cn.", want: true},
+		{query: "azure.cn", want: true},
+		{query: "job.azure-automation.cn", want: true},
+		{query: "x.trafficmanager.cn", want: true},
+		{query: "service.chinacloudapi.cn", want: true},
+		{query: "app.chinacloudapp.cn", want: true},
+		{query: "foo.reddog.microsoft.com", want: true},
+		{query: "cluster.azk8s.cn", want: true},
+		{query: "example.com", want: false},
+		{query: "", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.query, func(t *testing.T) {
+			assert.Equal(t, tt.want, matchDNSQueryDomain(tt.query, filters))
+		})
+	}
+}
+
+func TestShouldCollectDNSEvent_FilterEmptyCollectsAll(t *testing.T) {
+	d := &EtwInput{}
+	assert.True(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "example.com"}))
+}
+
+func TestShouldCollectDNSEvent_FilteredByDNSQuery(t *testing.T) {
+	d := &EtwInput{DNSQueryDomainFilters: []string{"*.azure.cn"}}
+	assert.True(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "agent.azure.cn"}))
+	assert.False(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "example.com"}))
+	assert.False(t, d.shouldCollectDNSEvent(map[string]string{}))
+}
+
 func TestMapDNSQueryType(t *testing.T) {
 	assert.Equal(t, "A", mapDNSQueryType("1"))
 	assert.Equal(t, "AAAA", mapDNSQueryType("28"))

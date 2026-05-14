@@ -47,6 +47,44 @@ func (d *EtwInput) isDNSProvider() bool {
 		strings.EqualFold(d.ProviderGUID, "{EB79061A-A566-4698-9119-3ED2807060E7}")
 }
 
+func (d *EtwInput) shouldCollectDNSEvent(fields map[string]string) bool {
+	if len(d.DNSQueryDomainFilters) == 0 {
+		return true
+	}
+	return matchDNSQueryDomain(fields["dns_query"], d.DNSQueryDomainFilters)
+}
+
+func matchDNSQueryDomain(query string, filters []string) bool {
+	query = normalizeDNSDomain(query)
+	if query == "" {
+		return false
+	}
+	for _, filter := range filters {
+		filter = normalizeDNSDomain(filter)
+		if filter == "" {
+			continue
+		}
+		if filter == "*" {
+			return true
+		}
+		if strings.HasPrefix(filter, "*.") {
+			suffix := strings.TrimPrefix(filter, "*.")
+			if query == suffix || strings.HasSuffix(query, "."+suffix) {
+				return true
+			}
+			continue
+		}
+		if query == filter {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeDNSDomain(domain string) string {
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(domain)), ".")
+}
+
 func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 	switch eventID {
 	case 256: // QUERY_RECEIVED

@@ -53,6 +53,9 @@ type EtwInput struct {
 	ProviderGUID string
 	Level        int
 	Keywords     KeywordMask
+	// DNSQueryDomainFilters filters Microsoft-Windows-DNSServer events by dns_query.
+	// It supports exact domains and leading wildcard suffixes such as "*.azure.cn".
+	DNSQueryDomainFilters []string
 
 	parsedGUID windows.GUID
 	session    *etw.Session
@@ -250,6 +253,9 @@ func (d *EtwInput) handleEvent(e *etw.Event) {
 
 	if d.isDNSProvider() {
 		d.enrichDNSFields(fields, eventID)
+		if !d.shouldCollectDNSEvent(fields) {
+			return
+		}
 	}
 
 	tags := map[string]string{"source": "etw"}

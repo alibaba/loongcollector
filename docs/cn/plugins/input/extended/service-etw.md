@@ -29,6 +29,7 @@ ETW 是 Windows 操作系统内置的高性能事件追踪框架，几乎所有 
 | ProviderGUID | string | 与 ProviderName 二选一 | 无 | ETW Provider GUID，格式为 `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}` |
 | Level | int | 否 | 4 | ETW Trace Level：1=Critical, 2=Error, 3=Warning, 4=Informational, 5=Verbose |
 | Keywords | uint64 | 否 | 0 | ETW Keywords 位掩码，用于按类别过滤事件。0 表示不过滤 |
+| DNSQueryDomainFilters | string[] | 否 | 空 | 仅对 `Microsoft-Windows-DNSServer` 生效，按 `dns_query` 过滤 DNS 事件。支持精确域名和 `*.example.com` 形式的后缀通配；为空表示不过滤 |
 
 > **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称对应的 GUID 时，才需回退为 `ProviderGUID` 方式。
 
@@ -110,6 +111,16 @@ Event 260/261 中的 InterfaceIP 有时为 `0.0.0.0`（INADDR_ANY），无法确
 1. Event 256 的 InterfaceIP 通常为服务器真实监听地址，当不是 `0.0.0.0` 和 `127.0.0.1` 时缓存到 `serverIP`
 2. 后续 Event 260/261/279 中若 InterfaceIP 为空或 `0.0.0.0`，自动使用缓存的 `serverIP` 作为回退
 
+### DNS 查询域名过滤
+
+`DNSQueryDomainFilters` 可在 DNS Server 场景下按查询域名降低采集量。插件会先完成 DNS 字段富化，再用 `dns_query` 与配置规则匹配；配置不为空时，未命中的 DNS 事件不会输出。
+
+匹配规则：
+
+- `*.example.com` 匹配 `example.com` 及其所有子域名，例如 `a.example.com`、`a.b.example.com`
+- `example.com` 仅精确匹配 `example.com`
+- 匹配大小写不敏感，查询域名尾部的 `.` 会自动忽略
+
 ### PacketData 解析
 
 当事件包含 `PacketData` 字段时（十六进制编码的 DNS wire format 报文），插件使用 `github.com/miekg/dns` 库自动解析：
@@ -152,7 +163,29 @@ flushers:
 > - `0x0000000000000010` — RECURSE_QUERY_OUT
 > - `0x0000000000000020` — RECURSE_RESPONSE_IN
 
-### 示例 2：采集 PowerShell 脚本执行事件
+### 示例 2：采集指定 DNS 查询域名
+
+```yaml
+enable: true
+inputs:
+  - Type: service_etw
+    ProviderName: "Microsoft-Windows-DNSServer"
+    Level: 4
+    Keywords: 0x8000000000000037
+    DNSQueryDomainFilters:
+      - "*.azure.cn"
+      - "*.azure-automation.cn"
+      - "*.trafficmanager.cn"
+      - "*.chinacloudapi.cn"
+      - "*.chinacloudapp.cn"
+      - "*.reddog.microsoft.com"
+      - "*.azk8s.cn"
+flushers:
+  - Type: flusher_stdout
+    OnlyStdout: true
+```
+
+### 示例 3：采集 PowerShell 脚本执行事件
 
 ```yaml
 enable: true
@@ -165,7 +198,7 @@ flushers:
     OnlyStdout: true
 ```
 
-### 示例 3：使用 GUID 指定 Provider
+### 示例 4：使用 GUID 指定 Provider
 
 ```yaml
 enable: true
