@@ -1,4 +1,4 @@
-﻿# Licenses of dependencies
+# Licenses of dependencies
 
 When distributed in a binary form, iLogtail may contain portions of the following works:
 

@@ -30,7 +30,7 @@ ETW 是 Windows 操作系统内置的高性能事件追踪框架，几乎所有 
 | Level | int | 否 | 4 | ETW Trace Level：1=Critical, 2=Error, 3=Warning, 4=Informational, 5=Verbose |
 | Keywords | uint64 | 否 | 0 | ETW Keywords 位掩码，用于按类别过滤事件。0 表示不过滤 |
 
-> **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称的 GUID 时才需退场为 `ProviderGUID` 方式。
+> **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称对应的 GUID 时，才需回退为 `ProviderGUID` 方式。
 
 ## 输出字段
 

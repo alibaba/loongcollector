@@ -43,7 +43,7 @@ func mapDNSResponseCode(rcode int) string {
 }
 
 func (d *EtwInput) isDNSProvider() bool {
-	return d.ProviderName == "Microsoft-Windows-DNSServer" ||
+	return strings.EqualFold(d.ProviderName, "Microsoft-Windows-DNSServer") ||
 		strings.EqualFold(d.ProviderGUID, "{EB79061A-A566-4698-9119-3ED2807060E7}")
 }
 
@@ -171,6 +171,10 @@ func (d *EtwInput) parseDNSPacketData(fields map[string]string, packetHex string
 		return
 	}
 
+	if !msg.Response && eventID != 261 && eventID != 279 {
+		return
+	}
+
 	rcode := msg.Rcode
 	fields["dns_response_code"] = fmt.Sprintf("%d", rcode)
 	rcodeName := mapDNSResponseCode(rcode)
@@ -187,14 +191,12 @@ func (d *EtwInput) parseDNSPacketData(fields map[string]string, packetHex string
 		fields["dns_flags"] = fmt.Sprintf("0x%04X", uint16(raw[2])<<8|uint16(raw[3]))
 	}
 
-	if eventID == 261 || eventID == 279 || msg.Response {
-		var answers []string
-		for _, rr := range msg.Answer {
-			answers = append(answers, formatRR(rr))
-		}
-		if len(answers) > 0 {
-			fields["dns_response_name"] = strings.Join(answers, "; ")
-		}
+	var answers []string
+	for _, rr := range msg.Answer {
+		answers = append(answers, formatRR(rr))
+	}
+	if len(answers) > 0 {
+		fields["dns_response_name"] = strings.Join(answers, "; ")
 	}
 }
 

@@ -99,6 +99,9 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	if d.Level == 0 {
 		d.Level = 4
 	}
+	if d.Level < 1 || d.Level > 5 {
+		return 0, fmt.Errorf("invalid Level %d: must be 1..5, or 0 for default", d.Level)
+	}
 
 	logger.Infof(d.context.GetRuntimeContext(),
 		"service_etw init: guid=%s level=%d keywords=0x%X",
@@ -129,17 +132,35 @@ func getWindowsOSVersion() string {
 	}
 	defer key.Close()
 
-	major, _, err := key.GetIntegerValue("CurrentMajorVersionNumber")
-	if err != nil || major == 0 {
-		major = 10
-	}
-	minor, _, err := key.GetIntegerValue("CurrentMinorVersionNumber")
-	if err != nil {
-		minor = 0
-	}
+	major, _, majorErr := key.GetIntegerValue("CurrentMajorVersionNumber")
+	minor, _, minorErr := key.GetIntegerValue("CurrentMinorVersionNumber")
+	currentVersion, _, _ := key.GetStringValue("CurrentVersion")
 	build, ok := readRegistryString(registry.LOCAL_MACHINE, `SOFTWARE\Microsoft\Windows NT\CurrentVersion`, "CurrentBuildNumber")
 	if !ok {
 		return ""
+	}
+	return buildWindowsOSVersion(major, minor, majorErr == nil && major != 0, minorErr == nil, currentVersion, build)
+}
+
+func buildWindowsOSVersion(major, minor uint64, hasMajor, hasMinor bool, currentVersion, build string) string {
+	if (!hasMajor || !hasMinor) && strings.TrimSpace(currentVersion) != "" {
+		parts := strings.SplitN(strings.TrimSpace(currentVersion), ".", 3)
+		if len(parts) >= 2 {
+			if parsedMajor, err := strconv.ParseUint(parts[0], 10, 64); err == nil {
+				major = parsedMajor
+				hasMajor = true
+			}
+			if parsedMinor, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+				minor = parsedMinor
+				hasMinor = true
+			}
+		}
+	}
+	if !hasMajor {
+		major = 10
+	}
+	if !hasMinor {
+		minor = 0
 	}
 	return fmt.Sprintf("%d.%d.%s.0", major, minor, build)
 }

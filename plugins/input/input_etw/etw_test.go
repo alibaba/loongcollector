@@ -76,6 +76,20 @@ func TestEtwInput_Init_Defaults(t *testing.T) {
 	assert.Equal(t, uint64(0), uint64(input.Keywords))
 }
 
+func TestEtwInput_Init_InvalidLevel(t *testing.T) {
+	tests := []int{-1, 6}
+	for _, level := range tests {
+		input := &EtwInput{
+			ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+			Level:        level,
+		}
+		ctx := mock.NewEmptyContext("test", "test", "test")
+		_, err := input.Init(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid Level")
+	}
+}
+
 func TestEtwInput_Description(t *testing.T) {
 	input := &EtwInput{}
 	assert.NotEmpty(t, input.Description())
@@ -152,6 +166,12 @@ func TestResolveProviderName_NotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "not found")
 }
 
+func TestBuildWindowsOSVersion(t *testing.T) {
+	assert.Equal(t, "10.0.20348.0", buildWindowsOSVersion(10, 0, true, true, "", "20348"))
+	assert.Equal(t, "6.3.9600.0", buildWindowsOSVersion(0, 0, false, false, "6.3", "9600"))
+	assert.Equal(t, "10.0.17763.0", buildWindowsOSVersion(0, 0, false, false, "", "17763"))
+}
+
 // --- DNS Enrichment Tests ---
 
 func TestIsDNSProvider(t *testing.T) {
@@ -163,6 +183,11 @@ func TestIsDNSProvider(t *testing.T) {
 		{
 			name:     "by ProviderName",
 			input:    EtwInput{ProviderName: "Microsoft-Windows-DNSServer"},
+			expected: true,
+		},
+		{
+			name:     "by ProviderName lowercase",
+			input:    EtwInput{ProviderName: "microsoft-windows-dnsserver"},
 			expected: true,
 		},
 		{
@@ -507,9 +532,23 @@ func TestParseDNSPacketData_RequestNoFlags(t *testing.T) {
 	fields := map[string]string{}
 	d.parseDNSPacketData(fields, packetHex, 256)
 
-	assert.Equal(t, "0", fields["dns_response_code"])
+	_, hasResponseCode := fields["dns_response_code"]
+	assert.False(t, hasResponseCode, "dns_response_code should not be set for query packets")
 	_, hasdns_flags := fields["dns_flags"]
 	assert.False(t, hasdns_flags, "dns_flags should not be set for query packets")
+}
+
+func TestEnrichDNSFields_RequestPacketKeepsNA(t *testing.T) {
+	packetHex := "1234010000010000000000000765" +
+		"78616d706c6503636f6d0000010001"
+
+	d := &EtwInput{ProviderName: "Microsoft-Windows-DNSServer"}
+	fields := map[string]string{"packet_data": packetHex}
+	d.enrichDNSFields(fields, 256)
+
+	assert.Equal(t, "NA", fields["event_result_details"])
+	_, hasResponseCode := fields["dns_response_code"]
+	assert.False(t, hasResponseCode, "request packets should not set response code")
 }
 
 func TestFormatRR_A(t *testing.T) {
