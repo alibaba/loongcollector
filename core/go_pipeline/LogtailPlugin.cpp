@@ -613,8 +613,8 @@ void LogtailPlugin::GetGoAlarms() {
     free(alarms);
     if (syncedAlarmCount > 0 || droppedAlarmCount > 0) {
         LOG_DEBUG(sLogger,
-                  ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)(
-                      "dropped_empty_type", droppedAlarmCount));
+                  ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)("dropped_empty_type",
+                                                                                             droppedAlarmCount));
     }
 }
 

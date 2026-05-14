@@ -114,7 +114,8 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
         PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
         pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
         pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
-        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE, SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                       SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
         auto now = GetCurrentLogtailTime();
         for (auto& alarmItem : alarmMap) {
             auto& messagePtr = alarmItem.second;
@@ -265,8 +266,7 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
     }
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr
-            = new AlarmMessage(messageType, levelStr, projectName, category, config, message, 1);
+        auto* messagePtr = new AlarmMessage(messageType, levelStr, projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();

@@ -105,7 +105,9 @@ void AlarmManagerUnittest::TestReservedAlarmTypeDrop() {
     const std::string region = "ReservedTypeRegion";
     AlarmManager::GetInstance()->SendAlarmWarning(
         static_cast<AlarmType>(60), "Reserved alarm should be dropped", region, "Project", "Config", "Category");
-    APSARA_TEST_EQUAL(true, AlarmManager::GetInstance()->mAllAlarmMap.find(region) == AlarmManager::GetInstance()->mAllAlarmMap.end());
+    APSARA_TEST_EQUAL(true,
+                      AlarmManager::GetInstance()->mAllAlarmMap.find(region)
+                          == AlarmManager::GetInstance()->mAllAlarmMap.end());
 }
 
 } // namespace logtail

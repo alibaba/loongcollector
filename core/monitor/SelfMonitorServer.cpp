@@ -25,10 +25,6 @@ using namespace std;
 
 namespace logtail {
 
-DEFINE_FLAG_BOOL(enable_go_alarm_sync_to_cpp_pipeline,
-                 "if sync go alarms into cpp internal alarm pipeline",
-                 true);
-
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
@@ -167,7 +163,7 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
         if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
             mSelfMonitorMetricEventMap[event.mKey].Merge(event);
         } else {
-            mSelfMonitorMetricEventMap[event.mKey] = event;
+            mSelfMonitorMetricEventMap.emplace(event.mKey, std::move(event));
         }
     }
 }
@@ -204,7 +200,9 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
-    SyncGoAlarms();
+    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
+        LogtailPlugin::GetInstance()->GetGoAlarms();
+    }
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
@@ -219,13 +217,6 @@ void SelfMonitorServer::SendAlarms() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
-}
-
-void SelfMonitorServer::SyncGoAlarms() {
-    if (!BOOL_FLAG(enable_go_alarm_sync_to_cpp_pipeline)) {
-        return;
-    }
-    LogtailPlugin::GetInstance()->GetGoAlarms();
 }
 
 void SelfMonitorServer::SendTaskStatus() {

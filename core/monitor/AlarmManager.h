@@ -198,7 +198,8 @@ private:
 
     std::vector<std::string> mMessageType;
     std::map<std::string, std::pair<std::shared_ptr<AlarmVector>, std::vector<int32_t>>> mAllAlarmMap;
-    std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<AlarmMessage>>>> mExternalAlarmMap;
+    std::map<std::string, std::map<std::string, std::map<std::string, std::unique_ptr<AlarmMessage>>>>
+        mExternalAlarmMap;
     std::map<std::string, std::map<std::string, int32_t>> mExternalAlarmLastUpdateMap;
     PTMutex mAlarmBufferMutex;
 
