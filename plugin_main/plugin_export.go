@@ -74,6 +74,21 @@ typedef struct {
     int count;
 } PluginMetrics;
 
+typedef struct {
+    char* alarmType;
+    char* alarmLevel;
+    char* alarmMessage;
+    char* projectName;
+    char* category;
+    char* config;
+    int count;
+} InnerGoAlarm;
+
+typedef struct {
+    InnerGoAlarm** alarms;
+    int count;
+} InnerGoAlarms;
+
 static KeyValue** makeKeyValueArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
 }
@@ -87,6 +102,14 @@ static PluginMetric** makePluginMetricArray(int size) {
 }
 
 static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
+    a[n] = s;
+}
+
+static InnerGoAlarm** makeInnerGoAlarmArray(int size) {
+    return malloc(sizeof(InnerGoAlarm*) * size);
+}
+
+static void setArrayInnerGoAlarm(InnerGoAlarm **a, InnerGoAlarm *s, int n) {
     a[n] = s;
 }
 */
@@ -344,6 +367,27 @@ func GetGoMetrics(metricType string) *C.PluginMetrics {
 		runtime.KeepAlive(cMetric)
 	}
 	return cPluginMetrics
+}
+
+//export GetGoAlarms
+func GetGoAlarms() *C.InnerGoAlarms {
+	results := pluginmanager.GetAlarmMessages()
+	cAlarms := (*C.InnerGoAlarms)(C.malloc(C.sizeof_InnerGoAlarms))
+	cAlarms.count = C.int(len(results))
+	cAlarms.alarms = C.makeInnerGoAlarmArray(cAlarms.count)
+	for i, alarm := range results {
+		cAlarm := (*C.InnerGoAlarm)(C.malloc(C.sizeof_InnerGoAlarm))
+		cAlarm.alarmType = C.CString(alarm.AlarmType)
+		cAlarm.alarmLevel = C.CString(alarm.AlarmLevel)
+		cAlarm.alarmMessage = C.CString(alarm.AlarmMessage)
+		cAlarm.projectName = C.CString(alarm.ProjectName)
+		cAlarm.category = C.CString(alarm.Category)
+		cAlarm.config = C.CString(alarm.Config)
+		cAlarm.count = C.int(alarm.Count)
+		C.setArrayInnerGoAlarm(cAlarms.alarms, cAlarm, C.int(i))
+		runtime.KeepAlive(cAlarm)
+	}
+	return cAlarms
 }
 
 func initPluginBase(cfgStr string) int {

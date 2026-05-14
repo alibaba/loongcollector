@@ -51,6 +51,24 @@ func RegisterAlarmsSerializeToPb(logGroup *protocol.LogGroup) {
 	}
 }
 
+func RegisterAlarmsSerializeToMessages(results *[]AlarmExportMessage) {
+	regMu.Lock()
+	defer regMu.Unlock()
+	for _, alarm := range RegisterAlarms {
+		alarm.SerializeToMessages(results)
+	}
+}
+
+type AlarmExportMessage struct {
+	AlarmType    string
+	AlarmLevel   string
+	AlarmMessage string
+	ProjectName  string
+	Category     string
+	Config       string
+	Count        int
+}
+
 type AlarmItem struct {
 	AlarmType AlarmType
 	Level     AlarmLevel
@@ -134,6 +152,27 @@ func (p *Alarm) SerializeToPb(logGroup *protocol.LogGroup) {
 		item.Message = ""
 	}
 	alarmMutex.Unlock()
+}
+
+func (p *Alarm) SerializeToMessages(results *[]AlarmExportMessage) {
+	alarmMutex.Lock()
+	defer alarmMutex.Unlock()
+	for _, item := range p.AlarmMap {
+		if item.Count == 0 {
+			continue
+		}
+		*results = append(*results, AlarmExportMessage{
+			AlarmType:    item.AlarmType.String(),
+			AlarmLevel:   item.Level.String(),
+			AlarmMessage: item.Message,
+			ProjectName:  p.Project,
+			Category:     p.Logstore,
+			Config:       p.Config,
+			Count:        item.Count,
+		})
+		item.Count = 0
+		item.Message = ""
+	}
 }
 
 func init() {
