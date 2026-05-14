@@ -552,6 +552,8 @@ void LogtailPlugin::GetGoAlarms() {
     if (alarms == nullptr) {
         return;
     }
+    int32_t syncedAlarmCount = 0;
+    int32_t droppedAlarmCount = 0;
     for (int i = 0; i < alarms->count; ++i) {
         InnerGoAlarm* innerAlarm = alarms->alarms[i];
         if (innerAlarm == nullptr) {
@@ -563,6 +565,17 @@ void LogtailPlugin::GetGoAlarms() {
         std::string projectName = innerAlarm->projectName ? std::string(innerAlarm->projectName) : "";
         std::string category = innerAlarm->category ? std::string(innerAlarm->category) : "";
         std::string config = innerAlarm->config ? std::string(innerAlarm->config) : "";
+        if (alarmType.empty()) {
+            ++droppedAlarmCount;
+            free(innerAlarm->alarmType);
+            free(innerAlarm->alarmLevel);
+            free(innerAlarm->alarmMessage);
+            free(innerAlarm->projectName);
+            free(innerAlarm->category);
+            free(innerAlarm->config);
+            free(innerAlarm);
+            continue;
+        }
 
         AlarmLevel level = ALARM_LEVEL_WARNING;
         if (alarmLevel == "2") {
@@ -573,6 +586,7 @@ void LogtailPlugin::GetGoAlarms() {
         int32_t count = innerAlarm->count > 0 ? innerAlarm->count : 1;
         AlarmManager::GetInstance()->SendExternalAlarm(
             alarmType, level, alarmMessage, count, "", projectName, config, category);
+        ++syncedAlarmCount;
 
         free(innerAlarm->alarmType);
         free(innerAlarm->alarmLevel);
@@ -584,6 +598,11 @@ void LogtailPlugin::GetGoAlarms() {
     }
     free(alarms->alarms);
     free(alarms);
+    if (syncedAlarmCount > 0 || droppedAlarmCount > 0) {
+        LOG_INFO(sLogger,
+                 ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)(
+                     "dropped_empty_type", droppedAlarmCount));
+    }
 }
 
 std::string LogtailPlugin::GetAllContainersMeta() {

@@ -25,6 +25,10 @@ using namespace std;
 
 namespace logtail {
 
+DEFINE_FLAG_BOOL(enable_go_alarm_sync_to_cpp_pipeline,
+                 "if sync go alarms into cpp internal alarm pipeline",
+                 true);
+
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM = "__alarm__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_METRIC = "__metric__";
 const string SelfMonitorServer::INTERNAL_DATA_TYPE_TASK_STATUS = "__task_status__";
@@ -218,6 +222,9 @@ void SelfMonitorServer::SendAlarms() {
 }
 
 void SelfMonitorServer::SyncGoAlarms() {
+    if (!BOOL_FLAG(enable_go_alarm_sync_to_cpp_pipeline)) {
+        return;
+    }
     LogtailPlugin::GetInstance()->GetGoAlarms();
 }
 
