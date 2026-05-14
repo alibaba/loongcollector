@@ -20,6 +20,17 @@ dev
 |  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
 |  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置 |
+|  ProbeConfig.CmdlineRules  |  object  |  否  |  /  |  进程命令行匹配规则，透传至 AgentSight `agentsight_config_add_cmdline_rule`，见下表  |
+|  ProbeConfig.DomainRules  |  array  |  否  |  /  |  域名 glob 白名单列表（字符串数组），透传至 `agentsight_config_add_domain_rule`；与 Prometheus 等插件中的 `array` 配置类似，每一项为字符串  |
+
+### ProbeConfig.CmdlineRules
+
+|  **参数**  |  **类型**  |  **必填**  |  **默认值**  |  **说明**  |
+| --- | --- | --- | --- | --- |
+|  whitelist  |  array  |  否  |  /  |  进程白名单：每一项为 **字符串数组**，按 argv 下标与进程命令行逐段做 glob 前缀匹配（语义以 AgentSight / coolbpf 文档为准）。多条规则独立生效。  |
+|  blacklist  |  array  |  否  |  /  |  进程黑名单：格式同 `whitelist`；命中则不 attach，且优先级高于白名单。  |
+
+白名单在底层仍会传入 `agent_name` 字段，仅作 **规则挂名（展示用）**，**不参与匹配**。LoongCollector 会按每条规则的 pattern 用 `|` 拼接生成挂名；若多条规则拼接结果相同，将自动追加 `_2`、`_3` 等后缀以免冲突。
 
 ## 输出格式
 
@@ -29,7 +40,7 @@ dev
 | `gen_ai.turn.id` | string | 同一会话中其中一次对话的 id |
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
 | `pid` | string | 进程号（十进制字符串） |
-| `process_name` | string | 进程名称 |
+| `comm` | string | 进程名称 |
 | `gen_ai.agent.name` | string | agent 名称 |
 | `gen_ai.request.timestamp` | string | 一次对大模型请求开始的时间，毫秒时间戳（十进制字符串） |
 | `gen_ai.response.duration` | string | 一次对大模型请求到大模型回复的耗时，毫秒（十进制字符串） |
@@ -68,6 +79,15 @@ inputs:
     ProbeConfig:
       Verbose: 1
       LogPath: ""
+      CmdlineRules:
+        whitelist:
+          - ["node", "*claude*"]
+          - ["node", "*hermes*"]
+        blacklist:
+          - ["node", "*webpack*"]
+      DomainRules:
+        - "*.openai.com"
+        - "*.anthropic.com"
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
@@ -120,7 +140,7 @@ flushers:
   "is_sse": "1",
   "is_usage_from_api": "true",
   "pid": "705127",
-  "process_name": "openclaw-gatewa",
+  "comm": "openclaw-gatewa",
   "server.address": "dashscope.aliyuncs.com",
   "server.port": "80",
   "gen_ai.session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",

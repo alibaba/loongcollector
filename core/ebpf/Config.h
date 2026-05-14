@@ -52,6 +52,12 @@ public:
     // Valid when mProbeType == SecurityProbeType::AGENTSIGHT_OBSERVE (AgentSight input).
     int32_t mVerbose = 0;
     std::string mLogPath;
+    /// Cmdline argv glob rows for `agentsight_config_add_cmdline_rule` (allow=1).
+    std::vector<std::vector<std::string>> mAgentsightCmdlineWhitelist;
+    /// Cmdline argv glob rows for `agentsight_config_add_cmdline_rule` (allow=0).
+    std::vector<std::vector<std::string>> mAgentsightCmdlineBlacklist;
+    /// Domain glob strings for `agentsight_config_add_domain_rule`.
+    std::vector<std::string> mAgentsightDomainRules;
 };
 
 ///////////////////// Process Level Config /////////////////////

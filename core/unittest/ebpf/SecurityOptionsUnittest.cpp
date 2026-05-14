@@ -27,6 +27,7 @@ public:
     void TestAgentsightProbeConfigParsesOptionalFields();
     void TestAgentsightProbeConfigOptionalInvalidTypes();
     void TestAgentsightVerboseClampedWhenNegative();
+    void TestAgentsightParsesCmdlineRulesAndDomainRules();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigReturnsTrue() {
@@ -37,6 +38,9 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigReturnsTrue() {
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(opt.mVerbose, 0);
     APSARA_TEST_TRUE(opt.mLogPath.empty());
+    APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
+    APSARA_TEST_TRUE(opt.mAgentsightCmdlineBlacklist.empty());
+    APSARA_TEST_TRUE(opt.mAgentsightDomainRules.empty());
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeWarns() {
@@ -85,10 +89,33 @@ void SecurityOptionsUnittest::TestAgentsightVerboseClampedWhenNegative() {
     APSARA_TEST_EQUAL(opt.mVerbose, 0);
 }
 
+void SecurityOptionsUnittest::TestAgentsightParsesCmdlineRulesAndDomainRules() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineRules":{"whitelist":[["node","*claude*"],["npm","run","*"]],"blacklist":[["node","*webpack*"]]},"DomainRules":["*.openai.com","*.anthropic.com"]}})",
+        config,
+        err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist.size());
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist[0].size());
+    APSARA_TEST_EQUAL("node", opt.mAgentsightCmdlineWhitelist[0][0]);
+    APSARA_TEST_EQUAL("*claude*", opt.mAgentsightCmdlineWhitelist[0][1]);
+    APSARA_TEST_EQUAL(3UL, opt.mAgentsightCmdlineWhitelist[1].size());
+    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineBlacklist.size());
+    APSARA_TEST_EQUAL("*webpack*", opt.mAgentsightCmdlineBlacklist[0][1]);
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightDomainRules.size());
+    APSARA_TEST_EQUAL("*.openai.com", opt.mAgentsightDomainRules[0]);
+}
+
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigReturnsTrue)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeWarns)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalFields)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigOptionalInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightVerboseClampedWhenNegative)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesCmdlineRulesAndDomainRules)
 
 UNIT_TEST_MAIN
