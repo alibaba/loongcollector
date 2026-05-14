@@ -105,6 +105,7 @@ AlarmManager::AlarmManager() {
     mMessageType[SERIALIZE_FAIL_ALARM] = "SERIALIZE_FAIL_ALARM";
     mMessageType[RELABEL_METRIC_FAIL_ALARM] = "RELABEL_METRIC_FAIL_ALARM";
     mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
+    mMessageType[HOST_MONITOR_ALARM] = "HOST_MONITOR_ALARM";
 }
 
 void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEventGroupList) {
@@ -235,10 +236,15 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
     string levelStr = ToString(level);
     string key = projectName + "_" + category + "_" + config + "_" + levelStr;
+    const string& messageType = mMessageType[alarmType];
+    if (messageType.empty()) {
+        LOG_ERROR(sLogger, ("alarm type is not mapped", static_cast<int32_t>(alarmType))("region", region));
+        return;
+    }
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
         auto* messagePtr
-            = new AlarmMessage(mMessageType[alarmType], levelStr, projectName, category, config, message, 1);
+            = new AlarmMessage(messageType, levelStr, projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();
