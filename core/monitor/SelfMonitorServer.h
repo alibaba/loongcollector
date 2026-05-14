@@ -71,6 +71,7 @@ private:
 
     // alarms
     void SendAlarms();
+    void SyncGoAlarms();
 
     mutable ReadWriteLock mAlarmPipelineMux;
     CollectionPipelineContext* mAlarmPipelineCtx = nullptr;

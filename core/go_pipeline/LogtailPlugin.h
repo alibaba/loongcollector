@@ -94,6 +94,21 @@ typedef struct {
     int count;
 } InnerPluginMetrics;
 
+typedef struct {
+    char* alarmType;
+    char* alarmLevel;
+    char* alarmMessage;
+    char* projectName;
+    char* category;
+    char* config;
+    int count;
+} InnerGoAlarm;
+
+typedef struct {
+    InnerGoAlarm** alarms;
+    int count;
+} InnerGoAlarms;
+
 struct K8sContainerMeta {
     std::string PodName;
     std::string K8sNamespace;
@@ -147,6 +162,7 @@ typedef struct innerContainerMeta* (*GetContainerMetaFun)(GoString containerID);
 typedef char* (*GetAllContainerMetaFun)();
 typedef char* (*GetDiffContainerMetaFun)();
 typedef InnerPluginMetrics* (*GetGoMetricsFun)(GoString metricType);
+typedef InnerGoAlarms* (*GetGoAlarmsFun)();
 
 // Methods export by adapter.
 typedef int (*IsValidToSendFun)(long long logstoreKey);
@@ -247,6 +263,7 @@ public:
     std::string GetDiffContainersMeta();
 
     void GetGoMetrics(std::vector<std::map<std::string, std::string>>& metircsList, const std::string& metricType);
+    void GetGoAlarms();
 
 private:
     void* mPluginBasePtr;
@@ -268,6 +285,7 @@ private:
     GetAllContainerMetaFun mGetAllContainerMetaFun;
     GetDiffContainerMetaFun mGetDiffContainerMetaFun;
     GetGoMetricsFun mGetGoMetricsFun;
+    GetGoAlarmsFun mGetGoAlarmsFun;
 
     // Configuration for plugin system in JSON format.
     Json::Value mPluginCfg;

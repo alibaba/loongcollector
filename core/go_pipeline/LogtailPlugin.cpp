@@ -56,6 +56,7 @@ LogtailPlugin::LogtailPlugin() {
     mStartFun = NULL;
     mLoadGlobalConfigFun = NULL;
     mPluginValid = false;
+    mGetGoAlarmsFun = NULL;
     mPluginAlarmConfig.mLogstore = "logtail_alarm";
     mPluginAlarmConfig.mAliuid = STRING_FLAG(logtail_profile_aliuid);
     mPluginAlarmConfig.mCompressor = CompressorFactory::GetInstance()->Create(CompressType::ZSTD);
@@ -424,6 +425,12 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load GetGoMetrics error, Message", error));
             return mPluginValid;
         }
+        // 获取golang部分告警信息
+        mGetGoAlarmsFun = (GetGoAlarmsFun)loader.LoadMethod("GetGoAlarms", error);
+        if (!error.empty()) {
+            LOG_ERROR(sLogger, ("load GetGoAlarms error, Message", error));
+            return mPluginValid;
+        }
 
         mPluginBasePtr = loader.Release();
     }
@@ -545,6 +552,48 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
             free(metrics);
         }
     }
+}
+
+void LogtailPlugin::GetGoAlarms() {
+    if (mGetGoAlarmsFun == nullptr) {
+        return;
+    }
+    auto* alarms = mGetGoAlarmsFun();
+    if (alarms == nullptr) {
+        return;
+    }
+    for (int i = 0; i < alarms->count; ++i) {
+        InnerGoAlarm* innerAlarm = alarms->alarms[i];
+        if (innerAlarm == nullptr) {
+            continue;
+        }
+        std::string alarmType = innerAlarm->alarmType ? std::string(innerAlarm->alarmType) : "";
+        std::string alarmLevel = innerAlarm->alarmLevel ? std::string(innerAlarm->alarmLevel) : "";
+        std::string alarmMessage = innerAlarm->alarmMessage ? std::string(innerAlarm->alarmMessage) : "";
+        std::string projectName = innerAlarm->projectName ? std::string(innerAlarm->projectName) : "";
+        std::string category = innerAlarm->category ? std::string(innerAlarm->category) : "";
+        std::string config = innerAlarm->config ? std::string(innerAlarm->config) : "";
+
+        AlarmLevel level = ALARM_LEVEL_WARNING;
+        if (alarmLevel == "2") {
+            level = ALARM_LEVEL_ERROR;
+        } else if (alarmLevel == "3") {
+            level = ALARM_LEVEL_CRITICAL;
+        }
+        int32_t count = innerAlarm->count > 0 ? innerAlarm->count : 1;
+        AlarmManager::GetInstance()->SendExternalAlarm(
+            alarmType, level, alarmMessage, count, "", projectName, config, category);
+
+        free(innerAlarm->alarmType);
+        free(innerAlarm->alarmLevel);
+        free(innerAlarm->alarmMessage);
+        free(innerAlarm->projectName);
+        free(innerAlarm->category);
+        free(innerAlarm->config);
+        free(innerAlarm);
+    }
+    free(alarms->alarms);
+    free(alarms);
 }
 
 std::string LogtailPlugin::GetAllContainersMeta() {

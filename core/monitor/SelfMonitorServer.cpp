@@ -18,6 +18,7 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -199,6 +200,7 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
+    SyncGoAlarms();
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 
@@ -213,6 +215,10 @@ void SelfMonitorServer::SendAlarms() {
                 mAlarmPipelineCtx->GetProcessQueueKey(), mAlarmInputIndex, std::move(pipelineEventGroup));
         }
     }
+}
+
+void SelfMonitorServer::SyncGoAlarms() {
+    LogtailPlugin::GetInstance()->GetGoAlarms();
 }
 
 void SelfMonitorServer::SendTaskStatus() {
