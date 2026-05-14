@@ -584,8 +584,22 @@ void LogtailPlugin::GetGoAlarms() {
             level = ALARM_LEVEL_CRITICAL;
         }
         int32_t count = innerAlarm->count > 0 ? innerAlarm->count : 1;
+        std::string pipelineConfig = config;
+        if (pipelineConfig.size() > 2 && pipelineConfig[pipelineConfig.size() - 2] == '/'
+            && (pipelineConfig.back() == '1' || pipelineConfig.back() == '2')) {
+            pipelineConfig = pipelineConfig.substr(0, pipelineConfig.size() - 2);
+        }
+        std::string resolvedRegion = STRING_FLAG(default_region_name);
+        const shared_ptr<CollectionPipeline>& pipeline
+            = CollectionPipelineManager::GetInstance()->FindConfigByName(pipelineConfig);
+        if (pipeline) {
+            const std::string& region = pipeline->GetContext().GetRegion();
+            if (!region.empty()) {
+                resolvedRegion = region;
+            }
+        }
         AlarmManager::GetInstance()->SendExternalAlarm(
-            alarmType, level, alarmMessage, count, "", projectName, config, category);
+            alarmType, level, alarmMessage, count, resolvedRegion, projectName, pipelineConfig, category);
         ++syncedAlarmCount;
 
         free(innerAlarm->alarmType);
@@ -599,9 +613,9 @@ void LogtailPlugin::GetGoAlarms() {
     free(alarms->alarms);
     free(alarms);
     if (syncedAlarmCount > 0 || droppedAlarmCount > 0) {
-        LOG_INFO(sLogger,
-                 ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)(
-                     "dropped_empty_type", droppedAlarmCount));
+        LOG_DEBUG(sLogger,
+                  ("sync go alarms to cpp pipeline", "finished")("synced", syncedAlarmCount)(
+                      "dropped_empty_type", droppedAlarmCount));
     }
 }
 
