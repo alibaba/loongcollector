@@ -228,10 +228,9 @@ int LogtailPlugin::SendPbV2(const char* configName,
                             int logstoreSize,
                             char* pbBuffer,
                             int32_t pbSize,
-                            int32_t lines,
+                            int32_t /*lines*/,
                             const char* shardHash,
                             int shardHashSize) {
-    (void)lines;
     static FlusherSLS* containerConfig = &(LogtailPlugin::GetInstance()->mPluginContainerConfig);
 
     string configNameStr = string(configName, configNameSize);
