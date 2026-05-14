@@ -65,6 +65,7 @@ type EtwInput struct {
 	osVersion  string
 	serverIP   string
 	mu         sync.Mutex
+	waitGroup  sync.WaitGroup
 	stopped    bool
 }
 
@@ -183,6 +184,8 @@ func (d *EtwInput) Description() string {
 
 func (d *EtwInput) Start(collector pipeline.Collector) error {
 	d.collector = collector
+	d.waitGroup.Add(1)
+	defer d.waitGroup.Done()
 
 	d.mu.Lock()
 	if d.stopped {
@@ -222,6 +225,7 @@ func (d *EtwInput) Stop() error {
 	if session != nil {
 		_ = session.Close()
 	}
+	d.waitGroup.Wait()
 	return nil
 }
 
