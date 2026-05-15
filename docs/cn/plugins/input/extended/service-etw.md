@@ -29,7 +29,7 @@ ETW 是 Windows 操作系统内置的高性能事件追踪框架，几乎所有 
 | ProviderGUID | string | 与 ProviderName 二选一 | 无 | ETW Provider GUID，格式为 `{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}` |
 | Level | int | 否 | 4 | ETW Trace Level：1=Critical, 2=Error, 3=Warning, 4=Informational, 5=Verbose |
 | Keywords | uint64 | 否 | 0 | ETW Keywords 位掩码，用于按类别过滤事件。0 表示不过滤 |
-| DNSQueryDomainFilters | string[] | 否 | 空 | 仅对 `Microsoft-Windows-DNSServer` 生效，按 `dns_query` 过滤 DNS 事件。支持精确域名和 `*.example.com` 形式的后缀通配；为空表示不过滤 |
+| DNSQueryDomainFilters | string[] | 否 | 空 | 仅对 `Microsoft-Windows-DNSServer` 生效，按 `dns_query` 丢弃 DNS 事件。支持精确域名和 `*.example.com` 形式的后缀通配；为空表示不丢弃 |
 
 > **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称对应的 GUID 时，才需回退为 `ProviderGUID` 方式。
 
@@ -113,7 +113,7 @@ Event 260/261 中的 InterfaceIP 有时为 `0.0.0.0`（INADDR_ANY），无法确
 
 ### DNS 查询域名过滤
 
-`DNSQueryDomainFilters` 可在 DNS Server 场景下按查询域名降低采集量。插件会先完成 DNS 字段富化，再用 `dns_query` 与配置规则匹配；配置不为空时，未命中的 DNS 事件不会输出。
+`DNSQueryDomainFilters` 可在 DNS Server 场景下按查询域名降低采集量。插件会优先使用原始 `qname` / 富化后的 `dns_query` 与配置规则匹配；配置不为空时，命中的 DNS 事件会被丢弃，未命中的 DNS 事件正常输出。
 
 匹配规则：
 
@@ -163,7 +163,7 @@ flushers:
 > - `0x0000000000000010` — RECURSE_QUERY_OUT
 > - `0x0000000000000020` — RECURSE_RESPONSE_IN
 
-### 示例 2：采集指定 DNS 查询域名
+### 示例 2：丢弃指定 DNS 查询域名
 
 ```yaml
 enable: true

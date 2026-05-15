@@ -47,11 +47,15 @@ func (d *EtwInput) isDNSProvider() bool {
 		strings.EqualFold(d.ProviderGUID, "{EB79061A-A566-4698-9119-3ED2807060E7}")
 }
 
-func (d *EtwInput) shouldCollectDNSEvent(fields map[string]string) bool {
+func (d *EtwInput) shouldDropDNSEvent(fields map[string]string) bool {
 	if len(d.DNSQueryDomainFilters) == 0 {
-		return true
+		return false
 	}
-	return matchDNSQueryDomain(fields["dns_query"], d.DNSQueryDomainFilters)
+	query := fields["dns_query"]
+	if query == "" {
+		query = fields["qname"]
+	}
+	return matchDNSQueryDomain(query, d.DNSQueryDomainFilters)
 }
 
 func matchDNSQueryDomain(query string, filters []string) bool {

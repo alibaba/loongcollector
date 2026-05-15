@@ -253,16 +253,17 @@ func TestMatchDNSQueryDomain(t *testing.T) {
 	}
 }
 
-func TestShouldCollectDNSEvent_FilterEmptyCollectsAll(t *testing.T) {
+func TestShouldDropDNSEvent_FilterEmptyDropsNothing(t *testing.T) {
 	d := &EtwInput{}
-	assert.True(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "example.com"}))
+	assert.False(t, d.shouldDropDNSEvent(map[string]string{"qname": "example.com"}))
 }
 
-func TestShouldCollectDNSEvent_FilteredByDNSQuery(t *testing.T) {
+func TestShouldDropDNSEvent_FilteredByDNSQuery(t *testing.T) {
 	d := &EtwInput{DNSQueryDomainFilters: []string{"*.azure.cn"}}
-	assert.True(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "agent.azure.cn"}))
-	assert.False(t, d.shouldCollectDNSEvent(map[string]string{"dns_query": "example.com"}))
-	assert.False(t, d.shouldCollectDNSEvent(map[string]string{}))
+	assert.True(t, d.shouldDropDNSEvent(map[string]string{"dns_query": "agent.azure.cn"}))
+	assert.True(t, d.shouldDropDNSEvent(map[string]string{"qname": "agent.azure.cn."}))
+	assert.False(t, d.shouldDropDNSEvent(map[string]string{"dns_query": "example.com"}))
+	assert.False(t, d.shouldDropDNSEvent(map[string]string{}))
 }
 
 func TestMapDNSQueryType(t *testing.T) {
