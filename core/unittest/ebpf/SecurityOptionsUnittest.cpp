@@ -155,9 +155,7 @@ void SecurityOptionsUnittest::TestAgentsightDomainWhitelistOverridesDomainRules(
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"DomainWhitelist":["only.this"],"DomainRules":["ignored.example"]}})",
-        config,
-        err));
+        R"({"ProbeConfig":{"DomainWhitelist":["only.this"],"DomainRules":["ignored.example"]}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(1UL, opt.mAgentsightDomainWhitelist.size());
     APSARA_TEST_EQUAL("only.this", opt.mAgentsightDomainWhitelist[0]);
