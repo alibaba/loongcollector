@@ -25,8 +25,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/logger"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery"
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/discovery/targetgroup"
 	"github.com/pyroscope-io/pyroscope/pkg/scrape/model"

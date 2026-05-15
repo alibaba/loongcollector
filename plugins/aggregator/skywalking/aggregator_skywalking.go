@@ -18,10 +18,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/plugins/aggregator/baseagg"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"sync"
 	"time"
 )

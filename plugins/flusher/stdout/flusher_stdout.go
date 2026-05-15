@@ -23,8 +23,8 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+
 	"github.com/cihub/seelog"
 	jsoniter "github.com/json-iterator/go"
 )
