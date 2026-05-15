@@ -222,7 +222,7 @@ public:
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
-        o.mAgentsightDomainRules.clear();
+        o.mAgentsightDomainWhitelist.clear();
     }
 
     void TearDown() override {
@@ -273,6 +273,8 @@ public:
     void TestDestroyTwice();
     void TestGetPluginType();
     void TestCmdlineAndDomainRulesInvokedOnAddOrUpdate();
+    void TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted();
+    void TestUserBlacklistOnlySkipsBuiltinAllowInjection();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -482,7 +484,7 @@ void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() 
     auto& o = agentsightOptions();
     o.mAgentsightCmdlineWhitelist = {{"node", "*claude*"}, {"node", "*claude*"}};
     o.mAgentsightCmdlineBlacklist = {{"node", "*webpack*"}};
-    o.mAgentsightDomainRules = {"*.openai.com", "*.anthropic.com"};
+    o.mAgentsightDomainWhitelist = {"*.openai.com", "*.anthropic.com"};
 
     auto mgr = makeManager();
     CollectionPipelineContext ctx;
@@ -492,6 +494,34 @@ void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() 
     APSARA_TEST_EQUAL(2, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
     APSARA_TEST_EQUAL(2, g_ut_domain_rule_calls);
+    mgr->RemoveConfig("p1");
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted() {
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    APSARA_TEST_EQUAL(9, g_ut_cmdline_allow_calls);
+    APSARA_TEST_EQUAL(0, g_ut_cmdline_deny_calls);
+    APSARA_TEST_EQUAL(0, g_ut_domain_rule_calls);
+    mgr->RemoveConfig("p1");
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestUserBlacklistOnlySkipsBuiltinAllowInjection() {
+    auto& o = agentsightOptions();
+    o.mAgentsightCmdlineBlacklist = {{"node", "*webpack*"}};
+
+    auto mgr = makeManager();
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("p1");
+    ctx.SetProcessQueueKey(1);
+    APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    APSARA_TEST_EQUAL(0, g_ut_cmdline_allow_calls);
+    APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -512,5 +542,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeWithNoRegistration);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSuspend);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyTwice);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineAndDomainRulesInvokedOnAddOrUpdate);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestUserBlacklistOnlySkipsBuiltinAllowInjection);
 
 UNIT_TEST_MAIN

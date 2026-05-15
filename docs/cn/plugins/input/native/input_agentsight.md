@@ -19,18 +19,97 @@ dev
 |  Type  |  string  |  是  |  /  |  插件类型。固定为 `input_agentsight`  |
 |  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
-|  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置 |
-|  ProbeConfig.CmdlineRules  |  object  |  否  |  /  |  进程命令行匹配规则，透传至 AgentSight `agentsight_config_add_cmdline_rule`，见下表  |
-|  ProbeConfig.DomainRules  |  array  |  否  |  /  |  域名 glob 白名单列表（字符串数组），透传至 `agentsight_config_add_domain_rule`；与 Prometheus 等插件中的 `array` 配置类似，每一项为字符串  |
+|  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程命令行 **白名单**：数组的每一项为 **字符串数组**，与进程 `argv` 按位置一一 glob 匹配；由 AgentSight 进程匹配引擎消费。见下文「优先级与默认值」。  |
+|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程命令行 **黑名单**，格式同 `CmdlineWhitelist`；命中则不 attach。**优先级高于白名单**（见下文）。  |
+|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 glob **白名单**（字符串数组），用于 AgentSight **DNS/SNI 阶段**的域名过滤；与 Prometheus 等插件中的 `array` 类似，每一项为字符串。未配置时不注入域名规则（见下文）。  |
 
-### ProbeConfig.CmdlineRules
+为兼容旧配置，仍支持 **`ProbeConfig.CmdlineRules`**（内含 `whitelist` / `blacklist`）与 **`ProbeConfig.DomainRules`**：仅当 **未** 出现 **`CmdlineWhitelist` 与 `CmdlineBlacklist` 任一键**（YAML 中均未写字段）时才读取 `CmdlineRules`；域名在 **未** 出现 **`DomainWhitelist` 键**时才回退读取 **`DomainRules`**。若新旧键同时存在，**以拍平键为准**（嵌套/旧键中与之重叠的部分不再生效）。
 
-|  **参数**  |  **类型**  |  **必填**  |  **默认值**  |  **说明**  |
-| --- | --- | --- | --- | --- |
-|  whitelist  |  array  |  否  |  /  |  进程白名单：每一项为 **字符串数组**，按 argv 下标与进程命令行逐段做 glob 前缀匹配（语义以 AgentSight / coolbpf 文档为准）。多条规则独立生效。  |
-|  blacklist  |  array  |  否  |  /  |  进程黑名单：格式同 `whitelist`；命中则不 attach，且优先级高于白名单。  |
+### 优先级与默认值
 
-白名单在底层仍会传入 `agent_name` 字段，仅作 **规则挂名（展示用）**，**不参与匹配**。LoongCollector 会按每条规则的 pattern 用 `|` 拼接生成挂名；若多条规则拼接结果相同，将自动追加 `_2`、`_3` 等后缀以免冲突。
+**Cmdline（进程命令行）**
+
+1. **黑名单优先于白名单**：同一进程若同时命中黑名单与白名单中的规则，**黑名单生效**（不 attach），语义与 AgentSight / coolbpf 一致。
+2. **多条白名单规则之间**：为 **OR** 关系，任一 allow 规则匹配即可参与后续阶段（具体 attach 逻辑以 AgentSight 为准）。
+3. **默认白名单注入**：当 **`CmdlineWhitelist` 与 `CmdlineBlacklist` 在解析结果中均为空**（未写拍平键且未使用兼容的 `CmdlineRules`，或写了但数组解析后仍无任何有效行）时，LoongCollector 会注入与内置文件 `core/_thirdparty/coolbpf/src/agentsight/agentsight.json` 中 `cmdline.allow` 一致的 **9 条**默认进程白名单（Hermes×3、Cosh×4、OpenClaw×2）。  
+   一旦配置了 **任意一条** 用户 cmdline 白名单或黑名单（含「仅黑名单」），则 **不再** 注入上述内置白名单，完全以用户配置为准。
+
+**Domain（域名）**
+
+1. **多条域名规则之间**：为 **OR**，任一 glob 命中即视为命中该阶段白名单（语义以 AgentSight 为准）。
+2. **默认值**：**不注入** 内置域名列表；未配置 `DomainWhitelist`（且未回退到 `DomainRules`）时，不向 AgentSight 注册域名规则，行为由 AgentSight 默认策略决定。
+3. **与 cmdline 的关系**：进程/cmdline 与域名分阶段参与决策；若配置了 `DomainWhitelist`，仅命中域名列表的连接才会在域名阶段满足白名单（整体 attach 逻辑以 AgentSight 文档为准）。
+
+### Cmdline 规则怎么写（含示例）
+
+配置里**每一项**是一条规则，对应进程启动时的 **`argv` 分段**（与 shell 解析后的参数一致）。请先在本机用下面命令看真实命令行，再对照写数组：
+
+```bash
+tr '\0' ' ' < /proc/<PID>/cmdline; echo
+```
+
+**示例 A：Node 起脚本**
+
+若输出为：
+
+`node /opt/app/openclaw/cli.js gateway`
+
+则常见写法是**两段**规则：第一段对 `argv[0]`，第二段对 `argv[1]`（一般是脚本路径）：
+
+```yaml
+CmdlineWhitelist:
+  - ["node", "*openclaw*"]   # argv0≈node，argv1 路径里含 openclaw（见下通配符）
+```
+
+**示例 B：单段可执行文件**
+
+若输出只有：
+
+`openclaw-gateway`
+
+则第一段就要能描述整个 argv0，例如：
+
+```yaml
+CmdlineWhitelist:
+  - ["openclaw-gateway"]
+  - ["*openclaw-gatewa*"]    # 若希望兼容带路径的前缀，可用 glob
+```
+
+**第一个参数写 `node`，`/usr/bin/node` 能匹配吗？**
+
+不一定。`argv[0]` 往往是**实际传入的第一段字符串**：可能是 `node`，也可能是 `/usr/bin/node`。规则里每一段都是 **glob**，是否命中取决于 AgentSight 的 glob 语义（见 coolbpf AgentSight 文档：**按位置对 `cmdline[i]` 做 glob 匹配**）。
+
+- 若实际是 **`/usr/bin/node`**，只写 **`node`** 常常**对不上**整段路径。
+- 更稳妥的写法是让第一段也带通配，例如 **`node*`**（内置规则里有 `node*` 形态）或 **`*node*`**，以你在目标进程上看到的 `cmdline` 为准。
+
+**`*` 是什么？还支持别的吗？**
+
+- 通配符来自 **glob** 语义，不是正则表达式。
+- 文档中明确强调：不关心的参数位可写 **`"*"`** 表示「该段任意」。
+- **域名规则**侧 coolbpf 文档写明支持 **`*`**（任意字符序列）与 **`?`**（单个字符）。
+- **cmdline 规则**侧文档对 `*` 说明最充分；**`?` 等是否可用于每一段以当前 AgentSight / coolbpf 版本为准**（不确定时先用 `*` 或对照 `agentsight.json` 里已有写法）。
+
+**大小写**
+
+cmdline 与域名的 glob 匹配在 AgentSight 侧均为 **不区分大小写**（见 coolbpf `agentsight-c-ffi-api` 说明）。配置里写 `Node` 与 `node` 效果相同。
+
+### Domain 规则怎么写（含示例）
+
+`DomainWhitelist` 里每一项是一条 **域名 glob**，用于 **SNI / HTTP Host** 等阶段（以 AgentSight 为准）。多条规则为 **OR**：命中任意一条即可。
+
+**示例**
+
+```yaml
+DomainWhitelist:
+  - "api.openai.com"           # 精确主机名（仍走 glob 匹配，大小写不敏感）
+  - "*.anthropic.com"          # 子域：如 claude.anthropic.com
+  - "*openai.com"              # 更宽的后缀匹配（按 glob 语义）
+```
+
+从请求里取到的主机名会去掉端口再匹配，例如 `Host: Api.OpenAI.Com:443` 与 `api.openai.com` 视为同类（**不区分大小写**）。
+
+通配符：**`*`**、**`?`**（单字符）；**不是正则**。
 
 ## 输出格式
 
@@ -79,14 +158,13 @@ inputs:
     ProbeConfig:
       Verbose: 1
       LogPath: ""
-      CmdlineRules:
-        whitelist:
-          - ["node", "*claude*"]
-          - ["node", "*hermes*"]
-        blacklist:
-          - ["node", "*webpack*"]
-      DomainRules:
-        - "*.openai.com"
+      CmdlineWhitelist:
+        - ["node", "*claude*"]
+        - ["node", "*hermes*"]
+      CmdlineBlacklist:
+        - ["node", "*webpack*"]
+      DomainWhitelist:
+        - "api.openai.com"
         - "*.anthropic.com"
 flushers:
   - Type: flusher_stdout
