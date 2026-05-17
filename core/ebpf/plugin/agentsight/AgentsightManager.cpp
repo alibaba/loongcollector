@@ -124,6 +124,20 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
     return kRules;
 }
 
+static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
+    static const std::vector<const char*> kRules = {
+        "api.openai.com",
+        "*.openai.com",
+        "dashscope.aliyuncs.com",
+        "*.dashscope.aliyuncs.com",
+        "dashscope-intl.aliyuncs.com",
+        "*.dashscope-intl.aliyuncs.com",
+        "api.anthropic.com",
+        "*.anthropic.com",
+    };
+    return kRules;
+}
+
 /// Join argv glob patterns for a stable FFI `agent_name` label (not used for matching).
 std::string DeriveAgentsightAliasBase(const std::vector<std::string>& patterns) {
     std::string s;
@@ -141,7 +155,7 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                                   const SecurityOptions& opts) {
     const bool injectBuiltinCmdlineAllow
         = opts.mAgentsightCmdlineWhitelist.empty() && opts.mAgentsightCmdlineBlacklist.empty();
-    const bool wantDomain = !opts.mAgentsightDomainWhitelist.empty();
+    const bool injectBuiltinDomainAllow = opts.mAgentsightDomainWhitelist.empty();
 
     if (!sym || !sym->config_add_cmdline_rule) {
         LOG_WARNING(sLogger,
@@ -150,10 +164,12 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                         "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_allow_injected",
                                                                                         injectBuiltinCmdlineAllow));
     }
-    if (wantDomain && (!sym || !sym->config_add_domain_rule)) {
+    if ((injectBuiltinDomainAllow || !opts.mAgentsightDomainWhitelist.empty())
+        && (!sym || !sym->config_add_domain_rule)) {
         LOG_WARNING(sLogger,
-                    ("AgentSight", "domain rules configured but agentsight_config_add_domain_rule is missing; skipped")(
-                        "domain_whitelist", opts.mAgentsightDomainWhitelist.size()));
+                    ("AgentSight", "domain rules required but agentsight_config_add_domain_rule is missing; skipped")(
+                        "user_domain_rows", opts.mAgentsightDomainWhitelist.size())(
+                        "builtin_domain_injected", injectBuiltinDomainAllow));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
@@ -208,9 +224,18 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
         }
     }
 
+    size_t domainRowsApplied = 0;
     if (sym && sym->config_add_domain_rule) {
-        for (const auto& d : opts.mAgentsightDomainWhitelist) {
-            sym->config_add_domain_rule(cfg, d.c_str());
+        if (injectBuiltinDomainAllow) {
+            for (const char* d : GetBuiltinDomainAllowRules()) {
+                sym->config_add_domain_rule(cfg, d);
+                ++domainRowsApplied;
+            }
+        } else {
+            for (const auto& d : opts.mAgentsightDomainWhitelist) {
+                sym->config_add_domain_rule(cfg, d.c_str());
+                ++domainRowsApplied;
+            }
         }
     }
 
@@ -220,8 +245,10 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
             "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())(
             "builtin_cmdline_allow_injected", injectBuiltinCmdlineAllow)("cmdline_allow_rows_applied",
                                                                          allowRowsToApply.size())(
-            "domain_whitelist", opts.mAgentsightDomainWhitelist.size())("whitelist_alias_collisions", aliasCollisions)(
-            "cmdline_api", sym && sym->config_add_cmdline_rule)("domain_api", sym && sym->config_add_domain_rule));
+            "user_domain_whitelist", opts.mAgentsightDomainWhitelist.size())(
+            "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
+            "whitelist_alias_collisions", aliasCollisions)("cmdline_api", sym && sym->config_add_cmdline_rule)(
+            "domain_api", sym && sym->config_add_domain_rule));
 }
 
 } // namespace

@@ -28,9 +28,7 @@ public:
     void TestAgentsightProbeConfigOptionalInvalidTypes();
     void TestAgentsightVerboseClampedWhenNegative();
     void TestAgentsightParsesFlatCmdlineAndDomainWhitelist();
-    void TestAgentsightLegacyNestedCmdlineAndDomainRules();
-    void TestAgentsightFlatCmdlineOverridesLegacyNested();
-    void TestAgentsightDomainWhitelistOverridesDomainRules();
+    void TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigReturnsTrue() {
@@ -114,51 +112,20 @@ void SecurityOptionsUnittest::TestAgentsightParsesFlatCmdlineAndDomainWhitelist(
     APSARA_TEST_EQUAL("*.openai.com", opt.mAgentsightDomainWhitelist[0]);
 }
 
-void SecurityOptionsUnittest::TestAgentsightLegacyNestedCmdlineAndDomainRules() {
+void SecurityOptionsUnittest::TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineRules":{"whitelist":[["a","b"]],"blacklist":[["c","d"]]},"DomainRules":["x.y"]}})",
+        R"({"ProbeConfig":{"CmdlineRules":{"whitelist":[["a","b"]],"blacklist":[["c","d"]]},"DomainRules":["x.y"]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineWhitelist.size());
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineBlacklist.size());
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightDomainWhitelist.size());
-    APSARA_TEST_EQUAL("x.y", opt.mAgentsightDomainWhitelist[0]);
-}
-
-void SecurityOptionsUnittest::TestAgentsightFlatCmdlineOverridesLegacyNested() {
-    CollectionPipelineContext ctx;
-    ctx.SetConfigName("cfg1");
-    SecurityOptions opt;
-    std::string err;
-    Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"CmdlineWhitelist":[["from","flat"]],"CmdlineRules":{"whitelist":[["from","nested"]]}}})",
-        config,
-        err));
-    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineWhitelist.size());
-    APSARA_TEST_EQUAL("from", opt.mAgentsightCmdlineWhitelist[0][0]);
-    APSARA_TEST_EQUAL("flat", opt.mAgentsightCmdlineWhitelist[0][1]);
+    APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineBlacklist.empty());
-}
-
-void SecurityOptionsUnittest::TestAgentsightDomainWhitelistOverridesDomainRules() {
-    CollectionPipelineContext ctx;
-    ctx.SetConfigName("cfg1");
-    SecurityOptions opt;
-    std::string err;
-    Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"DomainWhitelist":["only.this"],"DomainRules":["ignored.example"]}})", config, err));
-    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightDomainWhitelist.size());
-    APSARA_TEST_EQUAL("only.this", opt.mAgentsightDomainWhitelist[0]);
+    APSARA_TEST_TRUE(opt.mAgentsightDomainWhitelist.empty());
 }
 
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigReturnsTrue)
@@ -167,8 +134,6 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalF
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigOptionalInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightVerboseClampedWhenNegative)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesFlatCmdlineAndDomainWhitelist)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightLegacyNestedCmdlineAndDomainRules)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightFlatCmdlineOverridesLegacyNested)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightDomainWhitelistOverridesDomainRules)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules)
 
 UNIT_TEST_MAIN

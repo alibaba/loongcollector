@@ -650,45 +650,12 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                                       mAgentsightCmdlineBlacklist,
                                                       errorMsg,
                                                       warnOptionalParse);
-                if (!innerConfig.isMember("CmdlineWhitelist") && !innerConfig.isMember("CmdlineBlacklist")) {
-                    if (innerConfig.isMember("CmdlineRules")) {
-                        if (!innerConfig["CmdlineRules"].isObject()) {
-                            errorMsg = "ProbeConfig.CmdlineRules must be an object with optional whitelist/blacklist";
-                            warnOptionalParse();
-                        } else {
-                            const Json::Value& cr = innerConfig["CmdlineRules"];
-                            if (cr.isMember("whitelist")) {
-                                ParseAgentsightCmdlineRowArray(cr["whitelist"],
-                                                               "ProbeConfig.CmdlineRules.whitelist",
-                                                               mAgentsightCmdlineWhitelist,
-                                                               errorMsg,
-                                                               warnOptionalParse);
-                            }
-                            if (cr.isMember("blacklist")) {
-                                ParseAgentsightCmdlineRowArray(cr["blacklist"],
-                                                               "ProbeConfig.CmdlineRules.blacklist",
-                                                               mAgentsightCmdlineBlacklist,
-                                                               errorMsg,
-                                                               warnOptionalParse);
-                            }
-                        }
-                    }
-                }
-                if (innerConfig.isMember("DomainWhitelist")) {
-                    ParseAgentsightDomainStringList(innerConfig,
-                                                    "DomainWhitelist",
-                                                    "ProbeConfig.DomainWhitelist",
-                                                    mAgentsightDomainWhitelist,
-                                                    errorMsg,
-                                                    warnOptionalParse);
-                } else {
-                    ParseAgentsightDomainStringList(innerConfig,
-                                                    "DomainRules",
-                                                    "ProbeConfig.DomainRules",
-                                                    mAgentsightDomainWhitelist,
-                                                    errorMsg,
-                                                    warnOptionalParse);
-                }
+                ParseAgentsightDomainStringList(innerConfig,
+                                                "DomainWhitelist",
+                                                "ProbeConfig.DomainWhitelist",
+                                                mAgentsightDomainWhitelist,
+                                                errorMsg,
+                                                warnOptionalParse);
                 return true;
             }
             case SecurityProbeType::FILE: {
