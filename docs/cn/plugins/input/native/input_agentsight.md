@@ -20,8 +20,8 @@ dev
 |  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
 |  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置  |
-|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程 **agent 筛选白名单**：每一项为一条规则（**字符串数组**），与进程启动参数 `argv` 按位置做 glob 匹配；**整条规则各段均匹配则视为命中**，表示该进程符合待采集的 agent 特征，可纳入采集（见下文流程图）。未配置且黑名单也为空时注入默认规则。  |
-|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，规则格式同白名单；**命中则视为排除该进程**，不采集。**优先级高于白名单**：同一进程同时命中黑/白名单时，以黑名单为准。  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程 **agent 筛选白名单**：每一项为一条规则（**字符串数组**），与进程 `argv` 按位置做 glob 匹配；规则比 `argv` 短时**仅前缀匹配**（多余参数忽略）。规则各段均匹配则视为命中，可纳入采集（见下文）。未配置且黑名单也为空时注入默认规则。  |
+|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，规则格式同白名单（含前缀匹配语义）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：**访问白名单内域名的进程将被识别为 AI Agent 采集目标**。未配置时注入默认精确主机名列表，见下文「优先级与默认值」。  |
 
 ### 优先级与默认值
@@ -50,7 +50,7 @@ graph TD
 
 例如：只配置了 cmdline 黑名单、未配域名时，仍会注入默认 `DomainWhitelist`；只配域名、未配 cmdline 时，仍会注入默认 cmdline 白名单（当黑/白名单均为空时）。
 
-#### Cmdline 规则优先级
+#### Cmdline 规则优先级和默认注入值
 
 1. **黑名单优先于白名单**：同一进程同时命中黑/白名单时，**黑名单生效**。
 2. **多条白名单之间**：**OR**，命中任一条即可。
@@ -70,7 +70,7 @@ graph TD
 | OpenClaw | `*openclaw-gatewa*` |
 | OpenClaw | `node*`, `*openclaw*` |
 
-#### Domain 规则优先级
+#### Domain 规则优先级和默认注入值
 
 1. **多条域名之间**：**OR**，命中任一条即可。
 2. **默认注入条件**：`DomainWhitelist` **为空** 时，注入下表；一旦配置了 **任意一条** 用户域名，则 **不再** 注入默认域名。
@@ -84,7 +84,7 @@ graph TD
 | `dashscope.aliyuncs.com` |
 | `dashscope-intl.aliyuncs.com` |
 
-### Cmdline 规则怎么写
+### Cmdline 规则自定义写法
 
 配置里**每一项**是一条规则，对应 `argv` 各段（与 `/proc/<PID>/cmdline` 一致）。先在本机查看真实命令行，再写 glob：
 
@@ -92,14 +92,18 @@ graph TD
 tr '\0' ' ' < /proc/<PID>/cmdline; echo
 ```
 
-每一段用 **glob** 匹配，不关心的位置写 `"*"`。示例：
+每一段用 **glob** 匹配，不关心的位置写 `"*"`。
+
+**前缀匹配**：当规则的段数**少于** `argv` 时，只对前 N 段按位置做 glob 匹配，**后面多出来的参数不参与匹配**。例如规则 `["node*", "*openclaw*"]` 可命中 `node openclaw.js gateway`（第三段 `gateway` 被忽略）。若需约束后续参数，须在规则中继续写出对应段（如 `["node*", "*openclaw*", "gateway"]`）。反之，规则段数**多于** `argv` 时则不命中。
+
+示例：
 
 ```yaml
 CmdlineWhitelist:
   - ["node*", "*openclaw*"]   # 见 /proc/<PID>/cmdline 后调整各段
 ```
 
-### Domain 规则怎么写
+### Domain 规则自定义写法
 
 `DomainWhitelist` 里每一项用于匹配进程访问的大模型 API 主机名。**默认注入为精确主机名**；自行配置时也可写 glob（如 `*.anthropic.com`），通配符为 `*`，匹配 **不区分大小写**。示例：
 
@@ -108,8 +112,6 @@ DomainWhitelist:
   - "api.openai.com"
   - "dashscope.aliyuncs.com"
 ```
-
-> **建议**：尽量用 `CmdlineWhitelist` / `CmdlineBlacklist` **准确描述**待采集 agent 的命令行（先在本机查看 `/proc/<PID>/cmdline` 再写 glob），缩小采集范围、减少无关进程数据。`DomainWhitelist` 只能判断进程是否访问过大模型 API，**无法区分**具体是哪一个 agent；若 cmdline 规则过宽或未配置，凡访问默认域名（OpenAI、DashScope、Anthropic 等）的进程仍可能被纳入采集。
 
 ## 输出格式
 

@@ -155,16 +155,18 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
 
     if (!sym || !sym->config_add_cmdline_rule) {
         LOG_WARNING(sLogger,
-                    ("AgentSight", "cmdline rules required but agentsight_config_add_cmdline_rule is missing; skipped")(
+                    ("AgentSight",
+                     "cmdline rules configured but agentsight_config_add_cmdline_rule symbol not found; skipping")(
                         "user_whitelist_rows", opts.mAgentsightCmdlineWhitelist.size())(
                         "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_allow_injected",
                                                                                         injectBuiltinCmdlineAllow));
     }
     if (!sym || !sym->config_add_domain_rule) {
-        LOG_WARNING(sLogger,
-                    ("AgentSight", "domain rules required but agentsight_config_add_domain_rule is missing; skipped")(
-                        "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
-                                                                                    injectBuiltinDomainAllow));
+        LOG_WARNING(
+            sLogger,
+            ("AgentSight", "domain rules configured but agentsight_config_add_domain_rule symbol not found; skipping")(
+                "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
+                                                                            injectBuiltinDomainAllow));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
