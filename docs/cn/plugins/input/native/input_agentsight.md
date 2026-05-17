@@ -20,28 +20,35 @@ dev
 |  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
 |  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置  |
-|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程命令行 **白名单**：数组的每一项为 **字符串数组**，与进程 `argv` 按位置一一 glob 匹配。见下文「优先级与默认值」。  |
-|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程命令行 **黑名单**，格式同 `CmdlineWhitelist`；命中则不 attach。**优先级高于白名单**（见下文）。  |
-|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 glob **白名单**（字符串数组），用于 AgentSight **DNS/SNI 阶段**的域名过滤。见下文「优先级与默认值」。  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程 **agent 筛选白名单**：每一项为一条规则（**字符串数组**），与进程启动参数 `argv` 按位置做 glob 匹配；**整条规则各段均匹配则视为命中**，表示该进程符合待采集的 agent 特征，可纳入采集（见下文流程图）。未配置且黑名单也为空时注入默认规则。  |
+|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，规则格式同白名单；**命中则视为排除该进程**，不采集。**优先级高于白名单**：同一进程同时命中黑/白名单时，以黑名单为准。  |
+|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：**访问白名单内域名的进程将被识别为 AI Agent 采集目标**。未配置时注入默认精确主机名列表，见下文「优先级与默认值」。  |
 
 ### 优先级与默认值
 
-#### Cmdline 与 Domain 同时存在时
+#### 黑白名单判定逻辑
 
-先按 **cmdline**（进程 `argv`）判定，未 attach 时再按 **DNS 域名** 判定；同类规则内均为 **OR**。语义以 AgentSight 为准。
+进程是否纳入采集，按下列**固定顺序**判定（**不要求** `CmdlineBlacklist`、`CmdlineWhitelist`、`DomainWhitelist` 同时配置；三类名单相互独立，未配置项见下文「默认值」）：
+
+1. 命中 `CmdlineBlacklist` → **不采集**（cmdline 黑名单优先）
+2. 未命中黑名单，且命中 `CmdlineWhitelist` → **纳入采集**
+3. 仍未纳入，且进程访问域名命中 `DomainWhitelist` → **纳入采集**
+4. 以上均未命中 → **不采集**
+
+同一名单内的多条规则之间为 **OR**（命中任一条即可）。
 
 ```mermaid
 graph TD
-    A["是否 attach?"] --> B{"命中 CmdlineBlacklist?"}
-    B -->|是| N["不 attach"]
+    A["是否纳入采集?"] --> B{"命中 CmdlineBlacklist?"}
+    B -->|是| N["不采集"]
     B -->|否| C{"命中 CmdlineWhitelist?"}
-    C -->|是| Y["attach"]
-    C -->|否| D{"DNS 命中 DomainWhitelist?"}
+    C -->|是| Y["纳入采集"]
+    C -->|否| D{"访问域名命中 DomainWhitelist?"}
     D -->|是| Y
     D -->|否| N
 ```
 
-未配置 cmdline / domain 时，分别注入下文默认表；二者 **独立**（例如只配了 cmdline 黑名单，仍会注入默认域名）。
+例如：只配置了 cmdline 黑名单、未配域名时，仍会注入默认 `DomainWhitelist`；只配域名、未配 cmdline 时，仍会注入默认 cmdline 白名单（当黑/白名单均为空时）。
 
 #### Cmdline 规则优先级
 
@@ -68,16 +75,14 @@ graph TD
 1. **多条域名之间**：**OR**，命中任一条即可。
 2. **默认注入条件**：`DomainWhitelist` **为空** 时，注入下表；一旦配置了 **任意一条** 用户域名，则 **不再** 注入默认域名。
 
-**默认 `DomainWhitelist`（6 条）**
+**默认 `DomainWhitelist`（4 条，精确主机名）**
 
-| 域名 glob | 说明 |
-| --- | --- |
-| `*.openai.com` | 含 `api.openai.com` 等子域 |
-| `*.anthropic.com` | 含 `api.anthropic.com` 等子域 |
-| `dashscope.aliyuncs.com` | 国内 DashScope 根域（`*.dashscope...` 不匹配无子域前缀的该主机名） |
-| `*.dashscope.aliyuncs.com` | 如 `api.dashscope.aliyuncs.com` |
-| `dashscope-intl.aliyuncs.com` | 国际站根域 |
-| `*.dashscope-intl.aliyuncs.com` | 国际站子域 |
+| 域名 |
+| --- |
+| `api.openai.com` |
+| `api.anthropic.com` |
+| `dashscope.aliyuncs.com` |
+| `dashscope-intl.aliyuncs.com` |
 
 ### Cmdline 规则怎么写
 
@@ -96,17 +101,15 @@ CmdlineWhitelist:
 
 ### Domain 规则怎么写
 
-`DomainWhitelist` 里每一项是一条域名 glob（SNI / HTTP Host 等阶段，以 AgentSight 为准）。示例：
+`DomainWhitelist` 里每一项用于匹配进程访问的大模型 API 主机名。**默认注入为精确主机名**；自行配置时也可写 glob（如 `*.anthropic.com`），通配符为 `*`，匹配 **不区分大小写**。示例：
 
 ```yaml
 DomainWhitelist:
   - "api.openai.com"
-  - "*.anthropic.com"
+  - "dashscope.aliyuncs.com"
 ```
 
-通配符使用 `*`；匹配 **不区分大小写**。
-
-> **建议**：为减少无关进程的采集量，若使用默认 `DomainWhitelist`（或未收窄域名列表），请尽量同时配置 `CmdlineWhitelist` / `CmdlineBlacklist`，限定目标 agent 进程；仅依赖默认域名时，任意访问 OpenAI / DashScope / Anthropic 等域名的进程都可能触发 attach，数据量偏大。
+> **建议**：尽量用 `CmdlineWhitelist` / `CmdlineBlacklist` **准确描述**待采集 agent 的命令行（先在本机查看 `/proc/<PID>/cmdline` 再写 glob），缩小采集范围、减少无关进程数据。`DomainWhitelist` 只能判断进程是否访问过大模型 API，**无法区分**具体是哪一个 agent；若 cmdline 规则过宽或未配置，凡访问默认域名（OpenAI、DashScope、Anthropic 等）的进程仍可能被纳入采集。
 
 ## 输出格式
 
@@ -127,7 +130,7 @@ DomainWhitelist:
 | `status_code` | string | 一次请求的状态码，同 HTTP 状态码（十进制字符串，如 `200`） |
 | `is_sse` | string | 是否为 SSE（Server-Sent Events）连接；日志中取值为 `1`（是）或 `0`（否） |
 | `gen_ai.response.finish_reasons` | string | 大模型停止产生 token 的原因 |
-| `is_usage_from_api` | string | 数据来源标识，true 表示来自 LLM API response usage 字段（精确值），false 表示由 AgentSight 本地 tokenizer 计算（近似值） |
+| `is_usage_from_api` | string | 数据来源标识，true 表示来自 LLM API response usage 字段（精确值），false 表示由插件本地估算（近似值） |
 | `gen_ai.usage.input_tokens` | string | 发送给模型的 token 数量（十进制字符串） |
 | `gen_ai.usage.output_tokens` | string | 模型实际生成的回复内容长度（十进制字符串） |
 | `gen_ai.usage.total_tokens` | string | 一次请求消耗的 Token 总量（十进制字符串） |
@@ -162,7 +165,6 @@ inputs:
         - ["node*", "*webpack*"]
       DomainWhitelist:
         - "api.openai.com"
-        - "*.anthropic.com"
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

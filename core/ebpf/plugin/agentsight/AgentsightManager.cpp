@@ -126,12 +126,10 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
 
 static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
     static const std::vector<const char*> kRules = {
-        "*.openai.com",
-        "*.anthropic.com",
+        "api.openai.com",
+        "api.anthropic.com",
         "dashscope.aliyuncs.com",
-        "*.dashscope.aliyuncs.com",
         "dashscope-intl.aliyuncs.com",
-        "*.dashscope-intl.aliyuncs.com",
     };
     return kRules;
 }
@@ -162,12 +160,11 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                         "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_allow_injected",
                                                                                         injectBuiltinCmdlineAllow));
     }
-    if ((injectBuiltinDomainAllow || !opts.mAgentsightDomainWhitelist.empty())
-        && (!sym || !sym->config_add_domain_rule)) {
+    if (!sym || !sym->config_add_domain_rule) {
         LOG_WARNING(sLogger,
                     ("AgentSight", "domain rules required but agentsight_config_add_domain_rule is missing; skipped")(
-                        "user_domain_rows", opts.mAgentsightDomainWhitelist.size())(
-                        "builtin_domain_injected", injectBuiltinDomainAllow));
+                        "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
+                                                                                    injectBuiltinDomainAllow));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
@@ -237,16 +234,15 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
         }
     }
 
-    LOG_INFO(
-        sLogger,
-        ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
-            "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())(
-            "builtin_cmdline_allow_injected", injectBuiltinCmdlineAllow)("cmdline_allow_rows_applied",
-                                                                         allowRowsToApply.size())(
-            "user_domain_whitelist", opts.mAgentsightDomainWhitelist.size())(
-            "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
-            "whitelist_alias_collisions", aliasCollisions)("cmdline_api", sym && sym->config_add_cmdline_rule)(
-            "domain_api", sym && sym->config_add_domain_rule));
+    LOG_INFO(sLogger,
+             ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
+                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                                    injectBuiltinCmdlineAllow)(
+                 "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
+                                                                        opts.mAgentsightDomainWhitelist.size())(
+                 "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
+                 "whitelist_alias_collisions", aliasCollisions)("cmdline_api", sym && sym->config_add_cmdline_rule)(
+                 "domain_api", sym && sym->config_add_domain_rule));
 }
 
 } // namespace
