@@ -506,7 +506,7 @@ void AgentsightManagerUnittest::TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitte
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(9, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(0, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(8, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(6, g_ut_domain_rule_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -522,7 +522,7 @@ void AgentsightManagerUnittest::TestUserBlacklistOnlySkipsBuiltinAllowInjection(
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(0, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(8, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(6, g_ut_domain_rule_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }

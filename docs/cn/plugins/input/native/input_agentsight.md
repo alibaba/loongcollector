@@ -68,18 +68,16 @@ graph TD
 1. **多条域名之间**：**OR**，命中任一条即可。
 2. **默认注入条件**：`DomainWhitelist` **为空** 时，注入下表；一旦配置了 **任意一条** 用户域名，则 **不再** 注入默认域名。
 
-**默认 `DomainWhitelist`（8 条）**
+**默认 `DomainWhitelist`（6 条）**
 
-| 域名 glob |
-| --- |
-| `api.openai.com` |
-| `*.openai.com` |
-| `dashscope.aliyuncs.com` |
-| `*.dashscope.aliyuncs.com` |
-| `dashscope-intl.aliyuncs.com` |
-| `*.dashscope-intl.aliyuncs.com` |
-| `api.anthropic.com` |
-| `*.anthropic.com` |
+| 域名 glob | 说明 |
+| --- | --- |
+| `*.openai.com` | 含 `api.openai.com` 等子域 |
+| `*.anthropic.com` | 含 `api.anthropic.com` 等子域 |
+| `dashscope.aliyuncs.com` | 国内 DashScope 根域（`*.dashscope...` 不匹配无子域前缀的该主机名） |
+| `*.dashscope.aliyuncs.com` | 如 `api.dashscope.aliyuncs.com` |
+| `dashscope-intl.aliyuncs.com` | 国际站根域 |
+| `*.dashscope-intl.aliyuncs.com` | 国际站子域 |
 
 ### Cmdline 规则怎么写
 

@@ -126,14 +126,12 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
 
 static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
     static const std::vector<const char*> kRules = {
-        "api.openai.com",
         "*.openai.com",
+        "*.anthropic.com",
         "dashscope.aliyuncs.com",
         "*.dashscope.aliyuncs.com",
         "dashscope-intl.aliyuncs.com",
         "*.dashscope-intl.aliyuncs.com",
-        "api.anthropic.com",
-        "*.anthropic.com",
     };
     return kRules;
 }
