@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <cstdio>
+#include <unistd.h>
 
 #include <fstream>
 
@@ -1353,6 +1354,211 @@ void LogFileReaderHoleUnittest::TestReadLogJsonHoleOnTheRight() {
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleInTheMiddle);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogHoleOnTheLeft);
 UNIT_TEST_CASE(LogFileReaderHoleUnittest, TestReadLogJsonHoleOnTheRight);
+
+class WholeFileOverwriteUnittest : public ::testing::Test {
+public:
+    void TestOverwriteSameSize();
+    void TestOverwriteLargerSize();
+    void TestOverwriteSmallerSize();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "WholeFileOverwriteUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string WholeFileOverwriteUnittest::gRootDir;
+std::string WholeFileOverwriteUnittest::gLogName;
+std::string WholeFileOverwriteUnittest::gLogPath;
+
+void WholeFileOverwriteUnittest::TestOverwriteSameSize() {
+    std::string content1 = R"({"key":"value1","data":"aaa"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // First read: data goes to cache (WHOLE_FILE mode caches until flush timeout)
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    // Flush timeout: force read cached data
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, (int64_t)content1.size());
+
+    // Overwrite with same-size content (same signature prefix)
+    sleep(1); // ensure mtime changes
+    std::string content2 = R"({"key":"value2","data":"bbb"})";
+    APSARA_TEST_EQUAL_FATAL(content1.size(), content2.size());
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    // CheckFileSignatureAndOffset should detect mtime change and reset position
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+    APSARA_TEST_TRUE_FATAL(reader.mCache.empty());
+
+    // Read again: should get complete new content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+void WholeFileOverwriteUnittest::TestOverwriteLargerSize() {
+    std::string content1 = R"({"key":"v1"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+
+    // Overwrite with larger content
+    sleep(1);
+    std::string content2 = R"({"key":"value2","extra":"more_data_here"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+void WholeFileOverwriteUnittest::TestOverwriteSmallerSize() {
+    std::string content1 = R"({"key":"value1","extra":"some_data"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content1);
+    }
+
+    // Overwrite with smaller content
+    sleep(1);
+    std::string content2 = R"({"key":"v2"})";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), content2);
+    }
+}
+
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSameSize);
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteLargerSize);
+UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSmallerSize);
 
 } // namespace logtail
 

@@ -1343,6 +1343,31 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
     mLogFileOp.Stat(ps);
     time_t lastMTime = mLastMTime;
     mLastMTime = ps.GetMtime();
+
+    // In WHOLE_FILE mode, the entire file should be treated as a single log entry.
+    // When the file is modified (detected via mtime change), reset read position to
+    // the beginning so the complete file content is re-read. This handles the
+    // overwrite-in-place pattern (e.g., a JSON file being repeatedly rewritten).
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && lastMTime != 0 && lastMTime != mLastMTime) {
+        LOG_INFO(sLogger,
+                 ("whole_file mode detected file modification, read from begin",
+                  mHostLogPath)("old mtime", lastMTime)("new mtime", mLastMTime)(
+                     "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+        mLastFilePos = 0;
+        mCache.clear();
+        char firstLine[1025];
+        int nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+        if (nbytes > 0) {
+            firstLine[nbytes] = '\0';
+            CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
+        }
+        if (mEOOption) {
+            updatePrimaryCheckpointSignature();
+        }
+        return true;
+    }
+
     if (!isOpenOnUpdate || mLastFileSignatureSize == 0 || endSize < mLastFilePos
         || (endSize == mLastFilePos && lastMTime != mLastMTime)) {
         char firstLine[1025];
