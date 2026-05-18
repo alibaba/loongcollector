@@ -34,6 +34,7 @@
 | `metric_system_v2`<br>[主机监控数据](input/extended/metric-system.md)                       | SLS 官方                                              | 主机监控数据。                                                                   |
 | `service_canal`<br>[MySQL Binlog](input/extended/service-canal.md)                          | SLS 官方                                              | 将 MySQL Binlog 输入到 LoongCollector。                                                |
 | `service_docker_stdout`<br>[容器标准输出](input/extended/service-docker-stdout.md)            | SLS 官方                                              | 从容器标准输出/标准错误流中采集日志。                                            |
+| `service_etw`<br>[Windows ETW 数据](input/extended/service-etw.md)                         | SLS 官方                                              | 采集 Windows ETW（Event Tracing for Windows）实时事件。                         |
 | `service_go_profile`<br>[GO Profile](input/extended/service-goprofile.md)                   | SLS 官方                                              | 采集 Golang pprof 性能数据。                                                     |
 | `service_gpu_metric`<br>[GPU 数据](input/extended/service-gpu.md)                           | SLS 官方                                              | 支持收集英伟达 GPU 指标。                                                        |
 | `service_http_server`<br>[HTTP 数据](input/extended/service-http-server.md)                 | SLS 官方                                              | 接收来自 unix socket、http/https、tcp 的请求，并支持 sls 协议、otlp 等多种协议。 |
