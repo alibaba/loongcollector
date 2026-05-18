@@ -1321,31 +1321,31 @@ void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFileSingleLine() {
         }
         // case: F + P + P + F (needSingleLine=true)
         {
-            std::string prefix = makeDockerJsonFull("789") + "\n";
-            std::string testLog
-                = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n" + makeDockerJsonFull("789");
+            std::string expectedPrefix = makeDockerJsonFull("789") + "\n"
+                + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+            std::string testLog = expectedPrefix + makeDockerJsonFull("789");
 
             int32_t size = testLog.size();
             int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
             LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
 
             APSARA_TEST_EQUAL("789", line.data.to_string());
-            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(int(expectedPrefix.size()), line.lineBegin);
             APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
             APSARA_TEST_EQUAL(true, line.fullLine);
         }
         // case: F + P + P + F + '\n' (needSingleLine=true)
         {
-            std::string prefix = makeDockerJsonFull("789") + "\n";
-            std::string testLog = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n"
-                + makeDockerJsonFull("789") + "\n";
+            std::string expectedPrefix = makeDockerJsonFull("789") + "\n"
+                + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+            std::string testLog = expectedPrefix + makeDockerJsonFull("789") + "\n";
 
             int32_t size = testLog.size();
             int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
             LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
 
             APSARA_TEST_EQUAL("789", line.data.to_string());
-            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(int(expectedPrefix.size()), line.lineBegin);
             APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
             APSARA_TEST_EQUAL(true, line.fullLine);
         }

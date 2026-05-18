@@ -323,6 +323,7 @@ FileServer (读文件块)
 **目的**：验证 `ProcessorMergeMultilineLogNative` 以 `MergeType="json"` Init 成功。
 
 **验证**：
+
 - Init 返回 true
 - `mMergeType == MergeType::BY_JSON`
 
@@ -331,6 +332,7 @@ FileServer (读文件块)
 **目的**：验证单行完整 JSON 不触发合并。
 
 **输入**：3 个事件，每个 content 是完整 JSON：
+
 - `{"a":1}`
 - `{"b":2}`
 - `{"c":3}`
@@ -342,6 +344,7 @@ FileServer (读文件块)
 **目的**：验证多行 JSON 块正确合并。
 
 **输入**：6 个事件（模拟多行 JSON）：
+
 ```
 {
   "key": "value",
@@ -358,6 +361,7 @@ FileServer (读文件块)
 **目的**：验证连续多个 JSON 块各自独立合并。
 
 **输入**：4 个事件：
+
 - `{`
 - `"a":1`
 - `}`
@@ -390,6 +394,7 @@ FileServer (读文件块)
 **输入**：多行 JSON 块，累积大小超过限制。
 
 **预期**：
+
 - 强制拆分输出
 - 后续行继续正常处理
 
@@ -404,6 +409,7 @@ FileServer (读文件块)
 ### 4.5 InputContainerStdioUnittest — Phase 4 更新
 
 更新 TC-STDIO-JSON-MULTILINE-01 验证：
+
 - step 4 创建的是 `ProcessorMergeMultilineLogNative`(MergeType=json)，而非 `ProcessorSplitLogStringNative`
 - `mContext->RequiringJsonReader()` 返回 `false`
 
