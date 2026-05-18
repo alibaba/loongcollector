@@ -519,7 +519,7 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
 
     // content: log 字段末尾有 \n 为 Full，无 \n 为 Partial
     bool isPartialLog = !content.empty() && content.back() != '\n';
-    if (!isPartialLog) {
+    if (!content.empty() && content.back() == '\n') {
         content = StringView(content.data(), content.size() - 1);
     }
     sourceEvent.SetContentNoCopy(containerLogKey, content);

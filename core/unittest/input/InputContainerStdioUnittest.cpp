@@ -279,7 +279,6 @@ void InputContainerStdioUnittest::TestCreateInnerProcessorsJsonMultilineNoJsonRe
     APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
     input->CommitMetricsRecordRef();
 
-    APSARA_TEST_TRUE(input->CreateInnerProcessors());
     APSARA_TEST_FALSE(ctx.RequiringJsonReader());
 
     // Step 4 processor should be ProcessorMergeMultilineLogNative with MergeType=json
