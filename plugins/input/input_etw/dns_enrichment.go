@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"sync/atomic"
 
 	"github.com/miekg/dns"
 )
@@ -99,7 +100,7 @@ func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 			fields["dst_ip_addr"] = dst
 			fields["dvc_ip_addr"] = dst
 			if dst != "127.0.0.1" {
-				d.serverIP = dst
+				d.setServerIP(dst)
 			}
 		}
 		if port, ok := fields["port"]; ok && port != "" {
@@ -114,9 +115,9 @@ func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 		if src, ok := fields["interface_ip"]; ok && src != "" && src != "0.0.0.0" {
 			fields["src_ip_addr"] = src
 			fields["dvc_ip_addr"] = src
-		} else if d.serverIP != "" {
-			fields["src_ip_addr"] = d.serverIP
-			fields["dvc_ip_addr"] = d.serverIP
+		} else if serverIP := d.getServerIP(); serverIP != "" {
+			fields["src_ip_addr"] = serverIP
+			fields["dvc_ip_addr"] = serverIP
 		}
 		fields["event_sub_type"] = "request"
 
@@ -127,9 +128,9 @@ func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 		if dst, ok := fields["interface_ip"]; ok && dst != "" && dst != "0.0.0.0" {
 			fields["dst_ip_addr"] = dst
 			fields["dvc_ip_addr"] = dst
-		} else if d.serverIP != "" {
-			fields["dst_ip_addr"] = d.serverIP
-			fields["dvc_ip_addr"] = d.serverIP
+		} else if serverIP := d.getServerIP(); serverIP != "" {
+			fields["dst_ip_addr"] = serverIP
+			fields["dvc_ip_addr"] = serverIP
 		}
 		fields["event_sub_type"] = "response"
 
@@ -137,9 +138,9 @@ func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 		if src, ok := fields["interface_ip"]; ok && src != "" && src != "0.0.0.0" {
 			fields["src_ip_addr"] = src
 			fields["dvc_ip_addr"] = src
-		} else if d.serverIP != "" {
-			fields["src_ip_addr"] = d.serverIP
-			fields["dvc_ip_addr"] = d.serverIP
+		} else if serverIP := d.getServerIP(); serverIP != "" {
+			fields["src_ip_addr"] = serverIP
+			fields["dvc_ip_addr"] = serverIP
 		}
 		if dst, ok := fields["source"]; ok && dst != "" && dst != "0.0.0.0" {
 			fields["dst_ip_addr"] = dst
@@ -181,8 +182,10 @@ func (d *EtwInput) enrichDNSFields(fields map[string]string, eventID uint16) {
 		fields["event_result_details"] = "NA"
 	}
 
-	if packetHex, ok := fields["packet_data"]; ok && packetHex != "" {
-		d.parseDNSPacketData(fields, packetHex, eventID)
+	if d.parsePacketDataEnabled() {
+		if packetHex, ok := fields["packet_data"]; ok && packetHex != "" {
+			d.parseDNSPacketData(fields, packetHex, eventID)
+		}
 	}
 }
 
@@ -205,11 +208,13 @@ func (d *EtwInput) parseDNSPacketData(fields map[string]string, packetHex string
 
 	raw, err := hex.DecodeString(cleaned)
 	if err != nil || len(raw) < 12 {
+		atomic.AddUint64(&d.stats.packetDataParseError, 1)
 		return
 	}
 
 	msg := new(dns.Msg)
 	if err := msg.Unpack(raw); err != nil {
+		atomic.AddUint64(&d.stats.packetDataParseError, 1)
 		return
 	}
 

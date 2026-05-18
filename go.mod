@@ -306,3 +306,5 @@ replace (
 	github.com/satori/go.uuid => github.com/satori/go.uuid v1.2.0
 	github.com/streadway/handy => github.com/iLogtail/handy v0.0.0-20230327021402-6a47ec586270
 )
+
+replace github.com/bi-zone/etw => github.com/zdy/etw v1.0.0

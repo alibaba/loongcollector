@@ -74,6 +74,7 @@ func TestEtwInput_Init_Defaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 4, input.Level)
 	assert.Equal(t, uint64(0), uint64(input.Keywords))
+	assert.True(t, input.parsePacketDataEnabled())
 }
 
 func TestEtwInput_Init_InvalidLevel(t *testing.T) {
@@ -87,6 +88,103 @@ func TestEtwInput_Init_InvalidLevel(t *testing.T) {
 		_, err := input.Init(ctx)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid Level")
+	}
+}
+
+func TestEtwInput_Init_AsyncDefaults(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+		AsyncProcess: true,
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 8192, input.EventQueueSize)
+	assert.GreaterOrEqual(t, input.WorkerCount, 1)
+	assert.LessOrEqual(t, input.WorkerCount, 2)
+}
+
+func TestEtwInput_Init_InvalidBufferConfig(t *testing.T) {
+	tests := []struct {
+		name  string
+		input EtwInput
+	}{
+		{
+			name: "small buffer",
+			input: EtwInput{
+				ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				BufferSizeKB: 1,
+			},
+		},
+		{
+			name: "min greater than max",
+			input: EtwInput{
+				ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				MinBuffers:   16,
+				MaxBuffers:   8,
+			},
+		},
+		{
+			name: "huge buffer",
+			input: EtwInput{
+				ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				BufferSizeKB: 8192,
+			},
+		},
+		{
+			name: "too many min buffers",
+			input: EtwInput{
+				ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				MinBuffers:   2048,
+			},
+		},
+		{
+			name: "large flush timer",
+			input: EtwInput{
+				ProviderGUID:  "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				FlushTimerSec: 120,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := tt.input
+			ctx := mock.NewEmptyContext("test", "test", "test")
+			_, err := input.Init(ctx)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestEtwInput_Init_InvalidAsyncConfig(t *testing.T) {
+	tests := []struct {
+		name  string
+		input EtwInput
+	}{
+		{
+			name: "queue too large",
+			input: EtwInput{
+				ProviderGUID:   "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				AsyncProcess:   true,
+				EventQueueSize: 1000001,
+			},
+		},
+		{
+			name: "too many workers",
+			input: EtwInput{
+				ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+				AsyncProcess: true,
+				WorkerCount:  65,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := tt.input
+			ctx := mock.NewEmptyContext("test", "test", "test")
+			_, err := input.Init(ctx)
+			require.Error(t, err)
+		})
 	}
 }
 
@@ -597,6 +695,23 @@ func TestEnrichDNSFields_RequestPacketKeepsNA(t *testing.T) {
 	assert.Equal(t, "NA", fields["event_result_details"])
 	_, hasResponseCode := fields["dns_response_code"]
 	assert.False(t, hasResponseCode, "request packets should not set response code")
+}
+
+func TestEnrichDNSFields_ParsePacketDataDisabled(t *testing.T) {
+	parsePacketData := false
+	packetHex := "1234818000010001000000000765" +
+		"78616d706c6503636f6d0000010001" +
+		"c00c000100010000003c00045db8d822"
+
+	d := &EtwInput{ProviderName: "Microsoft-Windows-DNSServer", ParsePacketData: &parsePacketData}
+	fields := map[string]string{"packet_data": packetHex}
+	d.enrichDNSFields(fields, 279)
+
+	assert.Equal(t, "NA", fields["event_result_details"])
+	_, hasResponseCode := fields["dns_response_code"]
+	assert.False(t, hasResponseCode, "packet response code should not be parsed when ParsePacketData is false")
+	_, hasResponseName := fields["dns_response_name"]
+	assert.False(t, hasResponseName, "packet answers should not be parsed when ParsePacketData is false")
 }
 
 func TestFormatRR_A(t *testing.T) {

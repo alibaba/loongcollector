@@ -30,6 +30,15 @@ ETW 是 Windows 操作系统内置的高性能事件追踪框架，几乎所有 
 | Level | int | 否 | 4 | ETW Trace Level：1=Critical, 2=Error, 3=Warning, 4=Informational, 5=Verbose |
 | Keywords | uint64 | 否 | 0 | ETW Keywords 位掩码，用于按类别过滤事件。0 表示不过滤 |
 | DNSQueryDomainFilters | string[] | 否 | 空 | 仅对 `Microsoft-Windows-DNSServer` 生效，按 `dns_query` 丢弃 DNS 事件。支持精确域名和 `*.example.com` 形式的后缀通配；为空表示不丢弃 |
+| ParsePacketData | bool | 否 | true | 仅对 DNS 生效，是否解析 `PacketData` 中的 DNS wire format 响应内容。关闭可降低 CPU 消耗 |
+| AsyncProcess | bool | 否 | false | 是否将字段归一化、Provider 专属富化、过滤和写入 Collector 放到异步 worker 中处理，降低 ETW callback 阻塞风险；对所有 ETW Provider 生效 |
+| EventQueueSize | int | 否 | 8192 | 仅 `AsyncProcess=true` 时生效，异步事件队列长度；最大 1000000 |
+| WorkerCount | int | 否 | min(CPU, 2) | 仅 `AsyncProcess=true` 时生效，异步处理 worker 数量；最大 64。Collector 写入会串行化，避免依赖 Collector 并发安全 |
+| DropWhenQueueFull | bool | 否 | false | `AsyncProcess=true` 时生效，队列满时是否丢弃新事件；false 表示阻塞 ETW callback |
+| BufferSizeKB | uint32 | 否 | 0 | ETW 单个 buffer 大小，单位 KB；0 表示使用 Windows 默认值；配置时范围为 4..4096 |
+| MinBuffers | uint32 | 否 | 0 | ETW session 最小 buffer 数；0 表示使用 Windows 默认值；配置时最大 1024 |
+| MaxBuffers | uint32 | 否 | 0 | ETW session 最大 buffer 数；0 表示使用 Windows 默认值；配置时最大 1024 |
+| FlushTimerSec | uint32 | 否 | 0 | ETW buffer flush 间隔，单位秒；0 表示使用 Windows 默认值；配置时最大 60 |
 
 > **ProviderName vs ProviderGUID**：推荐使用 `ProviderName`，插件会自动解析为 GUID，无需手动查找。当目标 Windows 系统中未注册该名称对应的 GUID 时，才需回退为 `ProviderGUID` 方式。
 
@@ -131,6 +140,16 @@ Event 260/261 中的 InterfaceIP 有时为 `0.0.0.0`（INADDR_ANY），无法确
 - 判断 event_result（Success/Failure）
 - 设置 event_result_details：响应事件使用 DNS 响应码名称，请求事件使用 `NA`
 
+若主机 CPU 压力较高，可配置 `ParsePacketData: false` 关闭该解析。关闭后仍会保留 DNS 查询名、查询类型、源/目的地址、协议、设备字段等基础字段，但不会补齐 `dns_response_name`、`dns_flags`、`dns_response_code_name` 等响应报文解析字段。
+
+### 异步处理与 ETW Buffer
+
+`AsyncProcess` 可将字段归一化、Provider 专属富化、过滤和写入 Collector 的逻辑从 ETW callback 中移到 worker 处理，降低 callback 长时间阻塞导致 ETW buffer 积压的风险。由于 ETW 事件对象只在 callback 生命周期内可靠，插件仍会在 callback 中读取 `EventProperties`，但会把字符串格式化、字段名归一化、DNS 解析和 Collector 写入延后到 worker。该能力对所有 ETW Provider 生效；DNS Provider 只是在 worker 阶段额外执行 DNS 专属富化和黑名单过滤。
+
+开启 `AsyncProcess` 后，插件会每 30 分钟输出一次统计日志，并在停止时输出最终统计，字段包括 `received`、`enqueued`、`dropped_queue_full`、`dropped_domain_filter`、`packet_data_parse_error`。如果 `DropWhenQueueFull=true` 且 `dropped_queue_full` 持续增长，说明当前处理能力低于事件产生速度，需要增大队列/worker、放宽 ETW buffer，或进一步降低采集量。
+
+`BufferSizeKB`、`MinBuffers`、`MaxBuffers`、`FlushTimerSec` 会透传到 ETW session 的 `EVENT_TRACE_PROPERTIES`，对所有 ETW Provider 生效。这些参数主要提升突发流量下的缓冲能力，但会增加内核内存占用；如果长期处理速度低于事件产生速度，仍需通过收窄 `Keywords`、关闭 provider 专属重解析逻辑或异步处理来降低压力。对于 DNS Provider，还可以通过黑名单和 `ParsePacketData: false` 降低开销。
+
 ### 设备字段识别
 
 插件会尽量补齐设备侧字段，便于下游按 DNS 服务器维度聚合：
@@ -180,6 +199,15 @@ inputs:
       - "*.chinacloudapp.cn"
       - "*.reddog.microsoft.com"
       - "*.azk8s.cn"
+    ParsePacketData: false
+    AsyncProcess: true
+    EventQueueSize: 8192
+    WorkerCount: 2
+    DropWhenQueueFull: true
+    BufferSizeKB: 128
+    MinBuffers: 8
+    MaxBuffers: 64
+    FlushTimerSec: 1
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

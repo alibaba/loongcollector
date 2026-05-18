@@ -7,9 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 	"unicode"
 
 	"github.com/bi-zone/etw"
@@ -56,20 +59,57 @@ type EtwInput struct {
 	// DNSQueryDomainFilters drops Microsoft-Windows-DNSServer events whose dns_query matches.
 	// It supports exact domains and leading wildcard suffixes such as "*.azure.cn".
 	DNSQueryDomainFilters []string
+	// ParsePacketData controls DNS PacketData parsing. Nil keeps the legacy default: enabled.
+	ParsePacketData *bool
+	AsyncProcess    bool
+	EventQueueSize  int
+	WorkerCount     int
+	// DropWhenQueueFull drops events when the async queue is full. When false, ETW callbacks block.
+	DropWhenQueueFull bool
+	BufferSizeKB      uint32
+	MinBuffers        uint32
+	MaxBuffers        uint32
+	FlushTimerSec     uint32
 
-	parsedGUID windows.GUID
-	session    *etw.Session
-	context    pipeline.Context
-	collector  pipeline.Collector
-	hostname   string
-	domain     string
-	domainType string
-	osName     string
-	osVersion  string
-	serverIP   string
-	mu         sync.Mutex
-	waitGroup  sync.WaitGroup
-	stopped    bool
+	parsedGUID  windows.GUID
+	session     *etw.Session
+	context     pipeline.Context
+	collector   pipeline.Collector
+	hostname    string
+	domain      string
+	domainType  string
+	osName      string
+	osVersion   string
+	serverIP    string
+	serverIPMu  sync.RWMutex
+	collectorMu sync.Mutex
+	mu          sync.Mutex
+	waitGroup   sync.WaitGroup
+	eventCh     chan etwEventData
+	workerWG    sync.WaitGroup
+	statsStopCh chan struct{}
+	statsWG     sync.WaitGroup
+	stopped     bool
+	stats       etwStats
+}
+
+type etwEventData struct {
+	eventID    uint16
+	opcode     uint8
+	level      uint8
+	keywords   uint64
+	processID  uint32
+	threadID   uint32
+	properties map[string]interface{}
+	timestamp  time.Time
+}
+
+type etwStats struct {
+	received             uint64
+	enqueued             uint64
+	droppedQueueFull     uint64
+	droppedDomainFilter  uint64
+	packetDataParseError uint64
 }
 
 func (d *EtwInput) Init(context pipeline.Context) (int, error) {
@@ -106,10 +146,43 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	if d.Level < 1 || d.Level > 5 {
 		return 0, fmt.Errorf("invalid Level %d: must be 1..5, or 0 for default", d.Level)
 	}
+	if d.BufferSizeKB > 0 && d.BufferSizeKB < 4 {
+		return 0, fmt.Errorf("invalid BufferSizeKB %d: must be >= 4, or 0 for Windows default", d.BufferSizeKB)
+	}
+	if d.BufferSizeKB > 4096 {
+		return 0, fmt.Errorf("invalid BufferSizeKB %d: must be <= 4096", d.BufferSizeKB)
+	}
+	if d.MinBuffers > 1024 {
+		return 0, fmt.Errorf("invalid MinBuffers %d: must be <= 1024", d.MinBuffers)
+	}
+	if d.MaxBuffers > 1024 {
+		return 0, fmt.Errorf("invalid MaxBuffers %d: must be <= 1024", d.MaxBuffers)
+	}
+	if d.MinBuffers > 0 && d.MaxBuffers > 0 && d.MinBuffers > d.MaxBuffers {
+		return 0, fmt.Errorf("invalid ETW buffers: MinBuffers %d is greater than MaxBuffers %d", d.MinBuffers, d.MaxBuffers)
+	}
+	if d.FlushTimerSec > 60 {
+		return 0, fmt.Errorf("invalid FlushTimerSec %d: must be <= 60", d.FlushTimerSec)
+	}
+	if d.AsyncProcess {
+		if d.EventQueueSize <= 0 {
+			d.EventQueueSize = 8192
+		}
+		if d.EventQueueSize > 1000000 {
+			return 0, fmt.Errorf("invalid EventQueueSize %d: must be <= 1000000", d.EventQueueSize)
+		}
+		if d.WorkerCount <= 0 {
+			d.WorkerCount = minInt(runtime.NumCPU(), 2)
+		}
+		if d.WorkerCount > 64 {
+			return 0, fmt.Errorf("invalid WorkerCount %d: must be <= 64", d.WorkerCount)
+		}
+	}
 
 	logger.Infof(d.context.GetRuntimeContext(),
-		"service_etw init: guid=%s level=%d keywords=0x%X",
-		guidStr, d.Level, uint64(d.Keywords))
+		"service_etw init: guid=%s level=%d keywords=0x%X async=%t queue=%d workers=%d dropWhenFull=%t parsePacketData=%t bufferSizeKB=%d minBuffers=%d maxBuffers=%d flushTimerSec=%d",
+		guidStr, d.Level, uint64(d.Keywords), d.AsyncProcess, d.EventQueueSize, d.WorkerCount, d.DropWhenQueueFull, d.parsePacketDataEnabled(),
+		d.BufferSizeKB, d.MinBuffers, d.MaxBuffers, d.FlushTimerSec)
 	return 0, nil
 }
 
@@ -189,15 +262,34 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 	d.collector = collector
 	d.waitGroup.Add(1)
 	defer d.waitGroup.Done()
+	if d.AsyncProcess {
+		d.startWorkers()
+		defer d.stopWorkers()
+	}
 
 	d.mu.Lock()
 	if d.stopped {
 		d.mu.Unlock()
 		return nil
 	}
-	session, err := etw.NewSession(d.parsedGUID,
+	options := []etw.Option{
 		etw.WithLevel(etw.TraceLevel(d.Level)),
-		etw.WithMatchKeywords(uint64(d.Keywords), 0))
+		etw.WithMatchKeywords(uint64(d.Keywords), 0),
+	}
+	if d.BufferSizeKB > 0 {
+		options = append(options, etw.WithBufferSizeKB(d.BufferSizeKB))
+	}
+	if d.MinBuffers > 0 {
+		options = append(options, etw.WithMinBuffers(d.MinBuffers))
+	}
+	if d.MaxBuffers > 0 {
+		options = append(options, etw.WithMaxBuffers(d.MaxBuffers))
+	}
+	if d.FlushTimerSec > 0 {
+		options = append(options, etw.WithFlushTimerSec(d.FlushTimerSec))
+	}
+
+	session, err := etw.NewSession(d.parsedGUID, options...)
 	if err != nil {
 		d.mu.Unlock()
 		return fmt.Errorf("create ETW session: %w", err)
@@ -220,6 +312,82 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 	return nil
 }
 
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func (d *EtwInput) parsePacketDataEnabled() bool {
+	return d.ParsePacketData == nil || *d.ParsePacketData
+}
+
+func (d *EtwInput) getServerIP() string {
+	d.serverIPMu.RLock()
+	defer d.serverIPMu.RUnlock()
+	return d.serverIP
+}
+
+func (d *EtwInput) setServerIP(ip string) {
+	d.serverIPMu.Lock()
+	defer d.serverIPMu.Unlock()
+	d.serverIP = ip
+}
+
+func (d *EtwInput) startWorkers() {
+	d.eventCh = make(chan etwEventData, d.EventQueueSize)
+	d.statsStopCh = make(chan struct{})
+	d.statsWG.Add(1)
+	go func() {
+		defer d.statsWG.Done()
+		ticker := time.NewTicker(30 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				d.logStats("periodic")
+			case <-d.statsStopCh:
+				return
+			}
+		}
+	}()
+	for i := 0; i < d.WorkerCount; i++ {
+		d.workerWG.Add(1)
+		go func() {
+			defer d.workerWG.Done()
+			for event := range d.eventCh {
+				d.processEvent(event)
+			}
+		}()
+	}
+}
+
+func (d *EtwInput) stopWorkers() {
+	if d.statsStopCh != nil {
+		close(d.statsStopCh)
+		d.statsWG.Wait()
+		d.statsStopCh = nil
+	}
+	if d.eventCh != nil {
+		close(d.eventCh)
+		d.workerWG.Wait()
+		d.eventCh = nil
+	}
+	d.logStats("final")
+}
+
+func (d *EtwInput) logStats(reason string) {
+	logger.Infof(d.context.GetRuntimeContext(),
+		"service_etw stats reason=%s received=%d enqueued=%d dropped_queue_full=%d dropped_domain_filter=%d packet_data_parse_error=%d",
+		reason,
+		atomic.LoadUint64(&d.stats.received),
+		atomic.LoadUint64(&d.stats.enqueued),
+		atomic.LoadUint64(&d.stats.droppedQueueFull),
+		atomic.LoadUint64(&d.stats.droppedDomainFilter),
+		atomic.LoadUint64(&d.stats.packetDataParseError))
+}
+
 func (d *EtwInput) Stop() error {
 	d.mu.Lock()
 	d.stopped = true
@@ -233,33 +401,62 @@ func (d *EtwInput) Stop() error {
 }
 
 func (d *EtwInput) handleEvent(e *etw.Event) {
+	atomic.AddUint64(&d.stats.received, 1)
 	data, err := e.EventProperties()
 	if err != nil {
 		return
 	}
 
-	eventID := e.Header.EventDescriptor.ID
-	fields := make(map[string]string, len(data)+20)
-	fields["event_id"] = strconv.FormatUint(uint64(eventID), 10)
-	fields["opcode"] = strconv.FormatUint(uint64(e.Header.EventDescriptor.OpCode), 10)
-	fields["level"] = strconv.FormatUint(uint64(e.Header.EventDescriptor.Level), 10)
-	fields["keywords"] = fmt.Sprintf("0x%X", e.Header.EventDescriptor.Keyword)
-	fields["process_id"] = strconv.FormatUint(uint64(e.Header.ProcessID), 10)
-	fields["thread_id"] = strconv.FormatUint(uint64(e.Header.ThreadID), 10)
-
-	for k, v := range data {
-		fields[normalizeETWFieldName(k)] = fmt.Sprintf("%v", v)
+	event := etwEventData{
+		eventID:    e.Header.EventDescriptor.ID,
+		opcode:     e.Header.EventDescriptor.OpCode,
+		level:      e.Header.EventDescriptor.Level,
+		keywords:   e.Header.EventDescriptor.Keyword,
+		processID:  e.Header.ProcessID,
+		threadID:   e.Header.ThreadID,
+		properties: data,
+		timestamp:  e.Header.TimeStamp,
 	}
-
-	if d.isDNSProvider() {
-		if d.shouldDropDNSEvent(fields) {
+	if d.AsyncProcess {
+		if d.DropWhenQueueFull {
+			select {
+			case d.eventCh <- event:
+				atomic.AddUint64(&d.stats.enqueued, 1)
+			default:
+				atomic.AddUint64(&d.stats.droppedQueueFull, 1)
+			}
 			return
 		}
-		d.enrichDNSFields(fields, eventID)
+		d.eventCh <- event
+		atomic.AddUint64(&d.stats.enqueued, 1)
+		return
+	}
+	d.processEvent(event)
+}
+
+func (d *EtwInput) processEvent(event etwEventData) {
+	fields := make(map[string]string, len(event.properties)+20)
+	fields["event_id"] = strconv.FormatUint(uint64(event.eventID), 10)
+	fields["opcode"] = strconv.FormatUint(uint64(event.opcode), 10)
+	fields["level"] = strconv.FormatUint(uint64(event.level), 10)
+	fields["keywords"] = fmt.Sprintf("0x%X", event.keywords)
+	fields["process_id"] = strconv.FormatUint(uint64(event.processID), 10)
+	fields["thread_id"] = strconv.FormatUint(uint64(event.threadID), 10)
+	for k, v := range event.properties {
+		fields[normalizeETWFieldName(k)] = fmt.Sprintf("%v", v)
+	}
+	if d.isDNSProvider() {
+		if d.shouldDropDNSEvent(fields) {
+			atomic.AddUint64(&d.stats.droppedDomainFilter, 1)
+			return
+		}
+		d.enrichDNSFields(fields, event.eventID)
 	}
 
 	tags := map[string]string{"source": "etw"}
-	d.collector.AddData(tags, fields, e.Header.TimeStamp)
+	d.collectorMu.Lock()
+	defer d.collectorMu.Unlock()
+	d.collector.AddData(tags, fields, event.timestamp)
 }
 
 func normalizeETWFieldName(name string) string {
