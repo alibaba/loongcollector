@@ -352,6 +352,7 @@ void CpuProfilingManager::HandleProcessDiscoveryEvent(ProcessDiscoveryManager::D
         }
     }
 
+    // Here we only update pids, so we can keep the original handler and ctx
     mEBPFAdapter->UpdatePlugin(PluginType::CPU_PROFILING,
                                buildCpuProfilingConfig(std::move(totalPids), std::nullopt, nullptr, nullptr));
 }
