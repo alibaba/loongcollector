@@ -14,6 +14,7 @@
 
 #include "ebpf/Config.h"
 
+#include <functional>
 #include <string>
 #include <unordered_set>
 
@@ -513,6 +514,86 @@ void WarnSecurityProbeConfigIgnore(const CollectionPipelineContext* mContext,
                          mContext->GetRegion());
 }
 
+/// Fills `dest` with argv-glob rows from `rows` (must be JSON array of string arrays).
+void ParseAgentsightCmdlineRowArray(const Json::Value& rows,
+                                    const std::string& contextLabel,
+                                    std::vector<std::vector<std::string>>& dest,
+                                    std::string& errorMsg,
+                                    const std::function<void()>& warn) {
+    if (!rows.isArray()) {
+        errorMsg = contextLabel + " must be an array of string arrays";
+        warn();
+        return;
+    }
+    for (Json::ArrayIndex i = 0; i < rows.size(); ++i) {
+        const Json::Value& row = rows[i];
+        if (!row.isArray()) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " must be a string array";
+            warn();
+            continue;
+        }
+        std::vector<std::string> patterns;
+        patterns.reserve(row.size());
+        bool rowOk = true;
+        for (const auto& cell : row) {
+            if (!cell.isString()) {
+                errorMsg = contextLabel + " row " + std::to_string(i) + " contains non-string element";
+                warn();
+                rowOk = false;
+                break;
+            }
+            patterns.emplace_back(cell.asString());
+        }
+        if (!rowOk) {
+            continue;
+        }
+        if (patterns.empty()) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " is empty";
+            warn();
+            continue;
+        }
+        dest.emplace_back(std::move(patterns));
+    }
+}
+
+void ParseAgentsightCmdlineFromOptionalKey(const Json::Value& innerConfig,
+                                           const char* key,
+                                           const std::string& contextLabel,
+                                           std::vector<std::vector<std::string>>& dest,
+                                           std::string& errorMsg,
+                                           const std::function<void()>& warn) {
+    if (!innerConfig.isMember(key)) {
+        return;
+    }
+    ParseAgentsightCmdlineRowArray(innerConfig[key], contextLabel, dest, errorMsg, warn);
+}
+
+void ParseAgentsightDomainStringList(const Json::Value& innerConfig,
+                                     const char* key,
+                                     const std::string& contextLabel,
+                                     std::vector<std::string>& dest,
+                                     std::string& errorMsg,
+                                     const std::function<void()>& warn) {
+    if (!innerConfig.isMember(key)) {
+        return;
+    }
+    const Json::Value& dr = innerConfig[key];
+    if (!dr.isArray()) {
+        errorMsg = contextLabel + " must be an array of strings";
+        warn();
+        return;
+    }
+    for (Json::ArrayIndex i = 0; i < dr.size(); ++i) {
+        const Json::Value& cell = dr[i];
+        if (!cell.isString()) {
+            errorMsg = contextLabel + " element " + std::to_string(i) + " is not a string";
+            warn();
+            continue;
+        }
+        dest.emplace_back(cell.asString());
+    }
+}
+
 } // namespace
 
 bool SecurityOptions::Init(SecurityProbeType probeType,
@@ -526,6 +607,9 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mOptionList.clear();
         mVerbose = 0;
         mLogPath.clear();
+        mAgentsightCmdlineWhitelist.clear();
+        mAgentsightCmdlineBlacklist.clear();
+        mAgentsightDomainWhitelist.clear();
     }
 
     SecurityOption thisSecurityOption;
@@ -554,6 +638,24 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 if (!GetOptionalStringParam(innerConfig, "LogPath", mLogPath, errorMsg)) {
                     warnOptionalParse();
                 }
+                ParseAgentsightCmdlineFromOptionalKey(innerConfig,
+                                                      "CmdlineWhitelist",
+                                                      "ProbeConfig.CmdlineWhitelist",
+                                                      mAgentsightCmdlineWhitelist,
+                                                      errorMsg,
+                                                      warnOptionalParse);
+                ParseAgentsightCmdlineFromOptionalKey(innerConfig,
+                                                      "CmdlineBlacklist",
+                                                      "ProbeConfig.CmdlineBlacklist",
+                                                      mAgentsightCmdlineBlacklist,
+                                                      errorMsg,
+                                                      warnOptionalParse);
+                ParseAgentsightDomainStringList(innerConfig,
+                                                "DomainWhitelist",
+                                                "ProbeConfig.DomainWhitelist",
+                                                mAgentsightDomainWhitelist,
+                                                errorMsg,
+                                                warnOptionalParse);
                 return true;
             }
             case SecurityProbeType::FILE: {

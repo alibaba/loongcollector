@@ -15,11 +15,15 @@
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
 #include <algorithm>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringView.h"
 #include "common/magic_enum.hpp"
+#include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
 #include "ebpf/type/table/BaseElements.h"
@@ -98,6 +102,151 @@ bool ParseHostAndPortFromRequestUrl(const std::string& url, std::string& host, s
     return !host.empty();
 }
 
+/// Builtin cmdline allow rules — keep in sync with
+/// `core/_thirdparty/coolbpf/src/agentsight/agentsight.json` (`cmdline.allow`).
+struct BuiltinCmdlineAllowRule {
+    const char* agent_name;
+    std::vector<std::string> argv_globs;
+};
+
+static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules() {
+    static const std::vector<BuiltinCmdlineAllowRule> kRules = {
+        {"Hermes", {"hermes*"}},
+        {"Hermes", {"*python*", "*hermes*"}},
+        {"Hermes", {"*python*", "-m", "*hermes*"}},
+        {"Cosh", {"node*", "*/usr/bin/co*"}},
+        {"Cosh", {"node*", "*/usr/bin/cosh*"}},
+        {"Cosh", {"node*", "*/usr/bin/copliot*"}},
+        {"Cosh", {"node*", "*copilot-shell*"}},
+        {"OpenClaw", {"*openclaw-gatewa*"}},
+        {"OpenClaw", {"node*", "*openclaw*"}},
+    };
+    return kRules;
+}
+
+static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
+    static const std::vector<const char*> kRules = {
+        "api.openai.com",
+        "api.anthropic.com",
+        "dashscope.aliyuncs.com",
+        "dashscope-intl.aliyuncs.com",
+    };
+    return kRules;
+}
+
+/// Join argv glob patterns for a stable FFI `agent_name` label (not used for matching).
+std::string DeriveAgentsightAliasBase(const std::vector<std::string>& patterns) {
+    std::string s;
+    for (size_t i = 0; i < patterns.size(); ++i) {
+        if (i > 0) {
+            s += '|';
+        }
+        s += patterns[i];
+    }
+    return s;
+}
+
+void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
+                                  const AgentSightSymbolTable* sym,
+                                  const SecurityOptions& opts) {
+    const bool injectBuiltinCmdlineAllow
+        = opts.mAgentsightCmdlineWhitelist.empty() && opts.mAgentsightCmdlineBlacklist.empty();
+    const bool injectBuiltinDomainAllow = opts.mAgentsightDomainWhitelist.empty();
+
+    if (!sym || !sym->config_add_cmdline_rule) {
+        LOG_WARNING(sLogger,
+                    ("AgentSight",
+                     "cmdline rules configured but agentsight_config_add_cmdline_rule symbol not found; skipping")(
+                        "user_whitelist_rows", opts.mAgentsightCmdlineWhitelist.size())(
+                        "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_allow_injected",
+                                                                                        injectBuiltinCmdlineAllow));
+    }
+    if (!sym || !sym->config_add_domain_rule) {
+        LOG_WARNING(
+            sLogger,
+            ("AgentSight", "domain rules configured but agentsight_config_add_domain_rule symbol not found; skipping")(
+                "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
+                                                                            injectBuiltinDomainAllow));
+    }
+
+    std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
+    size_t aliasCollisions = 0;
+
+    if (injectBuiltinCmdlineAllow) {
+        const auto& builtins = GetBuiltinCmdlineAllowRules();
+        allowRowsToApply.reserve(builtins.size());
+        for (const auto& br : builtins) {
+            allowRowsToApply.emplace_back(std::string(br.agent_name), br.argv_globs);
+        }
+    } else {
+        std::unordered_map<std::string, int> aliasOrdinal;
+        std::vector<std::string> whitelistAliases;
+        whitelistAliases.reserve(opts.mAgentsightCmdlineWhitelist.size());
+        for (const auto& row : opts.mAgentsightCmdlineWhitelist) {
+            const std::string base = DeriveAgentsightAliasBase(row);
+            int& n = aliasOrdinal[base];
+            ++n;
+            if (n == 1) {
+                whitelistAliases.push_back(base);
+            } else {
+                ++aliasCollisions;
+                whitelistAliases.push_back(base + "_" + std::to_string(n));
+            }
+        }
+        allowRowsToApply.reserve(opts.mAgentsightCmdlineWhitelist.size());
+        for (size_t i = 0; i < opts.mAgentsightCmdlineWhitelist.size(); ++i) {
+            allowRowsToApply.emplace_back(std::move(whitelistAliases[i]), opts.mAgentsightCmdlineWhitelist[i]);
+        }
+    }
+
+    if (sym && sym->config_add_cmdline_rule) {
+        for (const auto& entry : allowRowsToApply) {
+            const auto& row = entry.second;
+            std::vector<const char*> ptrs;
+            ptrs.reserve(row.size() + 1U);
+            for (const auto& p : row) {
+                ptrs.push_back(p.c_str());
+            }
+            ptrs.push_back(nullptr);
+            sym->config_add_cmdline_rule(cfg, ptrs.data(), entry.first.c_str(), 1);
+        }
+        for (const auto& row : opts.mAgentsightCmdlineBlacklist) {
+            std::vector<const char*> ptrs;
+            ptrs.reserve(row.size() + 1U);
+            for (const auto& p : row) {
+                ptrs.push_back(p.c_str());
+            }
+            ptrs.push_back(nullptr);
+            sym->config_add_cmdline_rule(cfg, ptrs.data(), nullptr, 0);
+        }
+    }
+
+    size_t domainRowsApplied = 0;
+    if (sym && sym->config_add_domain_rule) {
+        if (injectBuiltinDomainAllow) {
+            for (const char* d : GetBuiltinDomainAllowRules()) {
+                sym->config_add_domain_rule(cfg, d);
+                ++domainRowsApplied;
+            }
+        } else {
+            for (const auto& d : opts.mAgentsightDomainWhitelist) {
+                sym->config_add_domain_rule(cfg, d.c_str());
+                ++domainRowsApplied;
+            }
+        }
+    }
+
+    LOG_INFO(sLogger,
+             ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
+                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                                    injectBuiltinCmdlineAllow)(
+                 "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
+                                                                        opts.mAgentsightDomainWhitelist.size())(
+                 "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
+                 "whitelist_alias_collisions", aliasCollisions)("cmdline_api", sym && sym->config_add_cmdline_rule)(
+                 "domain_api", sym && sym->config_add_domain_rule));
+}
+
 } // namespace
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -170,6 +319,8 @@ bool AgentsightManager::RestartAgentSightLocked(const SecurityOptions& opts) {
     if (!opts.mLogPath.empty()) {
         sym->config_set_log_path(cfg, opts.mLogPath.c_str());
     }
+
+    ApplyAgentsightRulesToConfig(cfg, sym, opts);
 
     mHandle = sym->handle_new(cfg);
     if (sym->config_free) {
@@ -424,7 +575,7 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
     if (rec->mPid != 0) {
         log->SetContent("pid", std::to_string(rec->mPid));
     }
-    setStr(StringView("process_name"), rec->mProcessName);
+    setStr(StringView("comm"), rec->mProcessName);
     setStr(StringView("gen_ai.agent.name"), rec->mAgentName);
 
     log->SetContent("gen_ai.request.timestamp", std::to_string(rec->mTimestampNs / 1000000ULL));
