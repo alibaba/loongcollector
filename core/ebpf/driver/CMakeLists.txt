@@ -74,7 +74,7 @@ if (LINUX)
     add_custom_target(
         install_coolbpf ALL
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
-        DEPENDS coolbpf coolbpf_static build_libprofiler
+        DEPENDS ${_coolbpf_install_deps} build_libprofiler
     )
 
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
