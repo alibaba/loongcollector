@@ -730,8 +730,7 @@ int AgentsightManager::resume(const PluginOptions& opt) {
     return 0;
 }
 
-std::unique_ptr<PluginConfig>
-AgentsightManager::GeneratePluginConfig(const PluginOptions&) {
+std::unique_ptr<PluginConfig> AgentsightManager::GeneratePluginConfig(const PluginOptions&) {
     auto c = std::make_unique<PluginConfig>();
     c->mPluginType = PluginType::AGENTSIGHT_OBSERVE;
     c->mConfig = ProcessConfig{};

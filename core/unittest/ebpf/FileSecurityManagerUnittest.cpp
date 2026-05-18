@@ -256,8 +256,7 @@ void FileSecurityManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("c1");
     ObserverNetworkOption o{};
-    APSARA_TEST_EQUAL(
-        -1, manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
+    APSARA_TEST_EQUAL(-1, manager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
     manager->Destroy();
 }
 
