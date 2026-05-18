@@ -989,8 +989,7 @@ void NetworkObserverManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() 
     ctx.SetConfigName("c-wrong-opt");
     ctx.SetProcessQueueKey(1);
     SecurityOptions bad{};
-    APSARA_TEST_NOT_EQUAL(
-        0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&bad)));
+    APSARA_TEST_NOT_EQUAL(0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&bad)));
 }
 
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);

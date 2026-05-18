@@ -70,8 +70,7 @@ public:
 
     int OnEpollReadable() override;
 
-    std::unique_ptr<PluginConfig>
-    GeneratePluginConfig(const PluginOptions& options) override;
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(const PluginOptions& options) override;
 
     void SetMetrics(CounterPtr lossKernelEventsTotal, CounterPtr pushLogFailedTotal) {
         mLossKernelEventsTotal = std::move(lossKernelEventsTotal);

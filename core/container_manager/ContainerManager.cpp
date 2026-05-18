@@ -112,7 +112,7 @@ void ContainerManager::ApplyContainerDiffs() {
                     options = itr->second.first;
                     ctx = itr->second.second;
                 } else if (const auto handlerItr = mContainerHandlers.find(pair.first);
-                        handlerItr != mContainerHandlers.end()) {
+                           handlerItr != mContainerHandlers.end()) {
                     auto* options = handlerItr->second.first.first;
                     if (options->IsContainerDiscoveryEnabled()) {
                         auto& callback = handlerItr->second.second;

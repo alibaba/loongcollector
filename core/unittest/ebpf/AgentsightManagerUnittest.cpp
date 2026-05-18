@@ -257,21 +257,15 @@ void AgentsightManagerUnittest::TestAddOrUpdateValidation() {
     ctx.SetProcessQueueKey(1);
 
     ObserverNetworkOption o{};
-    APSARA_TEST_NOT_EQUAL(
-        0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&o)));
 
-    APSARA_TEST_NOT_EQUAL(
-        0,
-        mgr->AddOrUpdateConfig(
-            nullptr, 0, nullptr, PluginOptions(&agentsightOptions())));
+    APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(nullptr, 0, nullptr, PluginOptions(&agentsightOptions())));
 
     {
         static SecurityOptions wrong;
         wrong = agentsightOptions();
         wrong.mProbeType = SecurityProbeType::FILE;
-        APSARA_TEST_NOT_EQUAL(
-            0,
-            mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&wrong)));
+        APSARA_TEST_NOT_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&wrong)));
     }
 
     mgr->Destroy();

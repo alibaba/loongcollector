@@ -39,7 +39,7 @@ public:
            const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
            moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
            EventPool* pool,
-            std::string hostRootPath) {
+           std::string hostRootPath) {
         return std::make_shared<CpuProfilingManager>(
             processCacheManager, eBPFAdapter, queue, pool, std::move(hostRootPath));
     }
