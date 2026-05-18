@@ -19,11 +19,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mindprince/gonvml"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/mindprince/gonvml"
 )
 
 type InputGpuMetric struct {

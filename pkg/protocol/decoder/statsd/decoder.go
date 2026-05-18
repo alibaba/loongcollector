@@ -26,8 +26,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/protocol/decoder/common"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	dogstatsd "github.com/narqo/go-dogstatsd-parser"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Decoder struct {

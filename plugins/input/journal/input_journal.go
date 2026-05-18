@@ -29,11 +29,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/coreos/go-systemd/sdjournal"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/coreos/go-systemd/sdjournal"
 )
 
 // Named constants for the journal cursor placement positions

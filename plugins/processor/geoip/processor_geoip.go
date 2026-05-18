@@ -15,16 +15,16 @@
 package geoip
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"net"
 	"strconv"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/oschwald/geoip2-golang"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // ProcessorGeoIP is a processor plugin to insert geographical information into log according

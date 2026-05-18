@@ -27,9 +27,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	restclient "k8s.io/client-go/rest"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"strconv"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 func (in *InputKubernetesMeta) InitKruise(cfg *restclient.Config) {

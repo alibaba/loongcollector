@@ -19,8 +19,9 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 
 	"context"
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"runtime"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 func panicRecover(cxt context.Context, key string) {

@@ -21,13 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/helper/profile"
-	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/pyroscope-io/pyroscope/pkg/ingestion"
@@ -38,6 +31,13 @@ import (
 	"github.com/pyroscope-io/pyroscope/pkg/storage/metadata"
 	"github.com/pyroscope-io/pyroscope/pkg/util/bytesize"
 	"github.com/sirupsen/logrus"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/helper/profile"
+	"github.com/alibaba/ilogtail/pkg/helper/profile/pyroscope/pprof"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type Mode string

@@ -15,18 +15,12 @@
 package systemv2
 
 import (
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"math"
 	"os"
 	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/prometheus/procfs"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -34,6 +28,12 @@ import (
 	"github.com/shirou/gopsutil/load"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // InputSystem plugin is modified with care, because two collect libs are used， which are procfs and gopsutil.

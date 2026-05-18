@@ -24,10 +24,11 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/elastic/beats/v7/winlogbeat/sys"
 	win "github.com/elastic/beats/v7/winlogbeat/sys/wineventlog"
 	"golang.org/x/sys/windows"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (

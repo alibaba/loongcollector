@@ -25,14 +25,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/prometheus/procfs"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/net"
+
+	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type tcpState uint64

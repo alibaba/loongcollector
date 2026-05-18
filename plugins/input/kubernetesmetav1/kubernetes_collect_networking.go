@@ -18,12 +18,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/ilogtail/pkg/helper"
-	"github.com/alibaba/ilogtail/pkg/logger"
-
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"k8s.io/apimachinery/pkg/labels"
 	networking "k8s.io/client-go/listers/networking/v1beta1"
+
+	"github.com/alibaba/ilogtail/pkg/helper"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // collectIngresses list the kubernetes Ingresses by the label selector and collect the core metadata.

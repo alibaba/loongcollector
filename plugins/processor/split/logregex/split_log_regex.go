@@ -20,9 +20,10 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"regexp"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorSplitRegex struct {

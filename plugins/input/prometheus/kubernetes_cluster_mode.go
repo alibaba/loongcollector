@@ -26,10 +26,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/rest"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // KubernetesMeta means workload meta

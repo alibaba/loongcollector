@@ -30,9 +30,9 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	// third-party
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	g "github.com/gosnmp/gosnmp"
 )
 

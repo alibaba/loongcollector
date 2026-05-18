@@ -26,12 +26,14 @@ package eventlog
 import (
 	"context"
 	"expvar"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog/common"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog/common"
+
 	"github.com/elastic/beats/v7/winlogbeat/sys"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // Stats for the message file caches.

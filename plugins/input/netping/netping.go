@@ -28,13 +28,13 @@ import (
 	"sync"
 	"time"
 
+	goping "github.com/go-ping/ping"
+
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	goping "github.com/go-ping/ping"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 const (

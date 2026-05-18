@@ -23,8 +23,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	"github.com/alibaba/ilogtail/pkg/logger"
 	_ "github.com/alibaba/ilogtail/pkg/logger/test"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 
 	// dependency packages
 	_ "github.com/alibaba/ilogtail/plugins/aggregator"
@@ -37,9 +40,6 @@ import (
 	_ "github.com/alibaba/ilogtail/plugins/input/mockd"
 	_ "github.com/alibaba/ilogtail/plugins/processor/anchor"
 	_ "github.com/alibaba/ilogtail/plugins/processor/regex"
-
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestPluginManager(t *testing.T) {

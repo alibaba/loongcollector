@@ -23,13 +23,15 @@
 package journal
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/util"
 	"io"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/util"
+
 	"github.com/coreos/go-systemd/sdjournal"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // SD_JOURNAL_FIELD_CATALOG_ENTRY stores the name of the JournalEntry field to export Catalog entry to.

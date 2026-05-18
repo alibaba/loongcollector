@@ -21,13 +21,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/alibaba/ilogtail/pkg/logger"
 	"reflect"
 	"strconv"
 	"time"
 
-	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/logger"
+
 	"github.com/elastic/beats/v7/winlogbeat/sys"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // Checkpoint represents the state of an individual event log.
