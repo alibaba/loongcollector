@@ -1035,6 +1035,8 @@ public:
     }
 
     void TestLastDockerJsonFile();
+    void TestLastDockerJsonFileSingleLine();
+    void TestLastDockerJsonFileMerge();
 
     std::unique_ptr<char[]> expectedContent;
     FileReaderOptions readerOpts;
@@ -1046,6 +1048,8 @@ public:
 };
 
 UNIT_TEST_CASE(LastMatchedDockerJsonFileUnittest, TestLastDockerJsonFile);
+UNIT_TEST_CASE(LastMatchedDockerJsonFileUnittest, TestLastDockerJsonFileSingleLine);
+UNIT_TEST_CASE(LastMatchedDockerJsonFileUnittest, TestLastDockerJsonFileMerge);
 
 std::string LastMatchedDockerJsonFileUnittest::logPathDir;
 std::string LastMatchedDockerJsonFileUnittest::gbkFile;
@@ -1061,7 +1065,7 @@ void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFile() {
                                     std::make_pair(&multilineOpts, &ctx),
                                     std::make_pair(&tagOpts, &ctx));
         BaseLineParse* baseLineParsePtr = nullptr;
-        baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
+        baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
         logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
         // 不带回车
         // 不带回车
@@ -1263,6 +1267,256 @@ void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFile() {
 }
 
 
+void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFileSingleLine() {
+    {
+        MultilineOptions multilineOpts;
+        LogFileReader logFileReader(logPathDir,
+                                    utf8File,
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&tagOpts, &ctx));
+        BaseLineParse* baseLineParsePtr = nullptr;
+        baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
+        logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
+
+        // Docker JSON Full line: log field ends with \n
+        // Docker JSON Partial line: log field does NOT end with \n
+        auto makeDockerJsonFull = [](const std::string& content) -> std::string {
+            return R"({"log":")" + content + R"(\n","stream":"stdout","time":"2024-02-19T03:49:37.793533014Z"})";
+        };
+        auto makeDockerJsonPartial = [](const std::string& content) -> std::string {
+            return R"({"log":")" + content + R"(","stream":"stdout","time":"2024-02-19T03:49:37.793533014Z"})";
+        };
+
+        // case: F + P + P (needSingleLine=true)
+        {
+            std::string testLog
+                = makeDockerJsonFull("789") + "\n" + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: F + P + P + '\n' (needSingleLine=true)
+        {
+            std::string testLog = makeDockerJsonFull("789") + "\n" + makeDockerJsonPartial("123") + "\n"
+                + makeDockerJsonPartial("456") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: F + P + P + F (needSingleLine=true)
+        {
+            std::string prefix = makeDockerJsonFull("789") + "\n";
+            std::string testLog
+                = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n" + makeDockerJsonFull("789");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: F + P + P + F + '\n' (needSingleLine=true)
+        {
+            std::string prefix = makeDockerJsonFull("789") + "\n";
+            std::string testLog = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n"
+                + makeDockerJsonFull("789") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P + F (needSingleLine=true)
+        {
+            std::string prefix = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+            std::string testLog = prefix + makeDockerJsonFull("789");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P + F + '\n' (needSingleLine=true)
+        {
+            std::string prefix = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+            std::string testLog = prefix + makeDockerJsonFull("789") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(1, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P (needSingleLine=true)
+        {
+            std::string testLog = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(0, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(false, line.fullLine);
+        }
+        // case: P + P + '\n' (needSingleLine=true)
+        {
+            std::string testLog = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs, true);
+
+            APSARA_TEST_EQUAL("", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(0, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(false, line.fullLine);
+        }
+    }
+}
+
+void LastMatchedDockerJsonFileUnittest::TestLastDockerJsonFileMerge() {
+    {
+        MultilineOptions multilineOpts;
+        LogFileReader logFileReader(logPathDir,
+                                    utf8File,
+                                    DevInode(),
+                                    std::make_pair(&readerOpts, &ctx),
+                                    std::make_pair(&multilineOpts, &ctx),
+                                    std::make_pair(&tagOpts, &ctx));
+        BaseLineParse* baseLineParsePtr = nullptr;
+        baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
+        logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
+
+        auto makeDockerJsonFull = [](const std::string& content) -> std::string {
+            return R"({"log":")" + content + R"(\n","stream":"stdout","time":"2024-02-19T03:49:37.793533014Z"})";
+        };
+        auto makeDockerJsonPartial = [](const std::string& content) -> std::string {
+            return R"({"log":")" + content + R"(","stream":"stdout","time":"2024-02-19T03:49:37.793533014Z"})";
+        };
+
+        // case: F + P + P + F (needSingleLine=false, merge mode)
+        {
+            std::string prefix = makeDockerJsonFull("789") + "\n";
+            std::string testLog
+                = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n" + makeDockerJsonFull("789");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("123456789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(3, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: F + P + P + F + '\n' (needSingleLine=false, merge mode)
+        {
+            std::string prefix = makeDockerJsonFull("789") + "\n";
+            std::string testLog = prefix + makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n"
+                + makeDockerJsonFull("789") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("123456789", line.data.to_string());
+            APSARA_TEST_EQUAL(int(prefix.size()), line.lineBegin);
+            APSARA_TEST_EQUAL(3, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P + F (needSingleLine=false, merge mode)
+        {
+            std::string testLog
+                = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n" + makeDockerJsonFull("789");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("123456789", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(3, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P + F + '\n' (needSingleLine=false, merge mode)
+        {
+            std::string testLog = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n"
+                + makeDockerJsonFull("789") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("123456789", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(3, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(true, line.fullLine);
+        }
+        // case: P + P (needSingleLine=false, merge mode)
+        {
+            std::string testLog = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456");
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(0, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(false, line.fullLine);
+        }
+        // case: P + P + '\n' (needSingleLine=false, merge mode)
+        {
+            std::string testLog = makeDockerJsonPartial("123") + "\n" + makeDockerJsonPartial("456") + "\n";
+
+            int32_t size = testLog.size();
+            int32_t endPs = (testLog[size - 1] == '\n') ? size - 1 : size;
+            LineInfo line = logFileReader.GetLastLine(testLog, endPs);
+
+            APSARA_TEST_EQUAL("", line.data.to_string());
+            APSARA_TEST_EQUAL(0, line.lineBegin);
+            APSARA_TEST_EQUAL(0, line.rollbackLineFeedCount);
+            APSARA_TEST_EQUAL(2, line.forceRollbackLineFeedCount);
+            APSARA_TEST_EQUAL(false, line.fullLine);
+        }
+    }
+}
+
 class LastMatchedContainerdTextWithDockerJsonUnittest : public ::testing::Test {
 public:
     static void SetUpTestCase() {
@@ -1328,7 +1582,7 @@ void LastMatchedContainerdTextWithDockerJsonUnittest::TestContainerdTextWithDock
                                 std::make_pair(&multilineOpts, &ctx),
                                 std::make_pair(&tagOpts, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
-    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
+    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
@@ -1390,7 +1644,7 @@ void LastMatchedContainerdTextWithDockerJsonUnittest::TestDockerJsonWithContaine
     BaseLineParse* baseLineParsePtr = nullptr;
     baseLineParsePtr = logFileReader.GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
-    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
+    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
     {
         std::string testLog

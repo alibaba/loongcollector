@@ -41,6 +41,7 @@ public:
     void OnEnableContainerDiscovery();
     void OnPipelineUpdate();
     void TestTryGetRealPath();
+    void TestCreateInnerProcessorsJsonMultilineNoJsonReader();
 
 protected:
     static void SetUpTestCase() {
@@ -255,6 +256,31 @@ UNIT_TEST_CASE(InputContainerStdioUnittest, OnSuccessfulInit)
 UNIT_TEST_CASE(InputContainerStdioUnittest, OnEnableContainerDiscovery)
 UNIT_TEST_CASE(InputContainerStdioUnittest, OnPipelineUpdate)
 UNIT_TEST_CASE(InputContainerStdioUnittest, TestTryGetRealPath)
+UNIT_TEST_CASE(InputContainerStdioUnittest, TestCreateInnerProcessorsJsonMultilineNoJsonReader)
+
+void InputContainerStdioUnittest::TestCreateInnerProcessorsJsonMultilineNoJsonReader() {
+    unique_ptr<InputContainerStdio> input;
+    Json::Value configJson, optionalGoPipeline;
+    string configStr, errorMsg;
+
+    configStr = R"(
+        {
+            "Type": "input_container_stdio",
+            "Multiline": {
+                "Mode": "JSON"
+            }
+        }
+    )";
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, configJson, errorMsg));
+    input.reset(new InputContainerStdio());
+    input->SetContext(ctx);
+    input->CreateMetricsRecordRef(InputContainerStdio::sName, "1");
+    APSARA_TEST_TRUE(input->Init(configJson, optionalGoPipeline));
+    input->CommitMetricsRecordRef();
+
+    APSARA_TEST_TRUE(input->CreateInnerProcessors());
+    APSARA_TEST_FALSE(ctx.RequiringJsonReader());
+}
 
 } // namespace logtail
 
