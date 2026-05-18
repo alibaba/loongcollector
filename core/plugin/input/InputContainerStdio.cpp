@@ -353,8 +353,8 @@ bool InputContainerStdio::CreateInnerProcessors() {
         Json::Value detail;
         if (mContext->IsFirstProcessorJson() || mMultiline.mMode == MultilineOptions::Mode::JSON) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
-                ProcessorSplitLogStringNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
-            detail["SplitChar"] = Json::Value('\0');
+                ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));
+            detail["MergeType"] = Json::Value("json");
         } else if (mMultiline.mMode == MultilineOptions::Mode::CUSTOM) {
             processor = PluginRegistry::GetInstance()->CreateProcessor(
                 ProcessorMergeMultilineLogNative::sName, mContext->GetPipeline().GenNextPluginMeta(false));

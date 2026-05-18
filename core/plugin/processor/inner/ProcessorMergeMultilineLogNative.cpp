@@ -22,6 +22,7 @@
 
 #include "app_config/AppConfig.h"
 #include "common/ParamExtractor.h"
+#include "file_server/reader/LogFileReader.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
 #include "monitor/metric_constants/MetricConstants.h"
@@ -59,6 +60,8 @@ bool ProcessorMergeMultilineLogNative::Init(const Json::Value& config) {
                            mContext->GetRegion());
     } else if (mergeType == "flag") {
         mMergeType = MergeType::BY_FLAG;
+    } else if (mergeType == "json") {
+        mMergeType = MergeType::BY_JSON;
     } else if (mergeType == "regex") {
         if (!mMultiline.Init(config, *mContext, sName)) {
             return false;
@@ -90,6 +93,8 @@ void ProcessorMergeMultilineLogNative::Process(PipelineEventGroup& logGroup) {
         // If there is no part log in the logGroup, this part of the logic does not need to be executed.
         MergeLogsByFlag(logGroup);
         logGroup.DelMetadata(EventGroupMetaKey::HAS_PART_LOG);
+    } else if (mMergeType == MergeType::BY_JSON) {
+        MergeLogsByJson(logGroup);
     }
 }
 
@@ -380,6 +385,101 @@ void ProcessorMergeMultilineLogNative::HandleUnmatchLogs(
             logEvents[newSize++] = std::move(logEvents[i]);
         }
     }
+}
+
+void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGroup) {
+    auto& sourceEvents = logGroup.MutableEvents();
+    size_t newSize = 0;
+    std::vector<LogEvent*> events;
+    size_t begin = 0;
+    int braceDepth = 0;
+    size_t accumulatedSize = 0;
+    size_t maxSize = mMaxJsonBlockSize > 0 ? mMaxJsonBlockSize : LogFileReader::BUFFER_SIZE;
+    StringView logPath = logGroup.GetMetadata(EventGroupMetaKey::LOG_FILE_PATH_RESOLVED);
+
+    for (size_t cur = 0; cur < sourceEvents.size(); ++cur) {
+        if (!IsSupportedEvent(sourceEvents[cur])) {
+            if (events.empty()) {
+                begin = cur;
+            }
+            for (size_t i = begin; i < sourceEvents.size(); ++i) {
+                sourceEvents[newSize++] = std::move(sourceEvents[i]);
+            }
+            sourceEvents.resize(newSize);
+            return;
+        }
+        LogEvent* sourceEvent = &sourceEvents[cur].Cast<LogEvent>();
+        if (sourceEvent->Empty()) {
+            continue;
+        }
+
+        StringView content = sourceEvent->GetContent(mSourceKey);
+
+        bool inQuote = false;
+        for (size_t i = 0; i < content.size(); ++i) {
+            char c = content[i];
+            switch (c) {
+                case '\\':
+                    if (inQuote) {
+                        ++i;
+                    }
+                    break;
+                case '"': inQuote = !inQuote; break;
+                case '{':
+                    if (!inQuote) {
+                        braceDepth++;
+                    }
+                    break;
+                case '}':
+                    if (!inQuote) {
+                        braceDepth--;
+                    }
+                    break;
+                default: break;
+            }
+        }
+
+        if (events.empty()) {
+            begin = cur;
+        }
+        events.emplace_back(sourceEvent);
+        accumulatedSize += content.size();
+
+        if (braceDepth <= 0) {
+            MergeEvents(events, true);
+            sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+            events.clear();
+            braceDepth = 0;
+            accumulatedSize = 0;
+        } else if (accumulatedSize > maxSize) {
+            MergeEvents(events, true);
+            sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+            events.clear();
+            braceDepth = 0;
+            accumulatedSize = 0;
+
+            LOG_WARNING(
+                mContext->GetLogger(),
+                ("JSON block too long, forced to split",
+                 "")("first 1KB",
+                      sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey).substr(0, 1024).to_string())(
+                    "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
+            mContext->GetAlarm().SendAlarmWarning(
+                SPLIT_LOG_FAIL_ALARM,
+                "JSON block too long and forced to split. processor: " + sName
+                    + " config: " + mContext->GetConfigName(),
+                mContext->GetRegion(),
+                mContext->GetProjectName(),
+                mContext->GetConfigName(),
+                mContext->GetLogstoreName());
+        }
+    }
+
+    if (!events.empty()) {
+        MergeEvents(events, true);
+        sourceEvents[newSize++] = std::move(sourceEvents[begin]);
+    }
+    sourceEvents.resize(newSize);
 }
 
 } // namespace logtail

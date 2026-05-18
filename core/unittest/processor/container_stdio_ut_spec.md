@@ -311,7 +311,101 @@ FileServer (读文件块)
 **验证**：
 
 - `mContext->RequiringJsonReader()` 返回 `false`
-- inner processors 链包含 `ProcessorSplitLogStringNative(SplitChar='\0')`（JSON `{}` 配对在 processor 层完成）
+- inner processors 链中 step 4 为 `ProcessorMergeMultilineLogNative`(MergeType=json)（Phase 4 将 `SplitChar='\0'` 替换为 JSON 块合并）
+- `mContext->RequiringJsonReader()` 返回 `false`
+
+### 4.4 ProcessorMergeMultilineLogNativeUnittest — Phase 4 新增
+
+新增测试类 `ProcessorMergeMultilineLogJsonUnittest`，验证 `MergeType::BY_JSON` 的 JSON 块合并功能。
+
+#### TC-JSON-01: TestMergeJsonInit
+
+**目的**：验证 `ProcessorMergeMultilineLogNative` 以 `MergeType="json"` Init 成功。
+
+**验证**：
+- Init 返回 true
+- `mMergeType == MergeType::BY_JSON`
+
+#### TC-JSON-02: TestMergeJsonSingleLineBlock
+
+**目的**：验证单行完整 JSON 不触发合并。
+
+**输入**：3 个事件，每个 content 是完整 JSON：
+- `{"a":1}`
+- `{"b":2}`
+- `{"c":3}`
+
+**预期**：3 个事件不变（braceDepth 在每行内 0→1→0，无需合并）。
+
+#### TC-JSON-03: TestMergeJsonMultiLineBlock
+
+**目的**：验证多行 JSON 块正确合并。
+
+**输入**：6 个事件（模拟多行 JSON）：
+```
+{
+  "key": "value",
+  "nested": {
+    "a": 1
+  }
+}
+```
+
+**预期**：1 个事件，content 为上述 6 行用 `\n` 拼接。
+
+#### TC-JSON-04: TestMergeJsonMultipleBlocks
+
+**目的**：验证连续多个 JSON 块各自独立合并。
+
+**输入**：4 个事件：
+- `{`
+- `"a":1`
+- `}`
+- `{"b":2}`
+
+**预期**：2 个事件（前 3 行合并为 `{\n"a":1\n}`，第 4 行独立）。
+
+#### TC-JSON-05: TestMergeJsonBraceInString
+
+**目的**：验证引号内的大括号不影响 braceDepth 计数。
+
+**输入**：1 个事件 `{"key": "value with { and } braces"}`
+
+**预期**：1 个事件不变（braceDepth 正确归零）。
+
+#### TC-JSON-06: TestMergeJsonEscapedQuote
+
+**目的**：验证转义引号 `\"` 不影响 inQuote 状态。
+
+**输入**：1 个事件 `{"key": "he said \"hello\""}`
+
+**预期**：1 个事件不变。
+
+#### TC-JSON-07: TestMergeJsonOversized
+
+**目的**：验证 JSON 块超过 `MaxJsonBlockSize` 时强制输出。
+
+**前置条件**：Init config 设置 `MaxJsonBlockSize` 为较小值（如 50 字节）。
+
+**输入**：多行 JSON 块，累积大小超过限制。
+
+**预期**：
+- 强制拆分输出
+- 后续行继续正常处理
+
+#### TC-JSON-08: TestMergeJsonIncompleteAtEnd
+
+**目的**：验证批次末尾未闭合 JSON 块不丢弃。
+
+**输入**：3 个事件 `{`, `"a":1`, `"b":2`（无 `}`）
+
+**预期**：合并为 1 个事件输出（内容为 `{\n"a":1\n"b":2`）。
+
+### 4.5 InputContainerStdioUnittest — Phase 4 更新
+
+更新 TC-STDIO-JSON-MULTILINE-01 验证：
+- step 4 创建的是 `ProcessorMergeMultilineLogNative`(MergeType=json)，而非 `ProcessorSplitLogStringNative`
+- `mContext->RequiringJsonReader()` 返回 `false`
 
 ---
 
@@ -343,12 +437,23 @@ GetLastLineDataUnittest
       ├── TestContainerdTextWithDockerJson          [已有]
       └── TestDockerJsonWithContainerdText          [已有]
 
+ProcessorMergeMultilineLogNativeUnittest (Phase 4 新增)
++ └── ProcessorMergeMultilineLogJsonUnittest
++     ├── TestMergeJsonInit                          [新增] MergeType=json Init
++     ├── TestMergeJsonSingleLineBlock               [新增] 单行 JSON 不合并
++     ├── TestMergeJsonMultiLineBlock                [新增] 多行 JSON 块合并
++     ├── TestMergeJsonMultipleBlocks                [新增] 连续多块各自合并
++     ├── TestMergeJsonBraceInString                 [新增] 引号内大括号忽略
++     ├── TestMergeJsonEscapedQuote                  [新增] 转义引号处理
++     ├── TestMergeJsonOversized                     [新增] 超限强制输出
++     └── TestMergeJsonIncompleteAtEnd               [新增] 末尾未闭合
+
 InputContainerStdioUnittest
   ├── OnSuccessfulInit                             [已有]
   ├── OnEnableContainerDiscovery                   [已有]
   ├── OnPipelineUpdate                             [已有]
   ├── TestTryGetRealPath                           [已有]
-+ └── TestCreateInnerProcessorsJsonMultilineNoJsonReader  [新增]
++ └── TestCreateInnerProcessorsJsonMultilineNoJsonReader  [新增/更新] Phase 3 + Phase 4
 ```
 
-新增 `+` 标记的共 **6 个测试方法**，覆盖 3 个已知缺陷的所有修复点。
+新增 `+` 标记的共 **14 个测试方法**（Phase 1-3: 6 个 + Phase 4: 8 个），覆盖 3 个已知缺陷 + JSON 多行块合并功能。

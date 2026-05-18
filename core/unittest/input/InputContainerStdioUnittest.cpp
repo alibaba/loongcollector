@@ -26,6 +26,7 @@
 #include "common/JsonUtil.h"
 #include "file_server/FileServer.h"
 #include "plugin/input/InputContainerStdio.h"
+#include "plugin/processor/inner/ProcessorMergeMultilineLogNative.h"
 #include "unittest/Unittest.h"
 
 DECLARE_FLAG_INT32(default_plugin_log_queue_size);
@@ -280,6 +281,13 @@ void InputContainerStdioUnittest::TestCreateInnerProcessorsJsonMultilineNoJsonRe
 
     APSARA_TEST_TRUE(input->CreateInnerProcessors());
     APSARA_TEST_FALSE(ctx.RequiringJsonReader());
+
+    // Step 4 processor should be ProcessorMergeMultilineLogNative with MergeType=json
+    APSARA_TEST_EQUAL(4UL, input->mInnerProcessors.size());
+    APSARA_TEST_EQUAL(ProcessorMergeMultilineLogNative::sName, input->mInnerProcessors[3]->Name());
+    auto* mergeProcessor
+        = static_cast<ProcessorMergeMultilineLogNative*>(input->mInnerProcessors[3]->mPlugin.get());
+    APSARA_TEST_TRUE(mergeProcessor->mMergeType == ProcessorMergeMultilineLogNative::MergeType::BY_JSON);
 }
 
 } // namespace logtail
