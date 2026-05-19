@@ -21,10 +21,12 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
 	pluginType             = "service_etw"
+	etwAlarmType           = selfmonitor.AlarmType("ETW_ALARM")
 	maxSessionRetryBackoff = 30 * time.Second
 )
 
@@ -287,10 +289,10 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 		}
 		if err != nil {
 			logger.Warningf(d.context.GetRuntimeContext(),
-				"ETW_ALARM", "ETW session error: %v; retrying in %s", err, backoff)
+				etwAlarmType, "ETW session error: %v; retrying in %s", err, backoff)
 		} else {
 			logger.Warningf(d.context.GetRuntimeContext(),
-				"ETW_ALARM", "ETW session stopped unexpectedly; retrying in %s", backoff)
+				etwAlarmType, "ETW session stopped unexpectedly; retrying in %s", backoff)
 		}
 		select {
 		case <-stopCh:
