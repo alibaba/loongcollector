@@ -15,7 +15,6 @@
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
 #include <algorithm>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -134,18 +133,6 @@ static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
     return kRules;
 }
 
-/// Join argv glob patterns for a stable FFI `agent_name` label (not used for matching).
-std::string DeriveAgentsightAliasBase(const std::vector<std::string>& patterns) {
-    std::string s;
-    for (size_t i = 0; i < patterns.size(); ++i) {
-        if (i > 0) {
-            s += '|';
-        }
-        s += patterns[i];
-    }
-    return s;
-}
-
 void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                                   const AgentSightSymbolTable* sym,
                                   const SecurityOptions& opts) {
@@ -170,7 +157,6 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
-    size_t aliasCollisions = 0;
 
     if (injectBuiltinCmdlineAllow) {
         const auto& builtins = GetBuiltinCmdlineAllowRules();
@@ -179,23 +165,9 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
             allowRowsToApply.emplace_back(std::string(br.agent_name), br.argv_globs);
         }
     } else {
-        std::unordered_map<std::string, int> aliasOrdinal;
-        std::vector<std::string> whitelistAliases;
-        whitelistAliases.reserve(opts.mAgentsightCmdlineWhitelist.size());
-        for (const auto& row : opts.mAgentsightCmdlineWhitelist) {
-            const std::string base = DeriveAgentsightAliasBase(row);
-            int& n = aliasOrdinal[base];
-            ++n;
-            if (n == 1) {
-                whitelistAliases.push_back(base);
-            } else {
-                ++aliasCollisions;
-                whitelistAliases.push_back(base + "_" + std::to_string(n));
-            }
-        }
         allowRowsToApply.reserve(opts.mAgentsightCmdlineWhitelist.size());
-        for (size_t i = 0; i < opts.mAgentsightCmdlineWhitelist.size(); ++i) {
-            allowRowsToApply.emplace_back(std::move(whitelistAliases[i]), opts.mAgentsightCmdlineWhitelist[i]);
+        for (const auto& rule : opts.mAgentsightCmdlineWhitelist) {
+            allowRowsToApply.emplace_back(rule.agentName, rule.patterns);
         }
     }
 
@@ -243,7 +215,7 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                  "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
                                                                         opts.mAgentsightDomainWhitelist.size())(
                  "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
-                 "whitelist_alias_collisions", aliasCollisions)("cmdline_api", sym && sym->config_add_cmdline_rule)(
+                 "cmdline_api", sym && sym->config_add_cmdline_rule)(
                  "domain_api", sym && sym->config_add_domain_rule));
 }
 

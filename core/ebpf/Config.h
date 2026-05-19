@@ -39,6 +39,12 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 enum class SecurityProbeType { PROCESS, FILE, NETWORK, AGENTSIGHT_OBSERVE, MAX };
 
+/// One cmdline allow rule: glob patterns plus the agent name reported as `gen_ai.agent.name`.
+struct AgentsightCmdlineAllowRule {
+    std::string agentName;
+    std::vector<std::string> patterns;
+};
+
 class SecurityOptions {
 public:
     bool Init(SecurityProbeType filterType,
@@ -52,8 +58,8 @@ public:
     // Valid when mProbeType == SecurityProbeType::AGENTSIGHT_OBSERVE (AgentSight input).
     int32_t mVerbose = 0;
     std::string mLogPath;
-    /// Cmdline argv glob rows (allow=1) for AgentSight process matching.
-    std::vector<std::vector<std::string>> mAgentsightCmdlineWhitelist;
+    /// Cmdline allow rules (argv globs + agent display name).
+    std::vector<AgentsightCmdlineAllowRule> mAgentsightCmdlineWhitelist;
     /// Cmdline argv glob rows (allow=0) for AgentSight process matching.
     std::vector<std::vector<std::string>> mAgentsightCmdlineBlacklist;
     /// Domain glob strings (whitelist) for AgentSight SNI / domain filtering.

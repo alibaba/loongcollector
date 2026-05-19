@@ -28,6 +28,7 @@ public:
     void TestAgentsightProbeConfigOptionalInvalidTypes();
     void TestAgentsightVerboseClampedWhenNegative();
     void TestAgentsightParsesFlatCmdlineAndDomainWhitelist();
+    void TestAgentsightParsesCmdlineWhitelistWithAgentName();
     void TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules();
 };
 
@@ -102,14 +103,34 @@ void SecurityOptionsUnittest::TestAgentsightParsesFlatCmdlineAndDomainWhitelist(
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist.size());
-    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist[0].size());
-    APSARA_TEST_EQUAL("node", opt.mAgentsightCmdlineWhitelist[0][0]);
-    APSARA_TEST_EQUAL("*claude*", opt.mAgentsightCmdlineWhitelist[0][1]);
-    APSARA_TEST_EQUAL(3UL, opt.mAgentsightCmdlineWhitelist[1].size());
+    APSARA_TEST_EQUAL("Custom Agent", opt.mAgentsightCmdlineWhitelist[0].agentName);
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist[0].patterns.size());
+    APSARA_TEST_EQUAL("node", opt.mAgentsightCmdlineWhitelist[0].patterns[0]);
+    APSARA_TEST_EQUAL("*claude*", opt.mAgentsightCmdlineWhitelist[0].patterns[1]);
+    APSARA_TEST_EQUAL("Custom Agent", opt.mAgentsightCmdlineWhitelist[1].agentName);
+    APSARA_TEST_EQUAL(3UL, opt.mAgentsightCmdlineWhitelist[1].patterns.size());
     APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineBlacklist.size());
     APSARA_TEST_EQUAL("*webpack*", opt.mAgentsightCmdlineBlacklist[0][1]);
     APSARA_TEST_EQUAL(2UL, opt.mAgentsightDomainWhitelist.size());
     APSARA_TEST_EQUAL("*.openai.com", opt.mAgentsightDomainWhitelist[0]);
+}
+
+void SecurityOptionsUnittest::TestAgentsightParsesCmdlineWhitelistWithAgentName() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"agent_name":"OpenClaw","rule":["node*","*openclaw*"]},{"agent_name":"Hermes","rule":["*python*","*hermes*"]}]}})",
+        config,
+        err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist.size());
+    APSARA_TEST_EQUAL("OpenClaw", opt.mAgentsightCmdlineWhitelist[0].agentName);
+    APSARA_TEST_EQUAL("node*", opt.mAgentsightCmdlineWhitelist[0].patterns[0]);
+    APSARA_TEST_EQUAL("*openclaw*", opt.mAgentsightCmdlineWhitelist[0].patterns[1]);
+    APSARA_TEST_EQUAL("Hermes", opt.mAgentsightCmdlineWhitelist[1].agentName);
 }
 
 void SecurityOptionsUnittest::TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules() {
@@ -134,6 +155,7 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalF
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigOptionalInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightVerboseClampedWhenNegative)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesFlatCmdlineAndDomainWhitelist)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesCmdlineWhitelistWithAgentName)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules)
 
 UNIT_TEST_MAIN
