@@ -214,13 +214,12 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
 
     LOG_INFO(sLogger,
              ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
-                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())(
-                 "builtin_cmdline_allow_injected", injectBuiltinCmdlineAllow)(
+                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                                    injectBuiltinCmdlineAllow)(
                  "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
                                                                         opts.mAgentsightDomainWhitelist.size())(
                  "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
-                 "cmdline_api", sym && sym->config_add_cmdline_rule)(
-                 "domain_api", sym && sym->config_add_domain_rule));
+                 "cmdline_api", sym && sym->config_add_cmdline_rule)("domain_api", sym && sym->config_add_domain_rule));
 }
 
 } // namespace

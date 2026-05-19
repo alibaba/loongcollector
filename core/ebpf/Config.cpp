@@ -622,7 +622,7 @@ bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
             warn();
             continue;
         }
-        dest.push_back(AgentsightCmdlineAllowRule {std::move(agentType), std::move(patterns)});
+        dest.push_back(AgentsightCmdlineAllowRule{std::move(agentType), std::move(patterns)});
     }
     if (dest.empty()) {
         errorMsg = contextLabel + " has no valid rules";

@@ -58,11 +58,10 @@ void InputAgentSightUnittest::TestInitWithProbeConfig() {
     std::string err;
     Json::Value configJson;
     Json::Value optionalGoPipeline;
-    APSARA_TEST_TRUE(
-        ParseJsonTable(
-            R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}]}})",
-            configJson,
-            err));
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}]}})",
+        configJson,
+        err));
     InputAgentSight input;
     input.SetContext(mContex);
     input.CreateMetricsRecordRef("t", "1");
