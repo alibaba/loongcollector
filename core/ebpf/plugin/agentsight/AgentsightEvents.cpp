@@ -28,8 +28,8 @@ static std::string CopyCStr(const char* s) {
 }
 
 static std::string CopyBuffer(const char* p, uint32_t len) {
-    // agentsight.h: request_messages / response_messages are (ptr, len), not necessarily NUL-terminated
-    // in the middle; copy exactly len bytes (no read past len).
+    // agentsight.h: request_messages / response_messages / tools are (ptr, len), not necessarily
+    // NUL-terminated in the middle; copy exactly len bytes (no read past len).
     if (!p || len == 0) {
         return {};
     }
@@ -64,6 +64,7 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mFinishReason = CopyCStr(d.finish_reason);
     mRequestMessagesJson = CopyBuffer(d.request_messages, d.request_messages_len);
     mResponseMessagesJson = CopyBuffer(d.response_messages, d.response_messages_len);
+    mToolDefinitionsJson = CopyBuffer(d.tools, d.tools_len);
 }
 
 } // namespace logtail::ebpf
