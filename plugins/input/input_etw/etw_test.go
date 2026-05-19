@@ -5,7 +5,9 @@ package input_etw
 
 import (
 	"encoding/json"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"golang.org/x/sys/windows"
 
@@ -74,6 +76,7 @@ func TestEtwInput_Init_Defaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 4, input.Level)
 	assert.Equal(t, uint64(0), uint64(input.Keywords))
+	assert.Equal(t, "etw", input.Source)
 	assert.True(t, input.parsePacketDataEnabled())
 }
 
@@ -202,6 +205,77 @@ func TestEtwInput_StopBeforeStart(t *testing.T) {
 	require.NoError(t, err)
 	err = input.Stop()
 	assert.NoError(t, err)
+}
+
+func TestEtwInput_StopIdempotent(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	require.NoError(t, input.Stop())
+	assert.NoError(t, input.Stop())
+}
+
+func TestEtwInput_ResetStats(t *testing.T) {
+	input := &EtwInput{}
+	atomic.StoreUint64(&input.stats.received, 1)
+	atomic.StoreUint64(&input.stats.enqueued, 2)
+	atomic.StoreUint64(&input.stats.droppedQueueFull, 3)
+	atomic.StoreUint64(&input.stats.droppedDomainFilter, 4)
+	atomic.StoreUint64(&input.stats.packetDataParseError, 5)
+
+	input.resetStats()
+
+	assert.Zero(t, atomic.LoadUint64(&input.stats.received))
+	assert.Zero(t, atomic.LoadUint64(&input.stats.enqueued))
+	assert.Zero(t, atomic.LoadUint64(&input.stats.droppedQueueFull))
+	assert.Zero(t, atomic.LoadUint64(&input.stats.droppedDomainFilter))
+	assert.Zero(t, atomic.LoadUint64(&input.stats.packetDataParseError))
+}
+
+func TestEtwInput_EnqueueEventDropWhenFull(t *testing.T) {
+	input := &EtwInput{
+		DropWhenQueueFull: true,
+		eventCh:           make(chan etwEventData),
+		stopCh:            make(chan struct{}),
+	}
+
+	input.enqueueEvent(etwEventData{})
+
+	assert.Zero(t, atomic.LoadUint64(&input.stats.enqueued))
+	assert.Equal(t, uint64(1), atomic.LoadUint64(&input.stats.droppedQueueFull))
+}
+
+func TestEtwInput_EnqueueEventTimeout(t *testing.T) {
+	oldTimeout := asyncEnqueueTimeout
+	asyncEnqueueTimeout = 10 * time.Millisecond
+	defer func() { asyncEnqueueTimeout = oldTimeout }()
+
+	input := &EtwInput{
+		eventCh: make(chan etwEventData),
+		stopCh:  make(chan struct{}),
+	}
+
+	input.enqueueEvent(etwEventData{})
+
+	assert.Zero(t, atomic.LoadUint64(&input.stats.enqueued))
+	assert.Equal(t, uint64(1), atomic.LoadUint64(&input.stats.droppedQueueFull))
+}
+
+func TestEtwInput_EnqueueEventStopSignal(t *testing.T) {
+	stopCh := make(chan struct{})
+	close(stopCh)
+	input := &EtwInput{
+		eventCh: make(chan etwEventData),
+		stopCh:  stopCh,
+	}
+
+	input.enqueueEvent(etwEventData{})
+
+	assert.Zero(t, atomic.LoadUint64(&input.stats.enqueued))
+	assert.Zero(t, atomic.LoadUint64(&input.stats.droppedQueueFull))
 }
 
 func TestKeywordMask_UnmarshalJSON(t *testing.T) {

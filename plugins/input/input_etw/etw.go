@@ -23,7 +23,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 )
 
-const pluginType = "service_etw"
+const (
+	pluginType             = "service_etw"
+	maxSessionRetryBackoff = 30 * time.Second
+)
+
+var asyncEnqueueTimeout = 5 * time.Second
 
 type KeywordMask uint64
 
@@ -54,6 +59,7 @@ func (k *KeywordMask) UnmarshalJSON(data []byte) error {
 type EtwInput struct {
 	ProviderName string
 	ProviderGUID string
+	Source       string
 	Level        int
 	Keywords     KeywordMask
 	// DNSQueryDomainFilters drops Microsoft-Windows-DNSServer events whose dns_query matches.
@@ -88,6 +94,7 @@ type EtwInput struct {
 	eventCh     chan etwEventData
 	workerWG    sync.WaitGroup
 	statsStopCh chan struct{}
+	stopCh      chan struct{}
 	statsWG     sync.WaitGroup
 	stopped     bool
 	stats       etwStats
@@ -118,6 +125,9 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	d.domain, d.domainType = getWindowsDomainInfo()
 	d.osName = "Windows"
 	d.osVersion = getWindowsOSVersion()
+	if d.Source == "" {
+		d.Source = "etw"
+	}
 
 	var guidStr string
 	if d.ProviderName != "" {
@@ -260,6 +270,8 @@ func (d *EtwInput) Description() string {
 
 func (d *EtwInput) Start(collector pipeline.Collector) error {
 	d.collector = collector
+	d.resetStats()
+	stopCh := d.prepareRun()
 	d.waitGroup.Add(1)
 	defer d.waitGroup.Done()
 	if d.AsyncProcess {
@@ -267,11 +279,42 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 		defer d.stopWorkers()
 	}
 
-	d.mu.Lock()
-	if d.stopped {
-		d.mu.Unlock()
-		return nil
+	backoff := time.Second
+	for {
+		err := d.runSession()
+		if d.isStopped() {
+			return nil
+		}
+		if err != nil {
+			logger.Warningf(d.context.GetRuntimeContext(),
+				"ETW_ALARM", "ETW session error: %v; retrying in %s", err, backoff)
+		} else {
+			logger.Warningf(d.context.GetRuntimeContext(),
+				"ETW_ALARM", "ETW session stopped unexpectedly; retrying in %s", backoff)
+		}
+		select {
+		case <-stopCh:
+			return nil
+		case <-time.After(backoff):
+		}
+		if backoff < maxSessionRetryBackoff {
+			backoff *= 2
+			if backoff > maxSessionRetryBackoff {
+				backoff = maxSessionRetryBackoff
+			}
+		}
 	}
+}
+
+func (d *EtwInput) prepareRun() <-chan struct{} {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.stopped = false
+	d.stopCh = make(chan struct{})
+	return d.stopCh
+}
+
+func (d *EtwInput) runSession() error {
 	options := []etw.Option{
 		etw.WithLevel(etw.TraceLevel(d.Level)),
 		etw.WithMatchKeywords(uint64(d.Keywords), 0),
@@ -289,6 +332,11 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 		options = append(options, etw.WithFlushTimerSec(d.FlushTimerSec))
 	}
 
+	d.mu.Lock()
+	if d.stopped {
+		d.mu.Unlock()
+		return nil
+	}
 	session, err := etw.NewSession(d.parsedGUID, options...)
 	if err != nil {
 		d.mu.Unlock()
@@ -296,20 +344,28 @@ func (d *EtwInput) Start(collector pipeline.Collector) error {
 	}
 	d.session = session
 	d.mu.Unlock()
+	defer func() {
+		d.mu.Lock()
+		if d.session == session {
+			d.session = nil
+		}
+		d.mu.Unlock()
+	}()
 
 	cb := func(e *etw.Event) { d.handleEvent(e) }
 	if err := session.Process(cb); err != nil {
-		d.mu.Lock()
-		stopped := d.stopped
-		d.mu.Unlock()
-		if stopped {
+		if d.isStopped() {
 			return nil
 		}
-		logger.Warningf(d.context.GetRuntimeContext(),
-			"ETW_ALARM", "session.Process error: %v", err)
-		return err
+		return fmt.Errorf("process ETW session: %w", err)
 	}
 	return nil
+}
+
+func (d *EtwInput) isStopped() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.stopped
 }
 
 func minInt(a, b int) int {
@@ -388,10 +444,28 @@ func (d *EtwInput) logStats(reason string) {
 		atomic.LoadUint64(&d.stats.packetDataParseError))
 }
 
+func (d *EtwInput) resetStats() {
+	atomic.StoreUint64(&d.stats.received, 0)
+	atomic.StoreUint64(&d.stats.enqueued, 0)
+	atomic.StoreUint64(&d.stats.droppedQueueFull, 0)
+	atomic.StoreUint64(&d.stats.droppedDomainFilter, 0)
+	atomic.StoreUint64(&d.stats.packetDataParseError, 0)
+}
+
 func (d *EtwInput) Stop() error {
 	d.mu.Lock()
+	if d.stopped {
+		d.mu.Unlock()
+		return nil
+	}
 	d.stopped = true
 	session := d.session
+	d.session = nil
+	stopCh := d.stopCh
+	d.stopCh = nil
+	if stopCh != nil {
+		close(stopCh)
+	}
 	d.mu.Unlock()
 	if session != nil {
 		_ = session.Close()
@@ -418,20 +492,40 @@ func (d *EtwInput) handleEvent(e *etw.Event) {
 		timestamp:  e.Header.TimeStamp,
 	}
 	if d.AsyncProcess {
-		if d.DropWhenQueueFull {
-			select {
-			case d.eventCh <- event:
-				atomic.AddUint64(&d.stats.enqueued, 1)
-			default:
-				atomic.AddUint64(&d.stats.droppedQueueFull, 1)
-			}
-			return
-		}
-		d.eventCh <- event
-		atomic.AddUint64(&d.stats.enqueued, 1)
+		d.enqueueEvent(event)
 		return
 	}
 	d.processEvent(event)
+}
+
+func (d *EtwInput) enqueueEvent(event etwEventData) {
+	stopCh := d.currentStopCh()
+	if d.DropWhenQueueFull {
+		select {
+		case d.eventCh <- event:
+			atomic.AddUint64(&d.stats.enqueued, 1)
+		case <-stopCh:
+		default:
+			atomic.AddUint64(&d.stats.droppedQueueFull, 1)
+		}
+		return
+	}
+
+	timer := time.NewTimer(asyncEnqueueTimeout)
+	defer timer.Stop()
+	select {
+	case d.eventCh <- event:
+		atomic.AddUint64(&d.stats.enqueued, 1)
+	case <-stopCh:
+	case <-timer.C:
+		atomic.AddUint64(&d.stats.droppedQueueFull, 1)
+	}
+}
+
+func (d *EtwInput) currentStopCh() <-chan struct{} {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.stopCh
 }
 
 func (d *EtwInput) processEvent(event etwEventData) {
@@ -453,7 +547,7 @@ func (d *EtwInput) processEvent(event etwEventData) {
 		d.enrichDNSFields(fields, event.eventID)
 	}
 
-	tags := map[string]string{"source": "etw"}
+	tags := map[string]string{"source": d.Source}
 	d.collectorMu.Lock()
 	defer d.collectorMu.Unlock()
 	d.collector.AddData(tags, fields, event.timestamp)
