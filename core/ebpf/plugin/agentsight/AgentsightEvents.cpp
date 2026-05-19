@@ -57,7 +57,7 @@ AgentsightLlmRecord::AgentsightLlmRecord(std::string pipelineConfigName, const A
     mCacheCreationInputTokens = d.cache_creation_input_tokens;
     mCacheReadInputTokens = d.cache_read_input_tokens;
     mProcessName = CopyProcessName(d.process_name);
-    mAgentName = CopyCStr(d.agent_name);
+    mAgentType = CopyCStr(d.agent_name);
     mRequestUrl = CopyCStr(d.request_url);
     mProvider = CopyCStr(d.provider);
     mModel = CopyCStr(d.model);

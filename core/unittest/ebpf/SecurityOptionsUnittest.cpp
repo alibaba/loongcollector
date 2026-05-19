@@ -22,29 +22,29 @@ using namespace logtail::ebpf;
 
 class SecurityOptionsUnittest : public testing::Test {
 public:
-    void TestAgentsightNoProbeConfigReturnsTrue();
-    void TestAgentsightProbeConfigWrongTypeWarns();
+    void TestAgentsightNoProbeConfigFallsBackToBuiltin();
+    void TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin();
     void TestAgentsightProbeConfigParsesOptionalFields();
     void TestAgentsightProbeConfigOptionalInvalidTypes();
     void TestAgentsightVerboseClampedWhenNegative();
-    void TestAgentsightParsesFlatCmdlineAndDomainWhitelist();
+    void TestAgentsightMissingCmdlineWhitelistFallsBackToBuiltin();
+    void TestAgentsightParsesCmdlineWhitelistWithAgentType();
+    void TestAgentsightAcceptsAnyAgentTypeShape();
+    void TestAgentsightRejectsLegacyLowercaseKeys();
+    void TestAgentsightRejectsEmptyCmdlineWhitelistArray();
     void TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules();
 };
 
-void SecurityOptionsUnittest::TestAgentsightNoProbeConfigReturnsTrue() {
+void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
     Json::Value config;
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_EQUAL(opt.mVerbose, 0);
-    APSARA_TEST_TRUE(opt.mLogPath.empty());
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
-    APSARA_TEST_TRUE(opt.mAgentsightCmdlineBlacklist.empty());
-    APSARA_TEST_TRUE(opt.mAgentsightDomainWhitelist.empty());
 }
 
-void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeWarns() {
+void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
@@ -52,6 +52,7 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeWarns() {
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": "not_a_map"})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigParsesOptionalFields() {
@@ -60,11 +61,14 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigParsesOptionalFields() {
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": {"Verbose": 2, "LogPath": "/tmp/as"}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"Verbose":2,"LogPath":"/tmp/as","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}]}})",
+        config,
+        err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(opt.mVerbose, 2);
     APSARA_TEST_EQUAL(opt.mLogPath, "/tmp/as");
-    // AGENTSIGHT branch returns before mOptionList.emplace_back (see Config.cpp).
+    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineWhitelist.size());
     APSARA_TEST_EQUAL(0UL, opt.mOptionList.size());
 }
 
@@ -74,7 +78,10 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigOptionalInvalidTypes() {
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": {"Verbose": "bad", "LogPath": 1}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"Verbose":"bad","LogPath":1,"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*"]}]}})",
+        config,
+        err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(0UL, opt.mOptionList.size());
 }
@@ -85,31 +92,81 @@ void SecurityOptionsUnittest::TestAgentsightVerboseClampedWhenNegative() {
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig": {"Verbose": -9}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"Verbose":-9,"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["*openclaw*"]}]}})",
+        config,
+        err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(opt.mVerbose, 0);
 }
 
-void SecurityOptionsUnittest::TestAgentsightParsesFlatCmdlineAndDomainWhitelist() {
+void SecurityOptionsUnittest::TestAgentsightMissingCmdlineWhitelistFallsBackToBuiltin() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"Verbose":0,"LogPath":""}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
+}
+
+void SecurityOptionsUnittest::TestAgentsightRejectsEmptyCmdlineWhitelistArray() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"CmdlineWhitelist":[]}})", config, err));
+    APSARA_TEST_FALSE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+}
+
+void SecurityOptionsUnittest::TestAgentsightParsesCmdlineWhitelistWithAgentType() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[["node","*claude*"],["npm","run","*"]],"CmdlineBlacklist":[["node","*webpack*"]],"DomainWhitelist":["*.openai.com","*.anthropic.com"]}})",
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]},{"AgentType":"hermes","Args":["*python*","*hermes*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist.size());
-    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist[0].size());
-    APSARA_TEST_EQUAL("node", opt.mAgentsightCmdlineWhitelist[0][0]);
-    APSARA_TEST_EQUAL("*claude*", opt.mAgentsightCmdlineWhitelist[0][1]);
-    APSARA_TEST_EQUAL(3UL, opt.mAgentsightCmdlineWhitelist[1].size());
-    APSARA_TEST_EQUAL(1UL, opt.mAgentsightCmdlineBlacklist.size());
-    APSARA_TEST_EQUAL("*webpack*", opt.mAgentsightCmdlineBlacklist[0][1]);
-    APSARA_TEST_EQUAL(2UL, opt.mAgentsightDomainWhitelist.size());
-    APSARA_TEST_EQUAL("*.openai.com", opt.mAgentsightDomainWhitelist[0]);
+    APSARA_TEST_EQUAL("openclaw", opt.mAgentsightCmdlineWhitelist[0].agentType);
+    APSARA_TEST_EQUAL("node*", opt.mAgentsightCmdlineWhitelist[0].patterns[0]);
+    APSARA_TEST_EQUAL("*openclaw*", opt.mAgentsightCmdlineWhitelist[0].patterns[1]);
+    APSARA_TEST_EQUAL("hermes", opt.mAgentsightCmdlineWhitelist[1].agentType);
+}
+
+void SecurityOptionsUnittest::TestAgentsightAcceptsAnyAgentTypeShape() {
+    // AgentType is a free-form non-empty string; we recommend lowercase+hyphen but do not enforce.
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"OpenClaw","Args":["node*","*openclaw*"]},{"AgentType":"my_custom_agent","Args":["*foo*"]}]}})",
+        config,
+        err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_EQUAL(2UL, opt.mAgentsightCmdlineWhitelist.size());
+    APSARA_TEST_EQUAL("OpenClaw", opt.mAgentsightCmdlineWhitelist[0].agentType);
+    APSARA_TEST_EQUAL("my_custom_agent", opt.mAgentsightCmdlineWhitelist[1].agentType);
+}
+
+void SecurityOptionsUnittest::TestAgentsightRejectsLegacyLowercaseKeys() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"agent_type":"openclaw","rule":["node*","*openclaw*"]}]}})",
+        config,
+        err));
+    APSARA_TEST_FALSE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
 }
 
 void SecurityOptionsUnittest::TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules() {
@@ -128,12 +185,16 @@ void SecurityOptionsUnittest::TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRu
     APSARA_TEST_TRUE(opt.mAgentsightDomainWhitelist.empty());
 }
 
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigReturnsTrue)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeWarns)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalFields)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigOptionalInvalidTypes)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightVerboseClampedWhenNegative)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesFlatCmdlineAndDomainWhitelist)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMissingCmdlineWhitelistFallsBackToBuiltin)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightParsesCmdlineWhitelistWithAgentType)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightAcceptsAnyAgentTypeShape)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsLegacyLowercaseKeys)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsEmptyCmdlineWhitelistArray)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightIgnoresLegacyCmdlineRulesAndDomainRules)
 
 UNIT_TEST_MAIN

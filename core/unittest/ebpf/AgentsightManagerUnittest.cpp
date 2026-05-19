@@ -482,7 +482,8 @@ void AgentsightManagerUnittest::TestDestroyTwice() {
 
 void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() {
     auto& o = agentsightOptions();
-    o.mAgentsightCmdlineWhitelist = {{"node", "*claude*"}, {"node", "*claude*"}};
+    o.mAgentsightCmdlineWhitelist = {AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}},
+                                     AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}}};
     o.mAgentsightCmdlineBlacklist = {{"node", "*webpack*"}};
     o.mAgentsightDomainWhitelist = {"*.openai.com", "*.anthropic.com"};
 
