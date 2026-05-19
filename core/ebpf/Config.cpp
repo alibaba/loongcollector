@@ -563,7 +563,7 @@ bool ParseAgentsightCmdlinePatternsArray(const Json::Value& row,
 
 } // namespace
 
-/// Fills `dest` with argv-glob rows from `rows` (must be JSON array of string arrays).
+/// Fills `dest` with cmdline-arg-glob rows from `rows` (must be JSON array of string arrays).
 void ParseAgentsightCmdlineRowArray(const Json::Value& rows,
                                     const std::string& contextLabel,
                                     std::vector<std::vector<std::string>>& dest,
@@ -584,7 +584,7 @@ void ParseAgentsightCmdlineRowArray(const Json::Value& rows,
     }
 }
 
-/// Fills `dest` with allow rules. Each entry must be `{"AgentType": "...", "Rule": [...]}`.
+/// Fills `dest` with allow rules. Each entry must be `{"AgentType": "...", "Args": [...]}`.
 bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
                                           const std::string& contextLabel,
                                           std::vector<AgentsightCmdlineAllowRule>& dest,
@@ -603,7 +603,7 @@ bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
     for (Json::ArrayIndex i = 0; i < rows.size(); ++i) {
         const Json::Value& row = rows[i];
         if (!row.isObject()) {
-            errorMsg = contextLabel + " row " + std::to_string(i) + " must be an object with AgentType and Rule";
+            errorMsg = contextLabel + " row " + std::to_string(i) + " must be an object with AgentType and Args";
             warn();
             continue;
         }
@@ -612,13 +612,13 @@ bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
             warn();
             continue;
         }
-        if (!row.isMember("Rule")) {
-            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have Rule";
+        if (!row.isMember("Args")) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have Args";
             warn();
             continue;
         }
         std::vector<std::string> patterns;
-        if (!ParseAgentsightCmdlinePatternsArray(row["Rule"], contextLabel, i, "Rule", patterns, errorMsg)) {
+        if (!ParseAgentsightCmdlinePatternsArray(row["Args"], contextLabel, i, "Args", patterns, errorMsg)) {
             warn();
             continue;
         }

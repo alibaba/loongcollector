@@ -20,7 +20,7 @@ dev
 |  ProbeConfig  |  object  |  否  |  /  |  AgentSight 探测配置。**整体未配置**时所有子项走默认。  |
 |  ProbeConfig.Verbose  |  uint  |  否  |  `0`  |  是否打印 ebpf 的详细日志，`1` 代表开启，`0` 代表关闭  |
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
-|  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Rule`（字符串数组，与 `argv` 按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
 
@@ -78,7 +78,7 @@ graph TD
 
 **默认 `CmdlineWhitelist`（9 条）**
 
-| AgentType | Rule（`argv` 各段 glob） |
+| AgentType | Args（cmdline 各段 glob） |
 | --- | --- |
 | `hermes` | `hermes*` |
 | `hermes` | `*python*`, `*hermes*` |
@@ -98,9 +98,9 @@ graph TD
 ProbeConfig:
   CmdlineWhitelist:
     - AgentType: openclaw
-      Rule: ["node*", "*openclaw*"]
+      Args: ["node*", "*openclaw*"]
     - AgentType: claude-code
-      Rule: ["node*", "*claude*"]
+      Args: ["node*", "*claude*"]
 ```
 
 #### Domain 规则优先级和默认注入值
@@ -134,7 +134,7 @@ ProbeConfig:
 | 字段 | 说明 |
 | --- | --- |
 | `AgentType` | 命中该规则后，写入日志 `gen_ai.agent.type` 的类型标识（如 `openclaw`）。多条规则可使用相同 `AgentType`。取值规范见上文。 |
-| `Rule` | 与进程 `argv` 各段按位置做 glob 匹配的字符串数组（与 `/proc/<PID>/cmdline` 一致）。 |
+| `Args` | 与进程 cmdline 各参数（即 `argv`，与 `/proc/<PID>/cmdline` 一致）按位置做 glob 匹配的字符串数组。 |
 
 先在本机查看真实命令行，再写 glob：
 
@@ -144,7 +144,7 @@ tr '\0' ' ' < /proc/<PID>/cmdline; echo
 
 每一段用 **glob** 匹配，不关心的位置写 `"*"`。
 
-**前缀匹配**：当 `Rule` 的段数**少于** `argv` 时，只对前 N 段按位置做 glob 匹配，**后面多出来的参数不参与匹配**。例如 `Rule: ["node*", "*openclaw*"]` 可命中 `node openclaw.js gateway`（第三段 `gateway` 被忽略）。若需约束后续参数，须在 `Rule` 中继续写出对应段。反之，`Rule` 段数**多于** `argv` 时则不命中。
+**前缀匹配**：当 `Args` 的段数**少于** cmdline 实际参数数时，只对前 N 段按位置做 glob 匹配，**后面多出来的参数不参与匹配**。例如 `Args: ["node*", "*openclaw*"]` 可命中 `node openclaw.js gateway`（第三段 `gateway` 被忽略）。若需约束后续参数，须在 `Args` 中继续写出对应段。反之，`Args` 段数**多于** cmdline 实际参数数时则不命中。
 
 **示例**（须写在 `ProbeConfig` 下）：
 
@@ -152,9 +152,9 @@ tr '\0' ' ' < /proc/<PID>/cmdline; echo
 ProbeConfig:
   CmdlineWhitelist:
     - AgentType: openclaw
-      Rule: ["node*", "*openclaw*"]
+      Args: ["node*", "*openclaw*"]
     - AgentType: hermes
-      Rule: ["*python*", "*hermes*"]
+      Args: ["*python*", "*hermes*"]
 ```
 
 同一进程命中多条规则时，**采集仍生效**；`gen_ai.agent.type` 取**列表中第一条**命中规则的 `AgentType`。若需固定类型，把更具体的规则排在前面，或避免 glob 重叠。
@@ -218,9 +218,9 @@ inputs:
       LogPath: ""
       CmdlineWhitelist:
         - AgentType: claude-code
-          Rule: ["node*", "*claude*"]
+          Args: ["node*", "*claude*"]
         - AgentType: hermes
-          Rule: ["node*", "*hermes*"]
+          Args: ["node*", "*hermes*"]
       CmdlineBlacklist:
         - ["node*", "*webpack*"]
       DomainWhitelist:

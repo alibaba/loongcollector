@@ -62,7 +62,7 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigParsesOptionalFields() {
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"Verbose":2,"LogPath":"/tmp/as","CmdlineWhitelist":[{"AgentType":"openclaw","Rule":["node*","*openclaw*"]}]}})",
+        R"({"ProbeConfig":{"Verbose":2,"LogPath":"/tmp/as","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
@@ -79,7 +79,7 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigOptionalInvalidTypes() {
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"Verbose":"bad","LogPath":1,"CmdlineWhitelist":[{"AgentType":"openclaw","Rule":["node*"]}]}})",
+        R"({"ProbeConfig":{"Verbose":"bad","LogPath":1,"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
@@ -93,7 +93,7 @@ void SecurityOptionsUnittest::TestAgentsightVerboseClampedWhenNegative() {
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"Verbose":-9,"CmdlineWhitelist":[{"AgentType":"openclaw","Rule":["*openclaw*"]}]}})",
+        R"({"ProbeConfig":{"Verbose":-9,"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["*openclaw*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
@@ -128,7 +128,7 @@ void SecurityOptionsUnittest::TestAgentsightParsesCmdlineWhitelistWithAgentType(
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"openclaw","Rule":["node*","*openclaw*"]},{"AgentType":"hermes","Rule":["*python*","*hermes*"]}]}})",
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]},{"AgentType":"hermes","Args":["*python*","*hermes*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
@@ -147,7 +147,7 @@ void SecurityOptionsUnittest::TestAgentsightAcceptsAnyAgentTypeShape() {
     std::string err;
     Json::Value config;
     APSARA_TEST_TRUE(ParseJsonTable(
-        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"OpenClaw","Rule":["node*","*openclaw*"]},{"AgentType":"my_custom_agent","Rule":["*foo*"]}]}})",
+        R"({"ProbeConfig":{"CmdlineWhitelist":[{"AgentType":"OpenClaw","Args":["node*","*openclaw*"]},{"AgentType":"my_custom_agent","Args":["*foo*"]}]}})",
         config,
         err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));

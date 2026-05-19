@@ -60,7 +60,7 @@ void InputAgentSightUnittest::TestInitWithProbeConfig() {
     Json::Value optionalGoPipeline;
     APSARA_TEST_TRUE(
         ParseJsonTable(
-            R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[{"AgentType":"openclaw","Rule":["node*","*openclaw*"]}]}})",
+            R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}]}})",
             configJson,
             err));
     InputAgentSight input;
