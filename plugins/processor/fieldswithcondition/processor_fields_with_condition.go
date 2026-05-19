@@ -93,7 +93,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 		case RelationOperatorStartwith:
 		default:
 			if len(relationOpertor) > 0 {
-				logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init relationOpertor error, relationOpertor", relationOpertor)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ConditionInitAlarm, "init relationOpertor error, relationOpertor", relationOpertor)
 			}
 			relationOpertor = RelationOperatorEquals
 			p.Switch[i].Case.RelationOperator = relationOpertor
@@ -104,7 +104,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 		case LogicalOperatorOr:
 		default:
 			if len(logicalOperator) > 0 {
-				logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init logicalOperator error, logicalOperator", logicalOperator)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ConditionInitAlarm, "init logicalOperator error, logicalOperator", logicalOperator)
 			}
 			p.Switch[i].Case.LogicalOperator = LogicalOperatorAnd
 		}
@@ -116,7 +116,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 				case RelationOperatorRegexp:
 					reg, err := regexp.Compile(val)
 					if err != nil {
-						logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition regex error, key", key, "regex", val, "error", err)
+						logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ConditionInitAlarm, "init condition regex error, key", key, "regex", val, "error", err)
 						return err
 					}
 					p.Switch[i].Case.fieldConditionFields[key] = Field{
@@ -193,7 +193,7 @@ func (p *ProcessorFieldsWithCondition) Init(context pipeline.Context) error {
 							}
 						}
 					default:
-						logger.Warning(p.context.GetRuntimeContext(), "CONDITION_INIT_ALARM", "init condition action type error, type", typeName)
+						logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ConditionInitAlarm, "init condition action type error, type", typeName)
 						return fmt.Errorf("init condition action type error,type is %v", typeName)
 					}
 				}

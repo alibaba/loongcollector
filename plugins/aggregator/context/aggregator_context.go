@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -90,7 +91,7 @@ func addToQueueWithRetry(context context.Context, queue pipeline.LogGroupQueue, 
 		}
 		// wait until shutdown is active
 		if tryCount%100 == 0 {
-			logger.Warning(context, "AGGREGATOR_ADD_ALARM", "error", err)
+			logger.Warning(context, selfmonitor.AggregatorAddAlarm, "error", err)
 		}
 		time.Sleep(time.Millisecond * 10)
 	}

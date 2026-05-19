@@ -105,10 +105,45 @@ AlarmManager::AlarmManager() {
     mMessageType[SERIALIZE_FAIL_ALARM] = "SERIALIZE_FAIL_ALARM";
     mMessageType[RELABEL_METRIC_FAIL_ALARM] = "RELABEL_METRIC_FAIL_ALARM";
     mMessageType[REGISTER_HANDLERS_TOO_SLOW_ALARM] = "REGISTER_HANDLERS_TOO_SLOW_ALARM";
+    mMessageType[HOST_MONITOR_ALARM] = "HOST_MONITOR_ALARM";
 }
 
 void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEventGroupList) {
     int32_t currentTime = time(nullptr);
+    auto appendAlarmEventGroup = [&](const string& region, map<string, unique_ptr<AlarmMessage>>& alarmMap) {
+        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
+        pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
+        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
+                                       SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
+        auto now = GetCurrentLogtailTime();
+        for (auto& alarmItem : alarmMap) {
+            auto& messagePtr = alarmItem.second;
+            LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
+            logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
+                                                                                       : now.tv_sec);
+            logEvent->SetContent("alarm_type", messagePtr->mMessageType);
+            logEvent->SetContent("alarm_level", messagePtr->mLevel);
+            logEvent->SetContent("alarm_message", messagePtr->mMessage);
+            logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
+            logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
+            logEvent->SetContent("os", OS_NAME);
+            logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
+            if (!messagePtr->mProjectName.empty()) {
+                logEvent->SetContent("project_name", messagePtr->mProjectName);
+            }
+            if (!messagePtr->mCategory.empty()) {
+                logEvent->SetContent("category", messagePtr->mCategory);
+            }
+            if (!messagePtr->mConfig.empty()) {
+                logEvent->SetContent("config", messagePtr->mConfig);
+            }
+        }
+        if (pipelineEventGroup.GetEvents().size() > 0) {
+            pipelineEventGroupList.emplace_back(std::move(pipelineEventGroup));
+        }
+    };
+
     size_t sendRegionIndex = 0;
     size_t sendAlarmTypeIndex = 0;
     do {
@@ -154,46 +189,35 @@ void AlarmManager::FlushAllRegionAlarm(vector<PipelineEventGroup>& pipelineEvent
             continue;
         }
 
-        PipelineEventGroup pipelineEventGroup(std::make_shared<SourceBuffer>());
-        pipelineEventGroup.SetTagNoCopy(LOG_RESERVED_KEY_SOURCE, LoongCollectorMonitor::mIpAddr);
-        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TARGET_REGION, region);
-        pipelineEventGroup.SetMetadata(EventGroupMetaKey::INTERNAL_DATA_TYPE,
-                                       SelfMonitorServer::INTERNAL_DATA_TYPE_ALARM);
-        auto now = GetCurrentLogtailTime();
-        for (map<string, unique_ptr<AlarmMessage>>::iterator mapIter = alarmMap.begin(); mapIter != alarmMap.end();
-             ++mapIter) {
-            auto& messagePtr = mapIter->second;
-
-            LogEvent* logEvent = pipelineEventGroup.AddLogEvent();
-            logEvent->SetTimestamp(AppConfig::GetInstance()->EnableLogTimeAutoAdjust() ? now.tv_sec + GetTimeDelta()
-                                                                                       : now.tv_sec);
-            logEvent->SetContent("alarm_type", messagePtr->mMessageType);
-            logEvent->SetContent("alarm_level", messagePtr->mLevel);
-            logEvent->SetContent("alarm_message", messagePtr->mMessage);
-            logEvent->SetContent("alarm_count", ToString(messagePtr->mCount));
-            logEvent->SetContent("ip", LoongCollectorMonitor::mIpAddr);
-            logEvent->SetContent("os", OS_NAME);
-            logEvent->SetContent("ver", string(ILOGTAIL_VERSION));
-            if (!messagePtr->mProjectName.empty()) {
-                logEvent->SetContent("project_name", messagePtr->mProjectName);
-            }
-            if (!messagePtr->mCategory.empty()) {
-                logEvent->SetContent("category", messagePtr->mCategory);
-            }
-            if (!messagePtr->mConfig.empty()) {
-                logEvent->SetContent("config", messagePtr->mConfig);
-            }
-        }
+        appendAlarmEventGroup(region, alarmMap);
         lastUpdateTimeVec[sendAlarmTypeIndex] = currentTime;
         alarmMap.clear();
         ++sendAlarmTypeIndex;
-
-        if (pipelineEventGroup.GetEvents().size() <= 0) {
-            continue;
-        }
-        // this is an anonymous send and non lock send
-        pipelineEventGroupList.emplace_back(std::move(pipelineEventGroup));
     } while (true);
+
+    {
+        PTScopedLock lock(mAlarmBufferMutex);
+        for (auto& regionMapItem : mExternalAlarmMap) {
+            const std::string& region = regionMapItem.first;
+            auto& regionAlarmMap = regionMapItem.second;
+            auto& typeLastUpdateTimeMap = mExternalAlarmLastUpdateMap[region];
+            for (auto& typeMapItem : regionAlarmMap) {
+                const std::string& alarmType = typeMapItem.first;
+                auto& alarmMap = typeMapItem.second;
+                if (alarmMap.empty()) {
+                    continue;
+                }
+                int32_t& lastUpdateTime = typeLastUpdateTimeMap[alarmType];
+                if (currentTime - lastUpdateTime < INT32_FLAG(logtail_alarm_interval)) {
+                    continue;
+                }
+
+                appendAlarmEventGroup(region, alarmMap);
+                alarmMap.clear();
+                lastUpdateTime = currentTime;
+            }
+        }
+    }
 }
 
 AlarmManager::AlarmVector* AlarmManager::MakesureLogtailAlarmMapVecUnlocked(const string& region) {
@@ -235,13 +259,47 @@ void AlarmManager::SendAlarm(const AlarmType& alarmType,
     std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
     string levelStr = ToString(level);
     string key = projectName + "_" + category + "_" + config + "_" + levelStr;
+    const string& messageType = mMessageType[alarmType];
+    if (messageType.empty()) {
+        LOG_ERROR(sLogger, ("alarm type is not mapped", static_cast<int32_t>(alarmType))("region", region));
+        return;
+    }
     AlarmVector& alarmBufferVec = *MakesureLogtailAlarmMapVecUnlocked(region);
     if (alarmBufferVec[alarmType].find(key) == alarmBufferVec[alarmType].end()) {
-        auto* messagePtr
-            = new AlarmMessage(mMessageType[alarmType], levelStr, projectName, category, config, message, 1);
+        auto* messagePtr = new AlarmMessage(messageType, levelStr, projectName, category, config, message, 1);
         alarmBufferVec[alarmType].emplace(key, messagePtr);
     } else
         alarmBufferVec[alarmType][key]->IncCount();
+}
+
+void AlarmManager::SendExternalAlarm(const std::string& alarmType,
+                                     const AlarmLevel& level,
+                                     const std::string& message,
+                                     int32_t count,
+                                     const std::string& region,
+                                     const std::string& projectName,
+                                     const std::string& config,
+                                     const std::string& category) {
+    if (alarmType.empty() || count <= 0) {
+        return;
+    }
+    if (GetProfileSender()->IsProfileData(region, projectName, category)) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(mAlarmBufferMutex);
+    string levelStr = ToString(level);
+    string key = projectName + "_" + category + "_" + config + "_" + levelStr;
+    auto& externalAlarmByType = mExternalAlarmMap[region][alarmType];
+    auto iter = externalAlarmByType.find(key);
+    if (iter == externalAlarmByType.end()) {
+        externalAlarmByType.emplace(
+            key, std::make_unique<AlarmMessage>(alarmType, levelStr, projectName, category, config, message, count));
+    } else {
+        iter->second->IncCount(count);
+    }
+    if (mExternalAlarmLastUpdateMap[region].find(alarmType) == mExternalAlarmLastUpdateMap[region].end()) {
+        mExternalAlarmLastUpdateMap[region][alarmType] = time(nullptr) - rand() % 180;
+    }
 }
 
 void AlarmManager::ForceToSend() {

@@ -21,6 +21,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -42,7 +43,7 @@ func (wrapper *AggregatorWrapperV1) Init(pluginMeta *pipeline.PluginMeta) error 
 
 	interval, err := wrapper.Aggregator.Init(wrapper.Config.Context, wrapper)
 	if err != nil {
-		logger.Error(wrapper.Config.Context.GetRuntimeContext(), "AGGREGATOR_INIT_ERROR", "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
+		logger.Error(wrapper.Config.Context.GetRuntimeContext(), selfmonitor.AggregatorInitErrorAlarm, "Aggregator failed to initialize", wrapper.Aggregator.Description(), "error", err)
 		return err
 	}
 	if interval == 0 {

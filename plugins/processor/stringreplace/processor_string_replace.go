@@ -76,13 +76,13 @@ func (p *ProcessorStringReplace) Init(context pipeline.Context) error {
 	case MethodRegex:
 		p.re, err = regexp2.Compile(p.Match, regexp2.RE2)
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init regex error", err, "regex", p.Match)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init regex error", err, "regex", p.Match)
 			return err
 		}
 		p.re.MatchTimeout = time.Duration(p.RegexTimeoutMs) * time.Millisecond
 		// warn about zero-width regex which may cause performance issues
 		if ok, _ := p.re.MatchString(""); ok {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "regex pattern is zero-width (matching empty string), may cause performance issues", "regex", p.Match)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "regex pattern is zero-width (matching empty string), may cause performance issues", "regex", p.Match)
 		}
 	case MethodUnquote:
 	default:
@@ -123,7 +123,7 @@ func (p *ProcessorStringReplace) ProcessLogs(logArray []*protocol.Log) []*protoc
 				newContVal = cont.Value
 			}
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_STRING_REPLACE_ALARM", "error", err,
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorStringReplaceAlarm, "error", err,
 					"method", p.Method, "source_key", cont.Key, "content", cont.Value)
 				newContVal = cont.Value
 			}

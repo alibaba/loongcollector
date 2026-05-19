@@ -24,6 +24,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -71,7 +72,7 @@ func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
 	var record []string
 	record, err := r.Read()
 	if err != nil && err != io.EOF {
-		logger.Warning(p.context.GetRuntimeContext(), "DECODE_LOG_ALARM", "cannot decode log", err, "log", util.CutString(value, 1024))
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.DecodeLogAlarm, "cannot decode log", err, "log", util.CutString(value, 1024))
 		return false
 	}
 	// Empty value should also be considered as a valid field.
@@ -103,7 +104,7 @@ func (p *ProcessorCSVDecoder) decodeCSV(log *protocol.Log, value string) bool {
 	}
 
 	if len(p.SplitKeys) != len(record) {
-		logger.Warning(p.context.GetRuntimeContext(), "DECODE_LOG_ALARM", "decode keys not match, split len", len(record), "log", util.CutString(value, 1024))
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.DecodeLogAlarm, "decode keys not match, split len", len(record), "log", util.CutString(value, 1024))
 	}
 	return true
 }
@@ -122,7 +123,7 @@ func (p *ProcessorCSVDecoder) ProcessLogs(logArray []*protocol.Log) []*protocol.
 			}
 		}
 		if !findKey && p.NoKeyError {
-			logger.Warning(p.context.GetRuntimeContext(), "DECODE_FIND_ALARM", "cannot find key", p.SourceKey)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.DecodeFindAlarm, "cannot find key", p.SourceKey)
 		}
 	}
 	return logArray

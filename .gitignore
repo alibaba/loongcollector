@@ -109,6 +109,7 @@ license_coverage.txt
 /tags/
 
 ### IDE configs
+/core/.clangd
 /.cursor/
 /.claude/settings.local.json
 /.claude/

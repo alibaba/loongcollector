@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pluginmanager"
 )
 
@@ -103,7 +104,7 @@ func HandleLoadConfig(w http.ResponseWriter, r *http.Request) {
 	defer controlLock.Unlock()
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		logger.Error(context.Background(), "LOAD_CONFIG_ALARM", "stage", "read", "err", err)
+		logger.Error(context.Background(), selfmonitor.LoadConfigAlarm, "stage", "read", "err", err)
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("read body error"))
 		return
@@ -111,7 +112,7 @@ func HandleLoadConfig(w http.ResponseWriter, r *http.Request) {
 	logger.Infof(context.Background(), "%s", string(bytes))
 	loadConfigs, err := config.DeserializeLoadedConfig(bytes)
 	if err != nil {
-		logger.Error(context.Background(), "LOAD_CONFIG_ALARM", "stage", "parse", "err", err)
+		logger.Error(context.Background(), selfmonitor.LoadConfigAlarm, "stage", "parse", "err", err)
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("parse body error"))
 		return
@@ -237,7 +238,7 @@ func InitHTTPServer() {
 				logger.Info(context.Background(), "#####################################")
 				logger.Info(context.Background(), "start http server for logtail plugin profile or control")
 				logger.Info(context.Background(), "#####################################")
-				logger.Critical(context.Background(), "INIT_HTTP_SERVER_ALARM", "err", http.ListenAndServe(*flags.HTTPAddr, mux)) //nolint
+				logger.Critical(context.Background(), selfmonitor.InitHTTPServerAlarm, "err", http.ListenAndServe(*flags.HTTPAddr, mux)) //nolint
 			}()
 		}
 	})

@@ -30,6 +30,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -70,7 +71,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 		for _, path := range p.CustomPatternDir {
 			err = p.addPatternsFromPath(path)
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "init grok's custom pattern in dir error", err)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "init grok's custom pattern in dir error", err)
 				return err
 			}
 		}
@@ -82,7 +83,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 
 	err = p.buildPatterns()
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "build grok's pattern error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "build grok's pattern error", err)
 		return err
 	}
 
@@ -93,7 +94,7 @@ func (p *ProcessorGrok) Init(context pipeline.Context) error {
 
 	err = p.compileMatchs()
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "compile grok's matchs error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "compile grok's matchs error", err)
 		return err
 	}
 
@@ -120,13 +121,13 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 			// no match error
 			if parseResult == matchFail && p.NoMatchError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "all match fail",
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "all match fail",
 					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
 			// tome out error
 			if parseResult == matchTimeOut && p.TimeoutError {
-				logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "match time out",
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "match time out",
 					"source_key", p.SourceKey, "content", cont.Value)
 			}
 
@@ -139,7 +140,7 @@ func (p *ProcessorGrok) processLog(log *protocol.Log) {
 
 	// no key err
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GROK_FIND_ALARM", "error", "anchor cannot find key",
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GrokFindAlarm, "error", "anchor cannot find key",
 			"source_key", p.SourceKey)
 	}
 }
@@ -346,7 +347,7 @@ func (p *ProcessorGrok) compileMatchs() error {
 
 		// warn about zero-width patterns which can cause infinite matches
 		if ok, _ := compiledRegex.MatchString(""); ok {
-			logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_INIT_ALARM", "grok match pattern is zero-width (matching empty string), may cause performance issues", "pattern", newPattern)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorInitAlarm, "grok match pattern is zero-width (matching empty string), may cause performance issues", "pattern", newPattern)
 		}
 
 		gr := compiledRegex

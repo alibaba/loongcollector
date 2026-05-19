@@ -6,6 +6,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	networking "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
@@ -221,7 +223,7 @@ const (
 	EventTypeDeferredDelete = "deferredDelete"
 	EventTypeTimer          = "timer"
 
-	K8sMetaUnifyErrorCode = "K8S_META_COLLECTOR_ERROR"
+	K8sMetaUnifyErrorCode = selfmonitor.K8sMetaCollectorError
 )
 
 type PodMetadata struct {

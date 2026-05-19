@@ -28,6 +28,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/config"
 	"github.com/alibaba/ilogtail/pkg/helper/async"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type DumpDataReq struct {
@@ -64,7 +65,7 @@ func (d *Dumper) Init() {
 	d.stop = make(chan struct{})
 	files, err := GetFileListByPrefix(path.Join(config.LoongcollectorGlobalConfig.LoongCollectorDebugDir, "dump"), d.prefix, true, 0)
 	if err != nil {
-		logger.Warning(context.Background(), "LIST_HISTORY_DUMP_ALARM", "err", err)
+		logger.Warning(context.Background(), selfmonitor.ListHistoryDumpAlarm, "err", err)
 	} else {
 		d.dumpDataKeepFiles = files
 	}
@@ -120,7 +121,7 @@ func (d *Dumper) doDumpFile() {
 			if time.Now().Hour() != lastHour {
 				file, cerr := cutFile()
 				if cerr != nil {
-					logger.Warning(context.Background(), "DUMP_FILE_ALARM", "cut new file error", err)
+					logger.Warning(context.Background(), selfmonitor.DumpFileAlarm, "cut new file error", err)
 				} else {
 					offset, _ = file.Seek(0, io.SeekEnd)
 					f = file

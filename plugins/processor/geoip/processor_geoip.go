@@ -15,15 +15,16 @@
 package geoip
 
 import (
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/pkg/pipeline"
-	"github.com/alibaba/ilogtail/pkg/protocol"
-	"github.com/alibaba/ilogtail/pkg/util"
-
 	"net"
 	"strconv"
 
 	"github.com/oschwald/geoip2-golang"
+
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/pkg/util"
 )
 
 // ProcessorGeoIP is a processor plugin to insert geographical information into log according
@@ -104,7 +105,7 @@ func (p *ProcessorGeoIP) ProcessLog(log *protocol.Log) {
 		}
 	}
 	if !findKey && p.NoKeyError {
-		logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "cannot find key", p.SourceKey)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "cannot find key", p.SourceKey)
 	}
 }
 
@@ -127,13 +128,13 @@ func (p *ProcessorGeoIP) ProcessGeoIP(log *protocol.Log, val *string) {
 	}
 	if ip == nil {
 		if p.NoMatchError {
-			logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "invalid ip", *val)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "invalid ip", *val)
 		}
 		return
 	}
 	record, err := p.db.City(ip)
 	if err != nil && p.NoMatchError {
-		logger.Warning(p.context.GetRuntimeContext(), "GEOIP_ALARM", "parse ip", ip, "error", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.GeoipAlarm, "parse ip", ip, "error", err)
 		return
 	}
 

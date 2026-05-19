@@ -23,6 +23,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -97,7 +98,7 @@ func (p *ProcessorSplit) ProcessLogs(logArray []*protocol.Log) []*protocol.Log {
 			}
 		} else {
 			if p.NoKeyError {
-				logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_SPLIT_LOG_STRING_FIND_ALARM", "can't find split key", p.SplitKey)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorSplitLogStringFindAlarm, "can't find split key", p.SplitKey)
 			}
 			if p.PreserveOthers {
 				destArray = append(destArray, newLog)
@@ -155,7 +156,7 @@ func (p *ProcessorSplit) Process(in *models.PipelineGroupEvents, context pipelin
 				}
 			} else {
 				if p.NoKeyError {
-					logger.Warning(p.context.GetRuntimeContext(), "PROCESSOR_SPLIT_LOG_STRING_FIND_ALARM", "can't find split key", p.SplitKey)
+					logger.Warning(p.context.GetRuntimeContext(), selfmonitor.ProcessorSplitLogStringFindAlarm, "can't find split key", p.SplitKey)
 				}
 				if p.PreserveOthers {
 					context.Collector().Collect(in.Group, tmpLog)

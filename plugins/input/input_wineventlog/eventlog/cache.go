@@ -26,11 +26,14 @@ package eventlog
 import (
 	"context"
 	"expvar"
-	"github.com/alibaba/ilogtail/pkg/logger"
-	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog/common"
 	"time"
 
+	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/plugins/input/input_wineventlog/eventlog/common"
+
 	"github.com/elastic/beats/v7/winlogbeat/sys"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // Stats for the message file caches.
@@ -148,8 +151,7 @@ func (hc *messageFilesCache) freeHandles(mf sys.MessageFiles) {
 	for _, fh := range mf.Handles {
 		err := hc.freer(fh.Handle)
 		if err != nil {
-			logger.Warningf(context.Background(), "WINEVENTLOG_UTIL_ALARM",
-				"messageFilesCache[%s] FreeLibrary error for handle %v",
+			logger.Warningf(context.Background(), selfmonitor.WineventlogUtilAlarm, "messageFilesCache[%s] FreeLibrary error for handle %v",
 				hc.eventLogName, fh.Handle)
 		}
 	}

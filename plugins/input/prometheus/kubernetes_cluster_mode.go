@@ -29,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	appsv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/rest"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // KubernetesMeta means workload meta
@@ -73,26 +75,26 @@ func (p *KubernetesMeta) readKubernetesWorkloadMeta() bool {
 	var err error
 	p.namespace, err = readNamespaceFunc()
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "read namespace err", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "read namespace err", err)
 		return false
 	}
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "create in cluster config err", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "create in cluster config err", err)
 		return false
 	}
 	p.appsClient, err = appsv1.NewForConfig(config)
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "create in cluster config err", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "create in cluster config err", err)
 		return false
 	}
 	podName := os.Getenv("POD_NAME")
 	if p.currentNum = helper.ExtractStatefulSetNum(podName); p.currentNum == -1 {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "read current num err", p.workloadName)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "read current num err", p.workloadName)
 		return false
 	}
 	if p.workloadName = helper.ExtractPodWorkload(podName); p.workloadName == "" {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "read workload name err", p.workloadName)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "read workload name err", p.workloadName)
 		return false
 	}
 	for i := 0; i < 3; i++ {
@@ -102,7 +104,7 @@ func (p *KubernetesMeta) readKubernetesWorkloadMeta() bool {
 		time.Sleep(time.Millisecond * 500)
 	}
 	if err != nil {
-		logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "read replicas err", err)
+		logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "read replicas err", err)
 		p.replicas = 1 // means maybe repeat scrape
 	}
 	p.kubernetesClusterMode = true
@@ -115,7 +117,7 @@ func (p *KubernetesMeta) getPrometheusReplicas() (change bool, err error) {
 	if err != nil {
 		p.readReplicasErrCount++
 		if p.readReplicasErrCount >= 30 {
-			logger.Warning(p.context.GetRuntimeContext(), "KUBE_PROMETHEUS_ALARM", "cannot get kubernetes ilogtail cluster mode replicas", err)
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.KubePrometheusAlarm, "cannot get kubernetes ilogtail cluster mode replicas", err)
 			p.readReplicasErrCount = 0
 		}
 		return false, err

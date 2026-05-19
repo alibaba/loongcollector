@@ -33,6 +33,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -115,7 +116,7 @@ func (p *ServiceLumber) Start(c pipeline.Collector) error {
 			var tlsConfig *tls.Config
 			tlsConfig, err = util.GetTLSConfig(p.SSLCert, p.SSLKey, p.SSLCA, p.InsecureSkipVerify)
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "LUMBER_LISTEN_ALARM", "init tls error", err)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LumberListenAlarm, "init tls error", err)
 			}
 			p.server, err = server.ListenAndServe(p.BindAddress,
 				server.V1(p.V1),
@@ -126,7 +127,7 @@ func (p *ServiceLumber) Start(c pipeline.Collector) error {
 		}
 
 		if err != nil {
-			logger.Warning(p.context.GetRuntimeContext(), "LUMBER_LISTEN_ALARM", "listen init error", err, "sleep 10 seconds and retry")
+			logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LumberListenAlarm, "listen init error", err, "sleep 10 seconds and retry")
 			if util.RandomSleep(time.Second*10, 0.1, p.shutdown) {
 				return nil
 			}
@@ -143,7 +144,7 @@ func (p *ServiceLumber) Start(c pipeline.Collector) error {
 			case batch := <-recvChan:
 				if batch == nil {
 					err = p.server.Close()
-					logger.Warning(p.context.GetRuntimeContext(), "LUMBER_CONNECTION_ALARM", "lumber server error", "chan closed", "close server, err", err)
+					logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LumberConnectionAlarm, "lumber server error", "chan closed", "close server, err", err)
 					break ForBlock
 				}
 				for _, event := range batch.Events {

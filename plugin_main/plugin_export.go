@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper/containercenter"
 	"github.com/alibaba/ilogtail/pkg/helper/k8smeta"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 	"github.com/alibaba/ilogtail/pluginmanager"
 )
@@ -74,6 +75,21 @@ typedef struct {
     int count;
 } PluginMetrics;
 
+typedef struct {
+    char* alarmType;
+    char* alarmLevel;
+    char* alarmMessage;
+    char* projectName;
+    char* category;
+    char* config;
+    int count;
+} InnerGoAlarm;
+
+typedef struct {
+    InnerGoAlarm** alarms;
+    int count;
+} InnerGoAlarms;
+
 static KeyValue** makeKeyValueArray(int size) {
     return malloc(sizeof(KeyValue*) * size);
 }
@@ -87,6 +103,14 @@ static PluginMetric** makePluginMetricArray(int size) {
 }
 
 static void setArrayPluginMetric(PluginMetric **a, PluginMetric *s, int n) {
+    a[n] = s;
+}
+
+static InnerGoAlarm** makeInnerGoAlarmArray(int size) {
+    return malloc(sizeof(InnerGoAlarm*) * size);
+}
+
+static void setArrayInnerGoAlarm(InnerGoAlarm **a, InnerGoAlarm *s, int n) {
     a[n] = s;
 }
 */
@@ -119,13 +143,13 @@ func LoadGlobalConfig(jsonStr string) int {
 			for _, log := range flags.LogsWaitToPrint {
 				switch log.LogType {
 				case flags.LogTypeError:
-					logger.Error(context.Background(), "", log.Content)
+					logger.Error(context.Background(), log.AlarmType, log.Content)
 				case flags.LogTypeInfo:
 					logger.Info(context.Background(), log.Content)
 				case flags.LogTypeDebug:
 					logger.Debug(context.Background(), log.Content)
 				case flags.LogTypeWarning:
-					logger.Warning(context.Background(), "", log.Content)
+					logger.Warning(context.Background(), log.AlarmType, log.Content)
 				}
 			}
 			logger.Info(context.Background(), "load global config", jsonStr)
@@ -150,7 +174,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		if err := recover(); err != nil {
 			trace := make([]byte, 2048)
 			runtime.Stack(trace, true)
-			logger.Critical(context.Background(), "PLUGIN_RUNTIME_ALARM", "panicked", err, "stack", string(trace))
+			logger.Critical(context.Background(), selfmonitor.PluginRuntimeAlarm, "panicked", err, "stack", string(trace))
 		}
 	}()
 
@@ -159,7 +183,7 @@ func LoadPipeline(project string, logstore string, configName string, logstoreKe
 		// Make deep copy if you want to save it in Go in the future.
 		logstoreKey, jsonStr)
 	if err != nil {
-		logger.Critical(context.Background(), "CONFIG_LOAD_ALARM", "load config error, project",
+		logger.Critical(context.Background(), selfmonitor.ConfigLoadAlarm, "load config error, project",
 			project, "logstore", logstore, "config", configName, "error", err)
 		return 1
 	}
@@ -193,7 +217,7 @@ func ProcessLogGroup(configName string, logBytes []byte, packID string) int {
 	config, flag := pluginmanager.LogtailConfig[configName]
 	pluginmanager.LogtailConfigLock.RUnlock()
 	if !flag {
-		logger.Critical(context.Background(), "PLUGIN_ALARM", "config not found", configName)
+		logger.Critical(context.Background(), selfmonitor.PluginAlarm, "config not found", configName)
 		return -1
 	}
 	return config.ProcessLogGroup(logBytes, util.StringDeepCopy(packID))
@@ -204,7 +228,7 @@ func StopAllPipelines(withInputFlag int) {
 	logger.Info(context.Background(), "Stop all", "start", "with input", withInputFlag)
 	err := pluginmanager.StopAllPipelines(withInputFlag != 0)
 	if err != nil {
-		logger.Error(context.Background(), "PLUGIN_ALARM", "stop all error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "stop all error", err)
 	}
 	logger.Info(context.Background(), "Stop all", "success", "with input", withInputFlag)
 	// Stop with input first, without input last.
@@ -220,7 +244,7 @@ func Stop(configName string, removedFlag int) {
 	logger.Info(context.Background(), "Stop", "start", "config", configName, "removed", removedFlag)
 	err := pluginmanager.Stop(configName, removedFlag != 0)
 	if err != nil {
-		logger.Error(context.Background(), "PLUGIN_ALARM", "stop error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "stop error", err)
 	}
 }
 
@@ -234,7 +258,7 @@ func Start(configName string) {
 	logger.Info(context.Background(), "Start", "start", "config", configName)
 	err := pluginmanager.Start(configName)
 	if err != nil {
-		logger.Error(context.Background(), "PLUGIN_ALARM", "start error", err)
+		logger.Error(context.Background(), selfmonitor.PluginAlarm, "start error", err)
 	}
 	logger.Info(context.Background(), "Start", "success", "config", configName)
 }
@@ -346,6 +370,27 @@ func GetGoMetrics(metricType string) *C.PluginMetrics {
 	return cPluginMetrics
 }
 
+//export GetGoAlarms
+func GetGoAlarms() *C.InnerGoAlarms {
+	results := pluginmanager.GetAlarmMessages()
+	cAlarms := (*C.InnerGoAlarms)(C.malloc(C.sizeof_InnerGoAlarms))
+	cAlarms.count = C.int(len(results))
+	cAlarms.alarms = C.makeInnerGoAlarmArray(cAlarms.count)
+	for i, alarm := range results {
+		cAlarm := (*C.InnerGoAlarm)(C.malloc(C.sizeof_InnerGoAlarm))
+		cAlarm.alarmType = C.CString(alarm.AlarmType)
+		cAlarm.alarmLevel = C.CString(alarm.AlarmLevel)
+		cAlarm.alarmMessage = C.CString(alarm.AlarmMessage)
+		cAlarm.projectName = C.CString(alarm.ProjectName)
+		cAlarm.category = C.CString(alarm.Category)
+		cAlarm.config = C.CString(alarm.Config)
+		cAlarm.count = C.int(alarm.Count)
+		C.setArrayInnerGoAlarm(cAlarms.alarms, cAlarm, C.int(i))
+		runtime.KeepAlive(cAlarm)
+	}
+	return cAlarms
+}
+
 func initPluginBase(cfgStr string) int {
 	// Only the first call will return non-zero.
 	rst := 0
@@ -365,18 +410,15 @@ func initPluginBase(cfgStr string) int {
 			instance.Run(stopCh)
 		}
 		if err := pluginmanager.Init(); err != nil {
-			logger.Critical(context.Background(), "PLUGIN_ALARM", "init plugin error", err)
+			logger.Critical(context.Background(), selfmonitor.PluginAlarm, "init plugin error", err)
 			rst = 1
-		}
-		if pluginmanager.AlarmConfig != nil {
-			pluginmanager.AlarmConfig.Start()
 		}
 		if pluginmanager.ContainerConfig != nil {
 			pluginmanager.ContainerConfig.Start()
 		}
 		err := pluginmanager.CheckPointManager.Init()
 		if err != nil {
-			logger.Error(context.Background(), "CHECKPOINT_INIT_ALARM", "init checkpoint manager error", err)
+			logger.Error(context.Background(), selfmonitor.CheckpointInitAlarm, "init checkpoint manager error", err)
 		}
 		pluginmanager.CheckPointManager.Start()
 	})

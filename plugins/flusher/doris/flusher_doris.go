@@ -29,6 +29,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	converter "github.com/alibaba/ilogtail/pkg/protocol/converter"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // FlusherDoris implements a data flusher that sends logs to Apache Doris via Stream Load.
@@ -140,7 +141,7 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 	f.context = context
 	// Validate config of flusher
 	if err := f.Validate(); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris flusher fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init doris flusher fail, error", err)
 		return err
 	}
 	// Set default value while not set
@@ -153,14 +154,14 @@ func (f *FlusherDoris) Init(context pipeline.Context) error {
 	// Init converter
 	convert, err := f.getConverter()
 	if err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris flusher converter fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init doris flusher converter fail, error", err)
 		return err
 	}
 	f.converter = convert
 
 	// Init Doris client
 	if err := f.initDorisClient(); err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris client fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init doris client fail, error", err)
 		return err
 	}
 
@@ -209,7 +210,7 @@ func parseGroupCommitMode(mode string) load.GroupCommitMode {
 	case "off", "":
 		return load.OFF
 	default:
-		logger.Warningf(context.Background(), "Unknown group commit mode: %s, using 'off'", mode)
+		logger.Warningf(context.Background(), selfmonitor.FlusherInitAlarm, "unknown group commit mode: %s, using 'off'", mode)
 		return load.OFF
 	}
 }
@@ -252,12 +253,12 @@ func (f *FlusherDoris) initDorisClient() error {
 func (f *FlusherDoris) Validate() error {
 	if len(f.Addresses) == 0 {
 		var err = fmt.Errorf("doris addrs is nil")
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init doris flusher error", err)
 		return err
 	}
 	if f.Table == "" {
 		var err = fmt.Errorf("doris table is nil")
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_INIT_ALARM", "init doris flusher error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherInitAlarm, "init doris flusher error", err)
 		return err
 	}
 	return nil
@@ -293,8 +294,7 @@ func (f *FlusherDoris) addTask(logGroupList []*protocol.LogGroup) error {
 		return nil
 	default:
 		// Queue is full, log warning and then block
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_QUEUE_FULL",
-			"doris flusher queue is full, blocking until space available",
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherQueueFull, "doris flusher queue is full, blocking until space available",
 			"queueCapacity", f.QueueCapacity,
 			"concurrency", f.Concurrency,
 			"suggestion", "consider increasing Concurrency or QueueCapacity")
@@ -313,8 +313,7 @@ func (f *FlusherDoris) runFlushWorker() {
 	for logGroupList := range f.queue {
 		err := f.flushSync(logGroupList)
 		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
-				"worker failed to flush data to doris, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "worker failed to flush data to doris, error", err)
 		}
 		f.counter.Done()
 	}
@@ -345,7 +344,7 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 		// Convert log group to byte stream
 		serializedLogs, err := f.converter.ToByteStream(logGroup)
 		if err != nil {
-			logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush doris convert log fail, error", err)
+			logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush doris convert log fail, error", err)
 			continue
 		}
 
@@ -370,7 +369,7 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 	response, err := f.dorisClient.Load(reader)
 
 	if err != nil {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM", "flush doris load fail, error", err)
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "flush doris load fail, error", err)
 		return fmt.Errorf("failed to load data to doris: %w", err)
 	}
 
@@ -384,8 +383,7 @@ func (f *FlusherDoris) flushSync(logGroupList []*protocol.LogGroup) error {
 		// Update statistics
 		f.updateStatistics(uint64(response.Resp.LoadBytes), uint64(response.Resp.NumberLoadedRows))
 	} else {
-		logger.Warning(f.context.GetRuntimeContext(), "FLUSHER_FLUSH_ALARM",
-			"doris load failed with status", response.Status,
+		logger.Warning(f.context.GetRuntimeContext(), selfmonitor.FlusherFlushAlarm, "doris load failed with status", response.Status,
 			"message", response.ErrorMessage)
 		return fmt.Errorf("doris load failed: %s", response.ErrorMessage)
 	}

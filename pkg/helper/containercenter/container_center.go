@@ -37,6 +37,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/flags"
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -860,9 +861,7 @@ func getContainerCenterInstance() *ContainerCenter {
 							"container discovery skipped: mount path does not exist",
 							"mount_path", DefaultLogtailMountPath)
 					} else {
-						logger.Warningf(context.Background(),
-							"container discovery skipped: failed to check mount path",
-							"mount_path", DefaultLogtailMountPath, "error", err)
+						logger.Warningf(context.Background(), selfmonitor.DockerCenterAlarm, "container discovery skipped: failed to check mount path", "mount_path", DefaultLogtailMountPath, "error", err)
 					}
 					return // Exit goroutine, no infinite retry needed
 				}
@@ -874,7 +873,7 @@ func getContainerCenterInstance() *ContainerCenter {
 					break
 				}
 				if retryCount%10 == 0 {
-					logger.Critical(context.Background(), "DOCKER_CENTER_ALARM", "docker center init failed", "retry count", retryCount)
+					logger.Critical(context.Background(), selfmonitor.DockerCenterAlarm, "docker center init failed", "retry count", retryCount)
 				}
 				retryCount++
 				time.Sleep(time.Second * 1)
@@ -895,7 +894,7 @@ func (dc *ContainerCenter) readStaticConfig(forceFlush bool) {
 	defer staticDockerContainerLock.Unlock()
 	containerInfo, removedIDs, changed, err := tryReadStaticContainerInfo()
 	if err != nil {
-		logger.Warning(context.Background(), "READ_STATIC_CONFIG_ALARM", "read static container info error", err)
+		logger.Warning(context.Background(), selfmonitor.ReadStaticConfigAlarm, "read static container info error", err)
 	}
 	if !dc.initStaticContainerInfoSuccess && len(containerInfo) > 0 {
 		dc.initStaticContainerInfoSuccess = true
@@ -931,7 +930,7 @@ func (dc *ContainerCenter) setLastError(err error, msg string) {
 	dc.lastErr = err
 	dc.lastErrMu.Unlock()
 	if err != nil {
-		logger.Warning(context.Background(), "DOCKER_CENTER_ALARM", "message", msg, "error found", err)
+		logger.Warning(context.Background(), selfmonitor.DockerCenterAlarm, "message", msg, "error found", err)
 	} else {
 		logger.Debug(context.Background(), "message", msg)
 	}
@@ -1121,7 +1120,7 @@ func (dc *ContainerCenter) getAllAcceptedInfoV2(
 		if ok {
 			matchList[id] = c
 		} else {
-			logger.Warningf(context.Background(), "DOCKER_MATCH_ALARM", "matched container not in docker center")
+			logger.Warningf(context.Background(), selfmonitor.DockerMatchAlarm, "matched container not in docker center")
 		}
 	}
 
@@ -1403,7 +1402,7 @@ func containerCenterRecover() {
 	if err := recover(); err != nil {
 		trace := make([]byte, 2048)
 		runtime.Stack(trace, true)
-		logger.Critical(context.Background(), "PLUGIN_RUNTIME_ALARM", "docker center runtime error", err, "stack", string(trace))
+		logger.Critical(context.Background(), selfmonitor.PluginRuntimeAlarm, "docker center runtime error", err, "stack", string(trace))
 	}
 }
 
@@ -1435,7 +1434,7 @@ func (dc *ContainerCenter) eventListener() {
 			select {
 			case event, ok := <-events:
 				if !ok {
-					logger.Criticalf(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener stop")
+					logger.Criticalf(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener stop")
 					errorCount++
 					breakFlag = true
 					break
@@ -1457,15 +1456,15 @@ func (dc *ContainerCenter) eventListener() {
 					select {
 					case dc.eventChan <- event:
 					default:
-						logger.Error(context.Background(), "DOCKER_EVENT_ALARM", "event queue is full, miss event", event)
+						logger.Error(context.Background(), selfmonitor.DockerEventAlarm, "event queue is full, miss event", event)
 					}
 				}
 				dc.eventChanLock.Unlock()
 			case err = <-errors:
-				logger.Warning(context.Background(), "DOCKER_EVENT_ALARM", "docker event listener error", err)
+				logger.Warning(context.Background(), selfmonitor.DockerEventAlarm, "docker event listener error", err)
 				breakFlag = true
 			case <-timer.C:
-				logger.Warningf(context.Background(), "DOCKER_EVENT_ALARM", "no docker event in 1 hour. Reset event listener")
+				logger.Warningf(context.Background(), selfmonitor.DockerEventAlarm, "no docker event in 1 hour. Reset event listener")
 				breakFlag = true
 			}
 		}
