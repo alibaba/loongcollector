@@ -2,7 +2,7 @@
 
 ## 简介
 
-`input_agentsight` 插件实现对当前openclaw，hermes等agent工具等采集，支持的大模型供应商包括OpenAI，Anthropic，以及国内的厂商协议
+`input_agentsight` 插件实现对当前 openclaw、hermes 等 agent 工具等采集，支持的大模型供应商包括 OpenAI、Anthropic，以及国内的厂商协议。
 
 ## 版本
 
@@ -17,18 +17,37 @@ dev
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为 `input_agentsight`  |
-|  ProbeConfig  |  object  |  否  |  /  |  插件配置参数列表  |
-|  ProbeConfig.Verbose  |  uint  |  否  |  /  |  是否打印ebpf的详细日志，1代表开启，0代表关闭  |
-|  ProbeConfig.LogPath  |  string  |  否  |  ""  | ebpf日志的输出位置  |
-|  ProbeConfig.CmdlineWhitelist  |  array  |  否  |  /  |  进程 **agent 筛选白名单**。推荐每一项为对象：`agent_name`（上报字段 `gen_ai.agent.name`）+ `rule`（**字符串数组**，与 `argv` 按位置 glob 匹配）。仍支持仅写 glob 数组的简写（此时 `agent_name` 默认为 `Custom Agent`）。未配置且黑名单也为空时注入默认规则（内置名称如 `OpenClaw`、`Hermes`）。  |
-|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，规则格式同白名单（含前缀匹配语义）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：**访问白名单内域名的进程将被识别为 AI Agent 采集目标**。未配置时注入默认精确主机名列表，见下文「优先级与默认值」。  |
+|  ProbeConfig  |  object  |  否  |  /  |  AgentSight 探测配置。**整体未配置**时所有子项走默认。  |
+|  ProbeConfig.Verbose  |  uint  |  否  |  `0`  |  是否打印 ebpf 的详细日志，`1` 代表开启，`0` 代表关闭  |
+|  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
+|  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Rule`（字符串数组，与 `argv` 按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
+|  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
+|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
+
+### `AgentType` 取值命名规范
+
+本插件通过 **cmdline 白名单** 设置的是 **agent 类型**，命中后写入日志的 `gen_ai.agent.type` 字段。
+
+**推荐**（非强制）的 `AgentType` 取值约定：
+
+- 仅使用 **小写字母**、**数字**、**连字符** `-`
+- 以字母或数字开头/结尾，**不**以 `-` 开头或结尾
+- 多个单词用 **单个** 连字符连接，不用空格、下划线或驼峰
+
+| 推荐 | 不推荐 |
+| --- | --- |
+| `openclaw` | `OpenClaw`、`open_claw` |
+| `claude-code` | `Claude Code`、`claude_code` |
+| `hermes` | `Hermes` |
+| `cosh` | `Cosh` |
+
+`AgentType` 必须是**非空字符串**；具体取值不做硬校验，写什么就上报什么到 `gen_ai.agent.type`。统一遵循上述规范便于跨产品聚合分析。
 
 ### 优先级与默认值
 
 #### 黑白名单判定逻辑
 
-进程是否纳入采集，按下列**固定顺序**判定（**不要求** `CmdlineBlacklist`、`CmdlineWhitelist`、`DomainWhitelist` 同时配置；三类名单相互独立，未配置项见下文「默认值」）：
+进程是否纳入采集，按下列**固定顺序**判定（三类名单相互独立，未配置项见下文「默认值」）：
 
 1. 命中 `CmdlineBlacklist` → **不采集**（cmdline 黑名单优先）
 2. 未命中黑名单，且命中 `CmdlineWhitelist` → **纳入采集**
@@ -48,27 +67,41 @@ graph TD
     D -->|否| N
 ```
 
-例如：只配置了 cmdline 黑名单、未配域名时，仍会注入默认 `DomainWhitelist`；只配域名、未配 cmdline 时，仍会注入默认 cmdline 白名单（当黑/白名单均为空时）。
+例如：只配置了 cmdline 黑名单、未配域名时，仍会注入默认 `DomainWhitelist`；只配域名、未配 cmdline 黑白名单时，仍会注入下文的默认 cmdline 白名单。
 
 #### Cmdline 规则优先级和默认注入值
 
 1. **黑名单优先于白名单**：同一进程同时命中黑/白名单时，**黑名单生效**。
 2. **多条白名单之间**：**OR**，命中任一条即可。
-3. **默认注入条件**：`CmdlineWhitelist` 与 `CmdlineBlacklist` **均为空** 时，注入下表；一旦配置了 **任意一条** 用户 cmdline 白名单或黑名单，则 **不再** 注入默认 cmdline。
+3. **默认注入条件**：`CmdlineWhitelist` 与 `CmdlineBlacklist` **均未配置**时，注入下表；一旦配置了 **任意一条** 用户 cmdline 白名单或黑名单，则 **不再** 注入默认 cmdline。
+4. **空数组拒绝**：显式写 `CmdlineWhitelist: []` 会被视为非法配置；不写该字段才会走默认注入。
 
 **默认 `CmdlineWhitelist`（9 条）**
 
-| agent 名称 | 规则（`argv` 各段 glob） |
+| AgentType | Rule（`argv` 各段 glob） |
 | --- | --- |
-| Hermes | `hermes*` |
-| Hermes | `*python*`, `*hermes*` |
-| Hermes | `*python*`, `-m`, `*hermes*` |
-| Cosh | `node*`, `*/usr/bin/co*` |
-| Cosh | `node*`, `*/usr/bin/cosh*` |
-| Cosh | `node*`, `*/usr/bin/copliot*` |
-| Cosh | `node*`, `*copilot-shell*` |
-| OpenClaw | `*openclaw-gatewa*` |
-| OpenClaw | `node*`, `*openclaw*` |
+| `hermes` | `hermes*` |
+| `hermes` | `*python*`, `*hermes*` |
+| `hermes` | `*python*`, `-m`, `*hermes*` |
+| `cosh` | `node*`, `*/usr/bin/co*` |
+| `cosh` | `node*`, `*/usr/bin/cosh*` |
+| `cosh` | `node*`, `*/usr/bin/copliot*` |
+| `cosh` | `node*`, `*copilot-shell*` |
+| `openclaw` | `*openclaw-gatewa*` |
+| `openclaw` | `node*`, `*openclaw*` |
+
+#### 自定义示例（覆盖默认）
+
+填写后只使用用户规则，不再叠加内置：
+
+```yaml
+ProbeConfig:
+  CmdlineWhitelist:
+    - AgentType: openclaw
+      Rule: ["node*", "*openclaw*"]
+    - AgentType: claude-code
+      Rule: ["node*", "*claude*"]
+```
 
 #### Domain 规则优先级和默认注入值
 
@@ -84,24 +117,24 @@ graph TD
 | `dashscope.aliyuncs.com` |
 | `dashscope-intl.aliyuncs.com` |
 
-#### `gen_ai.agent.name` 的取值规则
+#### `gen_ai.agent.type` 的取值规则
 
-`gen_ai.agent.name` 字段**只来自 cmdline 白名单**，与 `DomainWhitelist` 无关。按下列顺序确定：
+`gen_ai.agent.type` **只来自 cmdline 白名单**（用户配置或内置默认）中命中规则的 `AgentType`，与 `DomainWhitelist` 无直接映射关系。按下列顺序确定：
 
-1. 进程被 cmdline 白名单命中 → 取**第一条**命中规则的 `agent_name`（用户配置或内置名）。
-2. 进程仅靠 `DomainWhitelist` 命中（cmdline 没命中任何白名单） → 二次匹配 **内置 cmdline 规则**；命中则取内置名（如 `OpenClaw`、`Hermes`、`Cosh`）。
-3. 仍匹配不上 → **不输出 `gen_ai.agent.name`** 字段。
+1. 进程被当前生效的 cmdline 白名单命中 → 取**第一条**命中规则的 `AgentType`。
+2. 进程仅靠 `DomainWhitelist` 纳入采集，且 cmdline 未命中（用户已覆盖默认时）→ 二次匹配 **内置默认 9 条**；命中则输出对应类型（如 `openclaw`）。
+3. 仍匹配不上 → **不输出** `gen_ai.agent.type`。
 
-因此「只配 `DomainWhitelist`」时：若进程命令行恰好符合内置 9 条规则之一，会拿到内置名；否则字段缺失。**`DomainWhitelist` 中的域名本身不会作为 agent 名**。
+「只配 `DomainWhitelist`、不配 cmdline」是允许的：cmdline 走内置默认 9 条 + 域名走用户配置，互相独立生效。**`DomainWhitelist` 中的域名本身不会作为** `gen_ai.agent.type`。
 
 ### Cmdline 规则自定义写法
 
-配置里**每一项**是一条白名单规则，包含两部分：
+配置里**每一项**是一条白名单规则对象，包含两个字段：
 
 | 字段 | 说明 |
 | --- | --- |
-| `agent_name` | 命中该规则后，写入日志 `gen_ai.agent.name` 的名称（如 `OpenClaw`）。多条规则可使用相同名称。 |
-| `rule` | 与进程 `argv` 各段按位置做 glob 匹配的字符串数组（与 `/proc/<PID>/cmdline` 一致）。 |
+| `AgentType` | 命中该规则后，写入日志 `gen_ai.agent.type` 的类型标识（如 `openclaw`）。多条规则可使用相同 `AgentType`。取值规范见上文。 |
+| `Rule` | 与进程 `argv` 各段按位置做 glob 匹配的字符串数组（与 `/proc/<PID>/cmdline` 一致）。 |
 
 先在本机查看真实命令行，再写 glob：
 
@@ -111,26 +144,20 @@ tr '\0' ' ' < /proc/<PID>/cmdline; echo
 
 每一段用 **glob** 匹配，不关心的位置写 `"*"`。
 
-**前缀匹配**：当 `rule` 的段数**少于** `argv` 时，只对前 N 段按位置做 glob 匹配，**后面多出来的参数不参与匹配**。例如 `rule: ["node*", "*openclaw*"]` 可命中 `node openclaw.js gateway`（第三段 `gateway` 被忽略）。若需约束后续参数，须在 `rule` 中继续写出对应段。反之，`rule` 段数**多于** `argv` 时则不命中。
+**前缀匹配**：当 `Rule` 的段数**少于** `argv` 时，只对前 N 段按位置做 glob 匹配，**后面多出来的参数不参与匹配**。例如 `Rule: ["node*", "*openclaw*"]` 可命中 `node openclaw.js gateway`（第三段 `gateway` 被忽略）。若需约束后续参数，须在 `Rule` 中继续写出对应段。反之，`Rule` 段数**多于** `argv` 时则不命中。
 
-**推荐写法**（显式指定 agent 名称）：
-
-```yaml
-CmdlineWhitelist:
-  - agent_name: OpenClaw
-    rule: ["node*", "*openclaw*"]
-  - agent_name: Hermes
-    rule: ["*python*", "*hermes*"]
-```
-
-**简写**（仅 glob 数组，上报名为 `Custom Agent`）：
+**示例**（须写在 `ProbeConfig` 下）：
 
 ```yaml
-CmdlineWhitelist:
-  - ["node*", "*openclaw*"]
+ProbeConfig:
+  CmdlineWhitelist:
+    - AgentType: openclaw
+      Rule: ["node*", "*openclaw*"]
+    - AgentType: hermes
+      Rule: ["*python*", "*hermes*"]
 ```
 
-同一进程命中多条规则时，**采集仍生效**；`gen_ai.agent.name` 取**列表中第一条**命中规则的 `agent_name`。若需固定名称，把更具体的规则排在前面，或避免 glob 重叠。
+同一进程命中多条规则时，**采集仍生效**；`gen_ai.agent.type` 取**列表中第一条**命中规则的 `AgentType`。若需固定类型，把更具体的规则排在前面，或避免 glob 重叠。
 
 ### Domain 规则自定义写法
 
@@ -151,7 +178,7 @@ DomainWhitelist:
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
 | `pid` | string | 进程号（十进制字符串） |
 | `comm` | string | 进程名称 |
-| `gen_ai.agent.name` | string | agent 名称 |
+| `gen_ai.agent.type` | string | Agent **类型**（如 `openclaw`、`claude-code`），来自 cmdline 白名单 |
 | `gen_ai.request.timestamp` | string | 一次对大模型请求开始的时间，毫秒时间戳（十进制字符串） |
 | `gen_ai.response.duration` | string | 一次对大模型请求到大模型回复的耗时，毫秒（十进制字符串） |
 | `server.address` | string | 从请求 URL 解析出的服务端主机名（有请求 URL 时输出） |
@@ -174,11 +201,11 @@ DomainWhitelist:
 
 ## 样例
 
-### 采集agent与llm交互数据
+### 采集 agent 与 llm 交互数据
 
 - 输入
 
-打开agent进行交流
+打开 agent 进行交流
 
 - 采集配置
 
@@ -190,10 +217,10 @@ inputs:
       Verbose: 1
       LogPath: ""
       CmdlineWhitelist:
-        - agent_name: Claude
-          rule: ["node*", "*claude*"]
-        - agent_name: Hermes
-          rule: ["node*", "*hermes*"]
+        - AgentType: claude-code
+          Rule: ["node*", "*claude*"]
+        - AgentType: hermes
+          Rule: ["node*", "*hermes*"]
       CmdlineBlacklist:
         - ["node*", "*webpack*"]
       DomainWhitelist:
@@ -207,7 +234,7 @@ flushers:
 - 输出
 
 {
-  "gen_ai.agent.name": "OpenClaw",
+  "gen_ai.agent.type": "openclaw",
   "gen_ai.turn.id": "c47ac487c54c2da859ba2a0e873eeeae",
   "gen_ai.input.messages": [
     {

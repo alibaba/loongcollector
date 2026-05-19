@@ -516,7 +516,23 @@ void WarnSecurityProbeConfigIgnore(const CollectionPipelineContext* mContext,
 
 namespace {
 
-constexpr const char* kAgentsightDefaultAllowAgentName = "Custom Agent";
+bool ParseAgentsightAgentTypeField(const Json::Value& row,
+                                   const std::string& contextLabel,
+                                   size_t rowIndex,
+                                   std::string& agentType,
+                                   std::string& errorMsg) {
+    const std::string prefix = contextLabel + " row " + std::to_string(rowIndex);
+    if (!row.isMember("AgentType") || !row["AgentType"].isString()) {
+        errorMsg = prefix + " must have non-empty AgentType (string)";
+        return false;
+    }
+    agentType = row["AgentType"].asString();
+    if (agentType.empty()) {
+        errorMsg = prefix + " AgentType must be non-empty";
+        return false;
+    }
+    return true;
+}
 
 bool ParseAgentsightCmdlinePatternsArray(const Json::Value& row,
                                          const std::string& contextLabel,
@@ -568,9 +584,8 @@ void ParseAgentsightCmdlineRowArray(const Json::Value& rows,
     }
 }
 
-/// Fills `dest` with allow rules. Each entry is either a string array (legacy) or
-/// `{"agent_name": "...", "rule": [...]}`.
-void ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
+/// Fills `dest` with allow rules. Each entry must be `{"AgentType": "...", "Rule": [...]}`.
+bool ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
                                           const std::string& contextLabel,
                                           std::vector<AgentsightCmdlineAllowRule>& dest,
                                           std::string& errorMsg,
@@ -578,54 +593,43 @@ void ParseAgentsightCmdlineAllowRuleArray(const Json::Value& rows,
     if (!rows.isArray()) {
         errorMsg = contextLabel + " must be an array";
         warn();
-        return;
+        return false;
+    }
+    if (rows.empty()) {
+        errorMsg = contextLabel + " must contain at least one rule";
+        warn();
+        return false;
     }
     for (Json::ArrayIndex i = 0; i < rows.size(); ++i) {
         const Json::Value& row = rows[i];
-        if (row.isArray()) {
-            std::vector<std::string> patterns;
-            if (!ParseAgentsightCmdlinePatternsArray(row, contextLabel, i, "entry", patterns, errorMsg)) {
-                warn();
-                continue;
-            }
-            dest.push_back(AgentsightCmdlineAllowRule {kAgentsightDefaultAllowAgentName, std::move(patterns)});
-            continue;
-        }
         if (!row.isObject()) {
-            errorMsg = contextLabel + " row " + std::to_string(i)
-                       + " must be a string array or object with agent_name and rule";
+            errorMsg = contextLabel + " row " + std::to_string(i) + " must be an object with AgentType and Rule";
             warn();
             continue;
         }
-        if (!row.isMember("agent_name") || !row["agent_name"].isString() || row["agent_name"].asString().empty()) {
-            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have non-empty agent_name";
+        std::string agentType;
+        if (!ParseAgentsightAgentTypeField(row, contextLabel, i, agentType, errorMsg)) {
             warn();
             continue;
         }
-        if (!row.isMember("rule")) {
-            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have rule";
+        if (!row.isMember("Rule")) {
+            errorMsg = contextLabel + " row " + std::to_string(i) + " object must have Rule";
             warn();
             continue;
         }
         std::vector<std::string> patterns;
-        if (!ParseAgentsightCmdlinePatternsArray(row["rule"], contextLabel, i, "rule", patterns, errorMsg)) {
+        if (!ParseAgentsightCmdlinePatternsArray(row["Rule"], contextLabel, i, "Rule", patterns, errorMsg)) {
             warn();
             continue;
         }
-        dest.push_back(AgentsightCmdlineAllowRule {row["agent_name"].asString(), std::move(patterns)});
+        dest.push_back(AgentsightCmdlineAllowRule {std::move(agentType), std::move(patterns)});
     }
-}
-
-void ParseAgentsightCmdlineAllowFromOptionalKey(const Json::Value& innerConfig,
-                                                const char* key,
-                                                const std::string& contextLabel,
-                                                std::vector<AgentsightCmdlineAllowRule>& dest,
-                                                std::string& errorMsg,
-                                                const std::function<void()>& warn) {
-    if (!innerConfig.isMember(key)) {
-        return;
+    if (dest.empty()) {
+        errorMsg = contextLabel + " has no valid rules";
+        warn();
+        return false;
     }
-    ParseAgentsightCmdlineAllowRuleArray(innerConfig[key], contextLabel, dest, errorMsg, warn);
+    return true;
 }
 
 void ParseAgentsightCmdlineFromOptionalKey(const Json::Value& innerConfig,
@@ -692,6 +696,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
             WarnSecurityProbeConfigIgnore(mContext, errorMsg, sName);
         }
         if (probeType == SecurityProbeType::AGENTSIGHT_OBSERVE) {
+            // No ProbeConfig means AgentsightManager will fall back to built-in defaults.
             return true;
         }
     } else {
@@ -710,12 +715,17 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 if (!GetOptionalStringParam(innerConfig, "LogPath", mLogPath, errorMsg)) {
                     warnOptionalParse();
                 }
-                ParseAgentsightCmdlineAllowFromOptionalKey(innerConfig,
-                                                           "CmdlineWhitelist",
-                                                           "ProbeConfig.CmdlineWhitelist",
-                                                           mAgentsightCmdlineWhitelist,
-                                                           errorMsg,
-                                                           warnOptionalParse);
+                // CmdlineWhitelist is optional: when absent, AgentsightManager injects the
+                // built-in cmdline rules. When present, it must contain valid rules.
+                if (innerConfig.isMember("CmdlineWhitelist")) {
+                    if (!ParseAgentsightCmdlineAllowRuleArray(innerConfig["CmdlineWhitelist"],
+                                                              "ProbeConfig.CmdlineWhitelist",
+                                                              mAgentsightCmdlineWhitelist,
+                                                              errorMsg,
+                                                              warnOptionalParse)) {
+                        return false;
+                    }
+                }
                 ParseAgentsightCmdlineFromOptionalKey(innerConfig,
                                                       "CmdlineBlacklist",
                                                       "ProbeConfig.CmdlineBlacklist",

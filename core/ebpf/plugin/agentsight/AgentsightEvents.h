@@ -49,7 +49,7 @@ public:
     uint32_t mCacheCreationInputTokens = 0;
     uint32_t mCacheReadInputTokens = 0;
     std::string mProcessName;
-    std::string mAgentName;
+    std::string mAgentType;
     std::string mRequestUrl;
     std::string mProvider;
     std::string mModel;

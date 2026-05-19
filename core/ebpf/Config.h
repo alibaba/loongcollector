@@ -39,9 +39,9 @@ bool InitObserverNetworkOption(const Json::Value& config,
 
 enum class SecurityProbeType { PROCESS, FILE, NETWORK, AGENTSIGHT_OBSERVE, MAX };
 
-/// One cmdline allow rule: glob patterns plus the agent name reported as `gen_ai.agent.name`.
+/// One cmdline allow rule: glob patterns plus the agent type reported as `gen_ai.agent.type`.
 struct AgentsightCmdlineAllowRule {
-    std::string agentName;
+    std::string agentType;
     std::vector<std::string> patterns;
 };
 
