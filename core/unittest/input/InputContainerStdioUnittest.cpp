@@ -284,8 +284,8 @@ void InputContainerStdioUnittest::TestCreateInnerProcessorsJsonMultilineNoJsonRe
     // Step 4 processor should be ProcessorMergeMultilineLogNative with MergeType=json
     APSARA_TEST_EQUAL(4UL, input->mInnerProcessors.size());
     APSARA_TEST_EQUAL(ProcessorMergeMultilineLogNative::sName, input->mInnerProcessors[3]->Name());
-    auto* mergeProcessor
-        = static_cast<ProcessorMergeMultilineLogNative*>(input->mInnerProcessors[3]->mPlugin.get());
+    auto* mergeProcessor =
+        static_cast<ProcessorMergeMultilineLogNative*>(input->mInnerProcessors[3]->mPlugin.get());
     APSARA_TEST_TRUE(mergeProcessor->mMergeType == ProcessorMergeMultilineLogNative::MergeType::BY_JSON);
 }
 
