@@ -196,6 +196,7 @@ DomainWhitelist:
 | `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
 | `gen_ai.input.messages` | string | 大模型请求 message 的序列化 json |
 | `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json |
+| `gen_ai.tool.definitions` | string | 大模型请求中提供的工具（function/tool 定义）数组的序列化 json，例如 OpenAI 的 `tools` 字段、Anthropic 的 `tools` 字段。无工具时为 `[]`，请求未携带该字段时不输出。 |
 
 本表字段均由插件 `SetContent` 写入日志内容，**键值类型均为字符串**。其中带数值语义的字段以十进制文本（或 `is_sse` 的 `1`/`0`）落盘，与实现一致；并非日志 schema 中的强类型整型/浮点列。
 
@@ -261,6 +262,22 @@ flushers:
         }
       ],
       "finish_reason": "stop"
+    }
+  ],
+  "gen_ai.tool.definitions": [
+    {
+      "type": "function",
+      "function": {
+        "name": "read",
+        "description": "Read file contents",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string"}
+          },
+          "required": ["path"]
+        }
+      }
     }
   ],
   "gen_ai.provider.name": "openai",

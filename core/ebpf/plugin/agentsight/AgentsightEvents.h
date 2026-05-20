@@ -56,6 +56,7 @@ public:
     std::string mFinishReason;
     std::string mRequestMessagesJson;
     std::string mResponseMessagesJson;
+    std::string mToolDefinitionsJson;
 };
 
 } // namespace logtail::ebpf

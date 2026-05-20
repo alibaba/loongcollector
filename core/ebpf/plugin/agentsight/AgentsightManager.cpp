@@ -580,6 +580,7 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
     setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
+    setStr(StringView("gen_ai.tool.definitions"), rec->mToolDefinitionsJson);
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {

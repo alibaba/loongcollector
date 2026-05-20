@@ -26,16 +26,20 @@ public:
 void AgentsightEventsUnittest::TestLlmRecordCopiesNonNullSizedBuffers() {
     static const char kReq[] = {'{', 'a'};
     static const char kRes[] = {'b', 'c', 'd'};
+    static const char kTools[] = {'[', '{', '}', ']'};
 
     AgentsightLLMData d{};
     d.request_messages = kReq;
     d.request_messages_len = 2;
     d.response_messages = kRes;
     d.response_messages_len = 3;
+    d.tools = kTools;
+    d.tools_len = 4;
 
     AgentsightLlmRecord r("pipe-a", d);
     APSARA_TEST_EQUAL(r.mRequestMessagesJson, "{a");
     APSARA_TEST_EQUAL(r.mResponseMessagesJson, "bcd");
+    APSARA_TEST_EQUAL(r.mToolDefinitionsJson, "[{}]");
 }
 
 UNIT_TEST_CASE(AgentsightEventsUnittest, TestLlmRecordCopiesNonNullSizedBuffers)
