@@ -2312,7 +2312,9 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
 
 bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
     paseLine = rawLine;
-    paseLine.fullLine = false;
+    // Default to Full: invalid JSON or empty lines are boundaries, not Partial.
+    // Only valid JSON with log field missing trailing \n is Partial (set at L2348).
+    paseLine.fullLine = true;
     if (rawLine.data.size() == 0) {
         return false;
     }
