@@ -2312,12 +2312,13 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
 
 bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
     paseLine = rawLine;
-    // Default to Full: invalid JSON or empty lines are boundaries, not Partial.
-    // Only valid JSON with log field missing trailing \n is Partial (set at L2348).
-    paseLine.fullLine = true;
     if (rawLine.data.size() == 0) {
+        // Empty lines (e.g. from \n\n) are boundaries — must not be merged backward in Phase 2.
+        paseLine.fullLine = true;
         return false;
     }
+    // Non-empty lines default to Partial until proven to be valid JSON with trailing \n.
+    paseLine.fullLine = false;
     rapidjson::Document doc;
     doc.Parse(rawLine.data.data(), rawLine.data.size());
 

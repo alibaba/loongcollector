@@ -461,18 +461,14 @@ void ProcessorMergeMultilineLogNative::MergeLogsByJson(PipelineEventGroup& logGr
             braceDepth = 0;
             accumulatedSize = 0;
 
-            LOG_WARNING(mContext->GetLogger(),
-                        ("JSON block too long, forced to split", "")(
-                            "first 1KB",
-                            sourceEvents[newSize - 1]
-                                .Cast<LogEvent>()
-                                .GetContent(mSourceKey)
-                                .substr(0, 1024)
-                                .to_string())("filepath", logPath.to_string())(
-                            "processor", sName)("config", mContext->GetConfigName()));
+            StringView oversizedContent = sourceEvents[newSize - 1].Cast<LogEvent>().GetContent(mSourceKey);
+            LOG_WARNING(
+                mContext->GetLogger(),
+                ("JSON block too long, forced to split", "")("first 1KB", oversizedContent.substr(0, 1024).to_string())(
+                    "filepath", logPath.to_string())("processor", sName)("config", mContext->GetConfigName()));
             mContext->GetAlarm().SendAlarmWarning(SPLIT_LOG_FAIL_ALARM,
-                                                  "JSON block too long and forced to split. processor: "
-                                                      + sName + " config: " + mContext->GetConfigName(),
+                                                  "JSON block too long and forced to split. processor: " + sName
+                                                      + " config: " + mContext->GetConfigName(),
                                                   mContext->GetRegion(),
                                                   mContext->GetProjectName(),
                                                   mContext->GetConfigName(),
