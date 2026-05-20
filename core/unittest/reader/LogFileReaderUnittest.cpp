@@ -1560,6 +1560,223 @@ UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSameSize);
 UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteLargerSize);
 UNIT_TEST_CASE(WholeFileOverwriteUnittest, TestOverwriteSmallerSize);
 
+class WholeFileOverwriteLargeUnittest : public ::testing::Test {
+public:
+    void TestLargeFileChunkedDrain();
+    void TestOverwriteDuringAccumulation();
+    void TestAppendModeNoReset();
+
+protected:
+    static void SetUpTestCase() {
+        srand(time(NULL));
+        gRootDir = GetProcessExecutionDir();
+        gLogName = "test_large.log";
+        if (PATH_SEPARATOR[0] == gRootDir.at(gRootDir.size() - 1)) {
+            gRootDir.resize(gRootDir.size() - 1);
+        }
+        gRootDir += PATH_SEPARATOR + "testDataSet" + PATH_SEPARATOR + "WholeFileOverwriteLargeUnittest";
+        gLogPath = gRootDir + PATH_SEPARATOR + gLogName;
+        bfs::remove_all(gRootDir);
+    }
+
+    static void TearDownTestCase() {}
+    void SetUp() override {
+        bfs::create_directories(gRootDir);
+        mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
+        mMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+        mMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::OVERWRITE;
+    }
+    void TearDown() override { bfs::remove_all(gRootDir); }
+
+    static std::string gRootDir;
+    static std::string gLogName;
+    static std::string gLogPath;
+
+private:
+    FileDiscoveryOptions mDiscoveryOpts;
+    FileReaderOptions mReaderOpts;
+    MultilineOptions mMultilineOpts;
+    FileTagOptions mTagOpts;
+    CollectionPipelineContext mCtx;
+
+    bool writeLog(const std::string& logPath, const std::string& logContent) {
+        std::ofstream writer(logPath.c_str(), std::fstream::out | std::fstream::trunc | std::ios_base::binary);
+        if (!writer) {
+            return false;
+        }
+        writer << logContent;
+        writer.close();
+        return true;
+    }
+};
+
+std::string WholeFileOverwriteLargeUnittest::gRootDir;
+std::string WholeFileOverwriteLargeUnittest::gLogName;
+std::string WholeFileOverwriteLargeUnittest::gLogPath;
+
+void WholeFileOverwriteLargeUnittest::TestLargeFileChunkedDrain() {
+    // Create content larger than BUFFER_SIZE (512KB)
+    std::string content(600 * 1024, 'A'); // 600KB
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // First read: entire file goes to cache (one-shot read bypasses BUFFER_SIZE)
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+        // Data should be in cache, not emitted (WHOLE_FILE caches until flush timeout)
+        APSARA_TEST_TRUE_FATAL(logbuf.rawBuffer.empty());
+    }
+
+    // Flush timeout: should trigger chunked drain
+    std::string reconstructed;
+    int totalChunks = 0;
+    bool moreData = true;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            APSARA_TEST_TRUE_FATAL(logbuf.wholeFileSeq >= 0);
+            APSARA_TEST_EQUAL_FATAL(logbuf.wholeFileSeq, totalChunks);
+            reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            totalChunks++;
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(totalChunks > 1); // must have been split
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+    // All chunks should report the same total
+    APSARA_TEST_EQUAL_FATAL(totalChunks,
+                            static_cast<int>((content.size() + LogFileReader::BUFFER_SIZE - 1) / LogFileReader::BUFFER_SIZE));
+}
+
+void WholeFileOverwriteLargeUnittest::TestOverwriteDuringAccumulation() {
+    // Write initial content and read it fully
+    std::string content1(600 * 1024, 'B');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // Read into cache
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    // Drain first content
+    {
+        bool moreData = true;
+        while (moreData) {
+            auto pEvent = reader.CreateFlushTimeoutEvent();
+            LogBuffer logbuf;
+            moreData = reader.ReadLog(logbuf, pEvent.get());
+        }
+    }
+
+    // Overwrite with new content
+    sleep(1);
+    std::string content2(700 * 1024, 'C');
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
+
+    // CheckFileSignatureAndOffset should detect mtime change and reset
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, 0);
+    APSARA_TEST_TRUE_FATAL(reader.mCache.empty());
+
+    // Read new content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    // Drain and verify we get new content, not old
+    std::string reconstructed;
+    {
+        bool moreData = true;
+        while (moreData) {
+            auto pEvent = reader.CreateFlushTimeoutEvent();
+            LogBuffer logbuf;
+            moreData = reader.ReadLog(logbuf, pEvent.get());
+            if (!logbuf.rawBuffer.empty()) {
+                reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            }
+        }
+    }
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content2);
+}
+
+void WholeFileOverwriteLargeUnittest::TestAppendModeNoReset() {
+    // Test that append mode does NOT reset position on mtime change
+    FileReaderOptions appendOpts;
+    appendOpts.mInputType = FileReaderOptions::InputType::InputFile;
+    MultilineOptions appendMultilineOpts;
+    appendMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+    appendMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::APPEND;
+
+    std::string content1 = "initial content\n";
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content1));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&appendOpts, &mCtx),
+                         std::make_pair(&appendMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    // Read initial content
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+    {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, pEvent.get());
+        APSARA_TEST_EQUAL_FATAL(std::string(logbuf.rawBuffer.data(), logbuf.rawBuffer.size()), "initial content");
+    }
+    int64_t posAfterFirstRead = reader.mLastFilePos;
+    APSARA_TEST_TRUE_FATAL(posAfterFirstRead > 0);
+
+    // Append more content (mtime changes)
+    sleep(1);
+    {
+        std::ofstream writer(gLogPath.c_str(), std::fstream::out | std::fstream::app | std::ios_base::binary);
+        writer << "appended content\n";
+        writer.close();
+    }
+
+    // CheckFileSignatureAndOffset should NOT reset position for append mode
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+    APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, posAfterFirstRead);
+}
+
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestLargeFileChunkedDrain);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestOverwriteDuringAccumulation);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestAppendModeNoReset);
+
 } // namespace logtail
 
 int main(int argc, char** argv) {

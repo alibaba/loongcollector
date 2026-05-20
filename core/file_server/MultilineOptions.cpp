@@ -40,6 +40,48 @@ bool MultilineOptions::Init(const Json::Value& config, const CollectionPipelineC
     } else if (mode == "whole_file") {
         mMode = Mode::WHOLE_FILE;
         mIsMultiline = true;
+
+        // FileWriteMode (only meaningful for whole_file mode)
+        string fileWriteMode;
+        if (!GetOptionalStringParam(config, "FileWriteMode", fileWriteMode, errorMsg)) {
+            PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                                  ctx.GetAlarm(),
+                                  errorMsg,
+                                  "append",
+                                  pluginType,
+                                  ctx.GetConfigName(),
+                                  ctx.GetProjectName(),
+                                  ctx.GetLogstoreName(),
+                                  ctx.GetRegion());
+        } else if (fileWriteMode == "overwrite") {
+            mFileWriteMode = FileWriteMode::OVERWRITE;
+        } else if (!fileWriteMode.empty() && fileWriteMode != "append") {
+            PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                                  ctx.GetAlarm(),
+                                  "string param FileWriteMode is not valid",
+                                  "append",
+                                  pluginType,
+                                  ctx.GetConfigName(),
+                                  ctx.GetProjectName(),
+                                  ctx.GetLogstoreName(),
+                                  ctx.GetRegion());
+        }
+
+        // MaxWholeFileBytes
+        uint32_t maxWholeFileBytes = 0;
+        if (!GetOptionalUIntParam(config, "MaxWholeFileBytes", maxWholeFileBytes, errorMsg)) {
+            PARAM_WARNING_DEFAULT(ctx.GetLogger(),
+                                  ctx.GetAlarm(),
+                                  errorMsg,
+                                  mMaxWholeFileBytes,
+                                  pluginType,
+                                  ctx.GetConfigName(),
+                                  ctx.GetProjectName(),
+                                  ctx.GetLogstoreName(),
+                                  ctx.GetRegion());
+        } else if (maxWholeFileBytes > 0) {
+            mMaxWholeFileBytes = maxWholeFileBytes;
+        }
     } else if (!mode.empty() && mode != "custom") {
         PARAM_WARNING_DEFAULT(ctx.GetLogger(),
                               ctx.GetAlarm(),

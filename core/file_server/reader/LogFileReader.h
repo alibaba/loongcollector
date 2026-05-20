@@ -505,6 +505,10 @@ protected:
     int64_t mExpectedFileSize = 0; //  expected file size limit, used for StaticFileServer reader
     time_t mLastMTime = 0;
     std::string mCache;
+    bool mDrainingWholeFileCache = false;
+    int32_t mWholeFileChunkIndex = 0;
+    int32_t mWholeFileTotalChunks = 0;
+    std::string mWholeFileId;
     // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
@@ -747,6 +751,10 @@ struct LogBuffer {
     uint64_t readOffset = 0;
     uint64_t readLength = 0;
     std::unique_ptr<SourceBuffer> sourcebuffer;
+    // WHOLE_FILE overwrite mode: chunked delivery metadata
+    std::string wholeFileId;
+    int32_t wholeFileSeq = -1;
+    int32_t wholeFileTotal = -1;
 
     LogBuffer() : sourcebuffer(new SourceBuffer()) {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }
