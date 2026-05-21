@@ -2262,6 +2262,7 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
             rollbackLineFeedCount = 0;
         }
         finalLine = std::move(line);
+        finalLine.data = finalLine.dataRaw;
         finalLine.rollbackLineFeedCount = rollbackLineFeedCount;
         finalLine.forceRollbackLineFeedCount = forceRollbackLineFeedCount;
         mergeLines(finalLine, finalLine, true);
