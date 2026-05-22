@@ -157,7 +157,6 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 1. load skeleton
     // 2. start consumer
     // 3. attach prog
-    // RLIMIT_MEMLOCK is bumped once in EBPFServer::Init() for the whole process, so individual
     // plugin start paths no longer need to call setrlimit themselves.
     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "enter start_plugin, arg is null: %d \n", arg == nullptr);
 
