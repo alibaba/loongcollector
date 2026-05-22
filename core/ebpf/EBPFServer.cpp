@@ -14,10 +14,9 @@
 
 #include "ebpf/EBPFServer.h"
 
-#include <sys/resource.h>
-
 #include <cerrno>
 #include <cstring>
+#include <sys/resource.h>
 
 #include <future>
 #include <shared_mutex>
@@ -72,17 +71,17 @@ void BumpMemlockRlimit() {
     struct rlimit rlimNew = {RLIM_INFINITY, RLIM_INFINITY};
     if (setrlimit(RLIMIT_MEMLOCK, &rlimNew) != 0) {
         const int err = errno;
-        LOG_WARNING(sLogger,
-                    ("eBPF", "setrlimit(RLIMIT_MEMLOCK, INFINITY) failed; BPF map creation may "
-                             "fail on older kernels or memlock-constrained containers")(
-                        "errno", err)("errstr", std::strerror(err)));
+        LOG_WARNING(
+            sLogger,
+            ("eBPF",
+             "setrlimit(RLIMIT_MEMLOCK, INFINITY) failed; BPF map creation may "
+             "fail on older kernels or memlock-constrained containers")("errno", err)("errstr", std::strerror(err)));
         return;
     }
-    struct rlimit rlimCur{};
+    struct rlimit rlimCur {};
     if (getrlimit(RLIMIT_MEMLOCK, &rlimCur) == 0) {
         LOG_INFO(sLogger,
-                 ("eBPF", "setrlimit(RLIMIT_MEMLOCK) ok")("rlim_cur", rlimCur.rlim_cur)(
-                     "rlim_max", rlimCur.rlim_max));
+                 ("eBPF", "setrlimit(RLIMIT_MEMLOCK) ok")("rlim_cur", rlimCur.rlim_cur)("rlim_max", rlimCur.rlim_max));
     }
 }
 
