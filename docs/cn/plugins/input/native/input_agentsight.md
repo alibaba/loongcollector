@@ -10,7 +10,7 @@ dev
 
 ## 版本说明
 
-* 推荐版本：LoongCollector v3.1.4 及以上
+* 推荐版本：LoongCollector v3.3.4 及以上
 
 ## 配置参数
 
