@@ -28,7 +28,6 @@ extern "C" {
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <coolbpf/security/msg_type.h>
-#include <sys/resource.h>
 
 #include "ebpf/driver/eBPFDriver.h"
 }
@@ -51,19 +50,6 @@ void* __wrap_memcpy(void* dest, const void* src, size_t n) {
 
 int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     set_log_handler(fn);
-    return 0;
-}
-
-int bump_memlock_rlimit(void) {
-    struct rlimit rlim_new = {
-        .rlim_cur = RLIM_INFINITY,
-        .rlim_max = RLIM_INFINITY,
-    };
-
-    if (0 != setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "Failed to increase RLIMIT_MEMLOCK limit!\n");
-        return -1;
-    }
     return 0;
 }
 
@@ -171,10 +157,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 1. load skeleton
     // 2. start consumer
     // 3. attach prog
+    // RLIMIT_MEMLOCK is bumped once in EBPFServer::Init() for the whole process, so individual
+    // plugin start paths no longer need to call setrlimit themselves.
     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "enter start_plugin, arg is null: %d \n", arg == nullptr);
-    if (0 != bump_memlock_rlimit()) {
-        return -1;
-    }
 
     // TODO: The coolbpf_set_loglevel API isn't ideal anyway
     libbpf_set_print(libbpf_printf);
