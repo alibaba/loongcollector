@@ -44,11 +44,11 @@ void ProcessDiscoveryManager::Stop() {
     if (mRunning == false) {
         return;
     }
-    if (!mThreadRes.valid()) {
-        return;
-    }
     mRunning = false;
-    mThreadRes.wait();
+    mSleepCv.notify_all();
+    if (mThreadRes.valid()) {
+        mThreadRes.wait();
+    }
     mCallback = nullptr;
     mStatsCallback = nullptr;
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "stop"));
@@ -118,7 +118,10 @@ void ProcessDiscoveryManager::run() {
             mCallback(std::move(result));
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(mSleepMilliseconds));
+        std::unique_lock<std::mutex> cvLock(mSleepCvMutex);
+        mSleepCv.wait_for(cvLock, std::chrono::milliseconds(mSleepMilliseconds), [this]() {
+            return !mRunning.load();
+        });
     }
 }
 
