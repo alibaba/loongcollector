@@ -119,9 +119,7 @@ void ProcessDiscoveryManager::run() {
         }
 
         std::unique_lock<std::mutex> cvLock(mSleepCvMutex);
-        mSleepCv.wait_for(cvLock, std::chrono::milliseconds(mSleepMilliseconds), [this]() {
-            return !mRunning.load();
-        });
+        mSleepCv.wait_for(cvLock, std::chrono::milliseconds(mSleepMilliseconds), [this]() { return !mRunning.load(); });
     }
 }
 
