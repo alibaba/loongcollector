@@ -24,13 +24,17 @@
 namespace logtail {
 namespace ebpf {
 
-void ProcessDiscoveryManager::Start(NotifyFn fn, size_t milliseconds, const std::string& hostRootPath) {
+void ProcessDiscoveryManager::Start(NotifyFn fn,
+                                    size_t milliseconds,
+                                    const std::string& hostRootPath,
+                                    StatsFn statsFn) {
     if (mRunning) {
         return;
     }
     mProcParser.emplace(hostRootPath);
     mRunning = true;
     mCallback = std::move(fn);
+    mStatsCallback = std::move(statsFn);
     mSleepMilliseconds = milliseconds;
     mThreadRes = std::async(std::launch::async, &ProcessDiscoveryManager::run, this);
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "start"));
@@ -46,6 +50,7 @@ void ProcessDiscoveryManager::Stop() {
     mRunning = false;
     mThreadRes.wait();
     mCallback = nullptr;
+    mStatsCallback = nullptr;
     LOG_INFO(sLogger, ("ProcessDiscoveryManager", "stop"));
 }
 
@@ -94,13 +99,19 @@ void ProcessDiscoveryManager::run() {
         std::sort(pids.begin(), pids.end());
 
         std::vector<DiscoverEntry> result;
+        size_t pidMatchCacheSize = 0;
 
         {
             std::lock_guard<std::mutex> guard(mLock);
 
             for (auto& [_, state] : mStates) {
                 state.FindAllMatch(pids, *mProcParser, result, mIsContainerMode);
+                pidMatchCacheSize += state.mPidMatchCache.size();
             }
+        }
+
+        if (mStatsCallback) {
+            mStatsCallback(pidMatchCacheSize);
         }
 
         if (!result.empty()) {

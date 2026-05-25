@@ -72,6 +72,7 @@ public:
     using DiscoverEntry = std::pair<size_t, std::set<uint32_t>>;
     using DiscoverResult = std::vector<DiscoverEntry>;
     using NotifyFn = std::function<void(DiscoverResult)>;
+    using StatsFn = std::function<void(size_t)>;
 
     ProcessDiscoveryManager() : mIsContainerMode(AppConfig::GetInstance()->IsPurageContainerMode()) {}
 
@@ -87,7 +88,10 @@ public:
         return &sInstance;
     }
 
-    void Start(NotifyFn fn, size_t milliseconds = 15000, const std::string& hostRootPath = "/");
+    void Start(NotifyFn fn,
+               size_t milliseconds = 15000,
+               const std::string& hostRootPath = "/",
+               StatsFn statsFn = nullptr);
     void Stop();
 
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
@@ -117,6 +121,7 @@ private:
     std::mutex mLock;
     std::unordered_map<std::string, InnerState> mStates;
     NotifyFn mCallback;
+    StatsFn mStatsCallback;
 
     bool mIsContainerMode;
     std::optional<ProcParser> mProcParser;
