@@ -85,7 +85,11 @@ public:
 
     void HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result);
 
-    void SetMetrics(CounterPtr pollEventsTotal) { mRecvKernelEventsTotal = std::move(pollEventsTotal); }
+    void SetMetrics(CounterPtr pollEventsTotal, CounterPtr pushLogFailedTotal, IntGaugePtr pidMatchCacheSize) {
+        mRecvKernelEventsTotal = std::move(pollEventsTotal);
+        mPushLogFailedTotal = std::move(pushLogFailedTotal);
+        mPidMatchCacheSize = std::move(pidMatchCacheSize);
+    }
 
 protected:
     int update([[maybe_unused]] const PluginOptions& options) override { return 0; }
@@ -127,6 +131,8 @@ private:
 
     // runner metrics
     CounterPtr mRecvKernelEventsTotal;
+    CounterPtr mPushLogFailedTotal;
+    IntGaugePtr mPidMatchCacheSize;
 
     friend class CpuProfilingManagerUnittest;
 };

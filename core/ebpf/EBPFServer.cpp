@@ -226,6 +226,8 @@ EBPFServer::EBPFServer()
     mLossKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL);
     mConnectionCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE);
     mPushLogFailedTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL);
+    mCpuProfilingPidMatchCacheSize
+        = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CPU_PROFILING_PID_MATCH_CACHE_SIZE);
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
@@ -411,7 +413,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 if (!pluginMgr) {
                     auto mgr = CpuProfilingManager::Create(
                         mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mHostPathPrefix.string());
-                    mgr->SetMetrics(mRecvKernelEventsTotal);
+                    mgr->SetMetrics(mRecvKernelEventsTotal, mPushLogFailedTotal, mCpuProfilingPidMatchCacheSize);
                     pluginMgr = mgr;
                 }
                 break;

@@ -330,6 +330,7 @@ void CpuProfilingManager::HandleCpuProfilingEvent(uint32_t pid, const char* comm
         std::unique_ptr<ProcessQueueItem> item
             = std::make_unique<ProcessQueueItem>(eventGroup.Copy(), info.mPluginIndex);
         if (QueueStatus::OK != ProcessQueueManager::GetInstance()->PushQueue(info.mQueueKey, std::move(item))) {
+            ADD_COUNTER(mPushLogFailedTotal, 1);
             LOG_WARNING(sLogger,
                         ("configName", info.mPipelineCtx->GetConfigName())("pluginIdx", info.mPluginIndex)(
                             "[CpuProfilingEvent] push queue failed!", ""));
