@@ -15,6 +15,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <functional>
 #include <future>
 #include <map>
@@ -119,6 +120,8 @@ private:
     std::atomic_bool mRunning = false;
     std::future<void> mThreadRes;
     std::mutex mLock;
+    std::mutex mSleepCvMutex;
+    std::condition_variable mSleepCv;
     std::unordered_map<std::string, InnerState> mStates;
     NotifyFn mCallback;
     StatsFn mStatsCallback;
