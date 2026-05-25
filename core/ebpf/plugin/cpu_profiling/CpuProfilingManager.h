@@ -85,6 +85,8 @@ public:
 
     void HandleProcessDiscoveryEvent(ProcessDiscoveryManager::DiscoverResult result);
 
+    void HandleProcessDiscoveryStats(size_t pidMatchCacheSize);
+
     void SetMetrics(CounterPtr pollEventsTotal, CounterPtr pushLogFailedTotal, IntGaugePtr pidMatchCacheSize) {
         mRecvKernelEventsTotal = std::move(pollEventsTotal);
         mPushLogFailedTotal = std::move(pushLogFailedTotal);

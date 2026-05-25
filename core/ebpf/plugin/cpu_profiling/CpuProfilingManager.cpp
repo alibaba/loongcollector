@@ -70,7 +70,10 @@ int CpuProfilingManager::Init() {
     mEBPFAdapter->StartPlugin(PluginType::CPU_PROFILING,
                               buildCpuProfilingConfig({}, mHostRootPath, handleCpuProfilingEvent, this));
     ProcessDiscoveryManager::GetInstance()->Start(
-        [this](auto v) { HandleProcessDiscoveryEvent(std::move(v)); }, 15000, mHostRootPath);
+        [this](auto v) { HandleProcessDiscoveryEvent(std::move(v)); },
+        15000,
+        mHostRootPath,
+        [this](size_t pidMatchCacheSize) { HandleProcessDiscoveryStats(pidMatchCacheSize); });
     LOG_INFO(sLogger, ("CpuProfilingManager", "init"));
     return 0;
 }
@@ -356,6 +359,10 @@ void CpuProfilingManager::HandleProcessDiscoveryEvent(ProcessDiscoveryManager::D
     // Here we only update pids, so we can keep the original handler and ctx
     mEBPFAdapter->UpdatePlugin(PluginType::CPU_PROFILING,
                                buildCpuProfilingConfig(std::move(totalPids), std::nullopt, nullptr, nullptr));
+}
+
+void CpuProfilingManager::HandleProcessDiscoveryStats(size_t pidMatchCacheSize) {
+    SET_GAUGE(mPidMatchCacheSize, pidMatchCacheSize);
 }
 
 } // namespace ebpf
