@@ -89,10 +89,8 @@ public:
         return &sInstance;
     }
 
-    void Start(NotifyFn fn,
-               size_t milliseconds = 15000,
-               const std::string& hostRootPath = "/",
-               StatsFn statsFn = nullptr);
+    void
+    Start(NotifyFn fn, size_t milliseconds = 15000, const std::string& hostRootPath = "/", StatsFn statsFn = nullptr);
     void Stop();
 
     void AddDiscovery(const std::string& configName, ProcessDiscoveryConfig config);
