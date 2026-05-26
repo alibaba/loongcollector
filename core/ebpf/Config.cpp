@@ -644,12 +644,12 @@ void ParseAgentsightCmdlineFromOptionalKey(const Json::Value& innerConfig,
     ParseAgentsightCmdlineRowArray(innerConfig[key], contextLabel, dest, errorMsg, warn);
 }
 
-void ParseAgentsightDomainStringList(const Json::Value& innerConfig,
-                                     const char* key,
-                                     const std::string& contextLabel,
-                                     std::vector<std::string>& dest,
-                                     std::string& errorMsg,
-                                     const std::function<void()>& warn) {
+void ParseAgentsightOptionalStringList(const Json::Value& innerConfig,
+                                       const char* key,
+                                       const std::string& contextLabel,
+                                       std::vector<std::string>& dest,
+                                       std::string& errorMsg,
+                                       const std::function<void()>& warn) {
     if (!innerConfig.isMember(key)) {
         return;
     }
@@ -685,7 +685,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mLogPath.clear();
         mAgentsightCmdlineWhitelist.clear();
         mAgentsightCmdlineBlacklist.clear();
-        mAgentsightDomainWhitelist.clear();
+        mAgentsightHttps.clear();
+        mAgentsightHttp.clear();
     }
 
     SecurityOption thisSecurityOption;
@@ -732,12 +733,10 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                                       mAgentsightCmdlineBlacklist,
                                                       errorMsg,
                                                       warnOptionalParse);
-                ParseAgentsightDomainStringList(innerConfig,
-                                                "DomainWhitelist",
-                                                "ProbeConfig.DomainWhitelist",
-                                                mAgentsightDomainWhitelist,
-                                                errorMsg,
-                                                warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
                 return true;
             }
             case SecurityProbeType::FILE: {

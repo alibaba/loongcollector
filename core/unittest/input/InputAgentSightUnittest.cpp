@@ -28,6 +28,7 @@ class InputAgentSightUnittest : public testing::Test {
 public:
     void TestNameAndQueueType();
     void TestInitWithProbeConfig();
+    void TestInitWithHttpsAndHttp();
 
 protected:
     void SetUp() override {
@@ -70,8 +71,29 @@ void InputAgentSightUnittest::TestInitWithProbeConfig() {
     APSARA_TEST_EQUAL(input.mSecurityOptions.mProbeType, ebpf::SecurityProbeType::AGENTSIGHT_OBSERVE);
 }
 
+void InputAgentSightUnittest::TestInitWithHttpsAndHttp() {
+    std::string err;
+    Json::Value configJson;
+    Json::Value optionalGoPipeline;
+    APSARA_TEST_TRUE(ParseJsonTable(
+        R"({"Type":"input_agentsight","ProbeConfig":{"Verbose":0,"LogPath":"","CmdlineWhitelist":[{"AgentType":"openclaw","Args":["node*","*openclaw*"]}],"Https":["*.openai.com"],"Http":[":8080","model-svc.default.svc"]}})",
+        configJson,
+        err));
+    InputAgentSight input;
+    input.SetContext(mContex);
+    input.CreateMetricsRecordRef("t", "1");
+    APSARA_TEST_TRUE(input.Init(configJson, optionalGoPipeline));
+    input.CommitMetricsRecordRef();
+    APSARA_TEST_EQUAL(1UL, input.mSecurityOptions.mAgentsightHttps.size());
+    APSARA_TEST_EQUAL("*.openai.com", input.mSecurityOptions.mAgentsightHttps[0]);
+    APSARA_TEST_EQUAL(2UL, input.mSecurityOptions.mAgentsightHttp.size());
+    APSARA_TEST_EQUAL(":8080", input.mSecurityOptions.mAgentsightHttp[0]);
+    APSARA_TEST_EQUAL("model-svc.default.svc", input.mSecurityOptions.mAgentsightHttp[1]);
+}
+
 UNIT_TEST_CASE(InputAgentSightUnittest, TestNameAndQueueType)
 UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithProbeConfig)
+UNIT_TEST_CASE(InputAgentSightUnittest, TestInitWithHttpsAndHttp)
 
 } // namespace logtail
 

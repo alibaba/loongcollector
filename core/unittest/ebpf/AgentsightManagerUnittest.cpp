@@ -72,7 +72,8 @@ void fake_config_set_log_path(AgentsightConfigHandle* c, const char* p) {
 
 int g_ut_cmdline_allow_calls = 0;
 int g_ut_cmdline_deny_calls = 0;
-int g_ut_domain_rule_calls = 0;
+int g_ut_https_calls = 0;
+int g_ut_http_calls = 0;
 
 void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
                                   const char* const* rule,
@@ -88,10 +89,17 @@ void fake_config_add_cmdline_rule(AgentsightConfigHandle* cfg,
     }
 }
 
-void fake_config_add_domain_rule(AgentsightConfigHandle* cfg, const char* rule) {
+void fake_config_add_https(AgentsightConfigHandle* cfg, const char* rule) {
     (void)cfg;
     (void)rule;
-    ++g_ut_domain_rule_calls;
+    ++g_ut_https_calls;
+}
+
+int fake_config_add_http(AgentsightConfigHandle* cfg, const char* target) {
+    (void)cfg;
+    (void)target;
+    ++g_ut_http_calls;
+    return 0;
 }
 
 AgentsightHandle* fake_handle_new(AgentsightConfigHandle* cfg) {
@@ -169,7 +177,8 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     t->config_set_verbose = fake_config_set_verbose;
     t->config_set_log_path = fake_config_set_log_path;
     t->config_add_cmdline_rule = fake_config_add_cmdline_rule;
-    t->config_add_domain_rule = fake_config_add_domain_rule;
+    t->config_add_https = fake_config_add_https;
+    t->config_add_http = fake_config_add_http;
     t->handle_new = fake_handle_new;
     t->handle_free = fake_handle_free;
     t->handle_start = fake_handle_start;
@@ -218,11 +227,13 @@ public:
         g_config_new_null = false;
         g_ut_cmdline_allow_calls = 0;
         g_ut_cmdline_deny_calls = 0;
-        g_ut_domain_rule_calls = 0;
+        g_ut_https_calls = 0;
+        g_ut_http_calls = 0;
         auto& o = agentsightOptions();
         o.mAgentsightCmdlineWhitelist.clear();
         o.mAgentsightCmdlineBlacklist.clear();
-        o.mAgentsightDomainWhitelist.clear();
+        o.mAgentsightHttps.clear();
+        o.mAgentsightHttp.clear();
     }
 
     void TearDown() override {
@@ -272,7 +283,7 @@ public:
     void TestSuspend();
     void TestDestroyTwice();
     void TestGetPluginType();
-    void TestCmdlineAndDomainRulesInvokedOnAddOrUpdate();
+    void TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate();
     void TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted();
     void TestUserBlacklistOnlySkipsBuiltinAllowInjection();
 
@@ -480,12 +491,13 @@ void AgentsightManagerUnittest::TestDestroyTwice() {
     APSARA_TEST_EQUAL(0, mgr->Destroy());
 }
 
-void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() {
+void AgentsightManagerUnittest::TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate() {
     auto& o = agentsightOptions();
     o.mAgentsightCmdlineWhitelist = {AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}},
                                      AgentsightCmdlineAllowRule{"claude-code", {"node", "*claude*"}}};
     o.mAgentsightCmdlineBlacklist = {{"node", "*webpack*"}};
-    o.mAgentsightDomainWhitelist = {"*.openai.com", "*.anthropic.com"};
+    o.mAgentsightHttps = {"*.openai.com", "*.anthropic.com"};
+    o.mAgentsightHttp = {":8080", "10.0.0.1:9090", "model-svc.default.svc", "*.internal.svc"};
 
     auto mgr = makeManager();
     CollectionPipelineContext ctx;
@@ -494,7 +506,8 @@ void AgentsightManagerUnittest::TestCmdlineAndDomainRulesInvokedOnAddOrUpdate() 
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(2, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(2, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(2, g_ut_https_calls);
+    APSARA_TEST_EQUAL(4, g_ut_http_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -507,7 +520,8 @@ void AgentsightManagerUnittest::TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitte
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(9, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(0, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(4, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(4, g_ut_https_calls);
+    APSARA_TEST_EQUAL(0, g_ut_http_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -523,7 +537,8 @@ void AgentsightManagerUnittest::TestUserBlacklistOnlySkipsBuiltinAllowInjection(
     APSARA_TEST_EQUAL(0, mgr->AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
     APSARA_TEST_EQUAL(0, g_ut_cmdline_allow_calls);
     APSARA_TEST_EQUAL(1, g_ut_cmdline_deny_calls);
-    APSARA_TEST_EQUAL(4, g_ut_domain_rule_calls);
+    APSARA_TEST_EQUAL(4, g_ut_https_calls);
+    APSARA_TEST_EQUAL(0, g_ut_http_calls);
     mgr->RemoveConfig("p1");
     mgr->Destroy();
 }
@@ -543,7 +558,7 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeInvalidOptions);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestResumeWithNoRegistration);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestSuspend);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyTwice);
-UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineAndDomainRulesInvokedOnAddOrUpdate);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestUserBlacklistOnlySkipsBuiltinAllowInjection);
 

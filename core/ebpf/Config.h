@@ -62,8 +62,10 @@ public:
     std::vector<AgentsightCmdlineAllowRule> mAgentsightCmdlineWhitelist;
     /// Cmdline argv glob rows (allow=0) for AgentSight process matching.
     std::vector<std::vector<std::string>> mAgentsightCmdlineBlacklist;
-    /// Domain glob strings (whitelist) for AgentSight SNI / domain filtering.
-    std::vector<std::string> mAgentsightDomainWhitelist;
+    /// HTTPS 域名规则（glob 模式，大小写不敏感）。
+    std::vector<std::string> mAgentsightHttps;
+    /// HTTP 明文流量目标（端口、IP、IP:端口 或域名）。
+    std::vector<std::string> mAgentsightHttp;
 };
 
 ///////////////////// Process Level Config /////////////////////

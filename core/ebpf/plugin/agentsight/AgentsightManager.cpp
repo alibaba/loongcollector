@@ -125,7 +125,7 @@ static const std::vector<BuiltinCmdlineAllowRule>& GetBuiltinCmdlineAllowRules()
     return kRules;
 }
 
-static const std::vector<const char*>& GetBuiltinDomainAllowRules() {
+static const std::vector<const char*>& GetBuiltinHttpsAllowRules() {
     static const std::vector<const char*> kRules = {
         "api.openai.com",
         "api.anthropic.com",
@@ -141,9 +141,10 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
     // Built-in cmdline rules are injected only when the user did not supply either whitelist
     // or blacklist. Once any user rule is present, we use the user configuration verbatim so
     // strict matching scenarios are not silently broadened.
+    // Http 目标列表为空时不注入默认值，等价于明文 HTTP 采集关闭。
     const bool injectBuiltinCmdlineAllow
         = opts.mAgentsightCmdlineWhitelist.empty() && opts.mAgentsightCmdlineBlacklist.empty();
-    const bool injectBuiltinDomainAllow = opts.mAgentsightDomainWhitelist.empty();
+    const bool injectBuiltinHttpsAllow = opts.mAgentsightHttps.empty();
 
     if (!sym || !sym->config_add_cmdline_rule) {
         LOG_WARNING(sLogger,
@@ -153,12 +154,18 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                         "user_blacklist_rows", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_injected",
                                                                                         injectBuiltinCmdlineAllow));
     }
-    if (!sym || !sym->config_add_domain_rule) {
+    if (!sym || !sym->config_add_https) {
         LOG_WARNING(
             sLogger,
-            ("AgentSight", "domain rules configured but agentsight_config_add_domain_rule symbol not found; skipping")(
-                "user_domain_rows", opts.mAgentsightDomainWhitelist.size())("builtin_domain_injected",
-                                                                            injectBuiltinDomainAllow));
+            ("AgentSight",
+             "AgentSight https rules configured but agentsight_config_add_https symbol not found; skipping")(
+                "user_https_rows", opts.mAgentsightHttps.size())("builtin_https_injected", injectBuiltinHttpsAllow));
+    }
+    if (!sym || !sym->config_add_http) {
+        LOG_WARNING(sLogger,
+                    ("AgentSight",
+                     "AgentSight http targets configured but agentsight_config_add_http symbol not found; skipping")(
+                        "user_http_rows", opts.mAgentsightHttp.size()));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
@@ -197,29 +204,44 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
         }
     }
 
-    size_t domainRowsApplied = 0;
-    if (sym && sym->config_add_domain_rule) {
-        if (injectBuiltinDomainAllow) {
-            for (const char* d : GetBuiltinDomainAllowRules()) {
-                sym->config_add_domain_rule(cfg, d);
-                ++domainRowsApplied;
+    size_t httpsRowsApplied = 0;
+    if (sym && sym->config_add_https) {
+        if (injectBuiltinHttpsAllow) {
+            for (const char* d : GetBuiltinHttpsAllowRules()) {
+                sym->config_add_https(cfg, d);
+                ++httpsRowsApplied;
             }
         } else {
-            for (const auto& d : opts.mAgentsightDomainWhitelist) {
-                sym->config_add_domain_rule(cfg, d.c_str());
-                ++domainRowsApplied;
+            for (const auto& d : opts.mAgentsightHttps) {
+                sym->config_add_https(cfg, d.c_str());
+                ++httpsRowsApplied;
             }
         }
     }
 
-    LOG_INFO(sLogger,
-             ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
-                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
-                                                                                    injectBuiltinCmdlineAllow)(
-                 "cmdline_allow_rows_applied", allowRowsToApply.size())("user_domain_whitelist",
-                                                                        opts.mAgentsightDomainWhitelist.size())(
-                 "builtin_domain_allow_injected", injectBuiltinDomainAllow)("domain_rows_applied", domainRowsApplied)(
-                 "cmdline_api", sym && sym->config_add_cmdline_rule)("domain_api", sym && sym->config_add_domain_rule));
+    size_t httpRowsApplied = 0;
+    if (sym && sym->config_add_http) {
+        for (const auto& t : opts.mAgentsightHttp) {
+            const int rc = sym->config_add_http(cfg, t.c_str());
+            if (rc < 0) {
+                const char* err = sym->last_error ? sym->last_error() : nullptr;
+                LOG_WARNING(sLogger, ("AgentSight http target rejected", t)("last_error", err ? err : ""));
+            } else {
+                ++httpRowsApplied;
+            }
+        }
+    }
+
+    LOG_INFO(
+        sLogger,
+        ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
+            "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                               injectBuiltinCmdlineAllow)(
+            "cmdline_allow_rows_applied", allowRowsToApply.size())("user_https_rows", opts.mAgentsightHttps.size())(
+            "builtin_https_allow_injected", injectBuiltinHttpsAllow)("https_rows_applied", httpsRowsApplied)(
+            "user_http_rows", opts.mAgentsightHttp.size())("http_rows_applied", httpRowsApplied)(
+            "cmdline_api", sym && sym->config_add_cmdline_rule)("https_api", sym && sym->config_add_https)(
+            "http_api", sym && sym->config_add_http));
 }
 
 } // namespace

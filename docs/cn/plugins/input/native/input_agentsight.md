@@ -22,7 +22,8 @@ dev
 |  ProbeConfig.LogPath  |  string  |  否  |  `""`  |  ebpf 日志的输出位置  |
 |  ProbeConfig.CmdlineWhitelist  |  array  |  否（**推荐填写**）  |  内置 9 条  |  进程 **agent 筛选白名单**。每一项为对象：`AgentType`（上报字段 `gen_ai.agent.type`）+ `Args`（字符串数组，与进程 cmdline 各参数（即 `argv`）按位置 glob 匹配）。**未配置**且 `CmdlineBlacklist` 也为空时注入「默认 `CmdlineWhitelist`」（见下文）；**填写后只使用用户规则**，不再叠加内置。空数组 `[]` 视为非法配置。  |
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
-|  ProbeConfig.DomainWhitelist  |  array  |  否  |  /  |  域名 **白名单**（字符串数组）：访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
+|  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
+|  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
 
 ### `AgentType` 取值命名规范
 
@@ -47,27 +48,47 @@ dev
 
 #### 黑白名单判定逻辑
 
-进程是否纳入采集，按下列**固定顺序**判定（三类名单相互独立，未配置项见下文「默认值」）：
+本插件有**两条独立判定链**：
+
+- **HTTPS 加密流量** 走 **进程级判定**：由 `CmdlineBlacklist` / `CmdlineWhitelist` / `Https` 决定哪些进程被纳入采集。
+- **HTTP 明文流量** 走 **目的地级判定**：由 `Http` 列表按"目的端口 / 目的 IP / 目的域名"过滤要采集的流量，与进程无关。
+
+两条链相互独立、互不影响；同一名单内的多条规则之间为 **OR**（命中任一条即可）。
+
+##### 1. HTTPS 加密流量采集（进程级）
+
+进程是否纳入采集，按下列**固定顺序**判定（未配置项见下文「默认值」）：
 
 1. 命中 `CmdlineBlacklist` → **不采集**（cmdline 黑名单优先）
 2. 未命中黑名单，且命中 `CmdlineWhitelist` → **纳入采集**
-3. 仍未纳入，且进程访问域名命中 `DomainWhitelist` → **纳入采集**
+3. 仍未纳入，且进程访问域名命中 `Https` → **纳入采集**
 4. 以上均未命中 → **不采集**
-
-同一名单内的多条规则之间为 **OR**（命中任一条即可）。
 
 ```mermaid
 graph TD
-    A["是否纳入采集?"] --> B{"命中 CmdlineBlacklist?"}
+    A["进程是否纳入 HTTPS 采集?"] --> B{"命中 CmdlineBlacklist?"}
     B -->|是| N["不采集"]
     B -->|否| C{"命中 CmdlineWhitelist?"}
     C -->|是| Y["纳入采集"]
-    C -->|否| D{"访问域名命中 DomainWhitelist?"}
+    C -->|否| D{"访问域名命中 Https?"}
     D -->|是| Y
     D -->|否| N
 ```
 
-例如：只配置了 cmdline 黑名单、未配域名时，仍会注入默认 `DomainWhitelist`；只配域名、未配 cmdline 黑白名单时，仍会注入下文的默认 cmdline 白名单。
+例如：只配置了 cmdline 黑名单、未配 `Https` 时，仍会注入默认 `Https` 列表；只配 `Https`、未配 cmdline 黑白名单时，仍会注入下文的默认 cmdline 白名单。
+
+##### 2. HTTP 明文流量采集（目的地级）
+
+`Http` 是**纯流量白名单**，不区分进程，按目的地 `:端口` / `IP` / `IP:端口` / `域名` 命中即采集：
+
+```mermaid
+graph TD
+    A["HTTP 明文流量是否采集?"] --> B{"目的地命中 Http?"}
+    B -->|是| Y["采集该流量"]
+    B -->|否| N["不采集"]
+```
+
+`Http` 列表 **为空时不采集任何明文 HTTP 流量**（默认关闭）；非空时仅采集命中目的地的流量。
 
 #### Cmdline 规则优先级和默认注入值
 
@@ -103,12 +124,12 @@ ProbeConfig:
       Args: ["node*", "*claude*"]
 ```
 
-#### Domain 规则优先级和默认注入值
+#### Https 规则优先级和默认注入值
 
-1. **多条域名之间**：**OR**，命中任一条即可。
-2. **默认注入条件**：`DomainWhitelist` **为空** 时，注入下表；一旦配置了 **任意一条** 用户域名，则 **不再** 注入默认域名。
+1. **多条 Https 规则之间**：**OR**，命中任一条即可。
+2. **默认注入条件**：`Https` 列表 **为空** 时，注入下表；一旦配置了 **任意一条** 用户规则，则 **不再** 注入默认值。
 
-**默认 `DomainWhitelist`（4 条，精确主机名）**
+**默认 `Https`（4 条，精确主机名）**
 
 | 域名 |
 | --- |
@@ -117,15 +138,25 @@ ProbeConfig:
 | `dashscope.aliyuncs.com` |
 | `dashscope-intl.aliyuncs.com` |
 
+#### Http 规则优先级和默认注入值
+
+1. **多条 Http 条目之间**：**OR**，命中任一条即可，顺序无关。
+2. **每一项**可写以下四种形态之一：
+   - `:端口`（如 `:8080`）：匹配任意目的 IP + 指定端口。
+   - `IP`（如 `10.0.0.1`）：匹配指定目的 IPv4 + 任意端口。
+   - `IP:端口`（如 `10.0.0.1:9090`）：精确匹配目的 IPv4 + 端口。
+   - `域名`（如 `model-svc.default.svc`、`*.internal.svc`）：在**运行时**根据域名解析结果动态生效。
+3. **默认注入条件**：`Http` 列表 **为空** 时不注入任何默认值，明文 HTTP 流量采集**默认关闭**。
+
 #### `gen_ai.agent.type` 的取值规则
 
-`gen_ai.agent.type` **只来自 cmdline 白名单**（用户配置或内置默认）中命中规则的 `AgentType`，与 `DomainWhitelist` 无直接映射关系。按下列顺序确定：
+`gen_ai.agent.type` **只来自 cmdline 白名单**（用户配置或内置默认）中命中规则的 `AgentType`，与 `Https` / `Http` 列表无直接映射关系。按下列顺序确定：
 
 1. 进程被当前生效的 cmdline 白名单命中 → 取**第一条**命中规则的 `AgentType`。
-2. 进程仅靠 `DomainWhitelist` 纳入采集，且 cmdline 未命中（用户已覆盖默认时）→ 二次匹配 **内置默认 9 条**；命中则输出对应类型（如 `openclaw`）。
+2. 进程仅靠 `Https` 纳入采集，且 cmdline 未命中（用户已覆盖默认时）→ 二次匹配 **内置默认 9 条**；命中则输出对应类型（如 `openclaw`）。
 3. 仍匹配不上 → **不输出** `gen_ai.agent.type`。
 
-「只配 `DomainWhitelist`、不配 cmdline」是允许的：cmdline 走内置默认 9 条 + 域名走用户配置，互相独立生效。**`DomainWhitelist` 中的域名本身不会作为** `gen_ai.agent.type`。
+「只配 `Https`、不配 cmdline」是允许的：cmdline 走内置默认 9 条 + `Https` 走用户配置，互相独立生效。**`Https` / `Http` 列表中的条目本身不会作为** `gen_ai.agent.type`。
 
 ### Cmdline 规则自定义写法
 
@@ -159,14 +190,27 @@ ProbeConfig:
 
 同一进程命中多条规则时，**采集仍生效**；`gen_ai.agent.type` 取**列表中第一条**命中规则的 `AgentType`。若需固定类型，把更具体的规则排在前面，或避免 glob 重叠。
 
-### Domain 规则自定义写法
+### Https 规则自定义写法
 
-`DomainWhitelist` 里每一项用于匹配进程访问的大模型 API 主机名。**默认注入为精确主机名**；自行配置时也可写 glob（如 `*.anthropic.com`），通配符为 `*`，匹配 **不区分大小写**。示例：
+`Https` 里每一项用于匹配进程访问的大模型 API 主机名。**默认注入为精确主机名**；自行配置时也可写 glob（如 `*.anthropic.com`），通配符为 `*`，匹配 **不区分大小写**。示例：
 
 ```yaml
-DomainWhitelist:
+Https:
   - "api.openai.com"
   - "dashscope.aliyuncs.com"
+  - "*.anthropic.com"
+```
+
+### Http 规则自定义写法
+
+`Http` 里每一项可以是 `:端口`、`IP`、`IP:端口` 或域名（含 glob），四种形态可混合书写。命中其中之一即对该明文 HTTP 流量进行采集。示例：
+
+```yaml
+Http:
+  - ":8080"
+  - "10.0.0.1:9090"
+  - "model-svc.default.svc"
+  - "*.internal.svc"
 ```
 
 ## 输出格式
@@ -224,8 +268,11 @@ inputs:
           Args: ["node*", "*hermes*"]
       CmdlineBlacklist:
         - ["node*", "*webpack*"]
-      DomainWhitelist:
+      Https:
         - "api.openai.com"
+      Http:
+        - ":8080"
+        - "10.0.0.1:9090"
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
