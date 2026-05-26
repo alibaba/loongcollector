@@ -502,43 +502,47 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
 void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands) {
     int64_t now = static_cast<int64_t>(time(nullptr));
-    lock_guard<mutex> lock(mOnetimePipelineMux);
     for (const auto& cmd : commands) {
         if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
             continue;
         }
+
+        ConfigInfo info;
+        info.name = cmd.name();
+        info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
+        info.status = ConfigFeedbackStatus::APPLYING;
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             if (mOnetimePipelineConfigInfoMap.count(cmd.name())) {
                 continue;
             }
+            mOnetimePipelineConfigInfoMap[cmd.name()] = info;
         }
+
         filesystem::path filePath = mOnetimePipelineConfigDir / (cmd.name() + ".json");
         filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (cmd.name() + ".json.new");
         {
+            lock_guard<mutex> lock(mOnetimePipelineMux);
             ofstream fout(tmpFilePath);
             if (!fout) {
                 LOG_WARNING(sLogger, ("failed to open onetime config file", filePath.string()));
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mOnetimePipelineConfigInfoMap.erase(cmd.name());
                 continue;
             }
             fout << cmd.detail();
-        }
-        error_code ec;
-        filesystem::rename(tmpFilePath, filePath, ec);
-        if (ec) {
-            LOG_WARNING(sLogger,
-                        ("failed to rename onetime config file", filePath.string())("error code", ec.value())(
-                            "error msg", ec.message()));
-            filesystem::remove(tmpFilePath, ec);
-            continue;
-        }
-        {
-            lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            ConfigInfo info;
-            info.name = cmd.name();
-            info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
-            info.status = ConfigFeedbackStatus::APPLYING;
-            mOnetimePipelineConfigInfoMap[cmd.name()] = std::move(info);
+
+            error_code ec;
+            filesystem::rename(tmpFilePath, filePath, ec);
+            if (ec) {
+                LOG_WARNING(sLogger,
+                            ("failed to rename onetime config file", filePath.string())("error code", ec.value())(
+                                "error msg", ec.message()));
+                filesystem::remove(tmpFilePath, ec);
+                lock_guard<mutex> lockInfoMap(mInfoMapMux);
+                mOnetimePipelineConfigInfoMap.erase(cmd.name());
+                continue;
+            }
         }
         ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(cmd.name(), this);
         LOG_INFO(sLogger, ("received onetime pipeline config", cmd.name())("expire_time", cmd.expire_time()));
