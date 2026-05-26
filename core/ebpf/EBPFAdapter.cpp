@@ -259,10 +259,10 @@ bool EBPFAdapter::tryLoadAgentSightDylib() {
         tmpLib->LoadMethod("agentsight_config_set_log_path", symErr));
     sym.config_add_cmdline_rule = reinterpret_cast<decltype(sym.config_add_cmdline_rule)>(
         tmpLib->LoadMethod("agentsight_config_add_cmdline_rule", symErr));
-    sym.config_add_https = reinterpret_cast<decltype(sym.config_add_https)>(
-        tmpLib->LoadMethod("agentsight_config_add_https", symErr));
-    sym.config_add_http = reinterpret_cast<decltype(sym.config_add_http)>(
-        tmpLib->LoadMethod("agentsight_config_add_http", symErr));
+    sym.config_add_https
+        = reinterpret_cast<decltype(sym.config_add_https)>(tmpLib->LoadMethod("agentsight_config_add_https", symErr));
+    sym.config_add_http
+        = reinterpret_cast<decltype(sym.config_add_http)>(tmpLib->LoadMethod("agentsight_config_add_http", symErr));
     sym.handle_new = reinterpret_cast<decltype(sym.handle_new)>(tmpLib->LoadMethod("agentsight_new", symErr));
     sym.handle_free = reinterpret_cast<decltype(sym.handle_free)>(tmpLib->LoadMethod("agentsight_free", symErr));
     sym.handle_start = reinterpret_cast<decltype(sym.handle_start)>(tmpLib->LoadMethod("agentsight_start", symErr));

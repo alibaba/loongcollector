@@ -733,18 +733,10 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                                                       mAgentsightCmdlineBlacklist,
                                                       errorMsg,
                                                       warnOptionalParse);
-                ParseAgentsightOptionalStringList(innerConfig,
-                                                  "Https",
-                                                  "ProbeConfig.Https",
-                                                  mAgentsightHttps,
-                                                  errorMsg,
-                                                  warnOptionalParse);
-                ParseAgentsightOptionalStringList(innerConfig,
-                                                  "Http",
-                                                  "ProbeConfig.Http",
-                                                  mAgentsightHttp,
-                                                  errorMsg,
-                                                  warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
+                ParseAgentsightOptionalStringList(
+                    innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
                 return true;
             }
             case SecurityProbeType::FILE: {

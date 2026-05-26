@@ -162,11 +162,10 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
                 "user_https_rows", opts.mAgentsightHttps.size())("builtin_https_injected", injectBuiltinHttpsAllow));
     }
     if (!sym || !sym->config_add_http) {
-        LOG_WARNING(
-            sLogger,
-            ("AgentSight",
-             "AgentSight http targets configured but agentsight_config_add_http symbol not found; skipping")(
-                "user_http_rows", opts.mAgentsightHttp.size()));
+        LOG_WARNING(sLogger,
+                    ("AgentSight",
+                     "AgentSight http targets configured but agentsight_config_add_http symbol not found; skipping")(
+                        "user_http_rows", opts.mAgentsightHttp.size()));
     }
 
     std::vector<std::pair<std::string, std::vector<std::string>>> allowRowsToApply;
@@ -233,15 +232,16 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
         }
     }
 
-    LOG_INFO(sLogger,
-             ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
-                 "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
-                                                                                    injectBuiltinCmdlineAllow)(
-                 "cmdline_allow_rows_applied", allowRowsToApply.size())("user_https_rows", opts.mAgentsightHttps.size())(
-                 "builtin_https_allow_injected", injectBuiltinHttpsAllow)("https_rows_applied", httpsRowsApplied)(
-                 "user_http_rows", opts.mAgentsightHttp.size())("http_rows_applied", httpRowsApplied)(
-                 "cmdline_api", sym && sym->config_add_cmdline_rule)("https_api", sym && sym->config_add_https)(
-                 "http_api", sym && sym->config_add_http));
+    LOG_INFO(
+        sLogger,
+        ("AgentSight", "applied config rules")("user_cmdline_whitelist", opts.mAgentsightCmdlineWhitelist.size())(
+            "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
+                                                                               injectBuiltinCmdlineAllow)(
+            "cmdline_allow_rows_applied", allowRowsToApply.size())("user_https_rows", opts.mAgentsightHttps.size())(
+            "builtin_https_allow_injected", injectBuiltinHttpsAllow)("https_rows_applied", httpsRowsApplied)(
+            "user_http_rows", opts.mAgentsightHttp.size())("http_rows_applied", httpRowsApplied)(
+            "cmdline_api", sym && sym->config_add_cmdline_rule)("https_api", sym && sym->config_add_https)(
+            "http_api", sym && sym->config_add_http));
 }
 
 } // namespace
