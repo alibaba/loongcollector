@@ -105,8 +105,8 @@ void ProcessDiscoveryManagerUnittest::TestRemoveConfig() {
     std::system("sleep 0.5");
     APSARA_TEST_GE(count, 1);
 
-    count = 0;
     manager.RemoveDiscovery("test_watch");
+    count = 0;
     std::system("sleep 0.5");
     APSARA_TEST_EQUAL(count, 0);
 }
