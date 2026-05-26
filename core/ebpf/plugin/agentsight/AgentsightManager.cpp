@@ -238,7 +238,7 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
             "user_cmdline_blacklist", opts.mAgentsightCmdlineBlacklist.size())("builtin_cmdline_allow_injected",
                                                                                injectBuiltinCmdlineAllow)(
             "cmdline_allow_rows_applied", allowRowsToApply.size())("user_https_rows", opts.mAgentsightHttps.size())(
-            "builtin_https_allow_injected", injectBuiltinHttpsAllow)("https_rows_applied", httpsRowsApplied)(
+            "builtin_https_allow_injected", injectBuiltinHttpsAllow)("\thttps_rows_applied", httpsRowsApplied)(
             "user_http_rows", opts.mAgentsightHttp.size())("http_rows_applied", httpRowsApplied)(
             "cmdline_api", sym && sym->config_add_cmdline_rule)("https_api", sym && sym->config_add_https)(
             "http_api", sym && sym->config_add_http));
