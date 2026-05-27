@@ -506,43 +506,48 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
             continue;
         }
-
-        ConfigInfo info;
-        info.name = cmd.name();
-        info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
-        info.status = ConfigFeedbackStatus::APPLYING;
+        // Check under mInfoMapMux alone — do NOT hold mOnetimePipelineMux here to avoid
+        // lock-order inversion with the file-I/O section below.
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             if (mOnetimePipelineConfigInfoMap.count(cmd.name())) {
                 continue;
             }
-            mOnetimePipelineConfigInfoMap[cmd.name()] = info;
         }
-
         filesystem::path filePath = mOnetimePipelineConfigDir / (cmd.name() + ".json");
         filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (cmd.name() + ".json.new");
+        // File I/O under mOnetimePipelineMux alone — never hold mInfoMapMux simultaneously
+        // to maintain a strict single-level lock hierarchy and eliminate deadlock risk.
         {
             lock_guard<mutex> lock(mOnetimePipelineMux);
-            ofstream fout(tmpFilePath);
-            if (!fout) {
-                LOG_WARNING(sLogger, ("failed to open onetime config file", filePath.string()));
-                lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mOnetimePipelineConfigInfoMap.erase(cmd.name());
-                continue;
+            {
+                ofstream fout(tmpFilePath);
+                if (!fout) {
+                    LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
+                    continue;
+                }
+                fout << cmd.detail();
             }
-            fout << cmd.detail();
-
             error_code ec;
+            // Remove the target first so that filesystem::rename succeeds on Windows,
+            // where rename fails with an error if the destination already exists.
+            filesystem::remove(filePath, ec);
             filesystem::rename(tmpFilePath, filePath, ec);
             if (ec) {
                 LOG_WARNING(sLogger,
                             ("failed to rename onetime config file", filePath.string())("error code", ec.value())(
                                 "error msg", ec.message()));
                 filesystem::remove(tmpFilePath, ec);
-                lock_guard<mutex> lockInfoMap(mInfoMapMux);
-                mOnetimePipelineConfigInfoMap.erase(cmd.name());
                 continue;
             }
+        }
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            ConfigInfo info;
+            info.name = cmd.name();
+            info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
+            info.status = ConfigFeedbackStatus::APPLYING;
+            mOnetimePipelineConfigInfoMap[cmd.name()] = std::move(info);
         }
         ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(cmd.name(), this);
         LOG_INFO(sLogger, ("received onetime pipeline config", cmd.name())("expire_time", cmd.expire_time()));
