@@ -32,6 +32,7 @@ type MetaCache interface {
 	UnRegisterSendFunc(key string)
 	init(*kubernetes.Clientset)
 	watch(stopCh <-chan struct{})
+	ensureWatchStarted()
 }
 
 type FlushCh struct {
@@ -137,6 +138,7 @@ func (m *MetaManager) IsReady() bool {
 
 func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
 	if cache, ok := m.cacheMap[resourceType]; ok {
+		cache.ensureWatchStarted()
 		cache.RegisterSendFunc(configName, func(events []*K8sMetaEvent) {
 			defer panicRecover()
 			sendFunc(events)
@@ -162,6 +164,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 	}
 	// register link
 	if !isEntity(resourceType) {
+		m.ensureLinkDependenciesStarted(resourceType)
 		m.registerLock.Lock()
 		if _, ok := m.linkRegisterMap[configName]; !ok {
 			m.linkRegisterMap[configName] = make([]string, 0)
@@ -232,6 +235,44 @@ func GetMetaManagerMetrics() []map[string]string {
 
 	return []map[string]string{
 		manager.metricRecord.ExportMetricRecords(),
+	}
+}
+
+var linkCacheDependencies = map[string][]string{
+	POD_NODE:                         {NODE},
+	POD_DEPLOYMENT:                   {REPLICASET, DEPLOYMENT},
+	POD_REPLICASET:                   {REPLICASET},
+	REPLICASET_DEPLOYMENT:            {DEPLOYMENT},
+	POD_STATEFULSET:                  {STATEFULSET},
+	POD_DAEMONSET:                    {DAEMONSET},
+	POD_JOB:                          {JOB},
+	JOB_CRONJOB:                      {CRONJOB},
+	POD_PERSISENTVOLUMECLAIN:         {PERSISTENTVOLUMECLAIM},
+	POD_CONFIGMAP:                    {CONFIGMAP},
+	POD_SERVICE:                      {SERVICE},
+	POD_CONTAINER:                    {},
+	INGRESS_SERVICE:                  {SERVICE},
+	POD_NAMESPACE:                    {NAMESPACE},
+	SERVICE_NAMESPACE:                {NAMESPACE},
+	DEPLOYMENT_NAMESPACE:             {NAMESPACE},
+	DAEMONSET_NAMESPACE:              {NAMESPACE},
+	STATEFULSET_NAMESPACE:            {NAMESPACE},
+	CONFIGMAP_NAMESPACE:              {NAMESPACE},
+	JOB_NAMESPACE:                    {NAMESPACE},
+	CRONJOB_NAMESPACE:                {NAMESPACE},
+	PERSISTENTVOLUMECLAIM_NAMESPACE:  {NAMESPACE},
+	INGRESS_NAMESPACE:                {NAMESPACE},
+}
+
+func (m *MetaManager) ensureLinkDependenciesStarted(linkType string) {
+	deps, ok := linkCacheDependencies[linkType]
+	if !ok {
+		return
+	}
+	for _, dep := range deps {
+		if cache, ok := m.cacheMap[dep]; ok {
+			cache.ensureWatchStarted()
+		}
 	}
 }
 

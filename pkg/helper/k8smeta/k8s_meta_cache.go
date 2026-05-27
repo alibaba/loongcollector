@@ -3,6 +3,7 @@ package k8smeta
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	app "k8s.io/api/apps/v1"
@@ -34,6 +35,8 @@ type k8sMetaCache struct {
 
 	resourceType string
 	schema       *runtime.Scheme
+
+	watchOnce sync.Once
 }
 
 func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
@@ -57,7 +60,14 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 func (m *k8sMetaCache) init(clientset *kubernetes.Clientset) {
 	m.clientset = clientset
 	m.metaStore.Start()
-	m.watch(m.stopCh)
+}
+
+func (m *k8sMetaCache) ensureWatchStarted() {
+	m.watchOnce.Do(func() {
+		if m.clientset != nil {
+			go m.watch(m.stopCh)
+		}
+	})
 }
 
 func (m *k8sMetaCache) Get(key []string) map[string][]*ObjectWrapper {
