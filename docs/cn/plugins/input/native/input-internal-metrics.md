@@ -33,6 +33,11 @@ InternalMetricRule 的结构如下：
 |  Enable  |  bool  |  否  |  true  |  是否开启。默认开启。  |
 |  Interval  |  int  |  否  |  10  |  统计间隔，单位为分钟，表示每隔指定时间输出一次该类型的指标。  |
 
+## 导出到外部系统
+
+- **导出到 Prometheus**：两段 Pipeline 过渡方案（见 [如何导出自监控数据](../../../developer-guide/self-monitor/how-to-export-self-monitor-data.md)）；单条配置直连 `flusher_prometheus` 尚在建设中。
+- **仅写本地文件**：见下方样例。
+
 ## 样例
 
 采集LoongCollector所有自监控指标，并将采集结果写到本地文件。

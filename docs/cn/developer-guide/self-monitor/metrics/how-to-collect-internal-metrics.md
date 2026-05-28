@@ -2,6 +2,8 @@
 
 LoongCollector 目前提供用于暴露自监控指标的 Input 插件；在一个**采集配置（collection pipeline）**中加入该插件即可采集自监控数据。
 
+如需将自监控指标导出到 **Prometheus RemoteWrite**，请参见 [如何导出自监控数据](../how-to-export-self-monitor-data.md)（当前使用两段 Pipeline 过渡方案；单条配置直连能力建设中）。
+
 ## 创建自监控采集配置
 
 1. 选择输入插件[自监控指标数据](../../../plugins/input/native/input-internal-metrics.md)。这里需要注意一点，就是`input_internal_metrics`插件输出的数据格式是 C++ 的多值 MetricEvent 格式（UntypedMultiDoubleValues），需要确保数据的下游支持这种格式数据的处理。
