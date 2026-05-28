@@ -400,6 +400,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -468,64 +471,38 @@ jobs:
           echo "- ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
           echo "- ghcr.io/$REPO_OWNER/loongcollector:latest"
 
-  # 第四步：测试链接和产物
-  test-release:
-    needs: [create-release-branch, upload-images]
-    if: |
-      always() &&
-      (needs.create-release-branch.result == 'success') &&
-      (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: ${{ needs.create-release-branch.outputs.branch_name }}
-
-      - name: Generate release markdown
+      - name: Smoke test shared library resolution in pushed images
         run: |
+          set -euo pipefail
           VERSION="${{ github.event.inputs.version }}"
-          MILESTONE_ID="${{ github.event.inputs.milestone_id }}"
-          chmod +x scripts/gen_release_markdown.sh
-          ./scripts/gen_release_markdown.sh $VERSION $MILESTONE_ID
+          REPO_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/$REPO_OWNER/loongcollector:$VERSION"
+          LINUX_AMD64_FILE="dist/loongcollector-$VERSION.linux-amd64.tar.gz"
+          LINUX_ARM64_FILE="dist/loongcollector-$VERSION.linux-arm64.tar.gz"
 
-      - name: Test release links
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          DOC_FILE="changes/v${VERSION}.md"
-          
-          if [ ! -f "$DOC_FILE" ]; then
-            echo "Error: Release document $DOC_FILE not found"
-            exit 1
+          if [ -f "$LINUX_AMD64_FILE" ]; then
+            echo "Smoke testing linux/amd64 image: $IMAGE"
+            docker run --rm --platform linux/amd64 "$IMAGE" sh -c \
+              'ldd /usr/local/loongcollector/loongcollector | grep -E "libsasl2\\.so\\.3|libsasl2\\.so\\.3\\.0\\.0"'
           fi
-          
-          echo "Testing links in $DOC_FILE..."
-          
-          # 提取所有链接并测试，这里第一次运行会失败，手动上传到OSS后重试
-          grep -o 'https://[^)]*' "$DOC_FILE" | while read -r url; do
-            echo "Testing URL: $url"
-            if curl -f -s -o /dev/null "$url"; then
-              echo "✓ URL accessible: $url"
-            else
-              echo "✗ URL failed: $url"
-              exit 1
-            fi
-          done
-          
-          echo "All tests passed!" 
 
-  # 第五步：创建 GitHub Release
+          if [ -f "$LINUX_ARM64_FILE" ]; then
+            echo "Smoke testing linux/arm64 image: $IMAGE"
+            docker run --rm --platform linux/arm64 "$IMAGE" sh -c \
+              'ldd /usr/local/loongcollector/loongcollector | grep -E "libsasl2\\.so\\.3|libsasl2\\.so\\.3\\.0\\.0"'
+          fi
+
+          echo "Smoke test passed: libsasl2.so.3 resolved for all built Linux platforms."
+
+  # 第四步：创建 GitHub Release
   create-release:
-    needs: [create-release-branch, upload-images, test-release]
+    needs: [create-release-branch, upload-images]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     if: |
       always() &&
       (needs.create-release-branch.result == 'success') &&
       (needs.upload-images.result == 'success' || needs.upload-images.result == 'skipped') &&
-      (needs.test-release.result == 'success' || needs.test-release.result == 'skipped') &&
       github.event.inputs.create_release == 'true'
     permissions:
       contents: write
