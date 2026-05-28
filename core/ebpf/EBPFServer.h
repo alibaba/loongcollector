@@ -92,7 +92,7 @@ public:
                       uint32_t pluginIndex,
                       PluginType type,
                       const logtail::CollectionPipelineContext* ctx,
-                      const PluginOptions& options,
+                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                       const PluginMetricManagerPtr& mgr);
 
     bool DisablePlugin(const std::string& pipelineName, PluginType type);
@@ -121,7 +121,7 @@ private:
                              uint32_t pluginIndex,
                              PluginType type,
                              const logtail::CollectionPipelineContext* ctx,
-                             const PluginOptions& options,
+                             const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                              const PluginMetricManagerPtr& metricManager);
     EBPFServer();
 
@@ -178,7 +178,6 @@ private:
     CounterPtr mLossKernelEventsTotal;
     IntGaugePtr mConnectionCacheSize;
     CounterPtr mPushLogFailedTotal;
-    IntGaugePtr mCpuProfilingPidMatchCacheSize;
 
     int mUnifiedEpollFd = -1;
     std::vector<struct epoll_event> mEpollEvents;

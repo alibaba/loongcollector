@@ -63,11 +63,6 @@ public:
     void UpdateMatchedContainerInfoPipeline(CollectionPipelineContext* ctx, size_t inputIndex);
     void RemoveMatchedContainerInfoPipeline();
 
-    void AddContainerHandler(const std::string& name,
-                             const FileDiscoveryConfig& config,
-                             const std::function<void(std::shared_ptr<ContainerDiff>)>& handler);
-    void RemoveContainerHandler(const std::string& name);
-
 private:
     void pollingLoop();
     void refreshAllContainersSnapshot();
@@ -108,9 +103,6 @@ private:
     mutable ReadWriteLock mMatchedContainerInfoPipelineMux;
     CollectionPipelineContext* mMatchedContainerInfoPipelineCtx = nullptr;
     size_t mMatchedContainerInfoInputIndex = 0;
-
-    using ContainerHandler = std::pair<FileDiscoveryConfig, std::function<void(std::shared_ptr<ContainerDiff>)>>;
-    std::unordered_map<std::string, ContainerHandler> mContainerHandlers;
 };
 
 } // namespace logtail
