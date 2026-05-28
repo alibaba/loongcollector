@@ -32,6 +32,17 @@ const (
 
 var asyncEnqueueTimeout = 5 * time.Second
 
+type etwSession interface {
+	Process(etw.EventCallback) error
+	Close() error
+}
+
+type etwSessionOption = etw.Option
+
+var newEtwSession = func(guid windows.GUID, options ...etwSessionOption) (etwSession, error) {
+	return etw.NewSession(guid, options...)
+}
+
 type KeywordMask uint64
 
 func (k *KeywordMask) UnmarshalJSON(data []byte) error {
@@ -80,7 +91,7 @@ type EtwInput struct {
 	FlushTimerSec     uint32
 
 	parsedGUID  windows.GUID
-	session     *etw.Session
+	session     etwSession
 	context     pipeline.Context
 	collector   pipeline.Collector
 	hostname    string
@@ -317,7 +328,7 @@ func (d *EtwInput) prepareRun() <-chan struct{} {
 }
 
 func (d *EtwInput) runSession() error {
-	options := []etw.Option{
+	options := []etwSessionOption{
 		etw.WithLevel(etw.TraceLevel(d.Level)),
 		etw.WithMatchKeywords(uint64(d.Keywords), 0),
 	}
@@ -339,7 +350,7 @@ func (d *EtwInput) runSession() error {
 		d.mu.Unlock()
 		return nil
 	}
-	session, err := etw.NewSession(d.parsedGUID, options...)
+	session, err := newEtwSession(d.parsedGUID, options...)
 	if err != nil {
 		d.mu.Unlock()
 		return fmt.Errorf("create ETW session: %w", err)
@@ -347,11 +358,16 @@ func (d *EtwInput) runSession() error {
 	d.session = session
 	d.mu.Unlock()
 	defer func() {
+		shouldClose := false
 		d.mu.Lock()
 		if d.session == session {
 			d.session = nil
+			shouldClose = true
 		}
 		d.mu.Unlock()
+		if shouldClose {
+			_ = session.Close()
+		}
 	}()
 
 	cb := func(e *etw.Event) { d.handleEvent(e) }
