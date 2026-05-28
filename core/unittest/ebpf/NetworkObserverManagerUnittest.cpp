@@ -299,7 +299,7 @@ void NetworkObserverManagerUnittest::TestRecordProcessing() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->mContainerIds = {"1", "2"};
@@ -716,7 +716,7 @@ void NetworkObserverManagerUnittest::TestHandleHostMetadataUpdate() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     mManager->HandleHostMetadataUpdate({"1", "2", "3", "4"});
     APSARA_TEST_EQUAL(mManager->mEnableCids.size(), 4);
@@ -751,7 +751,7 @@ void NetworkObserverManagerUnittest::TestSaeScenario() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     // only 0
     APSARA_TEST_EQUAL(mManager->mContainerConfigs.size(), 1);
@@ -867,7 +867,7 @@ void NetworkObserverManagerUnittest::TestConverge() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("test-config-networkobserver");
     ctx.SetProcessQueueKey(1);
-    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&options));
+    mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&options));
 
     auto podInfo = std::make_shared<K8sPodInfo>();
     podInfo->mContainerIds = {"1", "2"};
@@ -989,8 +989,7 @@ void NetworkObserverManagerUnittest::TestAddOrUpdateConfigWrongOptionsVariant() 
     ctx.SetConfigName("c-wrong-opt");
     ctx.SetProcessQueueKey(1);
     SecurityOptions bad{};
-    APSARA_TEST_NOT_EQUAL(
-        0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, std::variant<SecurityOptions*, ObserverNetworkOption*>(&bad)));
+    APSARA_TEST_NOT_EQUAL(0, mManager->AddOrUpdateConfig(&ctx, 0, nullptr, PluginOptions(&bad)));
 }
 
 UNIT_TEST_CASE(NetworkObserverManagerUnittest, TestInitialization);

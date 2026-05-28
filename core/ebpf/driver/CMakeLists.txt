@@ -61,9 +61,20 @@ if (LINUX)
         message(STATUS "ENABLE_AGENTSIGHT=ON but no target 'libagentsight' in coolbpf; install_coolbpf skips it.")
     endif ()
     add_custom_target(
+        build_libprofiler ALL
+        COMMAND CARGO_TARGET_DIR=${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/profiler cargo build -r
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/_thirdparty/coolbpf/src/profiler
+    )
+    add_library(profiler SHARED IMPORTED)
+    set_target_properties(profiler PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf/src/profiler/release/libprofiler.so
+        IMPORTED_NO_SONAME TRUE
+    )
+    add_dependencies(profiler build_libprofiler)
+    add_custom_target(
         install_coolbpf ALL
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR}/_thirdparty/coolbpf
-        DEPENDS ${_coolbpf_install_deps}
+        DEPENDS ${_coolbpf_install_deps} build_libprofiler
     )
 
     include_directories("${DEPS_INCLUDE_ROOT}/coolbpf")
@@ -75,7 +86,7 @@ if (LINUX)
 
     add_library(${EBPF_DIRVER_TARGET} SHARED ${LIB_SOURCE_FILES})
     target_link_options(${EBPF_DIRVER_TARGET} PRIVATE "-Wl,-rpath=.:${DEFAULT_DEPS_ROOT}/lib")
-    target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf)
+    target_link_libraries(${EBPF_DIRVER_TARGET} coolbpf profiler)
     add_dependencies(${EBPF_DIRVER_TARGET} install_coolbpf)
     target_compile_options(${EBPF_DIRVER_TARGET} PRIVATE -fPIC)
 endif ()
