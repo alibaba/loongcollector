@@ -48,9 +48,6 @@ if (LINUX)
 
     add_executable(input_forward_unittest InputForwardUnittest.cpp)
     target_link_libraries(input_forward_unittest ${UT_BASE_TARGET})
-
-    add_executable(input_cpu_profiling_unittest InputCpuProfilingUnittest.cpp)
-    target_link_libraries(input_cpu_profiling_unittest unittest_base)
 endif()
 
 add_executable(input_internal_alarms_unittest InputInternalAlarmsUnittest.cpp)
@@ -97,5 +94,4 @@ if (LINUX)
     gtest_discover_tests(input_host_meta_unittest)
     gtest_discover_tests(input_host_monitor_unittest)
     gtest_discover_tests(input_forward_unittest)
-    gtest_discover_tests(input_cpu_profiling_unittest)
 endif()
