@@ -543,6 +543,10 @@ void LogtailPlugin::GetGoMetrics(std::vector<std::map<std::string, std::string>>
 }
 
 void LogtailPlugin::GetGoAlarms() {
+// Todo: windows 上 cgo 使用 MinGW 的 malloc，C++ 主程序使用 MSVC 的 free，跨 CRT 堆释放会 crash
+#ifdef _MSC_VER
+    return;
+#endif
     if (mGetGoAlarmsFun == nullptr) {
         return;
     }
