@@ -37,7 +37,6 @@
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 #include "plugin/agentsight/AgentsightManager.h"
-#include "plugin/cpu_profiling/CpuProfilingManager.h"
 #include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
@@ -103,8 +102,7 @@ bool EnvManager::IsSupportedEnv(PluginType type) {
             break;
         case PluginType::FILE_SECURITY:
         case PluginType::NETWORK_SECURITY:
-        case PluginType::PROCESS_SECURITY:
-        case PluginType::CPU_PROFILING: {
+        case PluginType::PROCESS_SECURITY: {
             status = mArchSupport && mBTFSupport;
             break;
         }
@@ -226,8 +224,6 @@ EBPFServer::EBPFServer()
     mLossKernelEventsTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_KERNEL_EVENTS_TOTAL);
     mConnectionCacheSize = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CONNECTION_CACHE_SIZE);
     mPushLogFailedTotal = mMetricsRecordRef.CreateCounter(METRIC_RUNNER_EBPF_LOST_LOG_EVENTS_TOTAL);
-    mCpuProfilingPidMatchCacheSize
-        = mMetricsRecordRef.CreateIntGauge(METRIC_RUNNER_EBPF_CPU_PROFILING_PID_MATCH_CACHE_SIZE);
 
     mProcessCacheManager = std::make_shared<ProcessCacheManager>(mEBPFAdapter,
                                                                  mHostName,
@@ -335,11 +331,10 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      uint32_t pluginIndex,
                                      PluginType type,
                                      const logtail::CollectionPipelineContext* ctx,
-                                     const PluginOptions& options,
+                                     const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                                      const PluginMetricManagerPtr& metricManager) {
     bool isNeedProcessCache = true;
-    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE
-        || type == PluginType::CPU_PROFILING) {
+    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE) {
         isNeedProcessCache = false;
     }
     auto& pluginMgr = getPluginState(type).mManager;
@@ -409,15 +404,6 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 }
                 break;
             }
-            case PluginType::CPU_PROFILING: {
-                if (!pluginMgr) {
-                    auto mgr = CpuProfilingManager::Create(
-                        mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool, mHostPathPrefix.string());
-                    mgr->SetMetrics(mRecvKernelEventsTotal, mPushLogFailedTotal, mCpuProfilingPidMatchCacheSize);
-                    pluginMgr = mgr;
-                }
-                break;
-            }
             default:
                 LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
                 return false;
@@ -445,7 +431,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
     if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
-        && type != PluginType::AGENTSIGHT_OBSERVE && type != PluginType::CPU_PROFILING) {
+        && type != PluginType::AGENTSIGHT_OBSERVE) {
         RegisterPluginPerfBuffers(type);
     }
 
@@ -465,7 +451,7 @@ bool EBPFServer::EnablePlugin(const std::string& pipelineName,
                               uint32_t pluginIndex,
                               PluginType type,
                               const CollectionPipelineContext* ctx,
-                              const PluginOptions& options,
+                              const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                               const PluginMetricManagerPtr& mgr) {
     if (!IsSupportedEnv(type)) {
         return false;
@@ -640,16 +626,12 @@ void EBPFServer::pollPerfBuffers() {
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
         {
-            std::vector<PluginState*> pluginStatePtrs
-                = {&getPluginState(PluginType::NETWORK_OBSERVE), &getPluginState(PluginType::CPU_PROFILING)};
-            for (auto& pluginStatePtr : pluginStatePtrs) {
-                auto& pluginState = *pluginStatePtr;
-                if (!pluginState.mValid.load(std::memory_order_acquire)) {
-                    continue;
-                }
+            auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
+            if (pluginState.mValid.load(std::memory_order_acquire)) {
                 std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
                 if (pluginState.mManager) {
-                    pluginState.mManager->PollPerfBuffer(0); // 0 means non-blocking
+                    auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
+                    mgr->PollPerfBuffer(0); // 0 means non-blocking
                 }
             }
         }

@@ -47,17 +47,21 @@ struct ContainerDiff {
         std::stringstream ss;
         ss << "Added: ";
         for (const auto& container : mAdded) {
-            ss << "{" << "containerName:" << container->mName << " ";
+            ss << "{"
+               << "containerName:" << container->mName << " ";
             ss << "containerID:" << container->mID << " ";
             ss << "containerStatus:" << container->mStatus << " ";
-            ss << "}" << " ";
+            ss << "}"
+               << " ";
         }
         ss << "Modified: ";
         for (const auto& container : mModified) {
-            ss << "{" << "containerName:" << container->mName << " ";
+            ss << "{"
+               << "containerName:" << container->mName << " ";
             ss << "containerID:" << container->mID << " ";
             ss << "containerStatus:" << container->mStatus << " ";
-            ss << "}" << " ";
+            ss << "}"
+               << " ";
         }
         ss << "Removed: ";
         for (const auto& containerID : mRemoved) {
@@ -66,9 +70,11 @@ struct ContainerDiff {
         if (!mLegacyCheckpointAdded.empty()) {
             ss << "LegacyCheckpointAdded: ";
             for (const auto& pair : mLegacyCheckpointAdded) {
-                ss << "{" << "containerName:" << pair.second->mName << " ";
+                ss << "{"
+                   << "containerName:" << pair.second->mName << " ";
                 ss << "containerID:" << pair.second->mID << " ";
-                ss << "}" << " ";
+                ss << "}"
+                   << " ";
             }
         }
         ss << "RefreshAllContainers: " << mRefreshAllContainers << " ";

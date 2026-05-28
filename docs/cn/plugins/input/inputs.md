@@ -18,7 +18,6 @@
 | 名称                                                                           | 提供方   | 功能简介                              |
 | ------------------------------------------------------------------------------ | -------- | ------------------------------------- |
 | `input_container_stdio`<br>[容器标准输出](native/input-container-stdio.md)    | SLS 官方 | 从容器标准输出/标准错误流中采集日志。 |
-| `input_cpu_profiling`<br>[CPU性能剖析数据](native/input-cpu-profiling.md)   | SLS 官方 | CPU性能剖析数据采集。                  |
 | `input_file`<br>[文本日志](native/input-file.md)                               | SLS 官方 | 文本采集。                            |
 | `input_file_security`<br>[文件安全数据](native/input-file-security.md)         | SLS 官方 | 文件安全数据采集。                    |
 | `input_forward`<br>[转发输入](native/input-forward.md)                           | SLS 官方 | 接收来自其他实例或系统的数据转发。     |

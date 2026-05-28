@@ -68,7 +68,7 @@ public:
     int AddOrUpdateConfig(const CollectionPipelineContext*,
                           uint32_t,
                           const PluginMetricManagerPtr&,
-                          const PluginOptions&) override;
+                          const std::variant<SecurityOptions*, ObserverNetworkOption*>&) override;
 
     int RemoveConfig(const std::string&) override;
 
@@ -77,7 +77,8 @@ public:
         return 0;
     }
 
-    std::unique_ptr<PluginConfig> GeneratePluginConfig([[maybe_unused]] const PluginOptions& options) override {
+    std::unique_ptr<PluginConfig> GeneratePluginConfig(
+        [[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         auto ebpfConfig = std::make_unique<PluginConfig>();
         ebpfConfig->mPluginType = PluginType::PROCESS_SECURITY;
         return ebpfConfig;
@@ -86,12 +87,12 @@ public:
     void SetMetrics(CounterPtr lossLogsTotal) { mPushLogFailedTotal = std::move(lossLogsTotal); }
 
 protected:
-    int update([[maybe_unused]] const PluginOptions& options) override {
+    int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         // do nothing ...
         return 0;
     }
 
-    int resume([[maybe_unused]] const PluginOptions& options) override {
+    int resume([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override {
         mSuspendFlag = false;
         return 0;
     }
