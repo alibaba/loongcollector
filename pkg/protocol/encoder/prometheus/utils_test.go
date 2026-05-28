@@ -19,8 +19,9 @@ import (
 	"testing"
 
 	pb "github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
-	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/alibaba/ilogtail/pkg/models"
 )
 
 // 场景：Prometheus label names 字典序排序

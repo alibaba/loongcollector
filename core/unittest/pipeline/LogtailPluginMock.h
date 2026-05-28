@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <atomic>
+#include <string>
+
 #include "go_pipeline/LogtailPlugin.h"
 
 namespace logtail {
@@ -25,6 +28,15 @@ public:
         static LogtailPluginMock instance;
         return &instance;
     }
+
+    static void ResetProcessPipelineEventGroupStats() {
+        sProcessPipelineEventGroupCount.store(0);
+        sLastPipelineEventGroup.clear();
+    }
+
+    static int GetProcessPipelineEventGroupCount() { return sProcessPipelineEventGroupCount.load(); }
+
+    static const std::string& GetLastPipelineEventGroup() { return sLastPipelineEventGroup; }
 
     void BlockStart() { startBlockFlag = true; }
     void UnblockStart() { startBlockFlag = false; }
@@ -73,6 +85,8 @@ public:
         while (processBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
+        sProcessPipelineEventGroupCount.fetch_add(1);
+        sLastPipelineEventGroup = pipelineEventGroup;
         LogtailPlugin::SendPbV2(configName.c_str(),
                                 configName.size(),
                                 "",
@@ -100,6 +114,9 @@ private:
 
     std::string mMockContainersMeta;
     std::string mMockDiffContainersMeta;
+
+    inline static std::atomic<int> sProcessPipelineEventGroupCount{0};
+    inline static std::string sLastPipelineEventGroup;
 };
 
 } // namespace logtail

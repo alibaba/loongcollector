@@ -20,9 +20,9 @@
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/EventPool.h"
-#include "protobuf/models/ProtocolConversion.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
+#include "protobuf/models/ProtocolConversion.h"
 #include "queue/ProcessQueueManager.h"
 #include "queue/QueueKeyManager.h"
 
@@ -147,16 +147,10 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                     continue;
                 }
                 const auto eventType = group.GetEvents()[0]->GetType();
-                if (eventType == PipelineEvent::Type::SPAN) {
+                if (eventType != PipelineEvent::Type::LOG && eventType != PipelineEvent::Type::METRIC
+                    && eventType != PipelineEvent::Type::SPAN) {
                     LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                ("span event group is not supported in go pipeline yet",
-                                 "discard data")("config", configName));
-                    continue;
-                }
-                if (eventType != PipelineEvent::Type::LOG && eventType != PipelineEvent::Type::METRIC) {
-                    LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                ("unsupported event type in go pipeline",
-                                 "discard data")("config", configName));
+                                ("unsupported event type in go pipeline", "discard data")("config", configName));
                     continue;
                 }
                 models::PipelineEventGroup pbGroup;
@@ -167,8 +161,8 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                                  errorMsg)("action", "discard data")("config", configName));
                     pipeline->GetContext().GetAlarm().SendAlarmWarning(
                         SERIALIZE_FAIL_ALARM,
-                        "failed to transfer event group to pb: " + errorMsg + "\taction: discard data\tconfig: "
-                            + configName,
+                        "failed to transfer event group to pb: " + errorMsg
+                            + "\taction: discard data\tconfig: " + configName,
                         pipeline->GetContext().GetRegion(),
                         pipeline->GetContext().GetProjectName(),
                         configName,
@@ -178,8 +172,7 @@ void ProcessorRunner::Run(uint32_t threadNo) {
                 string res;
                 if (!pbGroup.SerializeToString(&res)) {
                     LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                ("failed to serialize pipeline event group pb",
-                                 "discard data")("config", configName));
+                                ("failed to serialize pipeline event group pb", "discard data")("config", configName));
                     continue;
                 }
                 LogtailPlugin::GetInstance()->ProcessPipelineEventGroup(
@@ -194,47 +187,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
 
         gThreadedEventPool.CheckGC();
     }
-}
-
-bool ProcessorRunner::Serialize(
-    const PipelineEventGroup& group, bool enableNanosecond, const string& logstore, string& res, string& errorMsg) {
-    sls_logs::LogGroup logGroup;
-    for (const auto& e : group.GetEvents()) {
-        if (e.Is<LogEvent>()) {
-            const auto& logEvent = e.Cast<LogEvent>();
-            auto log = logGroup.add_logs();
-            for (const auto& kv : logEvent) {
-                auto contPtr = log->add_contents();
-                contPtr->set_key(kv.first.to_string());
-                contPtr->set_value(kv.second.to_string());
-            }
-            log->set_time(logEvent.GetTimestamp());
-            if (enableNanosecond && logEvent.GetTimestampNanosecond()) {
-                log->set_time_ns(logEvent.GetTimestampNanosecond().value());
-            }
-        } else {
-            errorMsg = "unsupported event type in event group";
-            return false;
-        }
-    }
-    for (const auto& tag : group.GetTags()) {
-        if (tag.first == LOG_RESERVED_KEY_TOPIC) {
-            logGroup.set_topic(tag.second.to_string());
-        } else {
-            auto logTag = logGroup.add_logtags();
-            logTag->set_key(tag.first.to_string());
-            logTag->set_value(tag.second.to_string());
-        }
-    }
-    logGroup.set_category(logstore);
-    size_t size = logGroup.ByteSizeLong();
-    if (static_cast<int32_t>(size) > INT32_FLAG(max_send_log_group_size)) {
-        errorMsg = "log group exceeds size limit\tgroup size: " + ToString(size)
-            + "\tsize limit: " + ToString(INT32_FLAG(max_send_log_group_size));
-        return false;
-    }
-    res = logGroup.SerializeAsString();
-    return true;
 }
 
 } // namespace logtail

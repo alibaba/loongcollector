@@ -35,7 +35,7 @@ logtail::models::UntypedValueMetricType ToPBMetricType(UntypedValueMetricType ty
 
 UntypedValueMetricType FromPBMetricType(logtail::models::UntypedValueMetricType type) {
     return type == logtail::models::METRIC_TYPE_GAUGE ? UntypedValueMetricType::MetricTypeGauge
-                                                        : UntypedValueMetricType::MetricTypeCounter;
+                                                      : UntypedValueMetricType::MetricTypeCounter;
 }
 
 } // namespace
@@ -131,8 +131,7 @@ bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::M
             dst.SetValue(UntypedMultiDoubleValues{{}, nullptr});
             auto* multiValues = dst.MutableValue<UntypedMultiDoubleValues>();
             for (const auto& entry : src.untypedmultidoublevalues().values()) {
-                multiValues->SetValue(entry.first,
-                                      {FromPBMetricType(entry.second.metrictype()), entry.second.value()});
+                multiValues->SetValue(entry.first, {FromPBMetricType(entry.second.metrictype()), entry.second.value()});
             }
             break;
         }

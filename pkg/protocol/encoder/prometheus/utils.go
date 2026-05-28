@@ -62,7 +62,8 @@ func genPromRemoteWriteTimeseries(event *models.Metric) []pb.TimeSeries {
 		return series
 	}
 
-	labels := append(baseLabels, pb.Label{Name: metricNameKey, Value: event.GetName()})
+	labels := append([]pb.Label{}, baseLabels...)
+	labels = append(labels, pb.Label{Name: metricNameKey, Value: event.GetName()})
 	return []pb.TimeSeries{{
 		Labels: lexicographicalSort(labels),
 		Samples: []pb.Sample{{

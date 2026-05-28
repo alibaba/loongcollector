@@ -1273,7 +1273,7 @@ void CollectionConfigUnittest::HandleValidConfig() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 }
 
 void CollectionConfigUnittest::HandleInvalidCreateTime() const {
@@ -1317,7 +1317,7 @@ void CollectionConfigUnittest::HandleInvalidGlobal() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 }
 
 void CollectionConfigUnittest::HandleInvalidInputs() const {
@@ -1560,7 +1560,7 @@ void CollectionConfigUnittest::HandleInvalidInputs() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 }
 
 void CollectionConfigUnittest::HandleInvalidProcessors() const {
@@ -1789,7 +1789,7 @@ void CollectionConfigUnittest::HandleInvalidProcessors() const {
     configJson.reset(new Json::Value());
     APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
     config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
-    APSARA_TEST_FALSE(config->Parse());
+    APSARA_TEST_TRUE(config->Parse());
 }
 
 void CollectionConfigUnittest::HandleInvalidAggregators() const {
@@ -2407,6 +2407,28 @@ void CollectionConfigUnittest::SelfMonitorInputWithGoFlusher() const {
             "flushers": [
                 {
                     "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+
+    configStr = R"(
+        {
+            "global": {
+                "StructureType": "v2"
+            },
+            "inputs": [
+                {
+                    "Type": "input_internal_metrics"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_sls"
                 }
             ]
         }

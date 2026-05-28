@@ -22,6 +22,8 @@
 | `input_internal_alarms` → Go Flusher（如 `flusher_http`） | 已支持 | 告警为 LogEvent，需 `StructureType: v2` |
 | `input_internal_alarms` → `flusher_prometheus` | 不适用 | 告警为日志形态，不应使用 Prometheus RemoteWrite |
 
+Native 经 Go Pipeline 刷盘时，统一通过 `ProcessPipelineEventGroup` 桥接，支持 **Log / Metric / Span** 三类事件（自监控场景仅使用 Metric 与 Log）。
+
 若配置 `input_internal_metrics` 与 `flusher_prometheus` 时 pipeline 无法启动（报错含 `extended flusher plugins coexist with native input`），请改用下文 **过渡方案**（两段 Pipeline）。
 
 ---
