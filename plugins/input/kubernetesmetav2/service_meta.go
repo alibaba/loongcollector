@@ -114,8 +114,8 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 	s.metaCollector = &metaCollector{
 		serviceK8sMeta:   s,
 		collector:        collector,
-		entityBuffer:     make(chan models.PipelineEvent, 100),
-		entityLinkBuffer: make(chan models.PipelineEvent, 100),
+		entityBuffer:     make(chan models.PipelineEvent, 5000),
+		entityLinkBuffer: make(chan models.PipelineEvent, 5000),
 		stopCh:           make(chan struct{}),
 		entityProcessor:  make(map[string]ProcessFunc),
 	}

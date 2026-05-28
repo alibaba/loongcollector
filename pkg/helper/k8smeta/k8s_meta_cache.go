@@ -122,6 +122,11 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 		UpdateFunc: func(oldObj interface{}, obj interface{}) {
 			defer panicRecover()
+			oldMeta, err1 := meta.Accessor(oldObj)
+			newMeta, err2 := meta.Accessor(obj)
+			if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				return
+			}
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,
