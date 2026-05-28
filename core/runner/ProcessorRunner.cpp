@@ -20,6 +20,7 @@
 #include "common/Flags.h"
 #include "go_pipeline/LogtailPlugin.h"
 #include "models/EventPool.h"
+#include "protobuf/models/ProtocolConversion.h"
 #include "monitor/AlarmManager.h"
 #include "monitor/metric_constants/MetricConstants.h"
 #include "queue/ProcessQueueManager.h"
@@ -134,8 +135,6 @@ void ProcessorRunner::Run(uint32_t threadNo) {
             continue;
         }
 
-        bool isLog = !item->mEventGroup.GetEvents().empty() && item->mEventGroup.GetEvents()[0].Is<LogEvent>();
-
         vector<PipelineEventGroup> eventGroupList;
         eventGroupList.emplace_back(std::move(item->mEventGroup));
         // TODO: use old pipeline input index to find inner processor in new pipeline, maybe cause some issues when
@@ -143,35 +142,50 @@ void ProcessorRunner::Run(uint32_t threadNo) {
         pipeline->Process(eventGroupList, item->mInputIndex);
 
         if (pipeline->IsFlushingThroughGoPipeline()) {
-            // TODO:
-            // 1. allow all event types to be sent to Go pipelines
-            // 2. use event group protobuf instead
-            if (isLog) {
-                for (auto& group : eventGroupList) {
-                    string res, errorMsg;
-                    if (!Serialize(group,
-                                   pipeline->GetContext().GetGlobalConfig().mEnableTimestampNanosecond,
-                                   pipeline->GetContext().GetLogstoreName(),
-                                   res,
-                                   errorMsg)) {
-                        LOG_WARNING(pipeline->GetContext().GetLogger(),
-                                    ("failed to serialize event group",
-                                     errorMsg)("action", "discard data")("config", configName));
-                        pipeline->GetContext().GetAlarm().SendAlarmWarning(
-                            SERIALIZE_FAIL_ALARM,
-                            "failed to serialize event group: " + errorMsg
-                                + "\taction: discard data\tconfig: " + configName,
-                            pipeline->GetContext().GetRegion(),
-                            pipeline->GetContext().GetProjectName(),
-                            configName,
-                            pipeline->GetContext().GetLogstoreName());
-                        continue;
-                    }
-                    LogtailPlugin::GetInstance()->ProcessLogGroup(
-                        pipeline->GetContext().GetConfigName(),
-                        res,
-                        group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
+            for (auto& group : eventGroupList) {
+                if (group.GetEvents().empty()) {
+                    continue;
                 }
+                const auto eventType = group.GetEvents()[0]->GetType();
+                if (eventType == PipelineEvent::Type::SPAN) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("span event group is not supported in go pipeline yet",
+                                 "discard data")("config", configName));
+                    continue;
+                }
+                if (eventType != PipelineEvent::Type::LOG && eventType != PipelineEvent::Type::METRIC) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("unsupported event type in go pipeline",
+                                 "discard data")("config", configName));
+                    continue;
+                }
+                models::PipelineEventGroup pbGroup;
+                string errorMsg;
+                if (!TransferPipelineEventGroupToPB(group, pbGroup, errorMsg)) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("failed to transfer event group to pb",
+                                 errorMsg)("action", "discard data")("config", configName));
+                    pipeline->GetContext().GetAlarm().SendAlarmWarning(
+                        SERIALIZE_FAIL_ALARM,
+                        "failed to transfer event group to pb: " + errorMsg + "\taction: discard data\tconfig: "
+                            + configName,
+                        pipeline->GetContext().GetRegion(),
+                        pipeline->GetContext().GetProjectName(),
+                        configName,
+                        pipeline->GetContext().GetLogstoreName());
+                    continue;
+                }
+                string res;
+                if (!pbGroup.SerializeToString(&res)) {
+                    LOG_WARNING(pipeline->GetContext().GetLogger(),
+                                ("failed to serialize pipeline event group pb",
+                                 "discard data")("config", configName));
+                    continue;
+                }
+                LogtailPlugin::GetInstance()->ProcessPipelineEventGroup(
+                    pipeline->GetContext().GetConfigName(),
+                    res,
+                    group.GetMetadata(EventGroupMetaKey::SOURCE_ID).to_string());
             }
         } else {
             pipeline->Send(std::move(eventGroupList));

@@ -396,16 +396,10 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load GetDiffContainerMetaFun error, Message", error));
             return mPluginValid;
         }
-        // C++传递单条数据到golang插件
-        mProcessLogsFun = (ProcessLogsFun)loader.LoadMethod("ProcessLog", error);
+        mProcessPipelineEventGroupFun
+            = (ProcessPipelineEventGroupFun)loader.LoadMethod("ProcessPipelineEventGroup", error);
         if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load ProcessLogs error, Message", error));
-            return mPluginValid;
-        }
-        // C++传递数据到golang插件
-        mProcessLogGroupFun = (ProcessLogGroupFun)loader.LoadMethod("ProcessLogGroup", error);
-        if (!error.empty()) {
-            LOG_ERROR(sLogger, ("load ProcessLogGroup error, Message", error));
+            LOG_ERROR(sLogger, ("load ProcessPipelineEventGroup error, Message", error));
             return mPluginValid;
         }
         // 获取golang部分指标信息
@@ -451,63 +445,30 @@ bool LogtailPlugin::LoadPluginBase() {
 }
 
 
-void LogtailPlugin::ProcessLog(const std::string& configName,
-                               sls_logs::Log& log,
-                               const std::string& packId,
-                               const std::string& topic,
-                               const std::string& tags) {
-    if (!log.has_time() || !(mPluginValid && mProcessLogsFun != NULL)) {
-        return;
-    }
-
-    std::string packIdPrefix = ToHexString(HashString(packId));
-    std::string realConfigName = configName + "/2";
-    GoString goConfigName;
-    GoSlice goLog;
-    GoString goPackId;
-    GoString goTopic;
-    GoSlice goTags;
-    goConfigName.n = realConfigName.size();
-    goConfigName.p = realConfigName.c_str();
-    goPackId.n = packIdPrefix.size();
-    goPackId.p = packIdPrefix.c_str();
-    goTopic.n = topic.size();
-    goTopic.p = topic.c_str();
-    goTags.data = (void*)tags.c_str();
-    goTags.len = goTags.cap = tags.length();
-    std::string sLog = log.SerializeAsString();
-    goLog.len = goLog.cap = sLog.length();
-    goLog.data = (void*)sLog.c_str();
-    GoInt rst = mProcessLogsFun(goConfigName, goLog, goPackId, goTopic, goTags);
-    if (rst != (GoInt)0) {
-        LOG_WARNING(sLogger, ("process log error", configName)("result", rst));
-    }
-}
-
-void LogtailPlugin::ProcessLogGroup(const std::string& configName,
-                                    const std::string& logGroup,
-                                    const std::string& packId) {
+void LogtailPlugin::ProcessPipelineEventGroup(const std::string& configName,
+                                              const std::string& pipelineEventGroup,
+                                              const std::string& packId) {
 #ifndef APSARA_UNIT_TEST_MAIN
-    if (logGroup.empty() || !(mPluginValid && mProcessLogsFun != NULL)) {
+    if (pipelineEventGroup.empty() || !(mPluginValid && mProcessPipelineEventGroupFun != NULL)) {
         return;
     }
     std::string realConfigName = configName + "/2";
     std::string packIdPrefix = ToHexString(HashString(packId));
     GoString goConfigName;
-    GoSlice goLog;
+    GoSlice goData;
     GoString goPackId;
     goConfigName.n = realConfigName.size();
     goConfigName.p = realConfigName.c_str();
     goPackId.n = packIdPrefix.size();
     goPackId.p = packIdPrefix.c_str();
-    goLog.len = goLog.cap = logGroup.length();
-    goLog.data = (void*)logGroup.c_str();
-    GoInt rst = mProcessLogGroupFun(goConfigName, goLog, goPackId);
+    goData.len = goData.cap = pipelineEventGroup.length();
+    goData.data = (void*)pipelineEventGroup.c_str();
+    GoInt rst = mProcessPipelineEventGroupFun(goConfigName, goData, goPackId);
     if (rst != (GoInt)0) {
-        LOG_WARNING(sLogger, ("process loggroup error", configName)("result", rst));
+        LOG_WARNING(sLogger, ("process pipeline event group error", configName)("result", rst));
     }
 #else
-    LogtailPluginMock::GetInstance()->ProcessLogGroup(configName, logGroup, packId);
+    LogtailPluginMock::GetInstance()->ProcessPipelineEventGroup(configName, pipelineEventGroup, packId);
 #endif
 }
 

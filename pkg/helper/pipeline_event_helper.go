@@ -101,6 +101,15 @@ func TransferMetricEventToPB(metric *models.Metric) (*protocol.MetricEvent, erro
 	metricEvent.Name = util.ZeroCopyStringToBytes(metric.GetName())
 	if metric.GetValue().IsSingleValue() {
 		metricEvent.Value = &protocol.MetricEvent_UntypedSingleValue{UntypedSingleValue: &protocol.UntypedSingleValue{Value: metric.Value.GetSingleValue()}}
+	} else if metric.GetValue().IsMultiValues() {
+		multiPb := &protocol.UntypedMultiDoubleValues{Values: make(map[string]*protocol.UntypedMultiDoubleValue)}
+		for k, v := range metric.GetValue().GetMultiValues().Iterator() {
+			multiPb.Values[k] = &protocol.UntypedMultiDoubleValue{
+				MetricType: toPBMetricType(models.MetricTypeUntyped),
+				Value:      v,
+			}
+		}
+		metricEvent.Value = &protocol.MetricEvent_UntypedMultiDoubleValues{UntypedMultiDoubleValues: multiPb}
 	} else {
 		return nil, fmt.Errorf("unsupported metric value type")
 	}
@@ -109,6 +118,104 @@ func TransferMetricEventToPB(metric *models.Metric) (*protocol.MetricEvent, erro
 		metricEvent.Tags[k] = util.ZeroCopyStringToBytes(v)
 	}
 	return &metricEvent, nil
+}
+
+func toPBMetricType(metricType models.MetricType) protocol.UntypedValueMetricType {
+	if metricType == models.MetricTypeGauge {
+		return protocol.UntypedValueMetricType_METRIC_TYPE_GAUGE
+	}
+	return protocol.UntypedValueMetricType_METRIC_TYPE_COUNTER
+}
+
+func TransferPBToLogEvent(src *protocol.LogEvent) (*models.Log, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil log event")
+	}
+	log := &models.Log{
+		Timestamp: src.Timestamp,
+		Tags:      models.NewTags(),
+		Offset:    src.FileOffset,
+		RawSize:   src.RawSize,
+	}
+	if len(src.Level) > 0 {
+		log.Level = string(src.Level)
+	}
+	for i, content := range src.Contents {
+		key := string(content.Key)
+		val := string(content.Value)
+		if key == "content" || i == 0 {
+			log.SetBody(util.ZeroCopyStringToBytes(val))
+		} else {
+			log.Tags.Add(key, val)
+		}
+	}
+	return log, nil
+}
+
+func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil metric event")
+	}
+	tags := models.NewTags()
+	for k, v := range src.Tags {
+		tags.Add(k, string(v))
+	}
+	switch value := src.Value.(type) {
+	case *protocol.MetricEvent_UntypedSingleValue:
+		return models.NewSingleValueMetric(string(src.Name), models.MetricTypeUntyped, tags, int64(src.Timestamp), value.UntypedSingleValue.Value), nil
+	case *protocol.MetricEvent_UntypedMultiDoubleValues:
+		multiValue := models.NewMetricMultiValue()
+		for k, v := range value.UntypedMultiDoubleValues.Values {
+			multiValue.Add(k, v.Value)
+		}
+		return models.NewMultiValuesMetric(string(src.Name), models.MetricTypeUntyped, tags, int64(src.Timestamp), multiValue.Values), nil
+	default:
+		return nil, fmt.Errorf("unsupported metric value type")
+	}
+}
+
+func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil pipeline event group")
+	}
+	group := models.NewGroup(models.NewMetadata(), models.NewTags())
+	for k, v := range src.Tags {
+		group.Tags.Add(k, string(v))
+	}
+	for k, v := range src.Metadata {
+		group.Metadata.Add(k, string(v))
+	}
+
+	var events []models.PipelineEvent
+	switch pipelineEvents := src.PipelineEvents.(type) {
+	case *protocol.PipelineEventGroup_Logs:
+		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Logs.Events))
+		for _, logEvent := range pipelineEvents.Logs.Events {
+			log, err := TransferPBToLogEvent(logEvent)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, log)
+		}
+	case *protocol.PipelineEventGroup_Metrics:
+		events = make([]models.PipelineEvent, 0, len(pipelineEvents.Metrics.Events))
+		for _, metricEvent := range pipelineEvents.Metrics.Events {
+			metric, err := TransferPBToMetricEvent(metricEvent)
+			if err != nil {
+				return nil, err
+			}
+			events = append(events, metric)
+		}
+	case *protocol.PipelineEventGroup_Spans:
+		return nil, fmt.Errorf("span events are not supported yet")
+	default:
+		return nil, fmt.Errorf("unsupported pipeline event group type")
+	}
+
+	return &models.PipelineGroupEvents{
+		Group:  group,
+		Events: events,
+	}, nil
 }
 
 func TransferSpanEventToPB(span *models.Span) (*protocol.SpanEvent, error) {

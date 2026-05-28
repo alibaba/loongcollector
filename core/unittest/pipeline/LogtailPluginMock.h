@@ -67,7 +67,9 @@ public:
     }
 
 
-    void ProcessLogGroup(const std::string& configName, const std::string& logGroup, const std::string& packId) {
+    void ProcessPipelineEventGroup(const std::string& configName,
+                                   const std::string& pipelineEventGroup,
+                                   const std::string& packId) {
         while (processBlockFlag) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -75,14 +77,14 @@ public:
                                 configName.size(),
                                 "",
                                 0,
-                                const_cast<char*>(logGroup.c_str()),
-                                logGroup.size(),
+                                const_cast<char*>(pipelineEventGroup.c_str()),
+                                pipelineEventGroup.size(),
                                 0,
                                 "",
                                 0);
         LOG_INFO(sLogger,
-                 ("LogtailPluginMock process log group", "success")("config", configName)("logGroup",
-                                                                                          logGroup)("packId", packId));
+                 ("LogtailPluginMock process pipeline event group",
+                  "success")("config", configName)("pipelineEventGroup", pipelineEventGroup)("packId", packId));
     }
 
     std::string GetAllContainersMeta() const { return mMockContainersMeta; }

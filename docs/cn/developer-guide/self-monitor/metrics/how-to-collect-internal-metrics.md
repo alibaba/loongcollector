@@ -2,7 +2,7 @@
 
 LoongCollector 目前提供用于暴露自监控指标的 Input 插件；在一个**采集配置（collection pipeline）**中加入该插件即可采集自监控数据。
 
-如需将自监控指标导出到 **Prometheus RemoteWrite**，请参见 [如何导出自监控数据](../how-to-export-self-monitor-data.md)（当前使用两段 Pipeline 过渡方案；单条配置直连能力建设中）。
+如需将自监控指标导出到 **Prometheus RemoteWrite**，请参见 [如何导出自监控数据](../how-to-export-self-monitor-data.md)（支持单条配置直连；旧版本可用两段 Pipeline 过渡方案）。
 
 ## 创建自监控采集配置
 

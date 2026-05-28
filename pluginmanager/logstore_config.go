@@ -237,39 +237,18 @@ func (lc *LogstoreConfig) ProcessRawLogV2(rawLog []byte, packID string, topic st
 	return 0
 }
 
-func (lc *LogstoreConfig) ProcessLog(logByte []byte, packID string, topic string, tags []byte) int {
-	log := &protocol.Log{}
-	err := log.Unmarshal(logByte)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process logs passed by core, err", err)
+func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID string) int {
+	pbGroup := &protocol.PipelineEventGroup{}
+	if err := pbGroup.Unmarshal(pbBytes); err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process pipeline event group passed by core, err", err)
 		return -1
 	}
-	if len(topic) > 0 {
-		log.Contents = append(log.Contents, &protocol.Log_Content{Key: "__log_topic__", Value: topic})
+	if runner, ok := lc.PluginRunner.(*pluginv2Runner); ok {
+		runner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
+		return 0
 	}
-	// When UsingOldContentTag is set to false, the tag is now put into the context during cgo.
-	if !lc.GlobalConfig.UsingOldContentTag {
-		logTags := extractTagsToLogTags(tags)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic, "tags": logTags}})
-	} else {
-		extractTags(tags, log)
-		lc.PluginRunner.ReceiveRawLog(&pipeline.LogWithContext{Log: log, Context: map[string]interface{}{"source": packID, "topic": topic}})
-	}
-	return 0
-}
-
-func (lc *LogstoreConfig) ProcessLogGroup(logByte []byte, packID string) int {
-	logGroup := &protocol.LogGroup{}
-	err := logGroup.Unmarshal(logByte)
-	if err != nil {
-		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm, "cannot process log group passed by core, err", err)
-		return -1
-	}
-	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
-		LogGroup: logGroup,
-		Context:  map[string]interface{}{ctxKeySource: packID}},
-	)
-	return 0
+	logger.Warning(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "pipeline event group requires v2 plugin runner", lc.ConfigName)
+	return -1
 }
 
 func hasDockerStdoutInput(plugins map[string]interface{}) bool {

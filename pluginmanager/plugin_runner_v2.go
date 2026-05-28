@@ -467,6 +467,25 @@ func (p *pluginv2Runner) ReceiveLogGroup(in pipeline.LogGroupWithContext) {
 	p.InputPipeContext.Collector().Collect(group, events...)
 }
 
+func (p *pluginv2Runner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEventGroup, ctx map[string]interface{}) {
+	groupEvents, err := helper.TransferPBToPipelineGroupEvents(pbGroup)
+	if err != nil {
+		logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
+		return
+	}
+	if ctx != nil {
+		for k, v := range ctx {
+			value, ok := v.(string)
+			if !ok {
+				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
+				continue
+			}
+			groupEvents.Group.Metadata.Add(k, value)
+		}
+	}
+	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
+}
+
 // TODO: Design the ReceiveRawLogV2, which is passed in a PipelineGroupEvents not pipeline.LogWithContext, and tags should be added in the PipelineGroupEvents.
 func (p *pluginv2Runner) ReceiveRawLog(in *pipeline.LogWithContext) {
 	md := models.NewMetadata()

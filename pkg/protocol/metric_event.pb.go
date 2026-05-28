@@ -6,11 +6,10 @@ package protocol
 import (
 	encoding_binary "encoding/binary"
 	fmt "fmt"
+	proto "github.com/gogo/protobuf/proto"
 	io "io"
 	math "math"
 	math_bits "math/bits"
-
-	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -23,6 +22,31 @@ var _ = math.Inf
 // A compilation error at this line likely means your copy of the
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
+
+type UntypedValueMetricType int32
+
+const (
+	UntypedValueMetricType_METRIC_TYPE_COUNTER UntypedValueMetricType = 0
+	UntypedValueMetricType_METRIC_TYPE_GAUGE   UntypedValueMetricType = 1
+)
+
+var UntypedValueMetricType_name = map[int32]string{
+	0: "METRIC_TYPE_COUNTER",
+	1: "METRIC_TYPE_GAUGE",
+}
+
+var UntypedValueMetricType_value = map[string]int32{
+	"METRIC_TYPE_COUNTER": 0,
+	"METRIC_TYPE_GAUGE":   1,
+}
+
+func (x UntypedValueMetricType) String() string {
+	return proto.EnumName(UntypedValueMetricType_name, int32(x))
+}
+
+func (UntypedValueMetricType) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_7e0c5b3c1d4100c7, []int{0}
+}
 
 type UntypedSingleValue struct {
 	Value float64 `protobuf:"fixed64,1,opt,name=Value,proto3" json:"Value,omitempty"`
@@ -68,6 +92,102 @@ func (m *UntypedSingleValue) GetValue() float64 {
 	return 0
 }
 
+type UntypedMultiDoubleValue struct {
+	MetricType UntypedValueMetricType `protobuf:"varint,1,opt,name=MetricType,proto3,enum=logtail.models.UntypedValueMetricType" json:"MetricType,omitempty"`
+	Value      float64                `protobuf:"fixed64,2,opt,name=Value,proto3" json:"Value,omitempty"`
+}
+
+func (m *UntypedMultiDoubleValue) Reset()         { *m = UntypedMultiDoubleValue{} }
+func (m *UntypedMultiDoubleValue) String() string { return proto.CompactTextString(m) }
+func (*UntypedMultiDoubleValue) ProtoMessage()    {}
+func (*UntypedMultiDoubleValue) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7e0c5b3c1d4100c7, []int{1}
+}
+func (m *UntypedMultiDoubleValue) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *UntypedMultiDoubleValue) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_UntypedMultiDoubleValue.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *UntypedMultiDoubleValue) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UntypedMultiDoubleValue.Merge(m, src)
+}
+func (m *UntypedMultiDoubleValue) XXX_Size() int {
+	return m.Size()
+}
+func (m *UntypedMultiDoubleValue) XXX_DiscardUnknown() {
+	xxx_messageInfo_UntypedMultiDoubleValue.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UntypedMultiDoubleValue proto.InternalMessageInfo
+
+func (m *UntypedMultiDoubleValue) GetMetricType() UntypedValueMetricType {
+	if m != nil {
+		return m.MetricType
+	}
+	return UntypedValueMetricType_METRIC_TYPE_COUNTER
+}
+
+func (m *UntypedMultiDoubleValue) GetValue() float64 {
+	if m != nil {
+		return m.Value
+	}
+	return 0
+}
+
+type UntypedMultiDoubleValues struct {
+	Values map[string]*UntypedMultiDoubleValue `protobuf:"bytes,1,rep,name=Values,proto3" json:"Values,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+}
+
+func (m *UntypedMultiDoubleValues) Reset()         { *m = UntypedMultiDoubleValues{} }
+func (m *UntypedMultiDoubleValues) String() string { return proto.CompactTextString(m) }
+func (*UntypedMultiDoubleValues) ProtoMessage()    {}
+func (*UntypedMultiDoubleValues) Descriptor() ([]byte, []int) {
+	return fileDescriptor_7e0c5b3c1d4100c7, []int{2}
+}
+func (m *UntypedMultiDoubleValues) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *UntypedMultiDoubleValues) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_UntypedMultiDoubleValues.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *UntypedMultiDoubleValues) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_UntypedMultiDoubleValues.Merge(m, src)
+}
+func (m *UntypedMultiDoubleValues) XXX_Size() int {
+	return m.Size()
+}
+func (m *UntypedMultiDoubleValues) XXX_DiscardUnknown() {
+	xxx_messageInfo_UntypedMultiDoubleValues.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_UntypedMultiDoubleValues proto.InternalMessageInfo
+
+func (m *UntypedMultiDoubleValues) GetValues() map[string]*UntypedMultiDoubleValue {
+	if m != nil {
+		return m.Values
+	}
+	return nil
+}
+
 type MetricEvent struct {
 	Timestamp uint64            `protobuf:"varint,1,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	Name      []byte            `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
@@ -75,14 +195,16 @@ type MetricEvent struct {
 	// Types that are valid to be assigned to Value:
 	//
 	//	*MetricEvent_UntypedSingleValue
-	Value isMetricEvent_Value `protobuf_oneof:"Value"`
+	//	*MetricEvent_UntypedMultiDoubleValues
+	Value    isMetricEvent_Value `protobuf_oneof:"Value"`
+	Metadata map[string][]byte   `protobuf:"bytes,5,rep,name=Metadata,proto3" json:"Metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 }
 
 func (m *MetricEvent) Reset()         { *m = MetricEvent{} }
 func (m *MetricEvent) String() string { return proto.CompactTextString(m) }
 func (*MetricEvent) ProtoMessage()    {}
 func (*MetricEvent) Descriptor() ([]byte, []int) {
-	return fileDescriptor_7e0c5b3c1d4100c7, []int{1}
+	return fileDescriptor_7e0c5b3c1d4100c7, []int{3}
 }
 func (m *MetricEvent) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -120,8 +242,12 @@ type isMetricEvent_Value interface {
 type MetricEvent_UntypedSingleValue struct {
 	UntypedSingleValue *UntypedSingleValue `protobuf:"bytes,4,opt,name=UntypedSingleValue,proto3,oneof" json:"UntypedSingleValue,omitempty"`
 }
+type MetricEvent_UntypedMultiDoubleValues struct {
+	UntypedMultiDoubleValues *UntypedMultiDoubleValues `protobuf:"bytes,6,opt,name=UntypedMultiDoubleValues,proto3,oneof" json:"UntypedMultiDoubleValues,omitempty"`
+}
 
-func (*MetricEvent_UntypedSingleValue) isMetricEvent_Value() {}
+func (*MetricEvent_UntypedSingleValue) isMetricEvent_Value()       {}
+func (*MetricEvent_UntypedMultiDoubleValues) isMetricEvent_Value() {}
 
 func (m *MetricEvent) GetValue() isMetricEvent_Value {
 	if m != nil {
@@ -158,40 +284,72 @@ func (m *MetricEvent) GetUntypedSingleValue() *UntypedSingleValue {
 	return nil
 }
 
+func (m *MetricEvent) GetUntypedMultiDoubleValues() *UntypedMultiDoubleValues {
+	if x, ok := m.GetValue().(*MetricEvent_UntypedMultiDoubleValues); ok {
+		return x.UntypedMultiDoubleValues
+	}
+	return nil
+}
+
+func (m *MetricEvent) GetMetadata() map[string][]byte {
+	if m != nil {
+		return m.Metadata
+	}
+	return nil
+}
+
 // XXX_OneofWrappers is for the internal use of the proto package.
 func (*MetricEvent) XXX_OneofWrappers() []interface{} {
 	return []interface{}{
 		(*MetricEvent_UntypedSingleValue)(nil),
+		(*MetricEvent_UntypedMultiDoubleValues)(nil),
 	}
 }
 
 func init() {
+	proto.RegisterEnum("logtail.models.UntypedValueMetricType", UntypedValueMetricType_name, UntypedValueMetricType_value)
 	proto.RegisterType((*UntypedSingleValue)(nil), "logtail.models.UntypedSingleValue")
+	proto.RegisterType((*UntypedMultiDoubleValue)(nil), "logtail.models.UntypedMultiDoubleValue")
+	proto.RegisterType((*UntypedMultiDoubleValues)(nil), "logtail.models.UntypedMultiDoubleValues")
+	proto.RegisterMapType((map[string]*UntypedMultiDoubleValue)(nil), "logtail.models.UntypedMultiDoubleValues.ValuesEntry")
 	proto.RegisterType((*MetricEvent)(nil), "logtail.models.MetricEvent")
+	proto.RegisterMapType((map[string][]byte)(nil), "logtail.models.MetricEvent.MetadataEntry")
 	proto.RegisterMapType((map[string][]byte)(nil), "logtail.models.MetricEvent.TagsEntry")
 }
 
 func init() { proto.RegisterFile("metric_event.proto", fileDescriptor_7e0c5b3c1d4100c7) }
 
 var fileDescriptor_7e0c5b3c1d4100c7 = []byte{
-	// 269 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0x12, 0xca, 0x4d, 0x2d, 0x29,
-	0xca, 0x4c, 0x8e, 0x4f, 0x2d, 0x4b, 0xcd, 0x2b, 0xd1, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2,
-	0xcb, 0xc9, 0x4f, 0x2f, 0x49, 0xcc, 0xcc, 0xd1, 0xcb, 0xcd, 0x4f, 0x49, 0xcd, 0x29, 0x56, 0xd2,
-	0xe2, 0x12, 0x0a, 0xcd, 0x2b, 0xa9, 0x2c, 0x48, 0x4d, 0x09, 0xce, 0xcc, 0x4b, 0xcf, 0x49, 0x0d,
-	0x4b, 0xcc, 0x29, 0x4d, 0x15, 0x12, 0xe1, 0x62, 0x05, 0x33, 0x24, 0x18, 0x15, 0x18, 0x35, 0x18,
-	0x83, 0x20, 0x1c, 0xa5, 0x49, 0x4c, 0x5c, 0xdc, 0xbe, 0x60, 0x23, 0x5d, 0x41, 0x26, 0x0a, 0xc9,
-	0x70, 0x71, 0x86, 0x64, 0xe6, 0xa6, 0x16, 0x97, 0x24, 0xe6, 0x16, 0x80, 0x55, 0xb2, 0x04, 0x21,
-	0x04, 0x84, 0x84, 0xb8, 0x58, 0xfc, 0x12, 0x73, 0x53, 0x25, 0x98, 0x14, 0x18, 0x35, 0x78, 0x82,
-	0xc0, 0x6c, 0x21, 0x4b, 0x2e, 0x96, 0x90, 0xc4, 0xf4, 0x62, 0x09, 0x66, 0x05, 0x66, 0x0d, 0x6e,
-	0x23, 0x55, 0x3d, 0x54, 0xc7, 0xe8, 0x21, 0x19, 0xae, 0x07, 0x52, 0xe7, 0x9a, 0x57, 0x52, 0x54,
-	0x19, 0x04, 0xd6, 0x22, 0x14, 0x82, 0xcd, 0xa1, 0x12, 0x2c, 0x0a, 0x8c, 0x1a, 0xdc, 0x46, 0x4a,
-	0xe8, 0x06, 0x61, 0xaa, 0xf4, 0x60, 0x08, 0xc2, 0xa2, 0x5f, 0xca, 0x9c, 0x8b, 0x13, 0x6e, 0x91,
-	0x90, 0x00, 0x17, 0x73, 0x76, 0x6a, 0x25, 0xd8, 0x27, 0x9c, 0x41, 0x20, 0x26, 0x28, 0x1c, 0xca,
-	0xc0, 0xf6, 0x40, 0x3c, 0x01, 0xe1, 0x58, 0x31, 0x59, 0x30, 0x3a, 0xb1, 0x43, 0x43, 0xc8, 0x49,
-	0xe2, 0xc4, 0x23, 0x39, 0xc6, 0x0b, 0x8f, 0xe4, 0x18, 0x1f, 0x3c, 0x92, 0x63, 0x9c, 0xf0, 0x58,
-	0x8e, 0xe1, 0xc2, 0x63, 0x39, 0x86, 0x1b, 0x8f, 0xe5, 0x18, 0x92, 0xd8, 0xc0, 0x21, 0x6e, 0x0c,
-	0x08, 0x00, 0x00, 0xff, 0xff, 0x0e, 0x8c, 0xec, 0xc0, 0x87, 0x01, 0x00, 0x00,
+	// 454 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x93, 0x4d, 0x6f, 0xd3, 0x30,
+	0x18, 0xc7, 0xe3, 0xf5, 0x05, 0xfa, 0x64, 0x4c, 0xc5, 0x0c, 0x66, 0x55, 0x28, 0x9a, 0x22, 0x01,
+	0x65, 0x87, 0x1c, 0x0a, 0x12, 0x6f, 0xe2, 0xc0, 0x46, 0x58, 0x91, 0xc8, 0x40, 0x26, 0x45, 0xe2,
+	0x54, 0xb9, 0xd4, 0x54, 0x11, 0x79, 0x53, 0xe3, 0x0e, 0xe5, 0x5b, 0xf0, 0xb1, 0x38, 0x70, 0xd8,
+	0x91, 0x23, 0x6a, 0xbf, 0x07, 0x42, 0xb5, 0xb3, 0xd6, 0x83, 0x04, 0x75, 0xa7, 0x3e, 0x75, 0x9e,
+	0xdf, 0xf3, 0xf7, 0xdf, 0x7f, 0x1b, 0x70, 0xc4, 0xc5, 0x34, 0xf8, 0x34, 0xe4, 0xa7, 0x3c, 0x16,
+	0x4e, 0x3a, 0x4d, 0x44, 0x82, 0x77, 0xc2, 0x64, 0x22, 0x58, 0x10, 0x3a, 0x51, 0x32, 0xe6, 0x61,
+	0x66, 0x1f, 0x00, 0x1e, 0xc4, 0x22, 0x4f, 0xf9, 0xf8, 0x7d, 0x10, 0x4f, 0x42, 0xfe, 0x81, 0x85,
+	0x33, 0x8e, 0x77, 0xa1, 0x21, 0x0b, 0x82, 0xf6, 0x51, 0x17, 0x51, 0xf5, 0xc7, 0xfe, 0x0a, 0x7b,
+	0x45, 0xaf, 0x37, 0x0b, 0x45, 0xf0, 0x32, 0x99, 0x8d, 0xce, 0x81, 0x57, 0x00, 0x9e, 0x14, 0xf3,
+	0xf3, 0x54, 0x51, 0x3b, 0xbd, 0xbb, 0xce, 0x45, 0x2d, 0xa7, 0x80, 0x25, 0xb1, 0xee, 0xa6, 0x1a,
+	0xb9, 0x16, 0xde, 0xd2, 0x85, 0x7f, 0x20, 0x20, 0x15, 0xca, 0x19, 0x7e, 0x03, 0x4d, 0x55, 0x11,
+	0xb4, 0x5f, 0xeb, 0x9a, 0xbd, 0x87, 0x15, 0xb2, 0xff, 0x90, 0x8e, 0xfa, 0x71, 0x63, 0x31, 0xcd,
+	0x69, 0x31, 0xa3, 0x33, 0x02, 0x53, 0x5b, 0xc6, 0x6d, 0xa8, 0x7d, 0xe1, 0xb9, 0x34, 0xd4, 0xa2,
+	0xcb, 0x12, 0x3f, 0x87, 0xc6, 0xe9, 0x6a, 0x87, 0x66, 0xef, 0xde, 0x86, 0x6a, 0x54, 0x51, 0x4f,
+	0xb7, 0x1e, 0x23, 0xfb, 0x77, 0x0d, 0x4c, 0xe5, 0xd9, 0x5d, 0x26, 0x83, 0x6f, 0x43, 0xcb, 0x0f,
+	0x22, 0x9e, 0x09, 0x16, 0xa5, 0x52, 0xaa, 0x4e, 0xd7, 0x0b, 0x18, 0x43, 0xfd, 0x84, 0x45, 0x4a,
+	0x6f, 0x9b, 0xca, 0x1a, 0x3f, 0x81, 0xba, 0xcf, 0x26, 0x19, 0xa9, 0x49, 0xc7, 0x77, 0xfe, 0xde,
+	0x83, 0x36, 0xdc, 0x59, 0xf6, 0x29, 0x8b, 0x12, 0xc1, 0x7e, 0x59, 0xe0, 0xa4, 0x2e, 0xcd, 0xd8,
+	0x15, 0x66, 0xb4, 0xce, 0xbe, 0x41, 0xcb, 0x2e, 0xcc, 0xe7, 0xea, 0x80, 0x48, 0x53, 0xce, 0xee,
+	0x6e, 0x1a, 0x4b, 0xdf, 0xa0, 0xd5, 0x61, 0xbb, 0x70, 0xd5, 0xe3, 0x82, 0x8d, 0x99, 0x60, 0xa4,
+	0x21, 0xcd, 0xdf, 0xff, 0x9f, 0xf9, 0xf3, 0x5e, 0x75, 0x00, 0x2b, 0xb4, 0xf3, 0x08, 0x5a, 0xab,
+	0x73, 0x29, 0xc9, 0x78, 0x57, 0xcf, 0x78, 0x5b, 0x8b, 0xae, 0xf3, 0x0c, 0xae, 0x5d, 0x98, 0x79,
+	0x19, 0xf8, 0xf0, 0x4a, 0x71, 0xb9, 0x0f, 0xfa, 0x70, 0xab, 0xfc, 0x2d, 0xe0, 0x3d, 0xb8, 0xe1,
+	0xb9, 0x3e, 0x7d, 0x7d, 0x34, 0xf4, 0x3f, 0xbe, 0x73, 0x87, 0x47, 0x6f, 0x07, 0x27, 0xbe, 0x4b,
+	0xdb, 0x06, 0xbe, 0x09, 0xd7, 0xf5, 0x0f, 0xc7, 0x2f, 0x06, 0xc7, 0x6e, 0x1b, 0x1d, 0x92, 0xef,
+	0x73, 0x0b, 0x9d, 0xcd, 0x2d, 0xf4, 0x6b, 0x6e, 0xa1, 0x6f, 0x0b, 0xcb, 0x38, 0x5b, 0x58, 0xc6,
+	0xcf, 0x85, 0x65, 0x8c, 0x9a, 0xf2, 0xbd, 0x3f, 0xf8, 0x13, 0x00, 0x00, 0xff, 0xff, 0xc4, 0xb2,
+	0x48, 0x62, 0x05, 0x04, 0x00, 0x00,
 }
 
 func (m *UntypedSingleValue) Marshal() (dAtA []byte, err error) {
@@ -223,6 +381,89 @@ func (m *UntypedSingleValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	return len(dAtA) - i, nil
 }
 
+func (m *UntypedMultiDoubleValue) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UntypedMultiDoubleValue) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UntypedMultiDoubleValue) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if m.Value != 0 {
+		i -= 8
+		encoding_binary.LittleEndian.PutUint64(dAtA[i:], uint64(math.Float64bits(float64(m.Value))))
+		i--
+		dAtA[i] = 0x11
+	}
+	if m.MetricType != 0 {
+		i = encodeVarintMetricEvent(dAtA, i, uint64(m.MetricType))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
+func (m *UntypedMultiDoubleValues) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *UntypedMultiDoubleValues) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *UntypedMultiDoubleValues) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.Values) > 0 {
+		for k := range m.Values {
+			v := m.Values[k]
+			baseI := i
+			if v != nil {
+				{
+					size, err := v.MarshalToSizedBuffer(dAtA[:i])
+					if err != nil {
+						return 0, err
+					}
+					i -= size
+					i = encodeVarintMetricEvent(dAtA, i, uint64(size))
+				}
+				i--
+				dAtA[i] = 0x12
+			}
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintMetricEvent(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintMetricEvent(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0xa
+		}
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *MetricEvent) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -250,6 +491,27 @@ func (m *MetricEvent) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 			if _, err := m.Value.MarshalTo(dAtA[i:]); err != nil {
 				return 0, err
 			}
+		}
+	}
+	if len(m.Metadata) > 0 {
+		for k := range m.Metadata {
+			v := m.Metadata[k]
+			baseI := i
+			if len(v) > 0 {
+				i -= len(v)
+				copy(dAtA[i:], v)
+				i = encodeVarintMetricEvent(dAtA, i, uint64(len(v)))
+				i--
+				dAtA[i] = 0x12
+			}
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintMetricEvent(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintMetricEvent(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x2a
 		}
 	}
 	if len(m.Tags) > 0 {
@@ -309,6 +571,27 @@ func (m *MetricEvent_UntypedSingleValue) MarshalToSizedBuffer(dAtA []byte) (int,
 	}
 	return len(dAtA) - i, nil
 }
+func (m *MetricEvent_UntypedMultiDoubleValues) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *MetricEvent_UntypedMultiDoubleValues) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	if m.UntypedMultiDoubleValues != nil {
+		{
+			size, err := m.UntypedMultiDoubleValues.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintMetricEvent(dAtA, i, uint64(size))
+		}
+		i--
+		dAtA[i] = 0x32
+	}
+	return len(dAtA) - i, nil
+}
 func encodeVarintMetricEvent(dAtA []byte, offset int, v uint64) int {
 	offset -= sovMetricEvent(v)
 	base := offset
@@ -328,6 +611,43 @@ func (m *UntypedSingleValue) Size() (n int) {
 	_ = l
 	if m.Value != 0 {
 		n += 9
+	}
+	return n
+}
+
+func (m *UntypedMultiDoubleValue) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.MetricType != 0 {
+		n += 1 + sovMetricEvent(uint64(m.MetricType))
+	}
+	if m.Value != 0 {
+		n += 9
+	}
+	return n
+}
+
+func (m *UntypedMultiDoubleValues) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if len(m.Values) > 0 {
+		for k, v := range m.Values {
+			_ = k
+			_ = v
+			l = 0
+			if v != nil {
+				l = v.Size()
+				l += 1 + sovMetricEvent(uint64(l))
+			}
+			mapEntrySize := 1 + len(k) + sovMetricEvent(uint64(len(k))) + l
+			n += mapEntrySize + 1 + sovMetricEvent(uint64(mapEntrySize))
+		}
 	}
 	return n
 }
@@ -360,6 +680,18 @@ func (m *MetricEvent) Size() (n int) {
 	if m.Value != nil {
 		n += m.Value.Size()
 	}
+	if len(m.Metadata) > 0 {
+		for k, v := range m.Metadata {
+			_ = k
+			_ = v
+			l = 0
+			if len(v) > 0 {
+				l = 1 + len(v) + sovMetricEvent(uint64(len(v)))
+			}
+			mapEntrySize := 1 + len(k) + sovMetricEvent(uint64(len(k))) + l
+			n += mapEntrySize + 1 + sovMetricEvent(uint64(mapEntrySize))
+		}
+	}
 	return n
 }
 
@@ -371,6 +703,18 @@ func (m *MetricEvent_UntypedSingleValue) Size() (n int) {
 	_ = l
 	if m.UntypedSingleValue != nil {
 		l = m.UntypedSingleValue.Size()
+		n += 1 + l + sovMetricEvent(uint64(l))
+	}
+	return n
+}
+func (m *MetricEvent_UntypedMultiDoubleValues) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.UntypedMultiDoubleValues != nil {
+		l = m.UntypedMultiDoubleValues.Size()
 		n += 1 + l + sovMetricEvent(uint64(l))
 	}
 	return n
@@ -422,6 +766,265 @@ func (m *UntypedSingleValue) Unmarshal(dAtA []byte) error {
 			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
 			iNdEx += 8
 			m.Value = float64(math.Float64frombits(v))
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMetricEvent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *UntypedMultiDoubleValue) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMetricEvent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: UntypedMultiDoubleValue: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: UntypedMultiDoubleValue: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field MetricType", wireType)
+			}
+			m.MetricType = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetricEvent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.MetricType |= UntypedValueMetricType(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 1 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Value", wireType)
+			}
+			var v uint64
+			if (iNdEx + 8) > l {
+				return io.ErrUnexpectedEOF
+			}
+			v = uint64(encoding_binary.LittleEndian.Uint64(dAtA[iNdEx:]))
+			iNdEx += 8
+			m.Value = float64(math.Float64frombits(v))
+		default:
+			iNdEx = preIndex
+			skippy, err := skipMetricEvent(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if (skippy < 0) || (iNdEx+skippy) < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
+}
+func (m *UntypedMultiDoubleValues) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowMetricEvent
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: UntypedMultiDoubleValues: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: UntypedMultiDoubleValues: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Values", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetricEvent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Values == nil {
+				m.Values = make(map[string]*UntypedMultiDoubleValue)
+			}
+			var mapkey string
+			var mapvalue *UntypedMultiDoubleValue
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetricEvent
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetricEvent
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapmsglen int
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetricEvent
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapmsglen |= int(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					if mapmsglen < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					postmsgIndex := iNdEx + mapmsglen
+					if postmsgIndex < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if postmsgIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = &UntypedMultiDoubleValue{}
+					if err := mapvalue.Unmarshal(dAtA[iNdEx:postmsgIndex]); err != nil {
+						return err
+					}
+					iNdEx = postmsgIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipMetricEvent(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Values[mapkey] = mapvalue
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipMetricEvent(dAtA[iNdEx:])
@@ -687,6 +1290,169 @@ func (m *MetricEvent) Unmarshal(dAtA []byte) error {
 				return err
 			}
 			m.Value = &MetricEvent_UntypedSingleValue{v}
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Metadata", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetricEvent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.Metadata == nil {
+				m.Metadata = make(map[string][]byte)
+			}
+			var mapkey string
+			mapvalue := []byte{}
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowMetricEvent
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetricEvent
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					var mapbyteLen uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowMetricEvent
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapbyteLen |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intMapbyteLen := int(mapbyteLen)
+					if intMapbyteLen < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					postbytesIndex := iNdEx + intMapbyteLen
+					if postbytesIndex < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if postbytesIndex > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapvalue = make([]byte, mapbyteLen)
+					copy(mapvalue, dAtA[iNdEx:postbytesIndex])
+					iNdEx = postbytesIndex
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipMetricEvent(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if (skippy < 0) || (iNdEx+skippy) < 0 {
+						return ErrInvalidLengthMetricEvent
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.Metadata[mapkey] = mapvalue
+			iNdEx = postIndex
+		case 6:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field UntypedMultiDoubleValues", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowMetricEvent
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthMetricEvent
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			v := &UntypedMultiDoubleValues{}
+			if err := v.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			m.Value = &MetricEvent_UntypedMultiDoubleValues{v}
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

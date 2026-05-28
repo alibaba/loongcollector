@@ -144,6 +144,7 @@ bool CollectionConfig::Parse() {
     // extensions module parsing will rely on their results.
     bool hasFileInput = false;
     bool hasSecurityInput = false;
+    bool hasSelfMonitorInput = false;
     key = "inputs";
     itr = mDetail->find(key.c_str(), key.c_str() + key.size());
     if (!itr) {
@@ -270,6 +271,9 @@ bool CollectionConfig::Parse() {
         if (pluginType.find("_security") != string::npos) {
             hasSecurityInput = true;
         }
+        if (pluginType == "input_internal_metrics" || pluginType == "input_internal_alarms") {
+            hasSelfMonitorInput = true;
+        }
     }
     // TODO: remove these special restrictions
     if (hasFileInput && (*mDetail)["inputs"].size() > 1) {
@@ -358,11 +362,12 @@ bool CollectionConfig::Parse() {
                 if (isCurrentPluginNative) {
                     if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
                         // TODO: remove these special restrictions
-                        if (!hasFileInput && !hasSecurityInput) {
+                        if (!hasFileInput && !hasSecurityInput && !hasSelfMonitorInput) {
                             PARAM_ERROR_RETURN(sLogger,
                                                alarm,
                                                "extended processor plugins coexist with native input plugins other "
-                                               "than input_file or input_container_stdio or input_*_security",
+                                               "than input_file or input_container_stdio or input_*_security "
+                                               "or input_internal_*",
                                                noModule,
                                                mName,
                                                mProject,
@@ -487,11 +492,12 @@ bool CollectionConfig::Parse() {
         const string pluginType = it->asString();
         if (PluginRegistry::GetInstance()->IsValidGoPlugin(pluginType)) {
             // TODO: remove these special restrictions
-            if (mHasNativeInput && !hasFileInput && !hasSecurityInput) {
+            if (mHasNativeInput && !hasFileInput && !hasSecurityInput && !hasSelfMonitorInput) {
                 PARAM_ERROR_RETURN(sLogger,
                                    alarm,
                                    "extended flusher plugins coexist with native input plugins other than "
-                                   "input_file or input_container_stdio or input_*_security",
+                                   "input_file or input_container_stdio or input_*_security "
+                                   "or input_internal_*",
                                    noModule,
                                    mName,
                                    mProject,

@@ -73,6 +73,8 @@ require (
 	k8s.io/client-go v0.32.1
 )
 
+require golang.org/x/tools v0.35.0 // indirect
+
 require (
 	cloud.google.com/go/compute/metadata v0.7.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect

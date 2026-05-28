@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	pb "github.com/VictoriaMetrics/VictoriaMetrics/lib/prompbmarshal"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,4 +94,25 @@ func BenchmarkLexicographicalSort(b *testing.B) {
 			sort.Strings(stringLabels)
 		}
 	})
+}
+
+func TestGenPromRemoteWriteTimeseries_MultiValue(t *testing.T) {
+	multiValue := models.NewMetricMultiValueWithMap(map[string]float64{
+		"cpu":            0.1,
+		"memory_used_mb": 25,
+	})
+	metric := models.NewMultiValuesMetric("agent", models.MetricTypeUntyped, models.NewTags(), 1_000_000_000, multiValue.Values)
+	series := genPromRemoteWriteTimeseries(metric)
+	assert.Len(t, series, 2)
+	names := map[string]bool{}
+	for _, ts := range series {
+		assert.Len(t, ts.Samples, 1)
+		for _, label := range ts.Labels {
+			if label.Name == metricNameKey {
+				names[label.Value] = true
+			}
+		}
+	}
+	assert.True(t, names["agent_cpu"])
+	assert.True(t, names["agent_memory_used_mb"])
 }

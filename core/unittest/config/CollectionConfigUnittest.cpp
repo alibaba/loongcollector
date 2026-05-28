@@ -37,6 +37,7 @@ public:
     void HandleInvalidFlushers() const;
     void HandleInvalidExtensions() const;
     void TestReplaceEnvVarRef() const;
+    void SelfMonitorInputWithGoFlusher() const;
 
 protected:
     static void SetUpTestCase() { PluginRegistry::GetInstance()->LoadPlugins(); }
@@ -2363,7 +2364,61 @@ void CollectionConfigUnittest::TestReplaceEnvVarRef() const {
     APSARA_TEST_TRUE(*config->mDetail == resJson);
 }
 
+void CollectionConfigUnittest::SelfMonitorInputWithGoFlusher() const {
+    unique_ptr<Json::Value> configJson;
+    unique_ptr<CollectionConfig> config;
+    string errorMsg;
+
+    string configStr = R"(
+        {
+            "global": {
+                "StructureType": "v2"
+            },
+            "inputs": [
+                {
+                    "Type": "input_internal_metrics"
+                }
+            ],
+            "processors": [
+                {
+                    "Type": "processor_add_fields"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_prometheus"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+    APSARA_TEST_TRUE(config->HasGoPlugin());
+
+    configStr = R"(
+        {
+            "inputs": [
+                {
+                    "Type": "input_internal_alarms"
+                }
+            ],
+            "flushers": [
+                {
+                    "Type": "flusher_http"
+                }
+            ]
+        }
+    )";
+    configJson.reset(new Json::Value());
+    APSARA_TEST_TRUE(ParseJsonTable(configStr, *configJson, errorMsg));
+    config.reset(new CollectionConfig(configName, std::move(configJson), filepath));
+    APSARA_TEST_TRUE(config->Parse());
+}
+
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleValidConfig)
+UNIT_TEST_CASE(CollectionConfigUnittest, SelfMonitorInputWithGoFlusher)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidCreateTime)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidGlobal)
 UNIT_TEST_CASE(CollectionConfigUnittest, HandleInvalidInputs)

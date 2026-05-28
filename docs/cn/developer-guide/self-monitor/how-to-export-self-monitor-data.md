@@ -1,6 +1,6 @@
 # 如何导出自监控数据
 
-本文说明如何将 LoongCollector **自监控指标**（`input_internal_metrics`）和 **自监控告警**（`input_internal_alarms`）导出到外部系统。当前请使用下文 **过渡方案**；单条配置直连 Prometheus 的能力尚在建设中。
+本文说明如何将 LoongCollector **自监控指标**（`input_internal_metrics`）和 **自监控告警**（`input_internal_alarms`）导出到外部系统。推荐在支持直连的版本中使用 **单条配置 + `flusher_prometheus`**；若配置校验失败，可使用 **两段 Pipeline 过渡方案**。
 
 相关文档：
 
@@ -18,16 +18,11 @@
 |------|------|------|
 | `input_internal_metrics` → `flusher_file` | 已支持 | 官方推荐，输出 JSON 行到本地文件 |
 | `input_internal_alarms` → `flusher_file` | 已支持 | 告警为 LogEvent，输出 JSON 行 |
-| `input_internal_metrics` → `flusher_prometheus`（单条配置） | 建设中 | 见 [Issue #2568](https://github.com/alibaba/loongcollector/issues/2568)；当前配置校验会拒绝该组合 |
+| `input_internal_metrics` → `flusher_prometheus`（单条配置） | 已支持 | 需 `global.StructureType: v2`；见下文直连配置样例 |
+| `input_internal_alarms` → Go Flusher（如 `flusher_http`） | 已支持 | 告警为 LogEvent，需 `StructureType: v2` |
 | `input_internal_alarms` → `flusher_prometheus` | 不适用 | 告警为日志形态，不应使用 Prometheus RemoteWrite |
 
-若配置 `input_internal_metrics` 与 `flusher_prometheus` 时 pipeline 无法启动，报错类似：
-
-```text
-extended flusher plugins coexist with native input plugins other than input_file or input_container_stdio or input_*_security
-```
-
-这表示当前构建尚未放开 `input_internal_metrics` 与 `flusher_prometheus` 的直接组合，请使用下文 **过渡方案**（两段 Pipeline）。
+若配置 `input_internal_metrics` 与 `flusher_prometheus` 时 pipeline 无法启动（报错含 `extended flusher plugins coexist with native input`），请改用下文 **过渡方案**（两段 Pipeline）。
 
 ---
 
@@ -149,18 +144,15 @@ flushers:
 | `__labels__` | Prometheus labels（`hostname`、`pipeline_name` 等） |
 | `__time__` | sample timestamp（秒） |
 
-规划中的直连能力将按 `{category}_{field}` 规则在 `flusher_prometheus` 编码阶段展开多值 Metric（`category` 为事件名，`field` 为 `__value__` 中的键）。
+直连 RemoteWrite 时，`flusher_prometheus` 会在编码阶段将多值 Metric 按 `{category}_{field}` 展开（`category` 为事件名，如 `agent`；`field` 为 `__value__` 中的键，如 `cpu` → `agent_cpu`）。
 
 ---
 
-## 规划能力（建设中）
+## 直连 Prometheus RemoteWrite（单条配置）
 
-计划支持在 **单条采集配置** 内完成：`input_internal_metrics` →（可选 processor）→ `flusher_prometheus`，无需经过本地文件与 `input_file`。相关开发跟踪 [Issue #2568](https://github.com/alibaba/loongcollector/issues/2568)。
+在 **单条采集配置** 内完成：`input_internal_metrics` →（可选 processor）→ `flusher_prometheus`。需设置 `global.StructureType: v2`。
 
-**当前请勿使用下述配置**；加载时会因 Native Input 与 Extended Flusher 组合限制而失败。仅供了解规划中的配置形态。
-
-<details>
-<summary>规划中的指标直连 Prometheus 配置样例（建设中，不可用）</summary>
+保存为 `conf/continuous_pipeline_config/local/self_metrics_prometheus_direct.yaml`：
 
 ```yaml
 enable: true
@@ -172,6 +164,12 @@ inputs:
       Enable: true
       Interval: 1
     Pipeline:
+      Enable: true
+      Interval: 1
+    Plugin:
+      Enable: true
+      Interval: 1
+    Component:
       Enable: true
       Interval: 1
 processors:
@@ -187,10 +185,16 @@ flushers:
     Compression: "snappy"
     Concurrency: 1
     QueueCapacity: 4096
+    DropEventWhenQueueFull: false
     Timeout: "10s"
+    Retry:
+      Enable: true
+      MaxRetryTimes: 3
+      InitialDelay: "1s"
+      MaxDelay: "30s"
 ```
 
-</details>
+告警可使用 `input_internal_alarms` → `flusher_http`（同为 v2 配置），参见 [input_internal_alarms 插件](../../plugins/input/native/input-internal-alarms.md)。
 
 ---
 
@@ -198,7 +202,7 @@ flushers:
 
 | 现象 | 可能原因 | 处理建议 |
 |------|----------|----------|
-| 配置加载失败，`extended flusher plugins coexist with native input` | 在单条配置中混用了 `input_internal_metrics` 与 `flusher_prometheus` | 拆成两段 Pipeline（见上文过渡方案） |
+| 配置加载失败，`extended flusher plugins coexist with native input` | 版本过旧或未含本特性 | 升级版本，或使用两段 Pipeline 过渡方案 |
 | Pipeline 2 无数据写入 Prometheus | `input_file` 路径错误或 processor 未产出 Metric 事件 | 检查绝对路径、`processor_json` 及 Metric 转换链路 |
 | 指标文件无数据 | `input_internal_metrics` 未 Start 或 Interval 未到 | 检查配置 `enable` 与 Interval（单位为分钟） |
 | RemoteWrite 4xx/5xx | Endpoint、鉴权、TLS | 检查 `Endpoint`、`Headers`、`Authenticator` |
