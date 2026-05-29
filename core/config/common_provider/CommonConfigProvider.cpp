@@ -15,6 +15,7 @@
 #include "CommonConfigProvider.h"
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <random>
 
@@ -169,6 +170,47 @@ void CommonConfigProvider::LoadConfigFile() {
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(info.name, this);
         }
     }
+    // Rebuild mOnetimePipelineConfigInfoMap from disk on startup to prevent re-delivery of
+    // already-applied onetime configs across process restarts.
+    // The directory may not exist yet (created lazily on first delivery), so ignore the error.
+    for (auto const& entry : filesystem::directory_iterator(mOnetimePipelineConfigDir, ec)) {
+        const filesystem::path& p = entry.path();
+        // Clean up any orphaned tmp files left by a crashed previous run.
+        if (p.extension() == ".new") {
+            filesystem::remove(p, ec);
+            continue;
+        }
+        if (p.extension() != ".json") {
+            continue;
+        }
+        // Compute version as FNV-1a hash of file content — consistent with the hash
+        // computed during write — so the server receives a stable, non-zero version.
+        ifstream fin(p, ios::binary);
+        if (!fin) {
+            continue;
+        }
+        string content((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
+        fin.close();
+        uint64_t fnvHash = 14695981039346656037ULL;
+        for (unsigned char c : content) {
+            fnvHash ^= static_cast<uint64_t>(c);
+            fnvHash *= 1099511628211ULL;
+        }
+        ConfigInfo info;
+        info.name = p.stem().string();
+        info.version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
+        info.status = ConfigFeedbackStatus::APPLIED;
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            mOnetimePipelineConfigInfoMap[info.name] = info;
+        }
+        ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(info.name, this);
+    }
+    // NOTE: cleanup of delivered onetime config files and map entries is not performed here.
+    // The expire_time field in the server command is a delivery deadline (skip stale commands),
+    // not a config lifetime.  When a delivered onetime config should be removed, the server is
+    // expected to drive deletion via a future protocol extension (analogous to version=-1 for
+    // continuous configs).
 }
 
 void CommonConfigProvider::CheckUpdateThread() {
@@ -501,6 +543,18 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
 
 void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands) {
+    // Ensure the target directory exists before any file I/O.
+    // This follows the same pattern as UpdateRemotePipelineConfig / UpdateRemoteInstanceConfig.
+    {
+        error_code ec;
+        filesystem::create_directories(mOnetimePipelineConfigDir, ec);
+        if (ec) {
+            LOG_ERROR(sLogger,
+                      ("failed to create onetime config dir, skipping batch",
+                       mOnetimePipelineConfigDir.string())("error code", ec.value())("error msg", ec.message()));
+            return;
+        }
+    }
     // expire_time is a Unix timestamp in seconds (same unit as time(nullptr)).
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
@@ -525,14 +579,16 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             continue;
         }
         if (name[0] == '.' || name[0] == '-') {
-            LOG_DEBUG(sLogger, ("onetime config name has invalid leading character, skipping",
-                                name.substr(0, kMaxLoggedNameLen)));
+            LOG_WARNING(sLogger,
+                        ("onetime config name has invalid leading character, skipping",
+                         name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         if (name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
             != string::npos) {
-            LOG_DEBUG(sLogger, ("onetime config name contains disallowed characters, skipping",
-                                name.substr(0, kMaxLoggedNameLen)));
+            LOG_WARNING(sLogger,
+                        ("onetime config name contains disallowed characters, skipping",
+                         name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         // Reserve a slot under mInfoMapMux to make the existence-check and reservation
@@ -541,13 +597,20 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // Do NOT hold mOnetimePipelineMux here to maintain a strict single-level lock
         // hierarchy and eliminate deadlock risk.
         // The placeholder is initialized with name and APPLYING status so that any concurrent
-        // reader can distinguish an in-progress entry (version=0, status=APPLYING) from an
-        // unrelated default-constructed ConfigInfo.
+        // reader (e.g. PrepareHeartbeat) can distinguish an in-progress entry
+        // (version=0, status=APPLYING) from a successfully delivered entry
+        // (version=<fnv_hash>, status=APPLIED/APPLYING-after-feedback).
+        // All readers that iterate mOnetimePipelineConfigInfoMap MUST check the status field
+        // rather than treating mere map presence as "delivered".
+        // NOTE: between this insertion and the rollback below, the entry is visible to
+        // concurrent readers with status=APPLYING.  This is intentional: it signals
+        // "in-flight" to the server and prevents duplicate delivery within the same batch.
+        // On rollback the entry is removed, allowing a retry on the next heartbeat.
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            // Onetime configs are one-shot per-name: once a name is recorded in the map
-            // (in-progress or delivered), it is never re-processed regardless of new content.
-            // This matches the server's "deliver once" semantics for transient commands.
+            // Onetime configs are one-shot per-name within this process lifetime.
+            // On startup, LoadConfigFile() pre-populates the map from disk so that
+            // configs delivered before a restart are not re-applied.
             if (mOnetimePipelineConfigInfoMap.count(name)) {
                 LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
                 continue;
