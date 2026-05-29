@@ -517,17 +517,22 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // Leading '.' avoids hidden files (e.g. ".hidden") and the special "." / ".." entries.
         // Leading '-' avoids option-like filenames that some tools misinterpret.
         const string& name = cmd.name();
+        // Truncate name in log messages to a fixed length to prevent log flooding
+        // from a misbehaving or hostile server sending oversized/non-printable names.
+        static constexpr size_t kMaxLoggedNameLen = 64;
         if (name.empty()) {
-            LOG_WARNING(sLogger, ("onetime config name is empty, skipping", name));
+            LOG_WARNING(sLogger, ("onetime config name is empty, skipping", ""));
             continue;
         }
         if (name[0] == '.' || name[0] == '-') {
-            LOG_WARNING(sLogger, ("onetime config name has invalid leading character, skipping", name));
+            LOG_DEBUG(sLogger, ("onetime config name has invalid leading character, skipping",
+                                name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         if (name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
             != string::npos) {
-            LOG_WARNING(sLogger, ("onetime config name contains disallowed characters, skipping", name));
+            LOG_DEBUG(sLogger, ("onetime config name contains disallowed characters, skipping",
+                                name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         // Reserve a slot under mInfoMapMux to make the existence-check and reservation
@@ -592,7 +597,8 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
                     LOG_WARNING(sLogger,
                                 ("failed to rename onetime config file",
                                  filePath.string())("error code", ec.value())("error msg", ec.message()));
-                    filesystem::remove(tmpFilePath, ec);
+                    error_code removeEc;
+                    filesystem::remove(tmpFilePath, removeEc);
                     fileWriteOk = false;
                 }
             }
@@ -606,7 +612,7 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // Compute the FNV-1a content hash outside the lock to keep the critical section short.
         // Use FNV-1a 64-bit: deterministic across processes, restarts, platforms, and
         // standard-library versions, making the version stable for downstream comparisons.
-        // Mask to INT63_MAX to guarantee a non-negative int64_t value.
+        // Mask to INT64_MAX to guarantee a non-negative int64_t value.
         uint64_t fnvHash = 14695981039346656037ULL; // FNV-1a 64-bit offset basis
         for (unsigned char c : cmd.detail()) {
             fnvHash ^= static_cast<uint64_t>(c);
