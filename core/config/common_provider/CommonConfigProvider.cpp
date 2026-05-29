@@ -502,15 +502,20 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
 
 void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands) {
+    // expire_time is a Unix timestamp in seconds (same unit as time(nullptr)).
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
         if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
+            LOG_WARNING(sLogger,
+                        ("onetime config already expired, skipping", cmd.name())("expire_time", cmd.expire_time()));
             continue;
         }
-        // Reject server-supplied names containing path separators or other unsafe characters
-        // to prevent directory traversal out of mOnetimePipelineConfigDir.
+        // Reject server-supplied names containing path separators, leading dots/dashes, or
+        // other unsafe characters to prevent directory traversal out of mOnetimePipelineConfigDir.
+        // Leading '.' avoids hidden files (e.g. ".hidden") and the special "." / ".." entries.
+        // Leading '-' avoids option-like filenames that some tools misinterpret.
         const string& name = cmd.name();
-        if (name.empty()
+        if (name.empty() || name[0] == '.' || name[0] == '-'
             || name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
                 != string::npos) {
             LOG_WARNING(sLogger, ("onetime config name contains invalid characters, skipping", name));
@@ -521,13 +526,18 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // being processed twice (TOCTOU between check and later insertion).
         // Do NOT hold mOnetimePipelineMux here to maintain a strict single-level lock
         // hierarchy and eliminate deadlock risk.
+        // The placeholder is initialized with name and APPLYING status so that any concurrent
+        // reader never observes an entry with an empty name or default-zero version.
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             if (mOnetimePipelineConfigInfoMap.count(name)) {
                 continue;
             }
-            // Placeholder: marks the slot as "in-progress"; updated on success, erased on failure.
-            mOnetimePipelineConfigInfoMap.emplace(name, ConfigInfo{});
+            ConfigInfo placeholder;
+            placeholder.name = name;
+            placeholder.version = 0;
+            placeholder.status = ConfigFeedbackStatus::APPLYING;
+            mOnetimePipelineConfigInfoMap.emplace(name, std::move(placeholder));
         }
         filesystem::path filePath = mOnetimePipelineConfigDir / (name + ".json");
         filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (name + ".json.new");
@@ -541,7 +551,12 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
                     LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
                 } else {
                     fout << cmd.detail();
-                    fileWriteOk = true;
+                    fout.close();
+                    fileWriteOk = fout.good();
+                    if (!fileWriteOk) {
+                        LOG_WARNING(sLogger, ("failed to write onetime config file", tmpFilePath.string()));
+                        filesystem::remove(tmpFilePath);
+                    }
                 }
             }
             if (fileWriteOk) {
@@ -569,10 +584,10 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             ConfigInfo info;
             info.name = name;
-            // Use a hash of the config content as the version. This is stable across
-            // restarts and avoids conflating expire_time (an absolute timestamp) with
-            // a version counter.
-            info.version = static_cast<int64_t>(std::hash<std::string>{}(cmd.detail()));
+            // Use a content hash as the version (the proto defines version as "version number
+            // or hash code"). Mask to INT64_MAX to guarantee a non-negative value and avoid
+            // unexpected behaviour in downstream version comparisons.
+            info.version = static_cast<int64_t>(std::hash<std::string>{}(cmd.detail()) & 0x7FFFFFFFFFFFFFFFULL);
             info.status = ConfigFeedbackStatus::APPLYING;
             mOnetimePipelineConfigInfoMap[name] = std::move(info);
         }
