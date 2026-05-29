@@ -505,8 +505,11 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
         if (cmd.expire_time() > 0 && cmd.expire_time() <= now) {
-            LOG_WARNING(sLogger,
-                        ("onetime config already expired, skipping", cmd.name())("expire_time", cmd.expire_time()));
+            // Downgrade to DEBUG: an expired command may be re-sent on every heartbeat
+            // (e.g. clock skew or a stuck server queue), and a WARNING per heartbeat
+            // would produce significant log noise.
+            LOG_DEBUG(sLogger,
+                      ("onetime config already expired, skipping", cmd.name())("expire_time", cmd.expire_time()));
             continue;
         }
         // Reject server-supplied names containing path separators, leading dots/dashes, or
@@ -537,6 +540,9 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         // unrelated default-constructed ConfigInfo.
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            // Onetime configs are one-shot per-name: once a name is recorded in the map
+            // (in-progress or delivered), it is never re-processed regardless of new content.
+            // This matches the server's "deliver once" semantics for transient commands.
             if (mOnetimePipelineConfigInfoMap.count(name)) {
                 LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
                 continue;
@@ -559,11 +565,12 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
                     LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
                 } else {
                     fout << cmd.detail();
-                    fout.close();
-                    fileWriteOk = fout.good();
-                    if (!fileWriteOk) {
+                    fout.close(); // flush buffered data; sets failbit on disk-full etc.
+                    if (!fout.good()) {
                         LOG_WARNING(sLogger, ("failed to write onetime config file", tmpFilePath.string()));
                         filesystem::remove(tmpFilePath);
+                    } else {
+                        fileWriteOk = true;
                     }
                 }
             }
@@ -572,7 +579,13 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
                 // On POSIX, filesystem::rename atomically replaces the destination; only
                 // remove first on Windows where rename fails if the destination exists.
 #ifdef _WIN32
-                filesystem::remove(filePath, ec);
+                {
+                    error_code removeEc;
+                    filesystem::remove(filePath, removeEc);
+                    // Ignore removeEc: a missing target is fine; rename will detect
+                    // real problems. Using a separate error_code avoids overwriting
+                    // ec before the rename call below.
+                }
 #endif
                 filesystem::rename(tmpFilePath, filePath, ec);
                 if (ec) {
@@ -600,12 +613,10 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             fnvHash *= 1099511628211ULL; // FNV-1a 64-bit prime
         }
         {
+            // The placeholder already has name and APPLYING status; only update version.
+            // In-place update avoids field-divergence if ConfigInfo gains new fields later.
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            ConfigInfo info;
-            info.name = name;
-            info.version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
-            info.status = ConfigFeedbackStatus::APPLYING;
-            mOnetimePipelineConfigInfoMap[name] = std::move(info);
+            mOnetimePipelineConfigInfoMap[name].version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
         }
         ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(name, this);
         LOG_INFO(sLogger, ("received onetime pipeline config", name)("expire_time", cmd.expire_time()));
