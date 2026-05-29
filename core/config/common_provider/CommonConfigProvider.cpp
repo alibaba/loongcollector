@@ -535,8 +535,8 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             filesystem::rename(tmpFilePath, filePath, ec);
             if (ec) {
                 LOG_WARNING(sLogger,
-                            ("failed to rename onetime config file", filePath.string())("error code", ec.value())(
-                                "error msg", ec.message()));
+                            ("failed to rename onetime config file",
+                             filePath.string())("error code", ec.value())("error msg", ec.message()));
                 filesystem::remove(tmpFilePath, ec);
                 continue;
             }
