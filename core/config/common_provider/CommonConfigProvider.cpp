@@ -206,7 +206,8 @@ void CommonConfigProvider::LoadConfigFile() {
         string content((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
         fin.close();
         ConfigInfo info;
-        info.name = p.stem().string();
+        string fname = p.filename().string();
+        info.name = fname.substr(0, fname.size() - 5); // strip trailing ".json" (5 chars)
         info.version = ComputeOnetimeConfigVersion(content);
         info.status = ConfigFeedbackStatus::APPLIED;
         {
@@ -564,7 +565,8 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             return;
         }
     }
-    // expire_time is a Unix timestamp in seconds (same unit as time(nullptr)).
+    // expire_time is a Unix timestamp in seconds; the config server populates it using
+    // time.Now().Unix() (see config_server/internal/server/agent/handler.go).
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
         if (cmd.expire_time() > 0 && cmd.expire_time() <= now) {
@@ -683,11 +685,12 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             continue;
         }
         // Compute the FNV-1a content hash outside the lock to keep the critical section short.
+        int64_t version = ComputeOnetimeConfigVersion(cmd.detail());
         {
             // The placeholder already has name and APPLYING status; only update version.
             // In-place update avoids field-divergence if ConfigInfo gains new fields later.
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            mOnetimePipelineConfigInfoMap[name].version = ComputeOnetimeConfigVersion(cmd.detail());
+            mOnetimePipelineConfigInfoMap[name].version = version;
         }
         ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(name, this);
         LOG_INFO(sLogger, ("received onetime pipeline config", name)("expire_time", cmd.expire_time()));

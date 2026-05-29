@@ -125,6 +125,8 @@ public:
     void TestInit();
 
     void TestGetConfigUpdateAndConfigWatcher();
+
+    void TestLoadConfigFileOnetimeRecovery();
 };
 
 void CommonConfigProviderUnittest::TestInit() {
@@ -727,8 +729,84 @@ void CommonConfigProviderUnittest::TestGetConfigUpdateAndConfigWatcher() {
     }
 }
 
+void CommonConfigProviderUnittest::TestLoadConfigFileOnetimeRecovery() {
+    // Discover the onetime config dir path used by this provider name.
+    filesystem::path onetimeDir;
+    {
+        MockCommonConfigProvider bootstrap;
+        bootstrap.Init("common_v2");
+        onetimeDir = bootstrap.mOnetimePipelineConfigDir;
+        bootstrap.Stop();
+    }
+    bfs::remove_all(onetimeDir.string()); // start with a clean slate
+
+    // (a) Recovery with a mix of valid .json files and orphaned .json.new tmp files.
+    //     Expect: .json files populate the map with APPLIED status; .json.new is deleted.
+    {
+        bfs::create_directories(onetimeDir.string());
+        {
+            ofstream f((onetimeDir / "cmdA.json").string(), ios::binary);
+            f << R"({"enable":true})";
+        }
+        {
+            ofstream f((onetimeDir / "cmdB.json").string(), ios::binary);
+            f << R"({"enable":false})";
+        }
+        {
+            ofstream f((onetimeDir / "cmdC.json.new").string(), ios::binary);
+            f << "orphan";
+        }
+        MockCommonConfigProvider provider;
+        provider.Init("common_v2");
+        APSARA_TEST_EQUAL(2U, provider.mOnetimePipelineConfigInfoMap.size());
+        APSARA_TEST_EQUAL(ConfigFeedbackStatus::APPLIED, provider.mOnetimePipelineConfigInfoMap["cmdA"].status);
+        APSARA_TEST_EQUAL(ConfigFeedbackStatus::APPLIED, provider.mOnetimePipelineConfigInfoMap["cmdB"].status);
+        APSARA_TEST_FALSE(bfs::exists((onetimeDir / "cmdC.json.new").string()));
+        provider.Stop();
+    }
+
+    // (b) Onetime dir removed between ConfigProvider::Init() and a direct LoadConfigFile() call.
+    //     Expect: no crash, onetime map remains empty.
+    {
+        bfs::remove_all(onetimeDir.string());
+        MockCommonConfigProvider provider;
+        provider.Init("common_v2"); // re-creates dir (empty)
+        bfs::remove_all(provider.mOnetimePipelineConfigDir.string()); // remove it again
+        provider.mOnetimePipelineConfigInfoMap.clear();
+        provider.LoadConfigFile(); // must not throw
+        APSARA_TEST_TRUE(provider.mOnetimePipelineConfigInfoMap.empty());
+        provider.Stop();
+    }
+
+    // (c) Idempotency: a config name recovered from disk is skipped by
+    //     UpdateRemoteOnetimePipelineConfig, preserving its APPLIED status.
+    {
+        bfs::create_directories(onetimeDir.string());
+        {
+            ofstream f((onetimeDir / "cmdA.json").string(), ios::binary);
+            f << R"({"enable":true})";
+        }
+        MockCommonConfigProvider provider;
+        provider.Init("common_v2");
+        APSARA_TEST_EQUAL(1U, provider.mOnetimePipelineConfigInfoMap.size());
+        APSARA_TEST_EQUAL(ConfigFeedbackStatus::APPLIED, provider.mOnetimePipelineConfigInfoMap["cmdA"].status);
+        // Simulate server re-delivering the same command.
+        google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail> cmds;
+        auto* cmd = cmds.Add();
+        cmd->set_name("cmdA");
+        cmd->set_detail(R"({"enable":true})");
+        cmd->set_expire_time(0);
+        provider.UpdateRemoteOnetimePipelineConfig(cmds);
+        // The entry must remain APPLIED — the skip branch was taken.
+        APSARA_TEST_EQUAL(ConfigFeedbackStatus::APPLIED, provider.mOnetimePipelineConfigInfoMap["cmdA"].status);
+        provider.Stop();
+        bfs::remove_all(onetimeDir.string());
+    }
+}
+
 UNIT_TEST_CASE(CommonConfigProviderUnittest, TestInit)
 UNIT_TEST_CASE(CommonConfigProviderUnittest, TestGetConfigUpdateAndConfigWatcher)
+UNIT_TEST_CASE(CommonConfigProviderUnittest, TestLoadConfigFileOnetimeRecovery)
 
 }; // namespace logtail
 
