@@ -70,6 +70,8 @@ protected:
         const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
     void UpdateRemoteInstanceConfig(
         const google::protobuf::RepeatedPtrField<configserver::proto::v2::ConfigDetail>& configs);
+    void UpdateRemoteOnetimePipelineConfig(
+        const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands);
 
     virtual bool
     FetchInstanceConfigFromServer(::configserver::proto::v2::HeartbeatResponse&,

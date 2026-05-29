@@ -261,6 +261,10 @@ void CommonConfigProvider::GetConfigUpdate() {
         LOG_DEBUG(sLogger, ("fetch instanceConfig config, config file number", instanceConfig.size()));
         UpdateRemoteInstanceConfig(instanceConfig);
     }
+    const auto& onetimeCommands = heartbeatResponse.onetime_pipeline_config_updates();
+    if (!onetimeCommands.empty()) {
+        UpdateRemoteOnetimePipelineConfig(onetimeCommands);
+    }
     ++mSequenceNum;
 }
 
@@ -270,7 +274,8 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     heartbeatReq.set_request_id(requestID);
     heartbeatReq.set_sequence_num(mSequenceNum);
     heartbeatReq.set_capabilities(configserver::proto::v2::AcceptsInstanceConfig
-                                  | configserver::proto::v2::AcceptsContinuousPipelineConfig);
+                                  | configserver::proto::v2::AcceptsContinuousPipelineConfig
+                                  | configserver::proto::v2::AcceptsOnetimePipelineConfig);
     heartbeatReq.set_instance_id(GetInstanceId());
     heartbeatReq.set_agent_type("LoongCollector");
     FillAttributes(*heartbeatReq.mutable_attributes());
@@ -491,6 +496,61 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
+    }
+}
+
+void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
+    const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands) {
+    int64_t now = static_cast<int64_t>(time(nullptr));
+    for (const auto& cmd : commands) {
+        if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
+            continue;
+        }
+        // Check under mInfoMapMux alone — do NOT hold mOnetimePipelineMux here to avoid
+        // lock-order inversion with the file-I/O section below.
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            if (mOnetimePipelineConfigInfoMap.count(cmd.name())) {
+                continue;
+            }
+        }
+        filesystem::path filePath = mOnetimePipelineConfigDir / (cmd.name() + ".json");
+        filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (cmd.name() + ".json.new");
+        // File I/O under mOnetimePipelineMux alone — never hold mInfoMapMux simultaneously
+        // to maintain a strict single-level lock hierarchy and eliminate deadlock risk.
+        {
+            lock_guard<mutex> lock(mOnetimePipelineMux);
+            {
+                ofstream fout(tmpFilePath);
+                if (!fout) {
+                    LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
+                    continue;
+                }
+                fout << cmd.detail();
+            }
+            error_code ec;
+            // Remove the target first so that filesystem::rename succeeds on Windows,
+            // where rename fails with an error if the destination already exists.
+            filesystem::remove(filePath, ec);
+            filesystem::rename(tmpFilePath, filePath, ec);
+            if (ec) {
+                LOG_WARNING(sLogger,
+                            ("failed to rename onetime config file", filePath.string())("error code", ec.value())(
+                                "error msg", ec.message()));
+                filesystem::remove(tmpFilePath, ec);
+                continue;
+            }
+        }
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            ConfigInfo info;
+            info.name = cmd.name();
+            info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
+            info.status = ConfigFeedbackStatus::APPLYING;
+            mOnetimePipelineConfigInfoMap[cmd.name()] = std::move(info);
+        }
+        ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(cmd.name(), this);
+        LOG_INFO(sLogger, ("received onetime pipeline config", cmd.name())("expire_time", cmd.expire_time()));
     }
 }
 
