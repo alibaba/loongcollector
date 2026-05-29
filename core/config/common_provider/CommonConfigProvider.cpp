@@ -261,6 +261,10 @@ void CommonConfigProvider::GetConfigUpdate() {
         LOG_DEBUG(sLogger, ("fetch instanceConfig config, config file number", instanceConfig.size()));
         UpdateRemoteInstanceConfig(instanceConfig);
     }
+    const auto& onetimeCommands = heartbeatResponse.onetime_pipeline_config_updates();
+    if (!onetimeCommands.empty()) {
+        UpdateRemoteOnetimePipelineConfig(onetimeCommands);
+    }
     ++mSequenceNum;
 }
 
@@ -270,7 +274,8 @@ configserver::proto::v2::HeartbeatRequest CommonConfigProvider::PrepareHeartbeat
     heartbeatReq.set_request_id(requestID);
     heartbeatReq.set_sequence_num(mSequenceNum);
     heartbeatReq.set_capabilities(configserver::proto::v2::AcceptsInstanceConfig
-                                  | configserver::proto::v2::AcceptsContinuousPipelineConfig);
+                                  | configserver::proto::v2::AcceptsContinuousPipelineConfig
+                                  | configserver::proto::v2::AcceptsOnetimePipelineConfig);
     heartbeatReq.set_instance_id(GetInstanceId());
     heartbeatReq.set_agent_type("LoongCollector");
     FillAttributes(*heartbeatReq.mutable_attributes());
@@ -491,6 +496,119 @@ void CommonConfigProvider::UpdateRemoteInstanceConfig(
             }
             ConfigFeedbackReceiver::GetInstance().RegisterInstanceConfig(config.name(), this);
         }
+    }
+}
+
+void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
+    const google::protobuf::RepeatedPtrField<configserver::proto::v2::CommandDetail>& commands) {
+    // expire_time is a Unix timestamp in seconds (same unit as time(nullptr)).
+    int64_t now = static_cast<int64_t>(time(nullptr));
+    for (const auto& cmd : commands) {
+        if (cmd.expire_time() > 0 && cmd.expire_time() <= now) {
+            LOG_WARNING(sLogger,
+                        ("onetime config already expired, skipping", cmd.name())("expire_time", cmd.expire_time()));
+            continue;
+        }
+        // Reject server-supplied names containing path separators, leading dots/dashes, or
+        // other unsafe characters to prevent directory traversal out of mOnetimePipelineConfigDir.
+        // Leading '.' avoids hidden files (e.g. ".hidden") and the special "." / ".." entries.
+        // Leading '-' avoids option-like filenames that some tools misinterpret.
+        const string& name = cmd.name();
+        if (name.empty()) {
+            LOG_WARNING(sLogger, ("onetime config name is empty, skipping", name));
+            continue;
+        }
+        if (name[0] == '.' || name[0] == '-') {
+            LOG_WARNING(sLogger, ("onetime config name has invalid leading character, skipping", name));
+            continue;
+        }
+        if (name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
+            != string::npos) {
+            LOG_WARNING(sLogger, ("onetime config name contains disallowed characters, skipping", name));
+            continue;
+        }
+        // Reserve a slot under mInfoMapMux to make the existence-check and reservation
+        // atomic. This prevents the same cmd.name() appearing twice in one batch from
+        // being processed twice (TOCTOU between check and later insertion).
+        // Do NOT hold mOnetimePipelineMux here to maintain a strict single-level lock
+        // hierarchy and eliminate deadlock risk.
+        // The placeholder is initialized with name and APPLYING status so that any concurrent
+        // reader can distinguish an in-progress entry (version=0, status=APPLYING) from an
+        // unrelated default-constructed ConfigInfo.
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            if (mOnetimePipelineConfigInfoMap.count(name)) {
+                LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
+                continue;
+            }
+            ConfigInfo placeholder;
+            placeholder.name = name;
+            placeholder.version = 0;
+            placeholder.status = ConfigFeedbackStatus::APPLYING;
+            mOnetimePipelineConfigInfoMap.emplace(name, std::move(placeholder));
+        }
+        filesystem::path filePath = mOnetimePipelineConfigDir / (name + ".json");
+        filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (name + ".json.new");
+        // File I/O under mOnetimePipelineMux alone.
+        bool fileWriteOk = false;
+        {
+            lock_guard<mutex> lock(mOnetimePipelineMux);
+            {
+                ofstream fout(tmpFilePath);
+                if (!fout) {
+                    LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
+                } else {
+                    fout << cmd.detail();
+                    fout.close();
+                    fileWriteOk = fout.good();
+                    if (!fileWriteOk) {
+                        LOG_WARNING(sLogger, ("failed to write onetime config file", tmpFilePath.string()));
+                        filesystem::remove(tmpFilePath);
+                    }
+                }
+            }
+            if (fileWriteOk) {
+                error_code ec;
+                // On POSIX, filesystem::rename atomically replaces the destination; only
+                // remove first on Windows where rename fails if the destination exists.
+#ifdef _WIN32
+                filesystem::remove(filePath, ec);
+#endif
+                filesystem::rename(tmpFilePath, filePath, ec);
+                if (ec) {
+                    LOG_WARNING(sLogger,
+                                ("failed to rename onetime config file",
+                                 filePath.string())("error code", ec.value())("error msg", ec.message()));
+                    filesystem::remove(tmpFilePath, ec);
+                    fileWriteOk = false;
+                }
+            }
+        }
+        if (!fileWriteOk) {
+            // Roll back the placeholder so this command can be retried on the next heartbeat.
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            mOnetimePipelineConfigInfoMap.erase(name);
+            continue;
+        }
+        // Compute the FNV-1a content hash outside the lock to keep the critical section short.
+        // Use FNV-1a 64-bit: deterministic across processes, restarts, platforms, and
+        // standard-library versions, making the version stable for downstream comparisons.
+        // Mask to INT63_MAX to guarantee a non-negative int64_t value.
+        uint64_t fnvHash = 14695981039346656037ULL; // FNV-1a 64-bit offset basis
+        for (unsigned char c : cmd.detail()) {
+            fnvHash ^= static_cast<uint64_t>(c);
+            fnvHash *= 1099511628211ULL; // FNV-1a 64-bit prime
+        }
+        {
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            ConfigInfo info;
+            info.name = name;
+            info.version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
+            info.status = ConfigFeedbackStatus::APPLYING;
+            mOnetimePipelineConfigInfoMap[name] = std::move(info);
+        }
+        ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(name, this);
+        LOG_INFO(sLogger, ("received onetime pipeline config", name)("expire_time", cmd.expire_time()));
     }
 }
 
