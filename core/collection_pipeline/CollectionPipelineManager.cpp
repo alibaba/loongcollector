@@ -58,18 +58,25 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
     // other threads only read mPipelineNameEntityMap, so we don't need to lock read here
     for (const auto& name : diff.mRemoved) {
         auto iter = mPipelineNameEntityMap.find(name);
+        bool isOnetime = iter->second->IsOnetime();
         iter->second->Stop(true);
         iter->second->RemoveProcessQueue();
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
             mPipelineNameEntityMap.erase(name);
         }
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
-                                                                                     ConfigFeedbackStatus::DELETED);
+        if (isOnetime) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(name,
+                                                                                      ConfigFeedbackStatus::DELETED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                         ConfigFeedbackStatus::DELETED);
+        }
     }
     for (auto& config : diff.mModified) {
         // Save config name and collect input types before BuildPipeline moves config
         const string configName = config.mName;
+        const bool isOnetimeConfig = config.IsOnetime();
         std::set<std::string> newInputTypes;
         for (const auto& input : config.mInputs) {
             newInputTypes.insert((*input)["Type"].asString());
@@ -87,8 +94,13 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
                 config.mProject,
                 config.mName,
                 config.mLogstore);
-            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                         ConfigFeedbackStatus::FAILED);
+            if (isOnetimeConfig) {
+                ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                          ConfigFeedbackStatus::FAILED);
+            } else {
+                ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                             ConfigFeedbackStatus::FAILED);
+            }
             continue;
         }
         LOG_INFO(sLogger,
@@ -121,24 +133,35 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
-                                                                                     ConfigFeedbackStatus::APPLIED);
+        if (p->IsOnetime()) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                      ConfigFeedbackStatus::APPLIED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                         ConfigFeedbackStatus::APPLIED);
+        }
     }
     for (auto& config : diff.mAdded) {
         const string configName = config.mName;
+        const bool isOnetimeConfig = config.IsOnetime();
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
-                        ("failed to build pipeline for new config", "skip current object")("config", config.mName));
+                        ("failed to build pipeline for new config", "skip current object")("config", configName));
             AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
-                "failed to build pipeline for new config: skip current object, config: " + config.mName,
-                config.mRegion,
-                config.mProject,
-                config.mName,
-                config.mLogstore);
-            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                         ConfigFeedbackStatus::FAILED);
+                "failed to build pipeline for new config: skip current object, config: " + configName,
+                "",
+                "",
+                configName,
+                "");
+            if (isOnetimeConfig) {
+                ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                          ConfigFeedbackStatus::FAILED);
+            } else {
+                ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                             ConfigFeedbackStatus::FAILED);
+            }
             continue;
         }
         LOG_INFO(sLogger,
@@ -148,8 +171,13 @@ void CollectionPipelineManager::UpdatePipelines(CollectionConfigDiff& diff) {
             mPipelineNameEntityMap[configName] = p;
         }
         p->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
-                                                                                     ConfigFeedbackStatus::APPLIED);
+        if (p->IsOnetime()) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                      ConfigFeedbackStatus::APPLIED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                         ConfigFeedbackStatus::APPLIED);
+        }
     }
 
     // 在Flusher改造完成前，先不执行如下步骤，不会造成太大影响

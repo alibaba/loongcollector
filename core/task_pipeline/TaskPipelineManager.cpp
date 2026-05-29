@@ -26,73 +26,106 @@ static unique_ptr<TaskPipeline> sEmptyTask;
 
 void TaskPipelineManager::UpdatePipelines(TaskConfigDiff& diff) {
     for (const auto& name : diff.mRemoved) {
+        bool isOnetime = false;
         {
             auto iter = mPipelineNameEntityMap.find(name);
             if (iter == mPipelineNameEntityMap.end()) {
                 continue;
             }
+            isOnetime = iter->second->IsOnetime();
             iter->second->Stop(true);
             {
                 unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
                 mPipelineNameEntityMap.erase(iter);
             }
         }
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
-                                                                                     ConfigFeedbackStatus::DELETED);
+        if (isOnetime) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(name,
+                                                                                      ConfigFeedbackStatus::DELETED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(name,
+                                                                                         ConfigFeedbackStatus::DELETED);
+        }
     }
     for (auto& config : diff.mModified) {
+        const string configName = config.mName;
+        const bool isOnetimeConfig = config.IsOnetime();
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(
                 sLogger,
-                ("failed to build task for existing config", "keep current task running")("config", config.mName));
+                ("failed to build task for existing config", "keep current task running")("config", configName));
             AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
-                "failed to build task for existing config: keep current task running, config: " + config.mName);
-            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                         ConfigFeedbackStatus::FAILED);
+                "failed to build task for existing config: keep current task running, config: " + configName);
+            if (isOnetimeConfig) {
+                ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                          ConfigFeedbackStatus::FAILED);
+            } else {
+                ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                             ConfigFeedbackStatus::FAILED);
+            }
             continue;
         }
         LOG_INFO(sLogger,
                  ("task building for existing config succeeded",
-                  "stop the old task and start the new one")("config", config.mName));
+                  "stop the old task and start the new one")("config", configName));
+        bool builtIsOnetime = p->IsOnetime();
         {
-            auto iter = mPipelineNameEntityMap.find(config.mName);
+            auto iter = mPipelineNameEntityMap.find(configName);
             // when pipeline lifespan attribute changes, two pipelines are considered unrelated, and thus the old one
             // should be considered as deleted
             if (iter == mPipelineNameEntityMap.end()) {
                 continue;
             }
-            iter->second->Stop(p->IsOnetime() != iter->second->IsOnetime());
+            iter->second->Stop(builtIsOnetime != iter->second->IsOnetime());
             {
                 unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-                mPipelineNameEntityMap[config.mName] = std::move(p);
+                mPipelineNameEntityMap[configName] = std::move(p);
             }
-            mPipelineNameEntityMap[config.mName]->Start();
+            mPipelineNameEntityMap[configName]->Start();
         }
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                     ConfigFeedbackStatus::APPLIED);
+        if (builtIsOnetime) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                      ConfigFeedbackStatus::APPLIED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                         ConfigFeedbackStatus::APPLIED);
+        }
     }
     for (auto& config : diff.mAdded) {
+        const string configName = config.mName;
+        const bool isOnetimeConfig = config.IsOnetime();
         auto p = BuildPipeline(std::move(config));
         if (!p) {
             LOG_WARNING(sLogger,
-                        ("failed to build task for new config", "skip current object")("config", config.mName));
+                        ("failed to build task for new config", "skip current object")("config", configName));
             AlarmManager::GetInstance()->SendAlarmError(
                 CATEGORY_CONFIG_ALARM,
-                "failed to build task for new config: skip current object, config: " + config.mName);
-            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                         ConfigFeedbackStatus::FAILED);
+                "failed to build task for new config: skip current object, config: " + configName);
+            if (isOnetimeConfig) {
+                ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                          ConfigFeedbackStatus::FAILED);
+            } else {
+                ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                             ConfigFeedbackStatus::FAILED);
+            }
             continue;
         }
-        LOG_INFO(sLogger, ("task building for new config succeeded", "begin to start task")("config", config.mName));
+        LOG_INFO(sLogger, ("task building for new config succeeded", "begin to start task")("config", configName));
+        bool builtIsOnetime = p->IsOnetime();
         {
             unique_lock<shared_mutex> lock(mPipelineNameEntityMapMutex);
-            mPipelineNameEntityMap[config.mName] = std::move(p);
+            mPipelineNameEntityMap[configName] = std::move(p);
         }
-        mPipelineNameEntityMap[config.mName]->Start();
-        ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(config.mName,
-                                                                                     ConfigFeedbackStatus::APPLIED);
+        mPipelineNameEntityMap[configName]->Start();
+        if (builtIsOnetime) {
+            ConfigFeedbackReceiver::GetInstance().FeedbackOnetimePipelineConfigStatus(configName,
+                                                                                      ConfigFeedbackStatus::APPLIED);
+        } else {
+            ConfigFeedbackReceiver::GetInstance().FeedbackContinuousPipelineConfigStatus(configName,
+                                                                                         ConfigFeedbackStatus::APPLIED);
+        }
     }
 }
 
