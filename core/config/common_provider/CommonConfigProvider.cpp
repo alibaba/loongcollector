@@ -134,6 +134,19 @@ void CommonConfigProvider::Stop() {
     }
 }
 
+// static
+int64_t CommonConfigProvider::ComputeOnetimeConfigVersion(const std::string& content) {
+    // FNV-1a 64-bit hash: deterministic across processes, restarts, platforms, and
+    // standard-library versions, making the version stable for downstream comparisons.
+    // Mask to INT64_MAX to guarantee a non-negative int64_t value.
+    uint64_t h = 14695981039346656037ULL; // FNV-1a 64-bit offset basis
+    for (unsigned char c : content) {
+        h ^= static_cast<uint64_t>(c);
+        h *= 1099511628211ULL; // FNV-1a 64-bit prime
+    }
+    return static_cast<int64_t>(h & 0x7FFFFFFFFFFFFFFFULL);
+}
+
 void CommonConfigProvider::LoadConfigFile() {
     error_code ec;
     for (auto const& entry : filesystem::directory_iterator(mContinuousPipelineConfigDir, ec)) {
@@ -173,6 +186,7 @@ void CommonConfigProvider::LoadConfigFile() {
     // Rebuild mOnetimePipelineConfigInfoMap from disk on startup to prevent re-delivery of
     // already-applied onetime configs across process restarts.
     // The directory may not exist yet (created lazily on first delivery), so ignore the error.
+    ec.clear();
     for (auto const& entry : filesystem::directory_iterator(mOnetimePipelineConfigDir, ec)) {
         const filesystem::path& p = entry.path();
         // Clean up any orphaned tmp files left by a crashed previous run.
@@ -191,14 +205,9 @@ void CommonConfigProvider::LoadConfigFile() {
         }
         string content((istreambuf_iterator<char>(fin)), istreambuf_iterator<char>());
         fin.close();
-        uint64_t fnvHash = 14695981039346656037ULL;
-        for (unsigned char c : content) {
-            fnvHash ^= static_cast<uint64_t>(c);
-            fnvHash *= 1099511628211ULL;
-        }
         ConfigInfo info;
         info.name = p.stem().string();
-        info.version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
+        info.version = ComputeOnetimeConfigVersion(content);
         info.status = ConfigFeedbackStatus::APPLIED;
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
@@ -636,7 +645,8 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
                     fout.close(); // flush buffered data; sets failbit on disk-full etc.
                     if (!fout.good()) {
                         LOG_WARNING(sLogger, ("failed to write onetime config file", tmpFilePath.string()));
-                        filesystem::remove(tmpFilePath);
+                        error_code removeEc;
+                        filesystem::remove(tmpFilePath, removeEc);
                     } else {
                         fileWriteOk = true;
                     }
@@ -673,19 +683,11 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             continue;
         }
         // Compute the FNV-1a content hash outside the lock to keep the critical section short.
-        // Use FNV-1a 64-bit: deterministic across processes, restarts, platforms, and
-        // standard-library versions, making the version stable for downstream comparisons.
-        // Mask to INT64_MAX to guarantee a non-negative int64_t value.
-        uint64_t fnvHash = 14695981039346656037ULL; // FNV-1a 64-bit offset basis
-        for (unsigned char c : cmd.detail()) {
-            fnvHash ^= static_cast<uint64_t>(c);
-            fnvHash *= 1099511628211ULL; // FNV-1a 64-bit prime
-        }
         {
             // The placeholder already has name and APPLYING status; only update version.
             // In-place update avoids field-divergence if ConfigInfo gains new fields later.
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            mOnetimePipelineConfigInfoMap[name].version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
+            mOnetimePipelineConfigInfoMap[name].version = ComputeOnetimeConfigVersion(cmd.detail());
         }
         ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(name, this);
         LOG_INFO(sLogger, ("received onetime pipeline config", name)("expire_time", cmd.expire_time()));
