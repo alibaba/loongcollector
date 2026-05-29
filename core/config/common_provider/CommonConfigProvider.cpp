@@ -590,16 +590,14 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             continue;
         }
         if (name[0] == '.' || name[0] == '-') {
-            LOG_WARNING(sLogger,
-                        ("onetime config name has invalid leading character, skipping",
-                         name.substr(0, kMaxLoggedNameLen)));
+            LOG_WARNING(sLogger, ("onetime config name has invalid leading character, skipping",
+                                  name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         if (name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
             != string::npos) {
-            LOG_WARNING(sLogger,
-                        ("onetime config name contains disallowed characters, skipping",
-                         name.substr(0, kMaxLoggedNameLen)));
+            LOG_WARNING(sLogger, ("onetime config name contains disallowed characters, skipping",
+                                  name.substr(0, kMaxLoggedNameLen)));
             continue;
         }
         // Reserve a slot under mInfoMapMux to make the existence-check and reservation
