@@ -15,6 +15,7 @@
 #include "CommonConfigProvider.h"
 
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <random>
 
@@ -506,51 +507,77 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
             continue;
         }
-        // Check under mInfoMapMux alone — do NOT hold mOnetimePipelineMux here to avoid
-        // lock-order inversion with the file-I/O section below.
+        // Reject server-supplied names containing path separators or other unsafe characters
+        // to prevent directory traversal out of mOnetimePipelineConfigDir.
+        const string& name = cmd.name();
+        if (name.empty()
+            || name.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.-")
+                != string::npos) {
+            LOG_WARNING(sLogger, ("onetime config name contains invalid characters, skipping", name));
+            continue;
+        }
+        // Reserve a slot under mInfoMapMux to make the existence-check and reservation
+        // atomic. This prevents the same cmd.name() appearing twice in one batch from
+        // being processed twice (TOCTOU between check and later insertion).
+        // Do NOT hold mOnetimePipelineMux here to maintain a strict single-level lock
+        // hierarchy and eliminate deadlock risk.
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
-            if (mOnetimePipelineConfigInfoMap.count(cmd.name())) {
+            if (mOnetimePipelineConfigInfoMap.count(name)) {
                 continue;
             }
+            // Placeholder: marks the slot as "in-progress"; updated on success, erased on failure.
+            mOnetimePipelineConfigInfoMap.emplace(name, ConfigInfo{});
         }
-        filesystem::path filePath = mOnetimePipelineConfigDir / (cmd.name() + ".json");
-        filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (cmd.name() + ".json.new");
-        // File I/O under mOnetimePipelineMux alone — never hold mInfoMapMux simultaneously
-        // to maintain a strict single-level lock hierarchy and eliminate deadlock risk.
+        filesystem::path filePath = mOnetimePipelineConfigDir / (name + ".json");
+        filesystem::path tmpFilePath = mOnetimePipelineConfigDir / (name + ".json.new");
+        // File I/O under mOnetimePipelineMux alone.
+        bool fileWriteOk = false;
         {
             lock_guard<mutex> lock(mOnetimePipelineMux);
             {
                 ofstream fout(tmpFilePath);
                 if (!fout) {
                     LOG_WARNING(sLogger, ("failed to open onetime config file", tmpFilePath.string()));
-                    continue;
+                } else {
+                    fout << cmd.detail();
+                    fileWriteOk = true;
                 }
-                fout << cmd.detail();
             }
-            error_code ec;
-            // Remove the target first so that filesystem::rename succeeds on Windows,
-            // where rename fails with an error if the destination already exists.
-            filesystem::remove(filePath, ec);
-            filesystem::rename(tmpFilePath, filePath, ec);
-            if (ec) {
-                LOG_WARNING(sLogger,
-                            ("failed to rename onetime config file",
-                             filePath.string())("error code", ec.value())("error msg", ec.message()));
-                filesystem::remove(tmpFilePath, ec);
-                continue;
+            if (fileWriteOk) {
+                error_code ec;
+                // Remove the target first so that filesystem::rename succeeds on Windows,
+                // where rename fails with an error if the destination already exists.
+                filesystem::remove(filePath, ec);
+                filesystem::rename(tmpFilePath, filePath, ec);
+                if (ec) {
+                    LOG_WARNING(sLogger,
+                                ("failed to rename onetime config file",
+                                 filePath.string())("error code", ec.value())("error msg", ec.message()));
+                    filesystem::remove(tmpFilePath, ec);
+                    fileWriteOk = false;
+                }
             }
+        }
+        if (!fileWriteOk) {
+            // Roll back the placeholder so this command can be retried on the next heartbeat.
+            lock_guard<mutex> lockInfoMap(mInfoMapMux);
+            mOnetimePipelineConfigInfoMap.erase(name);
+            continue;
         }
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             ConfigInfo info;
-            info.name = cmd.name();
-            info.version = cmd.expire_time() > 0 ? cmd.expire_time() : 1;
+            info.name = name;
+            // Use a hash of the config content as the version. This is stable across
+            // restarts and avoids conflating expire_time (an absolute timestamp) with
+            // a version counter.
+            info.version = static_cast<int64_t>(std::hash<std::string>{}(cmd.detail()));
             info.status = ConfigFeedbackStatus::APPLYING;
-            mOnetimePipelineConfigInfoMap[cmd.name()] = std::move(info);
+            mOnetimePipelineConfigInfoMap[name] = std::move(info);
         }
-        ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(cmd.name(), this);
-        LOG_INFO(sLogger, ("received onetime pipeline config", cmd.name())("expire_time", cmd.expire_time()));
+        ConfigFeedbackReceiver::GetInstance().RegisterOnetimePipelineConfig(name, this);
+        LOG_INFO(sLogger, ("received onetime pipeline config", name)("expire_time", cmd.expire_time()));
     }
 }
 
