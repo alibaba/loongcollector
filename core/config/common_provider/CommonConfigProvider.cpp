@@ -15,7 +15,6 @@
 #include "CommonConfigProvider.h"
 
 #include <filesystem>
-#include <functional>
 #include <iostream>
 #include <random>
 
@@ -505,7 +504,7 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
     // expire_time is a Unix timestamp in seconds (same unit as time(nullptr)).
     int64_t now = static_cast<int64_t>(time(nullptr));
     for (const auto& cmd : commands) {
-        if (cmd.expire_time() > 0 && cmd.expire_time() < now) {
+        if (cmd.expire_time() > 0 && cmd.expire_time() <= now) {
             LOG_WARNING(sLogger,
                         ("onetime config already expired, skipping", cmd.name())("expire_time", cmd.expire_time()));
             continue;
@@ -531,6 +530,7 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
         {
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             if (mOnetimePipelineConfigInfoMap.count(name)) {
+                LOG_DEBUG(sLogger, ("onetime config already delivered, skipping", name));
                 continue;
             }
             ConfigInfo placeholder;
@@ -561,9 +561,11 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             }
             if (fileWriteOk) {
                 error_code ec;
-                // Remove the target first so that filesystem::rename succeeds on Windows,
-                // where rename fails with an error if the destination already exists.
+                // On POSIX, filesystem::rename atomically replaces the destination; only
+                // remove first on Windows where rename fails if the destination exists.
+#ifdef _WIN32
                 filesystem::remove(filePath, ec);
+#endif
                 filesystem::rename(tmpFilePath, filePath, ec);
                 if (ec) {
                     LOG_WARNING(sLogger,
@@ -584,10 +586,16 @@ void CommonConfigProvider::UpdateRemoteOnetimePipelineConfig(
             lock_guard<mutex> lockInfoMap(mInfoMapMux);
             ConfigInfo info;
             info.name = name;
-            // Use a content hash as the version (the proto defines version as "version number
-            // or hash code"). Mask to INT64_MAX to guarantee a non-negative value and avoid
-            // unexpected behaviour in downstream version comparisons.
-            info.version = static_cast<int64_t>(std::hash<std::string>{}(cmd.detail()) & 0x7FFFFFFFFFFFFFFFULL);
+            // Use FNV-1a 64-bit as the content version. Unlike std::hash<std::string>,
+            // FNV-1a is deterministic across processes, restarts, platforms, and standard-library
+            // versions, making the version stable for downstream comparison and feedback reporting.
+            // Mask to INT63_MAX to guarantee a non-negative int64_t value.
+            uint64_t fnvHash = 14695981039346656037ULL; // FNV-1a 64-bit offset basis
+            for (unsigned char c : cmd.detail()) {
+                fnvHash ^= static_cast<uint64_t>(c);
+                fnvHash *= 1099511628211ULL; // FNV-1a 64-bit prime
+            }
+            info.version = static_cast<int64_t>(fnvHash & 0x7FFFFFFFFFFFFFFFULL);
             info.status = ConfigFeedbackStatus::APPLYING;
             mOnetimePipelineConfigInfoMap[name] = std::move(info);
         }
