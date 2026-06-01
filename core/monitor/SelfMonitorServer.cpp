@@ -18,6 +18,7 @@
 
 #include "MetricConstants.h"
 #include "Monitor.h"
+#include "go_pipeline/LogtailPlugin.h"
 #include "runner/ProcessorRunner.h"
 
 using namespace std;
@@ -162,7 +163,7 @@ void SelfMonitorServer::PushSelfMonitorMetricEvents(std::vector<SelfMonitorMetri
         if (mSelfMonitorMetricEventMap.find(event.mKey) != mSelfMonitorMetricEventMap.end()) {
             mSelfMonitorMetricEventMap[event.mKey].Merge(event);
         } else {
-            mSelfMonitorMetricEventMap[event.mKey] = event;
+            mSelfMonitorMetricEventMap.emplace(event.mKey, std::move(event));
         }
     }
 }
@@ -199,6 +200,12 @@ void SelfMonitorServer::SendAlarms() {
     // metadata:
     // INTERNAL_DATA_TARGET_REGION:${region}
     // INTERNAL_DATA_TYPE:__alarm__
+// Todo: windows 上的 cgo 内存有问题，调用 GetGoAlarms 函数时可能会 crash，需要修复
+#ifndef _MSC_VER
+    if (LogtailPlugin::GetInstance()->IsPluginOpened()) {
+        LogtailPlugin::GetInstance()->GetGoAlarms();
+    }
+#endif
     vector<PipelineEventGroup> pipelineEventGroupList;
     AlarmManager::GetInstance()->FlushAllRegionAlarm(pipelineEventGroupList);
 

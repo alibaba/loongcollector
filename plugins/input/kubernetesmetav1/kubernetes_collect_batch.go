@@ -22,6 +22,7 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 // collectJobs collect the core metadata from the kubernetes jobs.
@@ -29,7 +30,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 	jobLister := lister.(batch.JobLister)
 	jobs, err := jobLister.List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.Job {
@@ -64,7 +65,7 @@ func (in *InputKubernetesMeta) collectJobs(lister interface{}, selector labels.S
 func (in *InputKubernetesMeta) collectCronJobs(lister interface{}, selector labels.Selector) (nodes []*helper.MetaNode, err error) {
 	cronJobs, err := lister.(batchbeta.CronJobLister).List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.CronJob {

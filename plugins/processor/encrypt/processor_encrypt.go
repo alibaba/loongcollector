@@ -30,11 +30,12 @@ import (
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 const (
 	pluginType       = "processor_encrypt"
-	defaultAlarmType = "PROCESSOR_ENCRYPT_ALARM"
+	defaultAlarmType = selfmonitor.ProcessorEncryptAlarm
 	encryptErrorText = "ENCRYPT_ERROR"
 )
 

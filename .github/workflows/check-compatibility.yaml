@@ -80,6 +80,7 @@ jobs:
       - name: Check compatibility
         env:
           BUILD_LOGTAIL_UT: OFF
+          ENABLE_AGENTSIGHT: ON
           ENABLE_COMPATIBLE_MODE: ON
           ENABLE_STATIC_LINK_CRT: ON
           MAKE_JOBS: 16

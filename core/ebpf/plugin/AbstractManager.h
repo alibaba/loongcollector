@@ -69,6 +69,8 @@ public:
 
     virtual int ConsumePerfBufferData() { return mEBPFAdapter->ConsumePerfBufferData(GetPluginType()); }
 
+    virtual int OnEpollReadable() { return 0; }
+
     bool IsRunning() { return mInited && !mSuspendFlag; }
 
     bool IsExists() { return mInited; }
@@ -92,10 +94,12 @@ public:
     std::shared_ptr<ProcessCacheManager> GetProcessCacheManager() const { return mProcessCacheManager; }
 
 private:
-    mutable ReadWriteLock mMtx; // lock
     std::shared_ptr<ProcessCacheManager> mProcessCacheManager;
 
 protected:
+    // Subclasses that override Suspend()/resume() may need to set mSuspendFlag under this lock (same as base).
+    mutable ReadWriteLock mMtx;
+
     virtual int update([[maybe_unused]] const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) {
         bool ret = mEBPFAdapter->UpdatePlugin(GetPluginType(), GeneratePluginConfig(options));
         if (!ret) {

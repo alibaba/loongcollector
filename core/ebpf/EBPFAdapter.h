@@ -22,10 +22,31 @@
 #include <memory>
 #include <string>
 
+#include "agentsight.h"
 #include "common/DynamicLibHelper.h"
 #include "ebpf/include/export.h"
 
 namespace logtail::ebpf {
+
+/// Function pointers loaded from libagentsight.so — signatures must match
+/// `core/_thirdparty/coolbpf/src/agentsight/include/agentsight.h`.
+struct AgentSightSymbolTable {
+    const char* (*last_error)() = nullptr;
+    AgentsightConfigHandle* (*config_new)() = nullptr;
+    void (*config_free)(AgentsightConfigHandle*) = nullptr;
+    void (*config_set_verbose)(AgentsightConfigHandle*, int) = nullptr;
+    void (*config_set_log_path)(AgentsightConfigHandle*, const char*) = nullptr;
+    void (*config_add_cmdline_rule)(AgentsightConfigHandle*, const char* const*, const char*, int) = nullptr;
+    void (*config_add_https)(AgentsightConfigHandle*, const char*) = nullptr;
+    int (*config_add_http)(AgentsightConfigHandle*, const char*) = nullptr;
+    AgentsightHandle* (*handle_new)(AgentsightConfigHandle*) = nullptr;
+    void (*handle_free)(AgentsightHandle*) = nullptr;
+    int (*handle_start)(AgentsightHandle*) = nullptr;
+    int (*handle_stop)(AgentsightHandle*) = nullptr;
+    int (*handle_get_eventfd)(AgentsightHandle*) = nullptr;
+    int (*handle_read)(AgentsightHandle*, agentsight_https_callback_fn, void*, agentsight_llm_callback_fn, void*, int)
+        = nullptr;
+};
 
 inline constexpr int kDefaultMaxBatchConsumeSize = 1024;
 inline constexpr int kDefaultMaxWaitTimeMS = 200;
@@ -63,12 +84,15 @@ public:
     virtual bool
     BPFMapUpdateElem(PluginType pluginType, const std::string& mapName, void* key, void* value, uint64_t flag);
 
+    virtual const AgentSightSymbolTable* GetAgentSightSymbols() const { return mAgentSightSymbols.get(); }
+
     EBPFAdapter();
     virtual ~EBPFAdapter();
 
 private:
     bool loadDynamicLib(const std::string& libName);
     bool loadCoolBPF();
+    bool tryLoadAgentSightDylib();
     bool dynamicLibSuccess();
 
     enum class network_observer_uprobe_funcs {
@@ -101,6 +125,8 @@ private:
     std::atomic_bool mInited = false;
     std::shared_ptr<DynamicLibLoader> mLib;
     std::shared_ptr<DynamicLibLoader> mCoolbpfLib;
+    std::shared_ptr<DynamicLibLoader> mAgentSightLib;
+    std::unique_ptr<AgentSightSymbolTable> mAgentSightSymbols;
     std::array<void*, (int)ebpf_func::EBPF_FUNC_MAX> mFuncs = {};
     std::array<long, (int)network_observer_uprobe_funcs::EBPF_NETWORK_OBSERVER_MAX> mOffsets = {};
     std::string mBinaryPath;

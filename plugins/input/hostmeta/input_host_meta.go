@@ -26,6 +26,7 @@ import (
 	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/pkg/util"
 )
 
@@ -60,7 +61,7 @@ func (in *InputNodeMeta) Init(context pipeline.Context) (int, error) {
 	in.context = context
 	for _, regStr := range in.ProcessNamesRegex {
 		if reg, err := regexp.Compile(regStr); err != nil {
-			logger.Warning(in.context.GetRuntimeContext(), "INVALID_REGEX_ALARM", "invalid regex", regStr, "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), selfmonitor.InvalidRegexAlarm, "invalid regex", regStr, "error", err)
 		} else {
 			in.regexpList = append(in.regexpList, reg)
 		}
@@ -136,7 +137,7 @@ func (in *InputNodeMeta) collectHostMeta() (node *helper.MetaNode, err error) {
 	for _, collect := range in.hostCollects {
 		category, meta, err := collect()
 		if err != nil {
-			logger.Warning(in.context.GetRuntimeContext(), "FAILED_COLLECT_HOST_METADATA", "error", err)
+			logger.Warning(in.context.GetRuntimeContext(), selfmonitor.FailedCollectHostMetadata, "error", err)
 			continue
 		}
 		node.WithAttribute(category, meta)

@@ -32,8 +32,35 @@ type metaCollector struct {
 
 	stopCh          chan struct{}
 	entityProcessor map[string]ProcessFunc
+	crConfigs       map[string]k8smeta.CustomResourceCollectorConfig
+}
 
-	dropCount uint64
+func validateCustomResourceEntityTypeUniqueness(
+	cfg k8smeta.CustomResourceCollectorConfig, seenEntityTypes map[string]struct{},
+) error {
+	if _, exists := seenEntityTypes[cfg.EntityType]; exists {
+		return fmt.Errorf("duplicated CustomResources EntityType %q", cfg.EntityType)
+	}
+	seenEntityTypes[cfg.EntityType] = struct{}{}
+	return nil
+}
+
+func prepareNormalizedCustomResourceConfigs(
+	customResources []k8smeta.CustomResourceCollectorConfig,
+) ([]k8smeta.CustomResourceCollectorConfig, error) {
+	seenCustomResourceEntityTypes := make(map[string]struct{})
+	normalizedConfigs := make([]k8smeta.CustomResourceCollectorConfig, 0, len(customResources))
+	for _, cfg := range customResources {
+		if err := cfg.Normalize(); err != nil {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "invalid CustomResources entry", err, "entity", cfg.EntityType)
+			continue
+		}
+		if err := validateCustomResourceEntityTypeUniqueness(cfg, seenCustomResourceEntityTypes); err != nil {
+			return nil, err
+		}
+		normalizedConfigs = append(normalizedConfigs, cfg)
+	}
+	return normalizedConfigs, nil
 }
 
 func (m *metaCollector) Start() error {
@@ -80,6 +107,30 @@ func (m *metaCollector) Start() error {
 		k8smeta.INGRESS_NAMESPACE:               m.processIngressNamespaceLink,
 	}
 
+	normalizedCRConfigs, err := prepareNormalizedCustomResourceConfigs(m.serviceK8sMeta.resolvedCustomResources())
+	if err != nil {
+		return err
+	}
+
+	m.crConfigs = make(map[string]k8smeta.CustomResourceCollectorConfig)
+	for _, cfg := range normalizedCRConfigs {
+		if err := m.serviceK8sMeta.metaManager.RegisterCustomResourceCollector(cfg); err != nil {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "register custom resource collector", err, "entity", cfg.EntityType)
+			continue
+		}
+		m.crConfigs[cfg.EntityType] = cfg
+		if cfg.CollectEntity {
+			m.entityProcessor[cfg.EntityType] = m.processCustomResourceEntity
+		}
+		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			m.entityProcessor[k8smeta.PodLinkTypeForEntity(cfg.EntityType)] = m.processPodCustomResourceLink
+		}
+		if m.serviceK8sMeta.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			m.entityProcessor[k8smeta.NamespaceLinkTypeForEntity(cfg.EntityType)] = m.processNamespaceCustomResourceLink
+		}
+		m.serviceK8sMeta.metaManager.EnsureCustomResourceInformerStarted(cfg.EntityType)
+	}
+
 	if m.serviceK8sMeta.Pod {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD, m.handleEvent, m.serviceK8sMeta.Interval)
 	}
@@ -124,6 +175,17 @@ func (m *metaCollector) Start() error {
 	}
 	if m.serviceK8sMeta.Ingress {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.INGRESS, m.handleEvent, m.serviceK8sMeta.Interval)
+	}
+	for entityType, cfg := range m.crConfigs {
+		if cfg.CollectEntity {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, entityType, m.handleEvent, m.serviceK8sMeta.Interval)
+		}
+		if m.serviceK8sMeta.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.PodLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+		}
+		if m.serviceK8sMeta.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.NamespaceLinkTypeForEntity(entityType), m.handleEvent, m.serviceK8sMeta.Interval)
+		}
 	}
 
 	if m.serviceK8sMeta.Pod && m.serviceK8sMeta.Node && m.serviceK8sMeta.Node2Pod != "" {

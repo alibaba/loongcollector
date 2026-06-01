@@ -17,6 +17,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <shared_mutex>
 #include <thread>
 #include <vector>
@@ -28,6 +29,7 @@
 #include "common/TimeKeeper.h"
 #include "common/http/AsynCurlRunner.h"
 #include "ebpf/Config.h"
+#include "ebpf/EBPFAdapter.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/include/export.h"
 #include "logger/Logger.h"
@@ -69,6 +71,10 @@ public:
     void TestEbpfParameters();
 
     void TestEnvManager();
+
+    void TestEBPFAdapterAgentSightReloadShortCircuit();
+
+    void TestRegisterExternalEpollAndUnregister();
 
     void TestUnifiedEpoll();
 
@@ -818,6 +824,37 @@ void eBPFServerUnittest::TestEnvManager() {
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::NETWORK_SECURITY), false);
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::PROCESS_SECURITY), false);
     EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(logtail::ebpf::PluginType::FILE_SECURITY), false);
+
+    EBPFServer::GetInstance()->mEnvMgr.m310Support = false;
+    EBPFServer::GetInstance()->mEnvMgr.mArchSupport = true;
+    EBPFServer::GetInstance()->mEnvMgr.mBTFSupport = false;
+    EXPECT_EQ(EBPFServer::GetInstance()->IsSupportedEnv(PluginType::AGENTSIGHT_OBSERVE), true);
+}
+
+void eBPFServerUnittest::TestEBPFAdapterAgentSightReloadShortCircuit() {
+    EBPFAdapter adapter;
+    adapter.mBinaryPath = GetProcessExecutionDir();
+    auto sym = std::make_unique<AgentSightSymbolTable>();
+    adapter.mAgentSightSymbols = std::move(sym);
+#if defined(__linux__)
+    APSARA_TEST_TRUE(adapter.tryLoadAgentSightDylib());
+#endif
+}
+
+void eBPFServerUnittest::TestRegisterExternalEpollAndUnregister() {
+    auto* server = EBPFServer::GetInstance();
+    server->Init();
+    APSARA_TEST_GE(server->mUnifiedEpollFd, 0);
+    int fd = eventfd(0, EFD_NONBLOCK);
+    APSARA_TEST_GE(fd, 0);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, -1);
+    server->RegisterExternalEpollFd(PluginType::FILE_SECURITY, fd);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    server->RegisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    server->UnregisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, -1);
+    server->UnregisterExternalEpollFd(PluginType::FILE_SECURITY, fd);
+    server->UnregisterExternalEpollFd(PluginType::AGENTSIGHT_OBSERVE, fd);
+    close(fd);
 }
 
 // UNIT_TEST_CASE(eBPFServerUnittest, TestNetworkObserver);
@@ -836,6 +873,8 @@ UNIT_TEST_CASE(eBPFServerUnittest, TestLoadEbpfParametersV2);
 UNIT_TEST_CASE(eBPFServerUnittest, TestUnifiedEpoll);
 UNIT_TEST_CASE(eBPFServerUnittest, TestRetryCache);
 UNIT_TEST_CASE(eBPFServerUnittest, TestEnvManager);
+UNIT_TEST_CASE(eBPFServerUnittest, TestEBPFAdapterAgentSightReloadShortCircuit);
+UNIT_TEST_CASE(eBPFServerUnittest, TestRegisterExternalEpollAndUnregister);
 
 } // namespace ebpf
 } // namespace logtail

@@ -14,6 +14,10 @@
 
 #include "ebpf/EBPFServer.h"
 
+#include <cerrno>
+#include <cstring>
+#include <sys/resource.h>
+
 #include <future>
 #include <shared_mutex>
 #include <stdexcept>
@@ -32,6 +36,7 @@
 #include "ebpf/plugin/AbstractManager.h"
 #include "logger/Logger.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
+#include "plugin/agentsight/AgentsightManager.h"
 #include "plugin/file_security/FileSecurityManager.h"
 #include "plugin/network_observer/NetworkObserverManager.h"
 #include "plugin/network_security/NetworkSecurityManager.h"
@@ -47,6 +52,41 @@ static const uint16_t kKernelVersion310 = 3010; // for centos7
 static const std::string kKernelNameCentos = "CentOS";
 static const uint16_t kKernelCentosMinVersion = 7006;
 
+namespace {
+
+// Raise RLIMIT_MEMLOCK to RLIM_INFINITY for the whole process before any eBPF map / program is
+// created. Centralised here so every eBPF plugin (driver-based ones via start_plugin and
+// AgentSight via libagentsight FFI) shares the same one-shot setup. setrlimit is per-process, so
+// a single successful call covers all subsequent BPF loads regardless of which plugin triggers
+// them.
+//
+// Notes:
+// - Idempotent: extra calls are cheap and have no side effects.
+// - Requires CAP_SYS_RESOURCE to raise the hard limit above what the container runtime / systemd
+//   inherited; failure (EPERM) is logged but not fatal — modern kernels (>= 5.11) account BPF
+//   memory via memcg, so a low memlock hard limit alone usually does not block BPF loading.
+// - Diagnostic: success path also logs the effective rlim_cur/rlim_max via getrlimit so operators
+//   can tell whether the bump was clamped by an upper limit (e.g. dockerd default ulimit).
+void BumpMemlockRlimit() {
+    struct rlimit rlimNew = {RLIM_INFINITY, RLIM_INFINITY};
+    if (setrlimit(RLIMIT_MEMLOCK, &rlimNew) != 0) {
+        const int err = errno;
+        LOG_WARNING(
+            sLogger,
+            ("eBPF",
+             "setrlimit(RLIMIT_MEMLOCK, INFINITY) failed; BPF map creation may "
+             "fail on older kernels or memlock-constrained containers")("errno", err)("errstr", std::strerror(err)));
+        return;
+    }
+    struct rlimit rlimCur {};
+    if (getrlimit(RLIMIT_MEMLOCK, &rlimCur) == 0) {
+        LOG_INFO(sLogger,
+                 ("eBPF", "setrlimit(RLIMIT_MEMLOCK) ok")("rlim_cur", rlimCur.rlim_cur)("rlim_max", rlimCur.rlim_max));
+    }
+}
+
+} // namespace
+
 bool EnvManager::IsSupportedEnv(PluginType type) {
     if (!mInited) {
         LOG_ERROR(sLogger, ("env manager not inited ...", ""));
@@ -56,6 +96,9 @@ bool EnvManager::IsSupportedEnv(PluginType type) {
     switch (type) {
         case PluginType::NETWORK_OBSERVE:
             status = mArchSupport && (mBTFSupport || m310Support);
+            break;
+        case PluginType::AGENTSIGHT_OBSERVE:
+            status = mArchSupport;
             break;
         case PluginType::FILE_SECURITY:
         case PluginType::NETWORK_SECURITY:
@@ -215,10 +258,16 @@ void EBPFServer::Init() {
     mInited = true;
     mRunning = true;
 
+    // Raise RLIMIT_MEMLOCK once for the whole process before any plugin starts loading BPF
+    // programs/maps. Previously this was duplicated inside eBPFDriver::start_plugin (which the
+    // AgentSight path bypasses) and AgentsightManager::Init; centralising it here covers every
+    // eBPF plugin, driver-based or FFI-based.
+    BumpMemlockRlimit();
+
     AsynCurlRunner::GetInstance()->Init();
+    mEBPFAdapter->Init(); // Idempotent; loads optional AgentSight symbols before poller threads run.
     mPoller = async(std::launch::async, &EBPFServer::pollPerfBuffers, this);
     mHandler = async(std::launch::async, &EBPFServer::handlerEvents, this);
-    mEBPFAdapter->Init(); // Idempotent
     LOG_INFO(sLogger, ("eBPF server", "started"));
 }
 
@@ -284,9 +333,9 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                                      const logtail::CollectionPipelineContext* ctx,
                                      const std::variant<SecurityOptions*, ObserverNetworkOption*>& options,
                                      const PluginMetricManagerPtr& metricManager) {
-    bool isNeedProcessCache = false;
-    if (type != PluginType::NETWORK_OBSERVE) {
-        isNeedProcessCache = true;
+    bool isNeedProcessCache = true;
+    if (type == PluginType::NETWORK_OBSERVE || type == PluginType::AGENTSIGHT_OBSERVE) {
+        isNeedProcessCache = false;
     }
     auto& pluginMgr = getPluginState(type).mManager;
     if (!pluginMgr) {
@@ -346,6 +395,15 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
                 }
                 break;
             }
+            case PluginType::AGENTSIGHT_OBSERVE: {
+                if (!pluginMgr) {
+                    auto mgr
+                        = AgentsightManager::Create(mProcessCacheManager, mEBPFAdapter, mCommonEventQueue, &mEventPool);
+                    mgr->SetMetrics(mLossKernelEventsTotal, mPushLogFailedTotal);
+                    pluginMgr = mgr;
+                }
+                break;
+            }
             default:
                 LOG_ERROR(sLogger, ("Unknown plugin type", int(type)));
                 return false;
@@ -363,6 +421,7 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
 
     if (pluginMgr->AddOrUpdateConfig(ctx, pluginIndex, metricManager, options) != 0) {
         pluginMgr.reset();
+        getPluginState(type).mValid.store(false, std::memory_order_release);
         LOG_WARNING(sLogger, ("Failed to AddOrUpdateConfig, type", magic_enum::enum_name(type)));
         if (isNeedProcessCache && checkIfNeedStopProcessCacheManager()) {
             stopProcessCacheManager();
@@ -371,7 +430,8 @@ bool EBPFServer::startPluginInternal(const std::string& pipelineName,
     }
 
     updatePluginState(type, pipelineName, ctx->GetProjectName(), PluginStateOperation::kAddPipeline, pluginMgr);
-    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+    if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
+        && type != PluginType::AGENTSIGHT_OBSERVE) {
         RegisterPluginPerfBuffers(type);
     }
 
@@ -437,7 +497,8 @@ bool EBPFServer::DisablePlugin(const std::string& pipelineName, PluginType type)
         }
 
         // do real destroy ...
-        if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE) {
+        if (type != PluginType::PROCESS_SECURITY && type != PluginType::NETWORK_OBSERVE
+            && type != PluginType::AGENTSIGHT_OBSERVE) {
             UnregisterPluginPerfBuffers(type);
         }
         ret = pluginManager->Destroy();
@@ -525,9 +586,23 @@ void EBPFServer::handleEpollEvents() {
 
     for (int i = 0; i < numEvents; ++i) {
         auto type = static_cast<PluginType>(mEpollEvents[i].data.u32);
-
+        LOG_DEBUG(sLogger, ("Unified epoll detected event", magic_enum::enum_name(type)));
         if (type == PluginType::PROCESS_SECURITY) {
             mProcessCacheManager->ConsumePerfBufferData();
+            continue;
+        }
+
+        if (type == PluginType::AGENTSIGHT_OBSERVE) {
+            // Take mMtx before reading mManager. mValid was read here without the lock before, which could
+            // race with updatePluginState / pluginMgr.reset and skip OnEpollReadable while epoll still fires.
+            auto& pluginState = getPluginState(type);
+            LOG_DEBUG(sLogger, ("AgentSight plugin state", pluginState.mValid.load(std::memory_order_acquire)));
+            std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+            if (pluginState.mManager) {
+                auto* mgr = static_cast<AgentsightManager*>(pluginState.mManager.get());
+                const int cnt = mgr->OnEpollReadable();
+                LOG_DEBUG(sLogger, ("Event-driven AgentSight read", cnt));
+            }
             continue;
         }
 
@@ -550,14 +625,15 @@ void EBPFServer::pollPerfBuffers() {
         mProcessCacheManager->ClearProcessExpiredCache();
 
         // TODO (@qianlu.kk) adapt to ConsumePerfBufferData
-        auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
-        if (!pluginState.mValid.load(std::memory_order_acquire)) {
-            continue;
-        }
-        std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
-        if (pluginState.mManager) {
-            auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
-            mgr->PollPerfBuffer(0); // 0 means non-blocking r(ef: https://libbpf.readthedocs.io/en/latest/api.html)
+        {
+            auto& pluginState = getPluginState(PluginType::NETWORK_OBSERVE);
+            if (pluginState.mValid.load(std::memory_order_acquire)) {
+                std::shared_lock<std::shared_mutex> lock(pluginState.mMtx);
+                if (pluginState.mManager) {
+                    auto* mgr = static_cast<NetworkObserverManager*>(pluginState.mManager.get());
+                    mgr->PollPerfBuffer(0); // 0 means non-blocking
+                }
+            }
         }
     }
 }
@@ -600,6 +676,9 @@ void EBPFServer::updatePluginState(PluginType type,
             break;
     }
     mPlugins[static_cast<int>(type)].mValid.store(mgr != nullptr, std::memory_order_release);
+    LOG_DEBUG(sLogger,
+              ("updatePluginState", magic_enum::enum_name(type))(
+                  "valid", mPlugins[static_cast<int>(type)].mValid.load(std::memory_order_acquire)));
     mPlugins[static_cast<int>(type)].mManager = std::move(mgr);
 }
 
@@ -710,6 +789,47 @@ void EBPFServer::RegisterPluginPerfBuffers(PluginType type) {
                            epollFd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
             }
         }
+    }
+}
+
+// Bridges libagentsight's event fd into the same unified epoll as security/network perf fds (EPOLLIN path
+// dispatches in handleEpollEvents for AGENTSIGHT_OBSERVE).
+void EBPFServer::RegisterExternalEpollFd(PluginType type, int fd) {
+    if (mUnifiedEpollFd < 0 || fd < 0) {
+        return;
+    }
+    if (type != PluginType::AGENTSIGHT_OBSERVE) {
+        return;
+    }
+    struct epoll_event event {};
+    event.events = EPOLLIN;
+    event.data.u32 = static_cast<uint32_t>(type);
+    if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_ADD, fd, &event) != 0) {
+        if (errno != EEXIST) {
+            LOG_ERROR(sLogger,
+                      ("Failed to register external epoll fd",
+                       fd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
+        }
+    } else {
+        LOG_DEBUG(sLogger, ("Registered external epoll fd", fd)("plugin type", magic_enum::enum_name(type)));
+    }
+}
+
+void EBPFServer::UnregisterExternalEpollFd(PluginType type, int fd) {
+    if (mUnifiedEpollFd < 0 || fd < 0) {
+        return;
+    }
+    if (type != PluginType::AGENTSIGHT_OBSERVE) {
+        return;
+    }
+    if (epoll_ctl(mUnifiedEpollFd, EPOLL_CTL_DEL, fd, nullptr) != 0) {
+        if (errno != ENOENT && errno != EBADF) {
+            LOG_ERROR(sLogger,
+                      ("Failed to unregister external epoll fd",
+                       fd)("error", strerror(errno))("plugin type", magic_enum::enum_name(type)));
+        }
+    } else {
+        LOG_DEBUG(sLogger, ("Unregistered external epoll fd", fd)("plugin type", magic_enum::enum_name(type)));
     }
 }
 

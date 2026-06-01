@@ -29,13 +29,15 @@ import (
 
 	"strconv"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 func (in *InputKubernetesMeta) InitKruise(cfg *restclient.Config) {
 	logger.Debug(in.context.GetRuntimeContext(), "enable kruise meta")
 	kcs, err := kruisekubernetes.NewForConfig(cfg)
 	if err != nil {
-		logger.Error(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "enable kruise meta err", err)
+		logger.Error(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "enable kruise meta err", err)
 		return
 	}
 	var options []informers.SharedInformerOption
@@ -68,7 +70,7 @@ func (in *InputKubernetesMeta) collectKruiseCloneset(lister interface{}, selecto
 	clonesetLister := lister.(v1alpha1.CloneSetLister)
 	cloneset, err := clonesetLister.List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.Deployment {
@@ -106,7 +108,7 @@ func (in *InputKubernetesMeta) collectKruiseDaemonSet(lister interface{}, select
 	daemonSetLister := lister.(v1alpha1.DaemonSetLister)
 	daemonSets, err := daemonSetLister.List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.DaemonSet {
@@ -136,7 +138,7 @@ func (in *InputKubernetesMeta) collectKruiseStatefulSet(lister interface{}, sele
 	logger.Debug(in.context.GetRuntimeContext(), "collect kruise statefulset")
 	statefulSets, err := lister.(v1beta1.StatefulSetLister).List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.StatefulSet {
@@ -170,7 +172,7 @@ func (in *InputKubernetesMeta) collectKruiseCronJobs(lister interface{}, selecto
 	logger.Debug(in.context.GetRuntimeContext(), "collect kruise cronjob")
 	cronJobs, err := lister.(v1alpha1.AdvancedCronJobLister).List(selector)
 	if err != nil {
-		logger.Warning(in.context.GetRuntimeContext(), "KUBERNETES_META_ALARM", "err", err)
+		logger.Warning(in.context.GetRuntimeContext(), selfmonitor.KubernetesMetaAlarm, "err", err)
 		return
 	}
 	if in.CronJob {

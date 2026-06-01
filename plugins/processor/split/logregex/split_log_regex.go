@@ -22,6 +22,8 @@ import (
 
 	"regexp"
 	"time"
+
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 )
 
 type ProcessorSplitRegex struct {
@@ -125,7 +127,7 @@ func (p *ProcessorSplitRegex) ProcessLogs(logArray []*protocol.Log) []*protocol.
 			destArray = p.SplitLog(destArray, newLog, destCont)
 		} else {
 			if p.NoKeyError {
-				logger.Warning(p.context.GetRuntimeContext(), "LOG_REGEX_FIND_ALARM", "can't find split key", p.SplitKey)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.LogRegexFindAlarm, "can't find split key", p.SplitKey)
 			}
 			if p.PreserveOthers {
 				destArray = append(destArray, newLog)

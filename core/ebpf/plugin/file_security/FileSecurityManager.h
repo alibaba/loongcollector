@@ -17,6 +17,7 @@
 #include <coolbpf/security/type.h>
 
 #include <memory>
+#include <variant>
 
 #include "common/queue/blockingconcurrentqueue.h"
 #include "ebpf/Config.h"
@@ -88,8 +89,11 @@ public:
         std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
         pc->mPluginType = PluginType::FILE_SECURITY;
         FileSecurityConfig config;
-        SecurityOptions* opts = std::get<SecurityOptions*>(options);
-        config.mOptions = opts->mOptionList;
+        const auto* opts = std::get_if<SecurityOptions*>(&options);
+        if (!opts || !*opts) {
+            return pc;
+        }
+        config.mOptions = (*opts)->mOptionList;
         pc->mConfig = std::move(config);
         return pc;
     }

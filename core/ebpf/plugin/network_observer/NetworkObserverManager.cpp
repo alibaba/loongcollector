@@ -1256,11 +1256,12 @@ int NetworkObserverManager::AddOrUpdateConfig(const CollectionPipelineContext* c
         return 1;
     }
 
-    auto* option = std::get<ObserverNetworkOption*>(opt);
-    if (!option) {
-        LOG_WARNING(sLogger, ("option is null, configName", ctx->GetConfigName()));
+    const auto* optHolder = std::get_if<ObserverNetworkOption*>(&opt);
+    if (!optHolder || !*optHolder) {
+        LOG_WARNING(sLogger, ("option is null or wrong variant, configName", ctx->GetConfigName()));
         return 1;
     }
+    auto* option = *optHolder;
 
     auto newConfig = std::make_shared<AppDetail>(option, metricMgr);
     newConfig->mQueueKey = ctx->GetProcessQueueKey();

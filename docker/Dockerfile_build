@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.16 AS build
+# AgentSight (coolbpf / vendored openssl-sys): perl + IPC::Cmd + Data::Dumper + openssl-devel are preinstalled
+# in loongcollector-build-linux 2.1.17+; gen_build.sh still verifies required Perl modules.
+FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS build
 
 USER root
+ENV PERL=/usr/bin/perl
+ENV PERL5LIB=/usr/share/perl5:/usr/lib64/perl5/vendor_perl:/usr/share/perl5/vendor_perl:/usr/lib64/perl5
+# openssl-sys (agentsight): avoid system LibreSSL/OpenSSL mismatch; vendored build unless overridden.
+# To link system OpenSSL instead, set OPENSSL_NO_VENDOR=1 here and use supported libssl-dev.
+ENV OPENSSL_NO_VENDOR=0
 WORKDIR /src
 COPY . .
 

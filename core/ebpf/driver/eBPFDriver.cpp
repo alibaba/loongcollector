@@ -28,7 +28,6 @@ extern "C" {
 #include <coolbpf/security/bpf_process_event_type.h>
 #include <coolbpf/security/data_msg.h>
 #include <coolbpf/security/msg_type.h>
-#include <sys/resource.h>
 
 #include "ebpf/driver/eBPFDriver.h"
 }
@@ -51,19 +50,6 @@ void* __wrap_memcpy(void* dest, const void* src, size_t n) {
 
 int set_logger(logtail::ebpf::eBPFLogHandler fn) {
     set_log_handler(fn);
-    return 0;
-}
-
-int bump_memlock_rlimit(void) {
-    struct rlimit rlim_new = {
-        .rlim_cur = RLIM_INFINITY,
-        .rlim_max = RLIM_INFINITY,
-    };
-
-    if (0 != setrlimit(RLIMIT_MEMLOCK, &rlim_new)) {
-        EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN, "Failed to increase RLIMIT_MEMLOCK limit!\n");
-        return -1;
-    }
     return 0;
 }
 
@@ -115,6 +101,7 @@ int SetupPerfBuffers(logtail::ebpf::PluginConfig* arg) {
             break;
         }
         case logtail::ebpf::PluginType::NETWORK_OBSERVE:
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
         default:
             return kErrDriverInternal;
     }
@@ -170,10 +157,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
     // 1. load skeleton
     // 2. start consumer
     // 3. attach prog
+    // plugin start paths no longer need to call setrlimit themselves.
     EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_DEBUG, "enter start_plugin, arg is null: %d \n", arg == nullptr);
-    if (0 != bump_memlock_rlimit()) {
-        return -1;
-    }
 
     // TODO: The coolbpf_set_loglevel API isn't ideal anyway
     libbpf_set_print(libbpf_printf);
@@ -398,6 +383,8 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
                      "process security: DynamicAttachBPFObject success\n");
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[start plugin] unknown plugin type, please check. \n");
@@ -409,6 +396,9 @@ int start_plugin(logtail::ebpf::PluginConfig* arg) {
 int poll_plugin_pbs(logtail::ebpf::PluginType type, int32_t max_events, int32_t* stop_flag, int timeout_ms) {
     if (type == logtail::ebpf::PluginType::NETWORK_OBSERVE) {
         return ebpf_poll_events(max_events, stop_flag, timeout_ms);
+    }
+    if (type == logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE) {
+        return 0;
     }
     // find pbs
     std::vector<void*> pbs = gPluginPbs.at(static_cast<size_t>(type));
@@ -481,6 +471,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[resume plugin] unknown plugin type, please check. \n");
@@ -493,7 +485,8 @@ int resume_plugin(logtail::ebpf::PluginConfig* arg) {
 int update_plugin(logtail::ebpf::PluginConfig* arg) {
     auto pluginType = arg->mPluginType;
     if (pluginType == logtail::ebpf::PluginType::NETWORK_OBSERVE
-        || pluginType == logtail::ebpf::PluginType::PROCESS_SECURITY) {
+        || pluginType == logtail::ebpf::PluginType::PROCESS_SECURITY
+        || pluginType == logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE) {
         return 0;
     }
 
@@ -608,6 +601,8 @@ int stop_plugin(logtail::ebpf::PluginType pluginType) {
             DeletePerfBuffers(pluginType);
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            return 0;
         case logtail::ebpf::PluginType::FILE_SECURITY: {
             // 1. dynamic detach
             auto callNames = gPluginCallNames[int(pluginType)];
@@ -678,6 +673,8 @@ int suspend_plugin(logtail::ebpf::PluginType pluginType) {
         case logtail::ebpf::PluginType::PROCESS_SECURITY: {
             break;
         }
+        case logtail::ebpf::PluginType::AGENTSIGHT_OBSERVE:
+            break;
         default: {
             EBPF_LOG(logtail::ebpf::eBPFLogType::NAMI_LOG_TYPE_WARN,
                      "[suspend plugin] unknown plugin type, please check. \n");

@@ -29,6 +29,27 @@ import (
 	"github.com/alibaba/ilogtail/plugins/test/mock"
 )
 
+// testTargetUser is the user name used when tests run as root to execute scripts as
+// a non-root account. GitHub Actions defines "runner"; other hosts fall back to a
+// common system user that exists locally.
+func testTargetUser(t *testing.T) string {
+	t.Helper()
+	u, err := user.Current()
+	if err != nil {
+		t.Fatalf("user.Current: %v", err)
+	}
+	if u.Username != "root" {
+		return u.Username
+	}
+	for _, name := range []string{"runner", "nobody", "nfsnobody", "www-data", "nginx"} {
+		if _, err := user.Lookup(name); err == nil {
+			return name
+		}
+	}
+	t.Fatalf("no suitable non-root user found for root tests")
+	return ""
+}
+
 func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 	u, err := user.Current()
 	if err != nil {
@@ -51,7 +72,7 @@ func TestCommandTestCollecetUserBase64WithTimeout(t *testing.T) {
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	if _, err = p.Init(ctx); err != nil {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
@@ -80,7 +101,7 @@ func TestCommandTestCollecetUserBase64(t *testing.T) {
 	}
 	p.ScriptContent = base64.StdEncoding.EncodeToString([]byte(scriptContent))
 	p.ContentEncoding = "Base64"
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	if _, err := p.Init(ctx); err != nil {
 		t.Errorf("cannot init InputCommand: %v", err)
 		return
@@ -106,7 +127,7 @@ func TestCommandTestCollect(t *testing.T) {
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -134,7 +155,7 @@ func TestCommandTestExceptionCollect(t *testing.T) {
 	p.ScriptContent = `echo "1"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -163,7 +184,7 @@ func TestCommandTestTimeoutCollect(t *testing.T) {
 	p.ScriptContent = `sleep 10`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	if runtime.GOOS == "darwin" {
 		p.CmdPath = "/bin/sh"
 	}
@@ -216,7 +237,7 @@ func TestCommandTestInit(t *testing.T) {
 	if err != nil {
 		fmt.Println("expect error with wrong user root", err)
 	}
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 
 	// test contentType
 	p.ContentEncoding = "mixin"
@@ -299,7 +320,7 @@ func TestErrorCmdPath(t *testing.T) {
 	p.ScriptContent = `echo "test"`
 	p.ScriptType = "shell"
 	p.ContentEncoding = "PlainText"
-	p.User = map[bool]string{true: "runner", false: u.Username}[u.Username == "root"]
+	p.User = testTargetUser(t)
 	p.CmdPath = "rm -rf *"
 	if _, err = p.Init(ctx); err != nil {
 		if err.Error() == "CmdPath rm -rf * does not exist, err:stat rm -rf *: no such file or directory" {

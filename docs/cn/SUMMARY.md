@@ -62,6 +62,7 @@
     * [主机监控数据](plugins/input/extended/metric-system.md)
     * [MySQL Binlog](plugins/input/extended/service-canal.md)
     * [容器标准输出](plugins/input/extended/service-docker-stdout.md)
+    * [Windows ETW 数据](plugins/input/extended/service-etw.md)
     * [GO Profile](plugins/input/extended/service-goprofile.md)
     * [GPU数据](plugins/input/extended/service-gpu.md)
     * [HTTP数据](plugins/input/extended/service-http-server.md)

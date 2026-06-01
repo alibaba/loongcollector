@@ -269,11 +269,12 @@ int FileSecurityManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     std::unique_ptr<PluginConfig> pc = std::make_unique<PluginConfig>();
     pc->mPluginType = PluginType::FILE_SECURITY;
     FileSecurityConfig config;
-    SecurityOptions* opts = std::get<SecurityOptions*>(options);
-    if (!opts) {
-        LOG_ERROR(sLogger, ("SecurityOptions is null", ""));
+    const auto* optsHolder = std::get_if<SecurityOptions*>(&options);
+    if (!optsHolder || !*optsHolder) {
+        LOG_ERROR(sLogger, ("SecurityOptions is null or wrong variant", ""));
         return -1;
     }
+    SecurityOptions* opts = *optsHolder;
     config.mOptions = opts->mOptionList;
     config.mPerfBufferSpec
         = {{"file_secure_output",

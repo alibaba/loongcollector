@@ -14,6 +14,7 @@ import (
 	v1 "github.com/google/cadvisor/info/v1"
 
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/selfmonitor"
 	"github.com/alibaba/ilogtail/test/config"
 )
 
@@ -66,7 +67,7 @@ func (m *Monitor) Start(ctx context.Context, containerName string, timeout int) 
 	// 获取所有容器信息
 	allContainers, err := client.AllDockerContainers(&v1.ContainerInfoRequest{NumStats: 10})
 	if err != nil {
-		logger.Error(ctx, "MONITOR_START_ALARM", "Error getting all containers info:", err)
+		logger.Error(ctx, selfmonitor.MonitorStartAlarm, "Error getting all containers info:", err)
 		return ctx, err
 	}
 	for _, container := range allContainers {
@@ -105,7 +106,7 @@ func (m *Monitor) monitoring(client *client.Client, containerName string, timeou
 	for {
 		select {
 		case <-timeoutTimer.C:
-			logger.Error(context.Background(), "MONITOR_TIMEOUT_ALARM", "Monitoring timeout after", timeout, "minutes")
+			logger.Error(context.Background(), selfmonitor.MonitorTimeoutAlarm, "Monitoring timeout after", timeout, "minutes")
 			bytes, _ := m.statistic.MarshalStatisticJSON()
 			_ = os.WriteFile(statisticFile, bytes, 0600)
 			bytes, _ = m.statistic.MarshalRecordsJSON()

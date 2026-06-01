@@ -48,7 +48,7 @@ func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 		for key, val := range p.Include {
 			reg, err := regexp.Compile(val)
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "FILTER_INIT_ALARM", "init include filter error, key", key, "regex", val, "error", err)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FilterInitAlarm, "init include filter error, key", key, "regex", val, "error", err)
 				return err
 			}
 			p.includeRegex[key] = reg
@@ -59,7 +59,7 @@ func (p *ProcessorRegexFilter) Init(context pipeline.Context) error {
 		for key, val := range p.Exclude {
 			reg, err := regexp.Compile(val)
 			if err != nil {
-				logger.Warning(p.context.GetRuntimeContext(), "FILTER_INIT_ALARM", "init exclude filter error, key", key, "regex", val, "error", err)
+				logger.Warning(p.context.GetRuntimeContext(), selfmonitor.FilterInitAlarm, "init exclude filter error, key", key, "regex", val, "error", err)
 				return err
 			}
 			p.excludeRegex[key] = reg

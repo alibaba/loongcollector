@@ -209,6 +209,7 @@ void StaticFileServer::ReadFiles() {
     }
 }
 
+// Caller must hold mUpdateMux (ReadFiles, or TestGetNextAvailableReader for unit tests).
 LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configName, size_t idx) {
     FileFingerprint fingerprint;
     while (InputStaticFileCheckpointManager::GetInstance()->GetCurrentFileFingerprint(configName, idx, &fingerprint)) {
@@ -279,7 +280,7 @@ LogFileReaderPtr StaticFileServer::GetNextAvailableReader(const string& configNa
         }
         return reader;
     }
-    // all files have been read
+    // all files have been read (mDeletedInputs under mUpdateMux; see GetNextAvailableReader precondition)
     mDeletedInputs.emplace(configName, idx);
     return LogFileReaderPtr();
 }
@@ -346,6 +347,11 @@ void StaticFileServer::Clear() {
     mPipelineNameReadersMap.clear();
     mAddedInputs.clear();
     mDeletedInputs.clear();
+}
+
+LogFileReaderPtr StaticFileServer::TestGetNextAvailableReader(const string& configName, size_t idx) {
+    lock_guard<mutex> lock(mUpdateMux);
+    return GetNextAvailableReader(configName, idx);
 }
 #endif
 
