@@ -27,7 +27,7 @@ set -o pipefail
 # in the Docker build (docker/Dockerfile_build uses loongcollector-build-linux 2.1.17+ for packages).
 CATEGORY=$1
 GENERATED_HOME=$2
-VERSION=${3:-0.0.1}
+VERSION=${3:-3.3.5}
 REPOSITORY=${4:-aliyun/loongcollector}
 OUT_DIR=${5:-output}
 EXPORT_GO_ENVS=${6:-${DOCKER_BUILD_EXPORT_GO_ENVS:-true}}

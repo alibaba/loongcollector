@@ -5,7 +5,7 @@
 FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17 AS builder
 
 # Build arguments
-ARG VERSION=edge
+ARG VERSION=3.3.5
 ARG ENABLE_AGENTSIGHT=ON
 ARG ENABLE_COMPATIBLE_MODE=OFF
 ARG ENABLE_STATIC_LINK_CRT=OFF
@@ -61,7 +61,7 @@ ENV container=docker
 
 # Build arguments for final image
 ARG HOST_OS
-ARG VERSION=edge
+ARG VERSION=3.3.5
 ARG TARGETPLATFORM
 ARG TARGETARCH
 

@@ -15,7 +15,7 @@
 FROM sls-opensource-registry.cn-shanghai.cr.aliyuncs.com/loongcollector-community-edition/loongcollector-build-linux:2.1.17
 
 ARG HOST_OS=Linux
-ARG VERSION=0.0.1
+ARG VERSION=3.3.5
 
 USER root
 ENV container=docker
