@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/alibaba/ilogtail/pkg/models"
+	"github.com/alibaba/ilogtail/pkg/protocol"
 )
 
 func TestTransferMetricEventMultiValueRoundTrip(t *testing.T) {
@@ -119,4 +120,63 @@ func TestTransferPBToPipelineGroupEvents_Span(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "op", s.GetName())
 	assert.Equal(t, models.SpanKindServer, s.GetKind())
+}
+
+func TestTransferMetricEventSingleValueRoundTrip(t *testing.T) {
+	tags := models.NewTagsWithKeyValues("host", "node-a")
+	metric := models.NewSingleValueMetric("cpu", models.MetricTypeUntyped, tags, 1234567890, 0.5)
+
+	pbMetric, err := TransferMetricEventToPB(metric)
+	require.NoError(t, err)
+
+	restored, err := TransferPBToMetricEvent(pbMetric)
+	require.NoError(t, err)
+	assert.Equal(t, "cpu", restored.GetName())
+	assert.True(t, restored.GetValue().IsSingleValue())
+	assert.Equal(t, 0.5, restored.GetValue().GetSingleValue())
+	assert.Equal(t, "node-a", restored.GetTags().Get("host"))
+}
+
+// Group-level tags and metadata must survive the PB round trip, since the
+// self-monitor bridge relies on metadata (e.g. internal data type) downstream.
+func TestTransferPBToPipelineGroupEvents_TagsAndMetadata(t *testing.T) {
+	metric := models.NewSingleValueMetric("m", models.MetricTypeUntyped, models.NewTags(), 1, 1.0)
+	groupInfo := models.NewGroup(
+		models.NewMetadataWithKeyValues("internal.data.type", "self_monitor"),
+		models.NewTagsWithKeyValues("env", "prod"),
+	)
+	pbGroup, err := TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
+	require.NoError(t, err)
+
+	got, err := TransferPBToPipelineGroupEvents(pbGroup)
+	require.NoError(t, err)
+	assert.Equal(t, "prod", got.Group.Tags.Get("env"))
+	assert.Equal(t, "self_monitor", got.Group.Metadata.Get("internal.data.type"))
+}
+
+func TestTransferPipelineEventGroupToPB_EmptyEvents(t *testing.T) {
+	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
+	_, err := TransferPipelineEventGroupToPB(groupInfo, nil)
+	assert.Error(t, err)
+}
+
+func TestTransferPBToPipelineGroupEvents_Nil(t *testing.T) {
+	_, err := TransferPBToPipelineGroupEvents(nil)
+	assert.Error(t, err)
+}
+
+func TestTransferPBToEvent_Nil(t *testing.T) {
+	_, err := TransferPBToLogEvent(nil)
+	assert.Error(t, err)
+	_, err = TransferPBToMetricEvent(nil)
+	assert.Error(t, err)
+	_, err = TransferPBToSpanEvent(nil)
+	assert.Error(t, err)
+}
+
+func TestTransferPBToMetricEvent_UnsupportedValue(t *testing.T) {
+	// A metric event with no value set must be rejected rather than silently
+	// producing an empty metric.
+	_, err := TransferPBToMetricEvent(&protocol.MetricEvent{Name: []byte("m")})
+	assert.Error(t, err)
 }

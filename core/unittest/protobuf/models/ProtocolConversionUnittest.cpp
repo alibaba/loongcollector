@@ -90,7 +90,7 @@ TEST_F(ProtocolConversionUnittest, MetricMultiValueRoundTrip) {
     metric->SetTimestamp(20, 0);
     metric->SetName("agent");
     UntypedMultiDoubleValues values({{"cpu", {UntypedValueMetricType::MetricTypeGauge, 0.1}},
-                                      {"memory_used_mb", {UntypedValueMetricType::MetricTypeCounter, 25.0}}},
+                                     {"memory_used_mb", {UntypedValueMetricType::MetricTypeCounter, 25.0}}},
                                     nullptr);
     metric->SetValue(values);
 
@@ -105,8 +105,9 @@ TEST_F(ProtocolConversionUnittest, MetricMultiValueRoundTrip) {
     EXPECT_DOUBLE_EQ(0.1, field.Value);
     ASSERT_TRUE(out.GetValue<UntypedMultiDoubleValues>()->GetValue("memory_used_mb", field));
     EXPECT_DOUBLE_EQ(25.0, field.Value);
-    EXPECT_EQ(2U, std::distance(out.GetValue<UntypedMultiDoubleValues>()->ValuesBegin(),
-                                out.GetValue<UntypedMultiDoubleValues>()->ValuesEnd()));
+    EXPECT_EQ(2U,
+              std::distance(out.GetValue<UntypedMultiDoubleValues>()->ValuesBegin(),
+                            out.GetValue<UntypedMultiDoubleValues>()->ValuesEnd()));
 }
 
 TEST_F(ProtocolConversionUnittest, SpanEventRoundTrip) {
