@@ -986,8 +986,9 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isSta
     bool tryRollback = true;
     if (event != nullptr && event->IsReaderFlushTimeout()) {
         // If flush timeout event, we should filter whether the event is legacy.
-        if (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
-            && event->GetInode() == mDevInode.inode) {
+        if (mDrainingWholeFileCache
+            || (event->GetLastReadPos() == GetLastReadPos() && event->GetLastFilePos() == mLastFilePos
+                && event->GetInode() == mDevInode.inode)) {
             tryRollback = false;
         } else {
             return false;
@@ -1343,6 +1344,33 @@ bool LogFileReader::CheckFileSignatureAndOffset(bool isOpenOnUpdate) {
     mLogFileOp.Stat(ps);
     time_t lastMTime = mLastMTime;
     mLastMTime = ps.GetMtime();
+
+    // In WHOLE_FILE overwrite mode, the entire file should be treated as a single log entry.
+    // When the file is modified (detected via mtime change), reset read position to
+    // the beginning so the complete file content is re-read.
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+        && lastMTime != 0 && lastMTime != mLastMTime) {
+        LOG_INFO(sLogger,
+                 ("whole_file overwrite mode detected file modification, read from begin",
+                  mHostLogPath)("old mtime", lastMTime)("new mtime", mLastMTime)(
+                     "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+        mLastFilePos = 0;
+        mCache.clear();
+        mDrainingWholeFileCache = false;
+        mWholeFileChunkIndex = 0;
+        char firstLine[1025];
+        int nbytes = mLogFileOp.Pread(firstLine, 1, 1024, 0);
+        if (nbytes > 0) {
+            firstLine[nbytes] = '\0';
+            CheckAndUpdateSignature(string(firstLine), mLastFileSignatureHash, mLastFileSignatureSize);
+        }
+        if (mEOOption) {
+            updatePrimaryCheckpointSignature();
+        }
+        return true;
+    }
+
     if (!isOpenOnUpdate || mLastFileSignatureSize == 0 || endSize < mLastFilePos
         || (endSize == mLastFilePos && lastMTime != mLastMTime)) {
         char firstLine[1025];
@@ -1551,6 +1579,17 @@ size_t LogFileReader::getNextReadSize(int64_t fileEnd, bool& fromCpt) {
         readSize = checkpoint.read_length();
         LOG_INFO(sLogger, ("read specified length", readSize)("offset", mLastFilePos));
     }
+    if (mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+        && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE) {
+        allowMoreBufferSize = true;
+        if (readSize > mMultilineConfig.first->mMaxWholeFileBytes) {
+            LOG_WARNING(sLogger,
+                        ("whole_file overwrite mode file exceeds max limit, skipping",
+                         mHostLogPath)("file size", fileEnd)("max allowed", mMultilineConfig.first->mMaxWholeFileBytes)(
+                            "project", GetProject())("logstore", GetLogstore())("config", GetConfigName()));
+            return 0;
+        }
+    }
     if (readSize > BUFFER_SIZE && !allowMoreBufferSize) {
         readSize = BUFFER_SIZE;
     }
@@ -1573,8 +1612,41 @@ void LogFileReader::ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, 
     bool logTooLongSplitFlag = false;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        if (!mDrainingWholeFileCache) {
+            mDrainingWholeFileCache = true;
+            mWholeFileChunkIndex = 0;
+            mWholeFileTotalChunks = static_cast<int32_t>((mCache.size() + BUFFER_SIZE - 1) / BUFFER_SIZE);
+            mWholeFileId = mHostLogPath + "_" + ToString(mLastMTime) + "_" + ToString(mDevInode.inode);
+            mLastForceRead = true;
+        }
+        if (mCache.empty()) {
+            mDrainingWholeFileCache = false;
+            moreData = false;
+            return;
+        }
+        size_t chunkSize = std::min(mCache.size(), BUFFER_SIZE);
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(chunkSize);
+        memcpy(stringMemory.data, mCache.data(), chunkSize);
+        logBuffer.rawBuffer = StringView(stringMemory.data, chunkSize);
+        logBuffer.readLength = chunkSize;
+        logBuffer.readOffset = mLastFilePos;
+        logBuffer.wholeFileId = mWholeFileId;
+        logBuffer.wholeFileSeq = mWholeFileChunkIndex++;
+        logBuffer.wholeFileTotal = mWholeFileTotalChunks;
+        mCache.erase(0, chunkSize);
+        mLastFilePos += chunkSize;
+        moreData = !mCache.empty();
+        if (!moreData) {
+            mDrainingWholeFileCache = false;
+        }
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         nbytes = mCache.size();
         StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(nbytes);
         stringBuffer = stringMemory.data;
@@ -1731,8 +1803,41 @@ void LogFileReader::ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, b
     bool allowRollback = true;
 
     logBuffer.readOffset = mLastFilePos;
+    // WHOLE_FILE overwrite: chunked drain of large cache (continuation or initiation)
+    if (mDrainingWholeFileCache
+        || (!tryRollback && mMultilineConfig.first->mMode == MultilineOptions::Mode::WHOLE_FILE
+            && mMultilineConfig.first->mFileWriteMode == MultilineOptions::FileWriteMode::OVERWRITE
+            && mCache.size() > BUFFER_SIZE)) {
+        if (!mDrainingWholeFileCache) {
+            mDrainingWholeFileCache = true;
+            mWholeFileChunkIndex = 0;
+            mWholeFileTotalChunks = static_cast<int32_t>((mCache.size() + BUFFER_SIZE - 1) / BUFFER_SIZE);
+            mWholeFileId = mHostLogPath + "_" + ToString(mLastMTime) + "_" + ToString(mDevInode.inode);
+            mLastForceRead = true;
+        }
+        if (mCache.empty()) {
+            mDrainingWholeFileCache = false;
+            moreData = false;
+            return;
+        }
+        size_t chunkSize = std::min(mCache.size(), BUFFER_SIZE);
+        StringBuffer stringMemory = logBuffer.sourcebuffer->AllocateStringBuffer(chunkSize);
+        memcpy(stringMemory.data, mCache.data(), chunkSize);
+        logBuffer.rawBuffer = StringView(stringMemory.data, chunkSize);
+        logBuffer.readLength = chunkSize;
+        logBuffer.readOffset = mLastFilePos;
+        logBuffer.wholeFileId = mWholeFileId;
+        logBuffer.wholeFileSeq = mWholeFileChunkIndex++;
+        logBuffer.wholeFileTotal = mWholeFileTotalChunks;
+        mCache.erase(0, chunkSize);
+        mLastFilePos += chunkSize;
+        moreData = !mCache.empty();
+        if (!moreData) {
+            mDrainingWholeFileCache = false;
+        }
+        return;
+    }
     if (!mLogFileOp.IsOpen()) {
-        // read flush timeout
         readCharCount = mCache.size();
         gbkMemory.reset(new char[readCharCount + 1]);
         gbkBuffer = gbkMemory.get();
@@ -2543,6 +2648,12 @@ PipelineEventGroup LogFileReader::GenerateEventGroup(LogFileReaderPtr reader, Lo
     event->SetTimestamp(logtime);
     event->SetContentNoCopy(DEFAULT_CONTENT_KEY, logBuffer->rawBuffer);
     event->SetPosition(logBuffer->readOffset, logBuffer->readLength);
+
+    if (logBuffer->wholeFileSeq >= 0) {
+        event->SetContent("__whole_file_id__", logBuffer->wholeFileId);
+        event->SetContent("__whole_file_seq__", ToString(logBuffer->wholeFileSeq));
+        event->SetContent("__whole_file_total__", ToString(logBuffer->wholeFileTotal));
+    }
 
     return group;
 }
