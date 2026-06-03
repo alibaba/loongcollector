@@ -1379,6 +1379,7 @@ protected:
         bfs::create_directories(gRootDir);
         mReaderOpts.mInputType = FileReaderOptions::InputType::InputFile;
         mMultilineOpts.mMode = MultilineOptions::Mode::WHOLE_FILE;
+        mMultilineOpts.mFileWriteMode = MultilineOptions::FileWriteMode::OVERWRITE;
     }
     void TearDown() override { bfs::remove_all(gRootDir); }
 
@@ -1564,6 +1565,8 @@ class WholeFileOverwriteLargeUnittest : public ::testing::Test {
 public:
     void TestLargeFileChunkedDrain();
     void TestOverwriteDuringAccumulation();
+    void TestChunkLineAlignment();
+    void TestChunkCharAlignment();
     void TestAppendModeNoReset();
 
 protected:
@@ -1656,8 +1659,8 @@ void WholeFileOverwriteLargeUnittest::TestLargeFileChunkedDrain() {
     APSARA_TEST_TRUE_FATAL(totalChunks > 1); // must have been split
     APSARA_TEST_EQUAL_FATAL(reconstructed, content);
     // All chunks should report the same total
-    APSARA_TEST_EQUAL_FATAL(totalChunks,
-                            static_cast<int>((content.size() + LogFileReader::BUFFER_SIZE - 1) / LogFileReader::BUFFER_SIZE));
+    APSARA_TEST_EQUAL_FATAL(
+        totalChunks, static_cast<int>((content.size() + LogFileReader::BUFFER_SIZE - 1) / LogFileReader::BUFFER_SIZE));
 }
 
 void WholeFileOverwriteLargeUnittest::TestOverwriteDuringAccumulation() {
@@ -1724,6 +1727,103 @@ void WholeFileOverwriteLargeUnittest::TestOverwriteDuringAccumulation() {
     APSARA_TEST_EQUAL_FATAL(reconstructed, content2);
 }
 
+void WholeFileOverwriteLargeUnittest::TestChunkLineAlignment() {
+    // Multi-line content larger than BUFFER_SIZE: every non-final chunk must end on a line boundary
+    // so each chunk shown downstream (no reassembly) contains only whole lines.
+    std::string content;
+    content.reserve(600 * 1024);
+    int lineNo = 0;
+    while (content.size() < 600UL * 1024) {
+        std::string line = "this is log line number " + ToString(lineNo++) + " with some padding text here\n";
+        content += line;
+    }
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    std::vector<std::string> chunks;
+    bool moreData = true;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            chunks.emplace_back(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(chunks.size() > 1); // must have been split
+    std::string reconstructed;
+    for (size_t i = 0; i < chunks.size(); ++i) {
+        reconstructed += chunks[i];
+        if (i + 1 < chunks.size()) {
+            // every non-final chunk ends on a complete line
+            APSARA_TEST_EQUAL_FATAL(chunks[i].back(), '\n');
+            APSARA_TEST_TRUE_FATAL(chunks[i].size() <= LogFileReader::BUFFER_SIZE);
+        }
+    }
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+}
+
+void WholeFileOverwriteLargeUnittest::TestChunkCharAlignment() {
+    // A single huge line of multibyte UTF-8 characters (no newline) must never be split inside a
+    // character: every chunk length stays a multiple of the 3-byte character width.
+    const std::string ch = "\xE4\xB8\xAD"; // "中", 3 bytes
+    std::string content;
+    content.reserve(600 * 1024);
+    while (content.size() < 600UL * 1024) {
+        content += ch;
+    }
+    APSARA_TEST_TRUE_FATAL(content.size() % 3 == 0);
+    APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content));
+
+    LogFileReader reader(gRootDir,
+                         gLogName,
+                         DevInode(),
+                         std::make_pair(&mReaderOpts, &mCtx),
+                         std::make_pair(&mMultilineOpts, &mCtx),
+                         std::make_pair(&mTagOpts, &mCtx));
+    reader.UpdateReaderManual();
+    reader.InitReader(true, LogFileReader::BACKWARD_TO_BEGINNING);
+    APSARA_TEST_TRUE_FATAL(reader.CheckFileSignatureAndOffset(true));
+
+    {
+        Event event(gRootDir, "", EVENT_MODIFY, 0);
+        LogBuffer logbuf;
+        reader.ReadLog(logbuf, &event);
+    }
+
+    std::string reconstructed;
+    bool moreData = true;
+    int totalChunks = 0;
+    while (moreData) {
+        auto pEvent = reader.CreateFlushTimeoutEvent();
+        LogBuffer logbuf;
+        moreData = reader.ReadLog(logbuf, pEvent.get());
+        if (!logbuf.rawBuffer.empty()) {
+            // chunk boundary never splits a 3-byte character
+            APSARA_TEST_EQUAL_FATAL(logbuf.rawBuffer.size() % 3, 0UL);
+            reconstructed.append(logbuf.rawBuffer.data(), logbuf.rawBuffer.size());
+            totalChunks++;
+        }
+    }
+    APSARA_TEST_TRUE_FATAL(totalChunks > 1);
+    APSARA_TEST_EQUAL_FATAL(reconstructed, content);
+}
+
 void WholeFileOverwriteLargeUnittest::TestAppendModeNoReset() {
     // Test that append mode does NOT reset position on mtime change
     FileReaderOptions appendOpts;
@@ -1775,6 +1875,8 @@ void WholeFileOverwriteLargeUnittest::TestAppendModeNoReset() {
 
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestLargeFileChunkedDrain);
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestOverwriteDuringAccumulation);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkLineAlignment);
+UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestChunkCharAlignment);
 UNIT_TEST_CASE(WholeFileOverwriteLargeUnittest, TestAppendModeNoReset);
 
 } // namespace logtail
