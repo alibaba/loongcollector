@@ -128,8 +128,12 @@ func ScenarioInitializer(ctx *godog.ScenarioContext) {
 		cleanup.HandleSignal()
 		return ctx, nil
 	})
-	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
+	ctx.After(func(ctx context.Context, sc *godog.Scenario, stepErr error) (context.Context, error) {
+		ctx, agentErr := verify.AgentNotCrash(ctx)
 		cleanup.All()
-		return verify.AgentNotCrash(ctx)
+		if stepErr != nil {
+			return ctx, stepErr
+		}
+		return ctx, agentErr
 	})
 }

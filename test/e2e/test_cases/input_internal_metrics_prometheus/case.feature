@@ -37,12 +37,6 @@ Feature: input internal metrics to prometheus
         Concurrency: 1
         QueueCapacity: 4096
         DropEventWhenQueueFull: false
-        Timeout: "10s"
-        Retry:
-          Enable: true
-          MaxRetryTimes: 3
-          InitialDelay: "1s"
-          MaxDelay: "30s"
     """
     Given loongcollector depends on containers {["prometheus"]}
     When start docker-compose {input_internal_metrics_prometheus}

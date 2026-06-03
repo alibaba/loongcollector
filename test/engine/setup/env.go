@@ -15,6 +15,7 @@ package setup
 
 import (
 	"context"
+	"strings"
 
 	"github.com/alibaba/ilogtail/test/config"
 )
@@ -38,6 +39,10 @@ func InitEnv(ctx context.Context, envType string) (context.Context, error) {
 	case "deployment":
 		Env = NewDeploymentEnv()
 	}
+	// PID is captured after compose start in StartDockerComposeEnv; avoid host stray processes here.
+	if envType == "docker-compose" {
+		return ctx, nil
+	}
 	return SetAgentPID(ctx)
 }
 
@@ -56,7 +61,7 @@ func SetAgentPID(ctx context.Context) (context.Context, error) {
 		}
 		return ctx, err
 	}
-	return context.WithValue(ctx, config.AgentPIDKey, result), nil
+	return context.WithValue(ctx, config.AgentPIDKey, strings.TrimSpace(result)), nil
 }
 
 func RunCommandOnSource(ctx context.Context, command string) (context.Context, error) {

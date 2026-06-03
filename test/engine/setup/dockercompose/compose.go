@@ -91,6 +91,7 @@ func NewComposeBooter() *ComposeBooter {
 }
 
 func (c *ComposeBooter) Start(ctx context.Context) (err error) {
+	ensureComposeBuildEnv()
 	if err = c.createComposeFile(ctx); err != nil {
 		return err
 	}
@@ -135,6 +136,9 @@ func (c *ComposeBooter) Start(ctx context.Context) (err error) {
 		),
 	})
 	if len(list) != 1 {
+		if err == nil {
+			err = fmt.Errorf("loongcollector container count is %d, want 1", len(list))
+		}
 		logger.Errorf(context.Background(), selfmonitor.LoongcollectorComposeAlarm, "loongcollector container size is not equal 1, got %d count", len(list))
 		return err
 	}

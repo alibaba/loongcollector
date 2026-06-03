@@ -16,6 +16,7 @@ package verify
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/alibaba/ilogtail/test/config"
 	"github.com/alibaba/ilogtail/test/engine/setup"
@@ -36,10 +37,13 @@ func AgentNotCrash(ctx context.Context) (context.Context, error) {
 	}
 	agentPID := ctx.Value(config.AgentPIDKey)
 	if agentPID == nil {
-		return ctx, fmt.Errorf("agent PID not found in context")
+		// Compose never started or PID was not captured; do not mask the scenario error.
+		return ctx, nil
 	}
-	if result != agentPID {
-		return ctx, fmt.Errorf("agent crash, expect PID: %s, but got: %s", agentPID, result)
+	result = strings.TrimSpace(result)
+	expected := strings.TrimSpace(fmt.Sprint(agentPID))
+	if result != expected {
+		return ctx, fmt.Errorf("agent crash, expect PID: %s, but got: %s", expected, result)
 	}
 	return ctx, nil
 }

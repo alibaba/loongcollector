@@ -396,6 +396,7 @@ bool LogtailPlugin::LoadPluginBase() {
             LOG_ERROR(sLogger, ("load GetDiffContainerMetaFun error, Message", error));
             return mPluginValid;
         }
+        // C++传递数据到golang插件
         mProcessPipelineEventGroupFun
             = (ProcessPipelineEventGroupFun)loader.LoadMethod("ProcessPipelineEventGroup", error);
         if (!error.empty()) {

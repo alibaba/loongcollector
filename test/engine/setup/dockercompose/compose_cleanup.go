@@ -27,7 +27,16 @@ import (
 
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/selfmonitor"
+	"github.com/alibaba/ilogtail/test/config"
 )
+
+// ensureComposeBuildEnv disables buildkit for compose sidecar builds (bash:latest etc.).
+// Matches CI/local reliability; avoids buildx "multi-arch-builder" pulling from docker.io during tests.
+func ensureComposeBuildEnv() {
+	// Always disable buildkit for E2E compose sidecars (bash:latest, etc.).
+	_ = os.Setenv("DOCKER_BUILDKIT", "0")
+	_ = os.Setenv("COMPOSE_DOCKER_CLI_BUILD", "0")
+}
 
 // ComposeProjectName returns the hashed docker-compose project name for a test case directory.
 func ComposeProjectName(caseHome string) string {
@@ -44,6 +53,7 @@ func ComposeProjectName(caseHome string) string {
 
 // ComposeDown stops and removes containers for the given case compose file.
 func ComposeDown(caseHome string) error {
+	ensureComposeBuildEnv()
 	if caseHome == "" {
 		return nil
 	}
@@ -64,13 +74,25 @@ func ComposeDown(caseHome string) error {
 	return nil
 }
 
-// RemoveLeftoverE2EContainers force-removes E2E containers that did not exit cleanly.
+// RemoveLeftoverE2EContainers force-removes E2E containers for the current or given case project.
 func RemoveLeftoverE2EContainers() error {
+	caseHome := config.CaseHome
+	if caseHome == "" {
+		return removeContainersByNameFilters("loongcollectorC")
+	}
+	projectName := ComposeProjectName(caseHome)
+	if projectName == "" {
+		return removeContainersByNameFilters("loongcollectorC")
+	}
+	return removeContainersByNameFilters(projectName)
+}
+
+func removeContainersByNameFilters(filters ...string) error {
 	if _, err := exec.LookPath("docker"); err != nil {
 		return nil
 	}
 	var joined error
-	for _, nameFilter := range []string{"loongcollectorC", "-container-"} {
+	for _, nameFilter := range filters {
 		out, err := exec.Command("docker", "ps", "-aq", "--filter", "name="+nameFilter).CombinedOutput()
 		if err != nil {
 			joined = errors.Join(joined, err)
