@@ -4,7 +4,7 @@ description: LoongCollector E2E 测试全流程指南：设计、编写、运行
 ---
 # LoongCollector E2E 测试指南
 
-> 详细步骤模板见 [reference.md](reference.md) | 可复用脚本见 [scripts/](scripts/)
+> 步骤模板见 [reference.md](reference.md)。手动清理可选 [scripts/e2e-cleanup.sh](scripts/e2e-cleanup.sh)。
 
 ## 目录
 
@@ -19,46 +19,36 @@ description: LoongCollector E2E 测试全流程指南：设计、编写、运行
 
 ## 1 概览
 
-基于 **BDD Godog** 框架，通过 `.feature` 文件描述场景，引擎正则匹配步骤函数并传参。
+基于 **BDD Godog**，`.feature` 描述场景，`test/engine/steps.go` 为步骤权威来源。
 
 ```
-test/e2e/
-  test_cases/<case_name>/
-    case.feature              # 场景描述
-    docker-compose.yaml       # 可选，外部依赖服务
-  engine/
-    steps.go                  # 所有可用步骤（权威来源）
-    setup/ control/ trigger/ verify/ cleanup/
+test/e2e/test_cases/<case_name>/case.feature
+test/engine/          # setup / control / verify / cleanup
 ```
 
-**环境 tag**：`@host`、`@k8s`、`@docker-compose`（三选一，加 `@e2e`）
+**环境 tag**：`@e2e` + `@docker-compose`（或 `@host` / `@k8s`）
+
+**CI**：`.github/workflows/e2e.yaml` — 矩阵 job 每个 `TEST_CASE` 单独跑；镜像由 `Dockerfile_edge_linux` 构建后 `docker load`；环境变量 `DOCKER_BUILDKIT=0`、`COMPOSE_DOCKER_CLI_BUILD=0`。
+
+**测试框架**（`test/engine/setup/dockercompose/`）：compose 侧车构建禁用 BuildKit；场景结束后先校验 agent PID 再 `cleanup.All()`；失败时 `TryCopyCoreLogs` 导出到 `test/e2e/report/<case>_log/`。
 
 ---
 
 ## 2 设计测试用例
 
-编写 feature 文件前，先确定测试矩阵。按以下维度逐项评估是否需要覆盖：
+### 2.1 场景维度
 
-### 2.1 场景维度清单
-
-| 维度 | 典型场景 | 何时需要 |
-|------|----------|----------|
-| **基础功能** | 单配置、单数据类型端到端 | 必须 |
-| **多数据类型** | logs / metrics / traces 分别验证 | 插件支持多类型时 |
-| **多配置共存** | 同时加载多个 pipeline 配置 | 涉及端口/资源竞争时 |
-| **配置热加载** | 运行中增/删/改配置 | 持续运行的 input 插件 |
-| **配置类型变更** | 从 A 类型切换到 B 类型 | 插件支持多协议/格式时 |
-| **反压与恢复** | 下游不可达 → 恢复后数据不丢 | flusher 插件 |
-| **外部依赖失效** | 依赖服务重启/不可达 | 有外部依赖时 |
-| **大数据量** | 高吞吐压力下不 OOM/不丢数据 | 性能敏感路径 |
+| 维度 | 何时需要 |
+|------|----------|
+| 基础端到端 | 必须 |
+| logs / metrics / traces 分类型 | 插件支持多类型时 |
+| 多配置 / 热加载 | 端口竞争或持续 input 时 |
+| 反压与恢复 | flusher 类 |
+| 外部依赖失效 | 有 kafka、DB 等侧车时 |
 
 ### 2.2 设计产出
 
-确定要覆盖的场景后，明确每个 Scenario 的：
-- **输入**：什么数据、什么格式、多少条
-- **流经路径**：input → processor → flusher 的具体插件
-- **预期输出**：在哪里验证、验证什么
-- **外部依赖**：需要什么辅助服务（OTel Collector、Kafka 等）
+明确：输入数据、插件链路（input → processor → flusher）、验证点（subscriber / grpc / prometheus 等）、`docker-compose.yaml` 依赖。
 
 ---
 
@@ -69,141 +59,158 @@ test/e2e/
 ```
 test/e2e/test_cases/my_feature/
 ├── case.feature
-├── docker-compose.yaml       # 外部依赖
-└── otel-collector-config.yaml  # 如果用 OTel Collector
+└── docker-compose.yaml   # 可选
 ```
 
-### 3.2 Feature 文件模板
+### 3.2 模板（节选）
 
 ```gherkin
-@flusher
-Feature: my feature name
-  Brief description
-
   @e2e @docker-compose
-  Scenario: TestMyFeatureLogs
+  Scenario: TestMyFeatureBasic
     Given {docker-compose} environment
-    Given {my-config} local config as below
+    Given subcribe data from {grpc} with config
+    """
+    """
+    Given {my-case} local config as below
     """
     enable: true
     inputs:
       - Type: input_forward
-        Protocol: OTLP
-        Endpoint: "0.0.0.0:4320"
+        ...
     flushers:
-      - Type: flusher_otlp_native
-        Endpoint: "otel-collector:4317"
+      - Type: flusher_grpc
+        Address: "host.docker.internal:9000"
     """
     When start docker-compose {my_feature}
-    Then wait {10} seconds
-    When generate {1} OTLP {logs} via otelgen to endpoint {loongcollectorC:4320}, protocol {grpc}
-    Then wait {5} seconds
-    Then otlp collector received at least {1} logs from file {/tmp/otel-export/logs.json}
+    Then there is at least {1} logs
 ```
 
 ### 3.3 强制规则
 
-- 配置中必须含 `enable: true`
-- **只使用** `test/engine/steps.go` 中已注册的步骤
-- `wait {N} seconds` 是 **Then** 类型，不是 When
-- 命名格式：`Test${功能名}${场景描述}`
-- **不要**在持续运行插件的配置中使用 `global.ExcutionTimeout`（见 §6.1）
+- 配置含 `enable: true`
+- **仅使用** `test/engine/steps.go` 已注册步骤
+- `wait {N} seconds` 为 **Then**，不是 When
+- Scenario 名：`Test${功能名}${场景描述}`
+- 持续采集插件不要用 `global.ExcutionTimeout`（见 §6.1）
+- `flusher_prometheus` 的 `Retry.*Delay` 等为 **duration 类型**，YAML 里勿写 `"1s"` 字符串（会 JSON 反序列化失败）
 
-### 3.4 扩展步骤
+### 3.4 v1 / v2 与 flusher
 
-如需新步骤，参考 [reference.md §扩展步骤](reference.md) 中的开发和注册流程。
+| 配置 | 说明 |
+|------|------|
+| 默认 v1 + `flusher_grpc` / `flusher_http` | C++ `ProcessPipelineEventGroup` → Go 转 `LogGroup` → `ReceiveLogGroup` |
+| `StructureType: v2` + `flusher_prometheus` | Metric 走 `ReceivePipelineEventGroup`；**不能** v2 + `flusher_grpc`（未实现 FlusherV2） |
 
 ---
 
 ## 4 本地运行
 
-### 4.1 前置条件
+### 4.1 镜像
+
+**与 CI 一致（完整构建，慢）：**
 
 ```bash
-docker --version && docker compose version
+make e2edocker    # 产出 aliyun/loongcollector:0.0.1
 ```
 
-如修改了 C++ 代码，需重新编译并更新镜像。两种方式：
+**增量更新镜像（C++/Go 改过后常用）：**
 
-**方式一：完整构建**（慢，但保证一致）
 ```bash
-make e2e_image   # 从源码构建完整 Docker 镜像 aliyun/loongcollector:0.0.1
-```
-
-**方式二：增量更新**（快，适合迭代调试）
-```bash
-cd build && make -sj$(nproc) && cd ..
-# 替换镜像中的二进制
+# 示例：仅替换二进制与 Go 插件（路径按本机 build 输出调整）
 docker create --name tmp-lc aliyun/loongcollector:0.0.1
-docker cp build/loongcollector tmp-lc:/usr/local/loongcollector/loongcollector
+docker cp core/build/loongcollector tmp-lc:/usr/local/loongcollector/loongcollector
+docker cp output/libGoPluginBase.so tmp-lc:/usr/local/loongcollector/libGoPluginBase.so
 docker commit tmp-lc aliyun/loongcollector:0.0.1
 docker rm tmp-lc
 ```
 
-### 4.2 运行
+### 4.2 运行（与 GitHub matrix 一致）
+
+仓库根目录：
 
 ```bash
-cd test/e2e
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
 
-# 运行整个测试用例（所有 Scenario）
-TEST_CASE=flusher_otlp_native go test -v -run "TestE2EOnDockerCompose$" \
-  -timeout 600s -count=1 ./...
-
-# 只运行指定 Scenario
-TEST_CASE=flusher_otlp_native go test -v \
-  -run "TestE2EOnDockerCompose/TestFlusherOTLPNativeLogs$" \
-  -timeout 600s -count=1 ./...
+# 单用例（推荐，与 CI 相同）
+TEST_CASE=input_static_file ./scripts/e2e.sh e2e
 ```
 
-### 4.3 清理（测试失败后必做）
-
-可以直接运行脚本 `bash .cursor/skills/e2e/scripts/e2e-cleanup.sh`，或手动执行：
+或直接 `go test`（可自定义超时）：
 
 ```bash
-docker rm -f $(docker ps -aq) 2>/dev/null
-docker network prune -f
-rm -rf test/e2e/config test/e2e/onetime_pipeline_config
-sudo rm -rf test/e2e/report
-rm -f test/e2e/test_cases/<case>/testcase-compose.yaml
+cd test
+export DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0
+TEST_CASE=input_static_file go test -v -timeout 15m \
+  -run '^TestE2EOnDockerCompose$' github.com/alibaba/ilogtail/test/e2e
+
+# 单个 Scenario
+TEST_CASE=flusher_http go test -v -timeout 15m \
+  -run '^TestE2EOnDockerCompose/TestFlusherHTTP$' github.com/alibaba/ilogtail/test/e2e
 ```
+
+**全量 42 场景**（本地串跑，非 CI 方式）：
+
+```bash
+cd test
+go test -v -timeout 90m -run '^TestE2EOnDockerCompose$' github.com/alibaba/ilogtail/test/e2e
+```
+
+`./scripts/e2e.sh e2e` 未设 `TEST_CASE` 时会跑 `test/e2e` 下全部 feature，默认 **30m** 超时，全量可能不够。
+
+`make e2e` 等价 `clean e2edocker` + `./scripts/e2e.sh e2e`（会完整重建镜像，很慢）。
+
+### 4.3 清理
+
+- 正常退出：引擎 `cleanup.All()` + compose `ShutDown` 会 down 项目并清理残留 `loongcollectorC`。
+- 异常退出或端口占用：可执行 skill 附带脚本（**不会**删除宿主机上无关容器）：
+
+```bash
+bash .claude/skills/e2e/scripts/e2e-cleanup.sh
+bash .claude/skills/e2e/scripts/e2e-cleanup.sh input_static_file
+```
+
+勿将 `test/e2e/test_cases/**/a.log`、`reader_log_rotate/volume/simple.log` 等**跑测产物**提交进仓库。
 
 ---
 
 ## 5 调试
 
 ```bash
-# 1. 查看容器日志
-docker ps | grep loongcollectorC
+# 框架导出的日志（compose 启动失败或场景结束时会尝试复制）
+ls test/e2e/report/<TEST_CASE>_log/
+
+# 容器内实时查看
+docker ps -a --filter name=loongcollectorC
 docker exec <id> cat /usr/local/loongcollector/log/loongcollector.LOG
+docker exec <id> cat /usr/local/loongcollector/log/go_plugin.LOG
 
-# 2. 检查配置是否加载
+# 配置是否加载
 docker exec <id> ls /usr/local/loongcollector/conf/continuous_pipeline_config/local/
-
-# 3. 检查端口是否监听
-docker exec <id> ss -tlnp | grep <port>
-
-# 4. 手动复现 compose 环境
-cd test/e2e/test_cases/<case>
-docker compose -f testcase-compose.yaml up -d
-docker compose -f testcase-compose.yaml logs -f loongcollectorC
 ```
+
+常见失败：
+
+| 现象 | 方向 |
+|------|------|
+| `agent crash` / `agent PID not found` | 确认已合入 test/engine After 钩子与 PID 采集修复；compose 未启动时看 **When** 步骤原始错误 |
+| `compose exited abnormally` + buildx | 确认 `DOCKER_BUILDKIT=0`；侧车 `FROM bash` 需能 `docker pull bash` |
+| `plugin does not implement FlusherV2` | 勿对 `flusher_grpc` 单独设 `StructureType: v2` |
+| `cannot unmarshal string ... time.Duration` | 检查 flusher HTTP/Prometheus 的 Retry/Timeout 配置格式 |
+| 0 条日志 | `go_plugin.LOG` 中 CONFIG_LOAD_ALARM；镜像是否含 `ProcessPipelineEventGroup` |
 
 ---
 
 ## 6 已知陷阱
 
-### 6.1 ExcutionTimeout 使配置变为一次性
+### 6.1 ExcutionTimeout
 
-**绝对不要**在 `input_forward`、`input_file` 等持续插件的配置中使用 `global.ExcutionTimeout`。
+**不要**在 `input_file`、`input_forward` 等持续插件配置里写 `global.ExcutionTimeout`，否则被当作 onetime 配置，易出现 `unsupported input plugin`。详见 `.cursor/rules/project-knowledge/config-pitfalls.mdc`。
 
-它会使 `IsOnetime()` 返回 true，导致 `IsValidNativeInputPlugin(name, true)` 在 onetime 注册表中查找，而大部分 input 只注册了 continuous，结果报 `unsupported input plugin`。
+### 6.2 default_flusher.json
 
-详见 `.cursor/rules/project-knowledge/config-pitfalls.mdc`。
+`report/<case>default_flusher.json` 须为**文件**；宿主机路径不存在时 Docker 可能建成目录。`BootController.Start()` 会尝试自动修复。
 
-### 6.2 FlusherFile 必须是文件
+### 6.3 测试数据勿污染 git
 
-e2e 模板将 `report/<case>default_flusher.json` bind-mount 到容器。若宿主机路径不存在，Docker 会创建为**目录**。已在 `BootController.Start()` 中自动处理。
-
-### 6.3 测试间残留
-
-多 Scenario 共享进程，`Clean()` 会删除 config/report。异常退出后手动清理（§4.3）。
+跑测会改写 `a.log`、`volume/simple.log` 等；提交前 `git checkout -- test/e2e/test_cases/...` 恢复。
