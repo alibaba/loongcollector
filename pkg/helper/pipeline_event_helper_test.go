@@ -174,6 +174,57 @@ func TestTransferPBToEvent_Nil(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestTransferPBLogEventToLegacyLog(t *testing.T) {
+	ts := uint64(1_700_000_000*1e9 + 123)
+	pbLog := &protocol.LogEvent{
+		Timestamp: ts,
+		Contents: []*protocol.LogEvent_Content{
+			{Key: []byte("content"), Value: []byte("hello")},
+			{Key: []byte("k"), Value: []byte("v")},
+		},
+	}
+	legacy, err := TransferPBLogEventToLegacyLog(pbLog)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(1_700_000_000), legacy.Time)
+	require.NotNil(t, legacy.TimeNs)
+	assert.Equal(t, uint32(123), *legacy.TimeNs)
+	assert.Len(t, legacy.Contents, 2)
+	assert.Equal(t, "hello", legacy.Contents[0].Value)
+}
+
+func TestTransferPBToLogGroupForV1_Logs(t *testing.T) {
+	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
+	groupInfo.Tags.Add("host", "h1")
+	log := models.NewLog("", []byte("body"), "", "", "", models.NewTags(), 1_000_000_000)
+	pbGroup, err := TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+	require.NoError(t, err)
+
+	lg, discarded, err := TransferPBToLogGroupForV1(pbGroup)
+	require.NoError(t, err)
+	assert.False(t, discarded)
+	require.NotNil(t, lg)
+	assert.Len(t, lg.Logs, 1)
+	assert.Len(t, lg.LogTags, 1)
+	assert.Equal(t, "h1", lg.LogTags[0].Value)
+}
+
+func TestTransferPBToLogGroupForV1_DiscardMetricAndSpan(t *testing.T) {
+	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
+	metric := models.NewSingleValueMetric("m", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	pbMetric, err := TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
+	require.NoError(t, err)
+	_, discarded, err := TransferPBToLogGroupForV1(pbMetric)
+	require.NoError(t, err)
+	assert.True(t, discarded)
+
+	span := models.NewSpan("s", "tid", "sid", models.SpanKindServer, 1, 2, models.NewTags(), nil, nil)
+	pbSpan, err := TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{span})
+	require.NoError(t, err)
+	_, discarded, err = TransferPBToLogGroupForV1(pbSpan)
+	require.NoError(t, err)
+	assert.True(t, discarded)
+}
+
 func TestTransferPBToMetricEvent_UnsupportedValue(t *testing.T) {
 	// A metric event with no value set must be rejected rather than silently
 	// producing an empty metric.

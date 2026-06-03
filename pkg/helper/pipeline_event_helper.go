@@ -186,6 +186,61 @@ func TransferPBToMetricEvent(src *protocol.MetricEvent) (*models.Metric, error) 
 	}
 }
 
+// TransferPBLogEventToLegacyLog converts PipelineEventGroup LogEvent to sls_logs.Log for v1 plugin runner.
+func TransferPBLogEventToLegacyLog(src *protocol.LogEvent) (*protocol.Log, error) {
+	if src == nil {
+		return nil, fmt.Errorf("nil log event")
+	}
+	log := &protocol.Log{
+		Contents: make([]*protocol.Log_Content, 0, len(src.Contents)),
+	}
+	ts := src.Timestamp
+	log.Time = uint32(ts / 1e9)
+	if ns := uint32(ts % 1e9); ns != 0 {
+		log.TimeNs = &ns
+	}
+	for _, content := range src.Contents {
+		log.Contents = append(log.Contents, &protocol.Log_Content{
+			Key:   string(content.Key),
+			Value: string(content.Value),
+		})
+	}
+	return log, nil
+}
+
+// TransferPBToLogGroupForV1 converts a logs PipelineEventGroup to legacy LogGroup for v1 plugin runner.
+// Metric and Span groups are not supported on v1: discarded is true and logGroup is nil.
+func TransferPBToLogGroupForV1(src *protocol.PipelineEventGroup) (logGroup *protocol.LogGroup, discarded bool, err error) {
+	if src == nil {
+		return nil, false, fmt.Errorf("nil pipeline event group")
+	}
+	if src.GetMetrics() != nil || src.GetSpans() != nil {
+		return nil, true, nil
+	}
+	logEventsWrapper := src.GetLogs()
+	if logEventsWrapper == nil {
+		return nil, true, nil
+	}
+	logGroup = &protocol.LogGroup{
+		Logs:    make([]*protocol.Log, 0, len(logEventsWrapper.Events)),
+		LogTags: make([]*protocol.LogTag, 0, len(src.Tags)),
+	}
+	for k, v := range src.Tags {
+		logGroup.LogTags = append(logGroup.LogTags, &protocol.LogTag{
+			Key:   k,
+			Value: string(v),
+		})
+	}
+	for _, logEvent := range logEventsWrapper.Events {
+		log, convErr := TransferPBLogEventToLegacyLog(logEvent)
+		if convErr != nil {
+			return nil, false, convErr
+		}
+		logGroup.Logs = append(logGroup.Logs, log)
+	}
+	return logGroup, false, nil
+}
+
 func TransferPBToPipelineGroupEvents(src *protocol.PipelineEventGroup) (*models.PipelineGroupEvents, error) {
 	if src == nil {
 		return nil, fmt.Errorf("nil pipeline event group")

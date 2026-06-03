@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	queryPIDCommand = "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
+	queryPIDCommand = "ps -e | grep '[l]oongcollector' | awk '{print $1}' | head -1"
 )
 
 func AgentNotCrash(ctx context.Context) (context.Context, error) {

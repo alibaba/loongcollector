@@ -473,15 +473,13 @@ func (p *pluginv2Runner) ReceivePipelineEventGroup(pbGroup *protocol.PipelineEve
 		logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "transfer pipeline event group failed, err: %s", err.Error())
 		return
 	}
-	if ctx != nil {
-		for k, v := range ctx {
-			value, ok := v.(string)
-			if !ok {
-				logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
-				continue
-			}
-			groupEvents.Group.Metadata.Add(k, value)
+	for k, v := range ctx {
+		value, ok := v.(string)
+		if !ok {
+			logger.Warningf(p.LogstoreConfig.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "unknown values found in context, type is %T", v)
+			continue
 		}
+		groupEvents.Group.Metadata.Add(k, value)
 	}
 	p.InputPipeContext.Collector().Collect(groupEvents.Group, groupEvents.Events...)
 }

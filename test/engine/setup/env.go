@@ -48,7 +48,7 @@ func Mkdir(ctx context.Context, dir string) (context.Context, error) {
 }
 
 func SetAgentPID(ctx context.Context) (context.Context, error) {
-	command := "ps -e | grep loongcollector | grep -v grep | awk '{print $1}'"
+	command := "ps -e | grep '[l]oongcollector' | awk '{print $1}' | head -1"
 	result, err := Env.ExecOnLoongCollector(command)
 	if err != nil {
 		if err.Error() == "not implemented" {

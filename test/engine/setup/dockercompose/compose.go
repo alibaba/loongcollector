@@ -16,7 +16,6 @@ package dockercompose
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -91,14 +90,16 @@ func NewComposeBooter() *ComposeBooter {
 	return &ComposeBooter{}
 }
 
-func (c *ComposeBooter) Start(ctx context.Context) error {
-	if err := c.createComposeFile(ctx); err != nil {
+func (c *ComposeBooter) Start(ctx context.Context) (err error) {
+	if err = c.createComposeFile(ctx); err != nil {
 		return err
 	}
-	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
-	hasher := sha256.New()
-	hasher.Write([]byte(projectName))
-	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
+	defer func() {
+		if err != nil {
+			_ = c.Stop()
+		}
+	}()
+	projectName := ComposeProjectName(config.CaseHome)
 	compose := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).WithCommand([]string{"up", "-d", "--build"})
 	strategyWrappers := withExposedService(compose)
 	// retry 3 times
@@ -109,6 +110,8 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 		}
 		logger.Error(context.Background(), selfmonitor.StartDockerComposeError, "stdout", execError.Error.Error())
 		if i == 2 {
+			_ = ComposeDown(config.CaseHome)
+			_ = RemoveLeftoverE2EContainers()
 			return execError.Error
 		}
 		execError = composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
@@ -117,13 +120,15 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 			return execError.Error
 		}
 	}
-	cli, err := CreateDockerClient()
+	var cli *client.Client
+	cli, err = CreateDockerClient()
 	if err != nil {
 		return err
 	}
 	c.cli = cli
 
-	list, err := cli.ContainerList(context.Background(), containertypes.ListOptions{
+	var list []containertypes.Summary
+	list, err = cli.ContainerList(context.Background(), containertypes.ListOptions{
 		Filters: filters.NewArgs(
 			filters.Arg("name", fmt.Sprintf("%s_loongcollectorC*", projectName)),
 			filters.Arg("name", fmt.Sprintf("%s-loongcollectorC*", projectName)),
@@ -151,17 +156,11 @@ func (c *ComposeBooter) Start(ctx context.Context) error {
 }
 
 func (c *ComposeBooter) Stop() error {
-	projectName := strings.Split(config.CaseHome, "/")[len(strings.Split(config.CaseHome, "/"))-2]
-	hasher := sha256.New()
-	hasher.Write([]byte(projectName))
-	projectName = fmt.Sprintf("%x", hasher.Sum(nil))
-	execError := composeModule.NewLocalDockerCompose([]string{config.CaseHome + finalFileName}, projectName).Down()
-	if execError.Error != nil {
-		logger.Error(context.Background(), selfmonitor.StopDockerComposeError, "stdout", execError.Stdout.Error(), "stderr", execError.Stderr.Error())
-		return execError.Error
+	if err := ComposeDown(config.CaseHome); err != nil {
+		return err
 	}
-	_ = os.Remove(config.CaseHome + finalFileName)
-	return nil
+	c.logtailID = ""
+	return RemoveLeftoverE2EContainers()
 }
 
 func (c *ComposeBooter) exec(id string, cmd []string) error {

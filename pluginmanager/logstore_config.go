@@ -25,6 +25,7 @@ import (
 	"sync/atomic"
 
 	"github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
 	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
@@ -247,8 +248,27 @@ func (lc *LogstoreConfig) ProcessPipelineEventGroup(pbBytes []byte, packID strin
 		runner.ReceivePipelineEventGroup(pbGroup, map[string]interface{}{ctxKeySource: packID})
 		return 0
 	}
-	logger.Warning(lc.Context.GetRuntimeContext(), selfmonitor.ReceiveLogGroupAlarm, "pipeline event group requires v2 plugin runner", lc.ConfigName)
-	return -1
+	logGroup, discarded, err := helper.TransferPBToLogGroupForV1(pbGroup)
+	if err != nil {
+		logger.Error(lc.Context.GetRuntimeContext(), selfmonitor.WrongProtobufAlarm,
+			"cannot convert pipeline event group for v1 runner", err, "config", lc.ConfigName)
+		return -1
+	}
+	if discarded {
+		return 0
+	}
+	if logGroup == nil || len(logGroup.Logs) == 0 {
+		return 0
+	}
+	ctx := map[string]interface{}{ctxKeySource: packID}
+	for k, v := range pbGroup.Metadata {
+		ctx[k] = string(v)
+	}
+	lc.PluginRunner.ReceiveLogGroup(pipeline.LogGroupWithContext{
+		LogGroup: logGroup,
+		Context:  ctx,
+	})
+	return 0
 }
 
 func hasDockerStdoutInput(plugins map[string]interface{}) bool {
