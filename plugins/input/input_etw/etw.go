@@ -5,6 +5,7 @@ package input_etw
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -43,6 +44,8 @@ var newEtwSession = func(guid windows.GUID, options ...etwSessionOption) (etwSes
 	return etw.NewSession(guid, options...)
 }
 
+var killEtwSession = etw.KillSession
+
 type KeywordMask uint64
 
 func (k *KeywordMask) UnmarshalJSON(data []byte) error {
@@ -73,8 +76,10 @@ type EtwInput struct {
 	ProviderName string
 	ProviderGUID string
 	Source       string
-	Level        int
-	Keywords     KeywordMask
+	// SessionName fixes the ETW session name. When set, startup can reclaim a stale session with the same name.
+	SessionName string
+	Level       int
+	Keywords    KeywordMask
 	// DNSQueryDomainFilters drops Microsoft-Windows-DNSServer events whose dns_query matches.
 	// It supports exact domains and leading wildcard suffixes such as "*.azure.cn".
 	DNSQueryDomainFilters []string
@@ -141,6 +146,10 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	if d.Source == "" {
 		d.Source = "etw"
 	}
+	d.SessionName = strings.TrimSpace(d.SessionName)
+	if strings.ContainsRune(d.SessionName, '\x00') {
+		return 0, fmt.Errorf("invalid SessionName: must not contain NUL")
+	}
 
 	var guidStr string
 	if d.ProviderName != "" {
@@ -203,9 +212,9 @@ func (d *EtwInput) Init(context pipeline.Context) (int, error) {
 	}
 
 	logger.Infof(d.context.GetRuntimeContext(),
-		"service_etw init: guid=%s level=%d keywords=0x%X async=%t queue=%d workers=%d dropWhenFull=%t parsePacketData=%t bufferSizeKB=%d minBuffers=%d maxBuffers=%d flushTimerSec=%d",
+		"service_etw init: guid=%s level=%d keywords=0x%X async=%t queue=%d workers=%d dropWhenFull=%t parsePacketData=%t bufferSizeKB=%d minBuffers=%d maxBuffers=%d flushTimerSec=%d sessionName=%q",
 		guidStr, d.Level, uint64(d.Keywords), d.AsyncProcess, d.EventQueueSize, d.WorkerCount, d.DropWhenQueueFull, d.parsePacketDataEnabled(),
-		d.BufferSizeKB, d.MinBuffers, d.MaxBuffers, d.FlushTimerSec)
+		d.BufferSizeKB, d.MinBuffers, d.MaxBuffers, d.FlushTimerSec, d.SessionName)
 	return 0, nil
 }
 
@@ -332,6 +341,9 @@ func (d *EtwInput) runSession() error {
 		etw.WithLevel(etw.TraceLevel(d.Level)),
 		etw.WithMatchKeywords(uint64(d.Keywords), 0),
 	}
+	if d.SessionName != "" {
+		options = append(options, etw.WithName(d.SessionName))
+	}
 	if d.BufferSizeKB > 0 {
 		options = append(options, etw.WithBufferSizeKB(d.BufferSizeKB))
 	}
@@ -350,7 +362,7 @@ func (d *EtwInput) runSession() error {
 		d.mu.Unlock()
 		return nil
 	}
-	session, err := newEtwSession(d.parsedGUID, options...)
+	session, err := d.createSession(options...)
 	if err != nil {
 		d.mu.Unlock()
 		return fmt.Errorf("create ETW session: %w", err)
@@ -378,6 +390,34 @@ func (d *EtwInput) runSession() error {
 		return fmt.Errorf("process ETW session: %w", err)
 	}
 	return nil
+}
+
+func (d *EtwInput) createSession(options ...etwSessionOption) (etwSession, error) {
+	session, err := newEtwSession(d.parsedGUID, options...)
+	if err == nil || d.SessionName == "" {
+		return session, err
+	}
+
+	var exists etw.ExistsError
+	if !errors.As(err, &exists) {
+		return nil, err
+	}
+
+	sessionName := exists.SessionName
+	if sessionName == "" {
+		sessionName = d.SessionName
+	}
+	logger.Warningf(d.context.GetRuntimeContext(),
+		etwAlarmType, "ETW session %q already exists; stopping stale session before recreate", sessionName)
+	if killErr := killEtwSession(sessionName); killErr != nil {
+		return nil, fmt.Errorf("stop existing ETW session %q: %w", sessionName, killErr)
+	}
+
+	session, err = newEtwSession(d.parsedGUID, options...)
+	if err != nil {
+		return nil, fmt.Errorf("recreate ETW session %q after stopping stale session: %w", sessionName, err)
+	}
+	return session, nil
 }
 
 func (d *EtwInput) isStopped() bool {

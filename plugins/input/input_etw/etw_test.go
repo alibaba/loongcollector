@@ -857,6 +857,80 @@ func TestEtwInput_RunSessionClosesSessionWhenProcessReturns(t *testing.T) {
 	assert.Equal(t, 1, fake.closeCalls)
 }
 
+func TestEtwInput_RunSessionUsesConfiguredSessionName(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+		SessionName:  "loongcollector-etw-dns",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	input.prepareRun()
+
+	fake := &fakeEtwSession{processErr: assert.AnError}
+	var gotOptions []etwSessionOption
+	originalFactory := newEtwSession
+	newEtwSession = func(_ windows.GUID, options ...etwSessionOption) (etwSession, error) {
+		gotOptions = append([]etwSessionOption(nil), options...)
+		return fake, nil
+	}
+	defer func() { newEtwSession = originalFactory }()
+
+	err = input.runSession()
+
+	require.Error(t, err)
+	cfg := applySessionOptions(gotOptions)
+	assert.Equal(t, "loongcollector-etw-dns", cfg.Name)
+	assert.Equal(t, 1, fake.closeCalls)
+}
+
+func TestEtwInput_RunSessionStopsExistingNamedSessionBeforeRetry(t *testing.T) {
+	input := &EtwInput{
+		ProviderGUID: "{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",
+		SessionName:  "loongcollector-etw-dns",
+	}
+	ctx := mock.NewEmptyContext("test", "test", "test")
+	_, err := input.Init(ctx)
+	require.NoError(t, err)
+	input.prepareRun()
+
+	fake := &fakeEtwSession{processErr: assert.AnError}
+	createCalls := 0
+	originalFactory := newEtwSession
+	newEtwSession = func(_ windows.GUID, _ ...etwSessionOption) (etwSession, error) {
+		createCalls++
+		if createCalls == 1 {
+			return nil, etw.ExistsError{SessionName: "loongcollector-etw-dns"}
+		}
+		return fake, nil
+	}
+	defer func() { newEtwSession = originalFactory }()
+
+	var killed []string
+	originalKill := killEtwSession
+	killEtwSession = func(name string) error {
+		killed = append(killed, name)
+		return nil
+	}
+	defer func() { killEtwSession = originalKill }()
+
+	err = input.runSession()
+
+	require.Error(t, err)
+	assert.Equal(t, 2, createCalls)
+	assert.Equal(t, []string{"loongcollector-etw-dns"}, killed)
+	assert.Equal(t, 1, fake.processCalls)
+	assert.Equal(t, 1, fake.closeCalls)
+}
+
+func applySessionOptions(options []etwSessionOption) etw.SessionOptions {
+	var cfg etw.SessionOptions
+	for _, opt := range options {
+		opt(&cfg)
+	}
+	return cfg
+}
+
 type fakeEtwSession struct {
 	processErr   error
 	processCalls int
