@@ -265,9 +265,9 @@ Http:
 | `gen_ai.usage.cache_creation.input_tokens` | string | 本次请求中，被系统新写入缓存的那部分输入 Token 数量（十进制字符串） |
 | `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
 | `gen_ai.input.messages` | string | 完整 messages JSON 数组（**仅** `AutoMessageTrim: false` 且同 session 去重判定需上传时，非空则输出） |
-| `gen_ai.input.messages.delta` | string | 本轮增量 messages JSON（**每次** LLM 调用均输出，非空时）；剔除 system 后保留最后 `user` 起至末尾 |
-| `gen_ai.input.messages_hash` | string | 完整 messages 数组的 SHA-256（十六进制），用于校验去重 |
-| `gen_ai.system_instructions` | string | 从请求 messages 提取的 `role=system` 消息（**仅** `AutoMessageTrim: false`，非空时每次输出） |
+| `gen_ai.input.messages.delta` | string | 当次 LLM 请求对应的 input messages 片段（JSON 数组字符串，非空时输出） |
+| `gen_ai.input.messages_hash` | string | 当次全量 `gen_ai.input.messages` 的 SHA-256 摘要（十六进制字符串，非空时输出） |
+| `gen_ai.system_instructions` | string | 系统指令（system 角色）消息（JSON 字符串，**仅** `AutoMessageTrim: false`，非空时输出） |
 | `gen_ai.tool.definitions` | string | 请求 tools 定义 JSON 数组（**仅** `AutoMessageTrim: false`，非空时每次输出） |
 | `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json（**不受** `AutoMessageTrim` 控制，非空时输出） |
 
@@ -320,7 +320,7 @@ flushers:
     Tags: true
 ```
 
-- 输出（下列 JSON 为便于阅读将 `messages` / `delta` 等展开；实际上报时均为 **string** 类型的 JSON 文本。`gen_ai.input.messages_hash` 为十六进制字符串。合并模式无 `event.name` / `event.id`。）
+- 输出（`StreamModeFormat: false`，单条合并日志）
 
 {
   "gen_ai.agent.type": "openclaw",
@@ -409,3 +409,87 @@ flushers:
   "gen_ai.session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
   "status_code": "200"
 }
+
+- 采集配置（`StreamModeFormat: true`，其余同上，仅改此项）
+
+```yaml
+      StreamModeFormat: true
+      AutoMessageTrim: false
+```
+
+- 输出（`StreamModeFormat: true`，同一 `gen_ai.turn.id` 下两条日志）
+
+**`event.name` = `gen_ai.model.request`**
+
+```json
+{
+  "event.id": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+  "event.name": "gen_ai.model.request",
+  "gen_ai.agent.type": "openclaw",
+  "gen_ai.session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
+  "gen_ai.turn.id": "c47ac487c54c2da859ba2a0e873eeeae",
+  "gen_ai.input.messages": [
+    {
+      "role": "system",
+      "parts": [{"type": "text", "content": "You are a personal assistant running inside OpenClaw.\n## Tooling\n..."}]
+    },
+    {
+      "role": "user",
+      "parts": [{"type": "text", "content": "今天晚饭吃什么？"}]
+    }
+  ],
+  "gen_ai.input.messages.delta": [
+    {
+      "role": "user",
+      "parts": [{"type": "text", "content": "今天晚饭吃什么？"}]
+    }
+  ],
+  "gen_ai.input.messages_hash": "7f3b2c1a9e8d4f5061728394a5b6c7d8e9f0a1b2c3d4e5f6789012345678abcdef",
+  "gen_ai.system_instructions": "{\"role\":\"system\",\"parts\":[{\"type\":\"text\",\"content\":\"You are a personal assistant...\"}]}",
+  "gen_ai.tool.definitions": "[{\"type\":\"function\",\"function\":{\"name\":\"read\",\"description\":\"Read file contents\"}}]",
+  "gen_ai.provider.name": "openai",
+  "gen_ai.request.model": "qwen3.5-plus",
+  "gen_ai.request.timestamp": "1749123456789",
+  "pid": "705127",
+  "comm": "openclaw-gatewa",
+  "server.address": "dashscope.aliyuncs.com",
+  "server.port": "80"
+}
+```
+
+**`event.name` = `gen_ai.model.response`**
+
+```json
+{
+  "event.id": "F0E1D2C3-B4A5-9678-9012-3456789ABCDE",
+  "event.name": "gen_ai.model.response",
+  "gen_ai.agent.type": "openclaw",
+  "gen_ai.session.id": "dea5eed6-4a08-436c-b117-5ea14c9de39a",
+  "gen_ai.turn.id": "c47ac487c54c2da859ba2a0e873eeeae",
+  "gen_ai.output.messages": [
+    {
+      "role": "assistant",
+      "parts": [
+        {"type": "reasoning", "content": "说不吃米饭\n"},
+        {"type": "text", "content": "不吃米饭啊！"}
+      ],
+      "finish_reason": "stop"
+    }
+  ],
+  "gen_ai.response.id": "chatcmpl-3cd5d2d2-d2f5-91e9-a5e4-7fb740bb47f6",
+  "gen_ai.response.model": "qwen3.5-plus",
+  "gen_ai.response.finish_reasons": "[\"stop\"]",
+  "gen_ai.response.duration": "3548",
+  "gen_ai.provider.name": "openai",
+  "gen_ai.usage.input_tokens": "27466",
+  "gen_ai.usage.output_tokens": "195",
+  "gen_ai.usage.total_tokens": "27661",
+  "gen_ai.usage.cache_creation.input_tokens": "0",
+  "gen_ai.usage.cache_read.input_tokens": "0",
+  "is_sse": "1",
+  "is_usage_from_api": "true",
+  "status_code": "200",
+  "pid": "705127",
+  "comm": "openclaw-gatewa"
+}
+```
