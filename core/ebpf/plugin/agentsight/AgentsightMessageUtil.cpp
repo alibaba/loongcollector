@@ -236,6 +236,108 @@ std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson
     return std::string(buf.GetString(), buf.GetSize());
 }
 
+bool FinishReasonAlreadyInArray(const rapidjson::Value& reasons, const char* reason, rapidjson::SizeType len) {
+    for (rapidjson::SizeType i = 0; i < reasons.Size(); ++i) {
+        const auto& v = reasons[i];
+        if (v.IsString() && v.GetStringLength() == len && std::memcmp(v.GetString(), reason, len) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AppendFinishReasonString(const char* reason,
+                              rapidjson::SizeType len,
+                              rapidjson::Document& reasons,
+                              rapidjson::Document::AllocatorType& alloc) {
+    if (reason == nullptr || len == 0) {
+        return;
+    }
+    if (FinishReasonAlreadyInArray(reasons, reason, len)) {
+        return;
+    }
+    reasons.PushBack(rapidjson::Value(reason, len, alloc), alloc);
+}
+
+void CollectFinishReasonFromMessageObject(const rapidjson::Value& msg,
+                                          rapidjson::Document& reasons,
+                                          rapidjson::Document::AllocatorType& alloc) {
+    if (!msg.IsObject()) {
+        return;
+    }
+    if (msg.HasMember("finish_reason") && msg["finish_reason"].IsString()) {
+        AppendFinishReasonString(msg["finish_reason"].GetString(),
+                                 msg["finish_reason"].GetStringLength(),
+                                 reasons,
+                                 alloc);
+    }
+    if (!msg.HasMember("parts") || !msg["parts"].IsArray()) {
+        return;
+    }
+    for (rapidjson::SizeType i = 0; i < msg["parts"].Size(); ++i) {
+        CollectFinishReasonFromMessageObject(msg["parts"][i], reasons, alloc);
+    }
+}
+
+bool TryMergeFinishReasonsJsonArray(const std::string& raw,
+                                    rapidjson::Document& reasons,
+                                    rapidjson::Document::AllocatorType& alloc) {
+    if (raw.empty() || raw.front() != '[') {
+        return false;
+    }
+    rapidjson::Document parsed;
+    parsed.Parse(raw.c_str(), raw.size());
+    if (parsed.HasParseError() || !parsed.IsArray()) {
+        return false;
+    }
+    for (rapidjson::SizeType i = 0; i < parsed.Size(); ++i) {
+        const auto& item = parsed[i];
+        if (!item.IsString()) {
+            continue;
+        }
+        AppendFinishReasonString(item.GetString(), item.GetStringLength(), reasons, alloc);
+    }
+    return !reasons.Empty();
+}
+
+std::string SerializeFinishReasonsArray(const rapidjson::Document& reasons) {
+    if (!reasons.IsArray() || reasons.Empty()) {
+        return {};
+    }
+    rapidjson::StringBuffer buf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
+    reasons.Accept(writer);
+    const std::string out(buf.GetString(), buf.GetSize());
+    if (out.empty() || out.front() != '[') {
+        return {};
+    }
+    return out;
+}
+
+std::string FormatFinishReasonsJson(const std::string& responseMessagesJson,
+                                    const std::string& fallbackFinishReason) {
+    rapidjson::Document reasons(rapidjson::kArrayType);
+    auto& alloc = reasons.GetAllocator();
+
+    rapidjson::Document doc;
+    if (ParseMessagesArray(responseMessagesJson, doc)) {
+        for (rapidjson::SizeType i = 0; i < doc.Size(); ++i) {
+            CollectFinishReasonFromMessageObject(doc[i], reasons, alloc);
+        }
+    }
+
+    if (reasons.Empty() && !fallbackFinishReason.empty()) {
+        if (!TryMergeFinishReasonsJsonArray(fallbackFinishReason, reasons, alloc)) {
+            AppendFinishReasonString(fallbackFinishReason.c_str(),
+                                     static_cast<rapidjson::SizeType>(fallbackFinishReason.size()),
+                                     reasons,
+                                     alloc);
+        }
+    }
+
+    return SerializeFinishReasonsArray(reasons);
+}
+
 AgentsightParsedRequestParams ParseRequestParametersJson(const std::string& requestParamsJson) {
     AgentsightParsedRequestParams out;
     if (requestParamsJson.empty()) {

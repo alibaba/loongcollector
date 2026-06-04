@@ -113,8 +113,8 @@ private:
     AgentsightHandle* mHandle = nullptr;
     int mEventFd = -1;
     bool mRunning = false;
-    bool mSplitModelEvents = false;
-    bool mDetailedMessage = true;
+    bool mStreamModeFormat = true;
+    bool mAutoMessageTrim = true;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;

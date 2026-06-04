@@ -687,8 +687,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightCmdlineBlacklist.clear();
         mAgentsightHttps.clear();
         mAgentsightHttp.clear();
-        mAgentsightSplitModelEvents = false;
-        mAgentsightDetailedMessage = true;
+        mAgentsightStreamModeFormat = true;
+        mAgentsightAutoMessageTrim = true;
     }
 
     SecurityOption thisSecurityOption;
@@ -740,10 +740,10 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                 ParseAgentsightOptionalStringList(
                     innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
                 if (!GetOptionalBoolParam(
-                        innerConfig, "SplitModelEvents", mAgentsightSplitModelEvents, errorMsg)) {
+                        innerConfig, "StreamModeFormat", mAgentsightStreamModeFormat, errorMsg)) {
                     warnOptionalParse();
                 }
-                if (!GetOptionalBoolParam(innerConfig, "DetailedMessage", mAgentsightDetailedMessage, errorMsg)) {
+                if (!GetOptionalBoolParam(innerConfig, "AutoMessageTrim", mAgentsightAutoMessageTrim, errorMsg)) {
                     warnOptionalParse();
                 }
                 return true;

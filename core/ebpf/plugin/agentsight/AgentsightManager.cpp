@@ -22,6 +22,7 @@
 #include "collection_pipeline/queue/ProcessQueueItem.h"
 #include "collection_pipeline/queue/ProcessQueueManager.h"
 #include "common/StringView.h"
+#include "common/UUIDUtil.h"
 #include "common/magic_enum.hpp"
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
@@ -249,7 +250,7 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
 using SetLogStrFn = std::function<void(StringView, const std::string&)>;
 
 struct AgentsightLlmEmitOptions {
-    bool detailedMessage = true;
+    bool autoMessageTrim = true;
     AgentsightInputUploadPlan uploadPlan;
 };
 
@@ -259,7 +260,13 @@ void SetLogTimestampFromNs(logtail::LogEvent* log, uint64_t timestampNs) {
     log->SetTimestamp(sec, nsec);
 }
 
-void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec, SetLogStrFn setStr, logtail::LogEvent* log) {
+void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
+                                     SetLogStrFn setStr,
+                                     logtail::LogEvent* log,
+                                     const std::string& eventId = {}) {
+    if (!eventId.empty()) {
+        setStr(StringView("event.id"), eventId);
+    }
     setStr(StringView("gen_ai.session.id"), rec.mSessionId);
     setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
     if (rec.mPid != 0) {
@@ -284,10 +291,10 @@ void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn set
 void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
                                       SetLogStrFn setStr,
                                       const AgentsightLlmEmitOptions& opts) {
-    if (opts.detailedMessage && opts.uploadPlan.sendFullMessages) {
+    if (!opts.autoMessageTrim && opts.uploadPlan.sendFullMessages) {
         setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
     }
-    if (opts.detailedMessage) {
+    if (!opts.autoMessageTrim) {
         const std::string systemInstructions = ExtractSystemInstructionsJson(rec.mRequestMessagesJson);
         setStr(StringView("gen_ai.system_instructions"), systemInstructions);
         setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
@@ -320,7 +327,8 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     log->SetContent("gen_ai.request.model", rec.mModel);
     log->SetContent("status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"), rec.mFinishReason);
+    setStr(StringView("gen_ai.response.finish_reasons"),
+           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
     log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
 
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
@@ -335,7 +343,8 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
 
 void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
                                    logtail::LogEvent* log,
-                                   const AgentsightLlmEmitOptions& opts) {
+                                   const AgentsightLlmEmitOptions& opts,
+                                   const std::string& eventId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
@@ -344,7 +353,7 @@ void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
 
     SetLogTimestampFromNs(log, rec.mTimestampNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.request"));
-    FillAgentsightCommonCorrelation(rec, setStr, log);
+    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
 
     log->SetContent("gen_ai.request.timestamp", std::to_string(rec.mTimestampNs / 1000000ULL));
     FillAgentsightServerFromUrl(rec, setStr);
@@ -354,7 +363,9 @@ void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
     FillAgentsightRequestInputFields(rec, setStr, opts);
 }
 
-void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec, logtail::LogEvent* log) {
+void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
+                                    logtail::LogEvent* log,
+                                    const std::string& eventId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
@@ -364,7 +375,7 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec, logtail::Log
     const uint64_t responseEndNs = rec.mTimestampNs + rec.mDurationNs;
     SetLogTimestampFromNs(log, responseEndNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
-    FillAgentsightCommonCorrelation(rec, setStr, log);
+    FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
@@ -374,7 +385,8 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec, logtail::Log
     }
     log->SetContent("status_code", std::to_string(rec.mStatusCode));
     log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"), rec.mFinishReason);
+    setStr(StringView("gen_ai.response.finish_reasons"),
+           FormatFinishReasonsJson(rec.mResponseMessagesJson, rec.mFinishReason));
     log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
 
     log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
@@ -610,8 +622,8 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
-    mSplitModelEvents = sec->mAgentsightSplitModelEvents;
-    mDetailedMessage = sec->mAgentsightDetailedMessage;
+    mStreamModeFormat = sec->mAgentsightStreamModeFormat;
+    mAutoMessageTrim = sec->mAgentsightAutoMessageTrim;
 
     if (!RestartAgentSightLocked(*sec)) {
         releaseMetricRefs();
@@ -634,8 +646,8 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
-    mSplitModelEvents = false;
-    mDetailedMessage = true;
+    mStreamModeFormat = true;
+    mAutoMessageTrim = true;
     StopAgentSightLocked();
     return 0;
 }
@@ -650,8 +662,8 @@ int AgentsightManager::Destroy() {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
-    mSplitModelEvents = false;
-    mDetailedMessage = true;
+    mStreamModeFormat = true;
+    mAutoMessageTrim = true;
     mInited = false;
     return 0;
 }
@@ -672,8 +684,8 @@ int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetwo
         return 1;
     }
     std::lock_guard<std::mutex> lock(mLibMutex);
-    mSplitModelEvents = (*secPtr)->mAgentsightSplitModelEvents;
-    mDetailedMessage = (*secPtr)->mAgentsightDetailedMessage;
+    mStreamModeFormat = (*secPtr)->mAgentsightStreamModeFormat;
+    mAutoMessageTrim = (*secPtr)->mAgentsightAutoMessageTrim;
     return 0;
 }
 
@@ -690,8 +702,8 @@ int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetwo
     if (mRegisteredConfigCount == 0) {
         return 0;
     }
-    mSplitModelEvents = (*secPtr)->mAgentsightSplitModelEvents;
-    mDetailedMessage = (*secPtr)->mAgentsightDetailedMessage;
+    mStreamModeFormat = (*secPtr)->mAgentsightStreamModeFormat;
+    mAutoMessageTrim = (*secPtr)->mAgentsightAutoMessageTrim;
     if (!RestartAgentSightLocked(**secPtr)) {
         return 1;
     }
@@ -717,8 +729,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     logtail::QueueKey queueKey;
     uint32_t pluginIndex;
-    bool splitModelEvents = false;
-    bool detailedMessage = true;
+    bool streamModeFormat = true;
+    bool autoMessageTrim = true;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
         if (mPipelineCtx == nullptr) {
@@ -726,12 +738,12 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         }
         queueKey = mQueueKey;
         pluginIndex = mPluginIndex;
-        splitModelEvents = mSplitModelEvents;
-        detailedMessage = mDetailedMessage;
+        streamModeFormat = mStreamModeFormat;
+        autoMessageTrim = mAutoMessageTrim;
     }
 
     AgentsightLlmEmitOptions emitOpts;
-    emitOpts.detailedMessage = detailedMessage;
+    emitOpts.autoMessageTrim = autoMessageTrim;
     {
         std::lock_guard<std::mutex> sessionLock(mSessionInputMutex);
         if (mSessionInputState.size() >= kMaxSessionInputStates) {
@@ -759,14 +771,15 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    const size_t logCount = splitModelEvents ? 2U : 1U;
+    const size_t logCount = streamModeFormat ? 2U : 1U;
     for (size_t i = 0; i < logCount; ++i) {
         auto* log = eventGroup.AddLogEvent(true, mEventPool);
-        if (splitModelEvents) {
+        if (streamModeFormat) {
+            const std::string eventId = CalculateRandomUUID();
             if (i == 0) {
-                FillAgentsightModelRequestLog(*rec, log, emitOpts);
+                FillAgentsightModelRequestLog(*rec, log, emitOpts, eventId);
             } else {
-                FillAgentsightModelResponseLog(*rec, log);
+                FillAgentsightModelResponseLog(*rec, log, eventId);
             }
         } else {
             FillAgentsightCombinedLlmLog(*rec, log, emitOpts);

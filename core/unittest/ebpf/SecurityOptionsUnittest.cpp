@@ -34,8 +34,8 @@ public:
     void TestAgentsightRejectsEmptyCmdlineWhitelistArray();
     void TestAgentsightProbeConfigParsesHttpsAndHttp();
     void TestAgentsightProbeConfigHttpsHttpInvalidTypes();
-    void TestAgentsightSplitModelEventsParse();
-    void TestAgentsightDetailedMessageDefaultAndParse();
+    void TestAgentsightStreamModeFormatParse();
+    void TestAgentsightAutoMessageTrimDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -45,22 +45,23 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
     Json::Value config;
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
-    APSARA_TEST_TRUE(opt.mAgentsightDetailedMessage);
+    APSARA_TEST_TRUE(opt.mAgentsightAutoMessageTrim);
+    APSARA_TEST_TRUE(opt.mAgentsightStreamModeFormat);
 }
 
-void SecurityOptionsUnittest::TestAgentsightDetailedMessageDefaultAndParse() {
+void SecurityOptionsUnittest::TestAgentsightAutoMessageTrimDefaultAndParse() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     SecurityOptions opt;
     std::string err;
     Json::Value config;
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"DetailedMessage":false}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"AutoMessageTrim":false}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_FALSE(opt.mAgentsightDetailedMessage);
+    APSARA_TEST_FALSE(opt.mAgentsightAutoMessageTrim);
 
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"DetailedMessage":true}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"AutoMessageTrim":true}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_TRUE(opt.mAgentsightDetailedMessage);
+    APSARA_TEST_TRUE(opt.mAgentsightAutoMessageTrim);
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin() {
@@ -222,24 +223,24 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigHttpsHttpInvalidTypes() {
     APSARA_TEST_EQUAL(":80", opt.mAgentsightHttp[0]);
 }
 
-void SecurityOptionsUnittest::TestAgentsightSplitModelEventsParse() {
+void SecurityOptionsUnittest::TestAgentsightStreamModeFormatParse() {
     CollectionPipelineContext ctx;
     ctx.SetConfigName("cfg1");
     Json::Value config;
     std::string err;
     SecurityOptions opt;
 
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"SplitModelEvents":true}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"StreamModeFormat":true}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_TRUE(opt.mAgentsightSplitModelEvents);
+    APSARA_TEST_TRUE(opt.mAgentsightStreamModeFormat);
 
-    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"SplitModelEvents":false}})", config, err));
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"StreamModeFormat":false}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_FALSE(opt.mAgentsightSplitModelEvents);
+    APSARA_TEST_FALSE(opt.mAgentsightStreamModeFormat);
 
     APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
-    APSARA_TEST_FALSE(opt.mAgentsightSplitModelEvents);
+    APSARA_TEST_TRUE(opt.mAgentsightStreamModeFormat);
 }
 
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
@@ -254,7 +255,7 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsLegacyLowercaseKeys
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsEmptyCmdlineWhitelistArray)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesHttpsAndHttp)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvalidTypes)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightSplitModelEventsParse)
-UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightDetailedMessageDefaultAndParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightStreamModeFormatParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightAutoMessageTrimDefaultAndParse)
 
 UNIT_TEST_MAIN

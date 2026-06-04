@@ -33,6 +33,10 @@ public:
     void TestInputUploadSendsFullWhenPrefixChanges();
     void TestInputUploadSendsFullWhenSessionNotInMap();
     void TestParseRequestParameters();
+    void TestFormatFinishReasonsFromOutputMessages();
+    void TestFormatFinishReasonsFallback();
+    void TestFormatFinishReasonsFromParts();
+    void TestFormatFinishReasonsFallbackAlwaysArray();
 };
 
 void AgentsightMessageUtilUnittest::TestExtractSystemInstructions() {
@@ -96,10 +100,40 @@ void AgentsightMessageUtilUnittest::TestParseRequestParameters() {
     APSARA_TEST_TRUE(p.topP.has_value());
 }
 
+void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFromOutputMessages() {
+    const std::string output = R"([
+      {"role":"assistant","finish_reason":"tool_calls"},
+      {"role":"assistant","finish_reason":"stop"}
+    ])";
+    APSARA_TEST_EQUAL(R"(["tool_calls","stop"])", FormatFinishReasonsJson(output, ""));
+}
+
+void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFallback() {
+    APSARA_TEST_EQUAL(R"(["stop"])", FormatFinishReasonsJson("[]", "stop"));
+    APSARA_TEST_TRUE(FormatFinishReasonsJson("", "").empty());
+}
+
+void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFromParts() {
+    const std::string output = R"([
+      {"role":"assistant","parts":[{"type":"text","content":"ok","finish_reason":"stop"}]}
+    ])";
+    APSARA_TEST_EQUAL(R"(["stop"])", FormatFinishReasonsJson(output, ""));
+}
+
+void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFallbackAlwaysArray() {
+    const std::string out = FormatFinishReasonsJson("", "tool_calls");
+    APSARA_TEST_EQUAL(R"(["tool_calls"])", out);
+    APSARA_TEST_TRUE(!out.empty() && out.front() == '[');
+}
+
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestExtractSystemInstructions)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSendsFullWhenSessionNotInMap)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSkipsFullWhenPrefixStable)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSendsFullWhenPrefixChanges)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestParseRequestParameters)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromOutputMessages)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFallback)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromParts)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFallbackAlwaysArray)
 
 UNIT_TEST_MAIN
