@@ -6,7 +6,7 @@
 
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -35,8 +35,7 @@ InternalMetricRule 的结构如下：
 
 ## 导出到外部系统
 
-- **导出到 Prometheus**：推荐单条配置直连 `flusher_prometheus`；旧版本可用两段 Pipeline 过渡方案。见 [如何导出自监控数据](../../../developer-guide/self-monitor/how-to-export-self-monitor-data.md)。
-- **仅写本地文件**：见下方样例。
+采集、本地落盘及导出到 Prometheus 等外部系统的说明，见 [如何收集自监控指标](../../../developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)。下方样例为**仅写本地文件**的快速参考。
 
 ## 样例
 

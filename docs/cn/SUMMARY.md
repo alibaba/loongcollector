@@ -171,7 +171,6 @@
   * 指标
     * [自监控指标说明](developer-guide/self-monitor/metrics/internal-metrics-description.md)
     * [如何收集自监控指标](developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)
-    * [如何导出自监控数据](developer-guide/self-monitor/how-to-export-self-monitor-data.md)
     * [如何添加自监控指标](developer-guide/self-monitor/metrics/how-to-add-internal-metrics.md)
   * 告警
     * [自监控告警说明](developer-guide/self-monitor/alarms/internal-alarms-description.md)

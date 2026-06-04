@@ -6,7 +6,7 @@
 
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -20,9 +20,6 @@
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_alarms。  |
 
-## 导出到外部系统
-
-告警数据为 **LogEvent**，适合 `flusher_file`、`flusher_http` 等日志类输出，**不适用** `flusher_prometheus`。详见 [如何导出自监控数据](../../../developer-guide/self-monitor/how-to-export-self-monitor-data.md)。
 
 ## 样例
 
