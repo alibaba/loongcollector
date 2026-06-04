@@ -20,11 +20,21 @@
 
 namespace logtail::ebpf {
 
-/// Cached per `gen_ai.session.id`: last `gen_ai.input.messages` JSON array length and its hash.
+/// Cached per `gen_ai.session.id` (see `ResolveSessionStateKey`): last completed LLM round for delta/dedup.
 struct AgentsightSessionInputState {
     size_t messageCount = 0;
     std::string messagesHash;
+    size_t outputMessageCount = 0;
+    std::string outputMessagesHash;
 };
+
+/// Delta/dedup LRU key: `session_id`, or `turn.id` when session is absent.
+std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId);
+
+/// Step counter LRU key: `session_id` + `turn.id` when both present; else same fallback as session key.
+std::string ResolveTurnStepStateKey(const std::string& sessionId, const std::string& turnId);
+
+std::string FormatGenAiStepId(size_t stepNumber);
 
 struct AgentsightInputUploadPlan {
     bool sendFullMessages = true;
@@ -49,7 +59,15 @@ size_t CountJsonArrayElements(const std::string& messagesJson);
 
 std::string SerializeJsonArrayPrefix(const std::string& messagesJson, size_t prefixCount);
 
+/// Sub-array `[startIndex, startIndex + elementCount)` in message order.
+std::string SerializeJsonArrayRange(const std::string& messagesJson, size_t startIndex, size_t elementCount);
+
+/// Sub-array `[startIndex, end)` through the last element.
+std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t startIndex);
+
 std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount);
+
+std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount);
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
 
@@ -62,9 +80,25 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson,
 AgentsightParsedRequestParams ParseRequestParametersJson(const std::string& requestParamsJson);
 
 /// `fullMessagesJson` is the `gen_ai.input.messages` field value (one JSON array string).
-/// `previousState` is null when the state key (`session_id`, or `turn.id` if session is absent)
-/// is not in the map yet (must upload full messages).
+/// `previousState` is null when the turn state key is not in the LRU cache yet (must upload full messages).
 AgentsightInputUploadPlan PlanInputMessagesUpload(const std::string& fullMessagesJson,
                                                   const AgentsightSessionInputState* previousState);
+
+/// Derives `gen_ai.input.messages.delta` locally (does not use AgentSight FFI delta).
+/// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
+/// **response** (`outputMessageCount` / `outputMessagesHash`). When `cur`'s first `messageCount`
+/// messages match `messagesHash`, skip `outputMessageCount` messages only if
+/// `hash(cur[N_in:N_in+N_out]) == outputMessagesHash`; otherwise delta starts at `N_in`.
+/// `outputMessagesHash` is computed from the response with `finish_reason` stripped on assistant
+/// messages; replay slice comparison uses the raw request slice. System messages are omitted from delta.
+std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
+                                      const AgentsightSessionInputState* previousState);
+
+void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state);
+
+/// After each emit: `messageCount` / `messagesHash` cover request messages + response messages.
+void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
+                                 const std::string& responseMessagesJson,
+                                 AgentsightSessionInputState& state);
 
 } // namespace logtail::ebpf

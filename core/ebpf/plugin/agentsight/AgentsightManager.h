@@ -16,6 +16,7 @@
 
 #include <cstdint>
 
+#include <list>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -93,8 +94,14 @@ private:
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
     void clearSessionInputStateLocked();
+    void evictSessionInputStateLruIfNeededLocked();
+    AgentsightSessionInputState* touchSessionInputStateLocked(const std::string& sessionKey);
+    const AgentsightSessionInputState* findSessionInputStateLocked(const std::string& sessionKey);
+    void evictTurnStepStateLruIfNeededLocked();
+    size_t* touchTurnStepCounterLocked(const std::string& turnStepKey);
 
     static constexpr size_t kMaxSessionInputStates = 4096;
+    static constexpr size_t kMaxTurnStepStates = 4096;
 
     std::string mConfigName;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
@@ -107,8 +114,20 @@ private:
     // shared_lock(mMtx) then this mutex. OnLlmCallback must not lock this (runs under handle_read).
     std::mutex mLibMutex;
     std::mutex mSessionInputMutex;
-    /// Dedup key (`session_id`, else `turn.id`) -> last `gen_ai.input.messages` length and hash.
-    std::unordered_map<std::string, AgentsightSessionInputState> mSessionInputState;
+    /// `session_id` (or `turn.id` fallback) -> delta/dedup; survives turn changes within a session.
+    std::list<std::string> mSessionInputLruOrder;
+    struct SessionInputStateEntry {
+        AgentsightSessionInputState state;
+        std::list<std::string>::iterator lruIt;
+    };
+    std::unordered_map<std::string, SessionInputStateEntry> mSessionInputState;
+    /// `(session_id, turn.id)` -> per-turn `gen_ai.step.id` counter only.
+    std::list<std::string> mTurnStepLruOrder;
+    struct TurnStepStateEntry {
+        size_t nextStepNumber = 1;
+        std::list<std::string>::iterator lruIt;
+    };
+    std::unordered_map<std::string, TurnStepStateEntry> mTurnStepState;
 
     AgentsightHandle* mHandle = nullptr;
     int mEventFd = -1;
