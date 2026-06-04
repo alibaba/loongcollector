@@ -24,7 +24,7 @@ dev
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
-|  ProbeConfig.StreamModeFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时保持单条合并日志格式。  |
+|  ProbeConfig.StreamModeFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
 |  ProbeConfig.AutoMessageTrim  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出 `gen_ai.system_instructions`、`gen_ai.tool.definitions` 及全量 `gen_ai.input.messages`（仍输出 `delta` / `hash`）。为 `false` 时输出 system、tools（非空时每次），全量 input 由同 session **前缀 hash 去重**决定。**不影响** `gen_ai.output.messages`。  |
 
 ### `AgentType` 取值命名规范
@@ -215,22 +215,24 @@ Http:
   - "*.internal.svc"
 ```
 
-## 输出格式
+### `StreamModeFormat: false`（合并日志）
 
-四种 ProbeConfig 组合的**上报字段矩阵**及 **full / delta / output 跨轮关系**见：[agentsight_field_report.md](./agentsight_field_report.md)。
+一次 LLM 调用输出 **一条** 日志，同时包含请求与响应字段（见下表）。
 
-### `StreamModeFormat: false`
+- **无** `event.name`、**无** `event.id`
+- 时间戳为**请求开始**时刻
+- 同条内可有 `gen_ai.request.model`、`gen_ai.response.id`、`status_code`、`gen_ai.response.duration`、`gen_ai.response.finish_reasons`（JSON 数组）等
 
-一次 LLM 调用输出 **一条** 日志，同时包含请求与响应字段（见下表）。**不含** `event.name`。
+`Http` / `Https` 只影响**是否采集**对应流量，不改变上述合并/拆分形态。
 
-### `StreamModeFormat: true`（默认）
+### `StreamModeFormat: true`（默认，流式拆分）
 
 一次 LLM 调用在同一日志组内输出 **两条** 日志，通过 `gen_ai.session.id`、`gen_ai.turn.id` 等关联：
 
 | `event.name` | 时间戳 | 主要字段 |
 | :--- | :--- | :--- |
 | `gen_ai.model.request` | 请求开始（`timestamp_ns`） | `gen_ai.input.messages`（`AutoMessageTrim: false` 且去重允许时）、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`（后两者 `AutoMessageTrim: false` 时）、`gen_ai.request.model`、`server.*`、`gen_ai.request.timestamp` |
-| `gen_ai.model.response` | 请求结束（开始 + `duration_ns`） | `gen_ai.output.messages`（始终）、`gen_ai.response.id`、`gen_ai.response.model`、`gen_ai.response.finish_reasons`、`gen_ai.usage.*`（token，无 cost）、`status_code`、`is_sse`、`gen_ai.response.duration` |
+| `gen_ai.model.response` | 请求结束（开始 + `duration_ns`） | `gen_ai.output.messages`（始终）、`gen_ai.response.id`、`gen_ai.response.model`（非空时）、`gen_ai.response.finish_reasons`、`gen_ai.usage.*`（token，无 cost）、`status_code`、`is_sse`、`gen_ai.response.duration`、`gen_ai.provider.name` |
 
 两条日志均可能包含：`event.id`（仅流式拆分）、`gen_ai.session.id`、`gen_ai.turn.id`、`pid`、`comm`、`gen_ai.agent.type`、`gen_ai.provider.name`。
 
@@ -239,6 +241,7 @@ Http:
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `event.id` | string | 本条日志的唯一标识（UUID，大写带连字符）；**仅** `StreamModeFormat: true` 时输出，request/response 各 1 个 |
+| `event.name` | string | **`gen_ai.model.request`** 或 **`gen_ai.model.response`**；**仅** `StreamModeFormat: true` 时输出 |
 | `gen_ai.session.id` | string | 用户的会话 id |
 | `gen_ai.turn.id` | string | 同一会话中其中一次对话的 id |
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
@@ -250,8 +253,9 @@ Http:
 | `server.address` | string | 从请求 URL 解析出的服务端主机名（有请求 URL 时输出） |
 | `server.port` | string | 从请求 URL 解析出的端口（URL 中含显式端口时输出） |
 | `gen_ai.provider.name` | string | 大模型厂商名称 |
-| `gen_ai.request.model` | string | 大模型厂商使用的模型名称 |
-| `status_code` | string | 一次请求的状态码，同 HTTP 状态码（十进制字符串，如 `200`） |
+| `gen_ai.request.model` | string | 请求侧模型名；合并日志与 request 条输出 |
+| `gen_ai.response.model` | string | 响应侧模型名（非空时）；**仅** `StreamModeFormat: true` 的 response 条；合并日志**不**单独输出此字段（用 `gen_ai.request.model`） |
+| `status_code` | string | 一次请求的状态码，同 HTTP 状态码（十进制字符串，如 `200`）；合并条或 response 条 |
 | `is_sse` | string | 是否为 SSE（Server-Sent Events）连接；日志中取值为 `1`（是）或 `0`（否） |
 | `gen_ai.response.finish_reasons` | string | 停止原因 **JSON 数组字符串**（如 `["stop"]`、`["tool_calls","stop"]`）；从 `output.messages`（含 `parts` 内）收集，无则将 FFI 单值包装为单元素数组 |
 | `is_usage_from_api` | string | 数据来源标识，true 表示来自 LLM API response usage 字段（精确值），false 表示由插件本地估算（近似值） |
@@ -277,7 +281,7 @@ Http:
 
 ### `StreamModeFormat: false` 且 `AutoMessageTrim: true`（最瘦合并日志）
 
-- 每次 LLM 调用 **一条** 日志，**无** `event.name`；时间戳为请求开始时刻。
+- 每次 LLM 调用 **一条** 日志，**无** `event.name`、**无** `event.id`；时间戳为请求开始时刻。
 - **有**：关联字段、HTTP/`usage` 元数据、`gen_ai.input.messages.delta` / `gen_ai.input.messages_hash`（非空时）、`gen_ai.output.messages`。
 - **无**：全量 `gen_ai.input.messages`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`、拆分后的 `gen_ai.model.request` / `gen_ai.model.response`。
 
@@ -299,10 +303,8 @@ inputs:
       Verbose: 1
       LogPath: ""
       CmdlineWhitelist:
-        - AgentType: claude-code
-          Args: ["node*", "*claude*"]
-        - AgentType: hermes
-          Args: ["node*", "*hermes*"]
+        - AgentType: openclaw
+          Args: ["node*", "*openclaw*"]
       CmdlineBlacklist:
         - ["node*", "*webpack*"]
       Https:
@@ -310,7 +312,7 @@ inputs:
       Http:
         - ":8080"
         - "10.0.0.1:9090"
-      StreamModeFormat: true
+      StreamModeFormat: false
       AutoMessageTrim: false
 flushers:
   - Type: flusher_stdout
@@ -318,7 +320,7 @@ flushers:
     Tags: true
 ```
 
-- 输出
+- 输出（下列 JSON 为便于阅读将 `messages` / `delta` 等展开；实际上报时均为 **string** 类型的 JSON 文本。`gen_ai.input.messages_hash` 为十六进制字符串。合并模式无 `event.name` / `event.id`。）
 
 {
   "gen_ai.agent.type": "openclaw",
@@ -329,11 +331,32 @@ flushers:
       "parts": [
         {
           "type": "text",
-          "content": "You are a personal assistant running inside OpenClaw.\n## Tooling\nTool availability (filtered by policy):\nTool names are case-sensitive. Call tools exactly as listed.\n- read: Read file contents\n- write: Create or overwrite files\n- edit: Make precise edits to files\n- exec: Run shell commands (pty available for TTY-required CLIs)\n- process: Manage background exec sessions\n- web_search: Search the web (Brave API)\n- web_fetch: Fetch and extract readable content from a URL\n- cron: Manage cron jobs and wake events (use for reminders; when scheduling a reminder, write the systemEvent text as something that will read like a reminder when it fires, and mention that it is a reminder depending on the time gap between setting and firing; include recent context in reminder text if appropriate)\n- sessions_list: List other sessions (incl. sub-agents) with filters/last\n- sessions_history: Fetch history for another session/sub-agent\n- se..."
+          "content": "You are a personal assistant running inside OpenClaw.\n## Tooling\n..."
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "content": "今天晚饭吃什么？"
         }
       ]
     }
   ],
+  "gen_ai.input.messages.delta": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "type": "text",
+          "content": "今天晚饭吃什么？"
+        }
+      ]
+    }
+  ],
+  "gen_ai.input.messages_hash": "7f3b2c1a9e8d4f5061728394a5b6c7d8e9f0a1b2c3d4e5f6789012345678abcdef",
   "gen_ai.output.messages": [
     {
       "role": "assistant",
