@@ -687,6 +687,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightCmdlineBlacklist.clear();
         mAgentsightHttps.clear();
         mAgentsightHttp.clear();
+        mAgentsightSplitModelEvents = false;
+        mAgentsightDetailedMessage = true;
     }
 
     SecurityOption thisSecurityOption;
@@ -737,6 +739,13 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                     innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
                 ParseAgentsightOptionalStringList(
                     innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
+                if (!GetOptionalBoolParam(
+                        innerConfig, "SplitModelEvents", mAgentsightSplitModelEvents, errorMsg)) {
+                    warnOptionalParse();
+                }
+                if (!GetOptionalBoolParam(innerConfig, "DetailedMessage", mAgentsightDetailedMessage, errorMsg)) {
+                    warnOptionalParse();
+                }
                 return true;
             }
             case SecurityProbeType::FILE: {

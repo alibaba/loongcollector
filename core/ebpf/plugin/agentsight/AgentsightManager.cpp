@@ -15,6 +15,7 @@
 #include "ebpf/plugin/agentsight/AgentsightManager.h"
 
 #include <algorithm>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -25,6 +26,7 @@
 #include "ebpf/Config.h"
 #include "ebpf/EBPFServer.h"
 #include "ebpf/plugin/agentsight/AgentsightEvents.h"
+#include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "ebpf/type/table/BaseElements.h"
 #include "logger/Logger.h"
 #include "models/LogEvent.h"
@@ -244,6 +246,156 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
             "http_api", sym && sym->config_add_http));
 }
 
+using SetLogStrFn = std::function<void(StringView, const std::string&)>;
+
+struct AgentsightLlmEmitOptions {
+    bool detailedMessage = true;
+    AgentsightInputUploadPlan uploadPlan;
+};
+
+void SetLogTimestampFromNs(logtail::LogEvent* log, uint64_t timestampNs) {
+    const auto sec = static_cast<int64_t>(timestampNs / 1000000000ULL);
+    const auto nsec = static_cast<int64_t>(timestampNs % 1000000000ULL);
+    log->SetTimestamp(sec, nsec);
+}
+
+void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec, SetLogStrFn setStr, logtail::LogEvent* log) {
+    setStr(StringView("gen_ai.session.id"), rec.mSessionId);
+    setStr(StringView("gen_ai.turn.id"), rec.mConversationId);
+    if (rec.mPid != 0) {
+        log->SetContent("pid", std::to_string(rec.mPid));
+    }
+    setStr(StringView("comm"), rec.mProcessName);
+    setStr(StringView("gen_ai.agent.type"), rec.mAgentType);
+}
+
+void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn setStr) {
+    if (rec.mRequestUrl.empty()) {
+        return;
+    }
+    std::string host;
+    std::string port;
+    if (ParseHostAndPortFromRequestUrl(rec.mRequestUrl, host, port)) {
+        setStr(StringView("server.address"), host);
+        setStr(StringView("server.port"), port);
+    }
+}
+
+void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
+                                      SetLogStrFn setStr,
+                                      const AgentsightLlmEmitOptions& opts) {
+    if (opts.detailedMessage && opts.uploadPlan.sendFullMessages) {
+        setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
+    }
+    if (opts.detailedMessage) {
+        const std::string systemInstructions = ExtractSystemInstructionsJson(rec.mRequestMessagesJson);
+        setStr(StringView("gen_ai.system_instructions"), systemInstructions);
+        setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
+    }
+    setStr(StringView("gen_ai.input.messages.delta"), rec.mInputMessageDeltaJson);
+    if (!opts.uploadPlan.messagesHash.empty()) {
+        setStr(StringView("gen_ai.input.messages_hash"), opts.uploadPlan.messagesHash);
+    }
+}
+
+void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
+                                  logtail::LogEvent* log,
+                                  const AgentsightLlmEmitOptions& opts) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightCommonCorrelation(rec, setStr, log);
+    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+
+    log->SetContent("gen_ai.request.timestamp", std::to_string(rec.mTimestampNs / 1000000ULL));
+    log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
+
+    FillAgentsightServerFromUrl(rec, setStr);
+
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    log->SetContent("gen_ai.request.model", rec.mModel);
+    log->SetContent("status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+    setStr(StringView("gen_ai.response.finish_reasons"), rec.mFinishReason);
+    log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
+
+    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
+    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec.mOutputTokens));
+    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec.mTotalTokens));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
+
+    FillAgentsightRequestInputFields(rec, setStr, opts);
+    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
+}
+
+void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
+                                   logtail::LogEvent* log,
+                                   const AgentsightLlmEmitOptions& opts) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    SetLogTimestampFromNs(log, rec.mTimestampNs);
+    log->SetContent(StringView("event.name"), StringView("gen_ai.model.request"));
+    FillAgentsightCommonCorrelation(rec, setStr, log);
+
+    log->SetContent("gen_ai.request.timestamp", std::to_string(rec.mTimestampNs / 1000000ULL));
+    FillAgentsightServerFromUrl(rec, setStr);
+
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    log->SetContent("gen_ai.request.model", rec.mModel);
+    FillAgentsightRequestInputFields(rec, setStr, opts);
+}
+
+void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec, logtail::LogEvent* log) {
+    auto setStr = [&](StringView k, const std::string& v) {
+        if (!v.empty()) {
+            log->SetContent(k, StringView(v.data(), v.size()));
+        }
+    };
+
+    const uint64_t responseEndNs = rec.mTimestampNs + rec.mDurationNs;
+    SetLogTimestampFromNs(log, responseEndNs);
+    log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
+    FillAgentsightCommonCorrelation(rec, setStr, log);
+    setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+
+    log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
+    log->SetContent("gen_ai.provider.name", rec.mProvider);
+    if (!rec.mModel.empty()) {
+        log->SetContent("gen_ai.response.model", rec.mModel);
+    }
+    log->SetContent("status_code", std::to_string(rec.mStatusCode));
+    log->SetContent(StringView("is_sse"), StringView(rec.mIsSse ? "1" : "0"));
+    setStr(StringView("gen_ai.response.finish_reasons"), rec.mFinishReason);
+    log->SetContent(std::string("is_usage_from_api"), std::string(rec.mLlmUsage ? "true" : "false"));
+
+    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec.mInputTokens));
+    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec.mOutputTokens));
+    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec.mTotalTokens));
+    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
+    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
+
+    setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
+}
+
+std::string ResolveSessionInputStateKey(const AgentsightLlmRecord& rec) {
+    if (!rec.mSessionId.empty()) {
+        return rec.mSessionId;
+    }
+    if (!rec.mConversationId.empty()) {
+        return rec.mConversationId;
+    }
+    return {};
+}
+
 } // namespace
 
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -265,6 +417,11 @@ void AgentsightManager::LogAgentSightError(const char* what) {
     const auto* sym = mEBPFAdapter->GetAgentSightSymbols();
     const char* err = sym && sym->last_error ? sym->last_error() : nullptr;
     LOG_ERROR(sLogger, ("AgentSight", what)("last_error", err ? err : ""));
+}
+
+void AgentsightManager::clearSessionInputStateLocked() {
+    std::lock_guard<std::mutex> lock(mSessionInputMutex);
+    mSessionInputState.clear();
 }
 
 void AgentsightManager::releaseMetricRefs() {
@@ -453,6 +610,8 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
+    mSplitModelEvents = sec->mAgentsightSplitModelEvents;
+    mDetailedMessage = sec->mAgentsightDetailedMessage;
 
     if (!RestartAgentSightLocked(*sec)) {
         releaseMetricRefs();
@@ -467,6 +626,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
 }
 
 int AgentsightManager::RemoveConfig(const std::string&) {
+    clearSessionInputStateLocked();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     mRegisteredConfigCount = 0;
@@ -474,11 +634,14 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
+    mSplitModelEvents = false;
+    mDetailedMessage = true;
     StopAgentSightLocked();
     return 0;
 }
 
 int AgentsightManager::Destroy() {
+    clearSessionInputStateLocked();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     StopAgentSightLocked();
@@ -487,6 +650,8 @@ int AgentsightManager::Destroy() {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
+    mSplitModelEvents = false;
+    mDetailedMessage = true;
     mInited = false;
     return 0;
 }
@@ -501,7 +666,14 @@ int AgentsightManager::Suspend() {
     return 0;
 }
 
-int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetworkOption*>&) {
+int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetworkOption*>& opt) {
+    const auto* secPtr = std::get_if<SecurityOptions*>(&opt);
+    if (!secPtr || !*secPtr) {
+        return 1;
+    }
+    std::lock_guard<std::mutex> lock(mLibMutex);
+    mSplitModelEvents = (*secPtr)->mAgentsightSplitModelEvents;
+    mDetailedMessage = (*secPtr)->mAgentsightDetailedMessage;
     return 0;
 }
 
@@ -518,6 +690,8 @@ int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetwo
     if (mRegisteredConfigCount == 0) {
         return 0;
     }
+    mSplitModelEvents = (*secPtr)->mAgentsightSplitModelEvents;
+    mDetailedMessage = (*secPtr)->mAgentsightDetailedMessage;
     if (!RestartAgentSightLocked(**secPtr)) {
         return 1;
     }
@@ -543,6 +717,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     logtail::QueueKey queueKey;
     uint32_t pluginIndex;
+    bool splitModelEvents = false;
+    bool detailedMessage = true;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
         if (mPipelineCtx == nullptr) {
@@ -550,63 +726,56 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         }
         queueKey = mQueueKey;
         pluginIndex = mPluginIndex;
+        splitModelEvents = mSplitModelEvents;
+        detailedMessage = mDetailedMessage;
+    }
+
+    AgentsightLlmEmitOptions emitOpts;
+    emitOpts.detailedMessage = detailedMessage;
+    {
+        std::lock_guard<std::mutex> sessionLock(mSessionInputMutex);
+        if (mSessionInputState.size() >= kMaxSessionInputStates) {
+            mSessionInputState.clear();
+        }
+
+        const std::string stateKey = ResolveSessionInputStateKey(*rec);
+
+        const AgentsightSessionInputState* previous = nullptr;
+        if (!stateKey.empty()) {
+            const auto it = mSessionInputState.find(stateKey);
+            if (it != mSessionInputState.end()) {
+                previous = &it->second;
+            }
+        }
+
+        emitOpts.uploadPlan = PlanInputMessagesUpload(rec->mRequestMessagesJson, previous);
+
+        if (!stateKey.empty()) {
+            auto& current = mSessionInputState[stateKey];
+            current.messageCount = emitOpts.uploadPlan.inputMessageCount;
+            current.messagesHash = emitOpts.uploadPlan.messagesHash;
+        }
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    auto* log = eventGroup.AddLogEvent(true, mEventPool);
-    const auto sec = static_cast<int64_t>(rec->mTimestampNs / 1000000000ULL);
-    const auto nsec = static_cast<int64_t>(rec->mTimestampNs % 1000000000ULL);
-    log->SetTimestamp(sec, nsec);
-
-    auto setStr = [&](StringView k, const std::string& v) {
-        if (!v.empty()) {
-            log->SetContent(k, StringView(v.data(), v.size()));
-        }
-    };
-
-    setStr(StringView("gen_ai.session.id"), rec->mSessionId);
-    setStr(StringView("gen_ai.turn.id"), rec->mConversationId);
-    setStr(StringView("gen_ai.response.id"), rec->mResponseId);
-
-    if (rec->mPid != 0) {
-        log->SetContent("pid", std::to_string(rec->mPid));
-    }
-    setStr(StringView("comm"), rec->mProcessName);
-    setStr(StringView("gen_ai.agent.type"), rec->mAgentType);
-
-    log->SetContent("gen_ai.request.timestamp", std::to_string(rec->mTimestampNs / 1000000ULL));
-    log->SetContent("gen_ai.response.duration", std::to_string(rec->mDurationNs / 1000000ULL));
-
-    if (!rec->mRequestUrl.empty()) {
-        std::string host;
-        std::string port;
-        if (ParseHostAndPortFromRequestUrl(rec->mRequestUrl, host, port)) {
-            setStr(StringView("server.address"), host);
-            setStr(StringView("server.port"), port);
+    const size_t logCount = splitModelEvents ? 2U : 1U;
+    for (size_t i = 0; i < logCount; ++i) {
+        auto* log = eventGroup.AddLogEvent(true, mEventPool);
+        if (splitModelEvents) {
+            if (i == 0) {
+                FillAgentsightModelRequestLog(*rec, log, emitOpts);
+            } else {
+                FillAgentsightModelResponseLog(*rec, log);
+            }
+        } else {
+            FillAgentsightCombinedLlmLog(*rec, log, emitOpts);
         }
     }
-
-    log->SetContent("gen_ai.provider.name", rec->mProvider);
-    log->SetContent("gen_ai.request.model", rec->mModel);
-    log->SetContent("status_code", std::to_string(rec->mStatusCode));
-    log->SetContent(StringView("is_sse"), StringView(rec->mIsSse ? "1" : "0"));
-    setStr(StringView("gen_ai.response.finish_reasons"), rec->mFinishReason);
-    log->SetContent(std::string("is_usage_from_api"), std::string(rec->mLlmUsage ? "true" : "false"));
-
-    log->SetContent("gen_ai.usage.input_tokens", std::to_string(rec->mInputTokens));
-    log->SetContent("gen_ai.usage.output_tokens", std::to_string(rec->mOutputTokens));
-    log->SetContent("gen_ai.usage.total_tokens", std::to_string(rec->mTotalTokens));
-    log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec->mCacheCreationInputTokens));
-    log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec->mCacheReadInputTokens));
-
-    setStr(StringView("gen_ai.input.messages"), rec->mRequestMessagesJson);
-    setStr(StringView("gen_ai.output.messages"), rec->mResponseMessagesJson);
-    setStr(StringView("gen_ai.tool.definitions"), rec->mToolDefinitionsJson);
 
     std::unique_ptr<ProcessQueueItem> item = std::make_unique<ProcessQueueItem>(std::move(eventGroup), pluginIndex);
     if (QueueStatus::OK == ProcessQueueManager::GetInstance()->PushQueue(queueKey, std::move(item))) {
-        ADD_COUNTER(mPushLogsTotal, 1);
+        ADD_COUNTER(mPushLogsTotal, logCount);
         ADD_COUNTER(mPushLogGroupTotal, 1);
     } else {
         if (mPushLogFailedTotal) {

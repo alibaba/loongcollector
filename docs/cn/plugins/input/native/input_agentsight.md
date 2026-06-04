@@ -24,6 +24,8 @@ dev
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
+|  ProbeConfig.SplitModelEvents  |  bool  |  否  |  `false`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志：`event.name=gen_ai.model.request`（请求开始时间戳）与 `event.name=gen_ai.model.response`（请求结束时间戳）。为 `false` 时保持历史单条合并日志格式。  |
+|  ProbeConfig.DetailedMessage  |  bool  |  否  |  `true`  |  为 `true` 时输出 `gen_ai.system_instructions`、`gen_ai.tool.definitions`（非空时，**不受**去重影响）；全量 `gen_ai.input.messages` 是否输出由同 session **前缀 hash 去重**决定（见下文）。为 `false` 时不输出上述三字段，仅保留 `gen_ai.input.messages.delta` 等，**不影响** `gen_ai.output.messages`。  |
 
 ### `AgentType` 取值命名规范
 
@@ -215,6 +217,25 @@ Http:
 
 ## 输出格式
 
+四种 ProbeConfig 组合的**上报字段矩阵**及 **full / delta / output 跨轮关系**见：[agentsight_field_report.md](./agentsight_field_report.md)。
+
+### `SplitModelEvents: false`（默认）
+
+一次 LLM 调用输出 **一条** 日志，同时包含请求与响应字段（见下表）。**不含** `event.name`。
+
+### `SplitModelEvents: true`
+
+一次 LLM 调用在同一日志组内输出 **两条** 日志，通过 `gen_ai.session.id`、`gen_ai.turn.id` 等关联：
+
+| `event.name` | 时间戳 | 主要字段 |
+| :--- | :--- | :--- |
+| `gen_ai.model.request` | 请求开始（`timestamp_ns`） | `gen_ai.input.messages`（`DetailedMessage: true` 且去重允许时）、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`（后两者 `DetailedMessage: true` 时每次）、`gen_ai.request.model`、`server.*`、`gen_ai.request.timestamp` |
+| `gen_ai.model.response` | 请求结束（开始 + `duration_ns`） | `gen_ai.output.messages`（始终）、`gen_ai.response.id`、`gen_ai.response.model`、`gen_ai.response.finish_reasons`、`gen_ai.usage.*`（token，无 cost）、`status_code`、`is_sse`、`gen_ai.response.duration` |
+
+两条日志均可能包含：`gen_ai.session.id`、`gen_ai.turn.id`、`pid`、`comm`、`gen_ai.agent.type`、`gen_ai.provider.name`。
+
+### 字段表（合并模式 / 拆分模式中的并集）
+
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `gen_ai.session.id` | string | 用户的会话 id |
@@ -238,11 +259,26 @@ Http:
 | `gen_ai.usage.total_tokens` | string | 一次请求消耗的 Token 总量（十进制字符串） |
 | `gen_ai.usage.cache_creation.input_tokens` | string | 本次请求中，被系统新写入缓存的那部分输入 Token 数量（十进制字符串） |
 | `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
-| `gen_ai.input.messages` | string | 大模型请求 message 的序列化 json |
-| `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json |
-| `gen_ai.tool.definitions` | string | 大模型请求中提供的工具（function/tool 定义）数组的序列化 json，例如 OpenAI 的 `tools` 字段、Anthropic 的 `tools` 字段。无工具时为 `[]`，请求未携带该字段时不输出。 |
+| `gen_ai.input.messages` | string | 完整 messages JSON 数组（**仅** `DetailedMessage: true` 且同 session 去重判定需上传时，非空则输出） |
+| `gen_ai.input.messages.delta` | string | 本轮增量 messages JSON（**每次** LLM 调用均输出，非空时）；剔除 system 后保留最后 `user` 起至末尾 |
+| `gen_ai.input.messages_hash` | string | 完整 messages 数组的 SHA-256（十六进制），用于校验去重 |
+| `gen_ai.system_instructions` | string | 从请求 messages 提取的 `role=system` 消息（**仅** `DetailedMessage: true`，非空时每次输出，**不受**去重影响） |
+| `gen_ai.tool.definitions` | string | 请求 tools 定义 JSON 数组（**仅** `DetailedMessage: true`，非空时每次输出，**不受**去重影响） |
+| `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json（**不受** `DetailedMessage` 控制，非空时输出） |
 
 本表字段均由插件 `SetContent` 写入日志内容，**键值类型均为字符串**。其中带数值语义的字段以十进制文本（或 `is_sse` 的 `1`/`0`）落盘，与实现一致；并非日志 schema 中的强类型整型/浮点列。
+
+### `DetailedMessage` 与 `gen_ai.input.messages_hash`
+
+- `DetailedMessage: true`（默认）：`gen_ai.system_instructions`、`gen_ai.tool.definitions` 非空时**每次**输出。全量 `gen_ai.input.messages` 在同一 `gen_ai.session.id`（无 session 时用 `gen_ai.turn.id`）下，若相对上次**仅尾部追加**且前缀 hash 与上次一致则**省略**（仍输出 `delta` 与 `hash`）。
+- `DetailedMessage: false`：不输出 tool、system prompt、全量 input messages；**始终**输出 `gen_ai.input.messages.delta`（若有）；**始终**输出 `gen_ai.output.messages`（若有）。
+- `gen_ai.input.messages_hash`：按 session 维护全量数组 hash（非空时输出）；与去重逻辑配合：下游可用 hash 判断何时需拉取缺失的全量 `gen_ai.input.messages`。
+
+### `SplitModelEvents: false` 且 `DetailedMessage: false`（最瘦合并日志）
+
+- 每次 LLM 调用 **一条** 日志，**无** `event.name`；时间戳为请求开始时刻。
+- **有**：关联字段、HTTP/`usage` 元数据、`gen_ai.input.messages.delta` / `gen_ai.input.messages_hash`（非空时）、`gen_ai.output.messages`。
+- **无**：全量 `gen_ai.input.messages`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`、拆分后的 `gen_ai.model.request` / `gen_ai.model.response`。
 
 ## 样例
 
@@ -273,6 +309,8 @@ inputs:
       Http:
         - ":8080"
         - "10.0.0.1:9090"
+      SplitModelEvents: true
+      DetailedMessage: true
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true

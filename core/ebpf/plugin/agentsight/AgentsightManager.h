@@ -19,11 +19,13 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 
 #include "agentsight.h"
 #include "collection_pipeline/queue/QueueKey.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
+#include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
 #include "monitor/metric_models/ReentrantMetricsRecord.h"
 
 namespace logtail::ebpf {
@@ -90,6 +92,9 @@ private:
     int DrainReadsLocked();
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
+    void clearSessionInputStateLocked();
+
+    static constexpr size_t kMaxSessionInputStates = 4096;
 
     std::string mConfigName;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
@@ -101,10 +106,15 @@ private:
     // EBPFServer's per-plugin mMtx do so before calling in (Enable/Disable/Suspend); the poller takes
     // shared_lock(mMtx) then this mutex. OnLlmCallback must not lock this (runs under handle_read).
     std::mutex mLibMutex;
+    std::mutex mSessionInputMutex;
+    /// Dedup key (`session_id`, else `turn.id`) -> last `gen_ai.input.messages` length and hash.
+    std::unordered_map<std::string, AgentsightSessionInputState> mSessionInputState;
 
     AgentsightHandle* mHandle = nullptr;
     int mEventFd = -1;
     bool mRunning = false;
+    bool mSplitModelEvents = false;
+    bool mDetailedMessage = true;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;
