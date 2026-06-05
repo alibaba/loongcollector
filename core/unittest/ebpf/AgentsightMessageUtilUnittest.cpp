@@ -24,9 +24,7 @@ void ApplyPlanToState(const AgentsightInputUploadPlan& plan, AgentsightSessionIn
     state.messagesHash = plan.messagesHash;
 }
 
-void ApplyRoundState(const std::string& inputJson,
-                     const std::string& outputJson,
-                     AgentsightSessionInputState& state) {
+void ApplyRoundState(const std::string& inputJson, const std::string& outputJson, AgentsightSessionInputState& state) {
     CommitSessionStateAfterEmit(inputJson, outputJson, state);
 }
 
@@ -232,8 +230,7 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaT1ReplayWithoutFinishReason(
       {"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_EQUAL(
-        R"([{"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}])", delta);
+    APSARA_TEST_EQUAL(R"([{"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}])", delta);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaFromNinWhenOutputHashMismatch() {

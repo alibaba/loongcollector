@@ -15,6 +15,7 @@
 #pragma once
 
 #include <cstddef>
+
 #include <optional>
 #include <string>
 
@@ -76,8 +77,7 @@ std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson
 /// Builds `gen_ai.response.finish_reasons` as a JSON string array, e.g. `["stop"]`.
 /// Collects `finish_reason` from each object in `responseMessagesJson`; uses
 /// `fallbackFinishReason` when the array is empty or unparsable.
-std::string FormatFinishReasonsJson(const std::string& responseMessagesJson,
-                                    const std::string& fallbackFinishReason);
+std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason);
 
 AgentsightParsedRequestParams ParseRequestParametersJson(const std::string& requestParamsJson);
 

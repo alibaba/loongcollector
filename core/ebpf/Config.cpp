@@ -739,8 +739,7 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                     innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
                 ParseAgentsightOptionalStringList(
                     innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
-                if (!GetOptionalBoolParam(
-                        innerConfig, "StreamModeFormat", mAgentsightStreamModeFormat, errorMsg)) {
+                if (!GetOptionalBoolParam(innerConfig, "StreamModeFormat", mAgentsightStreamModeFormat, errorMsg)) {
                     warnOptionalParse();
                 }
                 if (!GetOptionalBoolParam(innerConfig, "AutoMessageTrim", mAgentsightAutoMessageTrim, errorMsg)) {
