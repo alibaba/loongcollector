@@ -321,7 +321,9 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaWhenInputPrefixMismatch() {
       {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_EQUAL(in2, delta);
+    APSARA_TEST_EQUAL(
+        R"([{"role":"user","parts":[{"type":"text","content":"RESET"}]},{"role":"user","parts":[{"type":"text","content":"c"}]}])",
+        delta);
 }
 
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestExtractSystemInstructions)
