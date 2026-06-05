@@ -51,6 +51,7 @@ public:
     void TestComputeDeltaT1ReplayWithoutFinishReason();
     void TestComputeDeltaOmitsSystem();
     void TestComputeDeltaFromNinWhenOutputHashMismatch();
+    void TestComputeDeltaIgnoresToolNameForInputHash();
     void TestResolveSessionStateKey();
     void TestResolveTurnStepStateKey();
     void TestFormatGenAiStepId();
@@ -67,7 +68,7 @@ void AgentsightMessageUtilUnittest::TestExtractSystemInstructions() {
 }
 
 void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenSessionNotInMap() {
-    const std::string full = R"([{"role":"user","content":"hello"}])";
+    const std::string full = R"([{"role":"user","parts":[{"type":"text","content":"hello"}]}])";
     const auto plan = PlanInputMessagesUpload(full, nullptr);
     APSARA_TEST_TRUE(plan.sendFullMessages);
     APSARA_TEST_EQUAL(1UL, plan.inputMessageCount);
@@ -75,9 +76,9 @@ void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenSessionNotInMap(
 
 void AgentsightMessageUtilUnittest::TestInputUploadSkipsFullWhenPrefixStable() {
     const std::string full = R"([
-      {"role":"user","content":"a"},
-      {"role":"assistant","content":"b"},
-      {"role":"user","content":"c"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"b"}]},
+      {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
 
     AgentsightSessionInputState state;
@@ -91,8 +92,8 @@ void AgentsightMessageUtilUnittest::TestInputUploadSkipsFullWhenPrefixStable() {
 
 void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenPrefixChanges() {
     const std::string full1 = R"([
-      {"role":"user","content":"a"},
-      {"role":"user","content":"b"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]},
+      {"role":"user","parts":[{"type":"text","content":"b"}]}
     ])";
 
     AgentsightSessionInputState state;
@@ -100,8 +101,8 @@ void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenPrefixChanges() 
     ApplyPlanToState(first, state);
 
     const std::string full2 = R"([
-      {"role":"user","content":"COMPACT"},
-      {"role":"user","content":"b"}
+      {"role":"user","parts":[{"type":"text","content":"COMPACT"}]},
+      {"role":"user","parts":[{"type":"text","content":"b"}]}
     ])";
     const auto second = PlanInputMessagesUpload(full2, &state);
     APSARA_TEST_TRUE(second.sendFullMessages);
@@ -144,67 +145,67 @@ void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFallbackAlwaysArray()
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaFirstRound() {
-    const std::string cur = R"([{"role":"user","content":"hello"}])";
+    const std::string cur = R"([{"role":"user","parts":[{"type":"text","content":"hello"}]}])";
     const std::string delta = ComputeInputMessagesDelta(cur, nullptr);
     APSARA_TEST_EQUAL(cur, delta);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaAfterOutputMatch() {
     const std::string in1 = R"([
-      {"role":"user","content":"a"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"b"}
+      {"role":"assistant","parts":[{"type":"text","content":"b"}]}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"user","content":"a"},
-      {"role":"assistant","content":"b"},
-      {"role":"user","content":"c"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"b"}]},
+      {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_EQUAL(R"([{"role":"user","content":"c"}])", delta);
+    APSARA_TEST_EQUAL(R"([{"role":"user","parts":[{"type":"text","content":"c"}]}])", delta);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaWhenOutputSliceMismatch() {
     const std::string in1 = R"([
-      {"role":"user","content":"a"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"b"}
+      {"role":"assistant","parts":[{"type":"text","content":"b"}]}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"user","content":"a"},
-      {"role":"user","content":"c"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]},
+      {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_EQUAL(R"([{"role":"user","content":"c"}])", delta);
+    APSARA_TEST_EQUAL(R"([{"role":"user","parts":[{"type":"text","content":"c"}]}])", delta);
 }
 
-// Replay assistant matches stripped H_out when request body omits finish_reason.
+// Multi-step tool loop: replay assistant matches H_out (role+parts; finish_reason ignored).
 void AgentsightMessageUtilUnittest::TestComputeDeltaToolLoopWhenOutputHashMatches() {
     const std::string in1 = R"([
-      {"role":"system","content":"sys"},
-      {"role":"user","content":"看看io读利用率"}
+      {"role":"system","parts":[{"type":"text","content":"sys"}]},
+      {"role":"user","parts":[{"type":"text","content":"看看io读利用率"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"call-io","finish_reason":"tool_calls"}
+      {"role":"assistant","parts":[{"type":"text","content":"call-io"}],"finish_reason":"tool_calls"}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"system","content":"sys"},
-      {"role":"user","content":"看看io读利用率"},
-      {"role":"assistant","content":"call-io"},
-      {"role":"tool","content":"io-stats"},
-      {"role":"assistant","content":"io-answer"},
-      {"role":"user","content":"看看网络利用率"}
+      {"role":"system","parts":[{"type":"text","content":"sys"}]},
+      {"role":"user","parts":[{"type":"text","content":"看看io读利用率"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"call-io"}]},
+      {"role":"tool","parts":[{"type":"tool_call_response","response":"io-stats"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"io-answer"}]},
+      {"role":"user","parts":[{"type":"text","content":"看看网络利用率"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
     APSARA_TEST_TRUE(delta.find("system") == std::string::npos);
@@ -214,56 +215,80 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaToolLoopWhenOutputHashMatche
     APSARA_TEST_TRUE(delta.find("看看网络利用率") != std::string::npos);
 }
 
-// H_out strips finish_reason from response; replay compare is raw (Hermes omits finish_reason).
+// H_out uses role+parts normalization; finish_reason on response does not affect replay match.
 void AgentsightMessageUtilUnittest::TestComputeDeltaT1ReplayWithoutFinishReason() {
     const std::string in1 = R"([
-      {"role":"user","content":"q"}
+      {"role":"user","parts":[{"type":"text","content":"q"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"call-tool","finish_reason":"tool_calls"}
+      {"role":"assistant","parts":[{"type":"text","content":"call-tool"}],"finish_reason":"tool_calls"}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"user","content":"q"},
-      {"role":"assistant","content":"call-tool"},
-      {"role":"tool","content":"tool-result"}
+      {"role":"user","parts":[{"type":"text","content":"q"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"call-tool"}]},
+      {"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_EQUAL(R"([{"role":"tool","content":"tool-result"}])", delta);
+    APSARA_TEST_EQUAL(
+        R"([{"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}])", delta);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaFromNinWhenOutputHashMismatch() {
     const std::string in1 = R"([
-      {"role":"user","content":"q1"}
+      {"role":"user","parts":[{"type":"text","content":"q1"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"a1","finish_reason":"tool_calls"}
+      {"role":"assistant","parts":[{"type":"text","content":"a1"}],"finish_reason":"tool_calls"}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"user","content":"q1"},
-      {"role":"assistant","content":"a1","extra_field":"client-added"},
-      {"role":"tool","content":"t1"},
-      {"role":"user","content":"q2"}
+      {"role":"user","parts":[{"type":"text","content":"q1"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"a1-changed"}]},
+      {"role":"tool","parts":[{"type":"tool_call_response","response":"t1"}]},
+      {"role":"user","parts":[{"type":"text","content":"q2"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_TRUE(delta.find("extra_field") != std::string::npos);
+    APSARA_TEST_TRUE(delta.find("a1-changed") != std::string::npos);
     APSARA_TEST_TRUE(delta.find("t1") != std::string::npos);
     APSARA_TEST_TRUE(delta.find("q2") != std::string::npos);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaOmitsSystem() {
     const std::string cur = R"([
-      {"role":"system","content":"sys"},
-      {"role":"user","content":"hi"}
+      {"role":"system","parts":[{"type":"text","content":"sys"}]},
+      {"role":"user","parts":[{"type":"text","content":"hi"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(cur, nullptr);
     APSARA_TEST_TRUE(delta.find("system") == std::string::npos);
     APSARA_TEST_TRUE(delta.find("hi") != std::string::npos);
+}
+
+// H_in ignores top-level tool `name`; only role+parts participate in prefix hash.
+void AgentsightMessageUtilUnittest::TestComputeDeltaIgnoresToolNameForInputHash() {
+    const std::string in1 = R"([
+      {"role":"user","parts":[{"type":"text","content":"q"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"call"}],"finish_reason":"tool_calls"},
+      {"role":"tool","name":"fn_a","parts":[{"type":"tool_call_response","response":"r"}]}
+    ])";
+    const std::string out1 = R"([
+      {"role":"assistant","parts":[{"type":"text","content":"call"}],"finish_reason":"tool_calls"}
+    ])";
+    AgentsightSessionInputState state;
+    ApplyRoundState(in1, out1, state);
+
+    const std::string in2 = R"([
+      {"role":"user","parts":[{"type":"text","content":"q"}]},
+      {"role":"assistant","parts":[{"type":"text","content":"call"}]},
+      {"role":"tool","name":"fn_b","parts":[{"type":"tool_call_response","response":"r"}]},
+      {"role":"user","parts":[{"type":"text","content":"follow-up"}]}
+    ])";
+    const std::string delta = ComputeInputMessagesDelta(in2, &state);
+    APSARA_TEST_EQUAL(R"([{"role":"user","parts":[{"type":"text","content":"follow-up"}]}])", delta);
 }
 
 void AgentsightMessageUtilUnittest::TestResolveSessionStateKey() {
@@ -286,17 +311,17 @@ void AgentsightMessageUtilUnittest::TestFormatGenAiStepId() {
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaWhenInputPrefixMismatch() {
     const std::string in1 = R"([
-      {"role":"user","content":"a"}
+      {"role":"user","parts":[{"type":"text","content":"a"}]}
     ])";
     const std::string out1 = R"([
-      {"role":"assistant","content":"b"}
+      {"role":"assistant","parts":[{"type":"text","content":"b"}]}
     ])";
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
     const std::string in2 = R"([
-      {"role":"user","content":"RESET"},
-      {"role":"user","content":"c"}
+      {"role":"user","parts":[{"type":"text","content":"RESET"}]},
+      {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
     APSARA_TEST_EQUAL(in2, delta);
@@ -319,6 +344,7 @@ UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaToolLoopWhenOutput
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaT1ReplayWithoutFinishReason)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaOmitsSystem)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaFromNinWhenOutputHashMismatch)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaIgnoresToolNameForInputHash)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveSessionStateKey)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveTurnStepStateKey)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatGenAiStepId)

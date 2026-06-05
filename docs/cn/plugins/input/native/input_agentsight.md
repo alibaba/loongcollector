@@ -267,7 +267,7 @@ Http:
 | `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
 | `gen_ai.input.messages` | string | 当次 LLM 请求的完整 messages JSON 数组（**仅** `AutoMessageTrim: false`，非空则**每次**输出） |
 | `gen_ai.input.messages.delta` | string | 当次请求 input 相对同 session 上一轮的增量片段（JSON 数组字符串）；**不含** `role=system` 消息；非空时输出 |
-| `gen_ai.input.messages_hash` | string | 当次请求**完整** input messages 数组的 SHA-256 摘要（十六进制字符串，与是否输出 delta / 全量无关；非空时输出） |
+| `gen_ai.input.messages_hash` | string | 当次请求 input messages 数组经 **role+parts 归一化**（每条仅保留 `role`、`parts`）后 JSON 序列化的 SHA-256 摘要（十六进制；与是否输出 delta / 全量无关；非空时输出） |
 | `gen_ai.system_instructions` | string | 系统指令（system 角色）消息（JSON 字符串，**仅** `AutoMessageTrim: false`，非空时输出） |
 | `gen_ai.tool.definitions` | string | 请求 tools 定义 JSON 数组（**仅** `AutoMessageTrim: false`，非空时每次输出） |
 | `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json（**不受** `AutoMessageTrim` 控制，非空时输出） |
@@ -287,7 +287,7 @@ Http:
 #### 全量 `gen_ai.input.messages`
 
 - `AutoMessageTrim: false`：每次 LLM 调用在 request 侧日志中输出当次完整 input 数组（非空时），**不做**同 session 前缀 hash 去重省略。
-- `AutoMessageTrim: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。
+- `AutoMessageTrim: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。session 内的 `messages_hash`（H_in）与输出重放 hash（H_out）均对每条 message 做 **role+parts 归一化**后再 SHA-256。
 
 字段含义见上文字段表中的 `gen_ai.input.messages`、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`。
 

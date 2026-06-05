@@ -162,19 +162,30 @@ std::string SerializeJsonArrayOmitSystem(const std::string& messagesJson) {
     return std::string(buf.GetString(), buf.GetSize());
 }
 
-void StripFinishReasonFromMessageObject(rapidjson::Value& msg) {
-    if (!msg.IsObject()) {
+// Session hashes (H_in, H_out, messages_hash): keep only role + parts per message.
+void NormalizeMessageForHash(const rapidjson::Value& src,
+                             rapidjson::Value& dst,
+                             rapidjson::Document::AllocatorType& alloc) {
+    if (!src.IsObject()) {
+        dst.CopyFrom(src, alloc);
         return;
     }
-    if (msg.HasMember("finish_reason")) {
-        msg.RemoveMember("finish_reason");
+    dst.SetObject();
+    if (src.HasMember("role")) {
+        rapidjson::Value role;
+        role.CopyFrom(src["role"], alloc);
+        dst.AddMember("role", role, alloc);
+    }
+    if (src.HasMember("parts")) {
+        rapidjson::Value parts;
+        parts.CopyFrom(src["parts"], alloc);
+        dst.AddMember("parts", parts, alloc);
     }
 }
 
-// Response-only: strip assistant finish_reason before hashing H_out.
-std::string SerializeJsonArrayRangeForOutputHash(const std::string& messagesJson,
-                                                 size_t startIndex,
-                                                 size_t elementCount) {
+std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson,
+                                           size_t startIndex,
+                                           size_t elementCount) {
     rapidjson::Document doc;
     if (!ParseMessagesArray(messagesJson, doc)) {
         return {};
@@ -188,34 +199,13 @@ std::string SerializeJsonArrayRangeForOutputHash(const std::string& messagesJson
     auto& alloc = slice.GetAllocator();
     for (size_t i = 0; i < take; ++i) {
         rapidjson::Value item;
-        item.CopyFrom(doc[static_cast<rapidjson::SizeType>(startIndex + i)], alloc);
-        if (item.IsObject() && item.HasMember("role") && item["role"].IsString()
-            && std::strcmp(item["role"].GetString(), "assistant") == 0) {
-            StripFinishReasonFromMessageObject(item);
-        }
+        NormalizeMessageForHash(doc[static_cast<rapidjson::SizeType>(startIndex + i)], item, alloc);
         slice.PushBack(item, alloc);
     }
     rapidjson::StringBuffer buf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(buf);
     slice.Accept(writer);
     return std::string(buf.GetString(), buf.GetSize());
-}
-
-std::string HashJsonArrayRangeForOutputHash(const std::string& fullMessagesJson,
-                                            size_t startIndex,
-                                            size_t elementCount) {
-    if (elementCount == 0) {
-        return {};
-    }
-    const std::string slice = SerializeJsonArrayRangeForOutputHash(fullMessagesJson, startIndex, elementCount);
-    if (slice.empty()) {
-        return {};
-    }
-    return Sha256Hex(slice);
-}
-
-std::string HashJsonArrayPrefixForOutputHash(const std::string& fullMessagesJson, size_t prefixCount) {
-    return HashJsonArrayRangeForOutputHash(fullMessagesJson, 0, prefixCount);
 }
 
 std::optional<std::string> JsonValueToString(const rapidjson::Value& v) {
@@ -305,19 +295,25 @@ std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t sta
     return SerializeJsonArrayRange(messagesJson, startIndex, docSize - startIndex);
 }
 
-std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+std::string HashJsonArrayRangeForHash(const std::string& fullMessagesJson,
+                                      size_t startIndex,
+                                      size_t elementCount) {
     if (elementCount == 0) {
         return {};
     }
-    const std::string slice = SerializeJsonArrayRange(fullMessagesJson, startIndex, elementCount);
+    const std::string slice = SerializeJsonArrayRangeForHash(fullMessagesJson, startIndex, elementCount);
     if (slice.empty()) {
         return {};
     }
     return Sha256Hex(slice);
 }
 
+std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+    return HashJsonArrayRangeForHash(fullMessagesJson, startIndex, elementCount);
+}
+
 std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount) {
-    return HashJsonArrayRange(fullMessagesJson, 0, prefixCount);
+    return HashJsonArrayRangeForHash(fullMessagesJson, 0, prefixCount);
 }
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson) {
@@ -523,9 +519,8 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
 
     const std::string prefixHash = HashJsonArrayPrefix(fullMessagesJson, prevInCount);
     if (!prefixHash.empty() && prefixHash == previousState->messagesHash) {
-        // cur = prev_in || replay_out || delta. Only skip N_out when the raw replay slice hash
-        // matches H_out (stored from response with finish_reason stripped); otherwise keep
-        // everything after N_in (no漏).
+        // cur = prev_in || replay_out || delta. Only skip N_out when the normalized replay slice
+        // hash matches H_out; otherwise keep everything after N_in (no漏).
         const size_t prevOutCount = previousState->outputMessageCount;
         size_t deltaStart = prevInCount;
         if (prevOutCount > 0 && curCount >= prevInCount + prevOutCount) {
@@ -554,7 +549,7 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
             const size_t baseIn = prevInCount - prevOutCount;
             size_t deltaStart = baseIn;
             if (!previousState->outputMessagesHash.empty() && curCount >= baseIn + prevOutCount) {
-                // Same raw replay hash vs normalized H_out as the primary branch above.
+                // Same normalized replay hash vs H_out as the primary branch above.
                 const std::string replayHash
                     = HashJsonArrayRange(fullMessagesJson, baseIn, prevOutCount);
                 if (!replayHash.empty() && replayHash == previousState->outputMessagesHash) {
@@ -576,8 +571,7 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
 void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state) {
     state.outputMessageCount = CountJsonArrayElements(responseMessagesJson);
     if (state.outputMessageCount > 0) {
-        state.outputMessagesHash
-            = HashJsonArrayPrefixForOutputHash(responseMessagesJson, state.outputMessageCount);
+        state.outputMessagesHash = HashJsonArrayPrefix(responseMessagesJson, state.outputMessageCount);
     } else {
         state.outputMessagesHash.clear();
     }

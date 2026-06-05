@@ -65,8 +65,10 @@ std::string SerializeJsonArrayRange(const std::string& messagesJson, size_t star
 /// Sub-array `[startIndex, end)` through the last element.
 std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t startIndex);
 
+/// SHA-256 of prefix messages after keeping only each message's `role` and `parts` (H_in / H_out).
 std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount);
 
+/// SHA-256 of `[startIndex, startIndex + elementCount)` with the same role+parts normalization as H_in / H_out.
 std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount);
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
@@ -87,10 +89,9 @@ AgentsightInputUploadPlan PlanInputMessagesUpload(const std::string& fullMessage
 /// Derives `gen_ai.input.messages.delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
 /// **response** (`outputMessageCount` / `outputMessagesHash`). When `cur`'s first `messageCount`
-/// messages match `messagesHash`, skip `outputMessageCount` messages only if
+/// messages match `messagesHash` (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
 /// `hash(cur[N_in:N_in+N_out]) == outputMessagesHash`; otherwise delta starts at `N_in`.
-/// `outputMessagesHash` is computed from the response with `finish_reason` stripped on assistant
-/// messages; replay slice comparison uses the raw request slice. System messages are omitted from delta.
+/// Both H_in and H_out use the same role+parts normalization. System messages are omitted from delta.
 std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
                                       const AgentsightSessionInputState* previousState);
 
