@@ -687,8 +687,8 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
         mAgentsightCmdlineBlacklist.clear();
         mAgentsightHttps.clear();
         mAgentsightHttp.clear();
-        mAgentsightStreamModeFormat = true;
-        mAgentsightAutoMessageTrim = true;
+        mAgentsightEventStreamFormat = true;
+        mAgentsightMessageDeltaOnly = true;
     }
 
     SecurityOption thisSecurityOption;
@@ -739,11 +739,16 @@ bool SecurityOptions::Init(SecurityProbeType probeType,
                     innerConfig, "Https", "ProbeConfig.Https", mAgentsightHttps, errorMsg, warnOptionalParse);
                 ParseAgentsightOptionalStringList(
                     innerConfig, "Http", "ProbeConfig.Http", mAgentsightHttp, errorMsg, warnOptionalParse);
-                if (!GetOptionalBoolParam(innerConfig, "StreamModeFormat", mAgentsightStreamModeFormat, errorMsg)) {
-                    warnOptionalParse();
+                if (innerConfig.isMember("EventStreamFormat")) {
+                    if (!GetOptionalBoolParam(
+                            innerConfig, "EventStreamFormat", mAgentsightEventStreamFormat, errorMsg)) {
+                        warnOptionalParse();
+                    }
                 }
-                if (!GetOptionalBoolParam(innerConfig, "AutoMessageTrim", mAgentsightAutoMessageTrim, errorMsg)) {
-                    warnOptionalParse();
+                if (innerConfig.isMember("MessageDeltaOnly")) {
+                    if (!GetOptionalBoolParam(innerConfig, "MessageDeltaOnly", mAgentsightMessageDeltaOnly, errorMsg)) {
+                        warnOptionalParse();
+                    }
                 }
                 return true;
             }

@@ -188,6 +188,16 @@ std::unique_ptr<AgentSightSymbolTable> makeFullSymbolTable() {
     return t;
 }
 
+std::shared_ptr<AgentsightLlmRecord> makeMinimalLlmRecord(const char* configName, const char* sessionId) {
+    static AgentsightLLMData data{};
+    std::memset(&data, 0, sizeof(data));
+    data.session_id = sessionId;
+    data.conversation_id = "turn-ut";
+    data.response_id = "resp-ut";
+    data.timestamp_ns = 1U;
+    return std::make_shared<AgentsightLlmRecord>(std::string(configName), data);
+}
+
 class AgentSightTestEBPFAdapter : public EBPFAdapter {
 public:
     void setAgentSightSymbols(std::unique_ptr<AgentSightSymbolTable> sym) { mTestSyms = std::move(sym); }
@@ -259,13 +269,27 @@ public:
 
     std::variant<SecurityOptions*, ObserverNetworkOption*> asVariant() { return &agentsightOptions(); }
 
-    std::shared_ptr<AgentsightManager> makeManager() {
-        auto m = AgentsightManager::Create(mProcessCacheManager,
-                                           std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
-                                           *mEventQueue,
-                                           mEventPool.get());
+    std::shared_ptr<AgentsightManager> makeManager(const size_t sessionInputCacheMaxSize = 4096) {
+        auto m = std::make_shared<AgentsightManager>(mProcessCacheManager,
+                                                     std::static_pointer_cast<EBPFAdapter>(mAgentSightAdapter),
+                                                     *mEventQueue,
+                                                     mEventPool.get(),
+                                                     sessionInputCacheMaxSize);
         APSARA_TEST_EQUAL(0, m->Init());
         return m;
+    }
+
+    void registerConfig(AgentsightManager& mgr, const char* configName) {
+        CollectionPipelineContext ctx;
+        ctx.SetConfigName(configName);
+        ctx.SetProcessQueueKey(1);
+        APSARA_TEST_EQUAL(0, mgr.AddOrUpdateConfig(&ctx, 0, nullptr, asVariant()));
+    }
+
+    void populateSessionInputCache(AgentsightManager& mgr, const char* configName, const char* const* sessionIds) {
+        for (const char* const* it = sessionIds; *it != nullptr; ++it) {
+            APSARA_TEST_EQUAL(0, mgr.HandleEvent(makeMinimalLlmRecord(configName, *it)));
+        }
     }
 
     void TestAddOrUpdateValidation();
@@ -286,6 +310,9 @@ public:
     void TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate();
     void TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted();
     void TestUserBlacklistOnlySkipsBuiltinAllowInjection();
+    void TestRemoveConfigClearsSessionInputCache();
+    void TestDestroyClearsSessionInputCache();
+    void TestSessionInputCacheLruEviction();
 
 protected:
     std::shared_ptr<AgentSightTestEBPFAdapter> mAgentSightAdapter;
@@ -543,6 +570,62 @@ void AgentsightManagerUnittest::TestUserBlacklistOnlySkipsBuiltinAllowInjection(
     mgr->Destroy();
 }
 
+void AgentsightManagerUnittest::TestRemoveConfigClearsSessionInputCache() {
+    const char* kConfigName = "p_remove_cache";
+    static const char* kSessionIds[] = {"sess-remove-1", "sess-remove-2", nullptr};
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, kConfigName);
+    populateSessionInputCache(*mgr, kConfigName, kSessionIds);
+    APSARA_TEST_EQUAL(2, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-remove-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-remove-2"));
+
+    APSARA_TEST_EQUAL(0, mgr->RemoveConfig(kConfigName));
+    APSARA_TEST_EQUAL(0, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-remove-1"));
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-remove-2"));
+
+    mgr->Destroy();
+}
+
+void AgentsightManagerUnittest::TestDestroyClearsSessionInputCache() {
+    const char* kConfigName = "p_destroy_cache";
+    static const char* kSessionIds[] = {"sess-destroy-1", "sess-destroy-2", nullptr};
+
+    auto mgr = makeManager();
+    registerConfig(*mgr, kConfigName);
+    populateSessionInputCache(*mgr, kConfigName, kSessionIds);
+    APSARA_TEST_EQUAL(2, mgr->GetSessionInputCacheSizeForTest());
+
+    APSARA_TEST_EQUAL(0, mgr->Destroy());
+    APSARA_TEST_EQUAL(0, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-destroy-1"));
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-destroy-2"));
+}
+
+void AgentsightManagerUnittest::TestSessionInputCacheLruEviction() {
+    const char* kConfigName = "p_lru_evict";
+    static constexpr size_t kCacheCap = 2;
+
+    auto mgr = makeManager(kCacheCap);
+    registerConfig(*mgr, kConfigName);
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-1")));
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-2")));
+    APSARA_TEST_EQUAL(kCacheCap, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-2"));
+
+    APSARA_TEST_EQUAL(0, mgr->HandleEvent(makeMinimalLlmRecord(kConfigName, "sess-lru-3")));
+    APSARA_TEST_EQUAL(kCacheCap, mgr->GetSessionInputCacheSizeForTest());
+    APSARA_TEST_TRUE(!mgr->SessionInputCacheContainsForTest("sess-lru-1"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-2"));
+    APSARA_TEST_TRUE(mgr->SessionInputCacheContainsForTest("sess-lru-3"));
+
+    mgr->Destroy();
+}
+
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestGetPluginType);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateValidation);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestAddOrUpdateNoSymbols);
@@ -561,5 +644,8 @@ UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyTwice);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestCmdlineHttpsHttpRulesInvokedOnAddOrUpdate);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestBuiltinCmdlineRulesInjectedWhenCmdlineOmitted);
 UNIT_TEST_CASE(AgentsightManagerUnittest, TestUserBlacklistOnlySkipsBuiltinAllowInjection);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestRemoveConfigClearsSessionInputCache);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestDestroyClearsSessionInputCache);
+UNIT_TEST_CASE(AgentsightManagerUnittest, TestSessionInputCacheLruEviction);
 
 UNIT_TEST_MAIN

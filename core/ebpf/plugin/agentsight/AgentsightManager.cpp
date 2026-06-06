@@ -249,10 +249,9 @@ void ApplyAgentsightRulesToConfig(AgentsightConfigHandle* cfg,
 
 using SetLogStrFn = std::function<void(StringView, const std::string&)>;
 
-struct AgentsightLlmEmitOptions {
-    bool autoMessageTrim = true;
-    AgentsightInputUploadPlan uploadPlan;
-    std::string inputMessagesDelta;
+struct AgentsightLlmEmitPayload {
+    std::string precomputedDelta;
+    std::string messagesHash;
     std::string stepId;
 };
 
@@ -292,24 +291,26 @@ void FillAgentsightServerFromUrl(const AgentsightLlmRecord& rec, SetLogStrFn set
 
 void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
                                       SetLogStrFn setStr,
-                                      const AgentsightLlmEmitOptions& opts) {
-    if (!opts.autoMessageTrim) {
+                                      bool messageDeltaOnly,
+                                      const AgentsightLlmEmitPayload& payload) {
+    if (!messageDeltaOnly) {
         setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
     }
-    if (!opts.autoMessageTrim) {
+    if (!messageDeltaOnly) {
         const std::string systemInstructions = ExtractSystemInstructionsJson(rec.mRequestMessagesJson);
         setStr(StringView("gen_ai.system_instructions"), systemInstructions);
         setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
     }
-    setStr(StringView("gen_ai.input.messages.delta"), opts.inputMessagesDelta);
-    if (!opts.uploadPlan.messagesHash.empty()) {
-        setStr(StringView("gen_ai.input.messages_hash"), opts.uploadPlan.messagesHash);
+    setStr(StringView("gen_ai.input.messages.delta"), payload.precomputedDelta);
+    if (!payload.messagesHash.empty()) {
+        setStr(StringView("gen_ai.input.messages_hash"), payload.messagesHash);
     }
 }
 
 void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
                                   logtail::LogEvent* log,
-                                  const AgentsightLlmEmitOptions& opts) {
+                                  bool messageDeltaOnly,
+                                  const AgentsightLlmEmitPayload& payload) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
             log->SetContent(k, StringView(v.data(), v.size()));
@@ -339,13 +340,14 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     log->SetContent("gen_ai.usage.cache_creation.input_tokens", std::to_string(rec.mCacheCreationInputTokens));
     log->SetContent("gen_ai.usage.cache_read.input_tokens", std::to_string(rec.mCacheReadInputTokens));
 
-    FillAgentsightRequestInputFields(rec, setStr, opts);
+    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
     setStr(StringView("gen_ai.output.messages"), rec.mResponseMessagesJson);
 }
 
 void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
                                    logtail::LogEvent* log,
-                                   const AgentsightLlmEmitOptions& opts,
+                                   bool messageDeltaOnly,
+                                   const AgentsightLlmEmitPayload& payload,
                                    const std::string& eventId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
@@ -362,8 +364,8 @@ void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
 
     log->SetContent("gen_ai.provider.name", rec.mProvider);
     log->SetContent("gen_ai.request.model", rec.mModel);
-    setStr(StringView("gen_ai.step.id"), opts.stepId);
-    FillAgentsightRequestInputFields(rec, setStr, opts);
+    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
 }
 
 void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
@@ -406,8 +408,9 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
 AgentsightManager::AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                                      const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                                      moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                                     EventPool* pool)
-    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool) {
+                                     EventPool* pool,
+                                     const size_t sessionInputCacheMaxSize)
+    : AbstractManager(processCacheManager, eBPFAdapter, queue, pool), mSessionInputCache(sessionInputCacheMaxSize, 0) {
 }
 
 int AgentsightManager::Init() {
@@ -424,74 +427,8 @@ void AgentsightManager::LogAgentSightError(const char* what) {
     LOG_ERROR(sLogger, ("AgentSight", what)("last_error", err ? err : ""));
 }
 
-void AgentsightManager::clearSessionInputStateLocked() {
-    std::lock_guard<std::mutex> lock(mSessionInputMutex);
-    mSessionInputState.clear();
-    mSessionInputLruOrder.clear();
-    mTurnStepState.clear();
-    mTurnStepLruOrder.clear();
-}
-
-void AgentsightManager::evictSessionInputStateLruIfNeededLocked() {
-    while (mSessionInputState.size() >= kMaxSessionInputStates && !mSessionInputLruOrder.empty()) {
-        const std::string& victim = mSessionInputLruOrder.back();
-        mSessionInputState.erase(victim);
-        mSessionInputLruOrder.pop_back();
-    }
-}
-
-AgentsightSessionInputState* AgentsightManager::touchSessionInputStateLocked(const std::string& sessionKey) {
-    if (sessionKey.empty()) {
-        return nullptr;
-    }
-    const auto it = mSessionInputState.find(sessionKey);
-    if (it != mSessionInputState.end()) {
-        mSessionInputLruOrder.splice(mSessionInputLruOrder.begin(), mSessionInputLruOrder, it->second.lruIt);
-        return &it->second.state;
-    }
-    evictSessionInputStateLruIfNeededLocked();
-    mSessionInputLruOrder.push_front(sessionKey);
-    auto& entry = mSessionInputState[sessionKey];
-    entry.state = {};
-    entry.lruIt = mSessionInputLruOrder.begin();
-    return &entry.state;
-}
-
-const AgentsightSessionInputState* AgentsightManager::findSessionInputStateLocked(const std::string& sessionKey) {
-    if (sessionKey.empty()) {
-        return nullptr;
-    }
-    const auto it = mSessionInputState.find(sessionKey);
-    if (it == mSessionInputState.end()) {
-        return nullptr;
-    }
-    mSessionInputLruOrder.splice(mSessionInputLruOrder.begin(), mSessionInputLruOrder, it->second.lruIt);
-    return &it->second.state;
-}
-
-void AgentsightManager::evictTurnStepStateLruIfNeededLocked() {
-    while (mTurnStepState.size() >= kMaxTurnStepStates && !mTurnStepLruOrder.empty()) {
-        const std::string& victim = mTurnStepLruOrder.back();
-        mTurnStepState.erase(victim);
-        mTurnStepLruOrder.pop_back();
-    }
-}
-
-size_t* AgentsightManager::touchTurnStepCounterLocked(const std::string& turnStepKey) {
-    if (turnStepKey.empty()) {
-        return nullptr;
-    }
-    const auto it = mTurnStepState.find(turnStepKey);
-    if (it != mTurnStepState.end()) {
-        mTurnStepLruOrder.splice(mTurnStepLruOrder.begin(), mTurnStepLruOrder, it->second.lruIt);
-        return &it->second.nextStepNumber;
-    }
-    evictTurnStepStateLruIfNeededLocked();
-    mTurnStepLruOrder.push_front(turnStepKey);
-    auto& entry = mTurnStepState[turnStepKey];
-    entry.nextStepNumber = 1;
-    entry.lruIt = mTurnStepLruOrder.begin();
-    return &entry.nextStepNumber;
+void AgentsightManager::clearSessionInputState() {
+    mSessionInputCache.clear();
 }
 
 void AgentsightManager::releaseMetricRefs() {
@@ -680,8 +617,8 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
     mPluginIndex = index;
     mPipelineCtx = ctx;
     mQueueKey = ctx->GetProcessQueueKey();
-    mStreamModeFormat = sec->mAgentsightStreamModeFormat;
-    mAutoMessageTrim = sec->mAgentsightAutoMessageTrim;
+    mEventStreamFormat = sec->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = sec->mAgentsightMessageDeltaOnly;
 
     if (!RestartAgentSightLocked(*sec)) {
         releaseMetricRefs();
@@ -696,7 +633,7 @@ int AgentsightManager::AddOrUpdateConfig(const CollectionPipelineContext* ctx,
 }
 
 int AgentsightManager::RemoveConfig(const std::string&) {
-    clearSessionInputStateLocked();
+    clearSessionInputState();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     mRegisteredConfigCount = 0;
@@ -704,14 +641,14 @@ int AgentsightManager::RemoveConfig(const std::string&) {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
-    mStreamModeFormat = true;
-    mAutoMessageTrim = true;
+    mEventStreamFormat = true;
+    mMessageDeltaOnly = true;
     StopAgentSightLocked();
     return 0;
 }
 
 int AgentsightManager::Destroy() {
-    clearSessionInputStateLocked();
+    clearSessionInputState();
     std::lock_guard<std::mutex> lock(mLibMutex);
     releaseMetricRefs();
     StopAgentSightLocked();
@@ -720,8 +657,8 @@ int AgentsightManager::Destroy() {
     mPipelineCtx = nullptr;
     mQueueKey = 0;
     mPluginIndex = 0;
-    mStreamModeFormat = true;
-    mAutoMessageTrim = true;
+    mEventStreamFormat = true;
+    mMessageDeltaOnly = true;
     mInited = false;
     return 0;
 }
@@ -742,8 +679,8 @@ int AgentsightManager::update(const std::variant<SecurityOptions*, ObserverNetwo
         return 1;
     }
     std::lock_guard<std::mutex> lock(mLibMutex);
-    mStreamModeFormat = (*secPtr)->mAgentsightStreamModeFormat;
-    mAutoMessageTrim = (*secPtr)->mAgentsightAutoMessageTrim;
+    mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
     return 0;
 }
 
@@ -760,8 +697,8 @@ int AgentsightManager::resume(const std::variant<SecurityOptions*, ObserverNetwo
     if (mRegisteredConfigCount == 0) {
         return 0;
     }
-    mStreamModeFormat = (*secPtr)->mAgentsightStreamModeFormat;
-    mAutoMessageTrim = (*secPtr)->mAgentsightAutoMessageTrim;
+    mEventStreamFormat = (*secPtr)->mAgentsightEventStreamFormat;
+    mMessageDeltaOnly = (*secPtr)->mAgentsightMessageDeltaOnly;
     if (!RestartAgentSightLocked(**secPtr)) {
         return 1;
     }
@@ -787,8 +724,8 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
 
     logtail::QueueKey queueKey;
     uint32_t pluginIndex;
-    bool streamModeFormat = true;
-    bool autoMessageTrim = true;
+    bool eventStreamFormat = true;
+    bool messageDeltaOnly = true;
     {
         std::lock_guard<std::mutex> lock(mLibMutex);
         if (mPipelineCtx == nullptr) {
@@ -796,44 +733,49 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         }
         queueKey = mQueueKey;
         pluginIndex = mPluginIndex;
-        streamModeFormat = mStreamModeFormat;
-        autoMessageTrim = mAutoMessageTrim;
+        eventStreamFormat = mEventStreamFormat;
+        messageDeltaOnly = mMessageDeltaOnly;
     }
 
-    AgentsightLlmEmitOptions emitOpts;
-    emitOpts.autoMessageTrim = autoMessageTrim;
-    {
-        std::lock_guard<std::mutex> sessionLock(mSessionInputMutex);
-        const std::string sessionKey = ResolveSessionStateKey(rec->mSessionId, rec->mConversationId);
-        const std::string turnStepKey = ResolveTurnStepStateKey(rec->mSessionId, rec->mConversationId);
+    AgentsightLlmEmitPayload emitPayload;
+    const std::string sessionKey = ResolveSessionStateKey(rec->mSessionId, rec->mConversationId);
 
-        const AgentsightSessionInputState* previous = findSessionInputStateLocked(sessionKey);
+    AgentsightSessionInputState previousCopy;
+    const AgentsightSessionInputState* previous = nullptr;
+    if (!sessionKey.empty() && mSessionInputCache.tryGetCopy(sessionKey, previousCopy)) {
+        previous = &previousCopy;
+    }
 
-        emitOpts.uploadPlan = PlanInputMessagesUpload(rec->mRequestMessagesJson, previous);
-        emitOpts.inputMessagesDelta = ComputeInputMessagesDelta(rec->mRequestMessagesJson, previous);
+    emitPayload.messagesHash = ComputeInputMessagesHash(rec->mRequestMessagesJson);
+    emitPayload.precomputedDelta = ComputeInputMessagesDelta(rec->mRequestMessagesJson, previous);
 
-        if (AgentsightSessionInputState* sessionState = touchSessionInputStateLocked(sessionKey)) {
-            CommitSessionStateAfterEmit(rec->mRequestMessagesJson, rec->mResponseMessagesJson, *sessionState);
+    if (!sessionKey.empty()) {
+        AgentsightSessionInputState sessionState = previous ? previousCopy : AgentsightSessionInputState{};
+        if (rec->mConversationId != sessionState.lastTurnId) {
+            sessionState.lastTurnId = rec->mConversationId;
+            sessionState.nextStepNumber = 1;
         }
-        if (size_t* stepCounter = touchTurnStepCounterLocked(turnStepKey)) {
-            emitOpts.stepId = FormatGenAiStepId((*stepCounter)++);
-        }
+        emitPayload.stepId = FormatGenAiStepId(sessionState.nextStepNumber++);
+        // Session/step state is committed before PushQueue. A queue failure drops delta
+        // state for this round; use MessageDeltaOnly=false when full input fidelity is required.
+        CommitSessionStateAfterEmit(rec->mRequestMessagesJson, rec->mResponseMessagesJson, sessionState);
+        mSessionInputCache.insert(sessionKey, std::move(sessionState));
     }
 
     auto sourceBuffer = std::make_shared<SourceBuffer>();
     PipelineEventGroup eventGroup(sourceBuffer);
-    const size_t logCount = streamModeFormat ? 2U : 1U;
+    const size_t logCount = eventStreamFormat ? 2U : 1U;
     for (size_t i = 0; i < logCount; ++i) {
         auto* log = eventGroup.AddLogEvent(true, mEventPool);
-        if (streamModeFormat) {
+        if (eventStreamFormat) {
             const std::string eventId = CalculateRandomUUID();
             if (i == 0) {
-                FillAgentsightModelRequestLog(*rec, log, emitOpts, eventId);
+                FillAgentsightModelRequestLog(*rec, log, messageDeltaOnly, emitPayload, eventId);
             } else {
                 FillAgentsightModelResponseLog(*rec, log, eventId);
             }
         } else {
-            FillAgentsightCombinedLlmLog(*rec, log, emitOpts);
+            FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);
         }
     }
 

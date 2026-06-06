@@ -24,8 +24,8 @@ dev
 |  ProbeConfig.CmdlineBlacklist  |  array  |  否  |  /  |  进程 **agent 筛选黑名单**，每项为 glob 字符串数组（无 `AgentType`）；**命中则排除**，不采集。**优先级高于白名单**。  |
 |  ProbeConfig.Https  |  array  |  否  |  内置 4 条  |  HTTPS 加密流量的域名白名单（字符串数组，glob 通配符 `*`，不区分大小写）。访问白名单内域名的进程可被识别为采集目标。未配置时注入默认精确主机名列表，见下文。  |
 |  ProbeConfig.Http  |  array  |  否  |  `[]`（关闭）  |  HTTP 明文流量的目标列表（字符串数组）。每项可为 `:端口`、`IP`、`IP:端口` 或域名（如 `model-svc.default.svc`、`*.internal.svc`）。**留空时不采集明文 HTTP 流量**。  |
-|  ProbeConfig.StreamModeFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
-|  ProbeConfig.AutoMessageTrim  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出 `gen_ai.system_instructions`、`gen_ai.tool.definitions` 及全量 `gen_ai.input.messages`（仍输出 `delta`、`messages_hash`）。为 `false` 时输出 system、tools（非空时每次），且**每次**输出非空的全量 `gen_ai.input.messages`（同 session **不**做前缀 hash 去重省略）。**不影响** `gen_ai.output.messages`；`delta` / `messages_hash` 及 session 状态维护**不受**本开关影响。  |
+|  ProbeConfig.EventStreamFormat  |  bool  |  否  |  `true`  |  为 `true` 时，每次 LLM 调用在同一 `PipelineEventGroup` 内输出两条日志（各有 `event.id`）：`event.name=gen_ai.model.request`（请求开始时间戳）与 `gen_ai.model.response`（请求结束时间戳）。为 `false` 时输出单条合并日志，**无** `event.name` / `event.id`。  |
+|  ProbeConfig.MessageDeltaOnly  |  bool  |  否  |  `true`  |  为 `true` 时**不**输出 `gen_ai.system_instructions`、`gen_ai.tool.definitions` 及全量 `gen_ai.input.messages`（仍输出 `delta`、`messages_hash`）。为 `false` 时输出 system、tools（非空时每次），且**每次**输出非空的全量 `gen_ai.input.messages`（同 session **不**做前缀 hash 去重省略）。**不影响** `gen_ai.output.messages`；`delta` / `messages_hash` 及 session 状态维护**不受**本开关影响。  |
 
 ### `AgentType` 取值命名规范
 
@@ -215,7 +215,7 @@ Http:
   - "*.internal.svc"
 ```
 
-### `StreamModeFormat: false`（合并日志）
+### `EventStreamFormat: false`（合并日志）
 
 一次 LLM 调用输出 **一条** 日志，同时包含请求与响应字段（见下表）。
 
@@ -225,13 +225,13 @@ Http:
 
 `Http` / `Https` 只影响**是否采集**对应流量，不改变上述合并/拆分形态。
 
-### `StreamModeFormat: true`（默认，流式拆分）
+### `EventStreamFormat: true`（默认，流式拆分）
 
 一次 LLM 调用在同一日志组内输出 **两条** 日志，通过 `gen_ai.session.id`、`gen_ai.turn.id` 等关联：
 
 | `event.name` | 时间戳 | 主要字段 |
 | :--- | :--- | :--- |
-| `gen_ai.model.request` | 请求开始时刻 | `gen_ai.input.messages`（`AutoMessageTrim: false` 且非空时**每次**）、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`（后三者 `AutoMessageTrim: false` 时）、`gen_ai.request.model`、`server.*`、`gen_ai.request.timestamp` |
+| `gen_ai.model.request` | 请求开始时刻 | `gen_ai.input.messages`（`MessageDeltaOnly: false` 且非空时**每次**）、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`、`gen_ai.system_instructions`、`gen_ai.tool.definitions`（后三者 `MessageDeltaOnly: false` 时）、`gen_ai.request.model`、`server.*`、`gen_ai.request.timestamp` |
 | `gen_ai.model.response` | 请求结束时刻（开始 + 耗时） | `gen_ai.output.messages`（始终）、`gen_ai.response.id`、`gen_ai.response.model`（非空时）、`gen_ai.response.finish_reasons`、`gen_ai.usage.*`（token，无 cost）、`status_code`、`is_sse`、`gen_ai.response.duration`、`gen_ai.provider.name` |
 
 两条日志均可能包含：`event.id`（仅流式拆分）、`gen_ai.session.id`、`gen_ai.turn.id`、`pid`、`comm`、`gen_ai.agent.type`、`gen_ai.provider.name`。
@@ -240,8 +240,8 @@ Http:
 
 | 字段 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `event.id` | string | 本条日志的唯一标识（UUID，大写带连字符）；**仅** `StreamModeFormat: true` 时输出，request/response 各 1 个 |
-| `event.name` | string | **`gen_ai.model.request`** 或 **`gen_ai.model.response`**；**仅** `StreamModeFormat: true` 时输出 |
+| `event.id` | string | 本条日志的唯一标识（UUID，大写带连字符）；**仅** `EventStreamFormat: true` 时输出，request/response 各 1 个 |
+| `event.name` | string | **`gen_ai.model.request`** 或 **`gen_ai.model.response`**；**仅** `EventStreamFormat: true` 时输出 |
 | `gen_ai.session.id` | string | 用户的会话 id |
 | `gen_ai.turn.id` | string | 同一会话中其中一次对话的 id |
 | `gen_ai.response.id` | string | 一次对话中其中一次对大模型请求的回复 id |
@@ -254,8 +254,8 @@ Http:
 | `server.port` | string | 从请求 URL 解析出的端口（URL 中含显式端口时输出） |
 | `gen_ai.provider.name` | string | 大模型厂商名称 |
 | `gen_ai.request.model` | string | 请求侧模型名；合并日志与 request 条输出 |
-| `gen_ai.step.id` | string | 同一 `gen_ai.session.id` + `gen_ai.turn.id` 下，每次 LLM **请求**递增（`step_1`、`step_2`…）；**仅** `event.name=gen_ai.model.request`（`StreamModeFormat: true`）时输出，response / 合并条无此字段 |
-| `gen_ai.response.model` | string | 响应侧模型名（非空时）；**仅** `StreamModeFormat: true` 的 response 条；合并日志**不**单独输出此字段（用 `gen_ai.request.model`） |
+| `gen_ai.step.id` | string | 同一 `gen_ai.session.id` + `gen_ai.turn.id` 下，每次 LLM **请求**递增（`step_1`、`step_2`…）；**仅** `event.name=gen_ai.model.request`（`EventStreamFormat: true`）时输出，response / 合并条无此字段 |
+| `gen_ai.response.model` | string | 响应侧模型名（非空时）；**仅** `EventStreamFormat: true` 的 response 条；合并日志**不**单独输出此字段（用 `gen_ai.request.model`） |
 | `status_code` | string | 一次请求的状态码，同 HTTP 状态码（十进制字符串，如 `200`）；合并条或 response 条 |
 | `is_sse` | string | 是否为 SSE（Server-Sent Events）连接；日志中取值为 `1`（是）或 `0`（否） |
 | `gen_ai.response.finish_reasons` | string | 停止原因 **JSON 数组字符串**（如 `["stop"]`、`["tool_calls","stop"]`）；从 `output.messages`（含 `parts` 内）收集；仅有一个停止原因时也输出单元素数组 |
@@ -265,33 +265,33 @@ Http:
 | `gen_ai.usage.total_tokens` | string | 一次请求消耗的 Token 总量（十进制字符串） |
 | `gen_ai.usage.cache_creation.input_tokens` | string | 本次请求中，被系统新写入缓存的那部分输入 Token 数量（十进制字符串） |
 | `gen_ai.usage.cache_read.input_tokens` | string | 本次请求中，直接从已有缓存中命中并读取的输入 Token 数量（十进制字符串） |
-| `gen_ai.input.messages` | string | 当次 LLM 请求的完整 messages JSON 数组（**仅** `AutoMessageTrim: false`，非空则**每次**输出） |
+| `gen_ai.input.messages` | string | 当次 LLM 请求的完整 messages JSON 数组（**仅** `MessageDeltaOnly: false`，非空则**每次**输出） |
 | `gen_ai.input.messages.delta` | string | 当次请求 input 相对同 session 上一轮的增量片段（JSON 数组字符串）；**不含** `role=system` 消息；非空时输出 |
 | `gen_ai.input.messages_hash` | string | 当次请求 input messages 数组经 **role+parts 归一化**（每条仅保留 `role`、`parts`）后 JSON 序列化的 SHA-256 摘要（十六进制；与是否输出 delta / 全量无关；非空时输出） |
-| `gen_ai.system_instructions` | string | 系统指令（system 角色）消息（JSON 字符串，**仅** `AutoMessageTrim: false`，非空时输出） |
-| `gen_ai.tool.definitions` | string | 请求 tools 定义 JSON 数组（**仅** `AutoMessageTrim: false`，非空时每次输出） |
-| `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json（**不受** `AutoMessageTrim` 控制，非空时输出） |
+| `gen_ai.system_instructions` | string | 系统指令（system 角色）消息（JSON 字符串，**仅** `MessageDeltaOnly: false`，非空时输出） |
+| `gen_ai.tool.definitions` | string | 请求 tools 定义 JSON 数组（**仅** `MessageDeltaOnly: false`，非空时每次输出） |
+| `gen_ai.output.messages` | string | 大模型回复 message 的序列化 json（**不受** `MessageDeltaOnly` 控制，非空时输出） |
 
 本表字段在日志内容中**键值类型均为字符串**。其中带数值语义的字段以十进制文本（或 `is_sse` 的 `1`/`0`）输出。
 
-### `AutoMessageTrim` 与 input 字段
+### `MessageDeltaOnly` 与 input 字段
 
-- `AutoMessageTrim: true`（默认）：不输出 system、tools、全量 input；**始终**输出 `gen_ai.input.messages.delta`（若有）、`gen_ai.input.messages_hash`（若有）、`gen_ai.output.messages`（若有）。
-- `AutoMessageTrim: false`：`gen_ai.system_instructions`、`gen_ai.tool.definitions`、全量 `gen_ai.input.messages` 非空时**每次**输出；**不因 turn 切换而重置**（同 session 内 input 通常连续累积）。
+- `MessageDeltaOnly: true`（默认）：不输出 system、tools、全量 input；**始终**输出 `gen_ai.input.messages.delta`（若有）、`gen_ai.input.messages_hash`（若有）、`gen_ai.output.messages`（若有）。
+- `MessageDeltaOnly: false`：`gen_ai.system_instructions`、`gen_ai.tool.definitions`、全量 `gen_ai.input.messages` 非空时**每次**输出；**不因 turn 切换而重置**（同 session 内 input 通常连续累积）。
 
 #### 会话与 `gen_ai.step.id`
 
 - 会话级 input 关联按 **`gen_ai.session.id`** 索引（无 session 时用 `gen_ai.turn.id`）；同一会话内 **不因 turn 切换而清空**。最多保留 **4096** 个 session，超出时淘汰最久未使用的条目。
-- **`gen_ai.step.id`**：在同一 `gen_ai.session.id` + `gen_ai.turn.id` 下，每次 LLM 请求递增（`step_1`、`step_2`…）；仅 `StreamModeFormat: true` 且 `event.name=gen_ai.model.request` 时输出。
+- **`gen_ai.step.id`**：在同一 `gen_ai.session.id` + `gen_ai.turn.id` 下，每次 LLM 请求递增（`step_1`、`step_2`…）；仅 `EventStreamFormat: true` 且 `event.name=gen_ai.model.request` 时输出。
 
 #### 全量 `gen_ai.input.messages`
 
-- `AutoMessageTrim: false`：每次 LLM 调用在 request 侧日志中输出当次完整 input 数组（非空时），**不做**同 session 前缀 hash 去重省略。
-- `AutoMessageTrim: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。session 内的 `messages_hash`（H_in）与输出重放 hash（H_out）均对每条 message 做 **role+parts 归一化**后再 SHA-256。
+- `MessageDeltaOnly: false`：每次 LLM 调用在 request 侧日志中输出当次完整 input 数组（非空时），**不做**同 session 前缀 hash 去重省略。
+- `MessageDeltaOnly: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。session 内的 `messages_hash`（H_in）与输出重放 hash（H_out）均对每条 message 做 **role+parts 归一化**后再 SHA-256。
 
 字段含义见上文字段表中的 `gen_ai.input.messages`、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`。
 
-### `StreamModeFormat: false` 且 `AutoMessageTrim: true`（最瘦合并日志）
+### `EventStreamFormat: false` 且 `MessageDeltaOnly: true`（最瘦合并日志）
 
 - 每次 LLM 调用 **一条** 日志，**无** `event.name`、**无** `event.id`；时间戳为请求开始时刻。
 - **有**：关联字段、HTTP/`usage` 元数据、`gen_ai.input.messages.delta` / `gen_ai.input.messages_hash`（非空时）、`gen_ai.output.messages`。
@@ -324,15 +324,15 @@ inputs:
       Http:
         - ":8080"
         - "10.0.0.1:9090"
-      StreamModeFormat: false
-      AutoMessageTrim: false
+      EventStreamFormat: false
+      MessageDeltaOnly: false
 flushers:
   - Type: flusher_stdout
     OnlyStdout: true
     Tags: true
 ```
 
-- 输出（`StreamModeFormat: false`，单条合并日志）
+- 输出（`EventStreamFormat: false`，单条合并日志）
 
 {
   "gen_ai.agent.type": "openclaw",
@@ -422,14 +422,14 @@ flushers:
   "status_code": "200"
 }
 
-- 采集配置（`StreamModeFormat: true`，其余同上，仅改此项）
+- 采集配置（`EventStreamFormat: true`，其余同上，仅改此项）
 
 ```yaml
-      StreamModeFormat: true
-      AutoMessageTrim: false
+      EventStreamFormat: true
+      MessageDeltaOnly: false
 ```
 
-- 输出（`StreamModeFormat: true`，同一 `gen_ai.turn.id` 下两条日志）
+- 输出（`EventStreamFormat: true`，同一 `gen_ai.turn.id` 下两条日志）
 
 **`event.name` = `gen_ai.model.request`**
 

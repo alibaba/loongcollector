@@ -16,14 +16,13 @@
 
 #include <cstdint>
 
-#include <list>
 #include <memory>
 #include <mutex>
 #include <string>
-#include <unordered_map>
 
 #include "agentsight.h"
 #include "collection_pipeline/queue/QueueKey.h"
+#include "common/LRUCache.h"
 #include "ebpf/EBPFAdapter.h"
 #include "ebpf/plugin/AbstractManager.h"
 #include "ebpf/plugin/agentsight/AgentsightMessageUtil.h"
@@ -37,7 +36,8 @@ public:
     AgentsightManager(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
                       const std::shared_ptr<EBPFAdapter>& eBPFAdapter,
                       moodycamel::BlockingConcurrentQueue<std::shared_ptr<CommonEvent>>& queue,
-                      EventPool* pool);
+                      EventPool* pool,
+                      size_t sessionInputCacheMaxSize = kMaxSessionInputStates);
 
     static std::shared_ptr<AgentsightManager>
     Create(const std::shared_ptr<ProcessCacheManager>& processCacheManager,
@@ -81,6 +81,14 @@ public:
         mPushLogFailedTotal = std::move(pushLogFailedTotal);
     }
 
+#ifdef APSARA_UNIT_TEST_MAIN
+    size_t GetSessionInputCacheSizeForTest() const { return mSessionInputCache.size(); }
+
+    bool SessionInputCacheContainsForTest(const std::string& sessionKey) const {
+        return mSessionInputCache.contains(sessionKey);
+    }
+#endif
+
 protected:
     int update(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
     int resume(const std::variant<SecurityOptions*, ObserverNetworkOption*>& options) override;
@@ -93,15 +101,9 @@ private:
     int DrainReadsLocked();
     void LogAgentSightError(const char* what);
     void releaseMetricRefs();
-    void clearSessionInputStateLocked();
-    void evictSessionInputStateLruIfNeededLocked();
-    AgentsightSessionInputState* touchSessionInputStateLocked(const std::string& sessionKey);
-    const AgentsightSessionInputState* findSessionInputStateLocked(const std::string& sessionKey);
-    void evictTurnStepStateLruIfNeededLocked();
-    size_t* touchTurnStepCounterLocked(const std::string& turnStepKey);
+    void clearSessionInputState();
 
     static constexpr size_t kMaxSessionInputStates = 4096;
-    static constexpr size_t kMaxTurnStepStates = 4096;
 
     std::string mConfigName;
     const CollectionPipelineContext* mPipelineCtx{nullptr};
@@ -113,27 +115,14 @@ private:
     // EBPFServer's per-plugin mMtx do so before calling in (Enable/Disable/Suspend); the poller takes
     // shared_lock(mMtx) then this mutex. OnLlmCallback must not lock this (runs under handle_read).
     std::mutex mLibMutex;
-    std::mutex mSessionInputMutex;
-    /// `session_id` (or `turn.id` fallback) -> delta/dedup; survives turn changes within a session.
-    std::list<std::string> mSessionInputLruOrder;
-    struct SessionInputStateEntry {
-        AgentsightSessionInputState state;
-        std::list<std::string>::iterator lruIt;
-    };
-    std::unordered_map<std::string, SessionInputStateEntry> mSessionInputState;
-    /// `(session_id, turn.id)` -> per-turn `gen_ai.step.id` counter only.
-    std::list<std::string> mTurnStepLruOrder;
-    struct TurnStepStateEntry {
-        size_t nextStepNumber = 1;
-        std::list<std::string>::iterator lruIt;
-    };
-    std::unordered_map<std::string, TurnStepStateEntry> mTurnStepState;
+    /// `session_id` (or `turn.id` fallback) -> delta/dedup and per-turn step counter.
+    lru11::Cache<std::string, AgentsightSessionInputState, std::mutex> mSessionInputCache;
 
     AgentsightHandle* mHandle = nullptr;
     int mEventFd = -1;
     bool mRunning = false;
-    bool mStreamModeFormat = true;
-    bool mAutoMessageTrim = true;
+    bool mEventStreamFormat = true;
+    bool mMessageDeltaOnly = true;
 
     CounterPtr mLossKernelEventsTotal;
     CounterPtr mPushLogFailedTotal;

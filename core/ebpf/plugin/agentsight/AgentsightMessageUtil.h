@@ -16,45 +16,25 @@
 
 #include <cstddef>
 
-#include <optional>
 #include <string>
 
 namespace logtail::ebpf {
 
-/// Cached per `gen_ai.session.id` (see `ResolveSessionStateKey`): last completed LLM round for delta/dedup.
+/// Cached per `gen_ai.session.id` (see `ResolveSessionStateKey`): last completed LLM round for delta/dedup
+/// and per-turn `gen_ai.step.id` sequencing.
 struct AgentsightSessionInputState {
     size_t messageCount = 0;
     std::string messagesHash;
     size_t outputMessageCount = 0;
     std::string outputMessagesHash;
+    std::string lastTurnId;
+    size_t nextStepNumber = 1;
 };
 
 /// Delta/dedup LRU key: `session_id`, or `turn.id` when session is absent.
 std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId);
 
-/// Step counter LRU key: `session_id` + `turn.id` when both present; else same fallback as session key.
-std::string ResolveTurnStepStateKey(const std::string& sessionId, const std::string& turnId);
-
 std::string FormatGenAiStepId(size_t stepNumber);
-
-struct AgentsightInputUploadPlan {
-    bool sendFullMessages = true;
-    size_t inputMessageCount = 0;
-    std::string messagesHash;
-};
-
-struct AgentsightParsedRequestParams {
-    std::optional<std::string> temperature;
-    std::optional<std::string> maxTokens;
-    std::optional<std::string> frequencyPenalty;
-    std::optional<std::string> presencePenalty;
-    std::optional<std::string> topP;
-    std::optional<std::string> topK;
-    std::optional<std::string> seed;
-    std::optional<std::string> choiceCount;
-};
-
-std::string Sha256Hex(const std::string& data);
 
 size_t CountJsonArrayElements(const std::string& messagesJson);
 
@@ -79,12 +59,8 @@ std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson
 /// `fallbackFinishReason` when the array is empty or unparsable.
 std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason);
 
-AgentsightParsedRequestParams ParseRequestParametersJson(const std::string& requestParamsJson);
-
-/// `fullMessagesJson` is the `gen_ai.input.messages` field value (one JSON array string).
-/// `previousState` is null when the turn state key is not in the LRU cache yet (must upload full messages).
-AgentsightInputUploadPlan PlanInputMessagesUpload(const std::string& fullMessagesJson,
-                                                  const AgentsightSessionInputState* previousState);
+/// H_in over the full `gen_ai.input.messages` array (role+parts normalization per message).
+std::string ComputeInputMessagesHash(const std::string& fullMessagesJson);
 
 /// Derives `gen_ai.input.messages.delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
@@ -97,7 +73,8 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
 
 void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state);
 
-/// After each emit: `messageCount` / `messagesHash` cover request messages + response messages.
+/// After each emit: `messageCount` / `messagesHash` cover **request** messages only; response
+/// replay state is stored in `outputMessageCount` / `outputMessagesHash`.
 void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
                                  const std::string& responseMessagesJson,
                                  AgentsightSessionInputState& state);

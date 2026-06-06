@@ -19,11 +19,6 @@ using namespace logtail::ebpf;
 
 namespace {
 
-void ApplyPlanToState(const AgentsightInputUploadPlan& plan, AgentsightSessionInputState& state) {
-    state.messageCount = plan.inputMessageCount;
-    state.messagesHash = plan.messagesHash;
-}
-
 void ApplyRoundState(const std::string& inputJson, const std::string& outputJson, AgentsightSessionInputState& state) {
     CommitSessionStateAfterEmit(inputJson, outputJson, state);
 }
@@ -33,10 +28,9 @@ void ApplyRoundState(const std::string& inputJson, const std::string& outputJson
 class AgentsightMessageUtilUnittest : public testing::Test {
 public:
     void TestExtractSystemInstructions();
-    void TestInputUploadSkipsFullWhenPrefixStable();
-    void TestInputUploadSendsFullWhenPrefixChanges();
-    void TestInputUploadSendsFullWhenSessionNotInMap();
-    void TestParseRequestParameters();
+    void TestInputMessagesHashFirstRound();
+    void TestInputMessagesHashStableAcrossRounds();
+    void TestInputMessagesHashChangesWhenContentChanges();
     void TestFormatFinishReasonsFromOutputMessages();
     void TestFormatFinishReasonsFallback();
     void TestFormatFinishReasonsFromParts();
@@ -51,7 +45,6 @@ public:
     void TestComputeDeltaFromNinWhenOutputHashMismatch();
     void TestComputeDeltaIgnoresToolNameForInputHash();
     void TestResolveSessionStateKey();
-    void TestResolveTurnStepStateKey();
     void TestFormatGenAiStepId();
 };
 
@@ -65,55 +58,41 @@ void AgentsightMessageUtilUnittest::TestExtractSystemInstructions() {
     APSARA_TEST_TRUE(out.find("user") == std::string::npos);
 }
 
-void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenSessionNotInMap() {
+void AgentsightMessageUtilUnittest::TestInputMessagesHashFirstRound() {
     const std::string full = R"([{"role":"user","parts":[{"type":"text","content":"hello"}]}])";
-    const auto plan = PlanInputMessagesUpload(full, nullptr);
-    APSARA_TEST_TRUE(plan.sendFullMessages);
-    APSARA_TEST_EQUAL(1UL, plan.inputMessageCount);
+    const std::string hash = ComputeInputMessagesHash(full);
+    APSARA_TEST_TRUE(!hash.empty());
+    APSARA_TEST_EQUAL(64UL, hash.size());
 }
 
-void AgentsightMessageUtilUnittest::TestInputUploadSkipsFullWhenPrefixStable() {
+void AgentsightMessageUtilUnittest::TestInputMessagesHashStableAcrossRounds() {
     const std::string full = R"([
       {"role":"user","parts":[{"type":"text","content":"a"}]},
       {"role":"assistant","parts":[{"type":"text","content":"b"}]},
       {"role":"user","parts":[{"type":"text","content":"c"}]}
     ])";
 
+    const std::string firstHash = ComputeInputMessagesHash(full);
     AgentsightSessionInputState state;
-    const auto first = PlanInputMessagesUpload(full, nullptr);
-    APSARA_TEST_TRUE(first.sendFullMessages);
-    ApplyPlanToState(first, state);
+    ApplyRoundState(full, R"([{"role":"assistant","parts":[{"type":"text","content":"b"}]}])", state);
 
-    const auto second = PlanInputMessagesUpload(full, &state);
-    APSARA_TEST_FALSE(second.sendFullMessages);
+    const std::string secondHash = ComputeInputMessagesHash(full);
+    APSARA_TEST_EQUAL(firstHash, secondHash);
 }
 
-void AgentsightMessageUtilUnittest::TestInputUploadSendsFullWhenPrefixChanges() {
+void AgentsightMessageUtilUnittest::TestInputMessagesHashChangesWhenContentChanges() {
     const std::string full1 = R"([
       {"role":"user","parts":[{"type":"text","content":"a"}]},
       {"role":"user","parts":[{"type":"text","content":"b"}]}
     ])";
-
-    AgentsightSessionInputState state;
-    const auto first = PlanInputMessagesUpload(full1, nullptr);
-    ApplyPlanToState(first, state);
+    const std::string hash1 = ComputeInputMessagesHash(full1);
 
     const std::string full2 = R"([
       {"role":"user","parts":[{"type":"text","content":"COMPACT"}]},
       {"role":"user","parts":[{"type":"text","content":"b"}]}
     ])";
-    const auto second = PlanInputMessagesUpload(full2, &state);
-    APSARA_TEST_TRUE(second.sendFullMessages);
-}
-
-void AgentsightMessageUtilUnittest::TestParseRequestParameters() {
-    const std::string json = R"({"temperature":0.2,"max_tokens":128,"top_p":0.9})";
-    const auto p = ParseRequestParametersJson(json);
-    APSARA_TEST_TRUE(p.temperature.has_value());
-    APSARA_TEST_EQUAL("0.2", *p.temperature);
-    APSARA_TEST_TRUE(p.maxTokens.has_value());
-    APSARA_TEST_EQUAL("128", *p.maxTokens);
-    APSARA_TEST_TRUE(p.topP.has_value());
+    const std::string hash2 = ComputeInputMessagesHash(full2);
+    APSARA_TEST_TRUE(hash1 != hash2);
 }
 
 void AgentsightMessageUtilUnittest::TestFormatFinishReasonsFromOutputMessages() {
@@ -295,12 +274,6 @@ void AgentsightMessageUtilUnittest::TestResolveSessionStateKey() {
     APSARA_TEST_EQUAL("", ResolveSessionStateKey("", ""));
 }
 
-void AgentsightMessageUtilUnittest::TestResolveTurnStepStateKey() {
-    APSARA_TEST_EQUAL("sess\x1eturn", ResolveTurnStepStateKey("sess", "turn"));
-    APSARA_TEST_EQUAL("sess-only", ResolveTurnStepStateKey("sess-only", ""));
-    APSARA_TEST_EQUAL("turn-only", ResolveTurnStepStateKey("", "turn-only"));
-}
-
 void AgentsightMessageUtilUnittest::TestFormatGenAiStepId() {
     APSARA_TEST_EQUAL("step_1", FormatGenAiStepId(1));
     APSARA_TEST_EQUAL("step_3", FormatGenAiStepId(3));
@@ -327,10 +300,9 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaWhenInputPrefixMismatch() {
 }
 
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestExtractSystemInstructions)
-UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSendsFullWhenSessionNotInMap)
-UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSkipsFullWhenPrefixStable)
-UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputUploadSendsFullWhenPrefixChanges)
-UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestParseRequestParameters)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputMessagesHashFirstRound)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputMessagesHashStableAcrossRounds)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestInputMessagesHashChangesWhenContentChanges)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromOutputMessages)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFallback)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatFinishReasonsFromParts)
@@ -345,7 +317,6 @@ UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaOmitsSystem)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaFromNinWhenOutputHashMismatch)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaIgnoresToolNameForInputHash)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveSessionStateKey)
-UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveTurnStepStateKey)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatGenAiStepId)
 
 UNIT_TEST_MAIN
