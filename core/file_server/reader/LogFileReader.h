@@ -474,6 +474,15 @@ protected:
     ReadUTF8(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
     void ReadGBK(LogBuffer& logBuffer, int64_t end, bool& moreData, bool tryRollback = true, bool isStaticFile = false);
 
+    // WHOLE_FILE overwrite chunked drain helpers. Each emitted chunk is sized to end on a line boundary
+    // ('\n') when possible, otherwise on a character boundary, so that every chunk shown downstream
+    // (which does not reassemble) is human-readable.
+    void DrainWholeFileChunk(LogBuffer& logBuffer, bool& moreData);
+    // Byte length of the next front chunk of [data, data+available), capped at BUFFER_SIZE, preferring a
+    // trailing '\n', else a complete character; always >= 1 to guarantee progress.
+    size_t GetWholeFileChunkSize(char* data, size_t available);
+    int32_t CountWholeFileChunks();
+
     size_t
     ReadFile(LogFileOperator& logFileOp, void* buf, size_t size, int64_t& offset, TruncateInfo** truncateInfo = NULL);
     static int32_t ParseTime(const char* buffer, const std::string& timeFormat);
@@ -505,6 +514,13 @@ protected:
     int64_t mExpectedFileSize = 0; //  expected file size limit, used for StaticFileServer reader
     time_t mLastMTime = 0;
     std::string mCache;
+    bool mDrainingWholeFileCache = false;
+    int32_t mWholeFileChunkIndex = 0;
+    int32_t mWholeFileTotalChunks = 0;
+    std::string mWholeFileId;
+    // WHOLE_FILE overwrite detection baselines (only touched by whole_file overwrite logic).
+    int64_t mLastMTimeNs = 0;
+    int64_t mLastWholeFileSize = -1;
     // >= 0: index of reader array, -1: new reader, -2: not in reader array, -3: not found
     int32_t mIdxInReaderArrayFromLastCpt = CHECKPOINT_IDX_OF_NEW_READER_IN_ARRAY;
     // std::string mProjectName;
@@ -526,6 +542,9 @@ protected:
     std::string mContainerID;
     time_t mContainerStoppedTime = 0;
     time_t mReadStoppedContainerAlarmTime = 0;
+    // Rate-limits the "whole_file overwrite exceeds MaxWholeFileBytes" warning so an oversized file does
+    // not flood the log on every read cycle.
+    time_t mWholeFileOversizeWarnTime = 0;
     int32_t mReadDelayTime = 0;
     bool mSkipFirstModify = false;
     // int64_t mReadDelayAlarmBytes;
@@ -747,6 +766,10 @@ struct LogBuffer {
     uint64_t readOffset = 0;
     uint64_t readLength = 0;
     std::unique_ptr<SourceBuffer> sourcebuffer;
+    // WHOLE_FILE overwrite mode: chunked delivery metadata
+    std::string wholeFileId;
+    int32_t wholeFileSeq = -1;
+    int32_t wholeFileTotal = -1;
 
     LogBuffer() : sourcebuffer(new SourceBuffer()) {}
     void SetDependecy(const LogFileReaderPtr& reader) { logFileReader = reader; }
