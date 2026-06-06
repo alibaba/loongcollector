@@ -43,6 +43,7 @@ public:
     void TestComputeDeltaT1ReplayWithoutFinishReason();
     void TestComputeDeltaOmitsSystem();
     void TestComputeDeltaFromNinWhenOutputHashMismatch();
+    void TestComputeDeltaOutputReplayIgnoresPartsDifference();
     void TestComputeDeltaIgnoresToolNameForInputHash();
     void TestResolveSessionStateKey();
     void TestFormatGenAiStepId();
@@ -164,7 +165,7 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaWhenOutputSliceMismatch() {
     APSARA_TEST_EQUAL(R"([{"role":"user","parts":[{"type":"text","content":"c"}]}])", delta);
 }
 
-// Multi-step tool loop: replay assistant matches H_out (role+parts; finish_reason ignored).
+// Multi-step tool loop: replay assistant matches H_out (role-only; parts/finish_reason ignored).
 void AgentsightMessageUtilUnittest::TestComputeDeltaToolLoopWhenOutputHashMatches() {
     const std::string in1 = R"([
       {"role":"system","parts":[{"type":"text","content":"sys"}]},
@@ -192,7 +193,7 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaToolLoopWhenOutputHashMatche
     APSARA_TEST_TRUE(delta.find("看看网络利用率") != std::string::npos);
 }
 
-// H_out uses role+parts normalization; finish_reason on response does not affect replay match.
+// H_out uses role-only normalization; finish_reason and parts on response do not affect replay match.
 void AgentsightMessageUtilUnittest::TestComputeDeltaT1ReplayWithoutFinishReason() {
     const std::string in1 = R"([
       {"role":"user","parts":[{"type":"text","content":"q"}]}
@@ -222,16 +223,37 @@ void AgentsightMessageUtilUnittest::TestComputeDeltaFromNinWhenOutputHashMismatc
     AgentsightSessionInputState state;
     ApplyRoundState(in1, out1, state);
 
+    // Replay slice role differs from stored output (assistant vs user) → H_out mismatch, delta from N_in.
     const std::string in2 = R"([
       {"role":"user","parts":[{"type":"text","content":"q1"}]},
-      {"role":"assistant","parts":[{"type":"text","content":"a1-changed"}]},
+      {"role":"user","parts":[{"type":"text","content":"unexpected-at-replay"}]},
       {"role":"tool","parts":[{"type":"tool_call_response","response":"t1"}]},
       {"role":"user","parts":[{"type":"text","content":"q2"}]}
     ])";
     const std::string delta = ComputeInputMessagesDelta(in2, &state);
-    APSARA_TEST_TRUE(delta.find("a1-changed") != std::string::npos);
+    APSARA_TEST_TRUE(delta.find("unexpected-at-replay") != std::string::npos);
     APSARA_TEST_TRUE(delta.find("t1") != std::string::npos);
     APSARA_TEST_TRUE(delta.find("q2") != std::string::npos);
+}
+
+// OpenClaw-style replay: response tool_call id `call_<hex>` vs replay `call<hex>`; H_out is role-only.
+void AgentsightMessageUtilUnittest::TestComputeDeltaOutputReplayIgnoresPartsDifference() {
+    const std::string in1 = R"([
+      {"role":"user","parts":[{"type":"text","content":"q"}]}
+    ])";
+    const std::string out1 = R"([
+      {"role":"assistant","parts":[{"type":"tool_call","id":"call_abc123","name":"fn"}],"finish_reason":"tool_calls"}
+    ])";
+    AgentsightSessionInputState state;
+    ApplyRoundState(in1, out1, state);
+
+    const std::string in2 = R"([
+      {"role":"user","parts":[{"type":"text","content":"q"}]},
+      {"role":"assistant","parts":[{"type":"tool_call","id":"callabc123","name":"fn"}]},
+      {"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}
+    ])";
+    const std::string delta = ComputeInputMessagesDelta(in2, &state);
+    APSARA_TEST_EQUAL(R"([{"role":"tool","parts":[{"type":"tool_call_response","response":"tool-result"}]}])", delta);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaOmitsSystem() {
@@ -315,6 +337,7 @@ UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaToolLoopWhenOutput
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaT1ReplayWithoutFinishReason)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaOmitsSystem)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaFromNinWhenOutputHashMismatch)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaOutputReplayIgnoresPartsDifference)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaIgnoresToolNameForInputHash)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveSessionStateKey)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatGenAiStepId)

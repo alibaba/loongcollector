@@ -62,7 +62,7 @@ std::string SerializeJsonArrayOmitSystem(const std::string& messagesJson) {
     return std::string(buf.GetString(), buf.GetSize());
 }
 
-// Session hashes (H_in, H_out, messages_hash): keep only role + parts per message.
+// H_in / messages_hash: keep only role + parts per message.
 void NormalizeMessageForHash(const rapidjson::Value& src,
                              rapidjson::Value& dst,
                              rapidjson::Document::AllocatorType& alloc) {
@@ -83,7 +83,30 @@ void NormalizeMessageForHash(const rapidjson::Value& src,
     }
 }
 
-std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson, size_t startIndex, size_t elementCount) {
+// H_out replay: keep only role per message (parts may differ between response and replay, e.g. tool_call id).
+void NormalizeMessageForOutputHash(const rapidjson::Value& src,
+                                   rapidjson::Value& dst,
+                                   rapidjson::Document::AllocatorType& alloc) {
+    if (!src.IsObject()) {
+        dst.CopyFrom(src, alloc);
+        return;
+    }
+    dst.SetObject();
+    if (src.HasMember("role")) {
+        rapidjson::Value role;
+        role.CopyFrom(src["role"], alloc);
+        dst.AddMember("role", role, alloc);
+    }
+}
+
+using NormalizeMessageFn = void (*)(const rapidjson::Value&,
+                                    rapidjson::Value&,
+                                    rapidjson::Document::AllocatorType&);
+
+std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson,
+                                             size_t startIndex,
+                                             size_t elementCount,
+                                             NormalizeMessageFn normalize) {
     rapidjson::Document doc;
     if (!ParseMessagesArray(messagesJson, doc)) {
         return {};
@@ -97,7 +120,7 @@ std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson, size
     auto& alloc = slice.GetAllocator();
     for (size_t i = 0; i < take; ++i) {
         rapidjson::Value item;
-        NormalizeMessageForHash(doc[static_cast<rapidjson::SizeType>(startIndex + i)], item, alloc);
+        normalize(doc[static_cast<rapidjson::SizeType>(startIndex + i)], item, alloc);
         slice.PushBack(item, alloc);
     }
     rapidjson::StringBuffer buf;
@@ -106,15 +129,26 @@ std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson, size
     return std::string(buf.GetString(), buf.GetSize());
 }
 
-std::string HashJsonArrayRangeForHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+std::string HashJsonArrayRangeNormalized(const std::string& fullMessagesJson,
+                                         size_t startIndex,
+                                         size_t elementCount,
+                                         NormalizeMessageFn normalize) {
     if (elementCount == 0) {
         return {};
     }
-    const std::string slice = SerializeJsonArrayRangeForHash(fullMessagesJson, startIndex, elementCount);
+    const std::string slice = SerializeJsonArrayRangeForHash(fullMessagesJson, startIndex, elementCount, normalize);
     if (slice.empty()) {
         return {};
     }
     return logtail::CalcSHA256Hex(slice);
+}
+
+std::string HashJsonArrayRangeForInputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+    return HashJsonArrayRangeNormalized(fullMessagesJson, startIndex, elementCount, NormalizeMessageForHash);
+}
+
+std::string HashJsonArrayRangeForOutputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+    return HashJsonArrayRangeNormalized(fullMessagesJson, startIndex, elementCount, NormalizeMessageForOutputHash);
 }
 
 } // namespace
@@ -167,11 +201,15 @@ std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t sta
 }
 
 std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
-    return HashJsonArrayRangeForHash(fullMessagesJson, startIndex, elementCount);
+    return HashJsonArrayRangeForInputHash(fullMessagesJson, startIndex, elementCount);
 }
 
 std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount) {
-    return HashJsonArrayRangeForHash(fullMessagesJson, 0, prefixCount);
+    return HashJsonArrayRangeForInputHash(fullMessagesJson, 0, prefixCount);
+}
+
+std::string HashJsonArrayPrefixForOutput(const std::string& fullMessagesJson, size_t prefixCount) {
+    return HashJsonArrayRangeForOutputHash(fullMessagesJson, 0, prefixCount);
 }
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson) {
@@ -335,7 +373,8 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
         size_t deltaStart = prevInCount;
         if (prevOutCount > 0 && curCount >= prevInCount + prevOutCount) {
             if (!previousState->outputMessagesHash.empty()) {
-                const std::string replayHash = HashJsonArrayRange(fullMessagesJson, prevInCount, prevOutCount);
+                const std::string replayHash =
+                    HashJsonArrayRangeForOutputHash(fullMessagesJson, prevInCount, prevOutCount);
                 if (!replayHash.empty() && replayHash == previousState->outputMessagesHash) {
                     deltaStart = prevInCount + prevOutCount;
                 }
@@ -355,7 +394,7 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
 void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state) {
     state.outputMessageCount = CountJsonArrayElements(responseMessagesJson);
     if (state.outputMessageCount > 0) {
-        state.outputMessagesHash = HashJsonArrayPrefix(responseMessagesJson, state.outputMessageCount);
+        state.outputMessagesHash = HashJsonArrayPrefixForOutput(responseMessagesJson, state.outputMessageCount);
     } else {
         state.outputMessagesHash.clear();
     }

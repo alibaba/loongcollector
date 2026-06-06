@@ -287,7 +287,7 @@ Http:
 #### 全量 `gen_ai.input.messages`
 
 - `MessageDeltaOnly: false`：每次 LLM 调用在 request 侧日志中输出当次完整 input 数组（非空时），**不做**同 session 前缀 hash 去重省略。
-- `MessageDeltaOnly: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。session 内的 `messages_hash`（H_in）与输出重放 hash（H_out）均对每条 message 做 **role+parts 归一化**后再 SHA-256。
+- `MessageDeltaOnly: true`：**不**输出全量 input；仍输出 `gen_ai.input.messages.delta` 与 `gen_ai.input.messages_hash`（非空时）。插件内部仍按 session 维护上一轮条数与 hash 以计算 delta，该状态**不**用于决定是否省略全量上报（因全量字段本身不输出）。session 内的 `messages_hash`（H_in）对每条 message 做 **role+parts 归一化**后再 SHA-256；输出重放 hash（H_out）仅保留 **role**（便于 response 与下一轮 replay 在 `parts`/tool_call id 等字段不一致时仍能匹配）。
 
 字段含义见上文字段表中的 `gen_ai.input.messages`、`gen_ai.input.messages.delta`、`gen_ai.input.messages_hash`。
 

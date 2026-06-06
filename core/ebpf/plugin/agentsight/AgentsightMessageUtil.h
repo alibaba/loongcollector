@@ -46,11 +46,14 @@ std::string SerializeJsonArrayRange(const std::string& messagesJson, size_t star
 /// Sub-array `[startIndex, end)` through the last element.
 std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t startIndex);
 
-/// SHA-256 of prefix messages after keeping only each message's `role` and `parts` (H_in / H_out).
+/// SHA-256 of prefix messages after keeping only each message's `role` and `parts` (H_in).
 std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount);
 
-/// SHA-256 of `[startIndex, startIndex + elementCount)` with the same role+parts normalization as H_in / H_out.
+/// SHA-256 of `[startIndex, startIndex + elementCount)` with the same role+parts normalization as H_in.
 std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount);
+
+/// SHA-256 of prefix messages after keeping only each message's `role` (H_out replay).
+std::string HashJsonArrayPrefixForOutput(const std::string& fullMessagesJson, size_t prefixCount);
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
 
@@ -67,7 +70,7 @@ std::string ComputeInputMessagesHash(const std::string& fullMessagesJson);
 /// **response** (`outputMessageCount` / `outputMessagesHash`). When `cur`'s first `messageCount`
 /// messages match `messagesHash` (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
 /// `hash(cur[N_in:N_in+N_out]) == outputMessagesHash`; otherwise delta starts at `N_in`.
-/// Both H_in and H_out use the same role+parts normalization. System messages are omitted from delta.
+/// H_in uses role+parts normalization; H_out uses role-only normalization. System messages are omitted from delta.
 std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
                                       const AgentsightSessionInputState* previousState);
 
