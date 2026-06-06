@@ -99,14 +99,12 @@ void NormalizeMessageForOutputHash(const rapidjson::Value& src,
     }
 }
 
-using NormalizeMessageFn = void (*)(const rapidjson::Value&,
-                                    rapidjson::Value&,
-                                    rapidjson::Document::AllocatorType&);
+using NormalizeMessageFn = void (*)(const rapidjson::Value&, rapidjson::Value&, rapidjson::Document::AllocatorType&);
 
 std::string SerializeJsonArrayRangeForHash(const std::string& messagesJson,
-                                             size_t startIndex,
-                                             size_t elementCount,
-                                             NormalizeMessageFn normalize) {
+                                           size_t startIndex,
+                                           size_t elementCount,
+                                           NormalizeMessageFn normalize) {
     rapidjson::Document doc;
     if (!ParseMessagesArray(messagesJson, doc)) {
         return {};
@@ -143,11 +141,13 @@ std::string HashJsonArrayRangeNormalized(const std::string& fullMessagesJson,
     return logtail::CalcSHA256Hex(slice);
 }
 
-std::string HashJsonArrayRangeForInputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+std::string
+HashJsonArrayRangeForInputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
     return HashJsonArrayRangeNormalized(fullMessagesJson, startIndex, elementCount, NormalizeMessageForHash);
 }
 
-std::string HashJsonArrayRangeForOutputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
+std::string
+HashJsonArrayRangeForOutputHash(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount) {
     return HashJsonArrayRangeNormalized(fullMessagesJson, startIndex, elementCount, NormalizeMessageForOutputHash);
 }
 
@@ -373,8 +373,8 @@ std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
         size_t deltaStart = prevInCount;
         if (prevOutCount > 0 && curCount >= prevInCount + prevOutCount) {
             if (!previousState->outputMessagesHash.empty()) {
-                const std::string replayHash =
-                    HashJsonArrayRangeForOutputHash(fullMessagesJson, prevInCount, prevOutCount);
+                const std::string replayHash
+                    = HashJsonArrayRangeForOutputHash(fullMessagesJson, prevInCount, prevOutCount);
                 if (!replayHash.empty() && replayHash == previousState->outputMessagesHash) {
                     deltaStart = prevInCount + prevOutCount;
                 }
