@@ -62,7 +62,7 @@ std::string SerializeJsonArrayOmitSystem(const std::string& messagesJson) {
     return std::string(buf.GetString(), buf.GetSize());
 }
 
-// H_in / messages_hash: keep only role + parts per message.
+// H_in (internal delta state): keep only role + parts per message.
 void NormalizeMessageForHash(const rapidjson::Value& src,
                              rapidjson::Value& dst,
                              rapidjson::Document::AllocatorType& alloc) {
@@ -210,6 +210,21 @@ std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t pref
 
 std::string HashJsonArrayPrefixForOutput(const std::string& fullMessagesJson, size_t prefixCount) {
     return HashJsonArrayRangeForOutputHash(fullMessagesJson, 0, prefixCount);
+}
+
+std::string ComputeContentSha256Hex(const std::string& content) {
+    if (content.empty()) {
+        return {};
+    }
+    return logtail::CalcSHA256Hex(content);
+}
+
+std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson) {
+    return ComputeContentSha256Hex(ExtractSystemInstructionsJson(requestMessagesJson));
+}
+
+std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson) {
+    return ComputeContentSha256Hex(toolDefinitionsJson);
 }
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson) {
@@ -402,6 +417,7 @@ void UpdateSessionOutputState(const std::string& responseMessagesJson, Agentsigh
 
 void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
                                  const std::string& responseMessagesJson,
+                                 const std::string& toolDefinitionsJson,
                                  AgentsightSessionInputState& state) {
     UpdateSessionOutputState(responseMessagesJson, state);
     state.messageCount = CountJsonArrayElements(requestMessagesJson);
@@ -410,6 +426,8 @@ void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
     } else {
         state.messagesHash.clear();
     }
+    state.systemInstructionsHash = ComputeSystemInstructionsHash(requestMessagesJson);
+    state.toolDefinitionsHash = ComputeToolDefinitionsHash(toolDefinitionsJson);
 }
 
 std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId) {
@@ -419,8 +437,11 @@ std::string ResolveSessionStateKey(const std::string& sessionId, const std::stri
     return turnId;
 }
 
-std::string FormatGenAiStepId(size_t stepNumber) {
-    return "step_" + std::to_string(stepNumber);
+std::string FormatGenAiStepId(const std::string& turnId, size_t stepNumber) {
+    if (turnId.empty()) {
+        return {};
+    }
+    return turnId + ":s" + std::to_string(stepNumber);
 }
 
 } // namespace logtail::ebpf

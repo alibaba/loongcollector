@@ -115,7 +115,7 @@ private:
     // EBPFServer's per-plugin mMtx do so before calling in (Enable/Disable/Suspend); the poller takes
     // shared_lock(mMtx) then this mutex. OnLlmCallback must not lock this (runs under handle_read).
     std::mutex mLibMutex;
-    /// `session_id` (or `turn.id` fallback) -> delta/dedup and per-turn step counter.
+    /// `session_id` (or `turn.id` fallback) -> delta/dedup and per-turn step/sequence counters.
     lru11::Cache<std::string, AgentsightSessionInputState, std::mutex> mSessionInputCache;
 
     AgentsightHandle* mHandle = nullptr;

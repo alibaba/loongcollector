@@ -27,14 +27,19 @@ struct AgentsightSessionInputState {
     std::string messagesHash;
     size_t outputMessageCount = 0;
     std::string outputMessagesHash;
+    std::string systemInstructionsHash;
+    std::string toolDefinitionsHash;
     std::string lastTurnId;
     size_t nextStepNumber = 1;
+    /// Per-turn monotonic sequence for split-mode `gen_ai.event.sequence` (each emitted log row).
+    size_t nextEventSequence = 1;
 };
 
 /// Delta/dedup LRU key: `session_id`, or `turn.id` when session is absent.
 std::string ResolveSessionStateKey(const std::string& sessionId, const std::string& turnId);
 
-std::string FormatGenAiStepId(size_t stepNumber);
+/// `{turn.id}:s{N}` (e.g. `278a5a71…:s2`); empty when `turnId` is empty.
+std::string FormatGenAiStepId(const std::string& turnId, size_t stepNumber);
 
 size_t CountJsonArrayElements(const std::string& messagesJson);
 
@@ -57,6 +62,12 @@ std::string HashJsonArrayPrefixForOutput(const std::string& fullMessagesJson, si
 
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
 
+/// SHA-256 (hex) of `ExtractSystemInstructionsJson` output.
+std::string ComputeSystemInstructionsHash(const std::string& requestMessagesJson);
+
+/// SHA-256 (hex) of the raw tool-definitions JSON string.
+std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson);
+
 /// Builds `gen_ai.response.finish_reasons` as a JSON string array, e.g. `["stop"]`.
 /// Collects `finish_reason` from each object in `responseMessagesJson`; uses
 /// `fallbackFinishReason` when the array is empty or unparsable.
@@ -65,7 +76,7 @@ std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, con
 /// H_in over the full `gen_ai.input.messages` array (role+parts normalization per message).
 std::string ComputeInputMessagesHash(const std::string& fullMessagesJson);
 
-/// Derives `gen_ai.input.messages.delta` locally (does not use AgentSight FFI delta).
+/// Derives `gen_ai.input.messages_delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
 /// **response** (`outputMessageCount` / `outputMessagesHash`). When `cur`'s first `messageCount`
 /// messages match `messagesHash` (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
@@ -80,6 +91,7 @@ void UpdateSessionOutputState(const std::string& responseMessagesJson, Agentsigh
 /// replay state is stored in `outputMessageCount` / `outputMessagesHash`.
 void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
                                  const std::string& responseMessagesJson,
+                                 const std::string& toolDefinitionsJson,
                                  AgentsightSessionInputState& state);
 
 } // namespace logtail::ebpf

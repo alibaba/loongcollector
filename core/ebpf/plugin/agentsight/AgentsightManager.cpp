@@ -251,14 +251,26 @@ using SetLogStrFn = std::function<void(StringView, const std::string&)>;
 
 struct AgentsightLlmEmitPayload {
     std::string precomputedDelta;
-    std::string messagesHash;
+    std::string systemInstructionsJson;
+    std::string systemInstructionsHash;
+    bool emitSystemInstructions = false;
+    std::string toolDefinitionsHash;
+    bool emitToolDefinitions = false;
     std::string stepId;
+    size_t eventSequenceRequest = 0;
+    size_t eventSequenceResponse = 0;
 };
 
 void SetLogTimestampFromNs(logtail::LogEvent* log, uint64_t timestampNs) {
     const auto sec = static_cast<int64_t>(timestampNs / 1000000000ULL);
     const auto nsec = static_cast<int64_t>(timestampNs % 1000000000ULL);
     log->SetTimestamp(sec, nsec);
+}
+
+void FillAgentsightOtlpTimeFields(logtail::LogEvent* log, uint64_t timestampNs) {
+    const std::string timestampStr = std::to_string(timestampNs);
+    log->SetContent("time_unix_nano", timestampStr);
+    log->SetContent("observed_time_unix_nano", timestampStr);
 }
 
 void FillAgentsightCommonCorrelation(const AgentsightLlmRecord& rec,
@@ -296,15 +308,19 @@ void FillAgentsightRequestInputFields(const AgentsightLlmRecord& rec,
     if (!messageDeltaOnly) {
         setStr(StringView("gen_ai.input.messages"), rec.mRequestMessagesJson);
     }
-    if (!messageDeltaOnly) {
-        const std::string systemInstructions = ExtractSystemInstructionsJson(rec.mRequestMessagesJson);
-        setStr(StringView("gen_ai.system_instructions"), systemInstructions);
+    if (!payload.systemInstructionsHash.empty()) {
+        setStr(StringView("gen_ai.system_instructions_hash"), payload.systemInstructionsHash);
+    }
+    if (payload.emitSystemInstructions) {
+        setStr(StringView("gen_ai.system_instructions"), payload.systemInstructionsJson);
+    }
+    if (!payload.toolDefinitionsHash.empty()) {
+        setStr(StringView("gen_ai.tool.definitions_hash"), payload.toolDefinitionsHash);
+    }
+    if (payload.emitToolDefinitions) {
         setStr(StringView("gen_ai.tool.definitions"), rec.mToolDefinitionsJson);
     }
-    setStr(StringView("gen_ai.input.messages.delta"), payload.precomputedDelta);
-    if (!payload.messagesHash.empty()) {
-        setStr(StringView("gen_ai.input.messages_hash"), payload.messagesHash);
-    }
+    setStr(StringView("gen_ai.input.messages_delta"), payload.precomputedDelta);
 }
 
 void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
@@ -318,10 +334,10 @@ void FillAgentsightCombinedLlmLog(const AgentsightLlmRecord& rec,
     };
 
     SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
     FillAgentsightCommonCorrelation(rec, setStr, log);
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
 
-    log->SetContent("gen_ai.request.timestamp", std::to_string(rec.mTimestampNs / 1000000ULL));
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
 
     FillAgentsightServerFromUrl(rec, setStr);
@@ -356,20 +372,24 @@ void FillAgentsightModelRequestLog(const AgentsightLlmRecord& rec,
     };
 
     SetLogTimestampFromNs(log, rec.mTimestampNs);
+    FillAgentsightOtlpTimeFields(log, rec.mTimestampNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.request"));
     FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
 
-    log->SetContent("gen_ai.request.timestamp", std::to_string(rec.mTimestampNs / 1000000ULL));
     FillAgentsightServerFromUrl(rec, setStr);
 
     log->SetContent("gen_ai.provider.name", rec.mProvider);
     log->SetContent("gen_ai.request.model", rec.mModel);
     setStr(StringView("gen_ai.step.id"), payload.stepId);
+    if (payload.eventSequenceRequest > 0) {
+        log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceRequest));
+    }
     FillAgentsightRequestInputFields(rec, setStr, messageDeltaOnly, payload);
 }
 
 void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
                                     logtail::LogEvent* log,
+                                    const AgentsightLlmEmitPayload& payload,
                                     const std::string& eventId) {
     auto setStr = [&](StringView k, const std::string& v) {
         if (!v.empty()) {
@@ -379,9 +399,14 @@ void FillAgentsightModelResponseLog(const AgentsightLlmRecord& rec,
 
     const uint64_t responseEndNs = rec.mTimestampNs + rec.mDurationNs;
     SetLogTimestampFromNs(log, responseEndNs);
+    FillAgentsightOtlpTimeFields(log, responseEndNs);
     log->SetContent(StringView("event.name"), StringView("gen_ai.model.response"));
     FillAgentsightCommonCorrelation(rec, setStr, log, eventId);
     setStr(StringView("gen_ai.response.id"), rec.mResponseId);
+    setStr(StringView("gen_ai.step.id"), payload.stepId);
+    if (payload.eventSequenceResponse > 0) {
+        log->SetContent("gen_ai.event.sequence", std::to_string(payload.eventSequenceResponse));
+    }
 
     log->SetContent("gen_ai.response.duration", std::to_string(rec.mDurationNs / 1000000ULL));
     log->SetContent("gen_ai.provider.name", rec.mProvider);
@@ -746,19 +771,33 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
         previous = &previousCopy;
     }
 
-    emitPayload.messagesHash = ComputeInputMessagesHash(rec->mRequestMessagesJson);
     emitPayload.precomputedDelta = ComputeInputMessagesDelta(rec->mRequestMessagesJson, previous);
+
+    emitPayload.systemInstructionsJson = ExtractSystemInstructionsJson(rec->mRequestMessagesJson);
+    emitPayload.systemInstructionsHash = ComputeSystemInstructionsHash(rec->mRequestMessagesJson);
+    emitPayload.toolDefinitionsHash = ComputeToolDefinitionsHash(rec->mToolDefinitionsJson);
+    const bool firstRoundInSession = previous == nullptr;
+    emitPayload.emitSystemInstructions = !emitPayload.systemInstructionsHash.empty()
+        && (firstRoundInSession || previousCopy.systemInstructionsHash != emitPayload.systemInstructionsHash);
+    emitPayload.emitToolDefinitions = !emitPayload.toolDefinitionsHash.empty()
+        && (firstRoundInSession || previousCopy.toolDefinitionsHash != emitPayload.toolDefinitionsHash);
 
     if (!sessionKey.empty()) {
         AgentsightSessionInputState sessionState = previous ? previousCopy : AgentsightSessionInputState{};
         if (rec->mConversationId != sessionState.lastTurnId) {
             sessionState.lastTurnId = rec->mConversationId;
             sessionState.nextStepNumber = 1;
+            sessionState.nextEventSequence = 1;
         }
-        emitPayload.stepId = FormatGenAiStepId(sessionState.nextStepNumber++);
+        emitPayload.stepId = FormatGenAiStepId(rec->mConversationId, sessionState.nextStepNumber++);
+        if (eventStreamFormat) {
+            emitPayload.eventSequenceRequest = sessionState.nextEventSequence++;
+            emitPayload.eventSequenceResponse = sessionState.nextEventSequence++;
+        }
         // Session/step state is committed before PushQueue. A queue failure drops delta
         // state for this round; use MessageDeltaOnly=false when full input fidelity is required.
-        CommitSessionStateAfterEmit(rec->mRequestMessagesJson, rec->mResponseMessagesJson, sessionState);
+        CommitSessionStateAfterEmit(
+            rec->mRequestMessagesJson, rec->mResponseMessagesJson, rec->mToolDefinitionsJson, sessionState);
         mSessionInputCache.insert(sessionKey, std::move(sessionState));
     }
 
@@ -772,7 +811,7 @@ int AgentsightManager::HandleEvent(const std::shared_ptr<CommonEvent>& event) {
             if (i == 0) {
                 FillAgentsightModelRequestLog(*rec, log, messageDeltaOnly, emitPayload, eventId);
             } else {
-                FillAgentsightModelResponseLog(*rec, log, eventId);
+                FillAgentsightModelResponseLog(*rec, log, emitPayload, eventId);
             }
         } else {
             FillAgentsightCombinedLlmLog(*rec, log, messageDeltaOnly, emitPayload);

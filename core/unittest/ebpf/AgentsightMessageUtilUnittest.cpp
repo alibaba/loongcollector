@@ -19,8 +19,11 @@ using namespace logtail::ebpf;
 
 namespace {
 
-void ApplyRoundState(const std::string& inputJson, const std::string& outputJson, AgentsightSessionInputState& state) {
-    CommitSessionStateAfterEmit(inputJson, outputJson, state);
+void ApplyRoundState(const std::string& inputJson,
+                     const std::string& outputJson,
+                     AgentsightSessionInputState& state,
+                     const std::string& toolsJson = "[]") {
+    CommitSessionStateAfterEmit(inputJson, outputJson, toolsJson, state);
 }
 
 } // namespace
@@ -47,6 +50,11 @@ public:
     void TestComputeDeltaIgnoresToolNameForInputHash();
     void TestResolveSessionStateKey();
     void TestFormatGenAiStepId();
+    void TestSystemInstructionsHashStable();
+    void TestSystemInstructionsHashChanges();
+    void TestToolDefinitionsHashStable();
+    void TestToolDefinitionsHashChanges();
+    void TestCommitSessionStateStoresSystemAndToolHashes();
 };
 
 void AgentsightMessageUtilUnittest::TestExtractSystemInstructions() {
@@ -297,8 +305,54 @@ void AgentsightMessageUtilUnittest::TestResolveSessionStateKey() {
 }
 
 void AgentsightMessageUtilUnittest::TestFormatGenAiStepId() {
-    APSARA_TEST_EQUAL("step_1", FormatGenAiStepId(1));
-    APSARA_TEST_EQUAL("step_3", FormatGenAiStepId(3));
+    APSARA_TEST_EQUAL("turn-abc:s1", FormatGenAiStepId("turn-abc", 1));
+    APSARA_TEST_EQUAL("278a5a71:s3", FormatGenAiStepId("278a5a71", 3));
+    APSARA_TEST_TRUE(FormatGenAiStepId("", 1).empty());
+}
+
+void AgentsightMessageUtilUnittest::TestSystemInstructionsHashStable() {
+    const std::string messages = R"([
+      {"role":"system","parts":[{"type":"text","content":"sys-a"}]},
+      {"role":"user","parts":[{"type":"text","content":"hi"}]}
+    ])";
+    const std::string hash1 = ComputeSystemInstructionsHash(messages);
+    const std::string hash2 = ComputeSystemInstructionsHash(messages);
+    APSARA_TEST_TRUE(!hash1.empty());
+    APSARA_TEST_EQUAL(64UL, hash1.size());
+    APSARA_TEST_EQUAL(hash1, hash2);
+}
+
+void AgentsightMessageUtilUnittest::TestSystemInstructionsHashChanges() {
+    const std::string messages1 = R"([{"role":"system","parts":[{"type":"text","content":"a"}]}])";
+    const std::string messages2 = R"([{"role":"system","parts":[{"type":"text","content":"b"}]}])";
+    APSARA_TEST_TRUE(ComputeSystemInstructionsHash(messages1) != ComputeSystemInstructionsHash(messages2));
+}
+
+void AgentsightMessageUtilUnittest::TestToolDefinitionsHashStable() {
+    const std::string tools = R"([{"type":"function","function":{"name":"read"}}])";
+    const std::string hash1 = ComputeToolDefinitionsHash(tools);
+    const std::string hash2 = ComputeToolDefinitionsHash(tools);
+    APSARA_TEST_TRUE(!hash1.empty());
+    APSARA_TEST_EQUAL(64UL, hash1.size());
+    APSARA_TEST_EQUAL(hash1, hash2);
+}
+
+void AgentsightMessageUtilUnittest::TestToolDefinitionsHashChanges() {
+    const std::string tools1 = R"([{"type":"function","function":{"name":"read"}}])";
+    const std::string tools2 = R"([{"type":"function","function":{"name":"write"}}])";
+    APSARA_TEST_TRUE(ComputeToolDefinitionsHash(tools1) != ComputeToolDefinitionsHash(tools2));
+}
+
+void AgentsightMessageUtilUnittest::TestCommitSessionStateStoresSystemAndToolHashes() {
+    const std::string input = R"([
+      {"role":"system","parts":[{"type":"text","content":"sys"}]},
+      {"role":"user","parts":[{"type":"text","content":"q"}]}
+    ])";
+    const std::string tools = R"([{"type":"function","function":{"name":"fn"}}])";
+    AgentsightSessionInputState state;
+    ApplyRoundState(input, R"([{"role":"assistant","parts":[{"type":"text","content":"a"}]}])", state, tools);
+    APSARA_TEST_EQUAL(ComputeSystemInstructionsHash(input), state.systemInstructionsHash);
+    APSARA_TEST_EQUAL(ComputeToolDefinitionsHash(tools), state.toolDefinitionsHash);
 }
 
 void AgentsightMessageUtilUnittest::TestComputeDeltaWhenInputPrefixMismatch() {
@@ -341,5 +395,10 @@ UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaOutputReplayIgnore
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestComputeDeltaIgnoresToolNameForInputHash)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestResolveSessionStateKey)
 UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestFormatGenAiStepId)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestSystemInstructionsHashStable)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestSystemInstructionsHashChanges)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestToolDefinitionsHashStable)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestToolDefinitionsHashChanges)
+UNIT_TEST_CASE(AgentsightMessageUtilUnittest, TestCommitSessionStateStoresSystemAndToolHashes)
 
 UNIT_TEST_MAIN
