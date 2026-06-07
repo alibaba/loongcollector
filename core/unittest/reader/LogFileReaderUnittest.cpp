@@ -14,7 +14,6 @@
 
 #include <cstdio>
 
-
 #include <fstream>
 
 #include "common/FileSystemUtil.h"
