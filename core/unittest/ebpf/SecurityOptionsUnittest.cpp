@@ -34,6 +34,8 @@ public:
     void TestAgentsightRejectsEmptyCmdlineWhitelistArray();
     void TestAgentsightProbeConfigParsesHttpsAndHttp();
     void TestAgentsightProbeConfigHttpsHttpInvalidTypes();
+    void TestAgentsightEventStreamFormatParse();
+    void TestAgentsightMessageDeltaOnlyDefaultAndParse();
 };
 
 void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
@@ -43,6 +45,23 @@ void SecurityOptionsUnittest::TestAgentsightNoProbeConfigFallsBackToBuiltin() {
     Json::Value config;
     APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
     APSARA_TEST_TRUE(opt.mAgentsightCmdlineWhitelist.empty());
+    APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+}
+
+void SecurityOptionsUnittest::TestAgentsightMessageDeltaOnlyDefaultAndParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    SecurityOptions opt;
+    std::string err;
+    Json::Value config;
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MessageDeltaOnly":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightMessageDeltaOnly);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"MessageDeltaOnly":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightMessageDeltaOnly);
 }
 
 void SecurityOptionsUnittest::TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin() {
@@ -204,6 +223,26 @@ void SecurityOptionsUnittest::TestAgentsightProbeConfigHttpsHttpInvalidTypes() {
     APSARA_TEST_EQUAL(":80", opt.mAgentsightHttp[0]);
 }
 
+void SecurityOptionsUnittest::TestAgentsightEventStreamFormatParse() {
+    CollectionPipelineContext ctx;
+    ctx.SetConfigName("cfg1");
+    Json::Value config;
+    std::string err;
+    SecurityOptions opt;
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EventStreamFormat":true}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{"EventStreamFormat":false}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_FALSE(opt.mAgentsightEventStreamFormat);
+
+    APSARA_TEST_TRUE(ParseJsonTable(R"({"ProbeConfig":{}})", config, err));
+    APSARA_TEST_TRUE(opt.Init(SecurityProbeType::AGENTSIGHT_OBSERVE, config, &ctx, "input_agentsight"));
+    APSARA_TEST_TRUE(opt.mAgentsightEventStreamFormat);
+}
+
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightNoProbeConfigFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigWrongTypeFallsBackToBuiltin)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesOptionalFields)
@@ -216,5 +255,7 @@ UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsLegacyLowercaseKeys
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightRejectsEmptyCmdlineWhitelistArray)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigParsesHttpsAndHttp)
 UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightProbeConfigHttpsHttpInvalidTypes)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightEventStreamFormatParse)
+UNIT_TEST_CASE(SecurityOptionsUnittest, TestAgentsightMessageDeltaOnlyDefaultAndParse)
 
 UNIT_TEST_MAIN

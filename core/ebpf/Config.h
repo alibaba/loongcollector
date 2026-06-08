@@ -66,6 +66,10 @@ public:
     std::vector<std::string> mAgentsightHttps;
     /// HTTP 明文流量目标（端口、IP、IP:端口 或域名）。
     std::vector<std::string> mAgentsightHttp;
+    /// When true, emit separate `gen_ai.model.request` and `gen_ai.model.response` logs per LLM call.
+    bool mAgentsightEventStreamFormat = true;
+    /// When true, omit system instructions, tool definitions, and full input messages (per dedup).
+    bool mAgentsightMessageDeltaOnly = true;
 };
 
 ///////////////////// Process Level Config /////////////////////

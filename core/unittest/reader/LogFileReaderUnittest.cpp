@@ -13,9 +13,10 @@
 // limitations under the License.
 
 #include <cstdio>
-#include <unistd.h>
 
+#include <chrono>
 #include <fstream>
+#include <thread>
 
 #include "common/FileSystemUtil.h"
 #include "common/RuntimeUtil.h"
@@ -1439,7 +1440,7 @@ void WholeFileOverwriteUnittest::TestOverwriteSameSize() {
     APSARA_TEST_EQUAL_FATAL(reader.mLastFilePos, (int64_t)content1.size());
 
     // Overwrite with same-size content (same signature prefix)
-    sleep(1); // ensure mtime changes
+    std::this_thread::sleep_for(std::chrono::seconds(1)); // ensure mtime changes
     std::string content2 = R"({"key":"value2","data":"bbb"})";
     APSARA_TEST_EQUAL_FATAL(content1.size(), content2.size());
     APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
@@ -1490,7 +1491,7 @@ void WholeFileOverwriteUnittest::TestOverwriteLargerSize() {
     }
 
     // Overwrite with larger content
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     std::string content2 = R"({"key":"value2","extra":"more_data_here"})";
     APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
 
@@ -1537,7 +1538,7 @@ void WholeFileOverwriteUnittest::TestOverwriteSmallerSize() {
     }
 
     // Overwrite with smaller content
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     std::string content2 = R"({"key":"v2"})";
     APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
 
@@ -1695,7 +1696,7 @@ void WholeFileOverwriteLargeUnittest::TestOverwriteDuringAccumulation() {
     }
 
     // Overwrite with new content
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     std::string content2(700 * 1024, 'C');
     APSARA_TEST_TRUE_FATAL(writeLog(gLogPath, content2));
 
@@ -1861,7 +1862,7 @@ void WholeFileOverwriteLargeUnittest::TestAppendModeNoReset() {
     APSARA_TEST_TRUE_FATAL(posAfterFirstRead > 0);
 
     // Append more content (mtime changes)
-    sleep(1);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     {
         std::ofstream writer(gLogPath.c_str(), std::fstream::out | std::fstream::app | std::ios_base::binary);
         writer << "appended content\n";

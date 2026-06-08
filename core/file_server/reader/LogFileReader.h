@@ -749,6 +749,8 @@ private:
     friend class CreateModifyHandlerUnittest;
     friend class LogFileReaderHoleUnittest;
     friend class LogFileReaderResolvedPathUnittest;
+    friend class WholeFileOverwriteUnittest;
+    friend class WholeFileOverwriteLargeUnittest;
 
 protected:
     void UpdateReaderManual();
