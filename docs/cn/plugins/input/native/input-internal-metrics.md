@@ -6,7 +6,7 @@
 
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -32,6 +32,10 @@ InternalMetricRule 的结构如下：
 | --- | --- | --- | --- | --- |
 |  Enable  |  bool  |  否  |  true  |  是否开启。默认开启。  |
 |  Interval  |  int  |  否  |  10  |  统计间隔，单位为分钟，表示每隔指定时间输出一次该类型的指标。  |
+
+## 导出到外部系统
+
+采集、本地落盘及导出到 Prometheus 等外部系统的说明，见 [如何收集自监控指标](../../../developer-guide/self-monitor/metrics/how-to-collect-internal-metrics.md)。下方样例为**仅写本地文件**的快速参考。
 
 ## 样例
 

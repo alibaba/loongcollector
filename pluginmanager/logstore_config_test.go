@@ -28,7 +28,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	global_config "github.com/alibaba/ilogtail/pkg/config"
+	"github.com/alibaba/ilogtail/pkg/helper"
 	"github.com/alibaba/ilogtail/pkg/logger"
+	"github.com/alibaba/ilogtail/pkg/models"
 	"github.com/alibaba/ilogtail/pkg/pipeline"
 	"github.com/alibaba/ilogtail/pkg/protocol"
 	"github.com/alibaba/ilogtail/pkg/util"
@@ -430,6 +432,57 @@ func Test_extractTagsToLogTags(t *testing.T) {
 	logTag = extractTagsToLogTags([]byte("^^^k2"))
 	assert.Equal(t, logTag[0].Key, "__tag__:__prefix__0")
 	assert.Equal(t, logTag[0].Value, "k2")
+}
+
+func TestLogstoreConfig_ProcessPipelineEventGroup_V1Logs(t *testing.T) {
+	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
+	log := models.NewLog("", []byte("hello"), "", "", "", models.NewTags(), 1_000_000_000)
+	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{log})
+	require.NoError(t, err)
+	pbBytes, err := pbGroup.Marshal()
+	require.NoError(t, err)
+
+	l := &LogstoreConfig{
+		ConfigName: "test-v1-ppeg",
+		Version:    v1,
+		Context:    &ContextImp{},
+		GlobalConfig: &global_config.GlobalConfig{
+			UsingOldContentTag: false,
+		},
+	}
+	l.Context.InitContext("", "", l.ConfigName)
+	l.PluginRunner = &pluginv1Runner{
+		LogstoreConfig: l,
+		LogsChan:       make(chan *pipeline.LogWithContext, 4),
+	}
+	assert.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+	require.Equal(t, 1, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
+	logCtx := <-l.PluginRunner.(*pluginv1Runner).LogsChan
+	assert.Equal(t, "hello", logCtx.Log.Contents[0].Value)
+	assert.Equal(t, "pack-1", logCtx.Context["source"])
+}
+
+func TestLogstoreConfig_ProcessPipelineEventGroup_V1DiscardMetric(t *testing.T) {
+	groupInfo := models.NewGroup(models.NewMetadata(), models.NewTags())
+	metric := models.NewSingleValueMetric("cpu", models.MetricTypeGauge, models.NewTags(), 0, 1.0)
+	pbGroup, err := helper.TransferPipelineEventGroupToPB(groupInfo, []models.PipelineEvent{metric})
+	require.NoError(t, err)
+	pbBytes, err := pbGroup.Marshal()
+	require.NoError(t, err)
+
+	l := &LogstoreConfig{
+		ConfigName:   "test-v1-metric",
+		Version:      v1,
+		Context:      &ContextImp{},
+		GlobalConfig: &global_config.GlobalConfig{},
+	}
+	l.Context.InitContext("", "", l.ConfigName)
+	l.PluginRunner = &pluginv1Runner{
+		LogstoreConfig: l,
+		LogsChan:       make(chan *pipeline.LogWithContext, 1),
+	}
+	assert.Equal(t, 0, l.ProcessPipelineEventGroup(pbBytes, "pack-1"))
+	assert.Equal(t, 0, len(l.PluginRunner.(*pluginv1Runner).LogsChan))
 }
 
 func TestLogstoreConfig_ProcessRawLogV2(t *testing.T) {

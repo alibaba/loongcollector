@@ -64,6 +64,7 @@ func NewComposeBenchmarkBooter() *ComposeBenchmarkBooter {
 }
 
 func (c *ComposeBenchmarkBooter) Start(ctx context.Context) error {
+	ensureComposeBuildEnv()
 	if err := c.createComposeFile(); err != nil {
 		return err
 	}

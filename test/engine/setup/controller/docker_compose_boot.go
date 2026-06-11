@@ -59,6 +59,9 @@ func (c *BootController) Start(ctx context.Context) error {
 	}
 	if err := dockercompose.Start(ctx); err != nil {
 		logger.Error(context.Background(), selfmonitor.BootStartAlarm, "err", err)
+		if stopErr := dockercompose.ShutDown(); stopErr != nil {
+			logger.Error(context.Background(), selfmonitor.BootStopAlarm, "err", stopErr, "stage", "start_failed_cleanup")
+		}
 		return err
 	}
 	return nil
@@ -66,6 +69,7 @@ func (c *BootController) Start(ctx context.Context) error {
 
 func (c *BootController) Clean() {
 	logger.Info(context.Background(), "boot controller is cleaning....")
+	dockercompose.CopyCoreLogs()
 	if err := dockercompose.ShutDown(); err != nil {
 		logger.Error(context.Background(), selfmonitor.BootStopAlarm, "err", err)
 	}

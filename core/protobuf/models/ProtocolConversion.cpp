@@ -1,8 +1,44 @@
 #include "protobuf/models/ProtocolConversion.h"
 
+#include "common/StringTools.h"
+
 using namespace std;
 
 namespace logtail {
+
+namespace {
+
+void TransferGroupMetadataToPB(const GroupMetadata& metadata, google::protobuf::Map<std::string, std::string>& dst) {
+    for (const auto& meta : metadata) {
+        dst[ToString(static_cast<int>(meta.first))] = meta.second.to_string();
+    }
+}
+
+void TransferGroupMetadataFromPB(const google::protobuf::Map<std::string, std::string>& src, PipelineEventGroup& dst) {
+    for (const auto& meta : src) {
+        int keyInt = 0;
+        if (!StringTo(meta.first, keyInt)) {
+            continue;
+        }
+        auto key = static_cast<EventGroupMetaKey>(keyInt);
+        if (key == EventGroupMetaKey::UNKNOWN) {
+            continue;
+        }
+        dst.SetMetadata(key, meta.second);
+    }
+}
+
+logtail::models::UntypedValueMetricType ToPBMetricType(UntypedValueMetricType type) {
+    return type == UntypedValueMetricType::MetricTypeGauge ? logtail::models::METRIC_TYPE_GAUGE
+                                                           : logtail::models::METRIC_TYPE_COUNTER;
+}
+
+UntypedValueMetricType FromPBMetricType(logtail::models::UntypedValueMetricType type) {
+    return type == logtail::models::METRIC_TYPE_GAUGE ? UntypedValueMetricType::MetricTypeGauge
+                                                      : UntypedValueMetricType::MetricTypeCounter;
+}
+
+} // namespace
 
 bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& src,
                                     logtail::PipelineEventGroup& dst,
@@ -58,12 +94,7 @@ bool TransferPBToPipelineEventGroup(const logtail::models::PipelineEventGroup& s
         dst.SetTag(tag.first, tag.second);
     }
 
-    // TODO: transfer metadatas
-    // for (auto& metaData : src.metadata()) {
-    //     if (metaData.first == "source_id") {
-    //         dst.SetMetadata(logtail::EventGroupMetaKey::SOURCE_ID, metaData.second);
-    //     }
-    // }
+    TransferGroupMetadataFromPB(src.metadata(), dst);
 
     return true;
 }
@@ -96,6 +127,14 @@ bool TransferPBToMetricEvent(const logtail::models::MetricEvent& src, logtail::M
         case logtail::models::MetricEvent::ValueCase::kUntypedSingleValue:
             dst.SetValue(logtail::UntypedSingleValue{src.untypedsinglevalue().value()});
             break;
+        case logtail::models::MetricEvent::ValueCase::kUntypedMultiDoubleValues: {
+            dst.SetValue(UntypedMultiDoubleValues{{}, nullptr});
+            auto* multiValues = dst.MutableValue<UntypedMultiDoubleValues>();
+            for (const auto& entry : src.untypedmultidoublevalues().values()) {
+                multiValues->SetValue(entry.first, {FromPBMetricType(entry.second.metrictype()), entry.second.value()});
+            }
+            break;
+        }
         default:
             errMsg = "error transfer PB to MetricEvent: unsupported value type";
             return false;
@@ -226,11 +265,8 @@ bool TransferPipelineEventGroupToPB(const logtail::PipelineEventGroup& src,
         dst.mutable_tags()->insert({tag.first.to_string(), tag.second.to_string()});
     }
 
-    // TODO: transfer metadatas
-    // auto sourceId = src.GetMetadata(logtail::EventGroupMetaKey::SOURCE_ID);
-    // if (!sourceId.empty()) {
-    //     dst.mutable_metadata()->insert({"source_id", sourceId.to_string()});
-    // }
+    TransferGroupMetadataToPB(src.GetAllMetadata(), *dst.mutable_metadata());
+
     return true;
 }
 
@@ -267,8 +303,16 @@ bool TransferMetricEventToPB(const logtail::MetricEvent& src, logtail::models::M
 
     // value
     if (src.Is<logtail::UntypedSingleValue>()) {
-        auto v = src.GetValue<logtail::UntypedSingleValue>();
+        const auto* v = src.GetValue<logtail::UntypedSingleValue>();
         dst.mutable_untypedsinglevalue()->set_value(v->mValue);
+    } else if (src.Is<logtail::UntypedMultiDoubleValues>()) {
+        const auto* multiValues = src.GetValue<logtail::UntypedMultiDoubleValues>();
+        auto* multiPb = dst.mutable_untypedmultidoublevalues();
+        for (auto value = multiValues->ValuesBegin(); value != multiValues->ValuesEnd(); ++value) {
+            auto& entry = (*multiPb->mutable_values())[value->first.to_string()];
+            entry.set_metrictype(ToPBMetricType(value->second.MetricType));
+            entry.set_value(value->second.Value);
+        }
     } else {
         errMsg = "error transfer MetricEvent to PB: unsupported value type";
         return false;
@@ -277,6 +321,10 @@ bool TransferMetricEventToPB(const logtail::MetricEvent& src, logtail::models::M
     // tags
     for (auto iter = src.TagsBegin(); iter != src.TagsEnd(); iter++) {
         dst.mutable_tags()->insert({iter->first.to_string(), iter->second.to_string()});
+    }
+
+    for (auto iter = src.MetadataBegin(); iter != src.MetadataEnd(); iter++) {
+        dst.mutable_metadata()->insert({iter->first.to_string(), iter->second.to_string()});
     }
 
     return true;

@@ -6,7 +6,7 @@
 
 ## 版本
 
-[Beta](../../stability-level.md)
+[Stable](../../stability-level.md)
 
 ## 版本说明
 
@@ -19,6 +19,7 @@
 |  **参数**  |  **类型**  |  **是否必填**  |  **默认值**  |  **说明**  |
 | --- | --- | --- | --- | --- |
 |  Type  |  string  |  是  |  /  |  插件类型。固定为input\_internal\_alarms。  |
+
 
 ## 样例
 
