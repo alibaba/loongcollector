@@ -22,16 +22,15 @@ namespace logtail {
 
 class DentryCollector : public BaseCollector {
 public:
-  DentryCollector();
-  ~DentryCollector() override = default;
+    DentryCollector();
+    ~DentryCollector() override = default;
 
-  bool Init(HostMonitorContext &collectContext) override;
-  bool Collect(HostMonitorContext &collectContext,
-               PipelineEventGroup *group) override;
-  [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
+    bool Init(HostMonitorContext& collectContext) override;
+    bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
+    [[nodiscard]] const std::chrono::seconds GetCollectInterval() const override;
 
-  static const std::string sName;
-  const std::string &Name() const override { return sName; }
+    static const std::string sName;
+    const std::string& Name() const override { return sName; }
 };
 
 } // namespace logtail

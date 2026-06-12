@@ -15,18 +15,28 @@
  */
 #pragma once
 
-#include <filesystem>
+#include <string>
 #include <vector>
 
 #include "host_monitor/collector/BaseCollector.h"
-#include "host_monitor/collector/MetricCalculate.h"
 
 namespace logtail {
 
-class CgroupCollector : public BaseCollector {
+struct FsStatInfo {
+    std::string device;
+    std::string mountPoint;
+    uint64_t bsize = 0;
+    uint64_t blocks = 0;
+    uint64_t bfree = 0;
+    uint64_t bavail = 0;
+    uint64_t files = 0;
+    uint64_t ffree = 0;
+};
+
+class FsStatCollector : public BaseCollector {
 public:
-    CgroupCollector();
-    ~CgroupCollector() override = default;
+    FsStatCollector() = default;
+    ~FsStatCollector() override = default;
 
     bool Init(HostMonitorContext& collectContext) override;
     bool Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) override;
@@ -34,6 +44,9 @@ public:
 
     static const std::string sName;
     const std::string& Name() const override { return sName; }
+
+private:
+    bool ReadMountPoints(std::vector<FsStatInfo>& fsStats);
 };
 
 } // namespace logtail

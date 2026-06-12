@@ -23,6 +23,7 @@
 #include "host_monitor/collector/CgroupCollector.h"
 #include "host_monitor/collector/DentryCollector.h"
 #include "host_monitor/collector/DiskCollector.h"
+#include "host_monitor/collector/FsStatCollector.h"
 #include "host_monitor/collector/GPUCollector.h"
 #include "host_monitor/collector/MemCollector.h"
 #include "host_monitor/collector/NetCollector.h"
@@ -32,173 +33,229 @@
 namespace logtail {
 
 const std::string InputHostMonitor::sName = "input_host_monitor";
-constexpr uint32_t kHostMonitorMinInterval = 5;      // seconds
+constexpr uint32_t kHostMonitorMinInterval = 5; // seconds
 constexpr uint32_t kHostMonitorDefaultInterval = 15; // seconds
 
-bool InputHostMonitor::Init(const Json::Value &config,
-                            Json::Value &optionalGoPipeline) {
-  std::string errorMsg;
-  mInterval = kHostMonitorDefaultInterval;
-  if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
-    PARAM_WARNING_DEFAULT(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                          mInterval, sName, mContext->GetConfigName(),
-                          mContext->GetProjectName(),
-                          mContext->GetLogstoreName(), mContext->GetRegion());
-  }
-  if (mInterval < kHostMonitorMinInterval) {
-    PARAM_WARNING_DEFAULT(mContext->GetLogger(), mContext->GetAlarm(),
-                          "uint param Interval is smaller than" +
-                              ToString(kHostMonitorMinInterval),
-                          mInterval, sName, mContext->GetConfigName(),
-                          mContext->GetProjectName(),
-                          mContext->GetLogstoreName(), mContext->GetRegion());
-    mInterval = kHostMonitorMinInterval;
-  }
+bool InputHostMonitor::Init(const Json::Value& config, Json::Value& optionalGoPipeline) {
+    std::string errorMsg;
+    mInterval = kHostMonitorDefaultInterval;
+    if (!GetOptionalUIntParam(config, "Interval", mInterval, errorMsg)) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              errorMsg,
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+    }
+    if (mInterval < kHostMonitorMinInterval) {
+        PARAM_WARNING_DEFAULT(mContext->GetLogger(),
+                              mContext->GetAlarm(),
+                              "uint param Interval is smaller than" + ToString(kHostMonitorMinInterval),
+                              mInterval,
+                              sName,
+                              mContext->GetConfigName(),
+                              mContext->GetProjectName(),
+                              mContext->GetLogstoreName(),
+                              mContext->GetRegion());
+        mInterval = kHostMonitorMinInterval;
+    }
 
-  // TODO: add more collectors
-  // cpu
-  bool enableCPU = true;
-  if (!GetOptionalBoolParam(config, "EnableCPU", enableCPU, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
-  if (enableCPU) {
-    mCollectors.push_back(CPUCollector::sName);
-  }
+    // TODO: add more collectors
+    // cpu
+    bool enableCPU = true;
+    if (!GetOptionalBoolParam(config, "EnableCPU", enableCPU, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableCPU) {
+        mCollectors.push_back(CPUCollector::sName);
+    }
 
-  // system load
-  bool enableSystem = true;
-  if (!GetOptionalBoolParam(config, "EnableSystem", enableSystem, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // system load
+    bool enableSystem = true;
+    if (!GetOptionalBoolParam(config, "EnableSystem", enableSystem, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableSystem) {
-    mCollectors.push_back(SystemCollector::sName);
-  }
+    if (enableSystem) {
+        mCollectors.push_back(SystemCollector::sName);
+    }
 
-  // meminfo
-  bool enableMem = true;
-  if (!GetOptionalBoolParam(config, "EnableMemory", enableMem, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // meminfo
+    bool enableMem = true;
+    if (!GetOptionalBoolParam(config, "EnableMemory", enableMem, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableMem) {
-    mCollectors.push_back(MemCollector::sName);
-  }
+    if (enableMem) {
+        mCollectors.push_back(MemCollector::sName);
+    }
 
-  // system disk
-  bool enableDisk = true;
-  if (!GetOptionalBoolParam(config, "EnableDisk", enableDisk, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // system disk
+    bool enableDisk = true;
+    if (!GetOptionalBoolParam(config, "EnableDisk", enableDisk, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableDisk) {
-    mCollectors.push_back(DiskCollector::sName);
-  }
+    if (enableDisk) {
+        mCollectors.push_back(DiskCollector::sName);
+    }
 
-  bool enableProcess = true;
-  if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    bool enableProcess = true;
+    if (!GetOptionalBoolParam(config, "EnableProcess", enableProcess, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableProcess) {
-    mCollectors.push_back(ProcessCollector::sName);
-  }
+    if (enableProcess) {
+        mCollectors.push_back(ProcessCollector::sName);
+    }
 
-  // net
-  bool enableNet = true;
-  if (!GetOptionalBoolParam(config, "EnableNet", enableNet, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // net
+    bool enableNet = true;
+    if (!GetOptionalBoolParam(config, "EnableNet", enableNet, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableNet) {
-    mCollectors.push_back(NetCollector::sName);
-  }
+    if (enableNet) {
+        mCollectors.push_back(NetCollector::sName);
+    }
 
-  // gpu
-  bool enableGPU = true;
-  if (!GetOptionalBoolParam(config, "EnableGPU", enableGPU, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // gpu
+    bool enableGPU = true;
+    if (!GetOptionalBoolParam(config, "EnableGPU", enableGPU, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  // cgroup
-  bool enableCgroup = true;
-  if (!GetOptionalBoolParam(config, "EnableCgroup", enableCgroup, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
-  if (enableGPU) {
-    mCollectors.push_back(GPUCollector::sName);
-  }
+    // cgroup
+    bool enableCgroup = true;
+    if (!GetOptionalBoolParam(config, "EnableCgroup", enableCgroup, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+    if (enableGPU) {
+        mCollectors.push_back(GPUCollector::sName);
+    }
 
-  if (enableCgroup) {
-    mCollectors.push_back(CgroupCollector::sName);
-  }
+    if (enableCgroup) {
+        mCollectors.push_back(CgroupCollector::sName);
+    }
 
-  // dentry
-  bool enableDentry = true;
-  if (!GetOptionalBoolParam(config, "EnableDentry", enableDentry, errorMsg)) {
-    PARAM_ERROR_RETURN(mContext->GetLogger(), mContext->GetAlarm(), errorMsg,
-                       sName, mContext->GetConfigName(),
-                       mContext->GetProjectName(), mContext->GetLogstoreName(),
-                       mContext->GetRegion());
-  }
+    // dentry
+    bool enableDentry = true;
+    if (!GetOptionalBoolParam(config, "EnableDentry", enableDentry, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
 
-  if (enableDentry) {
-    mCollectors.push_back(DentryCollector::sName);
-  }
+    if (enableDentry) {
+        mCollectors.push_back(DentryCollector::sName);
+    }
 
-  return true;
+    // fsstat
+    bool enableFsStat = true;
+    if (!GetOptionalBoolParam(config, "EnableFsStat", enableFsStat, errorMsg)) {
+        PARAM_ERROR_RETURN(mContext->GetLogger(),
+                           mContext->GetAlarm(),
+                           errorMsg,
+                           sName,
+                           mContext->GetConfigName(),
+                           mContext->GetProjectName(),
+                           mContext->GetLogstoreName(),
+                           mContext->GetRegion());
+    }
+
+    if (enableFsStat) {
+        mCollectors.push_back(FsStatCollector::sName);
+    }
+
+    return true;
 }
 
 bool InputHostMonitor::Start() {
-  auto *runner = HostMonitorInputRunner::GetInstance();
-  runner->Init();
+    auto* runner = HostMonitorInputRunner::GetInstance();
+    runner->Init();
 
-  // Check if runner is properly started before updating collectors
-  if (!runner->IsStarted()) {
-    LOG_ERROR(sLogger,
-              ("start host monitor input failed",
-               "runner not started")("config", mContext->GetConfigName()));
-    return false;
-  }
+    // Check if runner is properly started before updating collectors
+    if (!runner->IsStarted()) {
+        LOG_ERROR(sLogger,
+                  ("start host monitor input failed", "runner not started")("config", mContext->GetConfigName()));
+        return false;
+    }
 
-  std::vector<CollectorInfo> collectorInfos;
-  for (const auto &collectorName : mCollectors) {
-    collectorInfos.push_back(
-        {collectorName, mInterval, HostMonitorCollectType::kMultiValue});
-  }
-  runner->UpdateCollector(mContext->GetConfigName(), collectorInfos,
-                          mContext->GetProcessQueueKey(), mIndex);
-  return true;
+    std::vector<CollectorInfo> collectorInfos;
+    for (const auto& collectorName : mCollectors) {
+        collectorInfos.push_back({collectorName, mInterval, HostMonitorCollectType::kMultiValue});
+    }
+    runner->UpdateCollector(mContext->GetConfigName(), collectorInfos, mContext->GetProcessQueueKey(), mIndex);
+    return true;
 }
 
 bool InputHostMonitor::Stop(bool isPipelineRemoving) {
-  HostMonitorInputRunner::GetInstance()->RemoveCollector(
-      mContext->GetConfigName());
-  return true;
+    HostMonitorInputRunner::GetInstance()->RemoveCollector(mContext->GetConfigName());
+    return true;
 }
 
 } // namespace logtail

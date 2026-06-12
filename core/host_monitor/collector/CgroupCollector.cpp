@@ -24,106 +24,89 @@
 #include "host_monitor/SystemInterface.h"
 #include "logger/Logger.h"
 
-DEFINE_FLAG_INT32(basic_host_monitor_cgroup_collect_interval,
-                  "basic host monitor cgroup collect interval, seconds", 5);
+DEFINE_FLAG_INT32(basic_host_monitor_cgroup_collect_interval, "basic host monitor cgroup collect interval, seconds", 5);
 
 namespace logtail {
 
 const std::string CgroupCollector::sName = "cgroup";
 
-CgroupCollector::CgroupCollector() {}
+CgroupCollector::CgroupCollector() {
+}
 
-bool CgroupCollector::Init(HostMonitorContext &collectContext) {
-  return BaseCollector::Init(collectContext);
+bool CgroupCollector::Init(HostMonitorContext& collectContext) {
+    return BaseCollector::Init(collectContext);
 }
 
 const std::chrono::seconds CgroupCollector::GetCollectInterval() const {
-  return std::chrono::seconds(
-      INT32_FLAG(basic_host_monitor_cgroup_collect_interval));
+    return std::chrono::seconds(INT32_FLAG(basic_host_monitor_cgroup_collect_interval));
 }
 
-bool CgroupCollector::Collect(HostMonitorContext &collectContext,
-                              PipelineEventGroup *group) {
-  if (group == nullptr) {
+bool CgroupCollector::Collect(HostMonitorContext& collectContext, PipelineEventGroup* group) {
+    if (group == nullptr) {
+        return true;
+    }
+
+    CgroupStatInformation info;
+    if (!SystemInterface::GetInstance()->GetCgroupStatInformation(info)) {
+        LOG_ERROR(sLogger, ("cgroup collector", "GetCgroupStatInformation failed"));
+        return false;
+    }
+
+    const time_t now = time(nullptr);
+
+    MetricEvent* metricEvent = group->AddMetricEvent(true);
+    if (!metricEvent) {
+        LOG_ERROR(sLogger, ("cgroup collector", "metricEvent is nullptr"));
+        return false;
+    }
+    metricEvent->SetTimestamp(now, 0);
+    metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
+    auto* multiDoubleValues = metricEvent->MutableValue<UntypedMultiDoubleValues>();
+    multiDoubleValues->SetValue(
+        std::string("cgroup_cpuset"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.cpuset)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_cpu"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.cpu)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_cpuacct"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.cpuacct)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_blkio"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.blkio)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_memory"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.memory)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_devices"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.devices)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_freezer"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.freezer)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_net_cls"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.net_cls)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_perf_event"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.perf_event)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_net_prio"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.net_prio)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_hugetlb"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.hugetlb)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_pids"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.pids)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_ioasids"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.ioasids)});
+    multiDoubleValues->SetValue(
+        std::string("cgroup_rdma"),
+        UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge, static_cast<double>(info.stat.rdma)});
+
+    metricEvent->SetTag(std::string("m"), std::string("system.cgroup"));
     return true;
-  }
-
-  CgroupStatInformation info;
-  if (!SystemInterface::GetInstance()->GetCgroupStatInformation(info)) {
-    LOG_ERROR(sLogger, ("cgroup collector", "GetCgroupStatInformation failed"));
-    return false;
-  }
-
-  const time_t now = time(nullptr);
-
-  MetricEvent *metricEvent = group->AddMetricEvent(true);
-  if (!metricEvent) {
-    LOG_ERROR(sLogger, ("cgroup collector", "metricEvent is nullptr"));
-    return false;
-  }
-  metricEvent->SetTimestamp(now, 0);
-  metricEvent->SetValue<UntypedMultiDoubleValues>(metricEvent);
-  auto *multiDoubleValues =
-      metricEvent->MutableValue<UntypedMultiDoubleValues>();
-  multiDoubleValues->SetValue(
-      std::string("cgroup_cpuset"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.cpuset)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_cpu"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.cpu)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_cpuacct"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.cpuacct)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_blkio"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.blkio)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_memory"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.memory)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_devices"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.devices)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_freezer"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.freezer)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_net_cls"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.net_cls)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_perf_event"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.perf_event)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_net_prio"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.net_prio)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_hugetlb"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.hugetlb)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_pids"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.pids)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_ioasids"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.ioasids)});
-  multiDoubleValues->SetValue(
-      std::string("cgroup_rdma"),
-      UntypedMultiDoubleValue{UntypedValueMetricType::MetricTypeGauge,
-                              static_cast<double>(info.stat.rdma)});
-
-  metricEvent->SetTag(std::string("m"), std::string("system.cgroup"));
-  return true;
 }
 
 } // namespace logtail
