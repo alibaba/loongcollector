@@ -1,6 +1,7 @@
 import argparse
 import json as jsonlib
 import logging
+import os
 import random
 import time
 
@@ -133,6 +134,10 @@ def main():
     parser.add_argument('--rotate', type=int, default=30, help='Rotate Interval (s)')
 
     args = parser.parse_args()
+
+    log_dir = os.path.dirname(args.path)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
 
     logger = logging.getLogger('log_generator')
     logger.setLevel(logging.INFO)
