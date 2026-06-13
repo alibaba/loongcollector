@@ -26,7 +26,7 @@ namespace logtail {
 
 class ProcessorMergeMultilineLogNative : public Processor {
 public:
-    enum class MergeType { BY_REGEX, BY_FLAG };
+    enum class MergeType { BY_REGEX, BY_FLAG, BY_JSON };
 
     static const std::string PartLogFlag;
     static const std::string sName;
@@ -45,6 +45,7 @@ protected:
 private:
     void MergeLogsByRegex(PipelineEventGroup& logGroup);
     void MergeLogsByFlag(PipelineEventGroup& logGroup);
+    void MergeLogsByJson(PipelineEventGroup& logGroup);
 
     void HandleUnmatchLogs(
         std::vector<PipelineEventPtr>& logEvents, size_t& newSize, size_t begin, size_t end, StringView logPath);
@@ -56,11 +57,14 @@ private:
     CounterPtr mUnmatchedEventsTotal; // 未成功合并的日志条数
     // CounterPtr mProcUnmatchedEventsBytes; // 未成功合并的日志字节数
 
+    size_t mMaxJsonBlockSize = 0; // 0 表示使用 LogFileReader::BUFFER_SIZE
+
 #ifdef APSARA_UNIT_TEST_MAIN
     friend class ProcessorMergeMultilineLogNativeUnittest;
     friend class ProcessorMergeMultilineLogDisacardUnmatchUnittest;
     friend class ProcessorMergeMultilineLogKeepUnmatchUnittest;
     friend class ProcessorParseContainerLogNativeUnittest;
+    friend class ProcessorMergeMultilineLogJsonUnittest;
 #endif
 };
 

@@ -151,7 +151,7 @@ bool ProcessorParseContainerLogNative::ProcessEvent(StringView containerType,
     if (containerType == CONTAINERD_TEXT) {
         shouldKeepEvent = ParseContainerdTextLogLine(sourceEvent, errorMsg, logGroup);
     } else if (containerType == DOCKER_JSON_FILE) {
-        shouldKeepEvent = ParseDockerJsonLogLine(sourceEvent, errorMsg);
+        shouldKeepEvent = ParseDockerJsonLogLine(sourceEvent, errorMsg, logGroup);
     }
     if (!errorMsg.empty()) {
         ADD_COUNTER(mOutFailedEventsTotal, 1);
@@ -461,7 +461,9 @@ bool ProcessorParseContainerLogNative::ParseDockerLog(char* buffer, int32_t size
     return true;
 }
 
-bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEvent, std::string& errorMsg) {
+bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEvent,
+                                                              std::string& errorMsg,
+                                                              PipelineEventGroup& logGroup) {
     StringView buffer = sourceEvent.GetContent(mSourceKey);
 
     DockerLog entry;
@@ -515,11 +517,16 @@ bool ProcessorParseContainerLogNative::ParseDockerJsonLogLine(LogEvent& sourceEv
     // source
     sourceEvent.SetContent(containerSourceKey, sourceValue);
 
-    // content
+    // content: log 字段末尾有 \n 为 Full，无 \n 为 Partial
+    bool isPartialLog = !content.empty() && content.back() != '\n';
     if (!content.empty() && content.back() == '\n') {
         content = StringView(content.data(), content.size() - 1);
     }
     sourceEvent.SetContentNoCopy(containerLogKey, content);
+    if (isPartialLog) {
+        sourceEvent.SetContentNoCopy(ProcessorMergeMultilineLogNative::PartLogFlag, StringView());
+        logGroup.SetMetadata(EventGroupMetaKey::HAS_PART_LOG, ProcessorMergeMultilineLogNative::PartLogFlag);
+    }
 
     return true;
 }
