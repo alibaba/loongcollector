@@ -279,6 +279,7 @@ public:
         mLastFilePos = pos;
     }
     void SetExpectedFileSize(int64_t size) { mExpectedFileSize = size; }
+    void SetNasMode(bool isNas) { mIsNasMode = isNas; }
     void
     InitReader(bool tailExisted = false, FileReadPolicy policy = BACKWARD_TO_FIXED_POS, uint32_t eoConcurrency = 0);
 
@@ -495,6 +496,8 @@ protected:
     }
     void ResolveHostLogPath();
 
+    // NAS mode: compute stable size and call SetExpectedFileSize(stableSize); no out param.
+    bool PrepareNasRead(bool isFlushTimeout);
     // std::string mRegion;
     // std::string mCategory;
     // std::string mConfigName;
@@ -596,6 +599,11 @@ protected:
     CounterPtr mOutSizeBytes;
     IntGaugePtr mSourceSizeBytes;
     IntGaugePtr mSourceReadOffsetBytes;
+
+    // NAS mode: read up to "file size from 1s ago", update every 1s (reopen + refresh boundary size).
+    bool mIsNasMode = false;
+    uint64_t mNasLastBoundaryTimeMs = 0;   // last time we updated readable size; 0 = not yet
+    int64_t mNasSizeAtLastSecondBoundary = -1; // file size at last boundary (readable limit)
 
 private:
     bool mHasReadContainerBom = false;

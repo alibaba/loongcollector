@@ -33,7 +33,10 @@
 
 #include "boost/filesystem.hpp"
 #include "boost/regex.hpp"
+#include "json/json.h"
 #include "rapidjson/document.h"
+
+#include "collection_pipeline/CollectionPipeline.h"
 
 #include "app_config/AppConfig.h"
 #include "application/Application.h"
@@ -78,6 +81,9 @@ DEFINE_FLAG_INT32(max_fix_pos_bytes, "", 128 * 1024);
 DEFINE_FLAG_INT32(force_release_deleted_file_fd_timeout,
                   "force release fd if file is deleted after specified seconds, no matter read to end or not",
                   -1);
+DEFINE_FLAG_INT32(nas_read_stable_interval_ms,
+                  "NAS mode: refresh readable size interval in ms (align with NFS FileAttr cache T 1s~60s), default 1000",
+                  1000);
 #if defined(_MSC_VER)
 // On Windows, if Chinese config base path is used, the log path will be converted to GBK,
 // so the __tag__.__path__ have to be converted back to UTF8 to avoid bad display.
@@ -118,6 +124,9 @@ LogFileReader* LogFileReader::CreateLogFileReader(const string& hostLogPathDir,
     }
 
     if (reader) {
+        if (discoveryConfig.first) {
+            reader->SetNasMode(discoveryConfig.first->IsNas());
+        }
         if (forceFromBeginning) {
             reader->SetReadFromBeginning();
         }
@@ -254,6 +263,41 @@ void LogFileReader::SetMetrics() {
     mOutSizeBytes = mMetricsRecordRef->GetCounter(METRIC_PLUGIN_OUT_SIZE_BYTES);
     mSourceSizeBytes = mMetricsRecordRef->GetIntGauge(METRIC_PLUGIN_SOURCE_SIZE_BYTES);
     mSourceReadOffsetBytes = mMetricsRecordRef->GetIntGauge(METRIC_PLUGIN_SOURCE_READ_OFFSET_BYTES);
+}
+
+bool LogFileReader::PrepareNasRead(bool isFlushTimeout) {
+    if (!mIsNasMode || isFlushTimeout || !mLogFileOp.IsOpen()) {
+        return true;
+    }
+    fsutil::PathStat statBuf;
+    if (mLogFileOp.Stat(statBuf) != 0) {
+        return true;
+    }
+    const int64_t curSize = statBuf.GetFileSize();
+    const uint64_t nowMs = GetCurrentTimeInMilliSeconds();
+    const bool shouldUpdateBoundary = (mNasLastBoundaryTimeMs == 0)
+                                      || (nowMs - mNasLastBoundaryTimeMs
+                                          >= static_cast<uint64_t>(INT32_FLAG(nas_read_stable_interval_ms)));
+    if (shouldUpdateBoundary) {
+        bool isDeleted = false;
+        CloseFilePtr(isDeleted);
+        if (isDeleted || !UpdateFilePtr()) {
+            return false;
+        }
+        mNasLastBoundaryTimeMs = nowMs;
+        mNasSizeAtLastSecondBoundary = curSize;
+    }
+    if (mNasSizeAtLastSecondBoundary < 0) {
+        mNasSizeAtLastSecondBoundary = std::min(curSize, mLastFilePos > 0 ? mLastFilePos : 0);
+    }
+    int64_t readableSize;
+    if (mNasSizeAtLastSecondBoundary < mLastFilePos) {
+        readableSize = mLastFilePos;
+    } else {
+        readableSize = std::min(mLastFileSize, mNasSizeAtLastSecondBoundary);
+    }
+    SetExpectedFileSize(readableSize);
+    return true;
 }
 
 void LogFileReader::DumpMetaToMem(bool checkConfigFlag, int32_t idxInReaderArray) {
@@ -993,6 +1037,9 @@ bool LogFileReader::ReadLog(LogBuffer& logBuffer, const Event* event, bool isSta
         } else {
             return false;
         }
+    }
+    if (!PrepareNasRead(event != nullptr && event->IsReaderFlushTimeout())) {
+        return false;
     }
     bool moreData = GetRawData(logBuffer, mLastFileSize, tryRollback, isStaticFile);
     if (!logBuffer.rawBuffer.empty()) {
