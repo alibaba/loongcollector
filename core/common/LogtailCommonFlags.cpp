@@ -35,6 +35,9 @@ DEFINE_FLAG_STRING(
     "JSON key ignored_interfaces in ilogtail_config.json; env ignored_interfaces or LOONG_IGNORED_INTERFACES.",
     "kube-ipvs0,nodelocaldns,docker0");
 
+// machine info
+DEFINE_FLAG_BOOL(disable_identity_detect, "disable identity detect", false);
+
 // checkpoint
 DEFINE_FLAG_INT32(unused_checkpoints_clear_interval_sec, "", 600);
 
