@@ -152,31 +152,74 @@ cmake -D CMAKE_BUILD_TYPE=Debug ..
 cmake -DBUILD_LOGTAIL_UT=ON ..
 ```
 
+**AgentSight（`libagentsight.so` / `InputAgentSight`）**：Linux 上 `core/CMakeLists.txt` 默认 `ENABLE_AGENTSIGHT=ON`，一般 **`cmake ..` 无需额外开关** 即会编译 coolbpf 里的 AgentSight FFI。若曾显式关过或 CMake 缓存里为 OFF，需重新打开：
+
+```bash
+cmake -DENABLE_AGENTSIGHT=ON ..
+```
+
+确认是否开启：在 `core/build` 下查看 `cmake` 输出中的 `ENABLE_AGENTSIGHT=ON`，或检查是否存在 `core/build/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so`。CI / `make core` 也会传 `-DENABLE_AGENTSIGHT=ON`（见 `scripts/gen_build_scripts.sh`、`Makefile`）。
+
 - 制作镜像
 
 目前不支持，没有安装docker，请直接在主机上进行编译。
 
 ### 5. 获取编译产出  <a name="X0fef"></a>
 
-由于VS Code是直接将代码库目录挂载到镜像内的，因此主机上可以直接访问镜像内的编译产出。<br />![image.png](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/developer-guide/development-environment/artifacts-on-host.png)<br />目前，镜像使用的是root用户权限，因此在主机上可能需要执行`sudo chown -R $USER .`来修复一下权限。
+**编译目录与产物目录是同一个：`core/build/`。** 上述 C++ 编译步骤在容器内执行 `cd core/build && make` 后，产物直接落在该目录下；不要在仓库根目录另建 `build/` 编译。
 
-可以将C++核心的构建结果拷贝到`./output`目录组装出完整的构建结果。
+由于 VS Code 将代码库目录挂载进镜像，主机与容器看到的是同一路径，主机上可直接访问 `core/build/` 下的文件。<br />![image.png](https://ilogtail-community-edition.oss-cn-shanghai.aliyuncs.com/images/developer-guide/development-environment/artifacts-on-host.png)<br />镜像内默认使用 root 编译，主机上若遇权限问题可执行 `sudo chown -R $USER .`。
+
+#### 主要产物路径（相对仓库根目录）
+
+| 用途 | 路径 |
+|------|------|
+| 主程序 | `core/build/loongcollector` |
+| Go 插件适配层 | `core/build/go_pipeline/libGoPluginAdapter.so` |
+| Go 插件基础库 | `core/build/go_pipeline/libGoPluginBase.so` |
+| eBPF 驱动 | `core/build/ebpf/driver/libeBPFDriver.so` |
+| coolbpf 运行时 | `core/build/_thirdparty/coolbpf/src/libcoolbpf.so.1.0.0` |
+| AgentSight FFI | `core/build/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so` |
+| 单元测试可执行文件 | `core/build/unittest/<模块>/<名称>_unittest` |
+| 跑全部 core UT | 仓库根目录执行 `./scripts/run_core_ut.sh`（默认扫描 `core/build/unittest`） |
+
+单元测试必须在 `core/build` 目录下运行，例如：
 
 ```bash
-cp -a ./core/build/loongcollector ./output
-cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output
+cd core/build
+./unittest/ebpf/agentsight_message_util_unittest
 ```
 
-最终组装的`./output`目录的结构如下
+#### 组装可运行目录 `output/`
+
+本地调试推荐用脚本（从 `core/build` 拷贝二进制与 so，并同步配置）：
+
+```bash
+./run_scripts/restart.sh
+```
+
+也可手动拷贝核心文件：
+
+```bash
+mkdir -p output
+cp -a ./core/build/loongcollector ./output/
+cp -a ./core/build/go_pipeline/libGoPluginAdapter.so ./output/
+cp -a ./core/build/go_pipeline/libGoPluginBase.so ./output/
+cp -a ./core/build/ebpf/driver/libeBPFDriver.so ./output/
+cp -a ./core/build/_thirdparty/coolbpf/src/libcoolbpf.so.1.0.0 ./output/
+cp -a ./core/build/_thirdparty/coolbpf/src/agentsight/release/libagentsight.so ./output/
+```
+
+最终 `./output` 目录结构示例：
 
 ```text
 ./output
-├── loongcollector (主程序）
-├── libPluginAdapter.so（插件接口）
-├── libPluginBase.h
-├── libPluginBase.so (插件lib）
+├── loongcollector              # 主程序（来自 core/build/loongcollector）
+├── libGoPluginAdapter.so       # 插件接口
+├── libGoPluginBase.so          # 插件 lib
 ├── libeBPFDriver.so
-└── libcoolbpf.so.1.0.0
+├── libcoolbpf.so.1.0.0
+└── libagentsight.so            # AgentSight（restart.sh 会一并拷贝）
 ```
 
 ## 直接使用镜像编译  <a name="VsYKL"></a>
