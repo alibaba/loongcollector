@@ -404,11 +404,9 @@ int ProcessCacheManager::ConsumePerfBufferData() {
     int ret = 0;
     mIsConsuming = true;
     if (mInited) {
-        mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
-        LOG_DEBUG(sLogger, ("process cache consume buffer", "")("cnt", ret));
+        ret = mEBPFAdapter->ConsumePerfBufferData(PluginType::PROCESS_SECURITY);
     }
     mIsConsuming = false;
-
     return ret;
 }
 
