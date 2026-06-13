@@ -377,7 +377,8 @@ snapshot 在增量决策中的职责（必须遵守）：
 
 ### Sub-agent D: 复用合规与文档一致性
 
-- 是否重复实现了已有公共能力（优先复用 `core/common` 与现有工具函数）。
+- 是否重复实现了已有公共能力（优先复用 `core/common` 与现有工具函数）；先对照 `/.cursor/rules/project-knowledge/codebase-map.md` §2 检索，map 缺项则评审后补充。
+- 质疑多套同构 map/LRU 能否合并为单一状态 entry，说明合并与否的理由。
 - 注释与代码行为是否一致，TODO/FIXME 是否引入新技术债。
 - 插件配置或 `GetXxxParam` 改动是否同步更新 `docs/` 对应文档。
 - 重点覆盖评估标准：可维护性、兼容性与文档测试。
