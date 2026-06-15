@@ -95,8 +95,8 @@ std::string HashNormalizedMessageSlice(const rapidjson::Document& slice) {
     return logtail::CalcSHA256Hex(std::string(buf.GetString(), buf.GetSize()));
 }
 
-// One pass: count non-system messages; when hashPrefixCount > 0 hash that prefix; when
-// hashPrefixCount == kHashAllNonSystemMessages hash every non-system message.
+// Finite hashPrefixCount: hash the first N non-system messages, set idxAfterHashPrefix, then stop
+// (delta only needs nonSystemCount >= N). kHashAllNonSystemMessages: hash and count every non-system.
 NonSystemInputScan ScanNonSystemInput(const rapidjson::Document& doc, size_t hashPrefixCount) {
     NonSystemInputScan result;
     const bool hashAll = hashPrefixCount == kHashAllNonSystemMessages;
@@ -112,15 +112,15 @@ NonSystemInputScan ScanNonSystemInput(const rapidjson::Document& doc, size_t has
             continue;
         }
         ++result.nonSystemCount;
-        if (!hashAll && hashTaken >= hashPrefixCount) {
-            continue;
-        }
-        rapidjson::Value item;
-        NormalizeMessageForHash(doc[i], item, hashAlloc);
-        hashSlice.PushBack(item, hashAlloc);
-        ++hashTaken;
-        if (!hashAll && hashTaken == hashPrefixCount) {
-            result.idxAfterHashPrefix = static_cast<size_t>(i) + 1;
+        if (hashAll || hashTaken < hashPrefixCount) {
+            rapidjson::Value item;
+            NormalizeMessageForHash(doc[i], item, hashAlloc);
+            hashSlice.PushBack(item, hashAlloc);
+            ++hashTaken;
+            if (!hashAll && hashPrefixCount > 0 && hashTaken == hashPrefixCount) {
+                result.idxAfterHashPrefix = static_cast<size_t>(i) + 1;
+                break;
+            }
         }
     }
     if (hashTaken > 0) {
