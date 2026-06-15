@@ -41,25 +41,6 @@ std::string ResolveSessionStateKey(const std::string& sessionId, const std::stri
 /// `{turn.id}:s{N}` (e.g. `278a5a71…:s2`); empty when `turnId` is empty.
 std::string FormatGenAiStepId(const std::string& turnId, size_t stepNumber);
 
-size_t CountJsonArrayElements(const std::string& messagesJson);
-
-std::string SerializeJsonArrayPrefix(const std::string& messagesJson, size_t prefixCount);
-
-/// Sub-array `[startIndex, startIndex + elementCount)` in message order.
-std::string SerializeJsonArrayRange(const std::string& messagesJson, size_t startIndex, size_t elementCount);
-
-/// Sub-array `[startIndex, end)` through the last element.
-std::string SerializeJsonArraySuffix(const std::string& messagesJson, size_t startIndex);
-
-/// SHA-256 of prefix messages after keeping only each message's `role` and `parts` (H_in).
-std::string HashJsonArrayPrefix(const std::string& fullMessagesJson, size_t prefixCount);
-
-/// SHA-256 of `[startIndex, startIndex + elementCount)` with the same role+parts normalization as H_in.
-std::string HashJsonArrayRange(const std::string& fullMessagesJson, size_t startIndex, size_t elementCount);
-
-/// SHA-256 of prefix messages after keeping only each message's `role` (H_out replay).
-std::string HashJsonArrayPrefixForOutput(const std::string& fullMessagesJson, size_t prefixCount);
-
 std::string ExtractSystemInstructionsJson(const std::string& requestMessagesJson);
 
 /// SHA-256 (hex) of `ExtractSystemInstructionsJson` output.
@@ -73,22 +54,18 @@ std::string ComputeToolDefinitionsHash(const std::string& toolDefinitionsJson);
 /// `fallbackFinishReason` when the array is empty or unparsable.
 std::string FormatFinishReasonsJson(const std::string& responseMessagesJson, const std::string& fallbackFinishReason);
 
-/// H_in over the full `gen_ai.input.messages` array (role+parts normalization per message).
-std::string ComputeInputMessagesHash(const std::string& fullMessagesJson);
-
 /// Derives `gen_ai.input.messages_delta` locally (does not use AgentSight FFI delta).
 /// `previousState` stores the last round's **request** (`messageCount` / `messagesHash`) and
-/// **response** (`outputMessageCount` / `outputMessagesHash`). When `cur`'s first `messageCount`
-/// messages match `messagesHash` (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
-/// `hash(cur[N_in:N_in+N_out]) == outputMessagesHash`; otherwise delta starts at `N_in`.
+/// **response** (`outputMessageCount` / `outputMessagesHash`). `messageCount` counts **non-system**
+/// request messages only. When `cur`'s first `messageCount` non-system messages match `messagesHash`
+/// (H_in: role+parts-only per message), skip `outputMessageCount` messages only if
+/// `hash(cur[idxAfterIn:idxAfterIn+N_out]) == outputMessagesHash`; otherwise delta starts at `idxAfterIn`.
 /// H_in uses role+parts normalization; H_out uses role-only normalization. System messages are omitted from delta.
 std::string ComputeInputMessagesDelta(const std::string& fullMessagesJson,
                                       const AgentsightSessionInputState* previousState);
 
-void UpdateSessionOutputState(const std::string& responseMessagesJson, AgentsightSessionInputState& state);
-
-/// After each emit: `messageCount` / `messagesHash` cover **request** messages only; response
-/// replay state is stored in `outputMessageCount` / `outputMessagesHash`.
+/// After each emit: `messageCount` / `messagesHash` cover **non-system request** messages only;
+/// response replay state is stored in `outputMessageCount` / `outputMessagesHash`.
 void CommitSessionStateAfterEmit(const std::string& requestMessagesJson,
                                  const std::string& responseMessagesJson,
                                  const std::string& toolDefinitionsJson,
