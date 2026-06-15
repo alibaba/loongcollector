@@ -54,6 +54,7 @@ type TimerEvent struct {
 type SendFuncWithStopCh struct {
 	SendFunc SendFunc
 	StopCh   chan struct{}
+	EventCh  chan []*K8sMetaEvent
 }
 
 func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan struct{}, gracePeriod int64, keyFunc cache.KeyFunc, indexRules ...IdxFunc) *DeferredDeletionMetaStore {
@@ -134,10 +135,12 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 	sendFuncWithStopCh := &SendFuncWithStopCh{
 		SendFunc: f,
 		StopCh:   make(chan struct{}),
+		EventCh:  make(chan []*K8sMetaEvent, 5000),
 	}
 	m.registerLock.Lock()
 	m.sendFuncs[key] = sendFuncWithStopCh
 	m.registerLock.Unlock()
+
 	go func() {
 		defer panicRecover()
 		event := &K8sMetaEvent{
@@ -164,6 +167,17 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 			select {
 			case <-ticker.C:
 				m.eventCh <- event
+			case e := <-sendFuncWithStopCh.EventCh:
+				sendFuncWithStopCh.SendFunc(e)
+				n := len(sendFuncWithStopCh.EventCh)
+				for i := 0; i < n && i < 2000; i++ {
+					select {
+					case next := <-sendFuncWithStopCh.EventCh:
+						sendFuncWithStopCh.SendFunc(next)
+					default:
+						break
+					}
+				}
 			case <-sendFuncWithStopCh.StopCh:
 				return
 			}
@@ -258,7 +272,11 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 	m.lock.Unlock()
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
-		f.SendFunc([]*K8sMetaEvent{event})
+		select {
+		case f.EventCh <- []*K8sMetaEvent{event}:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping event", key)
+		}
 	}
 	m.registerLock.RUnlock()
 }
@@ -277,11 +295,14 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 	m.lock.Unlock()
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
-		f.SendFunc([]*K8sMetaEvent{event})
+		select {
+		case f.EventCh <- []*K8sMetaEvent{event}:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping delete event", key)
+		}
 	}
 	m.registerLock.RUnlock()
 	go func() {
-		// wait and add a deferred delete event
 		time.Sleep(time.Duration(m.gracePeriod) * time.Second)
 		m.eventCh <- &K8sMetaEvent{
 			EventType: EventTypeDeferredDelete,
@@ -321,19 +342,24 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	m.registerLock.RLock()
 	defer m.registerLock.RUnlock()
 	if f, ok := m.sendFuncs[timerEvent.ConfigName]; ok {
-		allItems := make([]*K8sMetaEvent, 0)
+		allItems := make([]*K8sMetaEvent, 0, len(m.Items))
 		m.lock.RLock()
 		for _, obj := range m.Items {
 			if !obj.Deleted {
-				obj.LastObservedTime = time.Now().Unix()
+				newObj := *obj
+				newObj.LastObservedTime = time.Now().Unix()
 				allItems = append(allItems, &K8sMetaEvent{
 					EventType: EventTypeUpdate,
-					Object:    obj,
+					Object:    &newObj,
 				})
 			}
 		}
 		m.lock.RUnlock()
-		f.SendFunc(allItems)
+		select {
+		case f.EventCh <- allItems:
+		default:
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer event", timerEvent.ConfigName)
+		}
 	}
 }
 

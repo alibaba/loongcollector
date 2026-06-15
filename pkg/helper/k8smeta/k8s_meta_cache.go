@@ -60,7 +60,14 @@ func newK8sMetaCache(stopCh chan struct{}, resourceType string) *k8sMetaCache {
 func (m *k8sMetaCache) init(clientset *kubernetes.Clientset) {
 	m.clientset = clientset
 	m.metaStore.Start()
-	m.watch(m.stopCh)
+}
+
+func (m *k8sMetaCache) ensureWatchStarted() {
+	m.watchOnce.Do(func() {
+		if m.clientset != nil {
+			go m.watch(m.stopCh)
+		}
+	})
 }
 
 func (m *k8sMetaCache) Get(key []string) map[string][]*ObjectWrapper {
@@ -123,6 +130,11 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 		},
 		UpdateFunc: func(oldObj interface{}, obj interface{}) {
 			defer panicRecover()
+			oldMeta, err1 := meta.Accessor(oldObj)
+			newMeta, err2 := meta.Accessor(obj)
+			if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+				return
+			}
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,

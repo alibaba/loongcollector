@@ -3,6 +3,7 @@ package kubernetesmetav2
 import (
 	"context"
 	"encoding/json"
+	"sync/atomic"
 
 	// #nosec G501
 	"crypto/md5"
@@ -401,8 +402,12 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	}
 	select {
 	case buffer <- event:
-	case <-time.After(3 * time.Second):
-		logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode, "send event timeout, isEntity", entity)
+	default:
+		count := atomic.AddUint64(&m.dropCount, 1)
+		if count%1000 == 0 {
+			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode,
+				"send buffer full, events dropped", "total_dropped", count, "isEntity", entity)
+		}
 	}
 }
 
@@ -426,16 +431,52 @@ func (m *metaCollector) sendInBackground() {
 		select {
 		case e := <-m.entityBuffer:
 			entityGroup.Events = append(entityGroup.Events, e)
-			if len(entityGroup.Events) >= 100 {
+			if len(entityGroup.Events) >= 500 {
 				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
 				sendFunc(entityGroup)
 			}
+			n := len(m.entityBuffer)
+			for i := 0; i < n && i < 5000; i++ {
+				select {
+				case e := <-m.entityBuffer:
+					entityGroup.Events = append(entityGroup.Events, e)
+					if len(entityGroup.Events) >= 1000 {
+						m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
+						sendFunc(entityGroup)
+					}
+				default:
+					break
+				}
+			}
+			if len(entityGroup.Events) > 0 {
+				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
+				sendFunc(entityGroup)
+			}
+
 		case e := <-m.entityLinkBuffer:
 			linkGroup.Events = append(linkGroup.Events, e)
-			if len(linkGroup.Events) >= 100 {
+			if len(linkGroup.Events) >= 500 {
 				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
 				sendFunc(linkGroup)
 			}
+			n := len(m.entityLinkBuffer)
+			for i := 0; i < n && i < 5000; i++ {
+				select {
+				case e := <-m.entityLinkBuffer:
+					linkGroup.Events = append(linkGroup.Events, e)
+					if len(linkGroup.Events) >= 1000 {
+						m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
+						sendFunc(linkGroup)
+					}
+				default:
+					break
+				}
+			}
+			if len(linkGroup.Events) > 0 {
+				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
+				sendFunc(linkGroup)
+			}
+
 		case <-time.After(3 * time.Second):
 			if len(entityGroup.Events) > 0 {
 				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
