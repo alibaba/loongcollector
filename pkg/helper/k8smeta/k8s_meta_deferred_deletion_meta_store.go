@@ -52,9 +52,10 @@ type TimerEvent struct {
 }
 
 type SendFuncWithStopCh struct {
-	SendFunc SendFunc
-	StopCh   chan struct{}
-	EventCh  chan []*K8sMetaEvent
+	SendFunc   SendFunc
+	StopCh     chan struct{}
+	EventCh    chan []*K8sMetaEvent
+	DrainBatch int
 }
 
 func NewDeferredDeletionMetaStore(eventCh chan *K8sMetaEvent, stopCh <-chan struct{}, gracePeriod int64, keyFunc cache.KeyFunc, indexRules ...IdxFunc) *DeferredDeletionMetaStore {
@@ -131,11 +132,12 @@ func (m *DeferredDeletionMetaStore) Filter(filterFunc func(*ObjectWrapper) bool,
 	return result
 }
 
-func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int) {
+func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int, eventChSize int, drainBatch int) {
 	sendFuncWithStopCh := &SendFuncWithStopCh{
-		SendFunc: f,
-		StopCh:   make(chan struct{}),
-		EventCh:  make(chan []*K8sMetaEvent, 5000),
+		SendFunc:   f,
+		StopCh:     make(chan struct{}),
+		EventCh:    make(chan []*K8sMetaEvent, eventChSize),
+		DrainBatch: drainBatch,
 	}
 	m.registerLock.Lock()
 	m.sendFuncs[key] = sendFuncWithStopCh
@@ -170,7 +172,7 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 			case e := <-sendFuncWithStopCh.EventCh:
 				sendFuncWithStopCh.SendFunc(e)
 				n := len(sendFuncWithStopCh.EventCh)
-				for i := 0; i < n && i < 2000; i++ {
+				for i := 0; i < n && i < sendFuncWithStopCh.DrainBatch; i++ {
 					select {
 					case next := <-sendFuncWithStopCh.EventCh:
 						sendFuncWithStopCh.SendFunc(next)
@@ -268,6 +270,8 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		}
 	}
 
+	// cache is always updated regardless of whether the notification below succeeds;
+	// dropped notifications will be compensated by the periodic timer full-sync
 	m.Items[key] = event.Object
 	m.lock.Unlock()
 	m.registerLock.RLock()
@@ -346,6 +350,7 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 		m.lock.RLock()
 		for _, obj := range m.Items {
 			if !obj.Deleted {
+				// copy to avoid data race on shared cache objects and prevent GC pinning
 				newObj := *obj
 				newObj.LastObservedTime = time.Now().Unix()
 				allItems = append(allItems, &K8sMetaEvent{

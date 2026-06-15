@@ -28,7 +28,7 @@ type MetaCache interface {
 	GetQueueSize() int
 	List() []*ObjectWrapper
 	Filter(filterFunc func(*ObjectWrapper) bool, limit int) []*ObjectWrapper
-	RegisterSendFunc(key string, sendFunc SendFunc, interval int)
+	RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int)
 	UnRegisterSendFunc(key string)
 	init(*kubernetes.Clientset)
 	watch(stopCh <-chan struct{})
@@ -212,7 +212,7 @@ func (m *MetaManager) IsReady() bool {
 	return m.ready.Load()
 }
 
-func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int) {
+func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
 	m.cacheMu.RLock()
 	cache, ok := m.cacheMap[resourceType]
 	m.cacheMu.RUnlock()
@@ -230,7 +230,7 @@ func (m *MetaManager) RegisterSendFunc(projectName, configName, resourceType str
 				}
 			}
 			m.registerLock.RUnlock()
-		}, interval)
+		}, interval, eventChSize, drainBatch)
 		m.registerLock.Lock()
 		if cnt, ok := m.projectNames[projectName]; ok {
 			m.projectNames[projectName] = cnt + 1

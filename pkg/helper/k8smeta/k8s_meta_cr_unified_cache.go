@@ -245,9 +245,9 @@ func (c *crUnifiedCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int)
 	return c.metaStore.Filter(filterFunc, limit)
 }
 
-func (c *crUnifiedCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int) {
+func (c *crUnifiedCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
 	c.EnsureWatchStarted()
-	c.metaStore.RegisterSendFunc(key, sendFunc, interval)
+	c.metaStore.RegisterSendFunc(key, sendFunc, interval, eventChSize, drainBatch)
 	logger.Debug(context.Background(), "register send func", c.resourceType)
 }
 

@@ -71,6 +71,10 @@ type ServiceK8sMeta struct {
 	Cluster2PersistentVolume string
 	Cluster2StorageClass     string
 
+	// buffer and batch tuning
+	EventBufferSize int
+	DrainBatchSize  int
+
 	// other
 	context       pipeline.Context
 	metaManager   *k8smeta.MetaManager
@@ -116,8 +120,8 @@ func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 	s.metaCollector = &metaCollector{
 		serviceK8sMeta:   s,
 		collector:        collector,
-		entityBuffer:     make(chan models.PipelineEvent, 5000),
-		entityLinkBuffer: make(chan models.PipelineEvent, 5000),
+		entityBuffer:     make(chan models.PipelineEvent, s.EventBufferSize),
+		entityLinkBuffer: make(chan models.PipelineEvent, s.EventBufferSize),
 		stopCh:           make(chan struct{}),
 		entityProcessor:  make(map[string]ProcessFunc),
 	}
@@ -149,6 +153,8 @@ func init() {
 			Interval:          60,
 			EnableLabels:      false,
 			EnableAnnotations: false,
+			EventBufferSize:   5000,
+			DrainBatchSize:    2000,
 			clusterID:         *flags.ClusterID,
 			clusterName:       *flags.ClusterName,
 			clusterRegion:     *flags.ClusterRegion,
