@@ -124,6 +124,10 @@ func gvrDiscoveryAvailable(d discovery.DiscoveryInterface, gvr schema.GroupVersi
 	return true
 }
 
+func (c *crUnifiedCache) ensureWatchStarted() {
+	c.EnsureWatchStarted()
+}
+
 // EnsureWatchStarted starts the dynamic informer (once) when the dynamic client is ready.
 // Important: never enter sync.Once when dynamicClient is nil.
 func (c *crUnifiedCache) EnsureWatchStarted() {
