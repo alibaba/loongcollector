@@ -135,6 +135,9 @@ func (m *k8sMetaCache) watch(stopCh <-chan struct{}) {
 			if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
 				return
 			}
+			if !isSignificantUpdate(m.resourceType, oldObj, obj) {
+				return
+			}
 			nowTime := time.Now().Unix()
 			m.eventCh <- &K8sMetaEvent{
 				EventType: EventTypeUpdate,
