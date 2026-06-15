@@ -32,6 +32,7 @@ type metaCollector struct {
 
 	stopCh          chan struct{}
 	dropCount       uint64
+	bufferSize      int
 	entityProcessor map[string]ProcessFunc
 	crConfigs       map[string]k8smeta.CustomResourceCollectorConfig
 }
@@ -131,6 +132,17 @@ func (m *metaCollector) Start() error {
 		}
 		m.serviceK8sMeta.metaManager.EnsureCustomResourceInformerStarted(cfg.EntityType)
 	}
+
+	// scale buffer size by the number of registered resource types,
+	// since all types share the same entityBuffer/entityLinkBuffer
+	resourceTypeCount := m.countResourceTypes()
+	if resourceTypeCount < 1 {
+		resourceTypeCount = 1
+	}
+	bufferSize := m.serviceK8sMeta.EventBufferSize * resourceTypeCount
+	m.bufferSize = bufferSize
+	m.entityBuffer = make(chan models.PipelineEvent, bufferSize)
+	m.entityLinkBuffer = make(chan models.PipelineEvent, bufferSize)
 
 	if m.serviceK8sMeta.Pod {
 		m.serviceK8sMeta.metaManager.RegisterSendFunc(m.serviceK8sMeta.context.GetProject(), m.serviceK8sMeta.configName, k8smeta.POD, m.handleEvent, m.serviceK8sMeta.Interval, m.serviceK8sMeta.EventBufferSize, m.serviceK8sMeta.DrainBatchSize)
@@ -261,6 +273,64 @@ func (m *metaCollector) Start() error {
 
 	go m.sendInBackground()
 	return nil
+}
+
+// countResourceTypes returns the number of enabled entity and link types
+// (including custom resources). Used to scale shared buffer sizes, since all
+// types produce into the same entityBuffer/entityLinkBuffer.
+func (m *metaCollector) countResourceTypes() int {
+	s := m.serviceK8sMeta
+	count := 0
+	bools := []bool{s.Pod, s.Node, s.Service, s.Deployment, s.ReplicaSet, s.DaemonSet,
+		s.StatefulSet, s.Configmap, s.Job, s.CronJob, s.Namespace,
+		s.PersistentVolume, s.PersistentVolumeClaim, s.StorageClass, s.Ingress}
+	for _, b := range bools {
+		if b {
+			count++
+		}
+	}
+	links := []bool{
+		s.Pod && s.Node && s.Node2Pod != "",
+		s.Deployment && s.Pod && s.Deployment2Pod != "",
+		s.ReplicaSet && s.Pod && s.ReplicaSet2Pod != "",
+		s.Deployment && s.ReplicaSet && s.Deployment2ReplicaSet != "",
+		s.StatefulSet && s.Pod && s.StatefulSet2Pod != "",
+		s.DaemonSet && s.Pod && s.DaemonSet2Pod != "",
+		s.CronJob && s.Job && s.CronJob2Job != "",
+		s.Job && s.Pod && s.Job2Pod != "",
+		s.Pod && s.PersistentVolumeClaim && s.Pod2PersistentVolumeClaim != "",
+		s.Pod && s.Configmap && s.Pod2ConfigMap != "",
+		s.Service && s.Pod && s.Service2Pod != "",
+		s.Pod && s.Container && s.Pod2Container != "",
+		s.Ingress && s.Service && s.Ingress2Service != "",
+		s.Namespace && s.Pod && s.Namespace2Pod != "",
+		s.Namespace && s.Service && s.Namespace2Service != "",
+		s.Namespace && s.Deployment && s.Namespace2Deployment != "",
+		s.Namespace && s.DaemonSet && s.Namespace2DaemonSet != "",
+		s.Namespace && s.StatefulSet && s.Namespace2StatefulSet != "",
+		s.Namespace && s.Configmap && s.Namespace2Configmap != "",
+		s.Namespace && s.Job && s.Namespace2Job != "",
+		s.Namespace && s.CronJob && s.Namespace2CronJob != "",
+		s.Namespace && s.PersistentVolumeClaim && s.Namespace2PersistentVolumeClaim != "",
+		s.Namespace && s.Ingress && s.Namespace2Ingress != "",
+	}
+	for _, b := range links {
+		if b {
+			count++
+		}
+	}
+	for _, cfg := range m.crConfigs {
+		if cfg.CollectEntity {
+			count++
+		}
+		if s.Pod && cfg.PodLink != nil && cfg.Entity2PodRelation != "" {
+			count++
+		}
+		if s.Namespace && cfg.CollectEntity && cfg.Namespace2EntityRelation != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *metaCollector) Stop() error {
@@ -437,7 +507,7 @@ func (m *metaCollector) sendInBackground() {
 				sendFunc(entityGroup)
 			}
 			n := len(m.entityBuffer)
-			for i := 0; i < n && i < m.serviceK8sMeta.EventBufferSize; i++ {
+			for i := 0; i < n && i < m.bufferSize; i++ {
 				select {
 				case e := <-m.entityBuffer:
 					entityGroup.Events = append(entityGroup.Events, e)
@@ -461,7 +531,7 @@ func (m *metaCollector) sendInBackground() {
 				sendFunc(linkGroup)
 			}
 			n := len(m.entityLinkBuffer)
-			for i := 0; i < n && i < m.serviceK8sMeta.EventBufferSize; i++ {
+			for i := 0; i < n && i < m.bufferSize; i++ {
 				select {
 				case e := <-m.entityLinkBuffer:
 					linkGroup.Events = append(linkGroup.Events, e)

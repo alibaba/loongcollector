@@ -118,12 +118,10 @@ func (s *ServiceK8sMeta) Stop() error {
 func (s *ServiceK8sMeta) Start(collector pipeline.Collector) error {
 	s.collector = collector
 	s.metaCollector = &metaCollector{
-		serviceK8sMeta:   s,
-		collector:        collector,
-		entityBuffer:     make(chan models.PipelineEvent, s.EventBufferSize),
-		entityLinkBuffer: make(chan models.PipelineEvent, s.EventBufferSize),
-		stopCh:           make(chan struct{}),
-		entityProcessor:  make(map[string]ProcessFunc),
+		serviceK8sMeta:  s,
+		collector:       collector,
+		stopCh:          make(chan struct{}),
+		entityProcessor: make(map[string]ProcessFunc),
 	}
 	return s.metaCollector.Start()
 }
