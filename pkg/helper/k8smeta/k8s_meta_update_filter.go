@@ -14,6 +14,10 @@ func isSignificantUpdate(resourceType string, oldObj, newObj interface{}) bool {
 	switch resourceType {
 	case POD:
 		return isPodSignificantChange(oldObj, newObj)
+	// These resource types' processors only consume metadata fields (labels,
+	// annotations, name, namespace, creationTimestamp). In particular, ConfigMap
+	// processor does NOT use Data — so filtering by Generation+Labels+Annotations
+	// is correct even though ConfigMap Data changes don't bump Generation.
 	case SERVICE, DAEMONSET, STATEFULSET, REPLICASET,
 		CONFIGMAP, NAMESPACE, CRONJOB, INGRESS, STORAGECLASS:
 		return isMetadataOnlySignificantChange(oldObj, newObj)

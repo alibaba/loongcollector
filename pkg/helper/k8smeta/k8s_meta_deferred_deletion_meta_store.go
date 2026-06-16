@@ -132,6 +132,29 @@ func (m *DeferredDeletionMetaStore) Filter(filterFunc func(*ObjectWrapper) bool,
 	return result
 }
 
+// sendBatch dispatches events with throttling for large batches (Timer full-sync).
+// Returns true if StopCh was triggered and the caller should exit.
+func (s *SendFuncWithStopCh) sendBatch(events []*K8sMetaEvent) bool {
+	if len(events) > s.DrainBatch {
+		for i := 0; i < len(events); i += s.DrainBatch {
+			end := i + s.DrainBatch
+			if end > len(events) {
+				end = len(events)
+			}
+			s.SendFunc(events[i:end])
+			// not a timer leak: limited iterations, each timer fires in 50ms and is GC'd
+			select {
+			case <-time.After(50 * time.Millisecond):
+			case <-s.StopCh:
+				return true
+			}
+		}
+	} else {
+		s.SendFunc(events)
+	}
+	return false
+}
+
 func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, interval int, eventChSize int, drainBatch int) {
 	sendFuncWithStopCh := &SendFuncWithStopCh{
 		SendFunc:   f,
@@ -170,36 +193,17 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 			case <-ticker.C:
 				m.eventCh <- event
 			case e := <-sendFuncWithStopCh.EventCh:
-				if len(e) > sendFuncWithStopCh.DrainBatch {
-					// Large batch (typically Timer full-sync with all cached objects).
-					// Send in small chunks with a short yield between each, so
-					// sendInBackground has time to drain entityBuffer and fewer
-					// events are dropped. Without this, the entire batch would be
-					// pushed at once, instantly filling entityBuffer and dropping
-					// the rest.
-					for i := 0; i < len(e); i += sendFuncWithStopCh.DrainBatch {
-						end := i + sendFuncWithStopCh.DrainBatch
-						if end > len(e) {
-							end = len(e)
-						}
-						sendFuncWithStopCh.SendFunc(e[i:end])
-						select {
-						case <-time.After(50 * time.Millisecond):
-						case <-sendFuncWithStopCh.StopCh:
-							return
-						}
-					}
-				} else {
-					// Small batch (real-time add/update/delete events).
-					// Send immediately without throttling.
-					sendFuncWithStopCh.SendFunc(e)
+				if sendFuncWithStopCh.sendBatch(e) {
+					return
 				}
 				n := len(sendFuncWithStopCh.EventCh)
 			drainEventCh:
 				for i := 0; i < n && i < sendFuncWithStopCh.DrainBatch; i++ {
 					select {
 					case next := <-sendFuncWithStopCh.EventCh:
-						sendFuncWithStopCh.SendFunc(next)
+						if sendFuncWithStopCh.sendBatch(next) {
+							return
+						}
 					default:
 						break drainEventCh
 					}

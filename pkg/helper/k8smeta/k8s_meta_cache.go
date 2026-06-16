@@ -68,6 +68,9 @@ func (m *k8sMetaCache) ensureWatchStarted() {
 	m.watchOnce.Do(func() {
 		if m.clientset != nil {
 			go m.watch(m.stopCh)
+		} else {
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode,
+				"ensureWatchStarted called before init, watch permanently skipped", m.resourceType)
 		}
 	})
 }
