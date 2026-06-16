@@ -507,6 +507,7 @@ func (m *metaCollector) sendInBackground() {
 				sendFunc(entityGroup)
 			}
 			n := len(m.entityBuffer)
+		drainEntity:
 			for i := 0; i < n && i < m.bufferSize; i++ {
 				select {
 				case e := <-m.entityBuffer:
@@ -516,7 +517,7 @@ func (m *metaCollector) sendInBackground() {
 						sendFunc(entityGroup)
 					}
 				default:
-					break
+					break drainEntity
 				}
 			}
 			if len(entityGroup.Events) > 0 {
@@ -531,6 +532,7 @@ func (m *metaCollector) sendInBackground() {
 				sendFunc(linkGroup)
 			}
 			n := len(m.entityLinkBuffer)
+		drainLink:
 			for i := 0; i < n && i < m.bufferSize; i++ {
 				select {
 				case e := <-m.entityLinkBuffer:
@@ -540,7 +542,7 @@ func (m *metaCollector) sendInBackground() {
 						sendFunc(linkGroup)
 					}
 				default:
-					break
+					break drainLink
 				}
 			}
 			if len(linkGroup.Events) > 0 {

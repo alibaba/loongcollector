@@ -170,14 +170,34 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 			case <-ticker.C:
 				m.eventCh <- event
 			case e := <-sendFuncWithStopCh.EventCh:
-				sendFuncWithStopCh.SendFunc(e)
+				if len(e) > sendFuncWithStopCh.DrainBatch {
+					// Large batch (typically Timer full-sync with all cached objects).
+					// Send in small chunks with a short yield between each, so
+					// sendInBackground has time to drain entityBuffer and fewer
+					// events are dropped. Without this, the entire batch would be
+					// pushed at once, instantly filling entityBuffer and dropping
+					// the rest.
+					for i := 0; i < len(e); i += sendFuncWithStopCh.DrainBatch {
+						end := i + sendFuncWithStopCh.DrainBatch
+						if end > len(e) {
+							end = len(e)
+						}
+						sendFuncWithStopCh.SendFunc(e[i:end])
+						time.Sleep(50 * time.Millisecond)
+					}
+				} else {
+					// Small batch (real-time add/update/delete events).
+					// Send immediately without throttling.
+					sendFuncWithStopCh.SendFunc(e)
+				}
 				n := len(sendFuncWithStopCh.EventCh)
+			drainEventCh:
 				for i := 0; i < n && i < sendFuncWithStopCh.DrainBatch; i++ {
 					select {
 					case next := <-sendFuncWithStopCh.EventCh:
 						sendFuncWithStopCh.SendFunc(next)
 					default:
-						break
+						break drainEventCh
 					}
 				}
 			case <-sendFuncWithStopCh.StopCh:
