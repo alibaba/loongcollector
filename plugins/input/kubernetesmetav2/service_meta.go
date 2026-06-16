@@ -72,8 +72,15 @@ type ServiceK8sMeta struct {
 	Cluster2StorageClass     string
 
 	// buffer and batch tuning
+	// EventBufferSize is the base buffer capacity per resource type for EventCh
+	// and entityBuffer/entityLinkBuffer. The actual buffer size is scaled by the
+	// number of registered resource types: actualSize = EventBufferSize * resourceTypeCount,
+	// capped at MaxBufferSize.
 	EventBufferSize int
-	DrainBatchSize  int
+	// MaxBufferSize is the upper limit of the scaled buffer size, preventing
+	// excessive memory allocation when many resource types are enabled.
+	MaxBufferSize  int
+	DrainBatchSize int
 
 	// other
 	context       pipeline.Context
@@ -152,6 +159,7 @@ func init() {
 			EnableLabels:      false,
 			EnableAnnotations: false,
 			EventBufferSize:   10000,
+			MaxBufferSize:     200000,
 			DrainBatchSize:    2000,
 			clusterID:         *flags.ClusterID,
 			clusterName:       *flags.ClusterName,

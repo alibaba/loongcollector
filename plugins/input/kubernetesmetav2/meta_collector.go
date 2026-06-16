@@ -140,6 +140,9 @@ func (m *metaCollector) Start() error {
 		resourceTypeCount = 1
 	}
 	bufferSize := m.serviceK8sMeta.EventBufferSize * resourceTypeCount
+	if bufferSize > m.serviceK8sMeta.MaxBufferSize {
+		bufferSize = m.serviceK8sMeta.MaxBufferSize
+	}
 	m.bufferSize = bufferSize
 	m.entityBuffer = make(chan models.PipelineEvent, bufferSize)
 	m.entityLinkBuffer = make(chan models.PipelineEvent, bufferSize)
@@ -475,7 +478,7 @@ func (m *metaCollector) send(event models.PipelineEvent, entity bool) {
 	case buffer <- event:
 	default:
 		count := atomic.AddUint64(&m.dropCount, 1)
-		if count%1000 == 0 {
+		if count == 1 || count%1000 == 0 {
 			logger.Warning(context.Background(), k8smeta.K8sMetaUnifyErrorCode,
 				"send buffer full, events dropped", "total_dropped", count, "isEntity", entity)
 		}

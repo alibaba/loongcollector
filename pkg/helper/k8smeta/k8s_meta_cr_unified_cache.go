@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -171,8 +172,13 @@ func (c *crUnifiedCache) EnsureWatchStarted() {
 				}
 				metaManager.addEventCount.Add(1)
 			},
-			UpdateFunc: func(_, obj interface{}) {
+			UpdateFunc: func(oldObj, obj interface{}) {
 				defer panicRecover()
+				oldMeta, err1 := meta.Accessor(oldObj)
+				newMeta, err2 := meta.Accessor(obj)
+				if err1 == nil && err2 == nil && oldMeta.GetResourceVersion() == newMeta.GetResourceVersion() {
+					return
+				}
 				u := trimmedCRCopyFromInformer(obj, c.resourceType)
 				if u == nil {
 					return

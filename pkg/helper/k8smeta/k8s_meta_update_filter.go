@@ -3,7 +3,6 @@ package k8smeta
 import (
 	"reflect"
 
-	app "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 )
@@ -85,13 +84,6 @@ func isMetadataOnlySignificantChange(oldObj, newObj interface{}) bool {
 	}
 	if !reflect.DeepEqual(oldMeta.GetAnnotations(), newMeta.GetAnnotations()) {
 		return true
-	}
-	// DaemonSet/StatefulSet/ReplicaSet: also check Spec.Replicas via type assertion
-	if oldDS, ok := oldObj.(*app.DaemonSet); ok {
-		newDS := newObj.(*app.DaemonSet)
-		if oldDS.Generation != newDS.Generation {
-			return true
-		}
 	}
 	return false
 }

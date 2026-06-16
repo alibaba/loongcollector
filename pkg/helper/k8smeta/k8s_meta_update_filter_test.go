@@ -213,7 +213,7 @@ func TestSameContainerIDs_Empty(t *testing.T) {
 	assert.False(t, sameContainerIDs(nil, []v1.ContainerStatus{{ContainerID: "a"}}))
 }
 
-func TestMetadataOnly_DaemonSet_GenerationCheck(t *testing.T) {
+func TestMetadataOnly_GenerationChange_DaemonSet(t *testing.T) {
 	oldDS := &app.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{Generation: 1, Labels: map[string]string{"a": "b"}},
 	}

@@ -183,7 +183,11 @@ func (m *DeferredDeletionMetaStore) RegisterSendFunc(key string, f SendFunc, int
 							end = len(e)
 						}
 						sendFuncWithStopCh.SendFunc(e[i:end])
-						time.Sleep(50 * time.Millisecond)
+						select {
+						case <-time.After(50 * time.Millisecond):
+						case <-sendFuncWithStopCh.StopCh:
+							return
+						}
 					}
 				} else {
 					// Small batch (real-time add/update/delete events).
@@ -317,6 +321,9 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		event.Object.FirstObservedTime = obj.FirstObservedTime
 	}
 	m.lock.Unlock()
+	// Dropped delete notifications are NOT compensated by Timer full-sync
+	// (Timer only sends non-deleted items). Downstream relies on keepAliveSeconds
+	// TTL to expire stale entities, so the delete will take effect after Interval*2.
 	m.registerLock.RLock()
 	for _, f := range m.sendFuncs {
 		select {
@@ -370,7 +377,9 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 		m.lock.RLock()
 		for _, obj := range m.Items {
 			if !obj.Deleted {
-				// copy to avoid data race on shared cache objects and prevent GC pinning
+				// shallow copy ObjectWrapper so we can set LastObservedTime without
+				// mutating the cached entry. Raw is effectively immutable after
+				// being stored, so sharing the pointer is safe.
 				newObj := *obj
 				newObj.LastObservedTime = time.Now().Unix()
 				allItems = append(allItems, &K8sMetaEvent{

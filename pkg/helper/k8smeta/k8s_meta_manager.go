@@ -355,6 +355,8 @@ func (m *MetaManager) ensureLinkDependenciesStarted(linkType string) {
 	if !ok {
 		return
 	}
+	m.cacheMu.RLock()
+	defer m.cacheMu.RUnlock()
 	for _, dep := range deps {
 		if cache, ok := m.cacheMap[dep]; ok {
 			cache.ensureWatchStarted()
