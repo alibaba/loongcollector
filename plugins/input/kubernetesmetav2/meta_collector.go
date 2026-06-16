@@ -498,6 +498,9 @@ func (m *metaCollector) sendInBackground() {
 	// send cluster entity as soon as k8s meta collector started
 	m.sendClusterEntity()
 
+	flushTimer := time.NewTimer(3 * time.Second)
+	defer flushTimer.Stop()
+
 	for {
 		select {
 		case e := <-m.entityBuffer:
@@ -550,7 +553,7 @@ func (m *metaCollector) sendInBackground() {
 				sendFunc(linkGroup)
 			}
 
-		case <-time.After(3 * time.Second):
+		case <-flushTimer.C:
 			if len(entityGroup.Events) > 0 {
 				m.serviceK8sMeta.entityCount.Add(int64(len(entityGroup.Events)))
 				sendFunc(entityGroup)
@@ -559,6 +562,7 @@ func (m *metaCollector) sendInBackground() {
 				m.serviceK8sMeta.linkCount.Add(int64(len(linkGroup.Events)))
 				sendFunc(linkGroup)
 			}
+			flushTimer.Reset(3 * time.Second)
 		case <-m.stopCh:
 			return
 		}

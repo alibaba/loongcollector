@@ -151,7 +151,7 @@ func init() {
 			Interval:          60,
 			EnableLabels:      false,
 			EnableAnnotations: false,
-			EventBufferSize:   5000,
+			EventBufferSize:   10000,
 			DrainBatchSize:    2000,
 			clusterID:         *flags.ClusterID,
 			clusterName:       *flags.ClusterName,

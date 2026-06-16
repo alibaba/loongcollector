@@ -224,6 +224,119 @@ loop:
 	t.Logf("Downstream delay:   %v per batch", downstreamDelay)
 }
 
+// TestStressLargeCluster simulates a 560k-object cluster with 15+ link types.
+// Each event in the consumer goroutine triggers ~16x processing (1 entity + 15 links).
+//
+// Run with: go test -count=1 -v -run TestStressLargeCluster github.com/alibaba/ilogtail/pkg/helper/k8smeta
+func TestStressLargeCluster(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping stress test in short mode")
+	}
+
+	const (
+		cacheSize       = 560000
+		realtimeRate    = 86               // ~5172 updates/min ÷ 60
+		linkTypes       = 15               // number of link types, each event processed 1+15=16 times
+		timerInterval   = 30 * time.Second // shortened for test (prod: 300s)
+		testDuration    = 35 * time.Second
+		eventChSize     = 10000
+		drainBatch      = 2000
+		downstreamDelay = 5 * time.Millisecond
+	)
+
+	store, eventCh, stopCh := setupStore(eventChSize)
+	defer close(stopCh)
+
+	t.Logf("Populating cache with %d objects...", cacheSize)
+	pods := generatePods(cacheSize)
+	for i, pod := range pods {
+		eventCh <- &K8sMetaEvent{
+			EventType: EventTypeAdd,
+			Object: &ObjectWrapper{
+				ResourceType:      POD,
+				Raw:               pod,
+				FirstObservedTime: time.Now().Unix(),
+				LastObservedTime:  time.Now().Unix(),
+			},
+		}
+		if (i+1)%100000 == 0 {
+			t.Logf("  populated %d/%d", i+1, cacheSize)
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	t.Logf("Cache populated. Waiting for Store to process...")
+	time.Sleep(3 * time.Second)
+
+	var received int64
+	// simulate per-event cost: 1 entity + 15 link generations
+	// each link generation adds ~0.3ms of processing
+	store.RegisterSendFunc("large-cluster", func(events []*K8sMetaEvent) {
+		for range events {
+			// simulate entity processing + 15 link generations
+			for j := 0; j < 1+linkTypes; j++ {
+				time.Sleep(20 * time.Microsecond)
+			}
+		}
+		atomic.AddInt64(&received, int64(len(events)))
+	}, int(timerInterval.Seconds()), eventChSize, drainBatch)
+
+	var realtimeSent, realtimeDropped int64
+
+	t.Logf("Starting large cluster stress: %v, rate=%d/sec, links=%d, buffer=%d",
+		testDuration, realtimeRate, linkTypes, eventChSize)
+
+	deadline := time.After(testDuration)
+	ticker := time.NewTicker(time.Second / time.Duration(realtimeRate))
+	defer ticker.Stop()
+	start := time.Now()
+
+loop:
+	for {
+		select {
+		case <-deadline:
+			break loop
+		case <-ticker.C:
+			idx := int(atomic.LoadInt64(&realtimeSent)) % cacheSize
+			pod := pods[idx]
+			pod.ResourceVersion = fmt.Sprintf("%d", time.Now().UnixNano())
+			select {
+			case eventCh <- &K8sMetaEvent{
+				EventType: EventTypeUpdate,
+				Object: &ObjectWrapper{
+					ResourceType:      POD,
+					Raw:               pod,
+					FirstObservedTime: time.Now().Unix(),
+					LastObservedTime:  time.Now().Unix(),
+				},
+			}:
+			default:
+				atomic.AddInt64(&realtimeDropped, 1)
+			}
+			atomic.AddInt64(&realtimeSent, 1)
+		}
+	}
+
+	t.Logf("Test phase complete, draining pipeline...")
+	time.Sleep(3 * time.Second)
+	elapsed := time.Since(start)
+	recv := atomic.LoadInt64(&received)
+	sent := atomic.LoadInt64(&realtimeSent)
+	rtDropped := atomic.LoadInt64(&realtimeDropped)
+
+	perEventCost := time.Duration(20*(1+linkTypes)) * time.Microsecond
+	maxConsumerRate := float64(time.Second) / float64(perEventCost)
+
+	t.Logf("========== Large Cluster Results ==========")
+	t.Logf("Duration:           %v", elapsed.Truncate(time.Millisecond))
+	t.Logf("Cache size:         %d", cacheSize)
+	t.Logf("Link types:         %d (per-event cost: %v, max consumer: %.0f/sec)", linkTypes, perEventCost, maxConsumerRate)
+	t.Logf("Realtime sent:      %d (%.0f/sec)", sent, float64(sent)/testDuration.Seconds())
+	t.Logf("Realtime eventCh drop: %d", rtDropped)
+	t.Logf("Received total:     %d (%.0f/sec)", recv, float64(recv)/elapsed.Seconds())
+	t.Logf("Timer interval:     %v", timerInterval)
+	t.Logf("EventCh:            size=%d, drain=%d", eventChSize, drainBatch)
+}
+
 // TestStressTimerOnly isolates the Timer full-sync behavior:
 // no real-time events, just Timer dumps of 238k objects with slow downstream.
 //
