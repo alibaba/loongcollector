@@ -93,6 +93,7 @@ func (m *k8sMetaCache) Filter(filterFunc func(*ObjectWrapper) bool, limit int) [
 }
 
 func (m *k8sMetaCache) RegisterSendFunc(key string, sendFunc SendFunc, interval int, eventChSize int, drainBatch int) {
+	m.ensureWatchStarted()
 	m.metaStore.RegisterSendFunc(key, sendFunc, interval, eventChSize, drainBatch)
 	logger.Debug(context.Background(), "register send func", m.resourceType)
 }
