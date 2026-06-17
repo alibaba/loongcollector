@@ -139,6 +139,12 @@ func (m *metaCollector) Start() error {
 	if resourceTypeCount < 1 {
 		resourceTypeCount = 1
 	}
+	if m.serviceK8sMeta.EventBufferSize < 1 {
+		m.serviceK8sMeta.EventBufferSize = 10000
+	}
+	if m.serviceK8sMeta.MaxBufferSize < 1 {
+		m.serviceK8sMeta.MaxBufferSize = 200000
+	}
 	bufferSize := m.serviceK8sMeta.EventBufferSize * resourceTypeCount
 	if bufferSize > m.serviceK8sMeta.MaxBufferSize {
 		bufferSize = m.serviceK8sMeta.MaxBufferSize
