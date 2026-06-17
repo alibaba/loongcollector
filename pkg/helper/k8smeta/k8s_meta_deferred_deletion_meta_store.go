@@ -309,7 +309,7 @@ func (m *DeferredDeletionMetaStore) handleAddOrUpdateEvent(event *K8sMetaEvent) 
 		select {
 		case f.EventCh <- []*K8sMetaEvent{event}:
 		default:
-			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping event", key)
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping event", "object_key", key)
 		}
 	}
 	m.registerLock.RUnlock()
@@ -335,7 +335,7 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		select {
 		case f.EventCh <- []*K8sMetaEvent{event}:
 		default:
-			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping delete event", key)
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, dropping delete event", "object_key", key)
 		}
 	}
 	m.registerLock.RUnlock()
@@ -398,7 +398,7 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 		select {
 		case f.EventCh <- allItems:
 		default:
-			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer event", timerEvent.ConfigName)
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer event", "config_name", timerEvent.ConfigName)
 		}
 	}
 }
