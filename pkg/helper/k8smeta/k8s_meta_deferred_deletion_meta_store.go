@@ -337,13 +337,13 @@ func (m *DeferredDeletionMetaStore) handleDeleteEvent(event *K8sMetaEvent) {
 		}
 	}
 	m.registerLock.RUnlock()
-	go func() {
-		time.Sleep(time.Duration(m.gracePeriod) * time.Second)
+	// time.AfterFunc avoids a sleeping goroutine per delete during gracePeriod
+	time.AfterFunc(time.Duration(m.gracePeriod)*time.Second, func() {
 		m.eventCh <- &K8sMetaEvent{
 			EventType: EventTypeDeferredDelete,
 			Object:    event.Object,
 		}
-	}()
+	})
 }
 
 func (m *DeferredDeletionMetaStore) handleDeferredDeleteEvent(event *K8sMetaEvent) {
