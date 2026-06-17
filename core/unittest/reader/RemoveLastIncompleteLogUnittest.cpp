@@ -1024,7 +1024,7 @@ private:
             rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
             writer.StartObject();
             writer.Key("log");
-            writer.String((log + "\n").c_str());
+            writer.String((log + "\\n").c_str());
             writer.Key("stream");
             writer.String("stdout");
             writer.Key("time");
@@ -1052,7 +1052,7 @@ void DockerJsonRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncomplet
                                 std::make_pair(&multilineOpts, &ctx),
                                 std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
-    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
+    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
     { // case: end with begin
         {
@@ -1216,7 +1216,7 @@ void DockerJsonRemoveLastIncompleteLogMultilineUnittest::TestRemoveLastIncomplet
                                 std::make_pair(&multilineOpts, &ctx),
                                 std::make_pair(nullptr, &ctx));
     BaseLineParse* baseLineParsePtr = nullptr;
-    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
+    baseLineParsePtr = logFileReader.GetParser<DockerJsonFileParser>(0);
     logFileReader.mLineParsers.emplace_back(baseLineParsePtr);
     { // case: end with end
         {

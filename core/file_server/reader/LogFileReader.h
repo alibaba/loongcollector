@@ -111,7 +111,6 @@ public:
                          bool needSingleLine,
                          std::vector<BaseLineParse*>* lineParsers) override;
     bool parseLine(LineInfo rawLine, LineInfo& paseLine);
-    void mergeLines(LineInfo& resultLine, const LineInfo& additionalLine, bool shouldResetBuffer);
     DockerJsonFileParser(size_t size) : BaseLineParse(size) {}
 };
 

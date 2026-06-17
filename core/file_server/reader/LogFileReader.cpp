@@ -753,7 +753,7 @@ void LogFileReader::checkContainerType(LogFileOperator& op) {
     BaseLineParse* baseLineParsePtr = nullptr;
     if (containerBOMBuffer[0] == '{') {
         mFileLogFormat = LogFormat::DOCKER_JSON_FILE;
-        baseLineParsePtr = GetParser<DockerJsonFileParser>(LogFileReader::BUFFER_SIZE);
+        baseLineParsePtr = GetParser<DockerJsonFileParser>(0);
     } else {
         mFileLogFormat = LogFormat::CONTAINERD_TEXT;
         baseLineParsePtr = GetParser<ContainerdTextParser>(LogFileReader::BUFFER_SIZE);
@@ -2235,13 +2235,12 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
         return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
     if (protocolFunctionIndex == 0) {
+        // 异常情况, DockerJsonFileParse不允许在最后一个解析器
         return LineInfo(StringView(), 0, 0, 0, false, 0);
     }
 
-    LineInfo finalLine;
-    finalLine.fullLine = false;
     size_t nextProtocolFunctionIndex = protocolFunctionIndex - 1;
-
+    LineInfo finalLine;
     while (!finalLine.fullLine) {
         LineInfo rawLine = (*lineParsers)[nextProtocolFunctionIndex]->GetLastLine(
             buffer, end, nextProtocolFunctionIndex, needSingleLine, lineParsers);
@@ -2262,10 +2261,8 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
             rollbackLineFeedCount = 0;
         }
         finalLine = std::move(line);
-        finalLine.data = finalLine.dataRaw;
         finalLine.rollbackLineFeedCount = rollbackLineFeedCount;
         finalLine.forceRollbackLineFeedCount = forceRollbackLineFeedCount;
-        mergeLines(finalLine, finalLine, true);
         if (!finalLine.fullLine) {
             if (finalLine.lineBegin == 0) {
                 return LineInfo(
@@ -2274,52 +2271,15 @@ LineInfo DockerJsonFileParser::GetLastLine(StringView buffer,
             end = finalLine.lineBegin - 1;
         }
     }
-
-    if (finalLine.lineBegin == 0) {
-        finalLine.fullLine = true;
-        return finalLine;
-    }
-    if (needSingleLine) {
-        return finalLine;
-    }
-
-    while (true) {
-        if (finalLine.lineBegin == 0) {
-            finalLine.fullLine = true;
-            break;
-        }
-
-        LineInfo previousLine;
-        LineInfo rawLine = (*lineParsers)[nextProtocolFunctionIndex]->GetLastLine(
-            buffer, finalLine.lineBegin - 1, nextProtocolFunctionIndex, needSingleLine, lineParsers);
-        if (rawLine.data.size() > 0 && rawLine.data.back() == '\n') {
-            rawLine.data = StringView(rawLine.data.data(), rawLine.data.size() - 1);
-        }
-
-        parseLine(rawLine, previousLine);
-        if (previousLine.fullLine) {
-            finalLine.fullLine = true;
-            return finalLine;
-        }
-
-        finalLine.rollbackLineFeedCount += previousLine.rollbackLineFeedCount;
-        finalLine.lineBegin = previousLine.lineBegin;
-
-        mergeLines(finalLine, previousLine, false);
-    }
-
     return finalLine;
 }
 
 bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
     paseLine = rawLine;
+    paseLine.fullLine = false;
     if (rawLine.data.size() == 0) {
-        // Empty lines (e.g. from \n\n) are boundaries — must not be merged backward in Phase 2.
-        paseLine.fullLine = true;
         return false;
     }
-    // Non-empty lines default to Partial until proven to be valid JSON with trailing \n.
-    paseLine.fullLine = false;
     rapidjson::Document doc;
     doc.Parse(rawLine.data.data(), rawLine.data.size());
 
@@ -2342,29 +2302,14 @@ bool DockerJsonFileParser::parseLine(LineInfo rawLine, LineInfo& paseLine) {
         return false;
     }
     StringView content = it->value.GetString();
-    bool hasNewline = (content.size() > 0 && content[content.size() - 1] == '\n');
-    if (hasNewline) {
+    if (content.size() > 0 && content[content.size() - 1] == '\n') {
         content = StringView(content.data(), content.size() - 1);
     }
 
     paseLine.dataRaw = content.to_string();
     paseLine.data = paseLine.dataRaw;
-    paseLine.fullLine = hasNewline;
+    paseLine.fullLine = true;
     return true;
-}
-
-void DockerJsonFileParser::mergeLines(LineInfo& resultLine, const LineInfo& additionalLine, bool shouldResetBuffer) {
-    StringBuffer* buffer = GetStringBuffer();
-    if (shouldResetBuffer) {
-        buffer->size = 0;
-    }
-    char* newDataPosition = buffer->data + buffer->capacity - buffer->size - additionalLine.data.size();
-
-    memcpy(newDataPosition, additionalLine.data.data(), additionalLine.data.size());
-
-    buffer->size += additionalLine.data.size();
-
-    resultLine.data = StringView(newDataPosition, buffer->size);
 }
 
 LineInfo ContainerdTextParser::GetLastLine(StringView buffer,
