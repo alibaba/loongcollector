@@ -1,3 +1,5 @@
+//go:build stress
+
 package k8smeta
 
 import (
@@ -122,7 +124,7 @@ func BenchmarkUpdateFilter(b *testing.B) {
 //   - Timer full-sync every timerInterval seconds (dumps all objects at once)
 //   - downstream consumption ~200 events/sec (simulated by sleep in SendFunc)
 //
-// Run with: go test -count=1 -v -run TestStressRealistic github.com/alibaba/ilogtail/pkg/helper/k8smeta
+// Run with: go test -tags stress -count=1 -v -run TestStressRealistic github.com/alibaba/ilogtail/pkg/helper/k8smeta
 func TestStressRealistic(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping stress test in short mode")
@@ -227,7 +229,7 @@ loop:
 // TestStressLargeCluster simulates a 560k-object cluster with 15+ link types.
 // Each event in the consumer goroutine triggers ~16x processing (1 entity + 15 links).
 //
-// Run with: go test -count=1 -v -run TestStressLargeCluster github.com/alibaba/ilogtail/pkg/helper/k8smeta
+// Run with: go test -tags stress -count=1 -v -run TestStressLargeCluster github.com/alibaba/ilogtail/pkg/helper/k8smeta
 func TestStressLargeCluster(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping stress test in short mode")
@@ -340,7 +342,7 @@ loop:
 // TestStressTimerOnly isolates the Timer full-sync behavior:
 // no real-time events, just Timer dumps of 238k objects with slow downstream.
 //
-// Run with: go test -count=1 -v -run TestStressTimerOnly github.com/alibaba/ilogtail/pkg/helper/k8smeta
+// Run with: go test -tags stress -count=1 -v -run TestStressTimerOnly github.com/alibaba/ilogtail/pkg/helper/k8smeta
 func TestStressTimerOnly(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping stress test in short mode")
