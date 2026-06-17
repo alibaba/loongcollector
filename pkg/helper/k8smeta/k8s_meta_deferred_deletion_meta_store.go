@@ -379,6 +379,11 @@ func (m *DeferredDeletionMetaStore) handleTimerEvent(event *K8sMetaEvent) {
 	m.registerLock.RLock()
 	defer m.registerLock.RUnlock()
 	if f, ok := m.sendFuncs[timerEvent.ConfigName]; ok {
+		// skip building the full snapshot if EventCh is already full
+		if len(f.EventCh) == cap(f.EventCh) {
+			logger.Warning(context.Background(), K8sMetaUnifyErrorCode, "send buffer full, skipping timer snapshot build", "config_name", timerEvent.ConfigName)
+			return
+		}
 		allItems := make([]*K8sMetaEvent, 0, len(m.Items))
 		m.lock.RLock()
 		for _, obj := range m.Items {
