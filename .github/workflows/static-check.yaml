@@ -39,11 +39,11 @@ jobs:
   LicensesCheck:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        runner: [loongcollector-small-runner]
+        runner: [ubuntu]
       fail-fast: true
     steps:
       - name: Set up Go
@@ -65,11 +65,11 @@ jobs:
   StaticCheck:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        runner: [loongcollector-small-runner]
+        runner: [ubuntu]
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
@@ -101,11 +101,11 @@ jobs:
   UnitTestGo:
     env:
       RUNNER_ALLOW_RUNASROOT: 1
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}-latest
     timeout-minutes: 60
     strategy:
       matrix:
-        runner: [loongcollector-small-runner]
+        runner: [ubuntu]
       fail-fast: true
     steps:
       - name: prepare ubuntu environment
