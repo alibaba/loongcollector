@@ -136,15 +136,17 @@ func (m *DeferredDeletionMetaStore) Filter(filterFunc func(*ObjectWrapper) bool,
 // Returns true if StopCh was triggered and the caller should exit.
 func (s *SendFuncWithStopCh) sendBatch(events []*K8sMetaEvent) bool {
 	if len(events) > s.DrainBatch {
+		throttle := time.NewTimer(50 * time.Millisecond)
+		defer throttle.Stop()
 		for i := 0; i < len(events); i += s.DrainBatch {
 			end := i + s.DrainBatch
 			if end > len(events) {
 				end = len(events)
 			}
 			s.SendFunc(events[i:end])
-			// not a timer leak: limited iterations, each timer fires in 50ms and is GC'd
 			select {
-			case <-time.After(50 * time.Millisecond):
+			case <-throttle.C:
+				throttle.Reset(50 * time.Millisecond)
 			case <-s.StopCh:
 				return true
 			}
