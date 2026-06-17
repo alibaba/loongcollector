@@ -134,7 +134,7 @@ jobs:
       - LicensesCheck
       - StaticCheck
       - UnitTestGo
-    runs-on: ubuntu-latest
+    runs-on: loongcollector-small-runner
     permissions:
       actions: read
     steps:
