@@ -1,15 +1,13 @@
 name: Request Copilot Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, ready_for_review]
 
 jobs:
   request-copilot-review:
-    # Skip draft PRs and PRs from forks (secrets are unavailable for forks)
-    if: |
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+    # Skip draft PRs; fork PRs are supported via pull_request_target (secrets available)
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     # Allow the job to pass even when steps fail, so it never blocks PR merge
     continue-on-error: true
